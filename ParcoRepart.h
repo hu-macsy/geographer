@@ -16,6 +16,6 @@ namespace ITI {
 			/**
 			* Partition the input graph given by the edge lists. 
 			*/
-			static DenseVector<IndexType> partitionGraph(Matrix &input, DenseVector<ValueType> &coordinates, IndexType dimensions,	IndexType k,  double epsilon = 0.05);
+			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, DenseVector<ValueType> &coordinates, IndexType dimensions,	IndexType k,  double epsilon = 0.05);
 	};
 }

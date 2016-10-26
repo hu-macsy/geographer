@@ -79,6 +79,8 @@ TEST_F(ParcoRepartTest, testPartitionBalance) {
     subsetSizes[partID] += 1;
   }
   IndexType optSize = std::ceil(n / k);
+
+  //in a distributed setting, this would need to be communicated and summed
   EXPECT_LE(*std::max_element(subsetSizes.begin(), subsetSizes.end()), (1+epsilon)*optSize);
 
 }
