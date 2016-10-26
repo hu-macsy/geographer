@@ -53,6 +53,7 @@ TEST_F(ParcoRepartTest, testPartitionBalance) {
   scai::lama::CSRSparseMatrix<ValueType>a(n,n);
   scai::lama::MatrixCreator::fillRandom(a, 0.01);
   IndexType dim = 2;
+  ValueType epsilon = 0.05;
 
   scai::lama::DenseVector<ValueType> coordinates(dim*n, 0);
   for (IndexType i = 0; i < nroot; i++) {
@@ -62,7 +63,7 @@ TEST_F(ParcoRepartTest, testPartitionBalance) {
     }
   }
 
-  scai::lama::DenseVector<ValueType> partition = ParcoRepart<ValueType>::partitionGraph(a, coordinates, dim,  k);
+  scai::lama::DenseVector<ValueType> partition = ParcoRepart<ValueType>::partitionGraph(a, coordinates, dim,  k, epsilon);
 
   EXPECT_EQ(n, partition.size());
   EXPECT_EQ(0, partition.min().getValue<ValueType>());
@@ -77,6 +78,8 @@ TEST_F(ParcoRepartTest, testPartitionBalance) {
     EXPECT_GE(partID, 0);
     subsetSizes[partID] += 1;
   }
+  IndexType optSize = std::ceil(n / k);
+  EXPECT_LE(*std::max_element(subsetSizes.begin(), subsetSizes.end()), (1+epsilon)*optSize);
 
 }
 
