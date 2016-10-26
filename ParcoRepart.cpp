@@ -9,6 +9,7 @@
 
 #include <assert.h>
 #include <cmath>
+#include <climits>
 
 #include "ParcoRepart.h"
 
@@ -53,6 +54,44 @@ ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const C
 }
 
 template<typename IndexType, typename ValueType>
+static ValueType getHilbertIndex(const DenseVector<ValueType> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
+	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
+
+	if (dimensions != 2) {
+		throw std::logic_error("Space filling curve currently only implemented for two dimensions");
+	}
+
+	scai::dmemo::DistributionPtr coordDist = coordinates.getDistributionPtr();
+
+	if (coordDist->getLocalSize() % int(dimensions) != 0) {
+		throw std::runtime_error("Size of coordinate vector no multiple of dimension. Maybe it was split in the distribution?");
+	}
+
+	size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
+	if (recursionDepth > bitsInValueType/dimensions) {
+		throw std::runtime_error("A space-filling curve that precise won't fit into the return datatype.");
+	}
+
+	if (!coordDist->isLocal(index*dimensions)) {
+		throw std::runtime_error("Coordinate with index" + std::to_string(index) + " is not present on this process.");
+	}
+
+	std::vector<ValueType> scaledCoord(dimensions);
+
+	for (IndexType dim = 0; dim < dimensions; dim++) {
+		scaledCoord[dim] = (coordinates[index*dimensions + dim] - minCoords[dim]) / (maxCoords[dim] - minCoords[dim]);
+	}
+
+	ValueType result = 0;
+	for (IndexType i = 0; i < recursionDepth; i++) {
+		
+	}
+
+
+}
+
+
+template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, DenseVector<ValueType> &coordinates,
 					IndexType dimensions,	IndexType k,  double epsilon) 
 {
@@ -86,7 +125,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	const IndexType localN = inputDist->getLocalSize();
 
 	if (coordDist->getLocalSize() % int(dimensions) != 0) {
-		throw std::runtime_error("Coordinate was split during distribution, redistribute first.");
+		throw std::runtime_error("Size of coordinate vector no multiple of dimension. Maybe it was split in the distribution?");
 	}
 
 	if (coordDist->getLocalSize() != dimensions*localN) {
@@ -118,19 +157,26 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	*	create space filling curve indices
 	*/
 
+
 	//sort them
 
 	/**
 	*	check for uniqueness. If not unique, level of detail was insufficient.
 	*/
+	std::vector<ValueType> hilbertIndices(localN);//in the distributed version, this vector needs to be distributed as well
+
 
 	/**
 	* initial partitioning. Upgrade to chains-on-chains-partitioning later
 	*/
 
+
+
 	/**
 	* local refinement, use Fiduccia-Mattheyses
 	*/
+
+
 
 	//dummy result
 	DenseVector<IndexType> result(input.getNumRows(),0);
