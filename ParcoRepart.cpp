@@ -6,11 +6,51 @@
  */
 
 #include <scai/dmemo/Distribution.hpp>
+
 #include <assert.h>
+#include <cmath>
 
 #include "ParcoRepart.h"
 
 namespace ITI {
+
+template<typename IndexType, typename ValueType>
+ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const CSRSparseMatrix<ValueType> &input, const DenseVector<ValueType> &coordinates,
+ IndexType dimensions) {
+	// iterate through matrix to find closest neighbours, implying necessary recursion depth for space-filling curve
+	// here it can happen that the closest neighbor is not stored on this processor.
+
+	const scai::dmemo::DistributionPtr coordDist = coordinates.getDistributionPtr();
+	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+	const IndexType localN = inputDist->getLocalSize();
+
+	const CSRStorage<ValueType> localStorage = input.getLocalStorage();
+	const scai::utilskernel::LArray<ValueType> localPartOfCoords = coordinates.getLocalValues();
+
+	const scai::utilskernel::LArray<IndexType> ia = localStorage.getIA();
+    const scai::utilskernel::LArray<IndexType> ja = localStorage.getJA();
+    assert(ia.size() == localN+1);
+
+    ValueType minDistanceSquared = std::numeric_limits<ValueType>::max();
+	for (IndexType i = 0; i < localN; i++) {
+		const IndexType beginCols = ia[i];
+		const IndexType endCols = ia[i+1];//assuming replicated columns
+		for (IndexType j = beginCols; j < endCols; j++) {
+			IndexType neighbor = ja[j];
+			if (coordDist->isLocal(neighbor)) {
+				ValueType distanceSquared = 0;
+				for (IndexType dim = 0; dim < dimensions; dim++) {
+					ValueType diff = localPartOfCoords[i*dimensions + dim] - localPartOfCoords[neighbor*dimensions + dim];
+					distanceSquared += diff*diff;
+				}
+				if (distanceSquared < minDistanceSquared) minDistanceSquared = distanceSquared;
+			}
+		}
+	}
+
+	const ValueType minDistance = std::sqrt(minDistanceSquared);
+	return minDistance;
+}
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, DenseVector<ValueType> &coordinates,
@@ -71,37 +111,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		}
 	}
 
-	// iterate through matrix to find closest neighbours, implying necessary recursion depth for space-filling curve
-	// here it can happen that the closest neighbor is not stored on this processor.
-	const CSRStorage<ValueType> localStorage = input.getLocalStorage();
-
-	const scai::utilskernel::LArray<IndexType> ia = localStorage.getIA();
-    const scai::utilskernel::LArray<IndexType> ja = localStorage.getJA();
-    assert(ia.size() == localN+1);
-
-    ValueType minDistance = std::numeric_limits<ValueType>::max();
-	for (IndexType i = 0; i < localN; i++) {
-		scai::utilskernel::LArray<ValueType> thisCoords(dimensions);
-		for (IndexType dim = 0; dim < dimensions; dim++) {
-			thisCoords[dim] = localPartOfCoords[i*dimensions + dim];
-		}
-
-		const IndexType beginCols = ia[i];
-		const IndexType endCols = ia[i+1];//assuming replicated columns
-		for (IndexType j = beginCols; j < endCols; j++) {
-			IndexType neighbor = ja[j];
-			if (coordDist->isLocal(neighbor)) {
-				scai::utilskernel::LArray<ValueType> neighborCoords(dimensions);
-				for (IndexType dim = 0; dim < dimensions; dim++) {
-					neighborCoords[dim] = localPartOfCoords[neighbor*dimensions + dim];
-				}
-				neighborCoords -= thisCoords;
-				const ValueType distance = neighborCoords.l2Norm();
-				if (distance < minDistance) minDistance = distance;
-			}
-		}
-	}
-
+	//the following is ~5% faster if manually inlined, probably because localPartOfCoords doesn't have to be computed twice
+	const ValueType minDistance = getMinimumNeighbourDistance(input, coordinates, dimensions);
 
 	/**
 	*	create space filling curve indices
@@ -118,7 +129,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	*/
 
 	/**
-	*
+	* local refinement, use Fiduccia-Mattheyses
 	*/
 
 	//dummy result
