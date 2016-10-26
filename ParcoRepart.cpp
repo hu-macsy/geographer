@@ -9,11 +9,10 @@
 
 namespace ITI {
 
-template<typename IndexType>
-scai::lama::DenseVector<IndexType> ParcoRepart<IndexType>::partitionGraph(scai::lama::Matrix &input, scai::lama::Vector &coordinates,
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(Matrix &input, DenseVector<ValueType> &coordinates,
 					IndexType dimensions,	IndexType k,  double epsilon) 
 {
-
 	/**
 	* check input arguments for sanity
 	*/
@@ -33,7 +32,19 @@ scai::lama::DenseVector<IndexType> ParcoRepart<IndexType>::partitionGraph(scai::
 	}
 
 	/**
-	* create space filling curve indices
+	*	gather information for space-filling curves
+	*/
+	//std::vector<
+
+
+	/**
+	*	create space filling curve indices
+	*/
+
+	//sort them
+
+	/**
+	*	check for uniqueness
 	*/
 
 	DenseVector<IndexType> result(input.getNumRows(),0);
@@ -41,7 +52,7 @@ scai::lama::DenseVector<IndexType> ParcoRepart<IndexType>::partitionGraph(scai::
 }
 
 //to force instantiation
-template scai::lama::DenseVector<double> ParcoRepart<double>::partitionGraph(scai::lama::Matrix &input, scai::lama::Vector &coordinates,
+template DenseVector<double> ParcoRepart<double, double>::partitionGraph(Matrix &input, DenseVector<double> &coordinates,
 					double dimensions,	double k,  double epsilon);
 
 }

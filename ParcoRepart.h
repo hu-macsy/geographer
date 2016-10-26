@@ -10,12 +10,12 @@
 using namespace scai::lama;
 
 namespace ITI {
-	template <typename IndexType>
+	template <typename IndexType, typename ValueType>
 	class ParcoRepart {
 		public:
 			/**
 			* Partition the input graph given by the edge lists. 
 			*/
-			static DenseVector<IndexType> partitionGraph(Matrix &input, Vector &coordinates, IndexType dimensions,	IndexType k,  double epsilon = 0.05);
+			static DenseVector<IndexType> partitionGraph(Matrix &input, DenseVector<ValueType> &coordinates, IndexType dimensions,	IndexType k,  double epsilon = 0.05);
 	};
 }

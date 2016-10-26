@@ -41,7 +41,7 @@ TEST_F(ParcoRepartTest, testPartitionerInterface) {
  		}
  	}
 
- 	scai::lama::DenseVector<ValueType> partition = ParcoRepart<ValueType>::partitionGraph(a, coordinates, dim,	k);
+ 	scai::lama::DenseVector<ValueType> partition = ParcoRepart<ValueType, ValueType>::partitionGraph(a, coordinates, dim,	k);
 
   EXPECT_EQ(partition.size(), n);
 }
@@ -63,7 +63,7 @@ TEST_F(ParcoRepartTest, testPartitionBalance) {
     }
   }
 
-  scai::lama::DenseVector<ValueType> partition = ParcoRepart<ValueType>::partitionGraph(a, coordinates, dim,  k, epsilon);
+  scai::lama::DenseVector<ValueType> partition = ParcoRepart<ValueType, ValueType>::partitionGraph(a, coordinates, dim,  k, epsilon);
 
   EXPECT_EQ(n, partition.size());
   EXPECT_EQ(0, partition.min().getValue<ValueType>());
@@ -89,9 +89,3 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-/**
-   if (partition.max() >= k) {
-    std::cout << "Highest index is " << partition.max() << " instead of " << k-1 << std::endl;
-    return 11;
-   }
-   */
