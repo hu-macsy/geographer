@@ -38,7 +38,7 @@ ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const C
 		const IndexType endCols = ia[i+1];//assuming replicated columns
 		for (IndexType j = beginCols; j < endCols; j++) {
 			IndexType neighbor = ja[j];
-			if (coordDist->isLocal(neighbor)) {
+			if (neighbor != i && coordDist->isLocal(neighbor)) {
 				ValueType distanceSquared = 0;
 				for (IndexType dim = 0; dim < dimensions; dim++) {
 					ValueType diff = localPartOfCoords[i*dimensions + dim] - localPartOfCoords[neighbor*dimensions + dim];
@@ -82,9 +82,23 @@ static ValueType getHilbertIndex(const DenseVector<ValueType> &coordinates, Inde
 		scaledCoord[dim] = (coordinates[index*dimensions + dim] - minCoords[dim]) / (maxCoords[dim] - minCoords[dim]);
 	}
 
-	ValueType result = 0;
+	long integerIndex = 0;//TODO: also check whether this data type is long enough
 	for (IndexType i = 0; i < recursionDepth; i++) {
-		
+		int subSquare;
+		//two dimensions only, for now
+		if (scaledCoord[0] < 0.5) {
+			if (scaledCoord[1] < 0.5) {
+				subSquare = 0;
+			} else {
+				subSquare = 1;
+			}
+		} else {
+			if (scaledCoord[1] < 0.5) {
+				subSquare = 3;
+			} else {
+				subSquare = 2;
+			}
+		}
 	}
 
 
