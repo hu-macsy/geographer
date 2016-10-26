@@ -11,11 +11,26 @@ namespace ITI {
 
 template<typename IndexType>
 scai::lama::DenseVector<IndexType> ParcoRepart<IndexType>::partitionGraph(scai::lama::Matrix &input, scai::lama::Vector &coordinates,
-					IndexType dimensions,	IndexType k,  double epsilon) {
+					IndexType dimensions,	IndexType k,  double epsilon) 
+{
 
 	/**
 	* check input arguments for sanity
 	*/
+	IndexType n = input.getNumRows();
+	if (n != (coordinates.size()/dimensions)) {
+		throw std::runtime_error("Matrix has " + std::to_string(n) + " rows, but " + std::to_string(coordinates.size())
+		 + " coordinates are given.");
+	}
+	if (n != input.getNumColumns()) {
+		throw std::runtime_error("Matrix must be quadratic.");
+	}
+	if (k > n) {
+		throw std::runtime_error("Creating " + std::to_string(k) + " blocks from " + std::to_string(n) + " elements is impossible.");
+	}
+	if (epsilon < 0) {
+		throw std::runtime_error("Epsilon" + std::to_string(epsilon) + " invalid.");
+	}
 
 	/**
 	* create space filling curve indices
