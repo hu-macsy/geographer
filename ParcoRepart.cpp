@@ -25,11 +25,11 @@ ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const C
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	const IndexType localN = inputDist->getLocalSize();
 
-	const CSRStorage<ValueType> localStorage = input.getLocalStorage();
-	const scai::utilskernel::LArray<ValueType> localPartOfCoords = coordinates.getLocalValues();
+	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
+	const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates.getLocalValues();
 
-	const scai::utilskernel::LArray<IndexType> ia = localStorage.getIA();
-    const scai::utilskernel::LArray<IndexType> ja = localStorage.getJA();
+	const scai::utilskernel::LArray<IndexType>& ia = localStorage.getIA();
+    const scai::utilskernel::LArray<IndexType>& ja = localStorage.getJA();
     assert(ia.size() == localN+1);
 
     ValueType minDistanceSquared = std::numeric_limits<ValueType>::max();
