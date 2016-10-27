@@ -53,6 +53,7 @@ ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const C
 	return minDistance;
 }
 
+//TODO: refactor to get all the indices at the same time. Alternative: Don't use distributed vectors.
 template<typename IndexType, typename ValueType>
 ValueType ParcoRepart<IndexType, ValueType>::getHilbertIndex(const DenseVector<ValueType> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
 	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
@@ -76,7 +77,7 @@ ValueType ParcoRepart<IndexType, ValueType>::getHilbertIndex(const DenseVector<V
 		throw std::runtime_error("Coordinate with index " + std::to_string(index) + " is not present on this process.");
 	}
 
-	const scai::utilskernel::LArray<ValueType> myCoords = coordinates.getLocalValues();
+	const scai::utilskernel::LArray<ValueType>& myCoords = coordinates.getLocalValues();
 	std::vector<ValueType> scaledCoord(dimensions);
 
 	for (IndexType dim = 0; dim < dimensions; dim++) {
@@ -232,7 +233,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 
 	/**
-	* initial partitioning. Upgrade to chains-on-chains-partitioning later
+	* initial partitioning with sfc. Upgrade to chains-on-chains-partitioning later
 	*/
 	DenseVector<IndexType> result(n,0);//not distributed right now
 	for (IndexType i = 0; i < n; i++) {
