@@ -120,7 +120,7 @@ ValueType ParcoRepart<IndexType, ValueType>::getHilbertIndex(const DenseVector<V
 		integerIndex = (integerIndex << 2) | subSquare;
 	}
 
-	long divisor = 1 << (2*recursionDepth+1);
+	long divisor = 1 << (2*int(recursionDepth)+1);
 	return double(integerIndex) / double(divisor);
 }
 
@@ -184,26 +184,52 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		}
 	}
 
+	ValueType maxExtent = 0;
+	for (IndexType dim = 0; dim < dimensions; dim++) {
+		if (maxCoords[dim] - minCoords[dim] > maxExtent) {
+			maxExtent = maxCoords[dim] - minCoords[dim];
+		}
+	}
+
 	//the following is ~5% faster if manually inlined, probably because localPartOfCoords doesn't have to be computed twice
 	const ValueType minDistance = getMinimumNeighbourDistance(input, coordinates, dimensions);
+	const IndexType recursionDepth = std::ceil(std::log2(maxExtent / minDistance) / 2);
 
 	/**
-	*	create space filling curve indices
+	*	create space filling curve indices. Since lama sorting is not yet available, we first gather the vector locally, then sort it, then redistribute it
 	*/
 
+	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n*dimensions));
+	coordinates.redistribute(noDistPointer);
+	assert(coordinates.getDistributionPtr()->getLocalSize() == n*dimensions);
+	std::cout << "Redistributed coordinates." << std::endl;
 
-	//sort them
+	std::vector<IndexType> allGlobalIndices(n);
+	IndexType p = 0;
+	std::generate(allGlobalIndices.begin(), allGlobalIndices.end(), [&p](){return p++;});
+	
+	std::vector<ValueType> hilbertIndices(n);
+	for (IndexType i = 0; i < n; i++) {
+		IndexType globalIndex = inputDist->local2global(i);
+		ValueType globalHilbertIndex = ParcoRepart<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, globalIndex, recursionDepth, minCoords, maxCoords);
+		hilbertIndices[globalIndex] = globalHilbertIndex;
+	}
+
+	std::sort(allGlobalIndices.begin(), allGlobalIndices.end(), [&hilbertIndices](IndexType i, IndexType j){return hilbertIndices[i] < hilbertIndices[j];});
+
 
 	/**
-	*	check for uniqueness. If not unique, level of detail was insufficient.
+	* check for uniqueness. If not unique, level of detail was insufficient.
 	*/
-	std::vector<ValueType> hilbertIndices(localN);//in the distributed version, this vector needs to be distributed as well
 
 
 	/**
 	* initial partitioning. Upgrade to chains-on-chains-partitioning later
 	*/
-
+	DenseVector<IndexType> result(n,0);//not distributed right now
+	for (IndexType i = 0; i < n; i++) {
+		result.setValue(allGlobalIndices[i], int(k*i / n));
+	}
 
 
 	/**
@@ -213,7 +239,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 
 	//dummy result
-	DenseVector<IndexType> result(input.getNumRows(),0);
 	return result;
 }
 

@@ -19,6 +19,6 @@ namespace ITI {
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, DenseVector<ValueType> &coordinates, IndexType dimensions,	IndexType k,  double epsilon = 0.05);
 			static ValueType getMinimumNeighbourDistance(const CSRSparseMatrix<ValueType> &input, const DenseVector<ValueType> &coordinates, IndexType dimensions);
 			static ValueType getHilbertIndex(const DenseVector<ValueType> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
-			 const std::vector<ValueType> &minCoord, const std::vector<ValueType> &maxCoords);
+			 const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 	};
 }
