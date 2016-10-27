@@ -73,16 +73,19 @@ ValueType ParcoRepart<IndexType, ValueType>::getHilbertIndex(const DenseVector<V
 	}
 
 	if (!coordDist->isLocal(index*dimensions)) {
-		throw std::runtime_error("Coordinate with index" + std::to_string(index) + " is not present on this process.");
+		throw std::runtime_error("Coordinate with index " + std::to_string(index) + " is not present on this process.");
 	}
 
+	const scai::utilskernel::LArray<ValueType> myCoords = coordinates.getLocalValues();
 	std::vector<ValueType> scaledCoord(dimensions);
 
 	for (IndexType dim = 0; dim < dimensions; dim++) {
-		const Scalar coord = coordinates.getValue(index*dimensions + dim);
+		assert(coordDist->isLocal(index*dimensions+dim));
+		const Scalar coord = myCoords[coordDist->global2local(index*dimensions+dim)];
 		scaledCoord[dim] = (coord.getValue<ValueType>() - minCoords[dim]) / (maxCoords[dim] - minCoords[dim]);
 		if (scaledCoord[dim] < 0 || scaledCoord[dim] > 1) {
-			throw std::runtime_error("Coordinate " + std::to_string(coord.getValue<ValueType>()) + " does not agree with bounds "
+			throw std::runtime_error("Coordinate " + std::to_string(coord.getValue<ValueType>()) + " at position " 
+				+ std::to_string(index*dimensions + dim) + " does not agree with bounds "
 				+ std::to_string(minCoords[dim]) + " and " + std::to_string(maxCoords[dim]));
 		}
 	}

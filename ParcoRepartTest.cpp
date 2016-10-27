@@ -49,6 +49,53 @@ TEST_F(ParcoRepartTest, testHilbertIndexUnitSquare) {
   EXPECT_LT(indices[2], indices[3]);
 }
 
+TEST_F(ParcoRepartTest, testHilbertIndexDistributedRandom) {
+  const IndexType dimensions = 2;
+  const IndexType n = 2;
+  const IndexType recursionDepth = 5;
+  scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n*dimensions) );
+  DenseVector<ValueType> coordinates(dist);
+
+  coordinates.setRandom(dist);
+
+  scai::dmemo::DistributionPtr distIndices ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+
+  const IndexType localN = dist->getLocalSize()/dimensions;
+  //std::cout << localN << std::endl;
+
+  std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
+  std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
+
+  const scai::utilskernel::LArray<ValueType> localPartOfCoords = coordinates.getLocalValues();
+  assert((localPartOfCoords.size() / dimensions) == localN);
+  for (IndexType i = 0; i < localN; i++) {
+    for (IndexType dim = 0; dim < dimensions; dim++) {
+      ValueType coord = localPartOfCoords[i*dimensions + dim];
+      //std::cout << *comm << ", " << i << "." << dim << ":" << coord << std::endl;
+      if (coord < minCoords[dim]) minCoords[dim] = coord;
+      if (coord > maxCoords[dim]) maxCoords[dim] = coord;
+    }
+  }
+  
+  //communicate minima/maxima over processors
+  for (IndexType dim = 0; dim < dimensions; dim++) {
+    ValueType globalMin = comm->min(minCoords[dim]);
+    ValueType globalMax = comm->max(maxCoords[dim]);
+    assert(globalMin <= minCoords[dim]);
+    assert(globalMax >= maxCoords[dim]);
+    minCoords[dim] = globalMin;
+    maxCoords[dim] = globalMax;
+  }
+
+  std::vector<ValueType> indices(localN);
+  for (IndexType i = 0; i < localN; i++) {
+    indices[i] = ParcoRepart<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, distIndices->local2global(i), recursionDepth ,minCoords, maxCoords);
+    EXPECT_LE(indices[i], 1);
+    EXPECT_GE(indices[i], 0);
+  }
+}
+
 TEST_F(ParcoRepartTest, testPartitionerInterface) {
 	IndexType nroot = 100;
 	IndexType n = nroot * nroot;
