@@ -54,7 +54,7 @@ ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const C
 }
 
 template<typename IndexType, typename ValueType>
-static ValueType getHilbertIndex(const DenseVector<ValueType> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
+ValueType ParcoRepart<IndexType, ValueType>::getHilbertIndex(const DenseVector<ValueType> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
 	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
 
 	if (dimensions != 2) {
@@ -79,7 +79,12 @@ static ValueType getHilbertIndex(const DenseVector<ValueType> &coordinates, Inde
 	std::vector<ValueType> scaledCoord(dimensions);
 
 	for (IndexType dim = 0; dim < dimensions; dim++) {
-		scaledCoord[dim] = (coordinates[index*dimensions + dim] - minCoords[dim]) / (maxCoords[dim] - minCoords[dim]);
+		const Scalar coord = coordinates.getValue(index*dimensions + dim);
+		scaledCoord[dim] = (coord.getValue<ValueType>() - minCoords[dim]) / (maxCoords[dim] - minCoords[dim]);
+		if (scaledCoord[dim] < 0 || scaledCoord[dim] > 1) {
+			throw std::runtime_error("Coordinate " + std::to_string(coord.getValue<ValueType>()) + " does not agree with bounds "
+				+ std::to_string(minCoords[dim]) + " and " + std::to_string(maxCoords[dim]));
+		}
 	}
 
 	long integerIndex = 0;//TODO: also check whether this data type is long enough
@@ -89,19 +94,34 @@ static ValueType getHilbertIndex(const DenseVector<ValueType> &coordinates, Inde
 		if (scaledCoord[0] < 0.5) {
 			if (scaledCoord[1] < 0.5) {
 				subSquare = 0;
+				//apply inverse hilbert operator
+				scaledCoord[0] *= 2;
+				scaledCoord[1] *= 2;
 			} else {
 				subSquare = 1;
+				//apply inverse hilbert operator
+				scaledCoord[0] *= 2;
+				scaledCoord[1] = scaledCoord[1] * 2-1;
 			}
 		} else {
 			if (scaledCoord[1] < 0.5) {
 				subSquare = 3;
+				//apply inverse hilbert operator
+				scaledCoord[0] = -2*scaledCoord[0]+1;
+				scaledCoord[1] = -2*scaledCoord[1]*2+2;
+
 			} else {
 				subSquare = 2;
+				//apply inverse hilbert operator
+				scaledCoord[0] = 2*scaledCoord[0]-1;
+				scaledCoord[1] = 2*scaledCoord[1]-1;
 			}
 		}
+		integerIndex = (integerIndex << 2) | subSquare;
 	}
 
-
+	long divisor = 1 << (2*recursionDepth+1);
+	return double(integerIndex) / double(divisor);
 }
 
 
@@ -200,5 +220,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 //to force instantiation
 template DenseVector<double> ParcoRepart<double, double>::partitionGraph(CSRSparseMatrix<double> &input, DenseVector<double> &coordinates,
 					double dimensions,	double k,  double epsilon);
+
+template double ParcoRepart<int, double>::getHilbertIndex(const DenseVector<double> &coordinates, int dimensions, int index, int recursionDepth,
+	const std::vector<double> &minCoords, const std::vector<double> &maxCoords);
 
 }

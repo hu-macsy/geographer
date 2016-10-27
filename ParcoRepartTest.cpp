@@ -5,6 +5,9 @@
 
 #include <scai/dmemo/BlockDistribution.hpp>
 
+#include <scai/hmemo/Context.hpp>
+#include <scai/hmemo/HArray.hpp>
+
 #include <scai/utilskernel/LArray.hpp>
 #include <scai/lama/Vector.hpp>
 
@@ -24,6 +27,27 @@ namespace ITI {
 class ParcoRepartTest : public ::testing::Test {
 
 };
+
+TEST_F(ParcoRepartTest, testHilbertIndexUnitSquare) {
+  const IndexType dimensions = 2;
+  const IndexType n = 4;
+  const IndexType recursionDepth = 5;
+  ValueType tempArray[8] = {0.1,0.1, 0.1, 0.6, 0.7, 0.7, 0.8, 0.1};
+  DenseVector<ValueType> coordinates(n*dimensions, 0);
+  coordinates.setValues(scai::hmemo::HArray<ValueType>(8, tempArray));
+  const std::vector<ValueType> minCoords({0,0});
+  const std::vector<ValueType> maxCoords({1,1});
+
+  std::vector<ValueType> indices(n);
+  for (IndexType i = 0; i < n; i++) {
+    indices[i] = ParcoRepart<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, i, recursionDepth ,minCoords, maxCoords);
+    EXPECT_LE(indices[i], 1);
+    EXPECT_GE(indices[i], 0);
+  }
+  EXPECT_LT(indices[0], indices[1]);
+  EXPECT_LT(indices[1], indices[2]);
+  EXPECT_LT(indices[2], indices[3]);
+}
 
 TEST_F(ParcoRepartTest, testPartitionerInterface) {
 	IndexType nroot = 100;
