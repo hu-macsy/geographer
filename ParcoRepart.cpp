@@ -196,26 +196,31 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	const IndexType recursionDepth = std::ceil(std::log2(maxExtent / minDistance) / 2);
 
 	/**
-	*	create space filling curve indices. Since lama sorting is not yet available, we first gather the vector locally, then sort it, then redistribute it
+	*	create space filling curve indices.
 	*/
+	
+	scai::lama::DenseVector<ValueType> hilbertIndices(inputDist);
+	for (IndexType i = 0; i < localN; i++) {
+		IndexType globalIndex = inputDist->local2global(i);
+		ValueType globalHilbertIndex = ParcoRepart<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, globalIndex, recursionDepth, minCoords, maxCoords);
+		hilbertIndices.setValue(globalIndex, globalHilbertIndex);
+	}
 
-	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n*dimensions));
-	coordinates.redistribute(noDistPointer);
-	assert(coordinates.getDistributionPtr()->getLocalSize() == n*dimensions);
-	std::cout << "Redistributed coordinates." << std::endl;
+	/**
+	* now sort the global indices by where they are on the space-filling curve. Since distributed sorting is not yet available, we gather them all and sort them locally
+	*/
+	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+	hilbertIndices.redistribute(noDistPointer);
+
+	assert(hilbertIndices.getDistributionPtr()->getLocalSize() == n);
+	
+	const scai::utilskernel::LArray<ValueType> allHilbertIndices = hilbertIndices.getLocalValues();
 
 	std::vector<IndexType> allGlobalIndices(n);
 	IndexType p = 0;
 	std::generate(allGlobalIndices.begin(), allGlobalIndices.end(), [&p](){return p++;});
-	
-	std::vector<ValueType> hilbertIndices(n);
-	for (IndexType i = 0; i < n; i++) {
-		IndexType globalIndex = inputDist->local2global(i);
-		ValueType globalHilbertIndex = ParcoRepart<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, globalIndex, recursionDepth, minCoords, maxCoords);
-		hilbertIndices[globalIndex] = globalHilbertIndex;
-	}
 
-	std::sort(allGlobalIndices.begin(), allGlobalIndices.end(), [&hilbertIndices](IndexType i, IndexType j){return hilbertIndices[i] < hilbertIndices[j];});
+	std::sort(allGlobalIndices.begin(), allGlobalIndices.end(), [&allHilbertIndices](IndexType i, IndexType j){return allHilbertIndices[i] < allHilbertIndices[j];});
 
 
 	/**
