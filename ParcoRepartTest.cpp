@@ -78,7 +78,7 @@ TEST_F(ParcoRepartTest, testHilbertIndexDistributedRandom) {
     }
   }
   
-  //communicate minima/maxima over processors
+  //communicate minima/maxima over processors. Not strictly necessary right now, since the RNG creates the same vector on all processors.
   for (IndexType dim = 0; dim < dimensions; dim++) {
     ValueType globalMin = comm->min(minCoords[dim]);
     ValueType globalMax = comm->max(maxCoords[dim]);
@@ -96,28 +96,37 @@ TEST_F(ParcoRepartTest, testHilbertIndexDistributedRandom) {
   }
 }
 
-TEST_F(ParcoRepartTest, testPartitionerInterface) {
-	IndexType nroot = 100;
-	IndexType n = nroot * nroot;
+TEST_F(ParcoRepartTest, testMinimumNeighborDistanceDistributed) {
+  IndexType nroot = 100;
+  IndexType n = nroot * nroot;
   IndexType k = 10;
-  scai::lama::CSRSparseMatrix<ValueType>a(n,n);
-  scai::lama::MatrixCreator::fillRandom(a, 0.01);
-  IndexType dim = 2;
+  IndexType dimensions = 2;
+  scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+  scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
 
-	scai::lama::DenseVector<ValueType> coordinates(dim*n, 0);
-	for (IndexType i = 0; i < nroot; i++) {
-		for (IndexType j = 0; j < nroot; j++) {
- 			coordinates.setValue(2*(i*nroot + j), i);
- 			coordinates.setValue(2*(i*nroot + j)+1, j);
- 		}
- 	}
+  scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
+  scai::lama::MatrixCreator::fillRandom(a, 0.01);//TODO: make this a proper heterogenuous mesh
+  
+  scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n*dimensions) );
+  DenseVector<ValueType> coordinates(coordDist);
 
- 	scai::lama::DenseVector<ValueType> partition = ParcoRepart<ValueType, ValueType>::partitionGraph(a, coordinates, dim,	k);
+  for (IndexType i = 0; i < nroot; i++) {
+    for (IndexType j = 0; j < nroot; j++) {
+      //this is slightly wasteful, since it also iterates over indices of other processors
+      if (coordDist->isLocal(2*(i*nroot + j))) {
+        coordinates.setValue(2*(i*nroot + j), i);
+        coordinates.setValue(2*(i*nroot + j)+1, j);
+      }
+    }
+  }
 
-  EXPECT_EQ(partition.size(), n);
+  const ValueType minDistance = ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(a, coordinates, dimensions);
+  EXPECT_LE(minDistance, nroot*1.5);
+  EXPECT_GE(minDistance, 1);
 }
 
-TEST_F(ParcoRepartTest, testPartitionBalance) {
+TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
   IndexType nroot = 100;
   IndexType n = nroot * nroot;
   IndexType k = 10;
@@ -153,8 +162,67 @@ TEST_F(ParcoRepartTest, testPartitionBalance) {
 
   //in a distributed setting, this would need to be communicated and summed
   EXPECT_LE(*std::max_element(subsetSizes.begin(), subsetSizes.end()), (1+epsilon)*optSize);
-
 }
+
+TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
+  IndexType nroot = 100;
+  IndexType n = nroot * nroot;
+  IndexType k = 10;
+  IndexType dimensions = 2;
+  scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+  scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+
+  scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
+  scai::lama::MatrixCreator::fillRandom(a, 0.01);//TODO: make this a proper heterogenuous mesh
+  
+  scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n*dimensions) );
+  DenseVector<ValueType> coordinates(coordDist);
+
+  for (IndexType i = 0; i < nroot; i++) {
+    for (IndexType j = 0; j < nroot; j++) {
+      //this is slightly wasteful, since it also iterates over indices of other processors
+      if (coordDist->isLocal(2*(i*nroot + j))) {
+        coordinates.setValue(2*(i*nroot + j), i);
+        coordinates.setValue(2*(i*nroot + j)+1, j);
+      }
+    }
+  }
+
+  ValueType epsilon = 0.05;
+
+  scai::lama::DenseVector<ValueType> partition = ParcoRepart<ValueType, ValueType>::partitionGraph(a, coordinates, dimensions,  k, epsilon);
+
+  EXPECT_EQ(n, partition.size());
+  EXPECT_EQ(0, partition.min().getValue<ValueType>());
+  EXPECT_EQ(k-1, partition.max().getValue<ValueType>());
+
+  std::vector<IndexType> subsetSizes(k, 0);
+  scai::utilskernel::LArray<ValueType> localPartition = partition.getLocalValues();
+  for (IndexType i = 0; i < localPartition.size(); i++) {
+    ValueType partID = localPartition[i];
+    EXPECT_LE(partID, k);
+    EXPECT_GE(partID, 0);
+    subsetSizes[partID] += 1;
+  }
+  IndexType optSize = std::ceil(n / k);
+
+  //if we don't have the full partition locally, 
+  if (!partition.getDistribution().isReplicated()) {
+    //sum block sizes over all processes
+    for (IndexType partID = 0; partID < k; partID++) {
+      subsetSizes[partID] = comm->sum(subsetSizes[partID]);
+    }
+  }
+  
+  EXPECT_LE(*std::max_element(subsetSizes.begin(), subsetSizes.end()), (1+epsilon)*optSize);
+}
+
+/**
+* TODO: test for correct error handling in case of inconsistent distributions
+*/
+
+
 
 } //namespace
 

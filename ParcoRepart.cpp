@@ -25,6 +25,14 @@ ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const C
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	const IndexType localN = inputDist->getLocalSize();
 
+	if (coordDist->getLocalSize() % int(dimensions) != 0) {
+		throw std::runtime_error("Size of coordinate vector no multiple of dimension. Maybe it was split in the distribution?");
+	}
+
+	if (!input.getColDistributionPtr()->isReplicated()) {
+		throw std::runtime_error("Columns must be replicated.");
+	}
+
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates.getLocalValues();
 
@@ -36,12 +44,15 @@ ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const C
 	for (IndexType i = 0; i < localN; i++) {
 		const IndexType beginCols = ia[i];
 		const IndexType endCols = ia[i+1];//assuming replicated columns
+		assert(ja.size() >= endCols);
 		for (IndexType j = beginCols; j < endCols; j++) {
-			IndexType neighbor = ja[j];
-			if (neighbor != i && coordDist->isLocal(neighbor)) {
+			IndexType neighbor = ja[j];//big question: does ja give local or global indices?
+			const IndexType globalI = inputDist->local2global(i);
+			if (neighbor != globalI && coordDist->isLocal(neighbor*dimensions)) {
+				const IndexType localNeighbor = coordDist->global2local(neighbor*dimensions);
 				ValueType distanceSquared = 0;
 				for (IndexType dim = 0; dim < dimensions; dim++) {
-					ValueType diff = localPartOfCoords[i*dimensions + dim] - localPartOfCoords[neighbor*dimensions + dim];
+					ValueType diff = localPartOfCoords[i*dimensions + dim] - localPartOfCoords[localNeighbor + dim];
 					distanceSquared += diff*diff;
 				}
 				if (distanceSquared < minDistanceSquared) minDistanceSquared = distanceSquared;
@@ -53,7 +64,10 @@ ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const C
 	return minDistance;
 }
 
-//TODO: refactor to get all the indices at the same time. Alternative: Don't use distributed vectors.
+/**
+* possible optimization: check whether all local points lie in the same region and thus have a common prefix
+*/
+
 template<typename IndexType, typename ValueType>
 ValueType ParcoRepart<IndexType, ValueType>::getHilbertIndex(const DenseVector<ValueType> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
 	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
@@ -137,7 +151,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	* check input arguments for sanity
 	*/
 	IndexType n = input.getNumRows();
-	if (n != (coordinates.size()/dimensions)) {
+	if (n*dimensions != coordinates.size()) {
 		throw std::runtime_error("Matrix has " + std::to_string(n) + " rows, but " + std::to_string(coordinates.size())
 		 + " coordinates are given.");
 	}
@@ -196,8 +210,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	}
 
 	//the following is ~5% faster if manually inlined, probably because localPartOfCoords doesn't have to be computed twice
-	const ValueType minDistance = getMinimumNeighbourDistance(input, coordinates, dimensions);
-	const IndexType recursionDepth = std::ceil(std::log2(maxExtent / minDistance) / 2);
+	//const ValueType minDistance = getMinimumNeighbourDistance(input, coordinates, dimensions);
+	const IndexType recursionDepth = std::log2(n);// std::ceil(std::log2(maxExtent / minDistance) / 2);
 
 	/**
 	*	create space filling curve indices.
@@ -213,6 +227,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	/**
 	* now sort the global indices by where they are on the space-filling curve. Since distributed sorting is not yet available, we gather them all and sort them locally
 	*/
+	
 	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
 	hilbertIndices.redistribute(noDistPointer);
 
@@ -257,5 +272,8 @@ template DenseVector<double> ParcoRepart<double, double>::partitionGraph(CSRSpar
 
 template double ParcoRepart<int, double>::getHilbertIndex(const DenseVector<double> &coordinates, int dimensions, int index, int recursionDepth,
 	const std::vector<double> &minCoords, const std::vector<double> &maxCoords);
+
+template double ParcoRepart<int, double>::getMinimumNeighbourDistance(const CSRSparseMatrix<double> &input, const DenseVector<double> &coordinates,
+ int dimensions);
 
 }
