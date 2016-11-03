@@ -4,6 +4,7 @@
 
 #include <scai/lama/matrix/all.hpp>
 
+
 #include <scai/lama/Vector.hpp>
 
 
@@ -20,5 +21,6 @@ namespace ITI {
 			static ValueType getMinimumNeighbourDistance(const CSRSparseMatrix<ValueType> &input, const DenseVector<ValueType> &coordinates, IndexType dimensions);
 			static ValueType getHilbertIndex(const DenseVector<ValueType> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
 			 const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+			static ValueType fiducciaMattheysesRound(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon);
 	};
 }

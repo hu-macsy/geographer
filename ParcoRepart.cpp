@@ -10,6 +10,7 @@
 #include <assert.h>
 #include <cmath>
 #include <climits>
+#include <queue>
 
 #include "ParcoRepart.h"
 
@@ -258,15 +259,90 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		result.setValue(allGlobalIndices[i], int(k*i / n));
 	}
 
-
 	/**
 	* local refinement, use Fiduccia-Mattheyses
 	*/
 
+	ValueType gain = 1;
+	while (gain > 0) {
+		gain = fiducciaMattheysesRound(input, result, k, epsilon);
+	}
 
-
-	//dummy result
 	return result;
+}
+
+template<typename IndexType, typename ValueType>
+ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon) {
+	const IndexType n = input.getNumRows();
+
+	/**
+	* check input and throw errors
+	*/
+	const Scalar minPartID = part.min();
+	const Scalar maxPartID = part.max();
+	if (minPartID.getValue<IndexType>() != 0) {
+		throw std::runtime_error("Smallest block ID is " + std::to_string(minPartID.getValue<IndexType>()) + ", should be 0");
+	}
+
+	if (maxPartID.getValue<IndexType>() != k-1) {
+		throw std::runtime_error("Highest block ID is " + std::to_string(maxPartID.getValue<IndexType>()) + ", should be " + std::to_string(k-1));
+	}
+
+	if (part.size() != n) {
+		throw std::runtime_error("Partition has " + std::to_string(part.size()) + " entries, but matrix has " + std::to_string(n) + ".");
+	}
+
+	if (epsilon < 0) {
+		throw std::runtime_error("Epsilon must be >= 0, not " + std::to_string(epsilon));
+	}
+
+	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+	const scai::dmemo::DistributionPtr partDist = input.getRowDistributionPtr();
+
+	if (!inputDist->isReplicated()) {
+		throw std::runtime_error("Input matrix must be replicated, for now.");
+	}
+
+	if (!partDist->isReplicated()) {
+		throw std::runtime_error("Input partition must be replicated, for now.");
+	}
+
+	/**
+	* allocate data structures
+	*/
+
+	const double optSize = ceil(double(n) / k);
+	const double maxAllowablePartSize = optSize*(1+epsilon);
+
+	std::vector<IndexType> bestTargetPartition(n);
+	std::vector<std::priority_queue<IndexType>> queues(k);
+	std::vector<IndexType> gains(n,0);
+	std::vector<std::pair<IndexType, IndexType> > transfers;
+	std::vector<IndexType> transferedVertices;
+
+	std::vector<double> fragmentSizes(k);
+
+	double maxFragmentSize = 0;
+
+	for (IndexType i = 0; i < n; i++) {
+		Scalar partID = part.getValue(i);
+		assert(partID.getValue<IndexType>() >= 0);
+		assert(partID.getValue<IndexType>() < k);
+		fragmentSizes[partID.getValue<IndexType>()] += 1;
+
+		if (fragmentSizes[partID.getValue<IndexType>()] < maxFragmentSize) {
+			maxFragmentSize = fragmentSizes[partID.getValue<IndexType>()];
+		}
+	}
+
+	std::vector<std::vector<ValueType> > edgeCuts(n);
+	for (IndexType v = 0; v < n; v++) {
+		edgeCuts[v].resize(k, 0);
+
+	}
+
+	//for now, don't change anything
+	return 0;
 }
 
 //to force instantiation
