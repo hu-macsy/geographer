@@ -196,6 +196,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   EXPECT_EQ(n, partition.size());
   EXPECT_EQ(0, partition.min().getValue<ValueType>());
   EXPECT_EQ(k-1, partition.max().getValue<ValueType>());
+  EXPECT_EQ(a.getRowDistribution(), partition.getDistribution());
 
   std::vector<IndexType> subsetSizes(k, 0);
   scai::utilskernel::LArray<ValueType> localPartition = partition.getLocalValues();

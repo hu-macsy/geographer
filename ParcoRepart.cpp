@@ -254,19 +254,19 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	/**
 	* initial partitioning with sfc. Upgrade to chains-on-chains-partitioning later
 	*/
-	DenseVector<IndexType> result(n,0);//not distributed right now
+	DenseVector<IndexType> result(inputDist);//not distributed right now
 	for (IndexType i = 0; i < n; i++) {
 		result.setValue(allGlobalIndices[i], int(k*i / n));
 	}
 
 	/**
-	* local refinement, use Fiduccia-Mattheyses
+	* local refinement, use Fiduccia-Mattheyses. 
 	*/
 
-	ValueType gain = 1;
-	while (gain > 0) {
-		gain = fiducciaMattheysesRound(input, result, k, epsilon);
-	}
+	//ValueType gain = 1;
+	//while (gain > 0) {
+	//	gain = fiducciaMattheysesRound(input, result, k, epsilon);
+	//}
 
 	return result;
 }
