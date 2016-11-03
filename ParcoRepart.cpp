@@ -349,6 +349,9 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(CSRSparseMa
 template DenseVector<double> ParcoRepart<double, double>::partitionGraph(CSRSparseMatrix<double> &input, DenseVector<double> &coordinates,
 					double dimensions,	double k,  double epsilon);
 
+template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, DenseVector<double> &coordinates,
+					int dimensions,	int k,  double epsilon);
+
 template double ParcoRepart<int, double>::getHilbertIndex(const DenseVector<double> &coordinates, int dimensions, int index, int recursionDepth,
 	const std::vector<double> &minCoords, const std::vector<double> &maxCoords);
 
