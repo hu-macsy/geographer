@@ -209,7 +209,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		}
 	}
 
-	//the following is ~5% faster if manually inlined, probably because localPartOfCoords doesn't have to be computed twice
+	/**
+	* Several possibilities exist for choosing the recursion depth. Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points
+	*/
+	//getMinimumNeighbourDistance is ~5% faster if manually inlined, probably because localPartOfCoords doesn't have to be computed twice
 	//const ValueType minDistance = getMinimumNeighbourDistance(input, coordinates, dimensions);
 	const IndexType recursionDepth = std::log2(n);// std::ceil(std::log2(maxExtent / minDistance) / 2);
 
