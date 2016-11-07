@@ -143,17 +143,17 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
     }
   }
 
-  scai::lama::DenseVector<ValueType> partition = ParcoRepart<ValueType, ValueType>::partitionGraph(a, coordinates, dim,  k, epsilon);
+  scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, dim,  k, epsilon);
 
   EXPECT_EQ(n, partition.size());
-  EXPECT_EQ(0, partition.min().getValue<ValueType>());
-  EXPECT_EQ(k-1, partition.max().getValue<ValueType>());
+  EXPECT_EQ(0, partition.min().getValue<IndexType>());
+  EXPECT_EQ(k-1, partition.max().getValue<IndexType>());
   EXPECT_TRUE(partition.getDistribution().isReplicated());//for now
 
   std::vector<IndexType> subsetSizes(k, 0);//probably replace with some Lama data structure later
-  scai::utilskernel::LArray<ValueType> localPartition = partition.getLocalValues();
+  scai::utilskernel::LArray<IndexType> localPartition = partition.getLocalValues();
   for (IndexType i = 0; i < localPartition.size(); i++) {
-    ValueType partID = localPartition[i];
+    IndexType partID = localPartition[i];
     EXPECT_LE(partID, k);
     EXPECT_GE(partID, 0);
     subsetSizes[partID] += 1;
@@ -191,7 +191,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
 
   ValueType epsilon = 0.05;
 
-  scai::lama::DenseVector<ValueType> partition = ParcoRepart<ValueType, ValueType>::partitionGraph(a, coordinates, dimensions,  k, epsilon);
+  scai::lama::DenseVector<ValueType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, dimensions,  k, epsilon);
 
   EXPECT_EQ(n, partition.size());
   EXPECT_EQ(0, partition.min().getValue<ValueType>());

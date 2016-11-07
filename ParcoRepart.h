@@ -58,7 +58,7 @@ namespace ITI {
 			* Performs local refinement of a given partition
 			*
 	 		* @param[in] input Adjacency matrix of the input graph
-			* @param[in] part Previous partition
+			* @param[in,out] part Partition which is to be refined
 	 		* @param[in] k Number of desired blocks. Must be the same as in the previous partition.
 	 		* @param[in] epsilon Tolerance of block size
 			*

@@ -229,22 +229,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	}
 
 	/**
-	* now sort the global indices by where they are on the space-filling curve. Since distributed sorting is not yet available, we gather them all and sort them locally
+	* now sort the global indices by where they are on the space-filling curve.
 	*/
-	
-	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
-	hilbertIndices.redistribute(noDistPointer);
 
-	assert(hilbertIndices.getDistributionPtr()->getLocalSize() == n);
-	
-	const scai::utilskernel::LArray<ValueType> allHilbertIndices = hilbertIndices.getLocalValues();
-
-	std::vector<IndexType> allGlobalIndices(n);
-	IndexType p = 0;
-	std::generate(allGlobalIndices.begin(), allGlobalIndices.end(), [&p](){return p++;});
-
-	std::sort(allGlobalIndices.begin(), allGlobalIndices.end(), [&allHilbertIndices](IndexType i, IndexType j){return allHilbertIndices[i] < allHilbertIndices[j];});
-
+	scai::lama::DenseVector<IndexType> permutation;
+	hilbertIndices.sort(permutation, true);
+	permutation.redistribute(inputDist);
 
 	/**
 	* check for uniqueness. If not unique, level of detail was insufficient.
@@ -254,9 +244,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	/**
 	* initial partitioning with sfc. Upgrade to chains-on-chains-partitioning later
 	*/
-	DenseVector<IndexType> result(inputDist);//not distributed right now
-	for (IndexType i = 0; i < n; i++) {
-		result.setValue(allGlobalIndices[i], int(k*i / n));
+	DenseVector<IndexType> result(inputDist);
+	scai::hmemo::ReadAccess<IndexType> readAccess(permutation.getLocalValues());
+	for (IndexType i = 0; i < localN; i++) {
+		IndexType targetPos;
+		readAccess.getValue(targetPos, i);
+		result.setValue(inputDist->local2global(i), int(k*targetPos / n));
 	}
 
 	/**
@@ -335,20 +328,36 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(CSRSparseMa
 		}
 	}
 
+	std::vector<IndexType> degrees(n);
+
 	std::vector<std::vector<ValueType> > edgeCuts(n);
 	for (IndexType v = 0; v < n; v++) {
 		edgeCuts[v].resize(k, 0);
 
 	}
 
+	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
+	const scai::utilskernel::LArray<IndexType>& ia = localStorage.getIA();
+	const scai::utilskernel::LArray<IndexType>& ja = localStorage.getJA();
+	const scai::utilskernel::LArray<IndexType>& values = localStorage.getValues();
+
+	for (IndexType v = 0; v < n; v++) {
+		const IndexType beginCols = ia[v];
+		const IndexType endCols = ia[v+1];
+		degrees[v] = endCols - beginCols;
+		for (IndexType j = beginCols; j < endCols; j++) {
+			IndexType neighbor = ja[j];
+			Scalar partID = part.getValue(neighbor);
+			edgeCuts[v][partID] += values[j];
+		}
+	}
+
+
 	//for now, don't change anything
 	return 0;
 }
 
 //to force instantiation
-template DenseVector<double> ParcoRepart<double, double>::partitionGraph(CSRSparseMatrix<double> &input, DenseVector<double> &coordinates,
-					double dimensions,	double k,  double epsilon);
-
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, DenseVector<double> &coordinates,
 					int dimensions,	int k,  double epsilon);
 
