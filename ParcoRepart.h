@@ -20,5 +20,9 @@ namespace ITI {
 			static ValueType getMinimumNeighbourDistance(const CSRSparseMatrix<ValueType> &input, const DenseVector<ValueType> &coordinates, IndexType dimensions);
 			static ValueType getHilbertIndex(const DenseVector<ValueType> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
 			 const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+			static ValueType getHilbertIndex3D(const DenseVector<ValueType> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
+			 const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+			static DenseVector<ValueType> Hilbert2DIndex2Point(ValueType index, IndexType level);
 	};
 }
+
