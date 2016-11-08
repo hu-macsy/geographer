@@ -463,6 +463,8 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 	* allocate data structures
 	*/
 
+	//const ValueType oldCut = computeCut(input, part, unweighted);
+
 	const IndexType optSize = ceil(double(n) / k);
 	const IndexType maxAllowablePartSize = optSize*(1+epsilon);
 
@@ -509,6 +511,7 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 		degrees[v] = endCols - beginCols;
 		for (IndexType j = beginCols; j < endCols; j++) {
 			IndexType neighbor = ja[j];
+			if (neighbor == v) continue;
 			if (!unweighted && values[j] < 0) {
 				throw std::runtime_error("Only positive edge weights are supported, " + std::to_string(values[j]) + " invalid.");
 			}
@@ -592,22 +595,12 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 		//now get target partition.
 		IndexType targetFragment = bestTargetFragment[topVertex];
 		ValueType storedGain = edgeCuts[topVertex][targetFragment] - edgeCuts[topVertex][partID];
-		if (storedGain != topGain) {
-			const IndexType beginCols = ia[topVertex];
-			const IndexType endCols = ia[topVertex+1];
-			ValueType checkedGain = 0;
-			for (IndexType j = beginCols; j < endCols; j++) {
-				const IndexType neighbour = ja[j];
-				Scalar neighbourBlockScalar = part.getValue(neighbour);
-				IndexType neighbourBlock = neighbourBlockScalar.getValue<IndexType>();
-				if (neighbourBlock == targetFragment) checkedGain += unweighted ? 1 : values[j];
-				else if (neighbourBlock == partID) checkedGain -= unweighted ? 1 : values[j];
-				std::cout << storedGain << ", " << topGain << ", " << checkedGain << std::endl;
-			}
-			
-		}
+		
 		assert(abs(storedGain - topGain) < 0.0001);
 		assert(fragmentSizes[partID] > 1);
+
+		//const ValueType preMoveCut = computeCut(input, part, unweighted);
+		//assert(oldCut - gainsum == preMoveCut);
 
 		//move node there
 		part.setValue(topVertex, targetFragment);
@@ -624,6 +617,28 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 		transferedVertices.push_back(topVertex);
 		assert(transferedVertices.size() == transfers.size());
 		assert(gains.size() == transfers.size());
+		//const ValueType currentCut = computeCut(input, part, unweighted);
+
+		/**
+		if (oldCut - gainsum != currentCut) {
+			const IndexType beginCols = ia[topVertex];
+			const IndexType endCols = ia[topVertex+1];
+			ValueType checkedGain = 0;
+			for (IndexType j = beginCols; j < endCols; j++) {
+				const IndexType neighbour = ja[j];
+				if (neighbour == topVertex) continue;
+				Scalar neighbourBlockScalar = part.getValue(neighbour);
+				IndexType neighbourBlock = neighbourBlockScalar.getValue<IndexType>();
+				if (neighbourBlock == targetFragment) checkedGain += unweighted ? 1 : values[j];
+				else if (neighbourBlock == partID) checkedGain -= unweighted ? 1 : values[j];
+				std::cout << storedGain << ", " << topGain << ", " << checkedGain << std::endl;
+			}
+			assert(oldCut - (gainsum - topGain + checkedGain) == currentCut);
+			
+		}
+		
+		assert(oldCut - gainsum == currentCut);		
+		*/
 
 		double imbalance = (*std::max_element(fragmentSizes.begin(), fragmentSizes.end()) - optSize) / optSize;
 		imbalances.push_back(imbalance);
