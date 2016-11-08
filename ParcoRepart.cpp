@@ -12,6 +12,7 @@
 #include <climits>
 #include <queue>
 
+#include "PrioQueue.h"
 #include "ParcoRepart.h"
 
 namespace ITI {
@@ -256,18 +257,24 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	* local refinement, use Fiduccia-Mattheyses. 
 	*/
 
-	//ValueType gain = 1;
-	//while (gain > 0) {
-	//	gain = fiducciaMattheysesRound(input, result, k, epsilon);
-	//}
+	if (false && inputDist->isReplicated()) {
+		ValueType gain = 1;
+		ValueType cut = computeCut(input, result);
+		while (gain > 0) {
+			gain = fiducciaMattheysesRound(input, result, k, epsilon);
+			ValueType oldCut = cut;
+			cut = computeCut(input, result);
+			assert(oldCut - gain == cut);
+			std::cout << "Last FM round yielded gain of " << gain << ", for total cut of " << computeCut(input, result) << std::endl;
+		}
+	}
 
 	return result;
 }
 
 template<typename IndexType, typename ValueType>
-ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon) {
+ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon) {
 	const IndexType n = input.getNumRows();
-
 	/**
 	* check input and throw errors
 	*/
@@ -290,7 +297,7 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(CSRSparseMa
 	}
 
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
-	const scai::dmemo::DistributionPtr partDist = input.getRowDistributionPtr();
+	const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
 
 	if (!inputDist->isReplicated()) {
 		throw std::runtime_error("Input matrix must be replicated, for now.");
@@ -308,10 +315,12 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(CSRSparseMa
 	const double maxAllowablePartSize = optSize*(1+epsilon);
 
 	std::vector<IndexType> bestTargetPartition(n);
-	std::vector<std::priority_queue<IndexType>> queues(k);
-	std::vector<IndexType> gains(n,0);
+	std::vector<PrioQueue<ValueType, IndexType>> queues(k, n);
+
+	std::vector<IndexType> gains;
 	std::vector<std::pair<IndexType, IndexType> > transfers;
 	std::vector<IndexType> transferedVertices;
+	std::vector<double> imbalances;
 
 	std::vector<double> fragmentSizes(k);
 
@@ -336,10 +345,13 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(CSRSparseMa
 
 	}
 
+	//TODO: use ReadAccess instead
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::utilskernel::LArray<IndexType>& ia = localStorage.getIA();
 	const scai::utilskernel::LArray<IndexType>& ja = localStorage.getJA();
 	const scai::utilskernel::LArray<IndexType>& values = localStorage.getValues();
+
+	ValueType totalWeight = 0;
 
 	for (IndexType v = 0; v < n; v++) {
 		const IndexType beginCols = ia[v];
@@ -348,13 +360,239 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(CSRSparseMa
 		for (IndexType j = beginCols; j < endCols; j++) {
 			IndexType neighbor = ja[j];
 			Scalar partID = part.getValue(neighbor);
-			edgeCuts[v][partID] += values[j];
+			edgeCuts[v][partID.getValue<IndexType>()] += 1;//values[j];
+			totalWeight += 1;//values[j];
 		}
 	}
 
+	for (IndexType v = 0; v < n; v++) {
+		ValueType maxCut = -totalWeight;
+		IndexType idAtMax = k;
+		Scalar partID = part.getValue(v);
 
-	//for now, don't change anything
-	return 0;
+		for (IndexType fragment = 0; fragment < k; fragment++) {
+			if (fragment != partID.getValue<IndexType>() && edgeCuts[v][fragment] > maxCut && fragmentSizes[fragment] <= maxAllowablePartSize) {
+				idAtMax = fragment;
+				maxCut = edgeCuts[v][fragment];
+			}
+		}
+
+		assert(idAtMax < k);
+		bestTargetPartition[v] = idAtMax;
+		assert(partID.getValue<IndexType>() < queues.size());
+		if (fragmentSizes[partID.getValue<IndexType>()] > 1) {
+			queues[partID.getValue<IndexType>()].insert(-(maxCut-edgeCuts[v][partID.getValue<IndexType>()]), v); //negative max gain
+		}
+	}
+
+	ValueType gainsum = 0;
+	bool allQueuesEmpty = false;
+
+	std::vector<bool> moved(n, false);
+
+	while (!allQueuesEmpty) {
+	allQueuesEmpty = true;
+
+	//choose largest partition with non-empty queue.
+	IndexType largestMovablePart = k;
+	IndexType largestSize = 0;
+
+	for (IndexType partID = 0; partID < k; partID++) {
+		if (queues[partID].size() > 0 && fragmentSizes[partID] > largestSize) {
+			largestMovablePart = partID;
+			largestSize = fragmentSizes[partID];
+		}
+	}
+
+	if (largestSize > 1 && largestMovablePart != k) {
+		//at least one queue is not empty
+		allQueuesEmpty = false;
+		IndexType partID = largestMovablePart;
+
+		assert(partID < queues.size());
+		assert(queues[partID].size() > 0);
+
+		IndexType topVertex;
+		ValueType topGain;
+		std::tie(topGain, topVertex) = queues[partID].extractMin();
+		topGain = -topGain;//invert, since the negative gain was used as priority.
+		assert(topVertex < n);
+		assert(topVertex >= 0);
+
+		//now get target partition.
+		IndexType targetFragment = bestTargetPartition[topVertex];
+		ValueType storedGain = edgeCuts[topVertex][targetFragment] - edgeCuts[topVertex][partID];
+		assert(abs(storedGain - topGain) < 0.0001);
+		assert(fragmentSizes[partID] > 1);
+		//ValueType checkedGain = calculateGain(g, part, topVertex, targetFragment);
+		//assert(abs(checkedGain - topGain) < 0.00001);
+
+		//move node there
+		part.setValue(topVertex, targetFragment);
+		moved[topVertex] = true;
+
+		//udpate size map
+		fragmentSizes[partID] -= 1;
+		fragmentSizes[targetFragment] += 1;
+
+		//update history
+		gainsum += topGain;
+		gains.push_back(gainsum);
+		transfers.emplace_back(partID, targetFragment);
+		transferedVertices.push_back(topVertex);
+		assert(transferedVertices.size() == transfers.size());
+		assert(gains.size() == transfers.size());
+
+		double imbalance = (*std::max_element(fragmentSizes.begin(), fragmentSizes.end()) - optSize) / optSize;
+		imbalances.push_back(imbalance);
+
+		//std::cout << "Moved node " << topVertex << " to block " << targetFragment << " for gain of " << topGain << ", bringing sum to " << gainsum 
+		//<< " and imbalance to " << imbalance  << "." << std::endl;
+
+		//TODO: replace by ReadAccess
+		const IndexType beginCols = ia[topVertex];
+		const IndexType endCols = ia[topVertex+1];
+
+		for (IndexType j = beginCols; j < endCols; j++) {
+			const IndexType neighbour = ja[j];
+			if (!moved[neighbour]) {
+				//update gain
+				Scalar partID = part.getValue(neighbour);
+
+				edgeCuts[neighbour][partID.getValue<IndexType>()] -= 1;//values[j];
+				edgeCuts[neighbour][targetFragment] += 1;//values[j];
+
+				//find new fragment for neighbour
+				ValueType maxCut = -totalWeight;
+				IndexType idAtMax = k;
+
+				for (IndexType fragment = 0; fragment < k; fragment++) {
+					if (fragment != partID && edgeCuts[neighbour][fragment] > maxCut  && fragmentSizes[fragment] <= maxAllowablePartSize) {
+						idAtMax = fragment;
+						maxCut = edgeCuts[neighbour][fragment];
+					}
+				}
+
+				bestTargetPartition[neighbour] = idAtMax;
+
+				//update prioqueue
+				queues[partID.getValue<IndexType>()].remove(neighbour);
+				queues[partID.getValue<IndexType>()].insert(-(maxCut-edgeCuts[neighbour][partID.getValue<IndexType>()]), neighbour);
+
+				}
+			}
+		}
+	}
+
+	const IndexType testedNodes = gains.size();
+	if (testedNodes == 0) return 0;
+	assert(gains.size() == transfers.size());
+
+	/**
+	 * now find best partition among those tested
+	 */
+	IndexType maxIndex = -1;
+	ValueType maxGain = 0;
+	for (IndexType i = 0; i < testedNodes; i++) {
+		if (gains[i] > maxGain && imbalances[i] <= epsilon) {
+			maxIndex = i;
+			maxGain = gains[i];
+		}
+	}
+	assert(testedNodes >= maxIndex);
+	assert(maxIndex >= 0);
+	assert(testedNodes-1 < transfers.size());
+
+	/**
+	 * apply partition modifications in reverse until best is recovered
+	 */
+	for (int i = testedNodes-1; i > maxIndex; i--) {
+		assert(transferedVertices[i] < n);
+		assert(transferedVertices[i] >= 0);
+		part.setValue(transferedVertices[i], transfers[i].first);
+	}
+	return maxGain;
+}
+
+template<typename IndexType, typename ValueType>
+ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool ignoreWeights) {
+	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+	const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
+	const IndexType n = inputDist->getGlobalSize();
+	const IndexType localN = inputDist->getLocalSize();
+
+	if (!partDist->isReplicated()) {
+		throw std::runtime_error("Input partition must be replicated, for now.");
+	}
+
+	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
+	scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+	scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+
+	scai::hmemo::ReadAccess<IndexType> partAccess(part.getLocalValues());
+
+	ValueType result = 0;
+	for (IndexType i = 0; i < localN; i++) {
+		const IndexType beginCols = ia[i];
+		const IndexType endCols = ia[i+1];
+		assert(ja.size() >= endCols);
+
+		const IndexType globalI = inputDist->local2global(i);
+		IndexType thisBlock;
+		partAccess.getValue(thisBlock, globalI);
+		
+		for (IndexType j = beginCols; j < endCols; j++) {
+			IndexType neighbor = ja[j];
+			assert(neighbor >= 0);
+			assert(neighbor < n);
+				
+			IndexType neighborBlock;
+			partAccess.getValue(neighborBlock, neighbor);
+			if (neighborBlock != thisBlock) {
+				if (ignoreWeights) {
+					result++;
+				} else {
+					ValueType edgeWeight;
+					values.getValue(edgeWeight, j);
+					result += edgeWeight;
+				}
+			}
+		}
+	}
+
+	if (!inputDist->isReplicated()) {
+    //sum block sizes over all processes
+    result = inputDist->getCommunicatorPtr()->sum(result);
+  }
+
+  return result / 2; //counted each edge from both sides
+}
+
+template<typename IndexType, typename ValueType>
+ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<IndexType> &part, IndexType k) {
+	const IndexType n = part.getDistributionPtr()->getGlobalSize();
+	std::vector<IndexType> subsetSizes(k, 0);
+	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
+ 	
+	for (IndexType i = 0; i < localPart.size(); i++) {
+		IndexType partID;
+		localPart.getValue(partID, i);
+		subsetSizes[partID] += 1;
+	}
+	IndexType optSize = std::ceil(n / k);
+
+	//if we don't have the full partition locally, 
+	scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
+	if (!part.getDistribution().isReplicated()) {
+	  //sum block sizes over all processes
+	  for (IndexType partID = 0; partID < k; partID++) {
+	    subsetSizes[partID] = comm->sum(subsetSizes[partID]);
+	  }
+	}
+	
+	IndexType maxBlockSize = *std::max_element(subsetSizes.begin(), subsetSizes.end());
+	return (maxBlockSize / optSize);
 }
 
 //to force instantiation
