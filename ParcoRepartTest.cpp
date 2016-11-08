@@ -219,6 +219,67 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   EXPECT_LE(*std::max_element(subsetSizes.begin(), subsetSizes.end()), (1+epsilon)*optSize);
 }
 
+TEST_F(ParcoRepartTest, testImbalanceDistributed) {
+  const IndexType n = 10000;
+  const IndexType k = 10;
+
+  scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+
+  //generate random partition
+  scai::lama::DenseVector<IndexType> part(dist);
+  for (IndexType i = 0; i < n; i++) {
+    IndexType blockId = rand() % k;
+    part.setValue(i, blockId);
+  }
+
+  //sanity check for partition generation
+  ASSERT_GE(part.min().getValue<ValueType>(), 0);
+  ASSERT_LE(part.max().getValue<ValueType>(), k-1);
+
+  ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k);
+  EXPECT_GE(imbalance, 0);
+
+  // test perfectly balanced partition
+  for (IndexType i = 0; i < n; i++) {
+    IndexType blockId = i % k;
+    part.setValue(i, blockId);
+  }
+  imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k);
+  EXPECT_EQ(0, imbalance);
+
+  //test maximally imbalanced partition
+  for (IndexType i = 0; i < n; i++) {
+    IndexType blockId = 0;
+    part.setValue(i, blockId);
+  }
+  imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k);
+  EXPECT_EQ((n/std::ceil(n/k))-1, imbalance);
+}
+
+TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
+  const IndexType n = 10000;
+  const IndexType k = 10;
+
+  //generate random matrix
+  scai::lama::CSRSparseMatrix<ValueType>a(n,n);
+  scai::lama::MatrixCreator::fillRandom(a, 0.01);
+
+  //generate random partition
+  scai::lama::DenseVector<IndexType> part(n, 0);
+  for (IndexType i = 0; i < n; i++) {
+    IndexType blockId = rand() % k;
+    part.setValue(i, blockId);
+  }
+
+  
+
+  //calculate cut
+  //call FM
+  //check for balance, consistency, improvement, 
+
+}
+
 /**
 * TODO: test for correct error handling in case of inconsistent distributions
 */

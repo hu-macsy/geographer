@@ -574,6 +574,10 @@ ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<
 	const IndexType n = part.getDistributionPtr()->getGlobalSize();
 	std::vector<IndexType> subsetSizes(k, 0);
 	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
+	const Scalar maxK = part.max();
+	if (maxK.getValue<IndexType>() >= k) {
+		throw std::runtime_error("Block id " + std::to_string(maxK.getValue<IndexType>()) + " found in partition with supposedly" + std::to_string(k) + " blocks.");
+	}
  	
 	for (IndexType i = 0; i < localPart.size(); i++) {
 		IndexType partID;
@@ -592,7 +596,7 @@ ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<
 	}
 	
 	IndexType maxBlockSize = *std::max_element(subsetSizes.begin(), subsetSizes.end());
-	return (maxBlockSize / optSize);
+	return ((maxBlockSize - optSize)/ optSize);
 }
 
 //to force instantiation
@@ -604,5 +608,7 @@ template double ParcoRepart<int, double>::getHilbertIndex(const DenseVector<doub
 
 template double ParcoRepart<int, double>::getMinimumNeighbourDistance(const CSRSparseMatrix<double> &input, const DenseVector<double> &coordinates,
  int dimensions);
+
+template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int> &partition, int k);
 
 }
