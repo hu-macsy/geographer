@@ -62,6 +62,16 @@ public:
 	virtual ElemType extractMin();
 
 	/**
+	* Returns True iff value val is present.
+	*/
+	virtual bool contains(const Val& val);
+
+	/**
+	* Return key of value val if present, undefined otherwise
+	*/
+	virtual Key getKey(const Val& val);
+
+	/**
 	 * Modifies entry with value @a value.
 	 * The entry is then set to @a newKey with the same value.
 	 * If the corresponding key is not present, the element will be inserted.
@@ -130,6 +140,17 @@ inline void ITI::PrioQueue<Key, Val>::insert(Key key, Val value) {
 	pqset.insert(std::make_pair(key, value));
 	mapValToKey.at(value) = key;
 }
+
+template<class Key, class Val>
+inline bool ITI::PrioQueue<Key, Val>::contains(const Val& val) {
+	return mapValToKey.at(val) != undefined;
+}
+
+template<class Key, class Val>
+inline Key ITI::PrioQueue<Key, Val>::getKey(const Val& val) {
+	return mapValToKey.at(val);
+}
+	
 
 template<class Key, class Val>
 inline void ITI::PrioQueue<Key, Val>::remove(const ElemType& elem) {

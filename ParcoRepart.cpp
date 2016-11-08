@@ -273,7 +273,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 }
 
 template<typename IndexType, typename ValueType>
-ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon) {
+ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted) {
 	const IndexType n = input.getNumRows();
 	/**
 	* check input and throw errors
@@ -307,14 +307,18 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 		throw std::runtime_error("Input partition must be replicated, for now.");
 	}
 
+	if (!input.checkSymmetry()) {
+		throw std::runtime_error("Only undirected graphs are supported, adjacency matrix must be symmetric.");
+	}
+
 	/**
 	* allocate data structures
 	*/
 
-	const double optSize = ceil(double(n) / k);
-	const double maxAllowablePartSize = optSize*(1+epsilon);
+	const IndexType optSize = ceil(double(n) / k);
+	const IndexType maxAllowablePartSize = optSize*(1+epsilon);
 
-	std::vector<IndexType> bestTargetPartition(n);
+	std::vector<IndexType> bestTargetFragment(n);
 	std::vector<PrioQueue<ValueType, IndexType>> queues(k, n);
 
 	std::vector<IndexType> gains;
@@ -338,12 +342,7 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 	}
 
 	std::vector<IndexType> degrees(n);
-
 	std::vector<std::vector<ValueType> > edgeCuts(n);
-	for (IndexType v = 0; v < n; v++) {
-		edgeCuts[v].resize(k, 0);
-
-	}
 
 	//TODO: use ReadAccess instead
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
@@ -353,24 +352,37 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 
 	ValueType totalWeight = 0;
 
+
 	for (IndexType v = 0; v < n; v++) {
+		edgeCuts[v].resize(k, 0);
+
 		const IndexType beginCols = ia[v];
 		const IndexType endCols = ia[v+1];
 		degrees[v] = endCols - beginCols;
 		for (IndexType j = beginCols; j < endCols; j++) {
 			IndexType neighbor = ja[j];
+			if (!unweighted && values[j] < 0) {
+				throw std::runtime_error("Only positive edge weights are supported, " + std::to_string(values[j]) + " invalid.");
+			}
 			Scalar partID = part.getValue(neighbor);
-			edgeCuts[v][partID.getValue<IndexType>()] += 1;//values[j];
-			totalWeight += 1;//values[j];
+			edgeCuts[v][partID.getValue<IndexType>()] += unweighted ? 1 : values[j];
+			totalWeight += unweighted ? 1 : values[j];
 		}
+		//std::cout << "Degree[" << v << "] = " << degrees[v] << "." << std::endl;
 	}
 
+	//setting initial best target for each node
 	for (IndexType v = 0; v < n; v++) {
 		ValueType maxCut = -totalWeight;
 		IndexType idAtMax = k;
 		Scalar partID = part.getValue(v);
 
 		for (IndexType fragment = 0; fragment < k; fragment++) {
+			if (unweighted) {
+				assert(edgeCuts[v][fragment] <= degrees[v]);
+			}
+			assert(edgeCuts[v][fragment] >= 0);
+
 			if (fragment != partID.getValue<IndexType>() && edgeCuts[v][fragment] > maxCut && fragmentSizes[fragment] <= maxAllowablePartSize) {
 				idAtMax = fragment;
 				maxCut = edgeCuts[v][fragment];
@@ -378,10 +390,14 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 		}
 
 		assert(idAtMax < k);
-		bestTargetPartition[v] = idAtMax;
+		assert(maxCut >= 0);
+		if (unweighted) assert(maxCut <= degrees[v]);
+		bestTargetFragment[v] = idAtMax;
 		assert(partID.getValue<IndexType>() < queues.size());
 		if (fragmentSizes[partID.getValue<IndexType>()] > 1) {
-			queues[partID.getValue<IndexType>()].insert(-(maxCut-edgeCuts[v][partID.getValue<IndexType>()]), v); //negative max gain
+			ValueType key = -(maxCut-edgeCuts[v][partID.getValue<IndexType>()]);
+			assert(-key <= degrees[v]);
+			queues[partID.getValue<IndexType>()].insert(key, v); //negative max gain
 		}
 	}
 
@@ -418,14 +434,32 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 		topGain = -topGain;//invert, since the negative gain was used as priority.
 		assert(topVertex < n);
 		assert(topVertex >= 0);
+		if (unweighted) {
+			assert(topGain <= degrees[topVertex]);
+		}
+		assert(!moved[topVertex]);
+		Scalar partScalar = part.getValue(topVertex);
+		assert(partScalar.getValue<IndexType>() == partID);
 
 		//now get target partition.
-		IndexType targetFragment = bestTargetPartition[topVertex];
+		IndexType targetFragment = bestTargetFragment[topVertex];
 		ValueType storedGain = edgeCuts[topVertex][targetFragment] - edgeCuts[topVertex][partID];
+		if (storedGain != topGain) {
+			const IndexType beginCols = ia[topVertex];
+			const IndexType endCols = ia[topVertex+1];
+			ValueType checkedGain = 0;
+			for (IndexType j = beginCols; j < endCols; j++) {
+				const IndexType neighbour = ja[j];
+				Scalar neighbourBlockScalar = part.getValue(neighbour);
+				IndexType neighbourBlock = neighbourBlockScalar.getValue<IndexType>();
+				if (neighbourBlock == targetFragment) checkedGain += unweighted ? 1 : values[j];
+				else if (neighbourBlock == partID) checkedGain -= unweighted ? 1 : values[j];
+				std::cout << storedGain << ", " << topGain << ", " << checkedGain << std::endl;
+			}
+			
+		}
 		assert(abs(storedGain - topGain) < 0.0001);
 		assert(fragmentSizes[partID] > 1);
-		//ValueType checkedGain = calculateGain(g, part, topVertex, targetFragment);
-		//assert(abs(checkedGain - topGain) < 0.00001);
 
 		//move node there
 		part.setValue(topVertex, targetFragment);
@@ -456,29 +490,38 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 		for (IndexType j = beginCols; j < endCols; j++) {
 			const IndexType neighbour = ja[j];
 			if (!moved[neighbour]) {
-				//update gain
-				Scalar partID = part.getValue(neighbour);
+				//update edge cuts
+				Scalar neighbourBlockScalar = part.getValue(neighbour);
+				IndexType neighbourBlock = neighbourBlockScalar.getValue<IndexType>();
 
-				edgeCuts[neighbour][partID.getValue<IndexType>()] -= 1;//values[j];
-				edgeCuts[neighbour][targetFragment] += 1;//values[j];
+				edgeCuts[neighbour][partID] -= unweighted ? 1 : values[j];
+				assert(edgeCuts[neighbour][partID] >= 0);
+				edgeCuts[neighbour][targetFragment] += unweighted ? 1 : values[j];
+				assert(edgeCuts[neighbour][targetFragment] <= degrees[neighbour]);
 
 				//find new fragment for neighbour
 				ValueType maxCut = -totalWeight;
 				IndexType idAtMax = k;
 
 				for (IndexType fragment = 0; fragment < k; fragment++) {
-					if (fragment != partID && edgeCuts[neighbour][fragment] > maxCut  && fragmentSizes[fragment] <= maxAllowablePartSize) {
+					if (fragment != neighbourBlock && edgeCuts[neighbour][fragment] > maxCut  && fragmentSizes[fragment] <= maxAllowablePartSize) {
 						idAtMax = fragment;
 						maxCut = edgeCuts[neighbour][fragment];
 					}
 				}
 
-				bestTargetPartition[neighbour] = idAtMax;
+				assert(maxCut >= 0);
+				if (unweighted) assert(maxCut <= degrees[neighbour]);
+				assert(idAtMax < k);
+				bestTargetFragment[neighbour] = idAtMax;
+
+				ValueType key = -(maxCut-edgeCuts[neighbour][neighbourBlock]);
+				assert(-key == edgeCuts[neighbour][idAtMax] - edgeCuts[neighbour][neighbourBlock]);
+				assert(-key <= degrees[neighbour]);
 
 				//update prioqueue
-				queues[partID.getValue<IndexType>()].remove(neighbour);
-				queues[partID.getValue<IndexType>()].insert(-(maxCut-edgeCuts[neighbour][partID.getValue<IndexType>()]), neighbour);
-
+				queues[neighbourBlock].remove(neighbour);
+				queues[neighbourBlock].insert(key, neighbour);
 				}
 			}
 		}
@@ -613,7 +656,7 @@ template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int
 
 template double ParcoRepart<int, double>::computeCut(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, bool ignoreWeights);
 
-template double ParcoRepart<int, double>::fiducciaMattheysesRound(const CSRSparseMatrix<double> &input, DenseVector<int> &part, int k, double epsilon);
+template double ParcoRepart<int, double>::fiducciaMattheysesRound(const CSRSparseMatrix<double> &input, DenseVector<int> &part, int k, double epsilon, bool unweighted);
 
 
 }

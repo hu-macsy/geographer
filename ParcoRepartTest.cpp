@@ -279,14 +279,26 @@ TEST_F(ParcoRepartTest, testCut) {
 }
 
 TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
-  const IndexType n = 10000;
+  const IndexType n = 1000;
   const IndexType k = 10;
   const ValueType epsilon = 0.05;
   const IndexType iterations = 1;
 
   //generate random matrix
   scai::lama::CSRSparseMatrix<ValueType>a(n,n);
-  scai::lama::MatrixCreator::fillRandom(a, 0.01);
+  scai::lama::MatrixCreator::buildPoisson(a, 3, 19, 10,10,10);
+  scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+  a.redistribute(noDistPointer, noDistPointer);
+
+  /**
+  //static void buildPoisson(
+        Matrix& matrix,
+        const IndexType dimension,
+        const IndexType stencilType,
+        const IndexType dimX,
+        const IndexType dimY,
+        const IndexType dimZ )
+        */
 
   //generate random partition
   scai::lama::DenseVector<IndexType> part(n, 0);
@@ -301,7 +313,7 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
 
     //check correct gain calculation
     const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
-    EXPECT_EQ(cut - gain, newCut);
+    EXPECT_EQ(cut - gain, newCut) << "Old cut " << cut << ", gain " << gain << " newCut " << newCut;
     EXPECT_LE(newCut, cut);
     cut = newCut;
   }
