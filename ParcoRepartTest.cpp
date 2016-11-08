@@ -219,7 +219,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   EXPECT_LE(*std::max_element(subsetSizes.begin(), subsetSizes.end()), (1+epsilon)*optSize);
 }
 
-TEST_F(ParcoRepartTest, testImbalanceDistributed) {
+TEST_F(ParcoRepartTest, testImbalance) {
   const IndexType n = 10000;
   const IndexType k = 10;
 
@@ -257,9 +257,32 @@ TEST_F(ParcoRepartTest, testImbalanceDistributed) {
   EXPECT_EQ((n/std::ceil(n/k))-1, imbalance);
 }
 
+TEST_F(ParcoRepartTest, testCut) {
+  const IndexType n = 1000;
+  const IndexType k = 10;
+
+  //generate random complete matrix
+  scai::lama::CSRSparseMatrix<ValueType>a(n,n);
+  scai::lama::MatrixCreator::fillRandom(a, 1);
+
+  //generate balanced partition
+  scai::lama::DenseVector<IndexType> part(n, 0);
+  for (IndexType i = 0; i < n; i++) {
+    IndexType blockId = i % k;
+    part.setValue(i, blockId);
+  }
+
+  //cut should be 10*900 / 2
+  const IndexType blockSize = n / k;
+  const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  EXPECT_EQ(k*blockSize*(n-blockSize) / 2, cut);
+}
+
 TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
   const IndexType n = 10000;
   const IndexType k = 10;
+  const ValueType epsilon = 0.05;
+  const IndexType iterations = 1;
 
   //generate random matrix
   scai::lama::CSRSparseMatrix<ValueType>a(n,n);
@@ -272,12 +295,33 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
     part.setValue(i, blockId);
   }
 
+  ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  for (IndexType i = 0; i < iterations; i++) {
+    ValueType gain = ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(a, part, k, epsilon);
+
+    //check correct gain calculation
+    const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+    EXPECT_EQ(cut - gain, newCut);
+    EXPECT_LE(newCut, cut);
+    cut = newCut;
+  }
   
+  //generate balanced partition
+  for (IndexType i = 0; i < n; i++) {
+    IndexType blockId = i % k;
+    part.setValue(i, blockId);
+  }
 
-  //calculate cut
-  //call FM
-  //check for balance, consistency, improvement, 
+  //check correct cut with balanced partition
+  cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  ValueType gain = ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(a, part, k, epsilon);
+  const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  EXPECT_EQ(cut - gain, newCut);
+  EXPECT_LE(newCut, cut);
 
+  //check for balance
+  ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k);
+  EXPECT_LE(imbalance, epsilon);
 }
 
 /**

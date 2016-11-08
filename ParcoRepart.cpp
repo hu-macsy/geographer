@@ -611,4 +611,9 @@ template double ParcoRepart<int, double>::getMinimumNeighbourDistance(const CSRS
 
 template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int> &partition, int k);
 
+template double ParcoRepart<int, double>::computeCut(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, bool ignoreWeights);
+
+template double ParcoRepart<int, double>::fiducciaMattheysesRound(const CSRSparseMatrix<double> &input, DenseVector<int> &part, int k, double epsilon);
+
+
 }
