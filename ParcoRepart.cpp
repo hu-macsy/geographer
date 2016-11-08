@@ -10,7 +10,9 @@
 #include <assert.h>
 #include <cmath>
 #include <climits>
+#include <queue>
 
+#include "PrioQueue.h"
 #include "ParcoRepart.h"
 
 using namespace std;
@@ -152,11 +154,9 @@ ValueType ParcoRepart<IndexType, ValueType>::getHilbertIndex(const DenseVector<V
 
 template<typename IndexType, typename ValueType>
 DenseVector<ValueType> ParcoRepart<IndexType, ValueType>::Hilbert2DIndex2Point(ValueType index, IndexType level){
-	//DenseVector<ValueType> p(2,1), ret(2,0);
 	DenseVector<ValueType>  p(2,0), ret(2,0);
 	ValueType r;
 	IndexType q;
-	//std::cout<< p(0)+ret(1)<< std::endl;
 
 	if(level==0)
 		return ret;
@@ -205,9 +205,9 @@ ValueType ParcoRepart<IndexType, ValueType>::getHilbertIndex3D(const DenseVector
 	for (IndexType dim = 0; dim < dimensions; dim++) {
 		assert(coordDist->isLocal(index*dimensions+dim));
 		const Scalar coord = myCoords[coordDist->global2local(index*dimensions+dim)];
-//cout<<"### "<< coord.getValue<ValueType>() << endl; 
+		//cout<<"### "<< coord.getValue<ValueType>() << endl; 
 		scaledCoord[dim] = (coord.getValue<ValueType>() - minCoords[dim]) / (maxCoords[dim] - minCoords[dim]);
-//cout<<"$$$ "<< scaledCoord[dim]<<endl;
+		//cout<<"$$$ "<< scaledCoord[dim]<<endl;
 		if (scaledCoord[dim] < 0 || scaledCoord[dim] > 1) {
 			throw std::runtime_error("Coordinate " + std::to_string(coord.getValue<ValueType>()) + " at position " 
 				+ std::to_string(index*dimensions + dim) + " does not agree with bounds "
@@ -215,16 +215,16 @@ ValueType ParcoRepart<IndexType, ValueType>::getHilbertIndex3D(const DenseVector
 		}
 	}
 
-//	for(int i=0;i<coordinates.size();++i)
-//		std::cout<< scaledCoord[i] << std::endl;
+	//for(int i=0;i<coordinates.size();++i)
+	//	std::cout<< scaledCoord[i] << std::endl;
 	
-//	cout<<endl<<__LINE__<<": point"<<" ("<<index<<") = ["<< scaledCoord[0]<<","<<scaledCoord[1]<<","<<scaledCoord[2]<<"]" <<endl;
+	//cout<<endl<<__LINE__<<": point"<<" ("<<index<<") = ["<< scaledCoord[0]<<","<<scaledCoord[1]<<","<<scaledCoord[2]<<"]" <<endl;
 	ValueType tmpX, tmpY, tmpZ;
 	ValueType x ,y ,z; 	//the coordinates each of the three dimensions
 	x= scaledCoord[0];
 	y= scaledCoord[1];
 	z= scaledCoord[2];
-	long integerIndex = 0;//TODO: also check whether this data type is long enough
+	long integerIndex = 0;	//TODO: also check whether this data type is long enough
 	for (IndexType i = 0; i < recursionDepth; i++) {
 		int subSquare;
 		if (z < 0.5) {
@@ -283,16 +283,11 @@ ValueType ParcoRepart<IndexType, ValueType>::getHilbertIndex3D(const DenseVector
 					z= -2*tmpX+1;				
 				}		
 			
-		integerIndex = (integerIndex << 2) | subSquare;
-		//cout<<__LINE__<<": ["<<  scaledCoord[0]<<","<<scaledCoord[1]<<","<<scaledCoord[2]<<"]" <<endl;
-		//cout<<__LINE__<<": "<< subSquare <<" _ "<< integerIndex<<endl;
-		//cout<<"\t["<< scaledCoord[0]<<","<<scaledCoord[1]<<"]"<<endl<<endl;
-		
+		integerIndex = (integerIndex << 2) | subSquare;		
 	}
 
 	long divisor = 1 << (2*int(recursionDepth)+1);
 	double ret = double(integerIndex) / double(divisor);
-//	cout<<"divisor= "<< divisor << " ret value= "<< ret<<endl;
 	return ret; 
 }
 
@@ -364,7 +359,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		}
 	}
 
-	//the following is ~5% faster if manually inlined, probably because localPartOfCoords doesn't have to be computed twice
+	/**
+	* Several possibilities exist for choosing the recursion depth. Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points
+	*/
+	//getMinimumNeighbourDistance is ~5% faster if manually inlined, probably because localPartOfCoords doesn't have to be computed twice
 	//const ValueType minDistance = getMinimumNeighbourDistance(input, coordinates, dimensions);
 	const IndexType recursionDepth = std::log2(n);// std::ceil(std::log2(maxExtent / minDistance) / 2);
 
@@ -380,22 +378,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	}
 
 	/**
-	* now sort the global indices by where they are on the space-filling curve. Since distributed sorting is not yet available, we gather them all and sort them locally
+	* now sort the global indices by where they are on the space-filling curve.
 	*/
-	
-	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
-	hilbertIndices.redistribute(noDistPointer);
 
-	assert(hilbertIndices.getDistributionPtr()->getLocalSize() == n);
-	
-	const scai::utilskernel::LArray<ValueType> allHilbertIndices = hilbertIndices.getLocalValues();
-
-	std::vector<IndexType> allGlobalIndices(n);
-	IndexType p = 0;
-	std::generate(allGlobalIndices.begin(), allGlobalIndices.end(), [&p](){return p++;});
-
-	std::sort(allGlobalIndices.begin(), allGlobalIndices.end(), [&allHilbertIndices](IndexType i, IndexType j){return allHilbertIndices[i] < allHilbertIndices[j];});
-
+	scai::lama::DenseVector<IndexType> permutation;
+	hilbertIndices.sort(permutation, true);
+	permutation.redistribute(inputDist);
 
 	/**
 	* check for uniqueness. If not unique, level of detail was insufficient.
@@ -405,25 +393,363 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	/**
 	* initial partitioning with sfc. Upgrade to chains-on-chains-partitioning later
 	*/
-	DenseVector<IndexType> result(n,0);//not distributed right now
-	for (IndexType i = 0; i < n; i++) {
-		result.setValue(allGlobalIndices[i], int(k*i / n));
+	DenseVector<IndexType> result(inputDist);
+	scai::hmemo::ReadAccess<IndexType> readAccess(permutation.getLocalValues());
+	for (IndexType i = 0; i < localN; i++) {
+		IndexType targetPos;
+		readAccess.getValue(targetPos, i);
+		result.setValue(inputDist->local2global(i), int(k*targetPos / n));
 	}
 
-
 	/**
-	* local refinement, use Fiduccia-Mattheyses
+	* local refinement, use Fiduccia-Mattheyses. 
 	*/
 
+	if (false && inputDist->isReplicated()) {
+		ValueType gain = 1;
+		ValueType cut = computeCut(input, result);
+		while (gain > 0) {
+			gain = fiducciaMattheysesRound(input, result, k, epsilon);
+			ValueType oldCut = cut;
+			cut = computeCut(input, result);
+			assert(oldCut - gain == cut);
+			std::cout << "Last FM round yielded gain of " << gain << ", for total cut of " << computeCut(input, result) << std::endl;
+		}
+	}
 
-
-	//dummy result
 	return result;
 }
 
+template<typename IndexType, typename ValueType>
+ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon) {
+	const IndexType n = input.getNumRows();
+	/**
+	* check input and throw errors
+	*/
+	const Scalar minPartID = part.min();
+	const Scalar maxPartID = part.max();
+	if (minPartID.getValue<IndexType>() != 0) {
+		throw std::runtime_error("Smallest block ID is " + std::to_string(minPartID.getValue<IndexType>()) + ", should be 0");
+	}
+
+	if (maxPartID.getValue<IndexType>() != k-1) {
+		throw std::runtime_error("Highest block ID is " + std::to_string(maxPartID.getValue<IndexType>()) + ", should be " + std::to_string(k-1));
+	}
+
+	if (part.size() != n) {
+		throw std::runtime_error("Partition has " + std::to_string(part.size()) + " entries, but matrix has " + std::to_string(n) + ".");
+	}
+
+	if (epsilon < 0) {
+		throw std::runtime_error("Epsilon must be >= 0, not " + std::to_string(epsilon));
+	}
+
+	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+	const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
+
+	if (!inputDist->isReplicated()) {
+		throw std::runtime_error("Input matrix must be replicated, for now.");
+	}
+
+	if (!partDist->isReplicated()) {
+		throw std::runtime_error("Input partition must be replicated, for now.");
+	}
+
+	/**
+	* allocate data structures
+	*/
+
+	const double optSize = ceil(double(n) / k);
+	const double maxAllowablePartSize = optSize*(1+epsilon);
+
+	std::vector<IndexType> bestTargetPartition(n);
+	std::vector<PrioQueue<ValueType, IndexType>> queues(k, n);
+
+	std::vector<IndexType> gains;
+	std::vector<std::pair<IndexType, IndexType> > transfers;
+	std::vector<IndexType> transferedVertices;
+	std::vector<double> imbalances;
+
+	std::vector<double> fragmentSizes(k);
+
+	double maxFragmentSize = 0;
+
+	for (IndexType i = 0; i < n; i++) {
+		Scalar partID = part.getValue(i);
+		assert(partID.getValue<IndexType>() >= 0);
+		assert(partID.getValue<IndexType>() < k);
+		fragmentSizes[partID.getValue<IndexType>()] += 1;
+
+		if (fragmentSizes[partID.getValue<IndexType>()] < maxFragmentSize) {
+			maxFragmentSize = fragmentSizes[partID.getValue<IndexType>()];
+		}
+	}
+
+	std::vector<IndexType> degrees(n);
+
+	std::vector<std::vector<ValueType> > edgeCuts(n);
+	for (IndexType v = 0; v < n; v++) {
+		edgeCuts[v].resize(k, 0);
+
+	}
+
+	//TODO: use ReadAccess instead
+	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
+	const scai::utilskernel::LArray<IndexType>& ia = localStorage.getIA();
+	const scai::utilskernel::LArray<IndexType>& ja = localStorage.getJA();
+	const scai::utilskernel::LArray<IndexType>& values = localStorage.getValues();
+
+	ValueType totalWeight = 0;
+
+	for (IndexType v = 0; v < n; v++) {
+		const IndexType beginCols = ia[v];
+		const IndexType endCols = ia[v+1];
+		degrees[v] = endCols - beginCols;
+		for (IndexType j = beginCols; j < endCols; j++) {
+			IndexType neighbor = ja[j];
+			Scalar partID = part.getValue(neighbor);
+			edgeCuts[v][partID.getValue<IndexType>()] += 1;//values[j];
+			totalWeight += 1;//values[j];
+		}
+	}
+
+	for (IndexType v = 0; v < n; v++) {
+		ValueType maxCut = -totalWeight;
+		IndexType idAtMax = k;
+		Scalar partID = part.getValue(v);
+
+		for (IndexType fragment = 0; fragment < k; fragment++) {
+			if (fragment != partID.getValue<IndexType>() && edgeCuts[v][fragment] > maxCut && fragmentSizes[fragment] <= maxAllowablePartSize) {
+				idAtMax = fragment;
+				maxCut = edgeCuts[v][fragment];
+			}
+		}
+
+		assert(idAtMax < k);
+		bestTargetPartition[v] = idAtMax;
+		assert(partID.getValue<IndexType>() < queues.size());
+		if (fragmentSizes[partID.getValue<IndexType>()] > 1) {
+			queues[partID.getValue<IndexType>()].insert(-(maxCut-edgeCuts[v][partID.getValue<IndexType>()]), v); //negative max gain
+		}
+	}
+
+	ValueType gainsum = 0;
+	bool allQueuesEmpty = false;
+
+	std::vector<bool> moved(n, false);
+
+	while (!allQueuesEmpty) {
+	allQueuesEmpty = true;
+
+	//choose largest partition with non-empty queue.
+	IndexType largestMovablePart = k;
+	IndexType largestSize = 0;
+
+	for (IndexType partID = 0; partID < k; partID++) {
+		if (queues[partID].size() > 0 && fragmentSizes[partID] > largestSize) {
+			largestMovablePart = partID;
+			largestSize = fragmentSizes[partID];
+		}
+	}
+
+	if (largestSize > 1 && largestMovablePart != k) {
+		//at least one queue is not empty
+		allQueuesEmpty = false;
+		IndexType partID = largestMovablePart;
+
+		assert(partID < queues.size());
+		assert(queues[partID].size() > 0);
+
+		IndexType topVertex;
+		ValueType topGain;
+		std::tie(topGain, topVertex) = queues[partID].extractMin();
+		topGain = -topGain;//invert, since the negative gain was used as priority.
+		assert(topVertex < n);
+		assert(topVertex >= 0);
+
+		//now get target partition.
+		IndexType targetFragment = bestTargetPartition[topVertex];
+		ValueType storedGain = edgeCuts[topVertex][targetFragment] - edgeCuts[topVertex][partID];
+		assert(abs(storedGain - topGain) < 0.0001);
+		assert(fragmentSizes[partID] > 1);
+		//ValueType checkedGain = calculateGain(g, part, topVertex, targetFragment);
+		//assert(abs(checkedGain - topGain) < 0.00001);
+
+		//move node there
+		part.setValue(topVertex, targetFragment);
+		moved[topVertex] = true;
+
+		//udpate size map
+		fragmentSizes[partID] -= 1;
+		fragmentSizes[targetFragment] += 1;
+
+		//update history
+		gainsum += topGain;
+		gains.push_back(gainsum);
+		transfers.emplace_back(partID, targetFragment);
+		transferedVertices.push_back(topVertex);
+		assert(transferedVertices.size() == transfers.size());
+		assert(gains.size() == transfers.size());
+
+		double imbalance = (*std::max_element(fragmentSizes.begin(), fragmentSizes.end()) - optSize) / optSize;
+		imbalances.push_back(imbalance);
+
+		//std::cout << "Moved node " << topVertex << " to block " << targetFragment << " for gain of " << topGain << ", bringing sum to " << gainsum 
+		//<< " and imbalance to " << imbalance  << "." << std::endl;
+
+		//TODO: replace by ReadAccess
+		const IndexType beginCols = ia[topVertex];
+		const IndexType endCols = ia[topVertex+1];
+
+		for (IndexType j = beginCols; j < endCols; j++) {
+			const IndexType neighbour = ja[j];
+			if (!moved[neighbour]) {
+				//update gain
+				Scalar partID = part.getValue(neighbour);
+
+				edgeCuts[neighbour][partID.getValue<IndexType>()] -= 1;//values[j];
+				edgeCuts[neighbour][targetFragment] += 1;//values[j];
+
+				//find new fragment for neighbour
+				ValueType maxCut = -totalWeight;
+				IndexType idAtMax = k;
+
+				for (IndexType fragment = 0; fragment < k; fragment++) {
+					if (fragment != partID && edgeCuts[neighbour][fragment] > maxCut  && fragmentSizes[fragment] <= maxAllowablePartSize) {
+						idAtMax = fragment;
+						maxCut = edgeCuts[neighbour][fragment];
+					}
+				}
+
+				bestTargetPartition[neighbour] = idAtMax;
+
+				//update prioqueue
+				queues[partID.getValue<IndexType>()].remove(neighbour);
+				queues[partID.getValue<IndexType>()].insert(-(maxCut-edgeCuts[neighbour][partID.getValue<IndexType>()]), neighbour);
+
+				}
+			}
+		}
+	}
+
+	const IndexType testedNodes = gains.size();
+	if (testedNodes == 0) return 0;
+	assert(gains.size() == transfers.size());
+
+	/**
+	 * now find best partition among those tested
+	 */
+	IndexType maxIndex = -1;
+	ValueType maxGain = 0;
+	for (IndexType i = 0; i < testedNodes; i++) {
+		if (gains[i] > maxGain && imbalances[i] <= epsilon) {
+			maxIndex = i;
+			maxGain = gains[i];
+		}
+	}
+	assert(testedNodes >= maxIndex);
+	assert(maxIndex >= 0);
+	assert(testedNodes-1 < transfers.size());
+
+	/**
+	 * apply partition modifications in reverse until best is recovered
+	 */
+	for (int i = testedNodes-1; i > maxIndex; i--) {
+		assert(transferedVertices[i] < n);
+		assert(transferedVertices[i] >= 0);
+		part.setValue(transferedVertices[i], transfers[i].first);
+	}
+	return maxGain;
+}
+
+template<typename IndexType, typename ValueType>
+ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool ignoreWeights) {
+	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+	const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
+	const IndexType n = inputDist->getGlobalSize();
+	const IndexType localN = inputDist->getLocalSize();
+
+	if (!partDist->isReplicated()) {
+		throw std::runtime_error("Input partition must be replicated, for now.");
+	}
+
+	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
+	scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+	scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+
+	scai::hmemo::ReadAccess<IndexType> partAccess(part.getLocalValues());
+
+	ValueType result = 0;
+	for (IndexType i = 0; i < localN; i++) {
+		const IndexType beginCols = ia[i];
+		const IndexType endCols = ia[i+1];
+		assert(ja.size() >= endCols);
+
+		const IndexType globalI = inputDist->local2global(i);
+		IndexType thisBlock;
+		partAccess.getValue(thisBlock, globalI);
+		
+		for (IndexType j = beginCols; j < endCols; j++) {
+			IndexType neighbor = ja[j];
+			assert(neighbor >= 0);
+			assert(neighbor < n);
+				
+			IndexType neighborBlock;
+			partAccess.getValue(neighborBlock, neighbor);
+			if (neighborBlock != thisBlock) {
+				if (ignoreWeights) {
+					result++;
+				} else {
+					ValueType edgeWeight;
+					values.getValue(edgeWeight, j);
+					result += edgeWeight;
+				}
+			}
+		}
+	}
+
+	if (!inputDist->isReplicated()) {
+    //sum block sizes over all processes
+    result = inputDist->getCommunicatorPtr()->sum(result);
+  }
+
+  return result / 2; //counted each edge from both sides
+}
+
+template<typename IndexType, typename ValueType>
+ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<IndexType> &part, IndexType k) {
+	const IndexType n = part.getDistributionPtr()->getGlobalSize();
+	std::vector<IndexType> subsetSizes(k, 0);
+	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
+	const Scalar maxK = part.max();
+	if (maxK.getValue<IndexType>() >= k) {
+		throw std::runtime_error("Block id " + std::to_string(maxK.getValue<IndexType>()) + " found in partition with supposedly" + std::to_string(k) + " blocks.");
+	}
+ 	
+	for (IndexType i = 0; i < localPart.size(); i++) {
+		IndexType partID;
+		localPart.getValue(partID, i);
+		subsetSizes[partID] += 1;
+	}
+	IndexType optSize = std::ceil(n / k);
+
+	//if we don't have the full partition locally, 
+	scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
+	if (!part.getDistribution().isReplicated()) {
+	  //sum block sizes over all processes
+	  for (IndexType partID = 0; partID < k; partID++) {
+	    subsetSizes[partID] = comm->sum(subsetSizes[partID]);
+	  }
+	}
+	
+	IndexType maxBlockSize = *std::max_element(subsetSizes.begin(), subsetSizes.end());
+	return ((maxBlockSize - optSize)/ optSize);
+}
+
 //to force instantiation
-template DenseVector<double> ParcoRepart<double, double>::partitionGraph(CSRSparseMatrix<double> &input, DenseVector<double> &coordinates,
-					double dimensions,	double k,  double epsilon);
+template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, DenseVector<double> &coordinates,
+					int dimensions,	int k,  double epsilon);
 
 template double ParcoRepart<int, double>::getHilbertIndex(const DenseVector<double> &coordinates, int dimensions, int index, int recursionDepth,
 	const std::vector<double> &minCoords, const std::vector<double> &maxCoords);
@@ -434,8 +760,15 @@ template double ParcoRepart<int, double>::getHilbertIndex3D(const DenseVector<do
 template double ParcoRepart<int, double>::getMinimumNeighbourDistance(const CSRSparseMatrix<double> &input, const DenseVector<double> &coordinates,
  int dimensions);
 
+
 template DenseVector<double> ParcoRepart<int, double>::Hilbert2DIndex2Point(double index, int level);
 			     
 //template struct point ParcoRepart<int, double>::hilbert(double index, int level);
+template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int> &partition, int k);
+
+template double ParcoRepart<int, double>::computeCut(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, bool ignoreWeights);
+
+template double ParcoRepart<int, double>::fiducciaMattheysesRound(const CSRSparseMatrix<double> &input, DenseVector<int> &part, int k, double epsilon);
+
 
 }

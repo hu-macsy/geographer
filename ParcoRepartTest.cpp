@@ -240,17 +240,17 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
     }
   }
 
-  scai::lama::DenseVector<ValueType> partition = ParcoRepart<ValueType, ValueType>::partitionGraph(a, coordinates, dim,  k, epsilon);
+  scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, dim,  k, epsilon);
 
   EXPECT_EQ(n, partition.size());
-  EXPECT_EQ(0, partition.min().getValue<ValueType>());
-  EXPECT_EQ(k-1, partition.max().getValue<ValueType>());
+  EXPECT_EQ(0, partition.min().getValue<IndexType>());
+  EXPECT_EQ(k-1, partition.max().getValue<IndexType>());
   EXPECT_TRUE(partition.getDistribution().isReplicated());//for now
 
   std::vector<IndexType> subsetSizes(k, 0);//probably replace with some Lama data structure later
-  scai::utilskernel::LArray<ValueType> localPartition = partition.getLocalValues();
+  scai::utilskernel::LArray<IndexType> localPartition = partition.getLocalValues();
   for (IndexType i = 0; i < localPartition.size(); i++) {
-    ValueType partID = localPartition[i];
+    IndexType partID = localPartition[i];
     EXPECT_LE(partID, k);
     EXPECT_GE(partID, 0);
     subsetSizes[partID] += 1;
@@ -289,11 +289,12 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
 
   ValueType epsilon = 0.05;
 
-  scai::lama::DenseVector<ValueType> partition = ParcoRepart<ValueType, ValueType>::partitionGraph(a, coordinates, dimensions,  k, epsilon);
+  scai::lama::DenseVector<ValueType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, dimensions,  k, epsilon);
 
   EXPECT_EQ(n, partition.size());
   EXPECT_EQ(0, partition.min().getValue<ValueType>());
   EXPECT_EQ(k-1, partition.max().getValue<ValueType>());
+  EXPECT_EQ(a.getRowDistribution(), partition.getDistribution());
 
   std::vector<IndexType> subsetSizes(k, 0);
   scai::utilskernel::LArray<ValueType> localPartition = partition.getLocalValues();
@@ -317,7 +318,110 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
 }
 
 
+TEST_F(ParcoRepartTest, testImbalance) {
+  const IndexType n = 10000;
+  const IndexType k = 10;
 
+  scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+
+  //generate random partition
+  scai::lama::DenseVector<IndexType> part(dist);
+  for (IndexType i = 0; i < n; i++) {
+    IndexType blockId = rand() % k;
+    part.setValue(i, blockId);
+  }
+
+  //sanity check for partition generation
+  ASSERT_GE(part.min().getValue<ValueType>(), 0);
+  ASSERT_LE(part.max().getValue<ValueType>(), k-1);
+
+  ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k);
+  EXPECT_GE(imbalance, 0);
+
+  // test perfectly balanced partition
+  for (IndexType i = 0; i < n; i++) {
+    IndexType blockId = i % k;
+    part.setValue(i, blockId);
+  }
+  imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k);
+  EXPECT_EQ(0, imbalance);
+
+  //test maximally imbalanced partition
+  for (IndexType i = 0; i < n; i++) {
+    IndexType blockId = 0;
+    part.setValue(i, blockId);
+  }
+  imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k);
+  EXPECT_EQ((n/std::ceil(n/k))-1, imbalance);
+}
+
+TEST_F(ParcoRepartTest, testCut) {
+  const IndexType n = 1000;
+  const IndexType k = 10;
+
+  //generate random complete matrix
+  scai::lama::CSRSparseMatrix<ValueType>a(n,n);
+  scai::lama::MatrixCreator::fillRandom(a, 1);
+
+  //generate balanced partition
+  scai::lama::DenseVector<IndexType> part(n, 0);
+  for (IndexType i = 0; i < n; i++) {
+    IndexType blockId = i % k;
+    part.setValue(i, blockId);
+  }
+
+  //cut should be 10*900 / 2
+  const IndexType blockSize = n / k;
+  const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  EXPECT_EQ(k*blockSize*(n-blockSize) / 2, cut);
+}
+
+TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
+  const IndexType n = 10000;
+  const IndexType k = 10;
+  const ValueType epsilon = 0.05;
+  const IndexType iterations = 1;
+
+  //generate random matrix
+  scai::lama::CSRSparseMatrix<ValueType>a(n,n);
+  scai::lama::MatrixCreator::fillRandom(a, 0.01);
+
+  //generate random partition
+  scai::lama::DenseVector<IndexType> part(n, 0);
+  for (IndexType i = 0; i < n; i++) {
+    IndexType blockId = rand() % k;
+    part.setValue(i, blockId);
+  }
+
+  ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  for (IndexType i = 0; i < iterations; i++) {
+    ValueType gain = ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(a, part, k, epsilon);
+
+    //check correct gain calculation
+    const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+    EXPECT_EQ(cut - gain, newCut);
+    EXPECT_LE(newCut, cut);
+    cut = newCut;
+  }
+  
+  //generate balanced partition
+  for (IndexType i = 0; i < n; i++) {
+    IndexType blockId = i % k;
+    part.setValue(i, blockId);
+  }
+
+  //check correct cut with balanced partition
+  cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  ValueType gain = ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(a, part, k, epsilon);
+  const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  EXPECT_EQ(cut - gain, newCut);
+  EXPECT_LE(newCut, cut);
+
+  //check for balance
+  ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k);
+  EXPECT_LE(imbalance, epsilon);
+}
 
 /**
 * TODO: test for correct error handling in case of inconsistent distributions
