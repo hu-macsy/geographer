@@ -15,7 +15,7 @@
 #include <cstdlib>
 
 #include "ParcoRepart.h"
-#include "gtest.h"
+#include "gtest/gtest.h"
 
 typedef double ValueType;
 typedef int IndexType;
