@@ -494,11 +494,14 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 	std::vector<IndexType> degrees(n);
 	std::vector<std::vector<ValueType> > edgeCuts(n);
 
-	//TODO: use ReadAccess instead
+	//Using ReadAccess here didn't give a performance benefit
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::utilskernel::LArray<IndexType>& ia = localStorage.getIA();
 	const scai::utilskernel::LArray<IndexType>& ja = localStorage.getJA();
 	const scai::utilskernel::LArray<IndexType>& values = localStorage.getValues();
+	if (!unweighted && values.min() < 0) {
+		throw std::runtime_error("Only positive edge weights are supported, " + std::to_string(values.min()) + " invalid.");
+	}
 
 	ValueType totalWeight = 0;
 
@@ -512,14 +515,10 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 		for (IndexType j = beginCols; j < endCols; j++) {
 			IndexType neighbor = ja[j];
 			if (neighbor == v) continue;
-			if (!unweighted && values[j] < 0) {
-				throw std::runtime_error("Only positive edge weights are supported, " + std::to_string(values[j]) + " invalid.");
-			}
 			Scalar partID = part.getValue(neighbor);
 			edgeCuts[v][partID.getValue<IndexType>()] += unweighted ? 1 : values[j];
 			totalWeight += unweighted ? 1 : values[j];
 		}
-		//std::cout << "Degree[" << v << "] = " << degrees[v] << "." << std::endl;
 	}
 
 	//setting initial best target for each node
@@ -599,8 +598,6 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 		assert(abs(storedGain - topGain) < 0.0001);
 		assert(fragmentSizes[partID] > 1);
 
-		//const ValueType preMoveCut = computeCut(input, part, unweighted);
-		//assert(oldCut - gainsum == preMoveCut);
 
 		//move node there
 		part.setValue(topVertex, targetFragment);
@@ -617,28 +614,6 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 		transferedVertices.push_back(topVertex);
 		assert(transferedVertices.size() == transfers.size());
 		assert(gains.size() == transfers.size());
-		//const ValueType currentCut = computeCut(input, part, unweighted);
-
-		/**
-		if (oldCut - gainsum != currentCut) {
-			const IndexType beginCols = ia[topVertex];
-			const IndexType endCols = ia[topVertex+1];
-			ValueType checkedGain = 0;
-			for (IndexType j = beginCols; j < endCols; j++) {
-				const IndexType neighbour = ja[j];
-				if (neighbour == topVertex) continue;
-				Scalar neighbourBlockScalar = part.getValue(neighbour);
-				IndexType neighbourBlock = neighbourBlockScalar.getValue<IndexType>();
-				if (neighbourBlock == targetFragment) checkedGain += unweighted ? 1 : values[j];
-				else if (neighbourBlock == partID) checkedGain -= unweighted ? 1 : values[j];
-				std::cout << storedGain << ", " << topGain << ", " << checkedGain << std::endl;
-			}
-			assert(oldCut - (gainsum - topGain + checkedGain) == currentCut);
-			
-		}
-		
-		assert(oldCut - gainsum == currentCut);		
-		*/
 
 		double imbalance = (*std::max_element(fragmentSizes.begin(), fragmentSizes.end()) - optSize) / optSize;
 		imbalances.push_back(imbalance);
@@ -646,7 +621,7 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 		//std::cout << "Moved node " << topVertex << " to block " << targetFragment << " for gain of " << topGain << ", bringing sum to " << gainsum 
 		//<< " and imbalance to " << imbalance  << "." << std::endl;
 
-		//TODO: replace by ReadAccess
+		//I've tried to replace these direct accesses by ReadAccess, program was slower
 		const IndexType beginCols = ia[topVertex];
 		const IndexType endCols = ia[topVertex+1];
 
