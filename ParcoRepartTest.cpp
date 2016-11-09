@@ -386,18 +386,10 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
   //generate random matrix
   scai::lama::CSRSparseMatrix<ValueType>a(n,n);
   scai::lama::MatrixCreator::buildPoisson(a, 3, 19, 10,10,10);
+
+  //we want a replicated matrix
   scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
   a.redistribute(noDistPointer, noDistPointer);
-
-  /**
-  //static void buildPoisson(
-        Matrix& matrix,
-        const IndexType dimension,
-        const IndexType stencilType,
-        const IndexType dimX,
-        const IndexType dimY,
-        const IndexType dimZ )
-        */
 
   //generate random partition
   scai::lama::DenseVector<IndexType> part(n, 0);
@@ -433,6 +425,31 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
   //check for balance
   ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k);
   EXPECT_LE(imbalance, epsilon);
+}
+
+TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
+  const IndexType n = 1000;
+  const IndexType k = 10;
+  const ValueType epsilon = 0.05;
+
+  //generate random matrix
+  scai::lama::CSRSparseMatrix<ValueType>a(n,n);
+  scai::lama::MatrixCreator::buildPoisson(a, 3, 19, 10,10,10);
+
+  //generate balanced partition
+  scai::lama::DenseVector<IndexType> part(n, 0);
+
+  for (IndexType i = 0; i < n; i++) {
+    IndexType blockId = i % k;
+    part.setValue(i, blockId);
+  }
+
+  //this object is only necessary since the Google test macro cannot handle multi-parameter templates in its comma resolution
+  ParcoRepart<IndexType, ValueType> repart;
+
+  if (!(a.getRowDistributionPtr()->isReplicated() && a.getColDistributionPtr()->isReplicated())) {
+    EXPECT_THROW(repart.fiducciaMattheysesRound(a, part, k, epsilon), std::runtime_error);
+  }
 }
 
 /**
