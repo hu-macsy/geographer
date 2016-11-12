@@ -289,7 +289,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
 
   ValueType epsilon = 0.05;
 
-  scai::lama::DenseVector<ValueType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, dimensions,  k, epsilon);
+  scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, dimensions,  k, epsilon);
 
   EXPECT_EQ(n, partition.size());
   EXPECT_EQ(0, partition.min().getValue<ValueType>());
@@ -451,12 +451,6 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
     EXPECT_THROW(repart.fiducciaMattheysesRound(a, part, k, epsilon), std::runtime_error);
   }
 }
-
-/**
-* TODO: test for correct error handling in case of inconsistent distributions
-*/
-
-
 
 } //namespace
 

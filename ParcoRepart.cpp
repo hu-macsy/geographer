@@ -15,7 +15,7 @@
 #include "PrioQueue.h"
 #include "ParcoRepart.h"
 
-using namespace std;
+using std::vector;
 
 namespace ITI {
 
