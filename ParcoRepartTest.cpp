@@ -13,6 +13,8 @@
 
 #include <memory>
 #include <cstdlib>
+#include <fstream>
+#include <iostream>
 
 #include "ParcoRepart.h"
 #include "gtest/gtest.h"
@@ -58,7 +60,7 @@ TEST_F(ParcoRepartTest, testHilbertIndexUnitSquare_3D) {
   const IndexType dimensions = 3;
   const IndexType n = 5;
   const IndexType recursionDepth = 3;
-  ValueType tempArray[3*n] = {0.1, 0.1, 0.13, 0.61, 0.1, 0.36, 0.7, 0.7, 0.35, 0.45, 0.61, 0.71, 0.76, 0.13, 0.88};
+  ValueType tempArray[3*n] = {0.1, 0.1, 0.13, 0.1, 0.61, 0.36, 0.7, 0.7, 0.35, 0.65, 0.41, 0.71, 0.4, 0.13, 0.88};
   DenseVector<ValueType> coordinates(n*dimensions, 0);
   coordinates.setValues(scai::hmemo::HArray<ValueType>(3*n, tempArray));
   const std::vector<ValueType> minCoords({0,0,0});
@@ -94,14 +96,19 @@ TEST_F(ParcoRepartTest, testHilbertIndexDistributedRandom_3D) {
     r= ((double) rand()/RAND_MAX);
     tempArray[i]= r;
   }
- 
-  coordinates.setValues(scai::hmemo::HArray<ValueType>(n*dimensions, tempArray));
-/*  for(int i=0; i<n; i++){
-    for(int j=0; j<dimensions; j++)
-      std::cout<< coordinates((i*dimensions+j)) <<", ";
-    std::cout <<"\b"<< std::endl;
+  //std::cout<<coordinates.size() <<"##"<< sizeof(tempArray)/sizeof(*tempArray)<< std::endl;
+  //coordinates.setValues(n*dimensions, tempArray);
+
+  for(int i=0; i<n; i++){
+    for(int j=0; j<dimensions; j++){
+      if(dist->isLocal(i*dimensions+j)){
+	coordinates.setValue( i*dimensions+j,tempArray[i*dimensions+j]);	
+        //std::cout<< coordinates((i*dimensions+j)) <<", ";
+      }
+    }
+    //std::cout<<std::endl;
   }
-*/
+
   scai::dmemo::DistributionPtr distIndices ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
 
   const IndexType localN = dist->getLocalSize()/dimensions;
@@ -130,8 +137,8 @@ TEST_F(ParcoRepartTest, testHilbertIndexDistributedRandom_3D) {
   }
 
   //without the next two lines it messes up the indexes in the distribution
-  minCoords= {0,0,0};
-  maxCoords= {1,1,1};
+  //minCoords= {0,0,0};
+  //maxCoords= {1,1,1};
 
   std::vector<ValueType> indices(localN);
   for (IndexType i = 0; i < localN; i++) {
@@ -143,11 +150,11 @@ TEST_F(ParcoRepartTest, testHilbertIndexDistributedRandom_3D) {
   
 }
 
-
+//-------------------------------------------------------------------------------------------------
 
 TEST_F(ParcoRepartTest, test2DHibertIndex2Point){
 
-  int recursionDepth= 3;	
+  int recursionDepth= 4;	
   int n= 65;					//how many indices we want to try
   int dimensions= 2;
   double index;					//the index of the curve
@@ -163,9 +170,9 @@ TEST_F(ParcoRepartTest, test2DHibertIndex2Point){
   }
 
   // a non-random array of points
-  //indexV[0]=0.015;
-  //for(int i=1; i<n; i++)  
-  //  indexV[i]=indexV[i-1]+0.015;
+  indexV[0]=0.015;
+  for(int i=1; i<n; i++)  
+    indexV[i]=indexV[i-1]+0.015;
 
   ValueType hilbertI;
   std::vector<ValueType> hilbertIV(n);
@@ -175,7 +182,7 @@ TEST_F(ParcoRepartTest, test2DHibertIndex2Point){
   //sort the indices and calculate their coordinates in the unit square
   std::sort(indexV.begin(), indexV.end() );
   for(int i=0; i<n; i++){
-    p= ParcoRepart<IndexType, ValueType>::Hilbert2DIndex2Point(indexV[i], recursionDepth);
+    p= ParcoRepart<IndexType, ValueType>::Hilbert2DIndex2Point(indexV[i], recursionDepth+2);
     pointsV.push_back(p);
     hilbertI= ParcoRepart<IndexType, ValueType>::getHilbertIndex(p, dimensions, 0, recursionDepth, minCoords, maxCoords);
     hilbertIV[i]=hilbertI;
@@ -183,15 +190,117 @@ TEST_F(ParcoRepartTest, test2DHibertIndex2Point){
 
   int error_cnt=0;
   for(int i=1; i<n; i++){
-	if(hilbertIV[i-1]>hilbertIV[i])
-		error_cnt++;
+    if(hilbertIV[i-1]>hilbertIV[i])
+	error_cnt++;
     EXPECT_GE(hilbertIV[i],hilbertIV[i-1]);
   }
-  std::cout<<"error cnt="<<error_cnt<<std::endl;
+
 }
 
+//-------------------------------------------------------------------------------------------------
 
-//-----------------------------------------------------------------
+Scalar dist3D(DenseVector<ValueType> p1, DenseVector<ValueType> p2){
+  Scalar res0, res1, res2, res;
+  res0= p1.getValue(0)-p2.getValue(0);
+  res0= res0*res0;
+  res1= p1.getValue(1)-p2.getValue(1);
+  res1= res1*res1;
+  res2= p1.getValue(2)-p2.getValue(2);
+  res2= res2*res2;
+  res = res0+ res1+ res2;
+  return common::Math::sqrt( res.getValue<ScalarRepType>() );
+}
+//------------------------
+
+typedef struct myclass{
+  ValueType index;
+  DenseVector<ValueType> p;
+
+  bool operator()(ValueType a, ValueType b){return a<b; }
+}myObject;
+
+bool mysort(myObject a, myObject b){ return a.index<b.index; }
+
+
+/*
+* Create points in 3D, either random or in a structured, grid-like way (uncomment the appropriate part),
+* and calculate theis hilbert index. Sorts the index and the point in a myclass vector and sorts the vector
+* according to the hilbert index. Prints all the points in a file for visualisation.
+* Does not work in parallel due to not distibuted sort.
+*/
+TEST_F(ParcoRepartTest, testHilbert3DPoint2Index){
+  int recursionDepth= 4;
+  const int n= 512;
+  int dimensions= 3;
+  ValueType index;			//a number in [0, 1], the index of the Hilbert curve
+
+  std::vector<ValueType> indexV(n);
+  DenseVector<ValueType> p;				//a point in 3D
+  const std::vector<ValueType> minCoords({0,0,0});
+  const std::vector<ValueType> maxCoords({1,1,1});  
+
+  scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n*dimensions) );
+  DenseVector<ValueType> coordinates(dist);
+  scai::dmemo::DistributionPtr distIndices ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+
+// points at random
+/*  srand(time(NULL));
+  for(int i=0; i<n*dimensions; i++){
+    index= ((double) rand()/RAND_MAX);
+    //if(index<0.3)       index+=0.5;
+    //if(dist->isLocal(i))
+    coordinates.setValue(i, index);  
+    //std::cout<<i<<": "<<index<<std::endl;
+  }
+*/
+
+//points in a grid-like fashion
+  IndexType i=0;
+  ValueType indexX, indexY, indexZ;
+  for(indexZ=0.05; indexZ<=1; indexZ+=0.12)
+    for(indexY=0.05; indexY<=1; indexY+=0.12)
+      for(indexX=0.05; indexX<=1; indexX+=0.12){
+	coordinates.setValue(i,indexX);
+	coordinates.setValue(i+1,indexY);
+	coordinates.setValue(i+2,indexZ);
+	i=i+3;
+ }
+
+  std::vector<ValueType> hilbertIndex(n);
+  std::vector<myObject> points_sorted(n);
+  const IndexType localN = dist->getLocalSize()/dimensions;
+
+  for(int i=0; i<localN; i++){
+    hilbertIndex[i]= ParcoRepart<IndexType, ValueType>::getHilbertIndex3D(coordinates, dimensions, distIndices->local2global(i), recursionDepth ,minCoords, maxCoords);
+    points_sorted[i].p = DenseVector<ValueType>(3,0);
+    points_sorted[i].index= hilbertIndex[i];
+    points_sorted[i].p.setValue(0,coordinates.getValue(i*3));
+    points_sorted[i].p.setValue(1,coordinates.getValue(i*3+1));
+    points_sorted[i].p.setValue(2,coordinates.getValue(i*3+2));
+  }
+  std::sort(points_sorted.begin(), points_sorted.end(), mysort );
+
+  ValueType max_dist = sqrt(dimensions)/pow(2,recursionDepth);
+  Scalar actual_max_dist=0;
+  Scalar d;
+  std::ofstream f;
+  f.open ("hilbert3D.plt");
+
+  int cnt=0;
+  f<< points_sorted[0].p.getValue(0).getValue<ValueType>()<<" "<<points_sorted[0].p.getValue(1).getValue<ValueType>()<<" "<<points_sorted[0].p.getValue(2).getValue<ValueType>()<<std::endl;
+  for(int i=1; i<localN; i++){
+    //std::cout<< points_sorted[i].index <<"\t| "<< points_sorted[i].p.getValue(0)<<", "<<points_sorted[i].p.getValue(1)<<", "<<points_sorted[i].p.getValue(2)<<std::endl;
+    f<< points_sorted[i].p.getValue(0).getValue<ValueType>()<<" "<<points_sorted[i].p.getValue(1).getValue<ValueType>()<<" "<<points_sorted[i].p.getValue(2).getValue<ValueType>()<<std::endl;
+    if(points_sorted[i].index==points_sorted[i-1].index){
+	d= dist3D(points_sorted[i].p, points_sorted[i-1].p);
+	EXPECT_LT(d, Scalar( max_dist ));
+    }
+ }
+  f.close();
+}
+
+//-------------------------------------------------------------------------------------------------
 
 TEST_F(ParcoRepartTest, testMinimumNeighborDistanceDistributed) {
   IndexType nroot = 100;
@@ -452,6 +561,14 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
   }
 }
 
+
+/**
+* TODO: test for correct error handling in case of inconsistent distributions
+*/
+
+
+
+	
 } //namespace
 
 int main(int argc, char **argv) {

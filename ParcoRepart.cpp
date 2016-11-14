@@ -175,13 +175,15 @@ DenseVector<ValueType> ParcoRepart<IndexType, ValueType>::Hilbert2DIndex2Point(V
 }
 
 //-------------------------------------------------------------------------------------------------
-
+/**
+* Given a point in 3D it returns its hilbert index, a value in [0,1]. 
+**/
 template<typename IndexType, typename ValueType>
 ValueType ParcoRepart<IndexType, ValueType>::getHilbertIndex3D(const DenseVector<ValueType> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
 	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
 
 	if (dimensions != 3) {
-		throw std::logic_error("Space filling curve for 3 dimensions");
+		throw std::logic_error("Space filling curve for 3 dimensions.");
 	}
 
 	scai::dmemo::DistributionPtr coordDist = coordinates.getDistributionPtr();
@@ -205,59 +207,54 @@ ValueType ParcoRepart<IndexType, ValueType>::getHilbertIndex3D(const DenseVector
 	for (IndexType dim = 0; dim < dimensions; dim++) {
 		assert(coordDist->isLocal(index*dimensions+dim));
 		const Scalar coord = myCoords[coordDist->global2local(index*dimensions+dim)];
-		//cout<<"### "<< coord.getValue<ValueType>() << endl; 
 		scaledCoord[dim] = (coord.getValue<ValueType>() - minCoords[dim]) / (maxCoords[dim] - minCoords[dim]);
-		//cout<<"$$$ "<< scaledCoord[dim]<<endl;
 		if (scaledCoord[dim] < 0 || scaledCoord[dim] > 1) {
 			throw std::runtime_error("Coordinate " + std::to_string(coord.getValue<ValueType>()) + " at position " 
 				+ std::to_string(index*dimensions + dim) + " does not agree with bounds "
 				+ std::to_string(minCoords[dim]) + " and " + std::to_string(maxCoords[dim]));
 		}
 	}
-
-	//for(int i=0;i<coordinates.size();++i)
-	//	std::cout<< scaledCoord[i] << std::endl;
 	
-	//cout<<endl<<__LINE__<<": point"<<" ("<<index<<") = ["<< scaledCoord[0]<<","<<scaledCoord[1]<<","<<scaledCoord[2]<<"]" <<endl;
 	ValueType tmpX, tmpY, tmpZ;
 	ValueType x ,y ,z; 	//the coordinates each of the three dimensions
 	x= scaledCoord[0];
 	y= scaledCoord[1];
 	z= scaledCoord[2];
 	long integerIndex = 0;	//TODO: also check whether this data type is long enough
+
 	for (IndexType i = 0; i < recursionDepth; i++) {
 		int subSquare;
 		if (z < 0.5) {
-			if (y < 0.5) {
-				if (x <0.5){		//x,y,z <0.5
+			if (x < 0.5) {
+				if (y <0.5){		//x,y,z <0.5
 					subSquare= 0;
 					//apply inverse hilbert operator
 					tmpX= x;
 					x= 2*z;
 					z= 2*y;
 					y= 2*tmpX;
-				} else{			//y,z<0.5 and x>0.5
+				} else{			//z<0.5, y>0.5, x<0.5
 					subSquare= 1;
 					tmpX= x;
 					x= 2*y-1;
 					y= 2*z;
 					z= 2*tmpX;
 				}
-			} else if (x>0.5){		//z<0.5, y,x>0,5
+			} else if (y>=0.5){		//z<0.5, y,x>0,5
 					subSquare= 2;
 					//apply inverse hilbert operator
 					tmpX= x;					
 					x= 2*y-1;
 					y= 2*z;
 					z= 2*tmpX-1;
-				}else{			//z<0.5, y>0.5, x<0.5
+				}else{			//z<0.5, y<0.5, x>0.5
 					subSquare= 3;
 					x= -2*x+2;
 					y= -2*y+1;
-					z= -2*z;
+					z= 2*z;
 				}
-		} else if(y>0.5){
-				if(x<0.5){ 		//z>0.5, y>0.5, x<0.5
+		} else if(x>=0.5){
+				if(y<0.5){ 		//z>0.5, y<0.5, x>0.5
 					subSquare= 4;
 					x= -2*x+2;
 					y= -2*y+1;
@@ -269,13 +266,13 @@ ValueType ParcoRepart<IndexType, ValueType>::getHilbertIndex3D(const DenseVector
 					y= -2*z+2;
 					z= -2*tmpX+2;
 				}
-			}else if(x<0.5){		//z>0.5, y<0.5, x<0.5
+			}else if(y<0.5){		//z>0.5, y<0.5, x<0.5
 					subSquare= 7;	//care, this is 7, not 6	
 					tmpX= x;
 					x= -2*z+2;
 					z= -2*y+1;
 					y= 2*tmpX;
-				}else{			//z>0.5, y<0.5, x>0.5
+				}else{			//z>0.5, y>0.5, x<0.5
 					subSquare= 6;	//this is case 6
 					tmpX= x;
 					x= 2*y-1;
@@ -283,12 +280,41 @@ ValueType ParcoRepart<IndexType, ValueType>::getHilbertIndex3D(const DenseVector
 					z= -2*tmpX+1;				
 				}		
 			
-		integerIndex = (integerIndex << 2) | subSquare;		
+		integerIndex = (integerIndex << 3) | subSquare;		
 	}
-
-	long divisor = 1 << (2*int(recursionDepth)+1);
+	long divisor = 1 << (3*int(recursionDepth));
 	double ret = double(integerIndex) / double(divisor);
 	return ret; 
+
+}
+//-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+DenseVector<ValueType> ParcoRepart<IndexType, ValueType>::Hilbert3DIndex2Point(ValueType index, IndexType level){
+	DenseVector<ValueType>  p(3,0), ret(3,0);
+	ValueType r;
+	IndexType q;
+	
+	if(level==0)
+		return ret;
+	else{		
+		q=int(8*index); 
+    		r= 8*index-q;
+		if( (q==0) && r==0 ) return ret;
+		p = ParcoRepart<IndexType, ValueType>::Hilbert3DIndex2Point(r, level-1);
+
+		switch(q){
+			case 0: ret.setValue(0, p(1)/2);	ret.setValue(1, p(2)/2);	ret.setValue(2, p(0)/2);	return ret;
+			case 1: ret.setValue(0, p(2)/2);	ret.setValue(1, 0.5+p(0)/2);	ret.setValue(2, p(1)/2);	return ret;
+			case 2: ret.setValue(0, 0.5+p(2)/2);	ret.setValue(1, 0.5+p(0)/2);	ret.setValue(2, p(1)/2);	return ret;
+			case 3: ret.setValue(0, 1-p(0)/2);	ret.setValue(1, 0.5-p(1)/2);	ret.setValue(2, -p(2)/2);	return ret;
+			case 4: ret.setValue(0, 1-p(0)/2);	ret.setValue(1, 0.5-p(1)/2);	ret.setValue(2, 0.5+p(2)/2);	return ret;
+			case 5: ret.setValue(0, 1-p(2)/2);	ret.setValue(1, 0.5+p(0)/2);	ret.setValue(2, 1-p(1)/2);	return ret;
+			case 6: ret.setValue(0, 0.5-p(2)/2);	ret.setValue(1, 0.5+p(0)/2);	ret.setValue(2, 1-p(1)/2);	return ret;
+			case 7: ret.setValue(0, p(1)/2);	ret.setValue(1, 0.5-p(2)/2);	ret.setValue(2, 1-p(0)/2);	return ret;			
+		}
+	}
+	return ret;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -795,6 +821,8 @@ template double ParcoRepart<int, double>::getMinimumNeighbourDistance(const CSRS
 
 
 template DenseVector<double> ParcoRepart<int, double>::Hilbert2DIndex2Point(double index, int level);
+
+template DenseVector<double> ParcoRepart<int, double>::Hilbert3DIndex2Point(double index, int level);
 			     
 //template struct point ParcoRepart<int, double>::hilbert(double index, int level);
 template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int> &partition, int k);

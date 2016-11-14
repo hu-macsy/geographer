@@ -76,6 +76,12 @@ namespace ITI {
 			*/
 			static DenseVector<ValueType> Hilbert2DIndex2Point(ValueType index, IndexType recursionDepth);
 
+			/**
+			* Given an index between 0 and 1 returns a point in 3 dimensions along the hilbert curve based on
+			* the recursion depth.
+			* Mostly for test reasons.
+			*/
+			static DenseVector<ValueType> Hilbert3DIndex2Point(ValueType index, IndexType recursionDepth);
 
 			/**
 			* Performs local refinement of a given partition
