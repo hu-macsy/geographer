@@ -108,7 +108,7 @@ ValueType ParcoRepart<IndexType, ValueType>::getHilbertIndex(const DenseVector<V
 				+ std::to_string(minCoords[dim]) + " and " + std::to_string(maxCoords[dim]));
 		}
 	}
-	//cout<<"point: ["<<scaledCoord[0]<<","<<scaledCoord[1]<<"]\n";
+
 	double temp=1;
 	long integerIndex = 0;//TODO: also check whether this data type is long enough
 	for (IndexType i = 0; i < recursionDepth; i++) {
