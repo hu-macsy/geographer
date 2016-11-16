@@ -14,6 +14,7 @@
 
 #include "PrioQueue.h"
 #include "ParcoRepart.h"
+#include "HilbertCurve.h"
 
 using std::vector;
 
@@ -148,7 +149,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	scai::lama::DenseVector<ValueType> hilbertIndices(inputDist);
 	for (IndexType i = 0; i < localN; i++) {
 		IndexType globalIndex = inputDist->local2global(i);
-		ValueType globalHilbertIndex = ParcoRepart<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, globalIndex, recursionDepth, minCoords, maxCoords);
+		ValueType globalHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, globalIndex, recursionDepth, minCoords, maxCoords);
 		hilbertIndices.setValue(globalIndex, globalHilbertIndex);
 	}
 
