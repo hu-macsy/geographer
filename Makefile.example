@@ -1,6 +1,6 @@
 CC=g++
 
-FILES= ParcoRepartTest.cpp ParcoRepart.cpp ParcoRepartHilbert.cpp ParcoRepartHilbertTest.cpp
+FILES= test_main.cpp ParcoRepartTest.cpp ParcoRepart.cpp HilbertCurve.cpp HilbertCurveTest.cpp
 EXECUTABLE=Katanomi
 
 SCAI_INCLUDE=
