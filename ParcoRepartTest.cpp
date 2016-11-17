@@ -47,7 +47,7 @@ TEST_F(ParcoRepartTest, testMinimumNeighborDistanceDistributed) {
   for (IndexType i = 0; i < nroot; i++) {
     for (IndexType j = 0; j < nroot; j++) {
       //this is slightly wasteful, since it also iterates over indices of other processors
-      if (coordDist->isLocal(2*(i*nroot + j))) {
+      if (coordDist->isLocal(2*(i*nroot + j)) ) {
         coordinates.setValue(2*(i*nroot + j), i);
         coordinates.setValue(2*(i*nroot + j)+1, j);
       }
@@ -294,7 +294,10 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 
 } //namespace
 
+
+/*
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
+*/
