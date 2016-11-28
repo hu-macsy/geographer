@@ -5,6 +5,13 @@
  *      Author: tzovas
  */
 
+#include <scai/dmemo/Distribution.hpp>
+
+#include <assert.h>
+#include <cmath>
+#include <climits>
+#include <queue>
+
 #include "ParcoRepart.h"
 #include "HilbertCurve.h"
 
@@ -50,11 +57,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(const DenseVector<
 				+ std::to_string(minCoords[dim]) + " and " + std::to_string(maxCoords[dim]));
 		}
 	}
-    assert(scaledCoord[0]>=0 && scaledCoord[0]<=1);
-    assert(scaledCoord[1]>=0 && scaledCoord[1]<=1);
 
-//std::cout<<__LINE__<<":"<< scaledCoord[0]<< ", "<< scaledCoord[1]<< std::endl;
-    
    if(dimensions==2){
 	double temp=1;
 	long integerIndex = 0;//TODO: also check whether this data type is long enough
@@ -89,13 +92,12 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(const DenseVector<
 				scaledCoord[1] = 2*scaledCoord[1]-1;
 			}
 		}
-//std::cout<< subSquare<<std::endl;
 		integerIndex = (integerIndex << 2) | subSquare;	
 	}
 	long divisor = 1 << (2*int(recursionDepth));
 	double ret = double(integerIndex) / double(divisor);
 	return ret; 
-   }else //if dimensions==3
+   }else
 	return HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(coordinates, dimensions, index, recursionDepth ,minCoords, maxCoords);
 }
 
@@ -169,10 +171,6 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(const DenseVecto
 	x= scaledCoord[0];
 	y= scaledCoord[1];
 	z= scaledCoord[2];
-        //std::cout<< x <<"__" << y<< "__"<<z<<"\t";
-        assert(x>=0 && x<=1);
-        assert(y>=0 && y<=1);
-        assert(z>=0 && z<=1);
 	long integerIndex = 0;	//TODO: also check whether this data type is long enough
 
 	for (IndexType i = 0; i < recursionDepth; i++) {

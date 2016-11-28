@@ -19,6 +19,7 @@
 #include "ParcoRepart.h"
 #include "gtest/gtest.h"
 #include "HilbertCurve.h"
+#include "MeshIO.h"
 
 typedef double ValueType;
 typedef int IndexType;
@@ -31,28 +32,98 @@ class HilbertCurveTest : public ::testing::Test {
 
 };
 
-/*
+
 TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare) {
   const IndexType dimensions = 2;
   const IndexType n = 8;
-  const IndexType recursionDepth = 3;
-  ValueType tempArray[2*n] = {0.1, 0.1, 0.13, 0.11, 0.1, 0.6, 0.7, 0.7, 0.55, 0.45, 0.61, 0.1, 0.76, 0.13, 0.88, 0.1};
+  const IndexType recursionDepth = 7;
+  //ValueType tempArray[2*n] = {0.1, 0.1, 0.13, 0.11, 0.1, 0.6, 0.7, 0.7, 0.55, 0.45, 0.61, 0.1, 0.76, 0.13, 0.88, 0.1};
+  ValueType tempArray[2*n] ={0,1 , 0,5 , 0,15 , 1,3 , 1,15, 2,0 , 2,15 , 3,0};
   DenseVector<ValueType> coordinates(n*dimensions, 0);
+  DenseVector<ValueType> coords2;
+  
+  IndexType N= 8*8;
+  const std::vector<ValueType> maxCoords2({0.875,0.875});
+  coords2= MeshIO<IndexType, ValueType>::fromFile2Coords_2D("./meshes/Grid8x8.xyz", N);
+  for (IndexType i = 0; i < N*2; i++)
+      coords2.setValue(i, (coords2.getValue(i)+0.17)/8.2 );
+  std::cout<< "######### "<< coords2.max() << std::endl;;
+  
+  //for(int i=0; i<30; i=i+2)
+    //  std::cout<< coords2.getValue(i)<<","<<coords2.getValue(i+1)<< std::endl;
+  EXPECT_EQ(coords2.size(), N*2);
+  std::cout<< coords2.size()<< endl;
+  
   coordinates.setValues(scai::hmemo::HArray<ValueType>(2*n, tempArray));
   const std::vector<ValueType> minCoords({0,0});
-  const std::vector<ValueType> maxCoords({1,1});
-
+  const std::vector<ValueType> maxCoords({16,16});
+  
   std::vector<ValueType> indices(n);
-  for (IndexType i = 0; i < n; i++) {
+  DenseVector<ValueType> indices2(N, 0);
+  for (IndexType i = 0; i < n; i++){
     indices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, i, recursionDepth, minCoords, maxCoords);
     EXPECT_LE(indices[i], 1);
     EXPECT_GE(indices[i], 0);
   }
-  for(int j=0;j<n-1;j++){
-    EXPECT_LT(indices[j], indices[j+1]);	
+  
+  for (IndexType i = 0; i < N; i++){
+    indices2.setValue(i, HilbertCurve<IndexType, ValueType>::getHilbertIndex(coords2, dimensions, i, recursionDepth, minCoords, maxCoords2) );
   }
+  
+  for (IndexType i = 0; i < N; i++){
+        std::cout<< i<< ": "<< coords2.getValue(i*2).getValue<ValueType>() << ", "<< coords2.getValue(i*2+1).getValue<ValueType>()<< " -- "<< indices2.getValue(i).getValue<ValueType>() << std::endl;
+  }
+  
+  //for(IndexType i=33; i<950; i++)       indices2+=0.000001;
+  
+  
+  //for visualization purposes
+   std::ofstream f;
+   f.open ("hilbert2D_8x8.plt");
+   
+   dmemo::DistributionPtr dist( new dmemo::NoDistribution( N ));
+   DenseVector<IndexType> perm(dist);
+   
+std::cout<< indices2.getValue(19)<<"\t";
+   indices2.sort(perm, true);
+std::cout<< indices2.getValue(19)<<std::endl;
+
+   f<< coords2.getValue(perm.getValue(0).getValue<IndexType>()*dimensions).getValue<ValueType>()<< " "\
+    << coords2.getValue(perm.getValue(0).getValue<IndexType>()*dimensions+1).getValue<ValueType>()<< endl;
+   for(int i=1; i<N; i++){
+        f<< coords2.getValue(perm.getValue(i).getValue<IndexType>()*dimensions).getValue<ValueType>()<< " "<< coords2.getValue(perm.getValue(i).getValue<IndexType>()*dimensions + 1).getValue<ValueType>()<< endl;
+   }
+   
+    for(int i=0; i<N; i++){
+        std::cout<<"perm("<< i<< ")= "<< perm.getValue(i).getValue<IndexType>() <<" - "<< coords2.getValue(perm.getValue(i).getValue<IndexType>()*dimensions).getValue<ValueType>()<< " "<< coords2.getValue(perm.getValue(i).getValue<IndexType>()*dimensions + 1).getValue<ValueType>()<< " , ind > "<<\
+        //indices2(perm.getValue(i).getValue<IndexType>()).getValue<ValueType>()<<endl;
+        indices2(i).getValue<ValueType>()<<endl;
+        
+   }
+  
+  /*
+  for(int j=0;j<N; j++){
+    //EXPECT_LT(indices[j], indices[j+1]);	
+      std::cout<< j<< ": "<< indices2[j]<< "  __  ";
+      if(j%32==0) std::cout<<std::endl;
+  }
+  */
+
 }
-*/
+//-------------------------------------------------------------------------------------------------
+  
+TEST_F(HilbertCurveTest, testHilbertIndexHand_2D) {  
+  int recursionDepth =8;
+  const std::vector<ValueType> minCoords({0,0});
+  const std::vector<ValueType> maxCoords({0.88, 0.88});
+  
+  DenseVector<ValueType> p1(2,0), p2(2,0);
+  p1.setValue(0,0.874);    p1.setValue(1, 0.752);
+  p2.setValue(1,0.874);    p2.setValue(0, 0.752);
+  std::cout<< HilbertCurve<IndexType, ValueType>::getHilbertIndex(p1, 2, 0, recursionDepth, minCoords, maxCoords)<<std::endl;
+  std::cout<< HilbertCurve<IndexType, ValueType>::getHilbertIndex(p2, 2, 0, recursionDepth, minCoords, maxCoords)<<std::endl;
+}
+
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_3D) {

@@ -1,12 +1,21 @@
+/*
+ * ParcoReportHilbert.h
+ *
+ *  Created on: 15.11.2016
+ *      Author: tzovas
+ */
+
 #pragma once
 
 #include <scai/lama.hpp>
-
 #include <scai/lama/matrix/all.hpp>
-
-
 #include <scai/lama/Vector.hpp>
+#include <scai/dmemo/Distribution.hpp>
 
+#include <assert.h>
+#include <cmath>
+#include <climits>
+#include <queue>
 
 using namespace scai::lama;
 
