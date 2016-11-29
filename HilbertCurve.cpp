@@ -164,7 +164,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(const DenseVecto
 		}
 	}
 	
-	ValueType tmpX, tmpY, tmpZ;
+	ValueType tmpX;
 	ValueType x ,y ,z; 	//the coordinates each of the three dimensions
 	x= scaledCoord[0];
 	y= scaledCoord[1];

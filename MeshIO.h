@@ -43,6 +43,10 @@ namespace ITI {
                  */
                 static void writeInFileMetisFormat (const CSRSparseMatrix<ValueType> &adjM, const string filename);
                 
+                /*Given the vector of the coordinates and their dimension, writes them in file "filename".
+                */
+                static void writeInFileCoords (const DenseVector<ValueType> &coords, IndexType dimension, const string filename);
+                
                 /* Reads a graph from filename in METIS format and returns the adjacency matrix.
                  */
                 static CSRSparseMatrix<ValueType>  fromFile2AdjMatrix(const string filename);
@@ -51,7 +55,6 @@ namespace ITI {
                  * of point i are in [i*2][i*2+1].
                  */
                 static DenseVector<ValueType> fromFile2Coords_2D( const string filename, IndexType numberOfCoords);
-
                     
             private:
                 /* Creates random points in the cube for the given dimension, points in [0,maxCoord]^dim.

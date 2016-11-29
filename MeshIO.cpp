@@ -102,26 +102,6 @@ void MeshIO<IndexType, ValueType>::create3DMesh(CSRSparseMatrix<ValueType> &adjM
 }
 
 //-------------------------------------------------------------------------------------------------
-template<typename IndexType, typename ValueType>
-vector<DenseVector<ValueType>> MeshIO<IndexType, ValueType>::randomPoints(int numberOfPoints, int dimensions, ValueType maxCoord){
-    int n = numberOfPoints;
-    int i, j;
-    vector<DenseVector<ValueType>> ret(n);
-
-    srand(time(NULL));
-    ValueType r;
-    
-    for(i=0; i<n; i++){
-        ret[i] = DenseVector<ValueType>(dimensions, 0);
-        for(j=0; j<dimensions; j++){
-            r= ((ValueType) rand()/RAND_MAX) * maxCoord;
-            ret[i].setValue(j,r);
-        }
-    }
-    return ret;
-}
-
-//-------------------------------------------------------------------------------------------------
 /*Given the adjacency matrix it writes it in the file "filename" using the METIS format. In the
  * METIS format the first line has two numbers, first is the number on vertices and the second
  * is the number of edges. Then, row i has numbers e1, e2, e3, ... notating the edges:
@@ -131,6 +111,7 @@ vector<DenseVector<ValueType>> MeshIO<IndexType, ValueType>::randomPoints(int nu
 
 //TODO: must write coordiantes in the filename.xyz file
 //      not sure what data type to use for coordinates: a) DenseVector or b)vector<DenseVector> ?
+//      Made a separate function for coordiantes
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::writeInFileMetisFormat (const CSRSparseMatrix<ValueType> &adjM, const string filename){
     ofstream f, fcoords;
@@ -139,8 +120,7 @@ void MeshIO<IndexType, ValueType>::writeInFileMetisFormat (const CSRSparseMatrix
     IndexType cols= adjM.getNumColumns() , rows= adjM.getNumRows();
     IndexType i, j;
     
-    //cout<<"NumCols= "<< cols<< " NumRows= "<< rows<< " , liNorm="<< adjM.l1Norm().Scalar::getValue<ValueType>() <<\
-            " getNumValues(): "<< adjM.getNumValues()<< endl;
+    //cout<<"NumCols= "<< cols<< " NumRows= "<< rows<< " , liNorm="<< adjM.l1Norm().Scalar::getValue<ValueType>() <<            " getNumValues(): "<< adjM.getNumValues()<< endl;
             
     //the l1Norm/2 is the number of edges for an undirected, unweighted graph.
     //since is must be an adjacencey matrix cols==rows
@@ -151,6 +131,29 @@ void MeshIO<IndexType, ValueType>::writeInFileMetisFormat (const CSRSparseMatrix
     for(i=0; i<rows; i++){
         for(j=0; j<cols; j++){
             if(adjM(i,j)==1) f<< j+1<< " ";
+        }
+        f<< endl;
+    }
+    
+}
+
+//-------------------------------------------------------------------------------------------------
+/*Given the vector of the coordinates and their dimension, writes them in file "filename".
+ */
+
+//TODO:  not sure what data type to use for coordinates: a) DenseVector or b)vector<DenseVector> ?
+template<typename IndexType, typename ValueType>
+void MeshIO<IndexType, ValueType>::writeInFileCoords (const DenseVector<ValueType> &coords, IndexType dimension, const string filename){
+    ofstream f;
+    f.open(filename);
+    IndexType i, j;
+
+    // point i has coordiantes: [i*dim],[i*dim+1],...,[i*dim+dim] 
+    // the size of the vector/dim must be an integer 
+    assert(coords.size()/dimension == std::floor(coords.size()/dimension) );
+    for(i=0; i<coords.size()/dimension; i++){
+        for(j=0; j<dimension; j++){
+            f<< coords.getValue(i*dimension +j)<< " ";
         }
         f<< endl;
     }
@@ -173,11 +176,8 @@ CSRSparseMatrix<ValueType>   MeshIO<IndexType, ValueType>::fromFile2AdjMatrix( c
     CSRSparseMatrix<ValueType> ret(N, N);
     //DenseVector<ValueType> row(N, 5);
     //ret.setRow( row, 1, utilskernel::binary::COPY);
-std::cout<<"file:"<<__FILE__ <<", "<<__LINE__<<std::endl; 
     common::scoped_array<ValueType> values( new ValueType[ N * N ] );
 
-    //ValueType Val[N*N];
-std::cout<<"file:"<<__FILE__ <<", "<<__LINE__<<std::endl;    
     for(IndexType i=0; i<=N; i++){
         std::string line;
         IndexType index;
@@ -188,9 +188,9 @@ std::cout<<"file:"<<__FILE__ <<", "<<__LINE__<<std::endl;
         all_integers.push_back( vector<int>( istream_iterator<int>(iss), istream_iterator<int>() ) );
 
         for(IndexType j=0; j<all_integers.size(); j++){
-            for(int oo=0;oo<all_integers[j].size(); oo++){
+            for(int oo=0; oo<all_integers[j].size(); oo++){
                 index =all_integers[j][oo];
-std::cout<<"file:"<<__FILE__ <<", "<<__LINE__<< "   , j= "<< j<< "  , oo="<< oo<< " ## "<< (i-1)*N+index-1<< std::endl;                   
+                //std::cout<<"file:"<<__FILE__ <<", "<<__LINE__<< "   , j= "<< j<< "  , oo="<< oo<< " ## "<< (i-1)*N+index-1<< std::endl;                   
                 // subtract 1 because in the METIS format numbering starts from 1 not 0.
                 values[(i-1)*N+index-1] = 1; 
             }
@@ -209,7 +209,7 @@ std::cout<<"file:"<<__FILE__ <<", "<<__LINE__<< "   , j= "<< j<< "  , oo="<< oo<
 */
 
 //cout<< ret.l1Norm()<< " - "<< ret.getNumValues()<< endl;
-std::cout<<"file:"<<__FILE__ <<", "<<__LINE__<<std::endl;    
+//std::cout<<"file:"<<__FILE__ <<", "<<__LINE__<<std::endl;    
 
     return ret;
 }
@@ -245,8 +245,30 @@ DenseVector<ValueType>   MeshIO<IndexType, ValueType>::fromFile2Coords_2D( const
 //
 
 //-------------------------------------------------------------------------------------------------
-// Calculates the distance in 3D.
-//
+/* Creates random points in the cube [0,maxCoord] in the given dimensions.
+ */
+template<typename IndexType, typename ValueType>
+vector<DenseVector<ValueType>> MeshIO<IndexType, ValueType>::randomPoints(int numberOfPoints, int dimensions, ValueType maxCoord){
+    int n = numberOfPoints;
+    int i, j;
+    vector<DenseVector<ValueType>> ret(n);
+
+    srand(time(NULL));
+    ValueType r;
+    
+    for(i=0; i<n; i++){
+        ret[i] = DenseVector<ValueType>(dimensions, 0);
+        for(j=0; j<dimensions; j++){
+            r= ((ValueType) rand()/RAND_MAX) * maxCoord;
+            ret[i].setValue(j,r);
+        }
+    }
+    return ret;
+}
+
+//-------------------------------------------------------------------------------------------------
+/* Calculates the distance in 3D.
+*/
 template<typename IndexType, typename ValueType>
 Scalar MeshIO<IndexType, ValueType>::dist3D(DenseVector<ValueType> p1, DenseVector<ValueType> p2){
   Scalar res0, res1, res2, res;
@@ -267,7 +289,8 @@ Scalar MeshIO<IndexType, ValueType>::dist3D(DenseVector<ValueType> p1, DenseVect
 template void MeshIO<int, double>::create3DMesh(CSRSparseMatrix<double> &adjM, vector<DenseVector<double>> &coords,  int numberOfPoints, double maxCoord);
 template vector<DenseVector<double>> MeshIO<int, double>::randomPoints(int numberOfPoints, int dimensions, double maxCoord);
 template Scalar MeshIO<int, double>::dist3D(DenseVector<double> p1, DenseVector<double> p2);
-template void MeshIO<int, double>::writeInFileMetisFormat (const CSRSparseMatrix<double> &adjM, const string filename); 
+template void MeshIO<int, double>::writeInFileMetisFormat (const CSRSparseMatrix<double> &adjM, const string filename);
+template void MeshIO<int, double>::writeInFileCoords (const DenseVector<double> &coords, int dimension, const string filename);
 template CSRSparseMatrix<double>  MeshIO<int, double>::fromFile2AdjMatrix(const string filename);
 template DenseVector<double>   MeshIO<int, double>::fromFile2Coords_2D( const string filename, int numberOfCoords);
 
