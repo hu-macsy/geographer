@@ -49,7 +49,13 @@ namespace ITI {
                 
                 /* Reads a graph from filename in METIS format and returns the adjacency matrix.
                  */
-                static CSRSparseMatrix<ValueType>  fromFile2AdjMatrix(const string filename);
+                static CSRSparseMatrix<ValueType>  readFromFile2AdjMatrix(const string filename);
+                
+                /** Reads a graph from filename in METIS format and returns the adjacency matrix.
+                 * @param[in] filename The file to read from. In a METIS format.
+                 * @param[out] matrix The adjacency matrix of the graph.
+                 */
+                static void  readFromFile2AdjMatrix( CSRSparseMatrix<ValueType> &matrix, dmemo::DistributionPtr distribution, const string filename);
                 
                 /* Reads the 2D coordinates from file "filename" and returns then in a DenseVector where the coordiantes
                  * of point i are in [i*2][i*2+1].
