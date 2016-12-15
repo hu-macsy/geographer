@@ -23,6 +23,10 @@ namespace ITI {
 	template <typename IndexType, typename ValueType>
 	class HilbertCurve {
 		public:
+                        /* Wrapper function that calls either the 2D or 3D hilbert curve depending on dimensions.
+                         * */
+                        static ValueType getHilbertIndex(const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+                        
 			/**
 			* Accepts a point and calculates where along the hilbert curve it lies.
 			*
@@ -35,8 +39,10 @@ namespace ITI {
 			*
 	 		* @return A value in the unit interval [0,1]
 			*/
-			static ValueType getHilbertIndex(const DenseVector<ValueType> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
-			 const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+			static ValueType getHilbertIndex2D(const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+                        
+
+                        static ValueType getHilbertIndex_noScaling(const DenseVector<ValueType> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 		
 			/**
 			*Accepts a point in 3 dimensions and calculates where along the hilbert curve it lies.
@@ -50,7 +56,7 @@ namespace ITI {
 			*
 	 		* @return A value in the unit interval [0,1]
 			*/
-			static ValueType getHilbertIndex3D(const DenseVector<ValueType> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
+			static ValueType getHilbertIndex3D(const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
 			 const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 
 			/**

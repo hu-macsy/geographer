@@ -4,6 +4,7 @@
 #include <scai/lama/matutils/MatrixCreator.hpp>
 
 #include <scai/dmemo/BlockDistribution.hpp>
+#include <scai/dmemo/Distribution.hpp>
 
 #include <scai/hmemo/Context.hpp>
 #include <scai/hmemo/HArray.hpp>
@@ -30,49 +31,63 @@ class ParcoRepartTest : public ::testing::Test {
 
 
 TEST_F(ParcoRepartTest, testMinimumNeighborDistanceDistributed) {
-  IndexType nroot = 100;
+  IndexType nroot = 20;
   IndexType n = nroot * nroot;
-  IndexType k = 10;
   IndexType dimensions = 2;
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
   scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
   scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
 
   scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
-  scai::lama::MatrixCreator::fillRandom(a, 0.01);//TODO: make this a proper heterogenuous mesh
+  scai::lama::MatrixCreator::fillRandom(a, 0.1);//TODO: make this a proper heterogenuous mesh
   
-  scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n*dimensions) );
-  DenseVector<ValueType> coordinates(coordDist);
-
+  scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+  scai::hmemo::ContextPtr contexPtr = scai::hmemo::Context::getHostPtr();
+  
+  std::vector<DenseVector<ValueType>> coordinates(dimensions);
+  for(IndexType i=0; i<dimensions; i++){ 
+      coordinates[i].allocate(coordDist);
+      coordinates[i] = static_cast<ValueType>( 0 );
+  }
+  
   for (IndexType i = 0; i < nroot; i++) {
     for (IndexType j = 0; j < nroot; j++) {
       //this is slightly wasteful, since it also iterates over indices of other processors
-      if (coordDist->isLocal(2*(i*nroot + j)) ) {
-        coordinates.setValue(2*(i*nroot + j), i);
-        coordinates.setValue(2*(i*nroot + j)+1, j);
-      }
+      // no need to check if local. index must always use the global value
+      //if (coordDist->isLocal(i*nroot + j) ) {
+        coordinates[0].setValue(i*nroot + j, i);
+        coordinates[1].setValue(i*nroot + j, j);
+      //}
     }
   }
-
   const ValueType minDistance = ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(a, coordinates, dimensions);
   EXPECT_LE(minDistance, nroot*1.5);
   EXPECT_GE(minDistance, 1);
+
 }
 
+
 TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
-  IndexType nroot = 100;
+  IndexType nroot = 50;
   IndexType n = nroot * nroot;
   IndexType k = 10;
+  
   scai::lama::CSRSparseMatrix<ValueType>a(n,n);
+  // for nroot > 200 (approximatelly), fillRandom throws an error
   scai::lama::MatrixCreator::fillRandom(a, 0.01);
   IndexType dim = 2;
   ValueType epsilon = 0.05;
 
-  scai::lama::DenseVector<ValueType> coordinates(dim*n, 0);
+  std::vector<DenseVector<ValueType>> coordinates(dim);
+  for(IndexType i=0; i<dim; i++){
+    coordinates[i]= DenseVector<ValueType>(n, 0);
+  }
+  
   for (IndexType i = 0; i < nroot; i++) {
     for (IndexType j = 0; j < nroot; j++) {
-      coordinates.setValue(2*(i*nroot + j), i);
-      coordinates.setValue(2*(i*nroot + j)+1, j);
+      //this is slightly wasteful, since it also iterates over indices of other processors
+      coordinates[0].setValue(i*nroot + j, i);
+      coordinates[1].setValue(i*nroot + j, j);
     }
   }
 
@@ -92,41 +107,65 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
     subsetSizes[partID] += 1;
   }
   IndexType optSize = std::ceil(n / k);
-
   //in a distributed setting, this would need to be communicated and summed
   EXPECT_LE(*std::max_element(subsetSizes.begin(), subsetSizes.end()), (1+epsilon)*optSize);
+  
+  
+    // visualisation part for small nroot, up to 50 (approx).
+    
+    /*
+    IndexType partViz2[nroot][nroot];   
+    for(int i=0; i<nroot; i++)
+        for(int j=0; j<nroot; j++)
+            partViz2[i][j]=partition.getValue(i*nroot+j).getValue<IndexType>();
+    std::cout<<"----------------------------"<< " Partition "<< std::endl;    
+    for(int i=0; i<nroot; i++){
+        for(int j=0; j<nroot; j++)
+            std::cout<< partViz2[i][j]<<"-";
+        std::cout<< std::endl;
+    }
+
+    for(int i=0; i<k; i++){
+      std::cout<< "part "<< i<< " has #elements="<< subsetSizes[i]<< std::endl;
+    }
+    */      
 }
 
 
 TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
-  IndexType nroot = 100;
+  IndexType nroot = 16;
   IndexType n = nroot * nroot;
-  IndexType k = 10;
+  IndexType k = 8;
   IndexType dimensions = 2;
+  
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
   scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
   scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
-
-  scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
-  scai::lama::MatrixCreator::fillRandom(a, 0.01);//TODO: make this a proper heterogenuous mesh
+  scai::lama::CSRSparseMatrix<ValueType> a(dist, noDistPointer);
+  scai::lama::MatrixCreator::fillRandom(a, 0.2);//TODO: make this a proper heterogenuous mesh  
   
-  scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n*dimensions) );
-  DenseVector<ValueType> coordinates(coordDist);
+  scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+  std::vector<DenseVector<ValueType>> coordinates(dimensions);
 
+  for(IndexType i=0; i<dimensions; i++){ 
+      coordinates[i].allocate(coordDist);
+      coordinates[i] = static_cast<ValueType>( 0 );
+  }
+
+IndexType index;
   for (IndexType i = 0; i < nroot; i++) {
     for (IndexType j = 0; j < nroot; j++) {
       //this is slightly wasteful, since it also iterates over indices of other processors
-      if (coordDist->isLocal(2*(i*nroot + j))) {
-        coordinates.setValue(2*(i*nroot + j), i);
-        coordinates.setValue(2*(i*nroot + j)+1, j);
-      }
+      index = i*nroot+j;
+      coordinates[0].setValue( index, i);
+      coordinates[1].setValue( index, j);
     }
   }
-
+  
   ValueType epsilon = 0.05;
 
   scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, dimensions,  k, epsilon);
-
+ 
   EXPECT_EQ(n, partition.size());
   EXPECT_EQ(0, partition.min().getValue<ValueType>());
   EXPECT_EQ(k-1, partition.max().getValue<ValueType>());
@@ -134,15 +173,16 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
 
   std::vector<IndexType> subsetSizes(k, 0);
   scai::utilskernel::LArray<ValueType> localPartition = partition.getLocalValues();
+  
   for (IndexType i = 0; i < localPartition.size(); i++) {
     ValueType partID = localPartition[i];
-    EXPECT_LE(partID, k);
+    EXPECT_LE(partID, k-1); 
     EXPECT_GE(partID, 0);
     subsetSizes[partID] += 1;
   }
   IndexType optSize = std::ceil(n / k);
 
-  //if we don't have the full partition locally, 
+//if we don't have the full partition locally, 
   if (!partition.getDistribution().isReplicated()) {
     //sum block sizes over all processes
     for (IndexType partID = 0; partID < k; partID++) {
@@ -287,6 +327,7 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
     EXPECT_THROW(repart.fiducciaMattheysesRound(a, part, k, epsilon), std::runtime_error);
   }
 }
+
 
 /**
 * TODO: test for correct error handling in case of inconsistent distributions

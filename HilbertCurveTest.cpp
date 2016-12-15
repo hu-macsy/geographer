@@ -15,6 +15,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <chrono>
 
 #include "ParcoRepart.h"
 #include "gtest/gtest.h"
@@ -37,8 +38,7 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare) {
   const IndexType dimensions = 2;
   const IndexType n = 8;
   const IndexType recursionDepth = 7;
-  //ValueType tempArray[2*n] = {0.1, 0.1, 0.13, 0.11, 0.1, 0.6, 0.7, 0.7, 0.55, 0.45, 0.61, 0.1, 0.76, 0.13, 0.88, 0.1};
-  ValueType tempArray[2*n] ={0,1 , 0,5 , 0,15 , 1,3 , 1,15, 2,0 , 2,15 , 3,0};
+  ValueType tempArray[2*n] = {0.1, 0.1, 0.13, 0.11, 0.1, 0.6, 0.7, 0.7, 0.55, 0.45, 0.61, 0.1, 0.76, 0.13, 0.88, 0.1};
   DenseVector<ValueType> coordinates(n*dimensions, 0);
   DenseVector<ValueType> coords2;
   
@@ -122,6 +122,84 @@ TEST_F(HilbertCurveTest, testHilbertIndexHand_2D) {
   p2.setValue(1,0.874);    p2.setValue(0, 0.752);
   std::cout<< HilbertCurve<IndexType, ValueType>::getHilbertIndex(p1, 2, 0, recursionDepth, minCoords, maxCoords)<<std::endl;
   std::cout<< HilbertCurve<IndexType, ValueType>::getHilbertIndex(p2, 2, 0, recursionDepth, minCoords, maxCoords)<<std::endl;
+}
+//-------------------------------------------------------------------------------------------------
+  
+TEST_F(HilbertCurveTest, testHilbertIndex2DNoScaling) {
+    IndexType N= 50000000;
+    ValueType max= 5000;
+    IndexType dimensions =2, recursionDepth= 15;
+    DenseVector<ValueType> coords(N*2,0); //2D points
+    
+    srand(time(NULL));
+    //N random points
+    for(int i=0; i<N*2; i++){
+        ValueType r= ((ValueType) rand()/RAND_MAX);
+        coords.setValue(i, r*max);
+    }
+    
+    vector<ValueType> scaledHilbert(N,0), noScaleHilbert(N,0);
+    vector<IndexType> scaledIndex(N,0), noScaleIndex(N,0);
+    
+    vector<ValueType> minCoords={0,0};
+    vector<ValueType> maxCoords={0,0};
+    
+    for (IndexType i = 0; i < N; i++){
+        scaledIndex[i]= i;
+        noScaleIndex[i]= i;
+        for (IndexType dim = 0; dim < dimensions; dim++) {
+            ValueType coord = coords.getValue(i*dimensions + dim).Scalar::getValue<ValueType>();
+            //std::cout << *comm << ", " << i << "." << dim << ":" << coord << std::endl;
+            if (coord < minCoords[dim]) minCoords[dim] = coord;
+            if (coord > maxCoords[dim]) maxCoords[dim] = coord;
+        }
+//cout<< i<< ": "<< maxCoords[0]<<" _ "<< maxCoords[1]<< endl;
+    }
+       
+    chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();       
+
+    for (IndexType i = 0; i < N; i++)
+        scaledHilbert[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coords, dimensions, i, recursionDepth, minCoords, maxCoords);
+    
+    chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration_cast<chrono::milliseconds>( t2 - t1 ).count();
+    cout << "time elapsed for hilbert indices with scaling: "<< duration<< " ms"<< endl;
+    
+    for (IndexType i = 0; i < N; i++)
+        noScaleHilbert[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex_noScaling(coords, dimensions, i, recursionDepth, minCoords, maxCoords);
+    
+    chrono::high_resolution_clock::time_point t3 = chrono::high_resolution_clock::now();
+    duration = chrono::duration_cast<chrono::milliseconds>( t3 - t2 ).count();
+    cout << "time elapsed for hilbert indices with NO scaling: "<< duration<< " ms"<< endl;
+    
+    
+    sort(scaledIndex.begin() , scaledIndex.end(),
+        [&](const int& a, const int& b){ return (scaledHilbert[a]<scaledHilbert[b]); }
+    );
+    sort(noScaleIndex.begin() , noScaleIndex.end(),
+        [&](const int& a, const int& b){ return (noScaleHilbert[a]<noScaleHilbert[b]); }
+    );
+/*    
+    for (IndexType i = 0; i < N; i++){
+        cout<< i<< ": "<< scaledIndex[i]<< " ## "<< noScaleIndex[i]<< endl;
+    }
+ */   
+    duration = chrono::duration_cast<chrono::milliseconds>( chrono::high_resolution_clock::now() -t3 ).count();
+    cout << "time elapsed for hilbert indices with NO scaling: "<< duration<< " ms"<< endl;
+    
+    if(scaledIndex == noScaleIndex)
+        std::cout<< "vector are equal"<< std::endl;
+    else{
+        std::cout<< "vector are NOT equal"<< std::endl;    
+  /*      for(int i=0; i<N; i++){
+            if( scaledIndex[i]!= noScaleIndex[i]){
+                cout<< i<< ": "<< scaledIndex[i]<< " <> "<< noScaleIndex[i]<< endl;
+                cout<< "\t"<< scaledHilbert[i]<< " :: "<< noScaleHilbert[i]<< endl;
+            }
+        }
+    */
+    }
+
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -293,7 +371,6 @@ TEST_F(HilbertCurveTest, testHilbertPoint2Index_3D){
   int dimensions= 3;
   ValueType startCoord=0, offset=0.063;
   const int n= pow( ceil((1-startCoord)/offset), dimensions);
-  ValueType index;			//a number in [0, 1], the index of the Hilbert curve
 
   std::vector<ValueType> indexV(n);
   DenseVector<ValueType> p;				//a point in 3D
@@ -328,6 +405,7 @@ TEST_F(HilbertCurveTest, testHilbertPoint2Index_3D){
   hilbertIndex.sort(perm, true);
 
 /*
+  ValueType index;			//a number in [0, 1], the index of the Hilbert curve
   for(int i=0; i<n; i++){
     std::cout<<i <<": "<<  perm.getValue(i);// << std::endl;
     std::cout<<" , index= "<< hilbertIndex.getValue(i) << std::endl;
@@ -340,7 +418,7 @@ TEST_F(HilbertCurveTest, testHilbertPoint2Index_3D){
   std::ofstream f;
   f.open ("hilbert3D.plt");
 
-  int cnt=0;
+  //int cnt=0;
   //write the coordinates in the file f.
   f	<< coordinates.getValue(perm.getValue(0).getValue<IndexType>()*dimensions).getValue<ValueType>()<<" "\
 	<< coordinates.getValue(perm.getValue(0).getValue<IndexType>()*dimensions+1).getValue<ValueType>()<<" "\

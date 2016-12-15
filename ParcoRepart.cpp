@@ -21,26 +21,32 @@ using std::vector;
 namespace ITI {
 
 template<typename IndexType, typename ValueType>
-ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const CSRSparseMatrix<ValueType> &input, const DenseVector<ValueType> &coordinates,
- IndexType dimensions) {
+ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const CSRSparseMatrix<ValueType> &input, const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions) {
 	// iterate through matrix to find closest neighbours, implying necessary recursion depth for space-filling curve
 	// here it can happen that the closest neighbor is not stored on this processor.
 
-	const scai::dmemo::DistributionPtr coordDist = coordinates.getDistributionPtr();
+        std::vector<scai::dmemo::DistributionPtr> coordDist(dimensions);
+        for(IndexType i=0; i<dimensions; i++){
+            coordDist[i] = coordinates[i].getDistributionPtr(); 
+        }
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	const IndexType localN = inputDist->getLocalSize();
-
-	if (coordDist->getLocalSize() % int(dimensions) != 0) {
+        /*
+	if (coordDist[0]->getLocalSize() % int(dimensions) != 0) {
 		throw std::runtime_error("Size of coordinate vector no multiple of dimension. Maybe it was split in the distribution?");
 	}
-
+        */
 	if (!input.getColDistributionPtr()->isReplicated()) {
 		throw std::runtime_error("Columns must be replicated.");
 	}
 
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
-	const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates.getLocalValues();
-
+	//const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates.getLocalValues();
+        std::vector<scai::utilskernel::LArray<ValueType>> localPartOfCoords2(dimensions);
+        for(IndexType i=0; i<dimensions; i++){
+            localPartOfCoords2[i] = coordinates[i].getLocalValues();
+        }
+        
 	const scai::utilskernel::LArray<IndexType>& ia = localStorage.getIA();
     const scai::utilskernel::LArray<IndexType>& ja = localStorage.getJA();
     assert(ia.size() == localN+1);
@@ -53,11 +59,12 @@ ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const C
 		for (IndexType j = beginCols; j < endCols; j++) {
 			IndexType neighbor = ja[j];//big question: does ja give local or global indices?
 			const IndexType globalI = inputDist->local2global(i);
-			if (neighbor != globalI && coordDist->isLocal(neighbor*dimensions)) {
-				const IndexType localNeighbor = coordDist->global2local(neighbor*dimensions);
+                        // just check coordDist[0]. Is is enough? If coord[0] is here so are the others.
+			if (neighbor != globalI && coordDist[0]->isLocal(neighbor)) {
+				const IndexType localNeighbor = coordDist[0]->global2local(neighbor);
 				ValueType distanceSquared = 0;
 				for (IndexType dim = 0; dim < dimensions; dim++) {
-					ValueType diff = localPartOfCoords[i*dimensions + dim] - localPartOfCoords[localNeighbor + dim];
+					ValueType diff = localPartOfCoords2[dim][i] -localPartOfCoords2[dim][localNeighbor];
 					distanceSquared += diff*diff;
 				}
 				if (distanceSquared < minDistanceSquared) minDistanceSquared = distanceSquared;
@@ -70,18 +77,21 @@ ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const C
 }
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, DenseVector<ValueType> &coordinates,
-					IndexType dimensions,	IndexType k,  double epsilon) 
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions,	IndexType k,  double epsilon) 
 {
 	/**
 	* check input arguments for sanity
 	*/
 	IndexType n = input.getNumRows();
-	if (n*dimensions != coordinates.size()) {
-		throw std::runtime_error("Matrix has " + std::to_string(n) + " rows, but " + std::to_string(coordinates.size())
+	if (n != coordinates[0].size()) {
+		throw std::runtime_error("Matrix has " + std::to_string(n) + " rows, but " + std::to_string(coordinates[0].size())
 		 + " coordinates are given.");
 	}
-
+        
+        if (dimensions != coordinates.size()){
+            throw std::runtime_error("Number of dimensions given "+ std::to_string(dimensions) + "must agree with coordinates.size()=" + std::to_string(coordinates.size()) );
+        }
+        
 	if (n != input.getNumColumns()) {
 		throw std::runtime_error("Matrix must be quadratic.");
 	}
@@ -97,37 +107,57 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	if (epsilon < 0) {
 		throw std::runtime_error("Epsilon " + std::to_string(epsilon) + " is invalid.");
 	}
-
-	const scai::dmemo::DistributionPtr coordDist = coordinates.getDistributionPtr();
+        
+	const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+        const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
+        
+        if( !coordDist->isEqual( *inputDist) ){ 
+            std::cout<< __FILE__<< "  "<< __LINE__<< "coordDist: " << *coordDist<< " and inputDist: "<< *inputDist<< std::endl;
+            throw std::runtime_error( "Distributions: should (?) be equal.");
+        }
+
 	const IndexType localN = inputDist->getLocalSize();
+        const IndexType globalN = inputDist->getGlobalSize();
 
-	if (coordDist->getLocalSize() % int(dimensions) != 0) {
-		throw std::runtime_error("Size of coordinate vector no multiple of dimension. Maybe it was split in the distribution?");
-	}
-
-	if (coordDist->getLocalSize() != dimensions*localN) {
+        if (coordDist->getLocalSize() != localN) {
 		throw std::runtime_error(std::to_string(coordDist->getLocalSize() / dimensions) + " point coordinates, "
 		 + std::to_string(localN) + " rows present.");
-	}
-
+	}	
+	
 	/**
 	*	gather information for space-filling curves
 	*/
 	std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
 	std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
 
-	const scai::utilskernel::LArray<ValueType> localPartOfCoords = coordinates.getLocalValues();
+        /*
+        std::vector<scai::utilskernel::LArray<ValueType>> localPartOfCoords2(dimensions);
+        for(IndexType i=0; i<dimensions; i++){
+            localPartOfCoords2[i] = coordinates[i].getLocalValues();
+        }
 
 	//Get extent of coordinates. Can probably speed this up with OpenMP by having thread-local min/max-Arrays and reducing them in the end
-	for (IndexType i = 0; i < (localPartOfCoords.size() / dimensions); i++) {
+	
+	for (IndexType i = 0; i < localPartOfCoords2[0].size() ; i++) {
 		for (IndexType dim = 0; dim < dimensions; dim++) {
-			ValueType coord = localPartOfCoords[i*dimensions + dim];
+			ValueType coord = localPartOfCoords2[dim][i];
 			if (coord < minCoords[dim]) minCoords[dim] = coord;
 			if (coord > maxCoords[dim]) maxCoords[dim] = coord;
 		}
 	}
-
+	*/
+        //
+        // the code above finds the local min and max. We want the global min and max.
+	
+	for (IndexType i = 0; i < globalN; i++) {
+		for (IndexType dim = 0; dim < dimensions; dim++) {
+			ValueType coord = coordinates[dim].getValue(i).Scalar::getValue<ValueType>();
+			if (coord < minCoords[dim]) minCoords[dim] = coord;
+			if (coord > maxCoords[dim]) maxCoords[dim] = coord;
+		}
+	}
+        
 	ValueType maxExtent = 0;
 	for (IndexType dim = 0; dim < dimensions; dim++) {
 		if (maxCoords[dim] - minCoords[dim] > maxExtent) {
@@ -150,7 +180,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	for (IndexType i = 0; i < localN; i++) {
 		IndexType globalIndex = inputDist->local2global(i);
 		ValueType globalHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, globalIndex, recursionDepth, minCoords, maxCoords);
-		hilbertIndices.setValue(globalIndex, globalHilbertIndex);
+		hilbertIndices.setValue(globalIndex, globalHilbertIndex);              
 	}
 
 	/**
@@ -160,7 +190,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	scai::lama::DenseVector<IndexType> permutation;
 	hilbertIndices.sort(permutation, true);
 	permutation.redistribute(inputDist);
-
+        
+        scai::utilskernel::LArray<ValueType> localPerm = permutation.getLocalValues();
+        
 	/**
 	* check for uniqueness. If not unique, level of detail was insufficient.
 	*/
@@ -174,12 +206,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	for (IndexType i = 0; i < localN; i++) {
 		IndexType targetPos;
 		readAccess.getValue(targetPos, i);
-		result.setValue(inputDist->local2global(i), int(k*targetPos / n));
-	}
-
-	/**
-	* local refinement, use Fiduccia-Mattheyses. 
-	*/
+                assert( targetPos==localPerm[i] );
+		//original: 
+                //result.setValue(inputDist->local2global(i), int(k*targetPos / n));
+                //changed to:
+                result.setValue( targetPos, int(k*inputDist->local2global(i) / n));
+        }
 
 	if (false && inputDist->isReplicated()) {
 		ValueType gain = 1;
@@ -445,11 +477,12 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 	if (testedNodes == 0) return 0;
 	assert(gains.size() == transfers.size());
 
-	/**
+        /**
 	 * now find best partition among those tested
 	 */
 	IndexType maxIndex = -1;
 	ValueType maxGain = 0;
+
 	for (IndexType i = 0; i < testedNodes; i++) {
 		if (gains[i] > maxGain && imbalances[i] <= epsilon) {
 			maxIndex = i;
@@ -457,7 +490,7 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 		}
 	}
 	assert(testedNodes >= maxIndex);
-	assert(maxIndex >= 0);
+	//assert(maxIndex >= 0);
 	assert(testedNodes-1 < transfers.size());
 
 	/**
@@ -557,11 +590,9 @@ ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<
 }
 
 //to force instantiation
-template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, DenseVector<double> &coordinates,
-					int dimensions,	int k,  double epsilon);
+template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, int dimensions,	int k,  double epsilon);
 
-template double ParcoRepart<int, double>::getMinimumNeighbourDistance(const CSRSparseMatrix<double> &input, const DenseVector<double> &coordinates,
- int dimensions);
+template double ParcoRepart<int, double>::getMinimumNeighbourDistance(const CSRSparseMatrix<double> &input, const std::vector<DenseVector<double>> &coordinates, int dimensions);
 			     
 //template struct point ParcoRepart<int, double>::hilbert(double index, int level);
 template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int> &partition, int k);

@@ -26,7 +26,7 @@ namespace ITI {
 	 		*
 	 		* @return DenseVector with the same distribution as the input matrix, at position i is the block node i is assigned to
 	 		*/
-			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, DenseVector<ValueType> &coordinates, IndexType dimensions,	IndexType k,  double epsilon = 0.05);
+			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions,	IndexType k,  double epsilon = 0.05);
 
 			/**
 			* Returns the minimum distance between two neighbours
@@ -37,7 +37,7 @@ namespace ITI {
 	 		*
 	 		* @return The spatial distance of the closest pair of neighbours
 			*/
-			static ValueType getMinimumNeighbourDistance(const CSRSparseMatrix<ValueType> &input, const DenseVector<ValueType> &coordinates, IndexType dimensions);
+			static ValueType getMinimumNeighbourDistance(const CSRSparseMatrix<ValueType> &input, const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions);
 
 			/**
 			* Performs local refinement of a given partition
