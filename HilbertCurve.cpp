@@ -11,12 +11,43 @@
 namespace ITI{
     
 template<typename IndexType, typename ValueType>
-ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
-	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords){
+ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords){
     
     if (dimensions > 3 || dimensions < 2) {
         throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
     }
+    std::string ff(__FILE__);
+    
+    const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
+    
+    std::vector<ValueType> localCoords(dimensions);
+    
+    for(IndexType dim=0; dim<dimensions; dim++){
+        //ValueType coord= coordinates[dim].getValue(index).Scalar::getValue<ValueType>();
+        ValueType coord= coordinates[dim].getLocalValues()[ coordDist->global2local(index)];
+        if(coordDist->isLocal(index)){
+            localCoords[dim]= coord;   
+            //std::cout<< coord<<", ";
+        }
+    }
+    
+    /* //for debugging
+     
+    std::cout<<"in file:"<< ff<<", line:"<< std::to_string(__LINE__) << "_ distribution: "<< *coordDist<< " and comm:"<< *comm << std::endl;
+    std::cout<< "index= "<< index <<" , dimension= "<< dimensions<< " and recursionDepth= "<< recursionDepth<< " >>> ";
+    
+    
+    if(coordDist->isLocal(index)){ 
+        std::cout<< "coord=";
+        for(IndexType dim=0; dim<dimensions; dim++){
+            std::cout<< localCoords[dim]<<" ,";
+        }
+        std::cout<< std::endl<< std::endl;
+    }else
+        std::cout<<"index: "<< index<< " not local dist for "<< *comm << std::endl<< std::endl;
+    */
+    
     
     if(dimensions==2) 
         return HilbertCurve<IndexType, ValueType>::getHilbertIndex2D( coordinates, dimensions, index, recursionDepth,
@@ -25,8 +56,8 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(const std::vector<
     if(dimensions==3) 
         return HilbertCurve<IndexType, ValueType>::getHilbertIndex3D( coordinates, dimensions, index, recursionDepth,
             minCoords, maxCoords);
-    //Something is wrong,should not reach this point
-    return -1;
+    
+    return -1; //Something is wrong,should not reach this point
 }
 //-------------------------------------------------------------------------------------------------
 
@@ -57,6 +88,9 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(const std::vecto
 	}
 
 	if (!coordDistX->isLocal(index)) {
+                std::string ff(__FILE__);
+                std::string ll= std::to_string(__LINE__);
+		throw std::runtime_error(ff+ ", "+ ll+ ". Coordinate with index " + std::to_string(index) + " is not present on this process.");
 		throw std::runtime_error("Coordinate with index " + std::to_string(index) + " is not present on this process.");
 	}
 
@@ -127,10 +161,10 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(const std::vecto
 
 //-------------------------------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
-ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex_noScaling(const DenseVector<ValueType> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
+ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex_noScaling( std::vector<DenseVector<ValueType>> &coords, IndexType dimensions, IndexType index, IndexType recursionDepth,
 	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
 
-        scai::dmemo::DistributionPtr coordDist = coordinates.getDistributionPtr();
+        scai::dmemo::DistributionPtr coordDist = coords[0].getDistributionPtr();
 
 	/*if (dimensions !=3) {
 		throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
@@ -145,46 +179,52 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex_noScaling(const De
 		throw std::runtime_error("A space-filling curve that precise won't fit into the return datatype.");
 	}
 
-	if (!coordDist->isLocal(index*dimensions)) {
+	if (!coordDist->isLocal(index)) {
 		throw std::runtime_error("Coordinate with index " + std::to_string(index) + " is not present on this process.");
 	}
 	
         std::vector<ValueType> tmpCoord(dimensions);
-        for(IndexType i=0; i<dimensions; i++)
-            tmpCoord[i]= coordinates.getValue(index*dimensions +i).Scalar::getValue<ValueType>();
+        //for(IndexType i=0; i<dimensions; i++)
+            //tmpCoord[i]= coordinates.getValue(index*dimensions +i).Scalar::getValue<ValueType>();
 
-        assert(tmpCoord[0]>=0 && tmpCoord[0]<=maxCoords[0]);
-        assert(tmpCoord[1]>=0 && tmpCoord[1]<=maxCoords[1]);
+        //assert(tmpCoord[0]>=0 && tmpCoord[0]<=maxCoords[0]);
+        //assert(tmpCoord[1]>=0 && tmpCoord[1]<=maxCoords[1]);
+        
+        assert(coords[0](index)>0 || coords[0](index)==0);
+        assert(coords[0](index)<maxCoords[0] || coords[0](index)==maxCoords[0]);
+        assert(coords[1](index)>0 || coords[1](index)==0);
+        assert(coords[1](index)<maxCoords[1] || coords[1](index)==maxCoords[1]);
 
 	unsigned long integerIndex = 0;//TODO: also check whether this data type is long enough
 	for (IndexType i = 0; i < recursionDepth; i++) {
 		int subSquare;
 		//two dimensions only, for now
-		if (tmpCoord[0] < 0.5*maxCoords[0]) {
-			if (tmpCoord[1] < 0.5*maxCoords[1]) {
+		if (coords[0](index) < 0.5*maxCoords[0]) {
+			if (coords[1](index) < 0.5*maxCoords[1]) {
 				subSquare = 0;
 				//apply inverse hilbert operator
-				double temp = tmpCoord[0];
-				tmpCoord[0] = 2*tmpCoord[1];
-				tmpCoord[1] = 2*temp;
+				double temp = coords[0](index).Scalar::getValue<ValueType>();
+				coords[0].setValue(index, 2*coords[1](index).Scalar::getValue<ValueType>());
+				coords[1].setValue(index, 2*temp);
 			} else {
 				subSquare = 1;
 				//apply inverse hilbert operator
-				tmpCoord[0] *= 2;
-				tmpCoord[1] = 2*tmpCoord[1] -1*maxCoords[1];
+				//coords[0](index) *= 2;
+                                coords[0].setValue(index, coords[0](index)*2);
+				coords[1].setValue(index, 2*coords[1](index).Scalar::getValue<ValueType>() -1*maxCoords[1]);
 			}
 		} else {
-			if (tmpCoord[1] < 0.5*maxCoords[1]) {
+			if (coords[1](index) < 0.5*maxCoords[1]) {
 				subSquare = 3;
 				//apply inverse hilbert operator
-				double temp = tmpCoord[0];
-				tmpCoord[0] = -2*tmpCoord[1]+1*maxCoords[0];
-				tmpCoord[1] = -2*temp+2*maxCoords[1];
+				double temp = coords[0](index).Scalar::getValue<ValueType>();
+				coords[0].setValue(index, -2*coords[1](index).Scalar::getValue<ValueType>()+1*maxCoords[0]);
+				coords[1].setValue(index, -2*temp+2*maxCoords[1]);
 			} else {
 				subSquare = 2;
 				//apply inverse hilbert operator
-				tmpCoord[0] = 2*tmpCoord[0]-1*maxCoords[0];
-				tmpCoord[1] = 2*tmpCoord[1]-1*maxCoords[1];
+				coords[0].setValue(index, 2*coords[0](index).Scalar::getValue<ValueType>()-1*maxCoords[0]);
+				coords[1].setValue(index, 2*coords[1](index).Scalar::getValue<ValueType>()-1*maxCoords[1]);
 			}
 		}
                 //std::cout<< subSquare<<std::endl;
@@ -233,10 +273,12 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(const std::vecto
 
 	//scai::dmemo::DistributionPtr coordDist = coordinates.getDistributionPtr();
 	scai::dmemo::DistributionPtr coordDistX = coordinates[0].getDistributionPtr();
-        scai::dmemo::DistributionPtr coordDistY = coordinates[1].getDistributionPtr();
-        scai::dmemo::DistributionPtr coordDistZ = coordinates[2].getDistributionPtr();
+        //scai::dmemo::DistributionPtr coordDistY = coordinates[1].getDistributionPtr();
+        //scai::dmemo::DistributionPtr coordDistZ = coordinates[2].getDistributionPtr();
         
         std::vector<scai::dmemo::DistributionPtr> coordDist({coordinates[0].getDistributionPtr(), coordinates[1].getDistributionPtr(), coordinates[2].getDistributionPtr() });
+        assert( coordDist[0]->isEqual(*coordDist[1]) );
+        assert( coordDist[0]->isEqual(*coordDist[2]) );
 
 	/*if (coordDist->getLocalSize() % int(dimensions) != 0) {
 		throw std::runtime_error("Size of coordinate vector no multiple of dimension. Maybe it was split in the distribution?");
@@ -248,7 +290,10 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(const std::vecto
 	}
 
 	if (!coordDistX->isLocal(index)) {
-		throw std::runtime_error("Coordinate with index " + std::to_string(index) + " is not present on this process.");
+                std::string ff(__FILE__);
+                std::string ll;
+                ll= std::to_string(__LINE__);
+		throw std::runtime_error(ff+ ", "+ ll+ ". Coordinate with index " + std::to_string(index) + " is not present on this process.");
 	}
 
 	//const scai::utilskernel::LArray<ValueType>& myCoords = coordinates.getLocalValues();
@@ -382,7 +427,7 @@ template double HilbertCurve<int, double>::getHilbertIndex(const std::vector<Den
 
 template double HilbertCurve<int, double>::getHilbertIndex2D(const std::vector<DenseVector<double>> &coordinates, int dimensions, int index, int recursionDepth,	const std::vector<double> &minCoords, const std::vector<double> &maxCoords);
 
-template double HilbertCurve<int, double>::getHilbertIndex_noScaling(const DenseVector<double> &coordinates, int dimensions, int index, int recursionDepth, const std::vector<double> &minCoords, const std::vector<double> &maxCoords);
+template double HilbertCurve<int, double>::getHilbertIndex_noScaling( std::vector<DenseVector<double>> &coordinates, int dimensions, int index, int recursionDepth, const std::vector<double> &minCoords, const std::vector<double> &maxCoords);
 
 template double HilbertCurve<int, double>::getHilbertIndex3D(const std::vector<DenseVector<double>> &coordinates, int dimensions, int index, int recursionDepth,
 	const std::vector<double> &minCoords, const std::vector<double> &maxCoords);

@@ -63,6 +63,7 @@ duration = chrono::duration_cast<chrono::milliseconds>( chrono::high_resolution_
 std::cout<<__FILE__<< "  "<< __LINE__<< " , time to write in files: "<< duration <<endl;
 std::cout<< "graph written in files: " << grFile<< " and "<< coordFile<< endl;
 }
+
 //-----------------------------------------------------------------
 TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh) {
 vector<IndexType> numPoints= {15, 17, 25};
@@ -749,7 +750,7 @@ coordFile = grFile +".xyz";
 
 TEST_F(MeshIOTest, testCSRSparseMatrixFromFile_3D){
     
-    vector<DenseVector<ValueType>> coords3D;        //the coordinates of each node 
+    vector<DenseVector<ValueType>> coords3D(3);        //the coordinates of each node 
     IndexType dim= 3, k= 4, i;
     ValueType epsilon= 0.7;
     /*
@@ -762,7 +763,7 @@ TEST_F(MeshIOTest, testCSRSparseMatrixFromFile_3D){
     std::string grFile = my_argv[1];
     istringstream ss(my_argv[2]);
     if(!(ss>>k)) 
-        throw std::runtime_error("argument 2"+ std::string(my_argv[2]) + " invalid.");
+        throw std::runtime_error("argument 2 "+ std::string(my_argv[2]) + " invalid.");
     //k= my_argv[2];
     std::cout<< "grFile: "<< grFile<< std::endl;
     //grFile = grFile2;

@@ -42,7 +42,7 @@ namespace ITI {
 			static ValueType getHilbertIndex2D(const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
                         
 
-                        static ValueType getHilbertIndex_noScaling(const DenseVector<ValueType> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+                        static ValueType getHilbertIndex_noScaling(std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 		
 			/**
 			*Accepts a point in 3 dimensions and calculates where along the hilbert curve it lies.
