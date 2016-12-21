@@ -54,12 +54,11 @@ TEST_F(ParcoRepartTest, testMinimumNeighborDistanceDistributed) {
     for (IndexType j = 0; j < nroot; j++) {
       //this is slightly wasteful, since it also iterates over indices of other processors
       // no need to check if local. index must always use the global value
-      //if (coordDist->isLocal(i*nroot + j) ) {
         coordinates[0].setValue(i*nroot + j, i);
         coordinates[1].setValue(i*nroot + j, j);
-      //}
     }
   }
+  
   const ValueType minDistance = ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(a, coordinates, dimensions);
   EXPECT_LE(minDistance, nroot*1.5);
   EXPECT_GE(minDistance, 1);
@@ -90,14 +89,14 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
       coordinates[1].setValue(i*nroot + j, j);
     }
   }
-
+  
   scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, dim,  k, epsilon);
-
+  
   EXPECT_EQ(n, partition.size());
   EXPECT_EQ(0, partition.min().getValue<IndexType>());
   EXPECT_EQ(k-1, partition.max().getValue<IndexType>());
   EXPECT_TRUE(partition.getDistribution().isReplicated());//for now
-
+  
   std::vector<IndexType> subsetSizes(k, 0);//probably replace with some Lama data structure later
   scai::utilskernel::LArray<IndexType> localPartition = partition.getLocalValues();
   for (IndexType i = 0; i < localPartition.size(); i++) {
@@ -106,30 +105,13 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
     EXPECT_GE(partID, 0);
     subsetSizes[partID] += 1;
   }
+  
   IndexType optSize = std::ceil(n / k);
   //in a distributed setting, this would need to be communicated and summed
   EXPECT_LE(*std::max_element(subsetSizes.begin(), subsetSizes.end()), (1+epsilon)*optSize);
-  
-  
-    // visualisation part for small nroot, up to 50 (approx).
     
-    /*
-    IndexType partViz2[nroot][nroot];   
-    for(int i=0; i<nroot; i++)
-        for(int j=0; j<nroot; j++)
-            partViz2[i][j]=partition.getValue(i*nroot+j).getValue<IndexType>();
-    std::cout<<"----------------------------"<< " Partition "<< std::endl;    
-    for(int i=0; i<nroot; i++){
-        for(int j=0; j<nroot; j++)
-            std::cout<< partViz2[i][j]<<"-";
-        std::cout<< std::endl;
-    }
-
-    for(int i=0; i<k; i++){
-      std::cout<< "part "<< i<< " has #elements="<< subsetSizes[i]<< std::endl;
-    }
-    */      
 }
+
 
 
 TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
@@ -164,8 +146,10 @@ IndexType index;
   
   ValueType epsilon = 0.05;
 
-  scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, dimensions,  k, epsilon);
- 
+  scai::lama::DenseVector<IndexType> partition(n, 121);
+  partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, dimensions,  k, epsilon);
+  
+  EXPECT_GE(k-1, partition.getLocalValues().max() );
   EXPECT_EQ(n, partition.size());
   EXPECT_EQ(0, partition.min().getValue<ValueType>());
   EXPECT_EQ(k-1, partition.max().getValue<ValueType>());
@@ -192,6 +176,7 @@ IndexType index;
   
   EXPECT_LE(*std::max_element(subsetSizes.begin(), subsetSizes.end()), (1+epsilon)*optSize);
 }
+
 
 
 TEST_F(ParcoRepartTest, testImbalance) {
@@ -252,6 +237,7 @@ TEST_F(ParcoRepartTest, testCut) {
   const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
   EXPECT_EQ(k*blockSize*(n-blockSize) / 2, cut);
 }
+
 
 TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
   const IndexType n = 1000;

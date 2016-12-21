@@ -34,11 +34,9 @@ class HilbertCurveTest : public ::testing::Test {
 };
 
 
-TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare) {
+TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
   const IndexType dimensions = 2;
-  //const IndexType n = 8;
   const IndexType recursionDepth = 7;
-  //ValueType tempArray[2*n] = {0.1, 0.1, 0.13, 0.11, 0.1, 0.6, 0.7, 0.7, 0.55, 0.45, 0.61, 0.1, 0.76, 0.13, 0.88, 0.1};
   IndexType N=64;
   std::vector<DenseVector<ValueType>> coords(dimensions);
   for(IndexType i=0; i<dimensions; i++){ 
@@ -47,161 +45,32 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare) {
   }
   
   std::vector<ValueType> maxCoords({0,0});
-  MeshIO<IndexType, ValueType>::fromFile2Coords_2D("./meshes/Grid8x8.xyz", coords,  N);
+  MeshIO<IndexType, ValueType>::fromFile2Coords_2D("./meshes/my_meshes/Grid8x8.xyz", coords,  N);
   
-  /*
-  for (IndexType i = 0; i < N; i++){
-    for(IndexType j=0; j<dimensions; j++)
-        coords[j].setValue(i, (coords[j].getValue(i)+0.17)/8.2 );
-    std::cout<< "## dim:"<< j<<" , max= "<< coords[j].max().Scalar::getValue<ValueType>() << std::endl;
-  }
-  */
   for(IndexType j=0; j<dimensions; j++){
       for (IndexType i = 0; i < N; i++){
         coords[j].setValue(i, (coords[j].getValue(i)+0.17)/8.2 );
       }
-      std::cout<< "## dim:"<< j<<" , max= "<< coords[j].max().Scalar::getValue<ValueType>() << std::endl;
       maxCoords[j]= coords[j].max().Scalar::getValue<ValueType>();
   }
   
   EXPECT_EQ(coords[0].size(), N);
   EXPECT_EQ(coords.size(), dimensions);
-  std::cout<< coords.size()<< endl;
   
   const std::vector<ValueType> minCoords({0,0});
-  //const std::vector<ValueType> maxCoords({16,16});
-  
-  DenseVector<ValueType> indices2(N, 0);
+
+  DenseVector<ValueType> indices(N, 0);
   for (IndexType i = 0; i < N; i++){
-    indices2.setValue(i, HilbertCurve<IndexType, ValueType>::getHilbertIndex(coords, dimensions, i, recursionDepth, minCoords, maxCoords) );
-    EXPECT_LE(indices2.getValue(i).getValue<ValueType>(), 1);
-    EXPECT_GE(indices2.getValue(i).getValue<ValueType>(), 0);
+    indices.setValue(i, HilbertCurve<IndexType, ValueType>::getHilbertIndex(coords, dimensions, i, recursionDepth, minCoords, maxCoords) );
+    EXPECT_LE(indices.getValue(i).getValue<ValueType>(), 1);
+    EXPECT_GE(indices.getValue(i).getValue<ValueType>(), 0);
   }
-  
-  /*
-  for (IndexType i = 0; i < N; i++){
-        std::cout<< i<< ": "<< coords[0].getValue(i).getValue<ValueType>() << ", "<< coords[1].getValue(i).getValue<ValueType>()<< " -- "<< indices2.getValue(i).getValue<ValueType>() << std::endl;
-  }
-  */
-  
-  //for visualization purposes
-   std::ofstream f;
-   f.open ("hilbert2D_8x8.plt");
-   
-   dmemo::DistributionPtr dist( new dmemo::NoDistribution( N ));
-   DenseVector<IndexType> perm(dist);
-   
-   indices2.sort(perm, true);
-
-   f<< coords[0].getValue(perm.getValue(0).getValue<IndexType>()).getValue<ValueType>()<< " "\
-    << coords[1].getValue(perm.getValue(0).getValue<IndexType>()).getValue<ValueType>()<< endl;
-   for(int i=1; i<N; i++){
-        f<< coords[0].getValue(perm.getValue(i).getValue<IndexType>()).getValue<ValueType>()<< " "<< coords[1].getValue(perm.getValue(i).getValue<IndexType>()).getValue<ValueType>()<< endl;
-   }
-   /*
-    for(int i=0; i<N; i++){
-        std::cout<<"perm("<< i<< ")= "<< perm.getValue(i).getValue<IndexType>() <<" - "<< coords[0].getValue(perm.getValue(i).getValue<IndexType>()).getValue<ValueType>()<< " "<< coords[1].getValue(perm.getValue(i).getValue<IndexType>()).getValue<ValueType>()<< " , ind > "<<\
-        //indices2(perm.getValue(i).getValue<IndexType>()).getValue<ValueType>()<<endl;
-        indices2(i).getValue<ValueType>()<<endl;
-   }
-    */
-}
-
-//-------------------------------------------------------------------------------------------------
-  
-TEST_F(HilbertCurveTest, testHilbertIndex2DNoScaling) {
-    IndexType N= 20000;
-    ValueType max= 500;
-    IndexType dimensions =2, recursionDepth= 15;
-    
-    vector<DenseVector<ValueType>> coords(2);//2D points
-    coords[0].allocate(N);
-    coords[1].allocate(N);
-    coords[0] = static_cast<ValueType>( 0 );
-    coords[1] = static_cast<ValueType>( 0 );
-    
-    srand(time(NULL));
-    //N random points
-    for(int i=0; i<N; i++){
-        ValueType r= ((ValueType) rand()/RAND_MAX);
-        coords[0].setValue(i, r*max);
-        r= ((ValueType) rand()/RAND_MAX);
-        coords[1].setValue(i, r*max);
-    }
-    
-    vector<ValueType> scaledHilbert(N,0), noScaleHilbert(N,0);
-    vector<IndexType> scaledIndex(N,0), noScaleIndex(N,0);
-    
-    vector<ValueType> minCoords={0,0};
-    vector<ValueType> maxCoords={0,0};
-    
-    for (IndexType i = 0; i < N; i++){
-        scaledIndex[i]= i;
-        noScaleIndex[i]= i;
-        for (IndexType dim = 0; dim < dimensions; dim++) {
-            ValueType coord = coords[dim].getValue(i).Scalar::getValue<ValueType>();
-            //std::cout << *comm << ", " << i << "." << dim << ":" << coord << std::endl;
-            if (coord < minCoords[dim]) minCoords[dim] = coord;
-            if (coord > maxCoords[dim]) maxCoords[dim] = coord;
-        }
-        //cout<< i<< ": "<< maxCoords[0]<<" _ "<< maxCoords[1]<< endl;
-    }
-    /*
-    for (IndexType dim = 0; dim < dimensions; dim++) {
-        cout<< dim<< ": max= "<< maxCoords[dim]<< " , min= "<< minCoords[dim]<< endl;
-    }
-    */
-    chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();       
-
-    for (IndexType i = 0; i < N; i++)
-        scaledHilbert[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coords, dimensions, i, recursionDepth, minCoords, maxCoords);
-    
-    chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
-    auto duration = chrono::duration_cast<chrono::milliseconds>( t2 - t1 ).count();
-    cout << "time elapsed for hilbert indices with scaling: "<< duration<< " ms"<< endl;
-    
-    for (IndexType i = 0; i < N; i++)
-        noScaleHilbert[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex_noScaling(coords, dimensions, i, recursionDepth, minCoords, maxCoords);
-    
-    chrono::high_resolution_clock::time_point t3 = chrono::high_resolution_clock::now();
-    duration = chrono::duration_cast<chrono::milliseconds>( t3 - t2 ).count();
-    cout << "time elapsed for hilbert indices with NO scaling but written over: "<< duration<< " ms"<< endl;
-    
-    
-    sort(scaledIndex.begin() , scaledIndex.end(),
-        [&](const int& a, const int& b){ return (scaledHilbert[a]<scaledHilbert[b]); }
-    );
-    sort(noScaleIndex.begin() , noScaleIndex.end(),
-        [&](const int& a, const int& b){ return (noScaleHilbert[a]<noScaleHilbert[b]); }
-    );
-/*    
-    for (IndexType i = 0; i < N; i++){
-        cout<< i<< ": "<< scaledIndex[i]<< " ## "<< noScaleIndex[i]<< endl;
-    }
- */   
-    //duration = chrono::duration_cast<chrono::milliseconds>( chrono::high_resolution_clock::now() -t3 ).count();
-    //cout << "time elapsed for hilbert indices with NO scaling: "<< duration<< " ms"<< endl;
-  
-    /*
-    if(scaledIndex == noScaleIndex)
-        std::cout<< "vector are equal"<< std::endl;
-    else{
-        std::cout<< "vector are NOT equal"<< std::endl;    
-        for(int i=0; i<N; i++){
-            if( scaledIndex[i]!= noScaleIndex[i]){
-                cout<< i<< ": "<< scaledIndex[i]<< " <> "<< noScaleIndex[i]<< endl;
-                cout<< "\t"<< scaledHilbert[i]<< " :: "<< noScaleHilbert[i]<< endl;
-            }
-        }
-    
-    }
-    */
 
 }
 
 //-------------------------------------------------------------------------------------------------
 
-TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_3D) {
+TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_3D) {
   const IndexType dimensions = 3;
   const IndexType n = 7;
   const IndexType recursionDepth = 3;
@@ -237,12 +106,13 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_3D) {
 /*
  * Creates random coordinates for n points
 */
-TEST_F(HilbertCurveTest, testHilbertIndexDistributedRandom_3D) {
+TEST_F(HilbertCurveTest, testHilbertIndexRandom_Distributed_3D) {
   const IndexType dimensions = 3;
-  const IndexType n = 16;
-  const IndexType recursionDepth = 2;
+  const IndexType N = 50;
+  const IndexType recursionDepth = 7;
+  
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
   std::vector<DenseVector<ValueType>> coordinates(dimensions);
   for(IndexType i=0; i<dimensions; i++){ 
       coordinates[i].allocate(dist);
@@ -251,58 +121,25 @@ TEST_F(HilbertCurveTest, testHilbertIndexDistributedRandom_3D) {
 
   srand(time(NULL));
   ValueType r;
-  /*
-  ValueType tempArray[n*dimensions];
-  for(int i=0; i<n*dimensions; i++){
-    r= ((double) rand()/RAND_MAX);
-    tempArray[i]= r;
-  }
-  */
   
-  for(int i=0; i<n; i++){      
-    //std::cout<<  *comm<< ": "<< " , i:"<< i<< "__ ";
+  for(int i=0; i<N; i++){      
     for(int j=0; j<dimensions; j++){
         r= ((double) rand()/RAND_MAX);
-        //r=i*dimensions +j;
 	coordinates[j].setValue( i, r);	
-        ValueType coord = coordinates[j](i).Scalar::getValue<ValueType>();
-       /* if( dist->isLocal(i))
-            std::cout<< coord <<", ";
-        else
-            std::cout<< "coord "<< i<<" not in "<< *comm<< " ";
-        */
     }
-    //td::cout<<std::endl;
   }
 
-  scai::dmemo::DistributionPtr distIndices ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
-
-  const IndexType localN = dist->getLocalSize();
-  //std::cout<< "localN=" << localN << std::endl;
   std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
   std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
 
-  /*
-  const scai::utilskernel::LArray<ValueType> localPartOfCoords = coordinates.getLocalValues();
-  assert((localPartOfCoords.size() / dimensions) == localN);
-  for (IndexType i = 0; i < localN; i++) {
-    for (IndexType dim = 0; dim < dimensions; dim++) {
-      ValueType coord = localPartOfCoords[i*dimensions + dim];
-      //std::cout << *comm << ", " << i << "." << dim << ":" << coord << std::endl;
-      if (coord < minCoords[dim]) minCoords[dim] = coord;
-      if (coord > maxCoords[dim]) maxCoords[dim] = coord;
-    }
-  }
-  */
-  
-  for (IndexType i = 0; i < n; i++) {
-    for (IndexType dim = 0; dim < dimensions; dim++) {
+  for (IndexType dim = 0; dim < dimensions; dim++) {
+    for (IndexType i = 0; i < N; i++) {
       ValueType coord = coordinates[dim].getValue(i).Scalar::getValue<ValueType>();
       if (coord < minCoords[dim]) minCoords[dim] = coord;
       if (coord > maxCoords[dim]) maxCoords[dim] = coord;
     }
   }
-  
+
   //communicate minima/maxima over processors. Not strictly necessary right now, since the RNG creates the same vector on all processors.
   for (IndexType dim = 0; dim < dimensions; dim++) {
     ValueType globalMin = comm->min(minCoords[dim]);
@@ -313,102 +150,46 @@ TEST_F(HilbertCurveTest, testHilbertIndexDistributedRandom_3D) {
     maxCoords[dim] = globalMax;
   }
 
-  //without the next two lines it messes up the indexes in the distribution. or not?
-  //minCoords= {0,0,0};
-  //maxCoords= {1,1,1};
-
-  std::vector<ValueType> indices(localN);
+  DenseVector<ValueType> indices(dist, 17);
+  DenseVector<IndexType> perm(dist, 17);
+  const IndexType localN = dist->getLocalSize();
+  
   for (IndexType i = 0; i < localN; i++) {
     //check if the new function return the same index. seems OK.
-    indices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, distIndices->local2global(i), recursionDepth, minCoords, maxCoords);
-
-    EXPECT_LE(indices[i], 1);
-    EXPECT_GE(indices[i], 0);
+    indices.getLocalValues()[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, dist->local2global(i), recursionDepth, minCoords, maxCoords);
+    
+    /*
+    EXPECT_LE(indices.getLocalValues()[i], 1);
+    EXPECT_GE(indices.getLocalValues()[i], 0);
+    */
+  }
+  
+  indices.sort(perm, true);
+  
+  for(IndexType i=0; i<N-1; i++){
+    ValueType ind1 = indices.getValue(i ).Scalar::getValue<ValueType>(); 
+    ValueType ind2 = indices.getValue(i+1 ).Scalar::getValue<ValueType>();
+    EXPECT_LE(ind1 , ind2);
   }
   
 }
 
 //-------------------------------------------------------------------------------------------------
-/*
-TEST_F(HilbertCurveTest, testHibertIndex2Point_2D){
 
-  int recursionDepth= 4;	
-  int n= 165;					//how many indices we want to try
-  int dimensions= 2;
-  double index;					//the index of the curve
-  std::vector<double> indexV(n);		//a vector of all indices
-  DenseVector<ValueType> p;			//a point in 2D calculated from an index in the curve
-  std::vector<DenseVector<ValueType>> pointsV(n);	//vectors of all the points
- 
-  //create indices at random
-  srand(time(NULL));
-  for(int i=1; i<n; i++){
-    index= ((double) rand()/RAND_MAX);
-    indexV[i]=index;  
-  }
-
-  // a non-random array of points
-  ValueType step = 1/n;
-  indexV[0]=step;
-  for(int i=1; i<n; i++)  
-    indexV[i]=indexV[i-1]+ step;
-
-  ValueType hilbertI;
-  std::vector<ValueType> hilbertIV(n);
-  const std::vector<ValueType> minCoords({0,0});
-  const std::vector<ValueType> maxCoords({1,1});  
-
-  //sort the indices and calculate their coordinates in the unit square
-  std::sort(indexV.begin(), indexV.end() );
-  for(int i=0; i<n; i++){
-    p= HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(indexV[i], recursionDepth+2);
-    pointsV.push_back(p);
-    hilbertI= HilbertCurve<IndexType, ValueType>::getHilbertIndex(p, dimensions, 0, recursionDepth, minCoords, maxCoords);
-    hilbertIV[i]=hilbertI;
-  }
-
-  int error_cnt=0;
-  for(int i=1; i<n; i++){
-    if(hilbertIV[i-1]>hilbertIV[i])
-	error_cnt++;
-    EXPECT_GE(hilbertIV[i],hilbertIV[i-1]);
-  }
-
-}
-*/
-//-------------------------------------------------------------------------------------------------
-// Calculates the disatnce in 3D.
-/*
-Scalar dist3D(DenseVector<ValueType> p1, DenseVector<ValueType> p2){
-  Scalar res0, res1, res2, res;
-  res0= p1.getValue(0)-p2.getValue(0);
-  res0= res0*res0;
-  res1= p1.getValue(1)-p2.getValue(1);
-  res1= res1*res1;
-  res2= p1.getValue(2)-p2.getValue(2);
-  res2= res2*res2;
-  res = res0+ res1+ res2;
-  return common::Math::sqrt( res.getValue<ScalarRepType>() );
-}*/
-//------------------------
 /*
 * Create points in 3D in a structured, grid-like way and calculate theis hilbert index.
 * Sorts the index and the point in a myclass vector and sorts the vector
 * according to the hilbert index. Prints all the points in a file for visualisation.
 */
-TEST_F(HilbertCurveTest, testHilbertPoint2Index_3D){
+
+TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distributed_3D){
   int recursionDepth= 7;
   int dimensions= 3;
-  ValueType startCoord=0, offset=0.063;
+  ValueType startCoord=0, offset=0.0872;
   const int n= pow( ceil((1-startCoord)/offset), dimensions);
 
-  std::vector<ValueType> indexV(n);
-  DenseVector<ValueType> p;				//a point in 3D
-  const std::vector<ValueType> minCoords({0,0,0});
-  const std::vector<ValueType> maxCoords({1,1,1});  
-
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n*dimensions) );
+  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
   std::vector<DenseVector<ValueType>> coordinates(dimensions);
   for(IndexType i=0; i<dimensions; i++){ 
       coordinates[i].allocate(dist);
@@ -428,50 +209,42 @@ TEST_F(HilbertCurveTest, testHilbertPoint2Index_3D){
 	++i;
  }
 
-  DenseVector<ValueType> hilbertIndex(n,0);
-  DenseVector<IndexType> perm(dist);
-  const IndexType localN = dist->getLocalSize()/dimensions;
+ DenseVector<ValueType> hilbertIndex(dist, 19);
+ DenseVector<IndexType> perm(dist);
+
+ std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
+ std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
+ IndexType N=i;
+ 
+ for (IndexType dim = 0; dim < dimensions; dim++) {
+    for (IndexType i = 0; i < N; i++) {
+      ValueType coord = coordinates[dim].getValue(i).Scalar::getValue<ValueType>();
+      if (coord < minCoords[dim]) minCoords[dim] = coord;
+      if (coord > maxCoords[dim]) maxCoords[dim] = coord;
+    }
+ }
+  
+ const IndexType localN = dist->getLocalSize();
 
   //calculate the hilbert index of the points located in the processor and sort them
-  for(int i=0; i<localN; i++)
-    hilbertIndex.setValue(i, HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(coordinates, dimensions, distIndices->local2global(i), recursionDepth ,minCoords, maxCoords) );
+ for(int i=0; i<localN; i++)
+    hilbertIndex.getLocalValues()[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, distIndices->local2global(i), recursionDepth ,minCoords, maxCoords) ;
   
   hilbertIndex.sort(perm, true);
-
-/*
-  ValueType index;			//a number in [0, 1], the index of the Hilbert curve
-  for(int i=0; i<n; i++){
-    std::cout<<i <<": "<<  perm.getValue(i);// << std::endl;
-    std::cout<<" , index= "<< hilbertIndex.getValue(i) << std::endl;
-  }
-
-  ValueType max_dist = sqrt(dimensions)/pow(2,recursionDepth);
-  Scalar actual_max_dist=0;
-  Scalar d;
-*/
+  
   std::ofstream f;
-  f.open ("hilbert3D.plt");
+  std::string fileName = std::string("meshes/my_meshes/hilbert3D_" + std::to_string(comm->getRank()) + ".plt");
+  f.open(fileName);
 
-  //int cnt=0;
-  //write the coordinates in the file f.
-  f	<< coordinates[0].getValue(perm.getValue(0).getValue<IndexType>()).getValue<ValueType>()<<" "\
-	<< coordinates[1].getValue(perm.getValue(0).getValue<IndexType>()).getValue<ValueType>()<<" "\
-	<< coordinates[2].getValue(perm.getValue(0).getValue<IndexType>()).getValue<ValueType>()<<std::endl;
-  for(int i=1; i<localN; i++){
-      /*
-      std::cout<< i <<": "<< points_sorted[i].index <<"\t| "<< points_sorted[i].p.getValue(0).getValue<ValueType>()<<", "<<points_sorted[i].p.getValue(1).getValue<ValueType>() \
-					<<", "<<points_sorted[i].p.getValue(2).getValue<ValueType>()<<std::endl;
-        */
-        /*
-        std::cout<< "\t\t| " 	<< coordinates.getValue(perm.getValue(i).getValue<IndexType>()*dimensions).getValue<ValueType>()<<", "\
-	  		<< coordinates.getValue(perm.getValue(i).getValue<IndexType>()*dimensions+1).getValue<ValueType>()<<", "\
-			<< coordinates.getValue(perm.getValue(i).getValue<IndexType>()*dimensions+2).getValue<ValueType>()\
-			<<"   perm(i)= "<< perm.getValue(i).getValue<IndexType>()<< std::endl;
-        */
-    f	<< coordinates[0].getValue(perm.getValue(i).getValue<IndexType>()).getValue<ValueType>()<<" "\
-	<< coordinates[1].getValue(perm.getValue(i).getValue<IndexType>()).getValue<ValueType>()<<" "\
-	<< coordinates[2].getValue(perm.getValue(i).getValue<IndexType>()).getValue<ValueType>()<<std::endl;
+  for(int i=0; i<N; i++){
+      ValueType x= coordinates[0].getValue( perm.getValue(i).Scalar::getValue<IndexType>() ).Scalar::getValue<ValueType>();
+      ValueType y= coordinates[1].getValue( perm.getValue(i).Scalar::getValue<IndexType>() ).Scalar::getValue<ValueType>();
+      ValueType z= coordinates[2].getValue( perm.getValue(i).Scalar::getValue<IndexType>() ).Scalar::getValue<ValueType>();
+      if( dist->isLocal(i)){
+        f << x << " "<< y << " "<< z << std::endl;
+      }
  }
+ std::cout<< "Coordinates written in file: "<< fileName << " for processor #"<< comm->getRank()<< std::endl;
   f.close();
 }
 //-------------------------------------------------------------------------------------------------

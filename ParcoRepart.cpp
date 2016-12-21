@@ -223,8 +223,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			assert(oldCut - gain == cut);
 			std::cout << "Last FM round yielded gain of " << gain << ", for total cut of " << computeCut(input, result) << std::endl;
 		}
-	}
-
+	}   
 	return result;
 }
 

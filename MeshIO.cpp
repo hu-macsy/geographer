@@ -17,15 +17,9 @@ template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::createRandom3DMesh(CSRSparseMatrix<ValueType> &adjM, vector<DenseVector<ValueType>> &coords, int numberOfPoints, ValueType maxCoord) {
     int n = numberOfPoints;
     int i, j;
-std::cout<<__FILE__<< "  "<< __LINE__<< endl;
+    
     coords = MeshIO::randomPoints(n, 3, maxCoord);
- /*
-     for(i=0; i<n; i++){
-        for(int j=0; j<3; j++)
-            cout<< i<< ": "<< coords[j].getValue(i)<< ", ";
-        cout<< endl;
-    }
- */
+ 
     srand(time(NULL));    
     int bottom= 4, top= 8;
     Scalar dist;
@@ -35,17 +29,14 @@ std::cout<<__FILE__<< "  "<< __LINE__<< endl;
         for(j=0; j<n; j++)
             adjArray[i*n+j]=0;
         
- std::cout<<__FILE__<< "  "<< __LINE__<< " , coords.size()="<< coords.size()<< endl;
- 
     for(i=0; i<n; i++){
         int k= ((int) rand()%(top-bottom) + bottom);
         list<ValueType> kNNdist(k,maxCoord*1.7);       //max distance* sqrt(3)
         list<IndexType> kNNindex(k,0);
         typename list<ValueType>::iterator liVal;
         typename list<IndexType>::iterator liIndex = kNNindex.begin();
-  //std::cout<<__FILE__<< "  "<< __LINE__<< " , i:"<< i<< endl;             
+  
         for(j=0; j<n; j++){
-   //std::cout<<__FILE__<< "  "<< __LINE__<< " , j:"<< j<< endl;               
             if(i==j) continue;
             DenseVector<ValueType> p1(3,0), p2(3,0);
             p1.setValue(0, coords[0].getValue(i));
@@ -73,10 +64,9 @@ std::cout<<__FILE__<< "  "<< __LINE__<< endl;
         }    
         kNNindex.sort();
         liIndex= kNNindex.begin();
-        
-        for(IndexType col=0; col<n; col++){
+
+    for(IndexType col=0; col<n; col++){
             if(col== *liIndex){
-//std::cout<<__FILE__<< "  "<< __LINE__<< " >>"<< col<< endl;
                 //undirected graph, symmetric adjacency matrix
                 adjArray[i*n +col] = 1;
                 adjArray[col*n +i] = 1;
@@ -87,13 +77,6 @@ std::cout<<__FILE__<< "  "<< __LINE__<< endl;
         
     }
     
-/*    cout<<endl;
-    for(int ee=0; ee<n*n; ee++){
-        if(ee%n==0) cout<<endl;
-        cout<< adjArray[ee]<<" , ";
-    }
-    cout<<endl;
-*/    
     //brute force zero in the diagonal
     //TODO: should not be needed but sometimes ones appear in the diagonal
     for(i=0; i<n; i++) adjArray[i*n +i]=0;
@@ -102,16 +85,7 @@ std::cout<<__FILE__<< "  "<< __LINE__<< endl;
     dmemo::DistributionPtr rep( new dmemo::NoDistribution( n ));
     adjM.setRawDenseData( rep, rep, adjArray.get() );
     assert(adjM.checkSymmetry() );
-    
-/*
-    cout<< string(30, '-')<< adjM.checkSymmetry()<<endl;
-    for(int p=0; p<n; p++){
-        for(int q=0; q<n; q++)
-            cout<< adjM(p,q).Scalar::getValue<ValueType>() <<" , ";
-        cout<<endl;
-    }
-*/        
-
+ 
 }
 //-------------------------------------------------------------------------------------------------
 // coords.size()= 3 , coords[i].size()= N
@@ -121,50 +95,26 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
     vector<ValueType> offset={maxCoord[0]/numPoints[0], maxCoord[1]/numPoints[1], maxCoord[2]/numPoints[2]};
     IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
 
-//std::cout<<__FILE__<< "  "<< __LINE__<< " , N="<< N<< std::endl;    
-std::cout<< "offsets= "<< offset[0]<< ", "<< offset[1]<< ", "<< offset[2]<< endl;
     // create the coordinates
     IndexType index=0;
-    /*
-    ValueType x= 0;
-    ValueType y= 0;
-    ValueType z= 0;
-    IndexType indexZ =0;
-    IndexType indexY =0;
-    for( x=0; x<maxCoord[0]; x+=offset[0]){
-        indexY =0;
-        for( y=0; y<maxCoord[1]; y+=offset[1]){
-            indexZ =0;
-            for( z=0; z<maxCoord[2]; z+=offset[2]){
-                coords[0].setValue(index, x); 
-                coords[1].setValue(index, y); 
-                coords[2].setValue(index, z); 
-                ++index;
-                ++indexZ;
-            }
-            ++indexY;
-        }
-std::cout<<__FILE__<< "  "<< __LINE__<< " ##  "<< index<< " _ x="<< x<< " _ y="<< indexY<< " _ z="<< indexZ<<  std::endl;    
-    }
-    */
-//std::cout<<__FILE__<< "  "<< __LINE__<< std::endl;    
-    index =1;
+    index = 0;
     coords[0].setValue(0,0);
     coords[1].setValue(0,0);
     coords[2].setValue(0,0);
     for( IndexType indX=0; indX<numPoints[0]; indX++){
         for( IndexType indY=0; indY<numPoints[1]; indY++){
             for( IndexType indZ=0; indZ<numPoints[2]; indZ++){
-                    coords[0].setValue(index, coords[0].getValue(index-1).Scalar::getValue<ValueType>() + offset[0] );
-                    coords[1].setValue(index, coords[1].getValue(index-1).Scalar::getValue<ValueType>() + offset[1] );
-                    coords[2].setValue(index, coords[2].getValue(index-1).Scalar::getValue<ValueType>() + offset[2] );
+                coords[0].setValue(index, indX*offset[0] );
+                coords[1].setValue(index, indY*offset[1] );
+                coords[2].setValue(index, indZ*offset[2] );
+                ++index;
             }
         }
     }
 
     scai::lama::CSRStorage<double> localMatrix;
     localMatrix.allocate( N, N );
-std::cout<<__FILE__<< "  "<< __LINE__<< std::endl;    
+    
     //create the adjacency matrix
     hmemo::HArray<IndexType> csrIA;
     hmemo::HArray<IndexType> csrJA;
@@ -174,21 +124,15 @@ std::cout<<__FILE__<< "  "<< __LINE__<< std::endl;
         // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
         IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
                                 -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
-std::cout<<__FILE__<< "  "<< __LINE__<<" , numEdges="<< numEdges<< std::endl;
         hmemo::WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
-        //hmemo::WriteOnlyAccess<IndexType> ja( csrJA, numEdges *2);
-        //hmemo::WriteOnlyAccess<double> values( csrValues, numEdges *2 );
         hmemo::WriteOnlyAccess<IndexType> ja( csrJA);
         hmemo::WriteOnlyAccess<double> values( csrValues);    
         ia[0] = 0;
-        
-std::cout<<__FILE__<< "  "<< __LINE__<< " , N="<< N<<  std::endl;        
+     
         IndexType nnzCounter = 0; // count non-zero elements
         // for every node= for every line of adjM
         for(IndexType i=0; i<N; i++){
-//std::cout<<__FILE__<< "  "<< __LINE__<< ", i:"<< i<< " , nnzCounter="<< nnzCounter<< std::endl;        
             // connect the point with its 6 (in 3D) neighbours
-            //adjM[i][colCounter]= 0;
             // neighbour_node: the index of a neighbour of i, can take negative values
             // but in that case we do not add it
             float ngb_node = 0;      
@@ -302,16 +246,11 @@ std::cout<<__FILE__<< "  "<< __LINE__<< " , N="<< N<<  std::endl;
             }
             
             ia[i+1] = ia[i] +static_cast<IndexType>(numRowElems);
-if(i%1000 == 0) std::cout<< i<< ": ia[i+1]="<< ia[i+1] << " , numRowElems="<< numRowElems<< std::endl;
         }//for
-std::cout<< "nnzCounter: "<< nnzCounter<< "  === values.size() :"<< values.size()<< " === ia[N]="<< ia[N]<< std::endl;
-std::cout<<__FILE__<< "  "<< __LINE__<< " #>  ja.size="<< ja.size()<< "  , values.size()="<< values.size()<<\
-         " , ja[last]="<< ja[nnzCounter-1]<< "  , values[last]="<<values[nnzCounter-1] <<std::endl;
     }
  
     localMatrix.swap( csrIA, csrJA, csrValues );
     adjM.assign(localMatrix);
-std::cout<<__FILE__<< "  "<< __LINE__<< " , adjM.getNumValues()=  "<< adjM.getNumValues()<< std::endl;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -332,10 +271,6 @@ void MeshIO<IndexType, ValueType>::writeInFileMetisFormat (const CSRSparseMatrix
     IndexType cols= adjM.getNumColumns() , rows= adjM.getNumRows();
     IndexType i, j;
     
-    //cout<<"NumCols= "<< cols<< " NumRows= "<< rows<< " , liNorm="<< adjM.l1Norm().Scalar::getValue<ValueType>() <<            " getNumValues(): "<< adjM.getNumValues()<< endl;
-    
-    //chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
-    
     //the l1Norm/2 is the number of edges for an undirected, unweighted graph.
     //since is must be an adjacencey matrix cols==rows
     assert(((int) adjM.l1Norm().Scalar::getValue<ValueType>())%2==0);
@@ -348,27 +283,6 @@ void MeshIO<IndexType, ValueType>::writeInFileMetisFormat (const CSRSparseMatrix
         }
         f<< endl;
     }
-/*    
-    chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
-    auto duration = chrono::duration_cast<chrono::milliseconds>( t2 - t1 ).count();
-    cout << __FILE__<<" , "<< __LINE__<< "# time elapsed after first write: "<< duration<< " ms"<< endl;
-*/
-
-/*  Writting in file by reading a whole row. It is slower than the above method.
-  
-    DenseVector<ValueType> row(cols, 0);
-    for(IndexType r=0; r<rows; r++){
-        adjM.getRow(row, r);
-        for( IndexType c=0; c<row.size(); c++){
-            f<< row.getValue(c).Scalar::getValue<ValueType>()<< " ";
-            //std::cout<<  row.getValue(c).Scalar::getValue<ValueType>()<< " ## ";
-        }
-    }
-    
-    chrono::high_resolution_clock::time_point t3 = chrono::high_resolution_clock::now();
-    duration = chrono::duration_cast<chrono::milliseconds>( t3 - t2 ).count();
-    cout <<__FILE__<<" , "<< __LINE__<< "# time elapsed after second write: "<< duration<< " ms"<< endl;
-*/
     f.close();
 }
 
@@ -390,7 +304,7 @@ void MeshIO<IndexType, ValueType>::writeInFileCoords (const DenseVector<ValueTyp
     assert(coords.size()/dimension == std::floor(coords.size()/dimension) );
     for(i=0; i<coords.size()/dimension; i++){
         for(j=0; j<dimension; j++){
-            f<< coords.getValue(i*dimension +j)<< " ";
+            f<< coords.getValue(i*dimension +j).Scalar::getValue<ValueType>() << " ";
         }
         f<< endl;
     }
@@ -410,12 +324,10 @@ void MeshIO<IndexType, ValueType>::writeInFileCoords (const vector<DenseVector<V
     IndexType i, j;
 
     assert(coords.size() == dimension );
-//std::cout<<__FILE__<< "  "<< __LINE__<<"  ,coords.size()="<< coords.size()<<"  dimensions="<< dimension <<endl;
     assert(coords[0].size() == numPoints);
-//std::cout<<__FILE__<< "  "<< __LINE__<<"  ,coords[0].size()="<< coords[0].size()<<"  numPoints="<< numPoints<<endl;
     for(i=0; i<numPoints; i++){
         for(j=0; j<dimension; j++)
-            f<< coords[j].getValue(i)<< " ";
+            f<< coords[j].getValue(i).Scalar::getValue<ValueType>() << " ";
         f<< endl;
     }
     
@@ -437,8 +349,6 @@ CSRSparseMatrix<ValueType>   MeshIO<IndexType, ValueType>::readFromFile2AdjMatri
    
     file >>N >> E;    
     CSRSparseMatrix<ValueType> ret(N, N);
-    //DenseVector<ValueType> row(N, 5);
-    //ret.setRow( row, 1, utilskernel::binary::COPY);
     common::scoped_array<ValueType> values( new ValueType[ N * N ] );
 
     for(IndexType i=0; i<=N; i++){
@@ -452,7 +362,6 @@ CSRSparseMatrix<ValueType>   MeshIO<IndexType, ValueType>::readFromFile2AdjMatri
         for(unsigned int j=0; j<all_integers.size(); j++){
             for(unsigned int k=0; k<all_integers[j].size(); k++){
                 int index =all_integers[j][k];
-                //std::cout<<"file:"<<__FILE__ <<", "<<__LINE__<< "   , j= "<< j<< "  , k="<< k<< " ## "<< (i-1)*N+index-1<< std::endl;                   
                 // subtract 1 because in the METIS format numbering starts from 1 not 0.
                 values[(i-1)*N+index-1] = 1; 
             }
@@ -461,9 +370,6 @@ CSRSparseMatrix<ValueType>   MeshIO<IndexType, ValueType>::readFromFile2AdjMatri
 
     dmemo::DistributionPtr rep( new dmemo::NoDistribution( N ) );
     ret.setRawDenseData( rep, rep, values.get() );
-
-//cout<< ret.l1Norm()<< " - "<< ret.getNumValues()<< endl;
-//std::cout<<"file:"<<__FILE__ <<", "<<__LINE__<<std::endl;    
 
     return ret;   
 }
@@ -626,11 +532,7 @@ void MeshIO<IndexType, ValueType>::fromFile2Coords_2D( const string filename, ve
         file>> x >> y >> z;
         coords[0].setValue(i, x);
         coords[1].setValue(i, y);
-        //ret.setValue(i*dim, x);
-        //ret.setValue(i*dim+1, y);
-        //ret.setValue(i*dim+2, z);
     }
-    //return ret;
 }
     
 //-------------------------------------------------------------------------------------------------
@@ -669,7 +571,6 @@ vector<DenseVector<ValueType>> MeshIO<IndexType, ValueType>::randomPoints(int nu
     
     srand(time(NULL));
     ValueType r;
-std::cout<<__FILE__<< "  "<< __LINE__<< endl;
     for(i=0; i<n; i++){
         //ret[i] = DenseVector<ValueType>(dimensions, 0);
         for(j=0; j<dimensions; j++){
@@ -677,7 +578,6 @@ std::cout<<__FILE__<< "  "<< __LINE__<< endl;
             ret[j].setValue(i, r);
         }
     }
-std::cout<<__FILE__<< "  "<< __LINE__<< endl;
     return ret;
 }
 
