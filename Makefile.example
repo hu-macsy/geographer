@@ -1,6 +1,6 @@
 CC=g++
 
-FILES= test_main.cpp ParcoRepartTest.cpp ParcoRepart.cpp HilbertCurve.cpp HilbertCurveTest.cpp
+FILES= test_main.cpp ParcoRepartTest.cpp ParcoRepart.cpp HilbertCurve.cpp HilbertCurveTest.cpp MeshIO.cpp
 EXECUTABLE=Katanomi
 
 SCAI_INCLUDE=
