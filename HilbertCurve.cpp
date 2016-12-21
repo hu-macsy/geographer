@@ -20,8 +20,11 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(const std::vector<
     
     const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
-    
     std::vector<ValueType> localCoords(dimensions);
+        
+    //        for debugging
+    /*
+    std::cout<< __FILE__<< " ,"<<__LINE__<<" __"<< *comm<< ": getHilbertIndex _ localCoords.size()="<< coordinates[0].getLocalValues().size() << std::endl;
     
     for(IndexType dim=0; dim<dimensions; dim++){
         //ValueType coord= coordinates[dim].getValue(index).Scalar::getValue<ValueType>();
@@ -31,8 +34,6 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(const std::vector<
             //std::cout<< coord<<", ";
         }
     }
-    
-    /* //for debugging
      
     std::cout<<"in file:"<< ff<<", line:"<< std::to_string(__LINE__) << "_ distribution: "<< *coordDist<< " and comm:"<< *comm << std::endl;
     std::cout<< "index= "<< index <<" , dimension= "<< dimensions<< " and recursionDepth= "<< recursionDepth<< " >>> ";
@@ -116,44 +117,43 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(const std::vecto
 
     //std::cout<<__LINE__<<":"<< scaledCoord[0]<< ", "<< scaledCoord[1]<< std::endl;
     
-    //if(dimensions==2){
-	long integerIndex = 0;//TODO: also check whether this data type is long enough
-	for (IndexType i = 0; i < recursionDepth; i++) {
-		int subSquare;
-		//two dimensions only, for now
-		if (scaledCoord[0] < 0.5) {
-			if (scaledCoord[1] < 0.5) {
-				subSquare = 0;
-				//apply inverse hilbert operator
-				double temp = scaledCoord[0];
-				scaledCoord[0] = 2*scaledCoord[1];
-				scaledCoord[1] = 2*temp;
-			} else {
-				subSquare = 1;
-				//apply inverse hilbert operator
-				scaledCoord[0] *= 2;
-				scaledCoord[1] = 2*scaledCoord[1] -1;
-			}
-		} else {
-			if (scaledCoord[1] < 0.5) {
-				subSquare = 3;
-				//apply inverse hilbert operator
-				double temp = scaledCoord[0];
-				scaledCoord[0] = -2*scaledCoord[1]+1;
-				scaledCoord[1] = -2*temp+2;
-			} else {
-				subSquare = 2;
-				//apply inverse hilbert operator
-				scaledCoord[0] = 2*scaledCoord[0]-1;
-				scaledCoord[1] = 2*scaledCoord[1]-1;
-			}
-		}
-                //std::cout<< subSquare<<std::endl;
-		integerIndex = (integerIndex << 2) | subSquare;	
-	}
-	long divisor = 1 << (2*int(recursionDepth));
-        return double(integerIndex) / double(divisor);
-    //}
+    long integerIndex = 0;//TODO: also check whether this data type is long enough
+    for (IndexType i = 0; i < recursionDepth; i++) {
+        int subSquare;
+        //two dimensions only, for now
+        if (scaledCoord[0] < 0.5) {
+            if (scaledCoord[1] < 0.5) {
+                subSquare = 0;
+                //apply inverse hilbert operator
+                double temp = scaledCoord[0];
+                scaledCoord[0] = 2*scaledCoord[1];
+                scaledCoord[1] = 2*temp;
+            } else {
+                subSquare = 1;
+                //apply inverse hilbert operator
+                scaledCoord[0] *= 2;
+                scaledCoord[1] = 2*scaledCoord[1] -1;
+            }
+        } else {
+            if (scaledCoord[1] < 0.5) {
+                subSquare = 3;
+                //apply inverse hilbert operator
+                double temp = scaledCoord[0];
+                scaledCoord[0] = -2*scaledCoord[1]+1;
+                scaledCoord[1] = -2*temp+2;
+            } else {
+                subSquare = 2;
+                //apply inverse hilbert operator
+                scaledCoord[0] = 2*scaledCoord[0]-1;
+                scaledCoord[1] = 2*scaledCoord[1]-1;
+            }
+        }
+        //std::cout<< subSquare<<std::endl;
+        integerIndex = (integerIndex << 2) | subSquare;	
+    }
+    long divisor = 1 << (2*int(recursionDepth));
+    return double(integerIndex) / double(divisor);
+
         /*else //if dimensions==3
 	return HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(coordinates, dimensions, index, recursionDepth ,minCoords, maxCoords);
     */
@@ -291,9 +291,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(const std::vecto
 
 	if (!coordDistX->isLocal(index)) {
                 std::string ff(__FILE__);
-                std::string ll;
-                ll= std::to_string(__LINE__);
-		throw std::runtime_error(ff+ ", "+ ll+ ". Coordinate with index " + std::to_string(index) + " is not present on this process.");
+		throw std::runtime_error(std::string(__FILE__) + ", "+ std::to_string(__LINE__)+ ". Coordinate with index " + std::to_string(index) + " is not present on this process.");
 	}
 
 	//const scai::utilskernel::LArray<ValueType>& myCoords = coordinates.getLocalValues();
