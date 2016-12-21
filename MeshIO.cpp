@@ -11,10 +11,18 @@
 //#include "ParcoRepart.h"
 //#include "HilbertCurve.h"
 
+using std::string;
+using std::list;
+using std::ifstream;
+using std::istream_iterator;
+using std::ofstream;
+using std::endl;
+using std::istringstream;
+
 namespace ITI{
 
 template<typename IndexType, typename ValueType>
-void MeshIO<IndexType, ValueType>::createRandom3DMesh(CSRSparseMatrix<ValueType> &adjM, vector<DenseVector<ValueType>> &coords, int numberOfPoints, ValueType maxCoord) {
+void MeshIO<IndexType, ValueType>::createRandom3DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, int numberOfPoints, ValueType maxCoord) {
     int n = numberOfPoints;
     int i, j;
 std::cout<<__FILE__<< "  "<< __LINE__<< endl;
@@ -117,8 +125,8 @@ std::cout<<__FILE__<< "  "<< __LINE__<< endl;
 // coords.size()= 3 , coords[i].size()= N
 // here, N= numPoints[0]*numPoints[1]*numPoints[2]
 template<typename IndexType, typename ValueType>
-void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueType> &adjM, vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
-    vector<ValueType> offset={maxCoord[0]/numPoints[0], maxCoord[1]/numPoints[1], maxCoord[2]/numPoints[2]};
+void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
+    std::vector<ValueType> offset={maxCoord[0]/numPoints[0], maxCoord[1]/numPoints[1], maxCoord[2]/numPoints[2]};
     IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
 
 //std::cout<<__FILE__<< "  "<< __LINE__<< " , N="<< N<< std::endl;    
@@ -404,7 +412,7 @@ void MeshIO<IndexType, ValueType>::writeInFileCoords (const DenseVector<ValueTyp
 //TODO:  not sure what data type to use for coordinates: a) DenseVector or b)vector<DenseVector> ?
 // b) coords = vector<DenseVector>
 template<typename IndexType, typename ValueType>
-void MeshIO<IndexType, ValueType>::writeInFileCoords (const vector<DenseVector<ValueType>> &coords, IndexType dimension, IndexType numPoints, const string filename){
+void MeshIO<IndexType, ValueType>::writeInFileCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType dimension, IndexType numPoints, const string filename){
     ofstream f;
     f.open(filename);
     IndexType i, j;
@@ -445,9 +453,9 @@ CSRSparseMatrix<ValueType>   MeshIO<IndexType, ValueType>::readFromFile2AdjMatri
         std::string line;
         // tokenize each line in the file
         std::getline(file, line);
-        vector< vector<int> > all_integers;
+        std::vector< std::vector<int> > all_integers;
         istringstream iss( line );
-        all_integers.push_back( vector<int>( istream_iterator<int>(iss), istream_iterator<int>() ) );
+        all_integers.push_back( std::vector<int>( istream_iterator<int>(iss), istream_iterator<int>() ) );
 
         for(unsigned int j=0; j<all_integers.size(); j++){
             for(unsigned int k=0; k<all_integers[j].size(); k++){
@@ -514,9 +522,9 @@ void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( lama::CSRSparseMatr
         //for every line, aka for all nodes
         for ( IndexType i=0; i<N; i++ ){
             std::getline(file, line);            
-            vector< vector<int> > line_integers;
+            std::vector< std::vector<int> > line_integers;
             istringstream iss( line );
-            line_integers.push_back( vector<int>( istream_iterator<int>(iss), istream_iterator<int>() ) );
+            line_integers.push_back( std::vector<int>( istream_iterator<int>(iss), istream_iterator<int>() ) );
             //ia += the numbers of neighbours of i = line_integers.size()
             ia[rowCounter + 1] = ia[rowCounter] + static_cast<IndexType>( line_integers[0].size() );
             for(unsigned int j=0, len=line_integers[0].size(); j<len; j++){
@@ -580,7 +588,7 @@ void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix_Boost( lama::CSRSpar
         //for every line, aka for all nodes
         for ( IndexType i=0; i<N; i++ ){
             std::getline(file, line);            
-            vector<ValueType> line_integers;
+            std::vector<ValueType> line_integers;
             boost::spirit::qi::phrase_parse( line.begin(), line.end(), 
                                             *boost::spirit::qi::double_,
                                             boost::spirit::ascii::space , line_integers );
@@ -611,7 +619,7 @@ void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix_Boost( lama::CSRSpar
  * Every line of the file contais 2 ValueType numbers.
  */
 template<typename IndexType, typename ValueType>
-void MeshIO<IndexType, ValueType>::fromFile2Coords_2D( const string filename, vector<DenseVector<ValueType>> &coords, IndexType numberOfPoints){
+void MeshIO<IndexType, ValueType>::fromFile2Coords_2D( const string filename, std::vector<DenseVector<ValueType>> &coords, IndexType numberOfPoints){
     IndexType N= numberOfPoints;
     //IndexType dim=2;
     //DenseVector<ValueType> ret(N*dim, 0);
@@ -639,7 +647,7 @@ void MeshIO<IndexType, ValueType>::fromFile2Coords_2D( const string filename, ve
  * Every line of the file contais 3 ValueType numbers.
  */
 template<typename IndexType, typename ValueType>
-void MeshIO<IndexType, ValueType>::fromFile2Coords_3D( const string filename, vector<DenseVector<ValueType>> &coords, IndexType numberOfPoints){
+void MeshIO<IndexType, ValueType>::fromFile2Coords_3D( const string filename, std::vector<DenseVector<ValueType>> &coords, IndexType numberOfPoints){
     IndexType N= numberOfPoints;
     ifstream file(filename);
     
@@ -660,10 +668,10 @@ void MeshIO<IndexType, ValueType>::fromFile2Coords_3D( const string filename, ve
 /* Creates random points in the cube [0,maxCoord] in the given dimensions.
  */
 template<typename IndexType, typename ValueType>
-vector<DenseVector<ValueType>> MeshIO<IndexType, ValueType>::randomPoints(int numberOfPoints, int dimensions, ValueType maxCoord){
+std::vector<DenseVector<ValueType>> MeshIO<IndexType, ValueType>::randomPoints(int numberOfPoints, int dimensions, ValueType maxCoord){
     int n = numberOfPoints;
     int i, j;
-    vector<DenseVector<ValueType>> ret(dimensions);
+    std::vector<DenseVector<ValueType>> ret(dimensions);
     for (i=0; i<dimensions; i++)
         ret[i] = DenseVector<ValueType>(numberOfPoints, 0);
     
@@ -701,18 +709,18 @@ Scalar MeshIO<IndexType, ValueType>::dist3D(DenseVector<ValueType> p1, DenseVect
 
 
 //-------------------------------------------------------------------------------------------------
-template void MeshIO<int, double>::createRandom3DMesh(CSRSparseMatrix<double> &adjM, vector<DenseVector<double>> &coords,  int numberOfPoints, double maxCoord);
-template void MeshIO<int, double>::createStructured3DMesh(CSRSparseMatrix<double> &adjM, vector<DenseVector<double>> &coords, vector<double> maxCoord, vector<int> numPoints);
-template vector<DenseVector<double>> MeshIO<int, double>::randomPoints(int numberOfPoints, int dimensions, double maxCoord);
+template void MeshIO<int, double>::createRandom3DMesh(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords,  int numberOfPoints, double maxCoord);
+template void MeshIO<int, double>::createStructured3DMesh(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
+template std::vector<DenseVector<double>> MeshIO<int, double>::randomPoints(int numberOfPoints, int dimensions, double maxCoord);
 template Scalar MeshIO<int, double>::dist3D(DenseVector<double> p1, DenseVector<double> p2);
 template void MeshIO<int, double>::writeInFileMetisFormat (const CSRSparseMatrix<double> &adjM, const string filename);
 template void MeshIO<int, double>::writeInFileCoords (const DenseVector<double> &coords, int dimension, const string filename);
-template void MeshIO<int, double>::writeInFileCoords (const vector<DenseVector<double>> &coords, int dimension, int numPoints, const string filename);
+template void MeshIO<int, double>::writeInFileCoords (const std::vector<DenseVector<double>> &coords, int dimension, int numPoints, const string filename);
 template CSRSparseMatrix<double>  MeshIO<int, double>::readFromFile2AdjMatrix(const string filename);
 template void MeshIO<int, double>::readFromFile2AdjMatrix( CSRSparseMatrix<double> &matrix, dmemo::DistributionPtr distribution, const string filename);
 template void MeshIO<int, double>::readFromFile2AdjMatrix_Boost( lama::CSRSparseMatrix<double> &matrix, dmemo::DistributionPtr  distribution, const string filename);
-template void  MeshIO<int, double>::fromFile2Coords_2D( const string filename, vector<DenseVector<double>> &coords, int numberOfCoords);
-template void MeshIO<int, double>::fromFile2Coords_3D( const string filename, vector<DenseVector<double>> &coords, int numberOfPoints);
+template void MeshIO<int, double>::fromFile2Coords_2D( const string filename, std::vector<DenseVector<double>> &coords, int numberOfCoords);
+template void MeshIO<int, double>::fromFile2Coords_3D( const string filename, std::vector<DenseVector<double>> &coords, int numberOfPoints);
 
 //template double MeshIO<int, double>:: randomValueType( double max);
 } //namespace ITI

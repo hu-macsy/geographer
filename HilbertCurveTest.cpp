@@ -27,6 +27,8 @@ typedef int IndexType;
 
 using namespace scai;
 
+using namespace std; //should be avoided, but better here than in header file
+
 namespace ITI {
 
 class HilbertCurveTest : public ::testing::Test {
