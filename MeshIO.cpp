@@ -11,6 +11,14 @@
 //#include "ParcoRepart.h"
 //#include "HilbertCurve.h"
 
+using std::string;
+using std::list;
+using std::ifstream;
+using std::istream_iterator;
+using std::ofstream;
+using std::endl;
+using std::istringstream;
+
 namespace ITI{
 
 template<typename IndexType, typename ValueType>
@@ -92,7 +100,7 @@ void MeshIO<IndexType, ValueType>::createRandom3DMesh(CSRSparseMatrix<ValueType>
 // here, N= numPoints[0]*numPoints[1]*numPoints[2]
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
-    
+
     std::vector<ValueType> offset={maxCoord[0]/numPoints[0], maxCoord[1]/numPoints[1], maxCoord[2]/numPoints[2]};
     IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
     // create the coordinates
@@ -423,6 +431,7 @@ void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( lama::CSRSparseMatr
             std::vector< std::vector<int> > line_integers;
             std::istringstream iss( line );
             line_integers.push_back( std::vector<int>( std::istream_iterator<int>(iss), std::istream_iterator<int>() ) );
+            
             //ia += the numbers of neighbours of i = line_integers.size()
             ia[rowCounter + 1] = ia[rowCounter] + static_cast<IndexType>( line_integers[0].size() );
             for(unsigned int j=0, len=line_integers[0].size(); j<len; j++){
