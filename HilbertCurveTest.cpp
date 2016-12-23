@@ -47,7 +47,7 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
   }
   
   std::vector<ValueType> maxCoords({0,0});
-  MeshIO<IndexType, ValueType>::fromFile2Coords_2D("./meshes/my_meshes/Grid8x8.xyz", coords,  N);
+  MeshIO<IndexType, ValueType>::fromFile2Coords_2D("./Grid32x32.xyz", coords,  N);
   
   for(IndexType j=0; j<dimensions; j++){
       for (IndexType i = 0; i < N; i++){

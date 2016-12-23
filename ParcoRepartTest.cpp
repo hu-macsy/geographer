@@ -72,7 +72,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
   IndexType k = 10;
   
   scai::lama::CSRSparseMatrix<ValueType>a(n,n);
-  // for nroot > 200 (approximatelly), fillRandom throws an error
+  // for nroot > 200 (approximately), fillRandom throws an error
   scai::lama::MatrixCreator::fillRandom(a, 0.01);
   IndexType dim = 2;
   ValueType epsilon = 0.05;
@@ -107,7 +107,6 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
   }
   
   IndexType optSize = std::ceil(n / k);
-  //in a distributed setting, this would need to be communicated and summed
   EXPECT_LE(*std::max_element(subsetSizes.begin(), subsetSizes.end()), (1+epsilon)*optSize);
     
 }
