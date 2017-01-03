@@ -590,7 +590,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::computeCo
 
 		for (IndexType i = 0; i < p; i++) {
 			IndexType partner = i ^ step;
-			if (partner <= p) {
+			if (partner < p) {
 				commPerm.setValue(i, partner);
 			} else {
 				commPerm.setValue(i, i);
