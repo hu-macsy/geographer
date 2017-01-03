@@ -25,27 +25,26 @@ ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const C
 	// iterate through matrix to find closest neighbours, implying necessary recursion depth for space-filling curve
 	// here it can happen that the closest neighbor is not stored on this processor.
 
-        std::vector<scai::dmemo::DistributionPtr> coordDist(dimensions);
-        for(IndexType i=0; i<dimensions; i++){
-            coordDist[i] = coordinates[i].getDistributionPtr(); 
-        }
+    std::vector<scai::dmemo::DistributionPtr> coordDist(dimensions);
+    for(IndexType i=0; i<dimensions; i++){
+        coordDist[i] = coordinates[i].getDistributionPtr(); 
+    }
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	const IndexType localN = inputDist->getLocalSize();
-        /*
-	if (coordDist[0]->getLocalSize() % int(dimensions) != 0) {
-		throw std::runtime_error("Size of coordinate vector no multiple of dimension. Maybe it was split in the distribution?");
-	}
-        */
+
 	if (!input.getColDistributionPtr()->isReplicated()) {
-		throw std::runtime_error("Columns must be replicated.");
+		throw std::runtime_error("Column of input matrix must be replicated.");
 	}
 
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
-	//const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates.getLocalValues();
-        std::vector<scai::utilskernel::LArray<ValueType>> localPartOfCoords2(dimensions);
-        for(IndexType i=0; i<dimensions; i++){
-            localPartOfCoords2[i] = coordinates[i].getLocalValues();
+    std::vector<scai::utilskernel::LArray<ValueType>> localPartOfCoords(dimensions);
+    for(IndexType i=0; i<dimensions; i++){
+        localPartOfCoords[i] = coordinates[i].getLocalValues();
+        if (localPartOfCoords[i].size() != localN) {
+        	throw std::runtime_error("Local part of coordinate vector "+ std::to_string(i) + " has size " + std::to_string(localPartOfCoords[i].size()) 
+        		+ ", but localN is " + std::to_string(localN));
         }
+    }
         
 	const scai::utilskernel::LArray<IndexType>& ia = localStorage.getIA();
     const scai::utilskernel::LArray<IndexType>& ja = localStorage.getJA();
@@ -54,17 +53,17 @@ ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const C
     ValueType minDistanceSquared = std::numeric_limits<ValueType>::max();
 	for (IndexType i = 0; i < localN; i++) {
 		const IndexType beginCols = ia[i];
-		const IndexType endCols = ia[i+1];//assuming replicated columns
+		const IndexType endCols = ia[i+1];//relying on replicated columns, which we checked earlier
 		assert(ja.size() >= endCols);
 		for (IndexType j = beginCols; j < endCols; j++) {
-			IndexType neighbor = ja[j];//big question: does ja give local or global indices?
+			IndexType neighbor = ja[j];//ja gives global indices
 			const IndexType globalI = inputDist->local2global(i);
                         // just check coordDist[0]. Is is enough? If coord[0] is here so are the others.
 			if (neighbor != globalI && coordDist[0]->isLocal(neighbor)) {
 				const IndexType localNeighbor = coordDist[0]->global2local(neighbor);
 				ValueType distanceSquared = 0;
 				for (IndexType dim = 0; dim < dimensions; dim++) {
-					ValueType diff = localPartOfCoords2[dim][i] -localPartOfCoords2[dim][localNeighbor];
+					ValueType diff = localPartOfCoords[dim][i] -localPartOfCoords[dim][localNeighbor];
 					distanceSquared += diff*diff;
 				}
 				if (distanceSquared < minDistanceSquared) minDistanceSquared = distanceSquared;
@@ -88,9 +87,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		 + " coordinates are given.");
 	}
         
-        if (dimensions != coordinates.size()){
-            throw std::runtime_error("Number of dimensions given "+ std::to_string(dimensions) + "must agree with coordinates.size()=" + std::to_string(coordinates.size()) );
-        }
+    if (dimensions != coordinates.size()){
+        throw std::runtime_error("Number of dimensions given "+ std::to_string(dimensions) + "must agree with coordinates.size()=" + std::to_string(coordinates.size()) );
+    }
         
 	if (n != input.getNumColumns()) {
 		throw std::runtime_error("Matrix must be quadratic.");
@@ -131,24 +130,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
 	std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
 
-        /*
-        std::vector<scai::utilskernel::LArray<ValueType>> localPartOfCoords2(dimensions);
-        for(IndexType i=0; i<dimensions; i++){
-            localPartOfCoords2[i] = coordinates[i].getLocalValues();
-        }
-
-	//Get extent of coordinates. Can probably speed this up with OpenMP by having thread-local min/max-Arrays and reducing them in the end
-	
-	for (IndexType i = 0; i < localPartOfCoords2[0].size() ; i++) {
-		for (IndexType dim = 0; dim < dimensions; dim++) {
-			ValueType coord = localPartOfCoords2[dim][i];
-			if (coord < minCoords[dim]) minCoords[dim] = coord;
-			if (coord > maxCoords[dim]) maxCoords[dim] = coord;
-		}
-	}
-	*/
-        //
-        // the code above finds the local min and max. We want the global min and max.
+    
+    // the code above finds the local min and max. We want the global min and max.
 	
 	for (IndexType i = 0; i < globalN; i++) {
 		for (IndexType dim = 0; dim < dimensions; dim++) {
@@ -476,9 +459,9 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 	if (testedNodes == 0) return 0;
 	assert(gains.size() == transfers.size());
 
-        /**
-	 * now find best partition among those tested
-	 */
+    /**
+	* now find best partition among those tested
+	*/
 	IndexType maxIndex = -1;
 	ValueType maxGain = 0;
 
