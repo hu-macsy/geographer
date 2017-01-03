@@ -129,13 +129,25 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
 	std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
 	
-	for (IndexType i = 0; i < globalN; i++) {
-		for (IndexType dim = 0; dim < dimensions; dim++) {
-			//TODO: the following line is extremely wasteful, as it initiates a global communication round each time
-			ValueType coord = coordinates[dim].getValue(i).Scalar::getValue<ValueType>();
+	/**
+	 * get minimum / maximum of local coordinates
+	 */
+	for (IndexType dim = 0; dim < dimensions; dim++) {
+		//get local parts of coordinates
+		scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
+		for (IndexType i = 0; i < localN; i++) {
+			ValueType coord = localPartOfCoords[i];
 			if (coord < minCoords[dim]) minCoords[dim] = coord;
 			if (coord > maxCoords[dim]) maxCoords[dim] = coord;
 		}
+	}
+
+	/**
+	 * communicate to get global min / max
+	 */
+	for (IndexType dim = 0; dim < dimensions; dim++) {
+		minCoords[dim] = comm->min(minCoords[dim]);
+		maxCoords[dim] = comm->max(maxCoords[dim]);
 	}
         
 	ValueType maxExtent = 0;
