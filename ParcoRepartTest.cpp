@@ -53,7 +53,7 @@ TEST_F(ParcoRepartTest, testMinimumNeighborDistanceDistributed) {
   for (IndexType i = 0; i < nroot; i++) {
     for (IndexType j = 0; j < nroot; j++) {
       //this is slightly wasteful, since it also iterates over indices of other processors
-      // no need to check if local. index must always use the global value
+      // no need to check if local, since setValue skips non-local coordinates. index must always use the global value
         coordinates[0].setValue(i*nroot + j, i);
         coordinates[1].setValue(i*nroot + j, j);
     }
@@ -62,7 +62,6 @@ TEST_F(ParcoRepartTest, testMinimumNeighborDistanceDistributed) {
   const ValueType minDistance = ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(a, coordinates, dimensions);
   EXPECT_LE(minDistance, nroot*1.5);
   EXPECT_GE(minDistance, 1);
-
 }
 
 
@@ -97,18 +96,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
   EXPECT_EQ(k-1, partition.max().getValue<IndexType>());
   EXPECT_TRUE(partition.getDistribution().isReplicated());//for now
   
-  std::vector<IndexType> subsetSizes(k, 0);//probably replace with some Lama data structure later
-  scai::utilskernel::LArray<IndexType> localPartition = partition.getLocalValues();
-  for (IndexType i = 0; i < localPartition.size(); i++) {
-    IndexType partID = localPartition[i];
-    EXPECT_LE(partID, k);
-    EXPECT_GE(partID, 0);
-    subsetSizes[partID] += 1;
-  }
-  
-  IndexType optSize = std::ceil(n / k);
-  EXPECT_LE(*std::max_element(subsetSizes.begin(), subsetSizes.end()), (1+epsilon)*optSize);
-    
+  EXPECT_LE(ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k) <= epsilon);
 }
 
 
@@ -154,26 +142,7 @@ IndexType index;
   EXPECT_EQ(k-1, partition.max().getValue<ValueType>());
   EXPECT_EQ(a.getRowDistribution(), partition.getDistribution());
 
-  std::vector<IndexType> subsetSizes(k, 0);
-  scai::utilskernel::LArray<ValueType> localPartition = partition.getLocalValues();
-  
-  for (IndexType i = 0; i < localPartition.size(); i++) {
-    ValueType partID = localPartition[i];
-    EXPECT_LE(partID, k-1); 
-    EXPECT_GE(partID, 0);
-    subsetSizes[partID] += 1;
-  }
-  IndexType optSize = std::ceil(n / k);
-
-//if we don't have the full partition locally, 
-  if (!partition.getDistribution().isReplicated()) {
-    //sum block sizes over all processes
-    for (IndexType partID = 0; partID < k; partID++) {
-      subsetSizes[partID] = comm->sum(subsetSizes[partID]);
-    }
-  }
-  
-  EXPECT_LE(*std::max_element(subsetSizes.begin(), subsetSizes.end()), (1+epsilon)*optSize);
+  EXPECT_LE(ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k) <= epsilon);
 }
 
 
@@ -319,11 +288,3 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 */
 
 } //namespace
-
-
-/*
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
-*/

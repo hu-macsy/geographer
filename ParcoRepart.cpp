@@ -109,19 +109,18 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         
 	const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
-        const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
-        
-        if( !coordDist->isEqual( *inputDist) ){ 
-            std::cout<< __FILE__<< "  "<< __LINE__<< "coordDist: " << *coordDist<< " and inputDist: "<< *inputDist<< std::endl;
-            throw std::runtime_error( "Distributions: should (?) be equal.");
-        }
+	const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
+
+	if( !coordDist->isEqual( *inputDist) ){
+		throw std::runtime_error( "Distributions: should be equal.");
+	}
 
 	const IndexType localN = inputDist->getLocalSize();
-        const IndexType globalN = inputDist->getGlobalSize();
+	const IndexType globalN = inputDist->getGlobalSize();
 
-        if (coordDist->getLocalSize() != localN) {
+	if (coordDist->getLocalSize() != localN) {
 		throw std::runtime_error(std::to_string(coordDist->getLocalSize() / dimensions) + " point coordinates, "
-		 + std::to_string(localN) + " rows present.");
+				+ std::to_string(localN) + " rows present.");
 	}	
 	
 	/**
@@ -129,12 +128,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	*/
 	std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
 	std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
-
-    
-    // the code above finds the local min and max. We want the global min and max.
 	
 	for (IndexType i = 0; i < globalN; i++) {
 		for (IndexType dim = 0; dim < dimensions; dim++) {
+			//TODO: the following line is extremely wasteful, as it initiates a global communication round each time
 			ValueType coord = coordinates[dim].getValue(i).Scalar::getValue<ValueType>();
 			if (coord < minCoords[dim]) minCoords[dim] = coord;
 			if (coord > maxCoords[dim]) maxCoords[dim] = coord;
@@ -149,16 +146,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	}
 
 	/**
-	* Several possibilities exist for choosing the recursion depth. Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points
+	* Several possibilities exist for choosing the recursion depth.
+	* Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
 	*/
-	//getMinimumNeighbourDistance is ~5% faster if manually inlined, probably because localPartOfCoords doesn't have to be computed twice
-	//const ValueType minDistance = getMinimumNeighbourDistance(input, coordinates, dimensions);
-	const IndexType recursionDepth = std::log2(n);// std::ceil(std::log2(maxExtent / minDistance) / 2);
+	const IndexType recursionDepth = std::log2(n);
 
 	/**
 	*	create space filling curve indices.
 	*/
-	
 	scai::lama::DenseVector<ValueType> hilbertIndices(inputDist);
 	for (IndexType i = 0; i < localN; i++) {
 		IndexType globalIndex = inputDist->local2global(i);
@@ -173,54 +168,35 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	scai::lama::DenseVector<IndexType> permutation, permPerm;
 	hilbertIndices.sort(permutation, true);
 	//permutation.redistribute(inputDist);
-        DenseVector<IndexType> tmpPerm = permutation;
-        tmpPerm.sort( permPerm, true);
-        //permPerm.redistribute(inputDist);
-        
-        /*
-        for (IndexType i = 0; i <n; i++) {
-            std::cout<< __FILE__<< ",  "<< __LINE__<< ", "<< i <<" __"<< *comm<< " , perm="<< permutation.getValue(i).Scalar::getValue<IndexType>() << " == permPerm="<< permPerm.getValue(i).Scalar::getValue<IndexType>() << std::endl;
-        }
-        */
-        
-        /*
-        for (IndexType i = 0; i < localN; i++) {
-            std::cout<< __FILE__<< ",  "<< __LINE__<< ", "<< i <<" __"<< *comm<< " , perm="<< permutation.getLocalValues()[i] << " == permPerm="<< permPerm.getLocalValues()[i] << std::endl;
-        }
-        */
-        
-        
-        
-        scai::utilskernel::LArray<ValueType> localPerm = permutation.getLocalValues();
-        
-        DenseVector<ValueType> coords_gathered( coordDist);
-        coords_gathered.gather( coordinates[0], permutation, scai::utilskernel::binary::COPY);
-        
-	/**
-	* check for uniqueness. If not unique, level of detail was insufficient.
-	*/
+	DenseVector<IndexType> tmpPerm = permutation;
+	tmpPerm.sort( permPerm, true);
+	//permPerm.redistribute(inputDist);
 
+	scai::utilskernel::LArray<ValueType> localPerm = permutation.getLocalValues();
+
+	DenseVector<ValueType> coords_gathered(coordDist);
+	coords_gathered.gather(coordinates[0], permutation, scai::utilskernel::binary::COPY);
 
 	/**
 	* initial partitioning with sfc. Upgrade to chains-on-chains-partitioning later
 	*/
-        DenseVector<IndexType> tmp_result(inputDist);   //values from 0 to k-1
-        DenseVector<IndexType> tmp_indices(inputDist);  //the global indices
+	DenseVector<IndexType> tmp_result(inputDist);   //values from 0 to k-1
+	DenseVector<IndexType> tmp_indices(inputDist);  //the global indices
 	DenseVector<IndexType> result(inputDist);
 	scai::hmemo::ReadAccess<IndexType> readAccess(permutation.getLocalValues());
         
 	for (IndexType i = 0; i < localN; i++) {
 		IndexType targetPos;
 		readAccess.getValue(targetPos, i);
-                assert( targetPos==localPerm[i] );
+		assert( targetPos==localPerm[i] );
 		//original: 
-                //result.setValue(inputDist->local2global(i), int(k*targetPos / n));
-                //changed to:
-                //result.setValue( targetPos, int(k*inputDist->local2global(i) / n));
-                result.getLocalValues()[i] = int( permPerm.getLocalValues()[i] *k/n);
-                //tmp_result.getLocalValues()[i] = int(k* inputDist->local2global(i) / n) ;
-                //tmp_indices.getLocalValues()[i] = targetPos;
-        }
+		//result.setValue(inputDist->local2global(i), int(k*targetPos / n));
+		//changed to:
+		//result.setValue( targetPos, int(k*inputDist->local2global(i) / n));
+		result.getLocalValues()[i] = int( permPerm.getLocalValues()[i] *k/n);
+		//tmp_result.getLocalValues()[i] = int(k* inputDist->local2global(i) / n) ;
+		//tmp_indices.getLocalValues()[i] = targetPos;
+	}
         
 	if (false && inputDist->isReplicated()) {
 		ValueType gain = 1;
