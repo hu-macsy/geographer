@@ -16,7 +16,7 @@
 #include "ParcoRepart.h"
 #include "HilbertCurve.h"
 
-using std::vector;
+//using std::vector;
 
 namespace ITI {
 
@@ -170,11 +170,31 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	* now sort the global indices by where they are on the space-filling curve.
 	*/
 
-	scai::lama::DenseVector<IndexType> permutation;
+	scai::lama::DenseVector<IndexType> permutation, permPerm;
 	hilbertIndices.sort(permutation, true);
-	permutation.redistribute(inputDist);
+	//permutation.redistribute(inputDist);
+        DenseVector<IndexType> tmpPerm = permutation;
+        tmpPerm.sort( permPerm, true);
+        //permPerm.redistribute(inputDist);
+        
+        /*
+        for (IndexType i = 0; i <n; i++) {
+            std::cout<< __FILE__<< ",  "<< __LINE__<< ", "<< i <<" __"<< *comm<< " , perm="<< permutation.getValue(i).Scalar::getValue<IndexType>() << " == permPerm="<< permPerm.getValue(i).Scalar::getValue<IndexType>() << std::endl;
+        }
+        */
+        
+        /*
+        for (IndexType i = 0; i < localN; i++) {
+            std::cout<< __FILE__<< ",  "<< __LINE__<< ", "<< i <<" __"<< *comm<< " , perm="<< permutation.getLocalValues()[i] << " == permPerm="<< permPerm.getLocalValues()[i] << std::endl;
+        }
+        */
+        
+        
         
         scai::utilskernel::LArray<ValueType> localPerm = permutation.getLocalValues();
+        
+        DenseVector<ValueType> coords_gathered( coordDist);
+        coords_gathered.gather( coordinates[0], permutation, scai::utilskernel::binary::COPY);
         
 	/**
 	* check for uniqueness. If not unique, level of detail was insufficient.
@@ -184,8 +204,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	/**
 	* initial partitioning with sfc. Upgrade to chains-on-chains-partitioning later
 	*/
+        DenseVector<IndexType> tmp_result(inputDist);   //values from 0 to k-1
+        DenseVector<IndexType> tmp_indices(inputDist);  //the global indices
 	DenseVector<IndexType> result(inputDist);
 	scai::hmemo::ReadAccess<IndexType> readAccess(permutation.getLocalValues());
+        
 	for (IndexType i = 0; i < localN; i++) {
 		IndexType targetPos;
 		readAccess.getValue(targetPos, i);
@@ -193,9 +216,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		//original: 
                 //result.setValue(inputDist->local2global(i), int(k*targetPos / n));
                 //changed to:
-                result.setValue( targetPos, int(k*inputDist->local2global(i) / n));
+                //result.setValue( targetPos, int(k*inputDist->local2global(i) / n));
+                result.getLocalValues()[i] = int( permPerm.getLocalValues()[i] *k/n);
+                //tmp_result.getLocalValues()[i] = int(k* inputDist->local2global(i) / n) ;
+                //tmp_indices.getLocalValues()[i] = targetPos;
         }
-
+        
 	if (false && inputDist->isReplicated()) {
 		ValueType gain = 1;
 		ValueType cut = computeCut(input, result);
