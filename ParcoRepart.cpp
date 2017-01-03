@@ -182,7 +182,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	//permutation.redistribute(inputDist);
 	DenseVector<IndexType> tmpPerm = permutation;
 	tmpPerm.sort( inversePermutation, true);
-	//permPerm.redistribute(inputDist);
 
 	/**
 	* initial partitioning with sfc. Upgrade to chains-on-chains-partitioning later
@@ -190,13 +189,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	DenseVector<IndexType> result(inputDist);
         
 	for (IndexType i = 0; i < localN; i++) {
-		//original: 
-		//result.setValue(inputDist->local2global(i), int(k*targetPos / n));
-		//changed to:
-		//result.setValue( targetPos, int(k*inputDist->local2global(i) / n));
 		result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
-		//tmp_result.getLocalValues()[i] = int(k* inputDist->local2global(i) / n) ;
-		//tmp_indices.getLocalValues()[i] = targetPos;
 	}
         
 	if (false && inputDist->isReplicated()) {
@@ -574,17 +567,52 @@ ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<
 	return ((maxBlockSize - optSize)/ optSize);
 }
 
+template<typename IndexType, typename ValueType>
+std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::computeCommunicationPairings(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part,
+			const DenseVector<IndexType> &blocksToPEs) {
+	/**
+	 * for now, trivial communication pairing in 2^(ceil(log_2(p))) steps.
+	 */
+
+	const Scalar maxPartID = blocksToPEs.max();
+	const IndexType p = maxPartID.getValue<IndexType>() + 1;
+	const IndexType rounds = std::ceil(std::log(p) / std::log(2));
+	const IndexType upperPowerP = 1 << rounds;
+	assert(upperPowerP >= p);
+	assert(upperPowerP < 2*p);
+	const IndexType steps = upperPowerP-1;
+	assert(steps >= p-1);
+
+	std::vector<DenseVector<IndexType>> result;
+
+	for (IndexType step = 1; step <= steps; step++) {
+		DenseVector<IndexType> commPerm(p,-1);
+
+		for (IndexType i = 0; i < p; i++) {
+			IndexType partner = i ^ step;
+			if (partner <= p) {
+				commPerm.setValue(i, partner);
+			} else {
+				commPerm.setValue(i, i);
+			}
+		}
+
+		result.push_back(commPerm);
+	}
+	return result;
+}
+
 //to force instantiation
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, int dimensions,	int k,  double epsilon);
 
 template double ParcoRepart<int, double>::getMinimumNeighbourDistance(const CSRSparseMatrix<double> &input, const std::vector<DenseVector<double>> &coordinates, int dimensions);
 			     
-//template struct point ParcoRepart<int, double>::hilbert(double index, int level);
 template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int> &partition, int k);
 
 template double ParcoRepart<int, double>::computeCut(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, bool ignoreWeights);
 
 template double ParcoRepart<int, double>::fiducciaMattheysesRound(const CSRSparseMatrix<double> &input, DenseVector<int> &part, int k, double epsilon, bool unweighted);
 
+template std::vector<DenseVector<IndexType>> ParcoRepart<int, double>::computeCommunicationPairings(const CSRSparseMatrix<double> &input, const DenseVector<int> &part,	const DenseVector<int> &blocksToPEs);
 
 }

@@ -145,8 +145,6 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   EXPECT_LE(repart.computeImbalance(partition, k), epsilon);
 }
 
-
-
 TEST_F(ParcoRepartTest, testImbalance) {
   const IndexType n = 10000;
   const IndexType k = 10;
@@ -280,6 +278,78 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
   if (!(a.getRowDistributionPtr()->isReplicated() && a.getColDistributionPtr()->isReplicated())) {
     EXPECT_THROW(repart.fiducciaMattheysesRound(a, part, k, epsilon), std::runtime_error);
   }
+}
+
+TEST_F(ParcoRepartTest, testCommunicationScheme) {
+	/**
+	 * Check for:
+	 * 1. Basic Sanity: All ids are valid
+	 * 2. Completeness: All PEs with a common edge communicate
+	 * 3. Symmetry: In each round, partner[partner[i]] == i holds
+	 * 4. Efficiency: Pairs don't communicate more than once
+	 */
+
+	/**
+	 * test with number of processors a power of two
+	 */
+	const IndexType n = 1000;
+	const IndexType p = 128;
+	const IndexType k = p;
+
+	//fill random matrix
+	scai::lama::CSRSparseMatrix<ValueType>a(n,n);
+	scai::lama::MatrixCreator::fillRandom(a, 0.0001);
+
+	//generate random partition
+	scai::lama::DenseVector<IndexType> part(n, 0);
+	for (IndexType i = 0; i < n; i++) {
+		IndexType blockId = rand() % k;
+		part.setValue(i, blockId);
+	}
+
+	//create trivial mapping
+	scai::lama::DenseVector<IndexType> mapping(k, 0);
+	for (IndexType i = 0; i < k; i++) {
+		mapping.setValue(i, i);
+	}
+
+	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::computeCommunicationPairings(a, part, mapping);
+
+	EXPECT_LE(scheme.size(), p);
+	std::vector<std::vector<bool> > communicated(p);
+	for (IndexType i = 0; i < p; i++) {
+		communicated[i].resize(p, false);
+	}
+
+	for (IndexType round = 0; round < scheme.size(); round++) {
+		EXPECT_EQ(scheme[round].size(), p);
+		for (IndexType i = 0; i < p; i++) {
+			//Scalar partner = scheme[round].getValue(i);
+			const IndexType partner = scheme[round].getValue(i).getValue<IndexType>();
+
+			//sanity
+			EXPECT_GE(partner, 0);
+			EXPECT_LT(partner, p);
+
+			if (partner != i) {
+				//symmetry
+				Scalar partnerOfPartner = scheme[round].getValue(partner);
+				EXPECT_EQ(i, partnerOfPartner.getValue<IndexType>());
+
+				//efficiency
+				EXPECT_FALSE(communicated[i][partner]) << i << " and " << partner << " already communicated.";
+
+				communicated[i][partner] = true;
+			}
+		}
+	}
+
+	//completeness
+	for (IndexType i = 0; i < p; i++) {
+		for (IndexType j = 0; j < i; j++) {
+			EXPECT_TRUE(communicated[i][j]) << i << " and " << j << " did not communicate";//TODO: for now.
+		}
+	}
 }
 
 

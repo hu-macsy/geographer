@@ -55,6 +55,8 @@ namespace ITI {
 
 			static ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k);
 
+			static std::vector<DenseVector<IndexType>> computeCommunicationPairings(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const DenseVector<IndexType> &blocksToPEs);
+
 	};
 }
 
