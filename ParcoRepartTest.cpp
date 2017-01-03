@@ -96,10 +96,9 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
   EXPECT_EQ(k-1, partition.max().getValue<IndexType>());
   EXPECT_TRUE(partition.getDistribution().isReplicated());//for now
   
-  EXPECT_LE(ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k) <= epsilon);
+  ParcoRepart<IndexType, ValueType> repart;
+  EXPECT_LE(repart.computeImbalance(partition, k), epsilon);
 }
-
-
 
 TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   IndexType nroot = 16;
@@ -121,7 +120,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
       coordinates[i] = static_cast<ValueType>( 0 );
   }
 
-IndexType index;
+  IndexType index;
   for (IndexType i = 0; i < nroot; i++) {
     for (IndexType j = 0; j < nroot; j++) {
       //this is slightly wasteful, since it also iterates over indices of other processors
@@ -131,9 +130,9 @@ IndexType index;
     }
   }
   
-  ValueType epsilon = 0.05;
+  const ValueType epsilon = 0.05;
 
-  scai::lama::DenseVector<IndexType> partition(n, 121);
+  scai::lama::DenseVector<IndexType> partition(n, k+1);
   partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, dimensions,  k, epsilon);
   
   EXPECT_GE(k-1, partition.getLocalValues().max() );
@@ -142,7 +141,8 @@ IndexType index;
   EXPECT_EQ(k-1, partition.max().getValue<ValueType>());
   EXPECT_EQ(a.getRowDistribution(), partition.getDistribution());
 
-  EXPECT_LE(ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k) <= epsilon);
+  ParcoRepart<IndexType, ValueType> repart;
+  EXPECT_LE(repart.computeImbalance(partition, k), epsilon);
 }
 
 

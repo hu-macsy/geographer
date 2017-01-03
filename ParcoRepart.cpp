@@ -536,7 +536,7 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<Va
 	}
 
 	if (!inputDist->isReplicated()) {
-    //sum block sizes over all processes
+    //sum values over all processes
     result = inputDist->getCommunicatorPtr()->sum(result);
   }
 
