@@ -177,35 +177,24 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	* now sort the global indices by where they are on the space-filling curve.
 	*/
 
-	scai::lama::DenseVector<IndexType> permutation, permPerm;
+	scai::lama::DenseVector<IndexType> permutation, inversePermutation;
 	hilbertIndices.sort(permutation, true);
 	//permutation.redistribute(inputDist);
 	DenseVector<IndexType> tmpPerm = permutation;
-	tmpPerm.sort( permPerm, true);
+	tmpPerm.sort( inversePermutation, true);
 	//permPerm.redistribute(inputDist);
-
-	scai::utilskernel::LArray<ValueType> localPerm = permutation.getLocalValues();
-
-	DenseVector<ValueType> coords_gathered(coordDist);
-	coords_gathered.gather(coordinates[0], permutation, scai::utilskernel::binary::COPY);
 
 	/**
 	* initial partitioning with sfc. Upgrade to chains-on-chains-partitioning later
 	*/
-	DenseVector<IndexType> tmp_result(inputDist);   //values from 0 to k-1
-	DenseVector<IndexType> tmp_indices(inputDist);  //the global indices
 	DenseVector<IndexType> result(inputDist);
-	scai::hmemo::ReadAccess<IndexType> readAccess(permutation.getLocalValues());
         
 	for (IndexType i = 0; i < localN; i++) {
-		IndexType targetPos;
-		readAccess.getValue(targetPos, i);
-		assert( targetPos==localPerm[i] );
 		//original: 
 		//result.setValue(inputDist->local2global(i), int(k*targetPos / n));
 		//changed to:
 		//result.setValue( targetPos, int(k*inputDist->local2global(i) / n));
-		result.getLocalValues()[i] = int( permPerm.getLocalValues()[i] *k/n);
+		result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
 		//tmp_result.getLocalValues()[i] = int(k* inputDist->local2global(i) / n) ;
 		//tmp_indices.getLocalValues()[i] = targetPos;
 	}
