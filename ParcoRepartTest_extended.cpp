@@ -14,9 +14,11 @@
 
 #include <memory>
 #include <cstdlib>
+#include <chrono>
 
 #include "ParcoRepart.h"
 #include "HilbertCurve.h"
+#include "MeshIO.h"
 #include "gtest/gtest.h"
 
 typedef double ValueType;
@@ -272,6 +274,154 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
       
 
 
+}
+
+//----------------------------------------------------------------------------------------
+
+TEST_F(ParcoRepartTest, testPartitionBalanceStructured_Distributed_3D) {
+    IndexType k = 8;
+    IndexType dimensions = 3;
+  
+    std::vector<IndexType> numPoints= {15, 13, 22};
+    std::vector<ValueType> maxCoord= {100,180,130};
+    IndexType numberOfPoints= numPoints[0]*numPoints[1]*numPoints[2];
+    std::vector<DenseVector<ValueType>> coords(3, DenseVector<ValueType>(numberOfPoints, 0));
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, numberOfPoints) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(numberOfPoints));
+    scai::lama::CSRSparseMatrix<ValueType> adjM(dist, noDistPointer);
+
+    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+
+    MeshIO<IndexType, ValueType>::createStructured3DMesh(adjM, coords, maxCoord, numPoints);
+    
+    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
+    std::cout<<__FILE__<< "  "<< __LINE__<< " , time for creating structured3DMesh: "<< duration <<std::endl;
+
+    ValueType epsilon = 0.05;
+
+    scai::lama::DenseVector<IndexType> partition(dist);
+    partition = ParcoRepart<IndexType, ValueType>::partitionGraph(adjM, coords, dimensions,  k, epsilon);
+    IndexType localN = dist->getLocalSize();  
+
+    //std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::high_resolution_clock::now() - t2 ).count();
+    std::cout<<__FILE__<< "  "<< __LINE__<< " , time for partitioning: "<< duration <<std::endl;
+
+    std::cout<< __FILE__<< " ,"<<__LINE__<<" == "<< *dist<< "==  __"<< *comm<< "local_max="<< partition.getLocalValues().max() <<std::endl ;
+  
+    EXPECT_GE(k-1, partition.getLocalValues().max() );
+    EXPECT_EQ(numberOfPoints, partition.size());
+    EXPECT_EQ(0, partition.min().getValue<ValueType>());
+    EXPECT_EQ(k-1, partition.max().getValue<ValueType>());
+    EXPECT_EQ(adjM.getRowDistribution(), partition.getDistribution());
+
+    std::vector<IndexType> subsetSizes(k, 0);
+    scai::utilskernel::LArray<ValueType> localPartition = partition.getLocalValues();
+  
+  
+    for (IndexType i = 0; i < localPartition.size(); i++) {
+        ValueType partID = localPartition[i];
+        EXPECT_LE(partID, k-1); 
+        EXPECT_GE(partID, 0);
+        subsetSizes[partID] += 1;
+    }
+    IndexType optSize = std::ceil(numberOfPoints / k);
+
+    //if we don't have the full partition locally, 
+    if (!partition.getDistribution().isReplicated()) {
+        //sum block sizes over all processes
+        for (IndexType partID = 0; partID < k; partID++) {
+            subsetSizes[partID] = comm->sum(subsetSizes[partID]);
+        }
+    }
+  
+    EXPECT_LE(*std::max_element(subsetSizes.begin(), subsetSizes.end()), (1+epsilon)*optSize);
+
+    for(int i=0; i<k; i++)
+        std::cout<< "part "<< i<< " has #elements="<< subsetSizes[i]<< std::endl;
+      
+  /*
+   * for replicating the local values check /home/harry/scai_lama/scai/dmemo/test/DistributionTest.cpp line 310.
+   */
+    const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(adjM, partition, true);
+    std::cout<< "cut "<< " is ="<< cut<< std::endl;
+}
+//----------------------------------------------------------------------------------------
+
+TEST_F(ParcoRepartTest, testPartitionBalanceStructured_Local_3D) {
+    IndexType k = 8;
+    IndexType dimensions = 3;
+  
+    std::vector<IndexType> numPoints= {15, 13, 22};
+    std::vector<ValueType> maxCoord= {100,180,130};
+    IndexType numberOfPoints= numPoints[0]*numPoints[1]*numPoints[2];
+    std::vector<DenseVector<ValueType>> coords(3, DenseVector<ValueType>(numberOfPoints, 0));
+    
+    //scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    //scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, numberOfPoints) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(numberOfPoints));
+    scai::lama::CSRSparseMatrix<ValueType> adjM(noDistPointer, noDistPointer);
+
+    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+
+    MeshIO<IndexType, ValueType>::createStructured3DMesh(adjM, coords, maxCoord, numPoints);
+    
+    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
+    std::cout<<__FILE__<< "  "<< __LINE__<< " , time for creating structured3DMesh: "<< duration <<std::endl;
+
+    ValueType epsilon = 0.05;
+
+    scai::lama::DenseVector<IndexType> partition(numberOfPoints, -1);
+    partition = ParcoRepart<IndexType, ValueType>::partitionGraph(adjM, coords, dimensions,  k, epsilon);
+    //IndexType localN = dist->getLocalSize();  
+
+    //std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::high_resolution_clock::now() - t2 ).count();
+    std::cout<<__FILE__<< "  "<< __LINE__<< " , time for partitioning: "<< duration <<std::endl;
+
+    std::cout<< __FILE__<< " ,"<<__LINE__<< "==  __"<< "local_max="<< partition.getLocalValues().max() <<std::endl ;
+  
+    EXPECT_GE(k-1, partition.getLocalValues().max() );
+    EXPECT_EQ(numberOfPoints, partition.size());
+    EXPECT_EQ(0, partition.min().getValue<ValueType>());
+    EXPECT_EQ(k-1, partition.max().getValue<ValueType>());
+    EXPECT_EQ(adjM.getRowDistribution(), partition.getDistribution());
+
+    std::vector<IndexType> subsetSizes(k, 0);
+    scai::utilskernel::LArray<ValueType> localPartition = partition.getLocalValues();
+  
+  
+    for (IndexType i = 0; i < localPartition.size(); i++) {
+        ValueType partID = localPartition[i];
+        EXPECT_LE(partID, k-1); 
+        EXPECT_GE(partID, 0);
+        subsetSizes[partID] += 1;
+    }
+    IndexType optSize = std::ceil(numberOfPoints / k);
+
+    /*
+    //if we don't have the full partition locally, 
+    if (!partition.getDistribution().isReplicated()) {
+        //sum block sizes over all processes
+        for (IndexType partID = 0; partID < k; partID++) {
+            subsetSizes[partID] = comm->sum(subsetSizes[partID]);
+        }
+    }
+    */
+    EXPECT_LE(*std::max_element(subsetSizes.begin(), subsetSizes.end()), (1+epsilon)*optSize);
+
+    for(int i=0; i<k; i++)
+        std::cout<< "part "<< i<< " has #elements="<< subsetSizes[i]<< std::endl;
+      
+  /*
+   * for replicating the local values check /home/harry/scai_lama/scai/dmemo/test/DistributionTest.cpp line 310.
+   */
+    const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(adjM, partition, true);
+    std::cout<< "cut "<< " is ="<< cut<< std::endl;
 }
 
 

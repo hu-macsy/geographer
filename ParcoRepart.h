@@ -54,6 +54,8 @@ namespace ITI {
 			static ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool ignoreWeights = true);
 
 			static ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k);
+                        
+                        static DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
 
 	};
 }

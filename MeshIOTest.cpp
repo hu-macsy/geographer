@@ -73,11 +73,11 @@ std::cout<< "graph written in files: " << grFile<< " and "<< coordFile<< std::en
  * */
 
 TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
-std::vector<IndexType> numPoints= {13, 15, 17};
+std::vector<IndexType> numPoints= {15, 13, 22};
 std::vector<ValueType> maxCoord= {100,180,130};
 IndexType numberOfPoints= numPoints[0]*numPoints[1]*numPoints[2];
 std::vector<DenseVector<ValueType>> coords(3, DenseVector<ValueType>(numberOfPoints, 0));
-std::string grFile = "meshes/structuredTest3.graph";
+std::string grFile = "meshes/structuredTest_15_13_22.graph";
 std::string coordFile= grFile + ".xyz";
 
 scai::lama::CSRSparseMatrix<ValueType> adjM(numberOfPoints, numberOfPoints);
@@ -102,7 +102,7 @@ std::cout<< "graph written in files: " << grFile<< " and "<< coordFile<< std::en
 //-----------------------------------------------------------------
 
 TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
-    IndexType N= 500;
+    IndexType N= 300;
     ValueType maxCoord= 1;
     IndexType dim= 3, k= 8;
     ValueType epsilon= 0.2;

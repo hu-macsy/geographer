@@ -614,6 +614,31 @@ ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<
 	return ((maxBlockSize - optSize)/ optSize);
 }
 
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part) {
+    
+    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const scai::utilskernel::LArray<IndexType> localPart= part.getLocalValues();
+    DenseVector<IndexType> border(dist);
+    scai::utilskernel::LArray<IndexType> localBorder= border.getLocalValues();
+    IndexType N = adjM.getNumColumns();
+    
+    for(IndexType i=0; i<dist->getLocalSize(); i++){ // for all local nodes 
+        for(IndexType j=0; j<N; j++){               // for all the edges of a node
+            if(adjM(i,j)>0){                       // i and j have an edge
+                if( localPart[i] != part(j).Scalar::getValue<IndexType>() ){ // i and j are in different parts
+                    localBorder[i] = 1;             // then i is a border node
+                    break;
+                }
+            }
+        }
+    }
+    return border;
+}
+
+
+
 //to force instantiation
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, int dimensions,	int k,  double epsilon);
 
@@ -626,5 +651,6 @@ template double ParcoRepart<int, double>::computeCut(const CSRSparseMatrix<doubl
 
 template double ParcoRepart<int, double>::fiducciaMattheysesRound(const CSRSparseMatrix<double> &input, DenseVector<int> &part, int k, double epsilon, bool unweighted);
 
+template DenseVector<int> ParcoRepart<int, double>::getBorderNodes( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part);
 
 }
