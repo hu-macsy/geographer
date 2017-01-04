@@ -289,11 +289,8 @@ TEST_F(ParcoRepartTest, testCommunicationScheme) {
 	 * 4. Efficiency: Pairs don't communicate more than once
 	 */
 
-	/**
-	 * test with number of processors a power of two
-	 */
 	const IndexType n = 1000;
-	const IndexType p = 129;
+	const IndexType p = 129;//purposefully not a power of two, to check what happens
 	const IndexType k = p;
 
 	//fill random matrix
