@@ -184,15 +184,20 @@ TEST_F(ParcoRepartTest, testImbalance) {
 }
 
 TEST_F(ParcoRepartTest, testCut) {
-  const IndexType n = 1000;
-  const IndexType k = 10;
+  const IndexType n = 10;
+  const IndexType k = 2;
+
+  //define distributions
+  scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+  scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
 
   //generate random complete matrix
-  scai::lama::CSRSparseMatrix<ValueType>a(n,n);
+  scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
   scai::lama::MatrixCreator::fillRandom(a, 1);
 
-  //generate balanced partition
-  scai::lama::DenseVector<IndexType> part(n, 0);
+  //generate balanced distributed partition
+  scai::lama::DenseVector<IndexType> part(dist);
   for (IndexType i = 0; i < n; i++) {
     IndexType blockId = i % k;
     part.setValue(i, blockId);
@@ -202,6 +207,12 @@ TEST_F(ParcoRepartTest, testCut) {
   const IndexType blockSize = n / k;
   const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
   EXPECT_EQ(k*blockSize*(n-blockSize) / 2, cut);
+
+  //now convert distributed into replicated partition vector and compare again
+  part.redistribute(noDistPointer);
+  a.redistribute(noDistPointer, noDistPointer);
+  const ValueType replicatedCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  EXPECT_EQ(k*blockSize*(n-blockSize) / 2, replicatedCut);
 }
 
 
@@ -228,7 +239,7 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
 
   ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
   for (IndexType i = 0; i < iterations; i++) {
-    ValueType gain = ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(a, part, k, epsilon);
+    ValueType gain = ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(a, part, k, epsilon);
 
     //check correct gain calculation
     const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
@@ -245,7 +256,7 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
 
   //check correct cut with balanced partition
   cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
-  ValueType gain = ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(a, part, k, epsilon);
+  ValueType gain = ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(a, part, k, epsilon);
   const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
   EXPECT_EQ(cut - gain, newCut);
   EXPECT_LE(newCut, cut);
@@ -276,7 +287,7 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
   ParcoRepart<IndexType, ValueType> repart;
 
   if (!(a.getRowDistributionPtr()->isReplicated() && a.getColDistributionPtr()->isReplicated())) {
-    EXPECT_THROW(repart.fiducciaMattheysesRound(a, part, k, epsilon), std::runtime_error);
+    EXPECT_THROW(repart.replicatedMultiWayFM(a, part, k, epsilon), std::runtime_error);
   }
 }
 
@@ -349,7 +360,6 @@ TEST_F(ParcoRepartTest, testCommunicationScheme) {
 		}
 	}
 }
-
 
 /**
 * TODO: test for correct error handling in case of inconsistent distributions

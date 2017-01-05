@@ -5,6 +5,8 @@
  *      Author: moritzl
  */
 
+#include <scai/dmemo/Halo.hpp>
+#include <scai/dmemo/HaloBuilder.hpp>
 #include <scai/dmemo/Distribution.hpp>
 
 #include <assert.h>
@@ -196,7 +198,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		ValueType gain = 1;
 		ValueType cut = computeCut(input, result);
 		while (gain > 0) {
-			gain = fiducciaMattheysesRound(input, result, k, epsilon);
+			gain = replicatedMultiWayFM(input, result, k, epsilon);
 			ValueType oldCut = cut;
 			cut = computeCut(input, result);
 			assert(oldCut - gain == cut);
@@ -207,7 +209,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 }
 
 template<typename IndexType, typename ValueType>
-ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted) {
+ValueType ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(const CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted) {
 	const IndexType n = input.getNumRows();
 	/**
 	* check input and throw errors
@@ -290,7 +292,6 @@ ValueType ParcoRepart<IndexType, ValueType>::fiducciaMattheysesRound(const CSRSp
 	}
 
 	ValueType totalWeight = 0;
-
 
 	for (IndexType v = 0; v < n; v++) {
 		edgeCuts[v].resize(k, 0);
@@ -486,11 +487,14 @@ template<typename IndexType, typename ValueType>
 ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool ignoreWeights) {
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
+
 	const IndexType n = inputDist->getGlobalSize();
 	const IndexType localN = inputDist->getLocalSize();
+	const Scalar maxBlockScalar = part.max();
+	const IndexType maxBlockID = maxBlockScalar.getValue<IndexType>();
 
-	if (!partDist->isReplicated()) {
-		throw std::runtime_error("Input partition must be replicated, for now.");
+	if (partDist->getLocalSize() != localN) {
+		throw std::runtime_error("partition has " + std::to_string(partDist->getLocalSize()) + " local values, but matrix has " + std::to_string(localN));
 	}
 
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
@@ -500,6 +504,13 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<Va
 
 	scai::hmemo::ReadAccess<IndexType> partAccess(part.getLocalValues());
 
+	std::vector<IndexType> interfaceNodes;
+	std::vector<IndexType> requiredHaloIndices;
+	std::vector<ValueType> crossingEdgeWeights;
+
+	/**
+	 * first pass, compute local cut and build list of required halo indices
+	 */
 	ValueType result = 0;
 	for (IndexType i = 0; i < localN; i++) {
 		const IndexType beginCols = ia[i];
@@ -507,22 +518,94 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<Va
 		assert(ja.size() >= endCols);
 
 		const IndexType globalI = inputDist->local2global(i);
+		assert(partDist->isLocal(globalI));
 		IndexType thisBlock;
-		partAccess.getValue(thisBlock, globalI);
+		partAccess.getValue(thisBlock, i);
 		
 		for (IndexType j = beginCols; j < endCols; j++) {
 			IndexType neighbor = ja[j];
 			assert(neighbor >= 0);
 			assert(neighbor < n);
-				
-			IndexType neighborBlock;
-			partAccess.getValue(neighborBlock, neighbor);
-			if (neighborBlock != thisBlock) {
+
+			if (!partDist->isLocal(neighbor)) {
+				interfaceNodes.push_back(globalI);//some redundancy here. TODO: compress it
+				crossingEdgeWeights.push_back(values[j]);
+				requiredHaloIndices.push_back(neighbor);
+			} else {
+				if (partAccess[partDist->global2local(neighbor)] != thisBlock) {
+					if (ignoreWeights) {
+						result++;
+					} else {
+						result += values[j];
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * build halo of partition
+	 */
+	if (requiredHaloIndices.size() > 0) {
+		assert(crossingEdgeWeights.size() == requiredHaloIndices.size());
+		assert(interfaceNodes.size() == requiredHaloIndices.size());
+
+		//could also sort and call unique, probably faster
+		std::set<IndexType> indexSet(requiredHaloIndices.begin(), requiredHaloIndices.end());
+		std::vector<IndexType> uniqueIndexVector(indexSet.begin(), indexSet.end());
+
+		assert(uniqueIndexVector.size() <= n - partDist->getLocalSize());
+
+		std::cout << interfaceNodes.size() << " outgoing edges to " << uniqueIndexVector.size() << " non-local nodes." << std::endl;
+
+		scai::dmemo::Halo halo;
+		const scai::dmemo::Halo& haloRef = halo;
+		{
+			scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( uniqueIndexVector );
+			scai::dmemo::HaloBuilder::build( *partDist, arrRequiredIndexes, halo );
+		}
+
+		/**
+		 * use updateHalo to get data
+		 */
+		scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
+		scai::hmemo::HArray<IndexType> localData = part.getLocalValues();
+
+		scai::utilskernel::LArray<IndexType> haloData;
+		comm->updateHalo( haloData, localData, halo );
+		assert(haloData.size() == halo.getHaloSize());
+		assert(haloData.size() == uniqueIndexVector.size());
+
+		/**
+		 * now compute cut of edges across PEs
+		 */
+		for (IndexType i = 0; i < interfaceNodes.size(); i++) {
+			const IndexType globalI = interfaceNodes[i];
+			assert(partDist->isLocal(globalI));
+	        assert(scai::common::Utils::validIndex( globalI, n));
+			const IndexType localI = partDist->global2local(globalI);
+			assert(scai::common::Utils::validIndex( localI, partDist->getLocalSize()));
+			assert(scai::common::Utils::validIndex( localI, partAccess.size()));
+
+			//IndexType thisBlock;
+			//partAccess.getValue(thisBlock, globalI);
+
+			assert(!partDist->isLocal(requiredHaloIndices[i]));
+	        const IndexType haloIndex = halo.global2halo(requiredHaloIndices[i]);
+	        assert(scai::common::Utils::validIndex( haloIndex, halo.getHaloSize()));
+
+	        assert(haloIndex < n);
+	        assert(haloData[haloIndex] <= maxBlockID);
+	        assert(haloData[haloIndex] >= 0);
+
+	        assert(partAccess[localI] <= maxBlockID);
+	        assert(partAccess[localI] >= 0);
+
+			if (haloData[haloIndex] != partAccess[localI]) {
 				if (ignoreWeights) {
 					result++;
 				} else {
-					ValueType edgeWeight;
-					values.getValue(edgeWeight, j);
+					ValueType edgeWeight = crossingEdgeWeights[i];
 					result += edgeWeight;
 				}
 			}
@@ -611,7 +694,7 @@ template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int
 
 template double ParcoRepart<int, double>::computeCut(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, bool ignoreWeights);
 
-template double ParcoRepart<int, double>::fiducciaMattheysesRound(const CSRSparseMatrix<double> &input, DenseVector<int> &part, int k, double epsilon, bool unweighted);
+template double ParcoRepart<int, double>::replicatedMultiWayFM(const CSRSparseMatrix<double> &input, DenseVector<int> &part, int k, double epsilon, bool unweighted);
 
 template std::vector<DenseVector<IndexType>> ParcoRepart<int, double>::computeCommunicationPairings(const CSRSparseMatrix<double> &input, const DenseVector<int> &part,	const DenseVector<int> &blocksToPEs);
 

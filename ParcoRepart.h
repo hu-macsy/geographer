@@ -4,9 +4,7 @@
 
 #include <scai/lama/matrix/all.hpp>
 
-
 #include <scai/lama/Vector.hpp>
-
 
 using namespace scai::lama;
 
@@ -18,8 +16,7 @@ namespace ITI {
 	 		* Partitions the given input graph with a space-filling curve and (in future versions) local refinement
 	 		*
 	 		* @param[in] input Adjacency matrix of the input graph
-	 		* @param[in] coordinates Node positions. In d dimensions, coordinates of node v are at v*d ... v*d+(d-1).
-	 		*	In principle arbitrary dimensions, currently only 2 are supported. 
+	 		* @param[in] coordinates Node positions
 	 		* @param[in] dimensions Number of dimensions of coordinates.
 	 		* @param[in] k Number of desired blocks
 	 		* @param[in] epsilon Tolerance of block size
@@ -27,6 +24,10 @@ namespace ITI {
 	 		* @return DenseVector with the same distribution as the input matrix, at position i is the block node i is assigned to
 	 		*/
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions,	IndexType k,  double epsilon = 0.05);
+
+			static ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool ignoreWeights = true);
+
+			static ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k);
 
 			/**
 			* Returns the minimum distance between two neighbours
@@ -49,14 +50,12 @@ namespace ITI {
 			*
 			* @return The difference in cut weight between this partition and the previous one
 			*/
-			static ValueType fiducciaMattheysesRound(const CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted = true);
+			static ValueType replicatedMultiWayFM(const CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted = true);
 
-			static ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool ignoreWeights = true);
-
-			static ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k);
+			static ValueType localTwoWayFM(const CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, const std::vector<IndexType>& movabels, ValueType epsilon, bool unweighted);
 
 			static std::vector<DenseVector<IndexType>> computeCommunicationPairings(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const DenseVector<IndexType> &blocksToPEs);
 
+			static std::vector<IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, IndexType thisBlock, IndexType neighborBlock);
 	};
 }
-
