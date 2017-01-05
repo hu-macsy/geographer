@@ -5,7 +5,6 @@
  *      Author: moritzl
  */
 
-#include <scai/dmemo/Halo.hpp>
 #include <scai/dmemo/HaloBuilder.hpp>
 #include <scai/dmemo/Distribution.hpp>
 
@@ -78,7 +77,7 @@ ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const C
 }
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions,	IndexType k,  double epsilon) 
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, IndexType k,  double epsilon)
 {
 	/**
 	* check input arguments for sanity
@@ -88,10 +87,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		throw std::runtime_error("Matrix has " + std::to_string(n) + " rows, but " + std::to_string(coordinates[0].size())
 		 + " coordinates are given.");
 	}
-        
-    if (dimensions != coordinates.size()){
-        throw std::runtime_error("Number of dimensions given "+ std::to_string(dimensions) + "must agree with coordinates.size()=" + std::to_string(coordinates.size()) );
-    }
         
 	if (n != input.getNumColumns()) {
 		throw std::runtime_error("Matrix must be quadratic.");
@@ -108,6 +103,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	if (epsilon < 0) {
 		throw std::runtime_error("Epsilon " + std::to_string(epsilon) + " is invalid.");
 	}
+
+	const IndexType dimensions = coordinates.size();
         
 	const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
@@ -121,7 +118,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	const IndexType globalN = inputDist->getGlobalSize();
 
 	if (coordDist->getLocalSize() != localN) {
-		throw std::runtime_error(std::to_string(coordDist->getLocalSize() / dimensions) + " point coordinates, "
+		throw std::runtime_error(std::to_string(coordDist->getLocalSize()) + " point coordinates, "
 				+ std::to_string(localN) + " rows present.");
 	}	
 	
@@ -500,13 +497,14 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<Va
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+	scai::hmemo::HArray<IndexType> localData = part.getLocalValues();
+	scai::hmemo::ReadAccess<IndexType> partAccess(localData);
+
 	scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
-	scai::hmemo::ReadAccess<IndexType> partAccess(part.getLocalValues());
-
-	std::vector<IndexType> interfaceNodes;
-	std::vector<IndexType> requiredHaloIndices;
-	std::vector<ValueType> crossingEdgeWeights;
+	scai::dmemo::Halo partHalo = buildPartHalo(input, part);
+	scai::utilskernel::LArray<IndexType> haloData;
+	partDist->getCommunicatorPtr()->updateHalo( haloData, localData, partHalo );
 
 	/**
 	 * first pass, compute local cut and build list of required halo indices
@@ -527,84 +525,18 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<Va
 			assert(neighbor >= 0);
 			assert(neighbor < n);
 
-			if (!partDist->isLocal(neighbor)) {
-				interfaceNodes.push_back(globalI);//some redundancy here. TODO: compress it
-				crossingEdgeWeights.push_back(values[j]);
-				requiredHaloIndices.push_back(neighbor);
+			IndexType neighborBlock;
+			if (partDist->isLocal(neighbor)) {
+				neighborBlock = partAccess[partDist->global2local(neighbor)];
 			} else {
-				if (partAccess[partDist->global2local(neighbor)] != thisBlock) {
-					if (ignoreWeights) {
-						result++;
-					} else {
-						result += values[j];
-					}
-				}
+				neighborBlock = haloData[partHalo.global2halo(neighbor)];
 			}
-		}
-	}
 
-	/**
-	 * build halo of partition
-	 */
-	if (requiredHaloIndices.size() > 0) {
-		assert(crossingEdgeWeights.size() == requiredHaloIndices.size());
-		assert(interfaceNodes.size() == requiredHaloIndices.size());
-
-		//could also sort and call unique, probably faster
-		std::set<IndexType> indexSet(requiredHaloIndices.begin(), requiredHaloIndices.end());
-		std::vector<IndexType> uniqueIndexVector(indexSet.begin(), indexSet.end());
-
-		assert(uniqueIndexVector.size() <= n - partDist->getLocalSize());
-
-		scai::dmemo::Halo halo;
-		const scai::dmemo::Halo& haloRef = halo;
-		{
-			scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( uniqueIndexVector );
-			scai::dmemo::HaloBuilder::build( *partDist, arrRequiredIndexes, halo );
-		}
-
-		/**
-		 * use updateHalo to get data
-		 */
-		scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
-		scai::hmemo::HArray<IndexType> localData = part.getLocalValues();
-
-		scai::utilskernel::LArray<IndexType> haloData;
-		comm->updateHalo( haloData, localData, halo );
-		assert(haloData.size() == halo.getHaloSize());
-		assert(haloData.size() == uniqueIndexVector.size());
-
-		/**
-		 * now compute cut of edges across PEs
-		 */
-		for (IndexType i = 0; i < interfaceNodes.size(); i++) {
-			const IndexType globalI = interfaceNodes[i];
-			assert(partDist->isLocal(globalI));
-	        assert(scai::common::Utils::validIndex( globalI, n));
-			const IndexType localI = partDist->global2local(globalI);
-			assert(scai::common::Utils::validIndex( localI, partDist->getLocalSize()));
-			assert(scai::common::Utils::validIndex( localI, partAccess.size()));
-
-			//IndexType thisBlock;
-			//partAccess.getValue(thisBlock, globalI);
-
-			assert(!partDist->isLocal(requiredHaloIndices[i]));
-	        const IndexType haloIndex = halo.global2halo(requiredHaloIndices[i]);
-	        assert(scai::common::Utils::validIndex( haloIndex, halo.getHaloSize()));
-
-	        assert(haloIndex < n);
-	        assert(haloData[haloIndex] <= maxBlockID);
-	        assert(haloData[haloIndex] >= 0);
-
-	        assert(partAccess[localI] <= maxBlockID);
-	        assert(partAccess[localI] >= 0);
-
-			if (haloData[haloIndex] != partAccess[localI]) {
+			if (neighborBlock != thisBlock) {
 				if (ignoreWeights) {
 					result++;
 				} else {
-					ValueType edgeWeight = crossingEdgeWeights[i];
-					result += edgeWeight;
+					result += values[j];
 				}
 			}
 		}
@@ -683,8 +615,80 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::computeCo
 	return result;
 }
 
+template<typename IndexType, typename ValueType>
+std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input) {
+	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+	const IndexType n = inputDist->getGlobalSize();
+	const IndexType localN = inputDist->getLocalSize();
+
+	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
+	scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+
+	std::set<IndexType> neighborSet;
+
+	for (IndexType i = 0; i < localN; i++) {
+		const IndexType beginCols = ia[i];
+		const IndexType endCols = ia[i+1];
+
+		for (IndexType j = beginCols; j < endCols; j++) {
+			IndexType neighbor = ja[j];
+			assert(neighbor >= 0);
+			assert(neighbor < n);
+
+			if (!inputDist->isLocal(neighbor)) {
+				neighborSet.insert(neighbor);
+			}
+		}
+	}
+	return std::vector<IndexType>(neighborSet.begin(), neighborSet.end()) ;
+}
+
+template<typename IndexType, typename ValueType>
+scai::dmemo::Halo ITI::ParcoRepart<IndexType, ValueType>::buildMatrixHalo(
+		const CSRSparseMatrix<ValueType>& input) {
+
+	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+	std::vector<IndexType> requiredHaloIndices = nonLocalNeighbors(input);
+
+	assert(requiredHaloIndices.size() <= inputDist->getGlobalSize() - inputDist->getLocalSize());
+
+	scai::dmemo::Halo mHalo;
+	{
+		scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
+		scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, mHalo );
+	}
+
+	return mHalo;
+}
+
+template<typename IndexType, typename ValueType>
+scai::dmemo::Halo ITI::ParcoRepart<IndexType, ValueType>::buildPartHalo(
+		const CSRSparseMatrix<ValueType>& input, const DenseVector<IndexType> &part) {
+
+	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+	const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
+
+	if (inputDist->getLocalSize() != partDist->getLocalSize()) {
+		throw std::runtime_error("Input matrix and partition must have the same distribution.");
+	}
+
+	std::vector<IndexType> requiredHaloIndices = nonLocalNeighbors(input);
+
+	assert(requiredHaloIndices.size() <= partDist->getGlobalSize() - partDist->getLocalSize());
+
+	scai::dmemo::Halo Halo;
+	{
+		scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
+		scai::dmemo::HaloBuilder::build( *partDist, arrRequiredIndexes, Halo );
+	}
+
+	return Halo;
+}
+
+
 //to force instantiation
-template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, int dimensions,	int k,  double epsilon);
+template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, int k,  double epsilon);
 
 template double ParcoRepart<int, double>::getMinimumNeighbourDistance(const CSRSparseMatrix<double> &input, const std::vector<DenseVector<double>> &coordinates, int dimensions);
 			     
@@ -694,6 +698,13 @@ template double ParcoRepart<int, double>::computeCut(const CSRSparseMatrix<doubl
 
 template double ParcoRepart<int, double>::replicatedMultiWayFM(const CSRSparseMatrix<double> &input, DenseVector<int> &part, int k, double epsilon, bool unweighted);
 
-template std::vector<DenseVector<IndexType>> ParcoRepart<int, double>::computeCommunicationPairings(const CSRSparseMatrix<double> &input, const DenseVector<int> &part,	const DenseVector<int> &blocksToPEs);
+template std::vector<DenseVector<int>> ParcoRepart<int, double>::computeCommunicationPairings(const CSRSparseMatrix<double> &input, const DenseVector<int> &part,	const DenseVector<int> &blocksToPEs);
+
+template std::vector<int> ITI::ParcoRepart<int, double>::nonLocalNeighbors(const CSRSparseMatrix<double>& input);
+
+template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildMatrixHalo(const CSRSparseMatrix<double> &input);
+
+template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildPartHalo(const CSRSparseMatrix<double> &input,  const DenseVector<int> &part);
+
 
 }

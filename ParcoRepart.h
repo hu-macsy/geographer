@@ -5,6 +5,9 @@
 #include <scai/lama/matrix/all.hpp>
 
 #include <scai/lama/Vector.hpp>
+#include <scai/dmemo/Halo.hpp>
+
+#include <set>
 
 using namespace scai::lama;
 
@@ -23,7 +26,7 @@ namespace ITI {
 	 		*
 	 		* @return DenseVector with the same distribution as the input matrix, at position i is the block node i is assigned to
 	 		*/
-			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions,	IndexType k,  double epsilon = 0.05);
+			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, IndexType k,  double epsilon = 0.05);
 
 			static ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool ignoreWeights = true);
 
@@ -52,9 +55,13 @@ namespace ITI {
 			*/
 			static ValueType replicatedMultiWayFM(const CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted = true);
 
-			static ValueType localTwoWayFM(const CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, const std::vector<IndexType>& movabels, ValueType epsilon, bool unweighted);
-
 			static std::vector<DenseVector<IndexType>> computeCommunicationPairings(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const DenseVector<IndexType> &blocksToPEs);
+
+			static std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
+
+			static scai::dmemo::Halo buildMatrixHalo(const CSRSparseMatrix<ValueType> &input);
+
+			static scai::dmemo::Halo buildPartHalo(const CSRSparseMatrix<ValueType> &input,  const DenseVector<IndexType> &part);
 
 			static std::vector<IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, IndexType thisBlock, IndexType neighborBlock);
 	};

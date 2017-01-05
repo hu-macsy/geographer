@@ -89,7 +89,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
     }
   }
   
-  scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, dim,  k, epsilon);
+  scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, k, epsilon);
   
   EXPECT_EQ(n, partition.size());
   EXPECT_EQ(0, partition.min().getValue<IndexType>());
@@ -133,7 +133,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   const ValueType epsilon = 0.05;
 
   scai::lama::DenseVector<IndexType> partition(n, k+1);
-  partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, dimensions,  k, epsilon);
+  partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, k, epsilon);
   
   EXPECT_GE(k-1, partition.getLocalValues().max() );
   EXPECT_EQ(n, partition.size());
