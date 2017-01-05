@@ -184,8 +184,8 @@ TEST_F(ParcoRepartTest, testImbalance) {
 }
 
 TEST_F(ParcoRepartTest, testCut) {
-  const IndexType n = 10;
-  const IndexType k = 2;
+  const IndexType n = 1000;
+  const IndexType k = 10;
 
   //define distributions
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();

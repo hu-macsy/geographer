@@ -556,8 +556,6 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<Va
 
 		assert(uniqueIndexVector.size() <= n - partDist->getLocalSize());
 
-		std::cout << interfaceNodes.size() << " outgoing edges to " << uniqueIndexVector.size() << " non-local nodes." << std::endl;
-
 		scai::dmemo::Halo halo;
 		const scai::dmemo::Halo& haloRef = halo;
 		{
