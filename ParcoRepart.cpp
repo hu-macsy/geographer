@@ -686,6 +686,106 @@ scai::dmemo::Halo ITI::ParcoRepart<IndexType, ValueType>::buildPartHalo(
 	return Halo;
 }
 
+template<typename IndexType, typename ValueType>
+std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, IndexType thisBlock, IndexType otherBlock, IndexType depth) {
+	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+	const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
+
+	const IndexType n = inputDist->getGlobalSize();
+	const IndexType localN = inputDist->getLocalSize();
+
+	Scalar maxBlockScalar = part.max();
+	if (thisBlock > maxBlockScalar.getValue<IndexType>()) {
+		throw std::runtime_error(std::to_string(thisBlock) + " is not a valid block id.");
+	}
+
+	if (otherBlock > maxBlockScalar.getValue<IndexType>()) {
+		throw std::runtime_error(std::to_string(otherBlock) + " is not a valid block id.");
+	}
+
+	if (thisBlock == otherBlock) {
+		throw std::runtime_error("Block IDs must be different.");
+	}
+
+	if (depth <= 0) {
+		throw std::runtime_error("Depth must be positive");
+	}
+
+	scai::hmemo::HArray<IndexType> localData = part.getLocalValues();
+	scai::hmemo::ReadAccess<IndexType> partAccess(localData);
+
+	scai::dmemo::Halo partHalo = buildPartHalo(input, part);
+	scai::utilskernel::LArray<IndexType> haloData;
+	partDist->getCommunicatorPtr()->updateHalo( haloData, localData, partHalo );
+
+	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
+	scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+
+	/**
+	 * first get nodes directly at the border to the other block
+	 */
+	std::vector<IndexType> interfaceNodes;
+
+	for (IndexType localI = 0; localI < localN; localI++) {
+		const IndexType beginCols = ia[localI];
+		const IndexType endCols = ia[localI+1];
+
+		if (partAccess[localI] == thisBlock) {
+
+			for (IndexType j = beginCols; j < endCols; j++) {
+				IndexType neighbor = ja[j];
+				IndexType neighborBlock;
+				if (partDist->isLocal(neighbor)) {
+					neighborBlock = partAccess[partDist->global2local(neighbor)];
+				} else {
+					neighborBlock = haloData[partHalo.global2halo(neighbor)];
+				}
+
+				if (neighborBlock == otherBlock) {
+					interfaceNodes.push_back(inputDist->local2global(localI));
+				}
+			}
+		}
+	}
+
+	/**
+	 * now gather buffer zone with breadth-first search
+	 */
+	if (depth > 1) {
+		std::vector<bool> touched(localN, false);
+		std::queue<IndexType> bfsQueue;
+		for (IndexType node : interfaceNodes) {
+			touched[inputDist->global2local(node)] = true;
+			bfsQueue.push(node);
+		}
+
+		for (IndexType round = 1; round < depth; round++) {
+			std::queue<IndexType> nextQueue;
+			while (!bfsQueue.empty()) {
+				IndexType nextNode = bfsQueue.front();
+				bfsQueue.pop();
+
+				const IndexType localI = inputDist->global2local(nextNode);
+				const IndexType beginCols = ia[localI];
+				const IndexType endCols = ia[localI+1];
+
+				for (IndexType j = beginCols; j < endCols; j++) {
+					IndexType neighbor = ja[j];
+					if (partDist->isLocal(neighbor) && partAccess[partDist->global2local(neighbor)] == thisBlock &&
+							!touched[inputDist->global2local(neighbor)]) {
+						nextQueue.push(neighbor);
+						interfaceNodes.push_back(neighbor);
+						touched[inputDist->global2local(neighbor)] = true;
+					}
+				}
+			}
+		}
+	}
+	return interfaceNodes;
+}
+
+
 
 //to force instantiation
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, int k,  double epsilon);
@@ -706,5 +806,5 @@ template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildMatrixHalo(const 
 
 template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildPartHalo(const CSRSparseMatrix<double> &input,  const DenseVector<int> &part);
 
-
+template std::vector<int> ITI::ParcoRepart<int, double>::getInterfaceNodes(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, int thisBlock, int otherBlock, int depth);
 }

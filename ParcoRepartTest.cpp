@@ -361,6 +361,42 @@ TEST_F(ParcoRepartTest, testCommunicationScheme) {
 	}
 }
 
+TEST_F(ParcoRepartTest, testGetInterfaceNodesLocal) {
+	/**
+	 * test first with complete matrix. Unsuitable, I know, but we don't have a mesh generator yet.
+	 */
+
+	  const IndexType n = 1000;
+	  const IndexType k = 10;
+
+	  //define distributions
+	  scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+	  scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+
+	  //generate random complete matrix
+	  scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
+	  scai::lama::MatrixCreator::fillRandom(a, 1);
+
+	  //generate balanced distributed partition
+	  scai::lama::DenseVector<IndexType> part(dist);
+	  for (IndexType i = 0; i < n; i++) {
+	    IndexType blockId = i % k;
+	    part.setValue(i, blockId);
+	  }
+
+	  IndexType thisBlock = 0;
+	  IndexType otherBlock = 1;
+	  std::vector<IndexType> interfaceNodes = ParcoRepart<IndexType, ValueType>::getInterfaceNodes(a, part, thisBlock, otherBlock, 1);
+
+	  scai::hmemo::ReadAccess<IndexType> partAccess(part.getLocalValues());
+
+	  for (IndexType node : interfaceNodes) {
+		  ASSERT_TRUE(dist->isLocal(node));
+		  EXPECT_EQ(thisBlock, partAccess[dist->global2local(node)]);
+	  }
+}
+
 /**
 * TODO: test for correct error handling in case of inconsistent distributions
 */
