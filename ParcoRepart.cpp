@@ -785,6 +785,42 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::getInterfaceNodes
 	return interfaceNodes;
 }
 
+template<typename IndexType, typename ValueType>
+ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted) {
+
+	/**
+	 * get trivial mapping for now.
+	 */
+	//create trivial mapping
+	scai::lama::DenseVector<IndexType> mapping(k, 0);
+	for (IndexType i = 0; i < k; i++) {
+		mapping.setValue(i, i);
+	}
+
+	std::vector<DenseVector<int>> communicationScheme = computeCommunicationPairings(input, part);
+    scai::dmemo::CommunicatorPtr comm = input->getCommunicatorPtr();
+
+    const Scalar maxBlockScalar = part.max();
+    const IndexType maxBlockID = maxBlockScalar.getValue<IndexType>();
+
+    if (maxBlockID != comm->getSize()) {
+    	throw std::runtime_error("For now, number of processes and blocks must be equal.");
+    }
+
+	scai::dmemo::Halo graphHalo = bulidMatrixHalo(input);
+	scai::dmemo::Halo partHalo = buildPartHalo(input, part);
+
+	for (IndexType i = 0; i < communicationScheme.size(); i++) {
+		if (!communicationScheme[i].getDistributionPtr()->isLocal(comm->getRank())) {
+			throw std::runtime_error("Scheme value must be local.");
+		}
+		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[i].getLocalData());
+		IndexType partner = commAccess[communicationScheme[i].getDistributionPtr()->global2local(comm->getRank())];
+
+
+		std::vector<IndexType> interfaceNodes = getInterfaceNodes(input, part, comm->getRank(), partner, 2);
+	}
+}
 
 
 //to force instantiation
