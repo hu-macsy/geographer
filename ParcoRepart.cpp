@@ -787,6 +787,15 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::getInterfaceNodes
 
 template<typename IndexType, typename ValueType>
 ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted) {
+	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+	const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
+
+	const IndexType localN = inputDist->getLocalSize();
+	const IndexType globalN = inputDist->getGlobalSize();
+
+	if (partDist->getLocalSize() != localN) {
+		throw std::runtime_error("Distributions of input matrix and partitions must be equal, for now.");
+	}
 
 	/**
 	 * get trivial mapping for now.
@@ -807,7 +816,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
     	throw std::runtime_error("For now, number of processes and blocks must be equal.");
     }
 
-	scai::dmemo::Halo graphHalo = bulidMatrixHalo(input);
+	scai::dmemo::Halo graphHalo = buildMatrixHalo(input);
 	scai::dmemo::Halo partHalo = buildPartHalo(input, part);
 
 	for (IndexType i = 0; i < communicationScheme.size(); i++) {
@@ -817,9 +826,83 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[i].getLocalData());
 		IndexType partner = commAccess[communicationScheme[i].getDistributionPtr()->global2local(comm->getRank())];
 
+		if (partner == comm->getRank()) {
+			//processor is inactive this round
+			continue;
+		}
 
+		/**
+		 * get indices of border nodes with breadth-first search
+		 */
 		std::vector<IndexType> interfaceNodes = getInterfaceNodes(input, part, comm->getRank(), partner, 2);
+
+		/**
+		 * now swap indices of nodes in border region with partner processor.
+		 * For this, first find out the length of the swap array.
+		 */
+
+		//prepare swap: find out number of nodes needing to be swapped
+		//TODO: find out size of local block, swap that as well
+		ValueType swapField[1];
+		swapField[0] = interfaceNodes.size();
+		comm->swap(swapField, 1, partner);
+		IndexType swapLength = std::max(swapField[0], interfaceNodes.size());
+
+		if (interfaceNodes.size() == 0) {
+			if (swapLength != 0) {
+				throw std::runtime_error("Partner PE has a border region, but his PE doesn't. Looks like the block indices were allocated badly.");
+			} else {
+				/**
+				 * These processors don't share a border and thus have no communication with each other.
+				 */
+				continue;
+			}
+		}
+
+		ValueType swapNodes[swapLength];
+		for (IndexType i = 0; i < swapLength; i++) {
+			if (i < interfaceNodes.size()) {
+				swapNodes[i] = interfaceNodes[i];
+			} else {
+				swapNodes[i] = -1;
+			}
+		}
+
+		comm->swap(swapNodes, swapLength, partner);
+
+		//the number of interface nodes was stored in swapField[0] and then swapped.
+		//swapField[0] now contains the number of nodes in the partner's border region
+		std::vector<IndexType> requiredHaloIndices(swapField[0]);
+		for (IndexType i = 0; i < swapField[0]; i++) {
+			requiredHaloIndices[i] = swapNodes[i];
+		}
+
+		assert(requiredHaloIndices.size() <= inputDist->getGlobalSize() - inputDist->getLocalSize());
+
+		/*
+		 * extend halos to cover border region of other PE.
+		 * This is probably very inefficient in a general distribution where all processors need to be contacted to gather the halo.
+		 * Possible Improvements: Assemble arrays describing the subgraph, swap that.
+		 * Exchanging the partHalo is actually unnecessary, since all indices in requiredHaloIndices have the same block.
+		 */
+
+		{
+			scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
+			scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, graphHalo );
+		}
+
+
+
+		//execute FM locally
+
+		//swap solutions
+
+		//keep best solution
+
+		//keep list of additional and removed nodes
 	}
+
+	//redistribute
 }
 
 
