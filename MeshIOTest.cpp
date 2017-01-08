@@ -173,8 +173,47 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
     MeshIO<IndexType, ValueType>::fromFile2Coords_2D(filename + string(".xyz"), coords2D, N );
     EXPECT_EQ(coords2D[0].size(), N);
     */
-    
 }
+
+//-----------------------------------------------------------------
+
+TEST_F(MeshIOTest, testReadFromFile_Distributed){
+    //string path = "./meshes/my_meshes/";
+    std::string path = "";
+    std::string file = "Grid8x8";
+    std::string filename= path + file;
+    CSRSparseMatrix<ValueType> graph;
+    IndexType N;    //number of points     
+        
+    std::ifstream f(filename);
+    IndexType nodes, edges;
+    //In the METIS format the two first number in the file are the number of nodes and edges
+    f >>nodes >> edges; 
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, nodes) );
+    scai::dmemo::DistributionPtr distNo( new dmemo::NoDistribution( nodes ));
+    graph = scai::lama::CSRSparseMatrix<ValueType>(dist, distNo);
+    
+    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrixDistr(graph, filename );
+    N = graph.getNumColumns();
+    EXPECT_EQ(graph.getNumColumns(), graph.getNumRows());
+    EXPECT_EQ(edges, (graph.getNumValues())/2 );
+    
+    //print
+    for(IndexType i=0; i<graph.getNumRows(); i++){
+        for(IndexType j=0; j<graph.getNumColumns(); j++){
+            std::cout<< graph(i,j).Scalar::getValue<ValueType>() << "-";
+        }
+        std::cout<< std::endl;
+    }
+    std::cout<< *comm<< ", #rows="<< graph.getNumRows()<< " , #cols="<<graph.getNumColumns() << " , #nodes="<< nodes << " , #edges="<< edges<< std::endl;
+    
+    EXPECT_EQ(1,0); // the distributed read has problems: PE0 and PE1 (for np -2) fill the same part of the matrix. PE1 should fill the bottom right part (for a 2D array) but fills the bottom left. SOmething is wrong with the indices.
+}
+
+
+
 //-----------------------------------------------------------------
 /* Testing reading from file using Boost. Does not seem faster.
  * */

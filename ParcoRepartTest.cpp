@@ -319,7 +319,7 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 TEST_F (ParcoRepartTest, testBorders_Distributed) {
     std::string file = "Grid32x32";
     std::ifstream f(file);
-    IndexType dimensions= 2, k=8;
+    IndexType dimensions= 2, k=6;
     IndexType N, edges;
     f >> N >> edges; 
     
@@ -334,7 +334,10 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     coords[1].allocate(N);
     coords[0]= static_cast<ValueType>( 0 );
     coords[1]= static_cast<ValueType>( 0 );
-
+    //coords[0].redistribute(dist);
+    //coords[1].redistribute(dist);
+    MeshIO<IndexType, ValueType>::fromFile2Coords_2D( std::string(file + ".xyz"), coords, N);
+    
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
     EXPECT_EQ(edges, (graph.getNumValues())/2 );
     
@@ -346,15 +349,210 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     ValueType imbalance= ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k);
     std::cout<< "# imbalance = " << imbalance<< std::endl; 
     
-    scai::lama::DenseVector<IndexType> border(dist, -1);
+    //get the border nodes
+    scai::lama::DenseVector<IndexType> border(dist, 0);
     border = ParcoRepart<IndexType,ValueType>::getBorderNodes( graph , partition);
     
     for(IndexType i=0; i<dist->getLocalSize(); i++){
-        std::cout<<  __FILE__<< " ,"<<__LINE__<<" == "<< i <<":  __"<< *comm<< " , border=" << border(i).Scalar::getValue<IndexType>() << " " <<std::endl;
+//std::cout<<  __FILE__<< " ,"<<__LINE__<<" == "<< i <<":  __"<< *comm<< " , border=" << border(i).Scalar::getValue<IndexType>() << " " <<std::endl;
         EXPECT_GE(border(i).Scalar::getValue<IndexType>() , 0);
         EXPECT_LE(border(i).Scalar::getValue<IndexType>() , 1);
     }
+    
+    partition.redistribute(dist);
+    for(IndexType i=0; i<dist->getLocalSize(); i++){     
+std::cout<<  __FILE__<< " ,"<<__LINE__<<" == "<< i <<":  __"<< *comm<< ", part.local[i]= "<< partition.getLocalValues()[i]  << std::endl;    
+    }
+    
+    //get the quotient graph - not distributed
+    //CSRSparseMatrix<ValueType> quotientGraph(k, k);
+    IndexType quotientGraph[k][k]={0};
+    for(IndexType i=0; i<k; i++){
+        for(IndexType j=0; j<k; j++){
+            quotientGraph[i][j]=0;
+        }
+    }
+    scai::dmemo::DistributionPtr distQ ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, k) );  
+    scai::dmemo::DistributionPtr noDistQ (new scai::dmemo::NoDistribution( k ));
+    CSRSparseMatrix<ValueType>  graphQ(distQ, noDistQ);
+    
+    for(IndexType i=0; i<dist->getLocalSize(); i++){    //for all local grid-nodes
+        DenseVector<IndexType> row(k,0);
+        scai::hmemo::HArray<ValueType> rowH(k,  static_cast<ValueType>( 0 ));
+        scai::hmemo::WriteAccess<ValueType> rowWrite(rowH);
+        if( border.getLocalValues()[i]==1 ){            //if this is a border node of the grid
+            IndexType localNode = partition.getLocalValues()[i];    //this/local node of the quotetient graph
+std::cout<<  __FILE__<< " ,"<<__LINE__<<" == "<< i <<":  __"<< *comm<< ", localNode= "<< localNode << std::endl;  
+            for(IndexType j=0; j<N; j++){               //for the neighbours of the grid-node
+                //if there is an edge between i and j in the grid and the belong to different parts
+                //TODO: since the second check involves two getvalue() calls maybe it can be skipped. If we just skip it then the diagonal of the quotient graph is 1.
+                if( graph(i,j)==1 && partition(i).Scalar::getValue<IndexType>() != partition(j).Scalar::getValue<IndexType>()){
+                    //get the neighbouring quotient-node
+                    IndexType notLocalNeighbour = partition(j).Scalar::getValue<IndexType>();
+std::cout<<  __FILE__<< " ,"<<__LINE__<<" == "<< i <<":  __"<< *comm<< ", localNode= "<< localNode << " , notLocalNeighbour="<< notLocalNeighbour << std::endl;
+                    //quotientGraph(localNode , notLocalNeighbour)=1; //add edge in quotient graph
+                    quotientGraph[localNode][notLocalNeighbour]= 1; //add edge in quotient graph
+                    row.getLocalValues()[notLocalNeighbour]= 1; 
+                    rowWrite.setValue(1, notLocalNeighbour);
+                }
+            }
+            rowWrite.release();
+            for(IndexType ii=0; ii<rowH.size(); ii++){
+                scai::hmemo::ReadAccess<ValueType> rowRead(rowH);
+                ValueType val;
+                rowRead.getValue(val, ii);
+                std::cout<<  __FILE__<< " ,"<<__LINE__<<" == "<< ii <<":  __"<< *comm<< " , >>"<< val << std::endl;
+            }
+            graphQ.setLocalRow(rowH, distQ->global2local(localNode), scai::utilskernel::binary::BinaryOp::COPY);
+        }
+    }
+    
+    
+    // print
+    
+    for(IndexType i=0; i<k; i++){
+        for(IndexType j=0; j<k; j++){
+            std::cout<< quotientGraph[i][j] << "-";
+        }
+        std::cout<< std::endl;
+    }
+    
+    for(IndexType i=0; i<k; i++){
+        for(IndexType j=0; j<k; j++){
+            std::cout<< graphQ(i,j).Scalar::getValue<IndexType>() << "#";
+        }
+        std::cout<< std::endl;
+    }
+    
+    int numX= 16, numY= 16;         // 2D grid dimensions
+    IndexType partViz[numX][numY];   
+    IndexType bordViz[numX][numY]; 
+    for(int i=0; i<numX; i++)
+        for(int j=0; j<numY; j++){
+            partViz[i][j]=partition.getValue(i*numX+j).getValue<IndexType>();
+            bordViz[i][j]=border.getValue(i*numX+j).getValue<IndexType>();
+        }
+            
+    std::cout<<"----------------------------"<< " Partition  "<< *comm << std::endl;    
+    for(int i=0; i<numX; i++){
+        for(int j=0; j<numY; j++){
+            if(bordViz[i][j]==1) 
+                std::cout<< "\033[1;31m"<< partViz[i][j] << "\033[0m" <<"-";
+            else
+                std::cout<< partViz[i][j]<<"-";
+        }
+        std::cout<< std::endl;
+    }
+    
 }
+
+
+TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
+    std::string file = "Grid4x4";
+    std::ifstream f(file);
+    IndexType dimensions= 2, k=4;
+    IndexType N, edges;
+    f >> N >> edges; 
+    
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    CSRSparseMatrix<ValueType> graph( N , N);           
+    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(graph, dist, file );
+
+    std::cout<<"----------------------------"<< "  graph  "<< *comm << "localNumRows="<< graph.getLocalNumRows() <<std::endl;        
+for(IndexType i=0; i<graph.getLocalNumRows(); i++){
+        for(IndexType j=0; j<graph.getLocalNumColumns(); j++){
+            std::cout<< graph(i,j).Scalar::getValue<ValueType>() << "-";
+        }
+        std::cout<< std::endl;
+}
+
+    //distrubute graph
+    graph.redistribute(dist, noDistPointer); // needed in a previous version because readFromFile2AdjMatrix 
+    std::cout<<"----------------------------"<< *dist << "  graph  "<< *comm << "localNumRows="<< graph.getLocalNumRows() <<std::endl;        
+for(IndexType i=0; i<graph.getLocalNumRows(); i++){
+    scai::hmemo::HArray<ValueType> localRow;   
+    graph.getLocalRow( localRow, i);
+    scai::hmemo::ReadAccess<ValueType> readLR(localRow);
+    std::cout<< *comm <<" ";
+    for(IndexType j=0; j<readLR.size(); j++){
+        ValueType val;
+        readLR.getValue(val, j);
+        std::cout<< val << "-";
+    }
+    std::cout<< std::endl;
+}
+
+
+    //read the array locally and messed the distribution. Left as a remainder.
+    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
+    EXPECT_EQ(edges, (graph.getNumValues())/2 ); 
+    std::vector<DenseVector<ValueType>> coords(2);
+    coords[0].allocate(N);
+    coords[1].allocate(N);
+    coords[0]= static_cast<ValueType>( 0 );
+    coords[1]= static_cast<ValueType>( 0 );
+    
+    MeshIO<IndexType, ValueType>::fromFile2Coords_2D( std::string(file + ".xyz"), coords, N);
+    coords[0].redistribute(dist);
+    coords[1].redistribute(dist);
+    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
+    
+
+    
+    
+std::cout<<  __FILE__<< " ,"<<__LINE__<<" == dist:"<< graph.getRowDistribution() <<std::endl;    
+    scai::lama::DenseVector<IndexType> partition(dist, -1);
+    partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, dimensions,  k, 0.2);
+//std::cout<<  __FILE__<< " ,"<<__LINE__<<" == dist:"<< graph.getRowDistribution() <<std::endl;    
+    scai::lama::CSRSparseMatrix<ValueType> PEgraph =  ParcoRepart<IndexType, ValueType>::getPEGraph( graph , partition); 
+    
+    //print
+    std::cout<<  __FILE__<< " ,"<<__LINE__<<" __"<< *comm << ": #nodes="<< N << " , #edges="<< edges<<std::endl;
+    std::cout<<"----------------------------"<< " PE graph  "<< *comm << std::endl;    
+    for(IndexType i=0; i<PEgraph.getNumRows(); i++){
+        for(IndexType j=0; j<PEgraph.getNumColumns(); j++){
+            std::cout<< PEgraph(i,j).Scalar::getValue<ValueType>() << "-";
+        }
+        std::cout<< std::endl;
+    }
+    
+}
+
+
+
+void testDist( CSRSparseMatrix<ValueType> input){
+const scai::dmemo::DistributionPtr distRow = input.getRowDistributionPtr();
+const scai::dmemo::DistributionPtr distCol = input.getColDistributionPtr();
+
+std::cout << "row dist:"<< *distRow << "  -  col dist:"<< *distCol<< std::endl;
+}
+
+TEST_F(ParcoRepartTest, testDistributionInFunction) {
+    IndexType N=100;
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    CSRSparseMatrix<ValueType> graph(dist, noDistPointer);
+    
+    testDist(graph);
+    
+    CSRSparseMatrix<ValueType> graph2(dist, dist);
+    testDist(graph2);
+    
+    CSRSparseMatrix<ValueType> graph3(noDistPointer, noDistPointer);
+    testDist(graph3);
+    /*
+    scai::dmemo::DistributionPtr distC ( scai::dmemo::Distribution::getDistributionPtr( "GENERAL", comm, N) );
+    CSRSparseMatrix<ValueType> graph4(noDistPointer, distC);
+    testDist(graph4);
+    */
+}
+
+
+
 
 
 /**

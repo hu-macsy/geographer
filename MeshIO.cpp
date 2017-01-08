@@ -252,6 +252,169 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
     localMatrix.swap( csrIA, csrJA, csrValues );
     adjM.assign(localMatrix);
 }
+/*
+//-------------------------------------------------------------------------------------------------
+// coords.size()= 2 , coords[i].size()= N
+// here, N= numPoints[0]*numPoints[1]
+template<typename IndexType, typename ValueType>
+void MeshIO<IndexType, ValueType>::createStructured2DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
+    
+    std::vector<ValueType> offset={maxCoord[0]/numPoints[0], maxCoord[1]/numPoints[1]};
+    IndexType N= numPoints[0]* numPoints[1];
+    // create the coordinates
+    IndexType index=0;
+    index = 0;
+    coords[0].setValue(0,0);
+    coords[1].setValue(0,0);
+    for( IndexType indX=0; indX<numPoints[0]; indX++){
+        for( IndexType indY=0; indY<numPoints[1]; indY++){
+            coords[0].setValue(index, indX*offset[0] );
+            coords[1].setValue(index, indY*offset[1] );
+            ++index;
+        }
+    }
+
+    scai::lama::CSRStorage<double> localMatrix;
+    localMatrix.allocate( N, N );
+    
+    //create the adjacency matrix
+    hmemo::HArray<IndexType> csrIA;
+    hmemo::HArray<IndexType> csrJA;
+    hmemo::HArray<double> csrValues;  
+    {
+        // ja and values have size= edges of the graph
+        // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
+        IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
+                                -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
+        hmemo::WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
+        hmemo::WriteOnlyAccess<IndexType> ja( csrJA);
+        hmemo::WriteOnlyAccess<double> values( csrValues);    
+        ia[0] = 0;
+     
+        IndexType nnzCounter = 0; // count non-zero elements
+        // for every node= for every line of adjM
+        for(IndexType i=0; i<N; i++){
+            // connect the point with its 6 (in 3D) neighbours
+            // neighbour_node: the index of a neighbour of i, can take negative values
+            // but in that case we do not add it
+            float ngb_node = 0;      
+            // the number of neighbours for each node. Can be less that 6.
+            int numRowElems= 0;
+            ValueType max_offset =  *max_element(offset.begin(),offset.end());
+            DenseVector<ValueType> p1(3,0);
+            p1.setValue(0,coords[0].getValue(i));
+            p1.setValue(1,coords[1].getValue(i));
+            p1.setValue(2,coords[2].getValue(i));
+            ngb_node = i +1;                             //edge 1
+            if(ngb_node>=0 && ngb_node<N){
+                // want to do: adjM[i][ngb_node]= 1;
+                DenseVector<ValueType> p2(3,0);
+                p2.setValue(0,coords[0].getValue(ngb_node));
+                p2.setValue(1,coords[1].getValue(ngb_node));
+                p2.setValue(2,coords[2].getValue(ngb_node));
+                if(dist3D(p1, p2).Scalar::getValue<ValueType>() <= max_offset )
+                {
+                ja.resize( ja.size()+1);
+                values.resize( values.size()+1);
+                ja[nnzCounter]= ngb_node;   
+                values[nnzCounter] = 1;         // unweighted edges
+                ++nnzCounter;
+                ++numRowElems;
+                }
+            }
+            ngb_node = i -1;                             //edge 2
+            if(ngb_node>=0 && ngb_node<N){
+                DenseVector<ValueType> p2(3,0);
+                p2.setValue(0,coords[0].getValue(ngb_node));
+                p2.setValue(1,coords[1].getValue(ngb_node));
+                p2.setValue(2,coords[2].getValue(ngb_node));
+                if(dist3D(p1, p2).Scalar::getValue<ValueType>() <= max_offset )
+                {
+                ja.resize( ja.size()+1);
+                values.resize( values.size()+1);
+                ja[nnzCounter]= ngb_node;    
+                values[nnzCounter] = 1;         // unweighted edges
+                ++nnzCounter;
+                ++numRowElems;
+                }
+            }
+            
+            ngb_node = i +numPoints[2];                  //edge 3
+            if(ngb_node>=0 && ngb_node<N){
+                                DenseVector<ValueType> p2(3,0);
+                p2.setValue(0,coords[0].getValue(ngb_node));
+                p2.setValue(1,coords[1].getValue(ngb_node));
+                p2.setValue(2,coords[2].getValue(ngb_node));
+                if(dist3D(p1, p2).Scalar::getValue<ValueType>() <= max_offset)
+                {
+                ja.resize( ja.size()+1);
+                values.resize( values.size()+1);
+                ja[nnzCounter]= ngb_node;    
+                values[nnzCounter] = 1;         // unweighted edges
+                ++nnzCounter;
+                ++numRowElems;
+                }
+            }
+                
+            ngb_node = i -numPoints[2];                  //edge 4
+            if(ngb_node>=0 && ngb_node<N){
+                DenseVector<ValueType> p2(3,0);
+                p2.setValue(0,coords[0].getValue(ngb_node));
+                p2.setValue(1,coords[1].getValue(ngb_node));
+                p2.setValue(2,coords[2].getValue(ngb_node));
+                if(dist3D(p1, p2).Scalar::getValue<ValueType>() <= max_offset)
+                {
+                ja.resize( ja.size()+1);
+                values.resize( values.size()+1);
+                ja[nnzCounter]= ngb_node;    
+                values[nnzCounter] = 1;         // unweighted edges
+                ++nnzCounter;
+                ++numRowElems;
+                }
+            }
+            
+            ngb_node = i +numPoints[2]*numPoints[1];     //edge 5
+            if(ngb_node>=0 && ngb_node<N){
+                DenseVector<ValueType> p2(3,0);
+                p2.setValue(0,coords[0].getValue(ngb_node));
+                p2.setValue(1,coords[1].getValue(ngb_node));
+                p2.setValue(2,coords[2].getValue(ngb_node));
+                if(dist3D(p1, p2).Scalar::getValue<ValueType>() <= max_offset )
+                {
+                ja.resize( ja.size()+1);
+                values.resize( values.size()+1);
+                ja[nnzCounter]= ngb_node;    
+                values[nnzCounter] = 1;         // unweighted edges
+                ++nnzCounter;
+                ++numRowElems;
+                }
+            }
+                
+            ngb_node = i -numPoints[2]*numPoints[1];     //edge 6
+            if(ngb_node>=0 && ngb_node<N){
+                DenseVector<ValueType> p2(3,0);
+                p2.setValue(0,coords[0].getValue(ngb_node));
+                p2.setValue(1,coords[1].getValue(ngb_node));
+                p2.setValue(2,coords[2].getValue(ngb_node));
+                if(dist3D(p1, p2).Scalar::getValue<ValueType>() <= max_offset)
+                {
+                ja.resize( ja.size()+1);
+                values.resize( values.size()+1);
+                ja[nnzCounter]= ngb_node;    //-1 for the METIS format
+                values[nnzCounter] = 1;         // unweighted edges
+                ++nnzCounter;
+                ++numRowElems;
+                }
+            }
+            
+            ia[i+1] = ia[i] +static_cast<IndexType>(numRowElems);
+        }//for
+    }
+ 
+    localMatrix.swap( csrIA, csrJA, csrValues );
+    adjM.assign(localMatrix);
+}
+*/
 
 //-------------------------------------------------------------------------------------------------
 /*Given the adjacency matrix it writes it in the file "filename" using the METIS format. In the
@@ -438,9 +601,95 @@ void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( lama::CSRSparseMatr
     
     localMatrix.swap( csrIA, csrJA, csrValues );
     //matrix.assign( localMatrix, distribution, distribution ); // builds also halo
-    matrix.assign(localMatrix);
+    matrix.assign(localMatrix);//, distRow, distCol);
+    //TODO: the completely distributes version
+    //reallocate/redistribute the matrix
+    //matrix.allocate(distRow, distCol); 
 }
 
+//-------------------------------------------------------------------------------------------------
+/*File "filename" contains a graph in the METIS format. The function reads that graph and transforms 
+ * it to the adjacency matrix as a CSRSparseMatrix.
+ */
+template<typename IndexType, typename ValueType>
+void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrixDistr( lama::CSRSparseMatrix<ValueType> &matrix, const std::string filename){
+    const scai::dmemo::DistributionPtr distRow = matrix.getRowDistributionPtr();
+    const scai::dmemo::DistributionPtr distCol = matrix.getColDistributionPtr(); //col=noDistribution
+    scai::dmemo::CommunicatorPtr comm = distRow->getCommunicatorPtr();
+    
+    IndexType N, numEdges;         //number of nodes and edges
+    std::ifstream file(filename);
+    
+    if(file.fail()) 
+        throw std::runtime_error("File "+ filename+ " failed.");
+   
+    file >>N >> numEdges;   
+    assert( N == distRow->getGlobalSize() );
+    
+    scai::lama::CSRStorage<double> localMatrix;
+    // in a distributed version should be something like that
+    //localMatrix.allocate( localSize, globalSize );
+    // here is not distributed, local=global
+    localMatrix.allocate( distRow->getLocalSize(), distRow->getGlobalSize() );
+std::cout<<  __FILE__<< " ,"<<__LINE__<<" == dist:"<< *distRow << " , local.size=" << distRow->getLocalSize()<< " , global.size=" << distRow->getGlobalSize()<< std::endl;    
+
+    hmemo::HArray<IndexType> csrIA;
+    hmemo::HArray<IndexType> csrJA;
+    hmemo::HArray<double> csrValues;  
+    {
+        //TODO: for a distributed version this must change as numNZ should be the number of
+        //      the local nodes in the processor, not the global
+        // number of Non Zero values. *2 because every edge is read twice.
+        
+        //IndexType numNZ = numEdges*2;
+        //hmemo::WriteOnlyAccess<IndexType> ja( csrJA, numNZ );
+        //hmemo::WriteOnlyAccess<double> values( csrValues, numNZ );
+        // In the distributed version we do not know the number of non zero values
+        hmemo::WriteOnlyAccess<IndexType> ja( csrJA);
+        hmemo::WriteOnlyAccess<double> values( csrValues);
+        hmemo::WriteOnlyAccess<IndexType> ia( csrIA, distRow->getLocalSize() +1 );
+        ia[0] = 0;
+
+        std::vector<IndexType> colIndexes;
+        std::vector<int> colValues;
+        
+        IndexType rowCounter = 0; //comm->getRank() * distRow->getLocalSize(); // count "local" rows
+        IndexType nnzCounter = 0; // count "local" non-zero elements
+        // read the first line and do nothing, contains the number of nodes and edges.
+    
+        std::string line;
+        std::getline(file, line);
+        
+        //for every line, aka for all nodes
+        for ( IndexType i=0; i<N; i++ ){
+            if( distRow->isLocal(i)){       //if the line index is local in the processor
+                std::getline(file, line);            
+                std::vector< std::vector<int> > line_integers;
+                std::istringstream iss( line );
+                line_integers.push_back( std::vector<int>( std::istream_iterator<int>(iss), std::istream_iterator<int>() ) );
+                //ia += the numbers of neighbours of i = line_integers.size()
+                ia[rowCounter + 1] = ia[rowCounter] + static_cast<IndexType>( line_integers[0].size() );
+                for(unsigned int j=0, len=line_integers[0].size(); j<len; j++){
+                    // -1 because of the METIS format
+                    ja.resize(ja.size() + 1); 
+                    ja[nnzCounter]= line_integers[0][j] -1 ;
+                    // all values are 1 for undirected, no-weigths graph    
+                    values.resize( values.size() +1 );
+                    values[nnzCounter]= 1;
+                    ++nnzCounter;
+                }                       
+                ++rowCounter; 
+            }
+        }        
+    }
+    
+    localMatrix.swap( csrIA, csrJA, csrValues );
+    //matrix.assign( localMatrix, distribution, distribution ); // builds also halo
+    matrix.assign(localMatrix, distRow, distCol);
+    //TODO: the completely distributes version
+    //reallocate/redistribute the matrix
+    //matrix.allocate(distRow, distCol); 
+}
 
 //-------------------------------------------------------------------------------------------------
 // it appears slower than the method above
@@ -610,6 +859,7 @@ template void MeshIO<int, double>::writeInFileCoords (const DenseVector<double> 
 template void MeshIO<int, double>::writeInFileCoords (const std::vector<DenseVector<double>> &coords, int dimension, int numPoints, const std::string filename);
 template CSRSparseMatrix<double>  MeshIO<int, double>::readFromFile2AdjMatrix(const std::string filename);
 template void MeshIO<int, double>::readFromFile2AdjMatrix( CSRSparseMatrix<double> &matrix, dmemo::DistributionPtr distribution, const std::string filename);
+template void MeshIO<int, double>::readFromFile2AdjMatrixDistr( lama::CSRSparseMatrix<double> &matrix, const std::string filename);
 template void MeshIO<int, double>::readFromFile2AdjMatrix_Boost( lama::CSRSparseMatrix<double> &matrix, dmemo::DistributionPtr  distribution, const std::string filename);
 template void  MeshIO<int, double>::fromFile2Coords_2D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfCoords);
 template void MeshIO<int, double>::fromFile2Coords_3D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfPoints);

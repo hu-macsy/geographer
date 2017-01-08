@@ -56,6 +56,8 @@ namespace ITI {
 			static ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k);
                         
                         static DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
+                        
+                        static scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
 
 	};
 }
