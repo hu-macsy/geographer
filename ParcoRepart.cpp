@@ -943,14 +943,14 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		}
 
 		ValueType resultSwap[swapLength];
-		IndexType j = 0;
 		if (!otherWasBetter) {
+			IndexType j = 0;
 			for (IndexType nodeID : secondRegion) {
 				resultSwap[j] = nodeID;
 				j++;
 			}
+			assert(j == secondRegion.size());
 		}
-		assert(j == secondRegion.size());
 
 		comm->swap(resultSwap, swapLength, partner);
 
@@ -990,6 +990,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			indexTransport[j] = newIndices[j];
 		}
 
+		std::cout << "Redistributing, with " << std::to_string(additionalNodes.size()) << " new nodes and " << std::to_string(deletedNodes.size()) << " removed nodes." << std::endl;
+
 		//redistribute. This could probably be done faster by using the haloStorage already there. Maybe use joinHalo or splitHalo methods here.
 		scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
 		input.redistribute(newDistribution, input.getColDistributionPtr());
@@ -1007,8 +1009,18 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		}
 	}
 }
+
 template<typename IndexType, typename ValueType>
-ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &halo, std::set<IndexType> &firstregion,  std::set<IndexType> &secondregion, ValueType epsilon, bool unweighted) {
+ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
+		const Halo &matrixHalo, std::set<IndexType> &firstregion,  std::set<IndexType> &secondregion, ValueType epsilon, bool unweighted) {
+//	const IndexType firstElement = *firstregion.begin();
+//	const IndexType secondElement = *secondregion.begin();
+//	firstregion.erase(firstElement);
+//	secondregion.erase(secondElement);
+//	firstregion.insert(secondElement);
+//	secondregion.insert(firstElement);
+//	std::cout << "Swapped elements " << std::to_string(firstElement) << " and " << std::to_string(secondElement) << "." << std::endl;
+
 	return 0;
 }
 
