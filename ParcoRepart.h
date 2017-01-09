@@ -10,6 +10,7 @@
 #include <set>
 
 using namespace scai::lama;
+using scai::dmemo::Halo;
 
 namespace ITI {
 	template <typename IndexType, typename ValueType>
@@ -90,5 +91,9 @@ namespace ITI {
 			static std::vector<IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, IndexType thisBlock, IndexType otherBlock, IndexType depth);
 
 			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted = true);
+
+			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &halo, std::set<IndexType> &firstregion,  std::set<IndexType> &secondregion, ValueType epsilon, bool unweighted = true);
+
+			static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
 	};
 }
