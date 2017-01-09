@@ -805,13 +805,10 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::getInterfaceNodes
 
 template<typename IndexType, typename ValueType>
 ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted) {
-	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
-	const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
+	const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
+	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
 
-	const IndexType localN = inputDist->getLocalSize();
-	const IndexType globalN = inputDist->getGlobalSize();
-
-	if (partDist->getLocalSize() != localN) {
+	if (part.getDistributionPtr()->getLocalSize() != input.getRowDistributionPtr()->getLocalSize()) {
 		throw std::runtime_error("Distributions of input matrix and partitions must be equal, for now.");
 	}
 
@@ -825,7 +822,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 	}
 
 	std::vector<DenseVector<IndexType >> communicationScheme = computeCommunicationPairings(input, part, mapping);
-    scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
 
     const Scalar maxBlockScalar = part.max();
     const IndexType maxBlockID = maxBlockScalar.getValue<IndexType>();
@@ -835,6 +831,12 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
     }
 
 	for (IndexType i = 0; i < communicationScheme.size(); i++) {
+
+		const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+		const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
+
+		const IndexType localN = inputDist->getLocalSize();
+
 		if (!communicationScheme[i].getDistributionPtr()->isLocal(comm->getRank())) {
 			throw std::runtime_error("Scheme value must be local.");
 		}
@@ -894,7 +896,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			requiredHaloIndices[i] = swapNodes[i];
 		}
 
-		assert(requiredHaloIndices.size() <= inputDist->getGlobalSize() - inputDist->getLocalSize());
+		assert(requiredHaloIndices.size() <= globalN - inputDist->getLocalSize());
 
 		/*
 		 * extend halos to cover border region of other PE.
@@ -989,8 +991,15 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		input.redistribute(newDistribution, input.getColDistributionPtr());
 		part.redistribute(newDistribution);
 
-		for (IndexType j = 0; j < newIndices.size(); j++) {
-			part.setValue(newIndices[j], localBlockID);
+		for (IndexType newNode : additionalNodes) {
+			assert(part.getDistributionPtr()->isLocal(newNode));
+			assert(input.getRowDistributionPtr()->isLocal(newNode));
+			part.setValue(newNode, localBlockID);
+		}
+
+		for (IndexType removed : deletedNodes) {
+			assert(!part.getDistributionPtr()->isLocal(removed));
+			assert(!input.getRowDistributionPtr()->isLocal(removed));
 		}
 	}
 }
