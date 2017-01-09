@@ -101,6 +101,14 @@ void MeshIO<IndexType, ValueType>::createRandom3DMesh(CSRSparseMatrix<ValueType>
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
 
+	if (coords.size() != 3) {
+		throw std::runtime_error("Needs three coordinate vectors, one for each dimension");
+	}
+
+	if (numPoints.size() != 3) {
+		throw std::runtime_error("Needs three point counts, one for each dimension");
+	}
+
     std::vector<ValueType> offset={maxCoord[0]/numPoints[0], maxCoord[1]/numPoints[1], maxCoord[2]/numPoints[2]};
     IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
     // create the coordinates
@@ -120,13 +128,13 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
         }
     }
 
-    scai::lama::CSRStorage<double> localMatrix;
+    scai::lama::CSRStorage<ValueType> localMatrix;
     localMatrix.allocate( N, N );
     
     //create the adjacency matrix
     hmemo::HArray<IndexType> csrIA;
     hmemo::HArray<IndexType> csrJA;
-    hmemo::HArray<double> csrValues;  
+    hmemo::HArray<ValueType> csrValues;
     {
         // ja and values have size= edges of the graph
         // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
@@ -134,7 +142,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
                                 -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
         hmemo::WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
         hmemo::WriteOnlyAccess<IndexType> ja( csrJA);
-        hmemo::WriteOnlyAccess<double> values( csrValues);    
+        hmemo::WriteOnlyAccess<ValueType> values( csrValues);
         ia[0] = 0;
      
         IndexType nnzCounter = 0; // count non-zero elements
@@ -269,9 +277,9 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
  *  
  */
 
-//TODO: must write coordiantes in the filename.xyz file
+//TODO: must write coordinates in the filename.xyz file
 //      not sure what data type to use for coordinates: a) DenseVector or b)vector<DenseVector> ?
-//DONE: Made a separate function for coordiantes
+//DONE: Made a separate function for coordinates
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::writeInFileMetisFormat (const CSRSparseMatrix<ValueType> &adjM, const std::string filename){
     std::ofstream f;
