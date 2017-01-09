@@ -71,28 +71,25 @@ TEST_F(ParcoRepartTest, testMinimumNeighborDistanceDistributed) {
 
 
 TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
-  IndexType nroot = 50;
-  IndexType n = nroot * nroot;
-  IndexType k = 10;
-  
-  scai::lama::CSRSparseMatrix<ValueType>a(n,n);
-  // for nroot > 200 (approximately), fillRandom throws an error
-  scai::lama::MatrixCreator::fillRandom(a, 0.01);
-  IndexType dim = 2;
-  ValueType epsilon = 0.05;
+  IndexType nroot = 8;
+  IndexType n = nroot * nroot * nroot;
+  IndexType k = 8;
+  IndexType dimensions = 3;
+  const ValueType epsilon = 0.05;
 
-  std::vector<DenseVector<ValueType>> coordinates(dim);
-  for(IndexType i=0; i<dim; i++){
-    coordinates[i]= DenseVector<ValueType>(n, 0);
+  scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+  
+  scai::lama::CSRSparseMatrix<ValueType>a(noDistPointer, noDistPointer);
+  std::vector<ValueType> maxCoord(dimensions, nroot);
+  std::vector<IndexType> numPoints(dimensions, nroot);
+
+  std::vector<DenseVector<ValueType>> coordinates(dimensions);
+  for(IndexType i=0; i<dimensions; i++){
+	  coordinates[i].allocate(noDistPointer);
+	  coordinates[i] = static_cast<ValueType>( 0 );
   }
   
-  for (IndexType i = 0; i < nroot; i++) {
-    for (IndexType j = 0; j < nroot; j++) {
-      //this is slightly wasteful, since it also iterates over indices of other processors
-      coordinates[0].setValue(i*nroot + j, i);
-      coordinates[1].setValue(i*nroot + j, j);
-    }
-  }
+  MeshIO<IndexType, ValueType>::createStructured3DMesh(a, coordinates, maxCoord, numPoints);
   
   scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, k, epsilon);
   
@@ -108,10 +105,12 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
 TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   IndexType nroot = 8;
   IndexType n = nroot * nroot * nroot;
-  IndexType k = 8;
   IndexType dimensions = 3;
   
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+  IndexType k = comm->getSize();
+
   scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
   scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
   

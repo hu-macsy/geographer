@@ -191,7 +191,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
 	}
         
-	if (false) {
+	if (true) {
 		ValueType gain = 1;
 		ValueType cut = computeCut(input, result);
 		while (gain > 0) {
@@ -826,8 +826,12 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
     const Scalar maxBlockScalar = part.max();
     const IndexType maxBlockID = maxBlockScalar.getValue<IndexType>();
 
-    if (maxBlockID != comm->getSize()) {
-    	throw std::runtime_error("For now, number of processes and blocks must be equal.");
+    if (k != maxBlockID + 1) {
+    	throw std::runtime_error("Should have " + std::to_string(k) + " blocks, has maximum ID" + std::to_string(maxBlockID));
+    }
+
+    if (k != comm->getSize()) {
+    	throw std::runtime_error("Called with " + std::to_string(comm->getSize()) + " processors, but " + std::to_string(k) + " blocks.");
     }
 
 	for (IndexType i = 0; i < communicationScheme.size(); i++) {
@@ -838,7 +842,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		const IndexType localN = inputDist->getLocalSize();
 
 		if (!communicationScheme[i].getDistributionPtr()->isLocal(comm->getRank())) {
-			throw std::runtime_error("Scheme value must be local.");
+			throw std::runtime_error("Scheme value for " + std::to_string(comm->getRank()) + " must be local.");
 		}
 		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[i].getLocalValues());
 		IndexType partner = commAccess[communicationScheme[i].getDistributionPtr()->global2local(comm->getRank())];
