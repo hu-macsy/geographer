@@ -12,6 +12,7 @@
 #include <cmath>
 #include <climits>
 #include <queue>
+#include <tuple>
 
 #include "PrioQueue.h"
 #include "ParcoRepart.h"
@@ -705,7 +706,7 @@ scai::dmemo::Halo ITI::ParcoRepart<IndexType, ValueType>::buildPartHalo(
 }
 
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, IndexType thisBlock, IndexType otherBlock, IndexType depth) {
+std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueType>::getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, IndexType thisBlock, IndexType otherBlock, IndexType depth) {
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
 
@@ -767,6 +768,7 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::getInterfaceNodes
 		}
 	}
 
+	IndexType lastRoundMarker = 0;
 	/**
 	 * now gather buffer zone with breadth-first search
 	 */
@@ -779,6 +781,7 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::getInterfaceNodes
 		}
 
 		for (IndexType round = 1; round < depth; round++) {
+			lastRoundMarker = interfaceNodes.size();
 			std::queue<IndexType> nextQueue;
 			while (!bfsQueue.empty()) {
 				IndexType nextNode = bfsQueue.front();
@@ -800,16 +803,22 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::getInterfaceNodes
 			}
 		}
 	}
-	return interfaceNodes;
+	return {interfaceNodes, lastRoundMarker};
 }
 
 template<typename IndexType, typename ValueType>
 ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted) {
+	const IndexType borderRegionDepth = 4;
+
 	const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
 	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
 
 	if (part.getDistributionPtr()->getLocalSize() != input.getRowDistributionPtr()->getLocalSize()) {
 		throw std::runtime_error("Distributions of input matrix and partitions must be equal, for now.");
+	}
+
+	if (epsilon < 0) {
+		throw std::runtime_error("Epsilon must be >= 0, not " + std::to_string(epsilon));
 	}
 
 	/**
@@ -856,7 +865,9 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		 * get indices of border nodes with breadth-first search
 		 */
 		const IndexType localBlockID = comm->getRank();
-		std::vector<IndexType> interfaceNodes = getInterfaceNodes(input, part, localBlockID, partner, 2);
+		std::vector<IndexType> interfaceNodes;
+		IndexType lastRoundMarker;
+		std::tie(interfaceNodes, lastRoundMarker)= getInterfaceNodes(input, part, localBlockID, partner, borderRegionDepth+1);
 		std::sort(interfaceNodes.begin(), interfaceNodes.end());
 
 		/**
@@ -864,11 +875,15 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		 * For this, first find out the length of the swap array.
 		 */
 
-		//prepare swap: find out number of nodes needing to be swapped
-		ValueType swapField[2];
+		//swap size of border region and total block size
+		IndexType blockSize = localBlockSize(part, localBlockID);
+		IndexType swapField[3];
 		swapField[0] = interfaceNodes.size();
-		swapField[1] = localBlockSize(part, localBlockID);
-		comm->swap(swapField, 2, partner);
+		swapField[1] = lastRoundMarker;
+		swapField[2] = blockSize;
+		comm->swap(swapField, 3, partner);
+		const IndexType otherLastRoundMarker = swapField[1];
+		const IndexType otherBlockSize = swapField[2];
 		IndexType swapLength = std::max(int(swapField[0]), int(interfaceNodes.size()));
 
 		if (interfaceNodes.size() == 0) {
@@ -897,6 +912,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		//swapField[0] now contains the number of nodes in the partner's border region
 		std::vector<IndexType> requiredHaloIndices(swapField[0]);
 		for (IndexType i = 0; i < swapField[0]; i++) {
+			assert(swapNodes[i] >= 0);
 			requiredHaloIndices[i] = swapNodes[i];
 		}
 
@@ -918,11 +934,21 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		haloMatrix.exchangeHalo( graphHalo, input.getLocalStorage(), *comm );
 
 		//why not use vectors in the FM step or use sets to begin with? Might be faster.
-		std::set<IndexType> firstRegion(interfaceNodes.begin(), interfaceNodes.end());
-		std::set<IndexType> secondRegion(requiredHaloIndices.begin(), requiredHaloIndices.end());
+		//here we only exchange one round less than gathered. The other forms a dummy border layer.
+		std::set<IndexType> firstRegion(interfaceNodes.begin(), interfaceNodes.begin()+lastRoundMarker);
+		std::set<IndexType> secondRegion(requiredHaloIndices.begin(), requiredHaloIndices.begin()+otherLastRoundMarker);
 
-		//execute FM locally. TODO: add block size information and partition boundary
-		ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, firstRegion, secondRegion, epsilon, unweighted);
+		std::set<IndexType> firstDummyLayer(interfaceNodes.begin()+lastRoundMarker, interfaceNodes.end());
+		std::set<IndexType> secondDummyLayer(requiredHaloIndices.begin()+otherLastRoundMarker, requiredHaloIndices.end());
+
+		//block sizes and capacities
+		const IndexType optSize = ceil(double(globalN) / k);
+		const IndexType maxAllowableBlockSize = optSize*(1+epsilon);
+		std::pair<IndexType, IndexType> blockSizes = {blockSize, otherBlockSize};
+		std::pair<IndexType, IndexType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
+
+		//execute FM locally.
+		ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, firstRegion, secondRegion, firstDummyLayer, secondDummyLayer, blockSizes, maxBlockSizes, epsilon, unweighted);
 
 		//communicate achieved gain. PE with better solution should send their secondRegion.
 		swapField[0] = secondRegion.size();
@@ -1012,14 +1038,215 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 template<typename IndexType, typename ValueType>
 ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-		const Halo &matrixHalo, std::set<IndexType> &firstregion,  std::set<IndexType> &secondregion, ValueType epsilon, bool unweighted) {
-//	const IndexType firstElement = *firstregion.begin();
-//	const IndexType secondElement = *secondregion.begin();
-//	firstregion.erase(firstElement);
-//	secondregion.erase(secondElement);
-//	firstregion.insert(secondElement);
-//	secondregion.insert(firstElement);
-//	std::cout << "Swapped elements " << std::to_string(firstElement) << " and " << std::to_string(secondElement) << "." << std::endl;
+		const Halo &matrixHalo, std::set<IndexType> &firstregion,  std::set<IndexType> &secondregion,
+		const std::set<IndexType> &firstDummyLayer, const std::set<IndexType> &secondDummyLayer,
+		std::pair<IndexType, IndexType> blockSizes,
+		const std::pair<IndexType, IndexType> blockCapacities, ValueType epsilon, const bool unweighted) {
+
+	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+	if (blockSizes.first >= blockCapacities.first && blockSizes.second >= blockCapacities.second) {
+		//cannot move any nodes, all blocks are overloaded already.
+		return 0;
+	}
+
+	/**
+	 * These maps are mapping the b global indices received in the border region sets onto the interval [0,b-1].
+	 */
+	std::map<IndexType, IndexType> globalToVeryLocal;
+	std::map<IndexType, IndexType> veryLocalToGlobal;
+	IndexType i = 0;
+	for (IndexType index : firstregion) {
+		//edge information about elements must be either local or in halo
+		assert(inputDist->isLocal(index) || matrixHalo.global2halo(index) != std::numeric_limits<IndexType>::max());
+		//no overlap between input regions or dummy layers
+		assert(secondregion.count(index) == 0);
+		assert(firstDummyLayer.count(index) == 0);
+
+		globalToVeryLocal[index] = i;
+		veryLocalToGlobal[i] = index;
+		i++;
+	}
+
+	for (IndexType index : secondregion) {
+		//edge information about elements must be either local or in halo
+		assert(inputDist->isLocal(index) || matrixHalo.global2halo(index) != std::numeric_limits<IndexType>::max());
+		assert(secondDummyLayer.count(index) == 0);
+
+		globalToVeryLocal[index] = i;
+		veryLocalToGlobal[i] = index;
+		i++;
+	}
+
+	assert(i == firstregion.size() + secondregion.size());
+	assert(globalToVeryLocal.size() == i);
+	assert(veryLocalToGlobal.size() == i);
+
+	const IndexType veryLocalN = i;
+
+	//possible optimization: use ReadAccess
+	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
+	const scai::utilskernel::LArray<IndexType>& ia = localStorage.getIA();
+	const scai::utilskernel::LArray<IndexType>& ja = localStorage.getJA();
+	const scai::utilskernel::LArray<IndexType>& values = localStorage.getValues();
+
+	const scai::utilskernel::LArray<IndexType>& haloIa = haloStorage.getIA();
+	const scai::utilskernel::LArray<IndexType>& haloJa = haloStorage.getJA();
+	const scai::utilskernel::LArray<IndexType>& haloValues = haloStorage.getValues();
+
+	if (!unweighted && values.min() < 0) {
+		throw std::runtime_error("Only positive edge weights are supported, " + std::to_string(values.min()) + " invalid.");
+	}
+
+	auto isVeryLocal = [&](IndexType globalID){return globalToVeryLocal.count(globalID) > 0;};
+	auto isInFirstBlock = [&](IndexType globalID){return firstregion.count(globalID) + firstDummyLayer.count(globalID) > 0;};
+	auto isInSecondBlock = [&](IndexType globalID){return secondregion.count(globalID) + secondDummyLayer.count(globalID) > 0;};
+
+	auto computeGain = [&](IndexType globalID){
+		bool firstBlock = isInFirstBlock(globalID);
+		assert(firstBlock != isInSecondBlock(globalID));
+
+		ValueType result;
+		/**
+		 * neighborhood information is either in local matrix or halo.
+		 */
+		if (inputDist->isLocal(globalID)) {
+			const IndexType localID = inputDist->global2local(globalID);
+			const IndexType beginCols = ia[localID];
+			const IndexType endCols = ia[localID+1];
+
+			for (IndexType j = beginCols; j < endCols; j++) {
+				IndexType globalNeighbor = ja[j];
+				if (globalNeighbor == globalID) continue;
+				const ValueType edgeweight = unweighted ? 1 : values[j];
+				bool same;
+				if (isInSecondBlock(globalNeighbor)) {
+					same = !firstBlock;
+				} else if (isInFirstBlock(globalNeighbor)) {
+					same = firstBlock;
+				} else {
+					//neighbor in other block, not relevant for gain
+					continue;
+				}
+
+				result += same ? -edgeweight : edgeweight;
+			}
+
+		} else if (matrixHalo.global2halo(globalID) != std::numeric_limits<IndexType>::max()) {
+			const IndexType localID = matrixHalo.global2halo(globalID);
+			assert(localID < haloStorage.getNumValues());
+			const IndexType beginCols = haloIa[localID];
+			const IndexType endCols = haloIa[localID+1];
+
+			for (IndexType j = beginCols; j < endCols; j++) {
+				IndexType globalNeighbor = haloJa[j];
+				if (globalNeighbor == globalID) continue;
+				const ValueType edgeweight = unweighted ? 1 : haloValues[j];
+				bool same;
+				if (isInSecondBlock(globalNeighbor)) {
+					same = !firstBlock;
+				} else if (isInFirstBlock(globalNeighbor)) {
+					same = firstBlock;
+				} else {
+					//neighbor in other block, not relevant for gain
+					continue;
+				}
+
+				result += same ? -edgeweight : edgeweight;
+			}
+
+		} else {
+			throw std::runtime_error("Node with ID" + std::to_string(globalID) + " not found in local matrix or halo.");
+		}
+		return result;
+	};
+
+	/**
+	 * constuct and fill gain table and priority queues. Since only one target block is possible, gain table is one-dimensional.
+	 */
+	PrioQueue<ValueType, IndexType> firstQueue(firstregion.size());
+	PrioQueue<ValueType, IndexType> secondQueue(secondregion.size());
+	std::vector<ValueType> gain(veryLocalN);
+
+	for (IndexType globalIndex : firstregion) {
+		IndexType veryLocalID = globalToVeryLocal.at(globalIndex);
+		gain[veryLocalID] = computeGain(globalIndex);
+		firstQueue.insert(gain[veryLocalID], globalIndex);
+	}
+
+	for (IndexType globalIndex : secondregion) {
+		IndexType veryLocalID = globalToVeryLocal.at(globalIndex);
+		gain[veryLocalID] = computeGain(globalIndex);
+		secondQueue.insert(gain[veryLocalID], globalIndex);
+	}
+
+	std::vector<bool> moved(veryLocalN, false);
+	std::vector<IndexType> transfers;
+	transfers.reserve(veryLocalN);
+
+	ValueType gainSum = 0;
+	std::vector<ValueType> gainSumList;
+	gainSumList.reserve(veryLocalN);
+
+	while (firstQueue.size() + secondQueue.size() > 0) {
+		IndexType bestQueueIndex;
+
+		/*
+		 * first check break situations
+		 */
+		if ((firstQueue.size() == 0 && blockSizes.first == blockCapacities.first)
+				 ||	(secondQueue.size() == 0 && blockSizes.second == blockCapacities.second)) {
+			//cannot move any nodes
+			break;
+		}
+
+		if (firstQueue.size() == 0) {
+			bestQueueIndex = 1;
+		} else if (secondQueue.size() == 0) {
+			bestQueueIndex = 0;
+		} else {
+			std::vector<ValueType> fullness = {double(blockSizes.first) / blockCapacities.first, double(blockSizes.second) / blockCapacities.second};
+			std::vector<ValueType> gains = {firstQueue.inspectMin().first, secondQueue.inspectMin().first};
+
+			//decide first by fullness, if fullness is equal, decide by gain
+			if (fullness[0] > fullness[1] || (fullness[0] == fullness[1] && gains[0] < gains[1])) {
+				bestQueueIndex = 1;
+			} else if (fullness[1] > fullness[0] || (fullness[0] == fullness[1] && gains[1] < gains[0])) {
+				bestQueueIndex = 0;
+			} else {
+				//tie, break randomly
+				assert(fullness[0] == fullness[1] && gains[0] == gains[1]);
+
+				if ((rand() / RAND_MAX) < 0.5) {
+					bestQueueIndex = 0;
+				} else {
+					bestQueueIndex = 1;
+				}
+			}
+
+		}
+
+		PrioQueue<ValueType, IndexType>& currentQueue = bestQueueIndex == 0 ? firstQueue : secondQueue;
+		std::set<IndexType>& currentRegion = bestQueueIndex == 0 ? firstregion : secondregion;
+		std::set<IndexType>& targetRegion = bestQueueIndex == 0 ? secondregion : firstregion;
+
+		//now, we have selected a Queue.
+		IndexType topVertex;
+		ValueType topGain;
+		std::tie(topGain, topVertex) = currentQueue.extractMin();
+		topGain *= -1;
+		assert(topGain == gain[globalToVeryLocal.at(topVertex)]);
+
+		transfers.push_back(topVertex);
+		gainSum += topGain;
+		gainSumList.push_back(gainSum);
+
+		currentRegion.erase(topVertex);
+		targetRegion.insert(topVertex);
+
+		//update gains of neighbors
+
+	}
+
 
 	return 0;
 }
@@ -1043,5 +1270,5 @@ template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildMatrixHalo(const 
 
 template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildPartHalo(const CSRSparseMatrix<double> &input,  const DenseVector<int> &part);
 
-template std::vector<int> ITI::ParcoRepart<int, double>::getInterfaceNodes(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, int thisBlock, int otherBlock, int depth);
+template std::pair<std::vector<int>, int> ITI::ParcoRepart<int, double>::getInterfaceNodes(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, int thisBlock, int otherBlock, int depth);
 }

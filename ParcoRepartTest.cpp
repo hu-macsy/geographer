@@ -363,6 +363,7 @@ TEST_F(ParcoRepartTest, testCommunicationScheme) {
 TEST_F(ParcoRepartTest, testGetInterfaceNodesLocal) {
 	/**
 	 * test first with complete matrix. Unsuitable, I know, but we don't have a mesh generator yet.
+	 * TODO: We now have a mesh generator. Update with it.
 	 */
 
 	  const IndexType n = 1000;
@@ -386,7 +387,10 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesLocal) {
 
 	  IndexType thisBlock = 0;
 	  IndexType otherBlock = 1;
-	  std::vector<IndexType> interfaceNodes = ParcoRepart<IndexType, ValueType>::getInterfaceNodes(a, part, thisBlock, otherBlock, 1);
+
+	  std::vector<IndexType> interfaceNodes;
+	  IndexType lastRoundMarker;
+	  std::tie(interfaceNodes, lastRoundMarker) = ParcoRepart<IndexType, ValueType>::getInterfaceNodes(a, part, thisBlock, otherBlock, 1);
 
 	  scai::hmemo::ReadAccess<IndexType> partAccess(part.getLocalValues());
 

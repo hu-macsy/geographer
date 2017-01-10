@@ -85,14 +85,17 @@ namespace ITI {
 			 * @param[in] input Adjacency matrix of the input graph
 			 * @param[in] part Partition vector
 			 * @param[in] thisBlock block in which the border region is required
-			 * @param[in] otherBlock block to which the border region shoulc be adjacent
+			 * @param[in] otherBlock block to which the border region should be adjacent
 			 * @param[in] depth Width of the border region, measured in hops
 			 */
-			static std::vector<IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, IndexType thisBlock, IndexType otherBlock, IndexType depth);
+			static std::pair<std::vector<IndexType>, IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, IndexType thisBlock, IndexType otherBlock, IndexType depth);
 
 			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted = true);
 
-			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &halo, std::set<IndexType> &firstregion,  std::set<IndexType> &secondregion, ValueType epsilon, bool unweighted = true);
+			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &halo,
+					std::set<IndexType> &firstregion,  std::set<IndexType> &secondregion,
+					const std::set<IndexType> &firstDummyLayer, const std::set<IndexType> &secondDummyLayer,
+					std::pair<IndexType, IndexType> blockSizes,	const std::pair<IndexType, IndexType> blockCapacities, ValueType epsilon, const bool unweighted = true);
 
 			static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
 	};
