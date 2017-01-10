@@ -12,7 +12,7 @@
 #include <cmath>
 #include <climits>
 #include <queue>
-#include <tuple>
+#include <string>
 
 #include "PrioQueue.h"
 #include "ParcoRepart.h"
@@ -24,7 +24,7 @@ namespace ITI {
 
 template<typename IndexType, typename ValueType>
 ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const CSRSparseMatrix<ValueType> &input, const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions) {
-	// iterate through matrix to find closest neighbours, implying necessary recursion depth for space-filling curve
+	// iterate through matrix to find closest neighbors, implying necessary recursion depth for space-filling curve
 	// here it can happen that the closest neighbor is not stored on this processor.
 
     std::vector<scai::dmemo::DistributionPtr> coordDist(dimensions);
@@ -1087,11 +1087,11 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::utilskernel::LArray<IndexType>& ia = localStorage.getIA();
 	const scai::utilskernel::LArray<IndexType>& ja = localStorage.getJA();
-	const scai::utilskernel::LArray<IndexType>& values = localStorage.getValues();
+	const scai::utilskernel::LArray<ValueType>& values = localStorage.getValues();
 
 	const scai::utilskernel::LArray<IndexType>& haloIa = haloStorage.getIA();
 	const scai::utilskernel::LArray<IndexType>& haloJa = haloStorage.getJA();
-	const scai::utilskernel::LArray<IndexType>& haloValues = haloStorage.getValues();
+	const scai::utilskernel::LArray<ValueType>& haloValues = haloStorage.getValues();
 
 	if (!unweighted && values.min() < 0) {
 		throw std::runtime_error("Only positive edge weights are supported, " + std::to_string(values.min()) + " invalid.");
@@ -1226,6 +1226,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		}
 
 		PrioQueue<ValueType, IndexType>& currentQueue = bestQueueIndex == 0 ? firstQueue : secondQueue;
+		PrioQueue<ValueType, IndexType>& otherQueue = bestQueueIndex == 0 ? secondQueue : firstQueue;
+
 		std::set<IndexType>& currentRegion = bestQueueIndex == 0 ? firstregion : secondregion;
 		std::set<IndexType>& targetRegion = bestQueueIndex == 0 ? secondregion : firstregion;
 
@@ -1245,8 +1247,31 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 		//update gains of neighbors
 
-	}
+		const CSRStorage<ValueType>& storage = inputDist->isLocal(topVertex) ? input.getLocalStorage() : haloStorage;
+		const IndexType localID = inputDist->isLocal(topVertex) ? inputDist->global2local(topVertex) : matrixHalo.global2halo(topVertex);
 
+		const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
+		const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());
+		const scai::hmemo::ReadAccess<ValueType> localValues(storage.getValues());
+		const IndexType beginCols = localIa[localID];
+		const IndexType endCols = localIa[localID+1];
+
+		for (IndexType j = beginCols; j < endCols; j++) {
+			IndexType neighbor = localJa[j];
+			ValueType edgeweight = unweighted ? 1 : localValues[j];
+			if (isVeryLocal(neighbor)) {
+				IndexType veryLocalNeighborID = globalToVeryLocal.at(neighbor);
+				bool sameBlock = bestQueueIndex == 0 ? isInFirstBlock(neighbor) : isInSecondBlock(neighbor);
+				gain[veryLocalNeighborID] += sameBlock ? edgeweight : -edgeweight;
+				if (sameBlock) {
+					currentQueue.decreaseKey(gain[veryLocalNeighborID], neighbor);
+				} else {
+					otherQueue.decreaseKey(gain[veryLocalNeighborID], neighbor);
+				}
+			}
+
+		}
+	}
 
 	return 0;
 }
