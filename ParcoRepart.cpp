@@ -1043,11 +1043,13 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		std::pair<IndexType, IndexType> blockSizes,
 		const std::pair<IndexType, IndexType> blockCapacities, ValueType epsilon, const bool unweighted) {
 
-	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	if (blockSizes.first >= blockCapacities.first && blockSizes.second >= blockCapacities.second) {
 		//cannot move any nodes, all blocks are overloaded already.
 		return 0;
 	}
+
+	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+	const IndexType globalN = inputDist->getGlobalSize();
 
 	/**
 	 * These maps are mapping the b global indices received in the border region sets onto the interval [0,b-1].
@@ -1083,20 +1085,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 	const IndexType veryLocalN = i;
 
-	//possible optimization: use ReadAccess
-	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
-	const scai::utilskernel::LArray<IndexType>& ia = localStorage.getIA();
-	const scai::utilskernel::LArray<IndexType>& ja = localStorage.getJA();
-	const scai::utilskernel::LArray<ValueType>& values = localStorage.getValues();
-
-	const scai::utilskernel::LArray<IndexType>& haloIa = haloStorage.getIA();
-	const scai::utilskernel::LArray<IndexType>& haloJa = haloStorage.getJA();
-	const scai::utilskernel::LArray<ValueType>& haloValues = haloStorage.getValues();
-
-	if (!unweighted && values.min() < 0) {
-		throw std::runtime_error("Only positive edge weights are supported, " + std::to_string(values.min()) + " invalid.");
-	}
-
 	auto isVeryLocal = [&](IndexType globalID){return globalToVeryLocal.count(globalID) > 0;};
 	auto isInFirstBlock = [&](IndexType globalID){return firstregion.count(globalID) + firstDummyLayer.count(globalID) > 0;};
 	auto isInSecondBlock = [&](IndexType globalID){return secondregion.count(globalID) + secondDummyLayer.count(globalID) > 0;};
@@ -1109,59 +1097,39 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		/**
 		 * neighborhood information is either in local matrix or halo.
 		 */
-		if (inputDist->isLocal(globalID)) {
-			const IndexType localID = inputDist->global2local(globalID);
-			const IndexType beginCols = ia[localID];
-			const IndexType endCols = ia[localID+1];
+		const CSRStorage<ValueType>& storage = inputDist->isLocal(globalID) ? input.getLocalStorage() : haloStorage;
+		const IndexType localID = inputDist->isLocal(globalID) ? inputDist->global2local(globalID) : matrixHalo.global2halo(globalID);
+		assert(localID != nIndex);
 
-			for (IndexType j = beginCols; j < endCols; j++) {
-				IndexType globalNeighbor = ja[j];
-				if (globalNeighbor == globalID) continue;
-				const ValueType edgeweight = unweighted ? 1 : values[j];
-				bool same;
-				if (isInSecondBlock(globalNeighbor)) {
-					same = !firstBlock;
-				} else if (isInFirstBlock(globalNeighbor)) {
-					same = firstBlock;
-				} else {
-					//neighbor in other block, not relevant for gain
-					continue;
-				}
+		const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
+		const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());
+		const scai::hmemo::ReadAccess<ValueType> localValues(storage.getValues());
 
-				result += same ? -edgeweight : edgeweight;
+		const IndexType beginCols = localIa[localID];
+		const IndexType endCols = localIa[localID+1];
+
+		for (IndexType j = beginCols; j < endCols; j++) {
+			IndexType globalNeighbor = localJa[j];
+			if (globalNeighbor == globalID) continue;
+			const ValueType edgeweight = unweighted ? 1 : localValues[j];
+			bool same;
+			if (isInSecondBlock(globalNeighbor)) {
+				same = !firstBlock;
+			} else if (isInFirstBlock(globalNeighbor)) {
+				same = firstBlock;
+			} else {
+				//neighbor in other block, not relevant for gain
+				continue;
 			}
 
-		} else if (matrixHalo.global2halo(globalID) != std::numeric_limits<IndexType>::max()) {
-			const IndexType localID = matrixHalo.global2halo(globalID);
-			assert(localID < haloStorage.getNumValues());
-			const IndexType beginCols = haloIa[localID];
-			const IndexType endCols = haloIa[localID+1];
-
-			for (IndexType j = beginCols; j < endCols; j++) {
-				IndexType globalNeighbor = haloJa[j];
-				if (globalNeighbor == globalID) continue;
-				const ValueType edgeweight = unweighted ? 1 : haloValues[j];
-				bool same;
-				if (isInSecondBlock(globalNeighbor)) {
-					same = !firstBlock;
-				} else if (isInFirstBlock(globalNeighbor)) {
-					same = firstBlock;
-				} else {
-					//neighbor in other block, not relevant for gain
-					continue;
-				}
-
-				result += same ? -edgeweight : edgeweight;
-			}
-
-		} else {
-			throw std::runtime_error("Node with ID" + std::to_string(globalID) + " not found in local matrix or halo.");
+			result += same ? -edgeweight : edgeweight;
 		}
+
 		return result;
 	};
 
 	/**
-	 * constuct and fill gain table and priority queues. Since only one target block is possible, gain table is one-dimensional.
+	 * construct and fill gain table and priority queues. Since only one target block is possible, gain table is one-dimensional.
 	 */
 	PrioQueue<ValueType, IndexType> firstQueue(firstregion.size());
 	PrioQueue<ValueType, IndexType> secondQueue(secondregion.size());
@@ -1180,12 +1148,13 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	}
 
 	std::vector<bool> moved(veryLocalN, false);
-	std::vector<IndexType> transfers;
+	std::vector<std::pair<IndexType, IndexType>> transfers;
 	transfers.reserve(veryLocalN);
 
 	ValueType gainSum = 0;
-	std::vector<ValueType> gainSumList;
+	std::vector<ValueType> gainSumList, fillFactorList;
 	gainSumList.reserve(veryLocalN);
+	fillFactorList.reserve(veryLocalN);
 
 	while (firstQueue.size() + secondQueue.size() > 0) {
 		IndexType bestQueueIndex;
@@ -1236,14 +1205,22 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		ValueType topGain;
 		std::tie(topGain, topVertex) = currentQueue.extractMin();
 		topGain *= -1;
-		assert(topGain == gain[globalToVeryLocal.at(topVertex)]);
+		IndexType veryLocalID = globalToVeryLocal.at(topVertex);
+		assert(topGain == gain[veryLocalID]);
 
-		transfers.push_back(topVertex);
+		//move node
+		transfers.emplace_back(bestQueueIndex, topVertex);
 		gainSum += topGain;
 		gainSumList.push_back(gainSum);
 
 		currentRegion.erase(topVertex);
 		targetRegion.insert(topVertex);
+		moved[veryLocalID] = true;
+
+		blockSizes.first += bestQueueIndex == 0 ? -1 : 1;
+		blockSizes.second += bestQueueIndex == 0 ? 1 : -1;
+
+		fillFactorList.push_back(std::max(double(blockSizes.first) / blockCapacities.first, double(blockSizes.second) / blockCapacities.second));
 
 		//update gains of neighbors
 
@@ -1261,6 +1238,9 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 			ValueType edgeweight = unweighted ? 1 : localValues[j];
 			if (isVeryLocal(neighbor)) {
 				IndexType veryLocalNeighborID = globalToVeryLocal.at(neighbor);
+				if (moved[veryLocalNeighborID]) {
+					continue;
+				}
 				bool sameBlock = bestQueueIndex == 0 ? isInFirstBlock(neighbor) : isInSecondBlock(neighbor);
 				gain[veryLocalNeighborID] += sameBlock ? edgeweight : -edgeweight;
 				if (sameBlock) {
@@ -1273,7 +1253,42 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		}
 	}
 
-	return 0;
+	/**
+	* now find best partition among those tested
+	*/
+	const IndexType testedNodes = gainSumList.size();
+	if (testedNodes == 0) return 0;
+
+	IndexType maxIndex = -1;
+	ValueType maxGain = 0;
+
+	for (IndexType i = 0; i < testedNodes; i++) {
+		if (gainSumList[i] > maxGain && fillFactorList[i] <= 1) {
+			maxIndex = i;
+			maxGain = gainSumList[i];
+		}
+	}
+	assert(testedNodes >= maxIndex);
+	//assert(maxIndex >= 0);
+	assert(testedNodes-1 < transfers.size());
+
+	/**
+	 * apply partition modifications in reverse until best is recovered
+	 */
+	for (int i = testedNodes-1; i > maxIndex; i--) {
+		assert(transfers[i].second < globalN);
+		std::set<IndexType>& sourceRegion = transfers[i].first == 0 ? firstregion : secondregion;
+		std::set<IndexType>& targetRegion = transfers[i].first == 0 ? secondregion : firstregion;
+
+		//apply movement in reverse
+		sourceRegion.insert(transfers[i].second);
+		targetRegion.erase(transfers[i].second);
+
+		blockSizes.first += transfers[i].first == 0 ? 1 : -1;
+		blockSizes.second += transfers[i].first == 0 ? -1 : 1;
+
+	}
+	return maxGain;
 }
 
 //to force instantiation
