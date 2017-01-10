@@ -249,6 +249,11 @@ ValueType ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(const CSRSpars
 		throw std::runtime_error("Only undirected graphs are supported, adjacency matrix must be symmetric.");
 	}
 
+	if (k == 1) {
+		//nothing to partition
+		return 0;
+	}
+
 	/**
 	* allocate data structures
 	*/
@@ -1093,7 +1098,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		bool firstBlock = isInFirstBlock(globalID);
 		assert(firstBlock != isInSecondBlock(globalID));
 
-		ValueType result;
+		ValueType result = 0;
 		/**
 		 * neighborhood information is either in local matrix or halo.
 		 */
@@ -1131,20 +1136,20 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	/**
 	 * construct and fill gain table and priority queues. Since only one target block is possible, gain table is one-dimensional.
 	 */
-	PrioQueue<ValueType, IndexType> firstQueue(firstregion.size());
-	PrioQueue<ValueType, IndexType> secondQueue(secondregion.size());
+	PrioQueue<ValueType, IndexType> firstQueue(veryLocalN);
+	PrioQueue<ValueType, IndexType> secondQueue(veryLocalN);
 	std::vector<ValueType> gain(veryLocalN);
 
 	for (IndexType globalIndex : firstregion) {
 		IndexType veryLocalID = globalToVeryLocal.at(globalIndex);
 		gain[veryLocalID] = computeGain(globalIndex);
-		firstQueue.insert(gain[veryLocalID], globalIndex);
+		firstQueue.insert(-gain[veryLocalID], veryLocalID);
 	}
 
 	for (IndexType globalIndex : secondregion) {
 		IndexType veryLocalID = globalToVeryLocal.at(globalIndex);
 		gain[veryLocalID] = computeGain(globalIndex);
-		secondQueue.insert(gain[veryLocalID], globalIndex);
+		secondQueue.insert(-gain[veryLocalID], veryLocalID);
 	}
 
 	std::vector<bool> moved(veryLocalN, false);
@@ -1201,11 +1206,14 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		std::set<IndexType>& targetRegion = bestQueueIndex == 0 ? secondregion : firstregion;
 
 		//now, we have selected a Queue.
-		IndexType topVertex;
+		IndexType veryLocalID;
 		ValueType topGain;
-		std::tie(topGain, topVertex) = currentQueue.extractMin();
+		std::tie(topGain, veryLocalID) = currentQueue.extractMin();
 		topGain *= -1;
-		IndexType veryLocalID = globalToVeryLocal.at(topVertex);
+
+		IndexType topVertex = veryLocalToGlobal.at(veryLocalID);
+		assert(!moved[veryLocalID]);
+		assert(topGain == computeGain(topVertex));
 		assert(topGain == gain[veryLocalID]);
 
 		//move node
@@ -1242,12 +1250,16 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 					continue;
 				}
 				bool sameBlock = bestQueueIndex == 0 ? isInFirstBlock(neighbor) : isInSecondBlock(neighbor);
+
+				//assert(gain[veryLocalNeighborID] == computeGain(neighbor));
 				gain[veryLocalNeighborID] += sameBlock ? edgeweight : -edgeweight;
+				assert(gain[veryLocalNeighborID] == computeGain(neighbor));
 				if (sameBlock) {
-					currentQueue.decreaseKey(gain[veryLocalNeighborID], neighbor);
+					currentQueue.decreaseKey(-gain[veryLocalNeighborID], veryLocalNeighborID);
 				} else {
-					otherQueue.decreaseKey(gain[veryLocalNeighborID], neighbor);
+					otherQueue.decreaseKey(-gain[veryLocalNeighborID], veryLocalNeighborID);
 				}
+
 			}
 
 		}
