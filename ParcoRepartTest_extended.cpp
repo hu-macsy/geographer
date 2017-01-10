@@ -350,6 +350,48 @@ TEST_F(ParcoRepartTest, testPartitionBalanceStructured_Distributed_3D) {
     std::cout<< "cut "<< " is ="<< cut<< std::endl;
 }
 //----------------------------------------------------------------------------------------
+/*  // code for the quotient graph, [robably wrong
+
+  scai::dmemo::DistributionPtr distQ ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, k) );  
+    scai::dmemo::DistributionPtr noDistQ (new scai::dmemo::NoDistribution( k ));
+    CSRSparseMatrix<ValueType>  graphQ(distQ, noDistQ);
+    
+
+    for(IndexType i=0; i<dist->getLocalSize(); i++){    //for all local grid-nodes
+        DenseVector<IndexType> row(k,0);
+        scai::hmemo::HArray<ValueType> rowH(k,  static_cast<ValueType>( 0 ));
+        scai::hmemo::WriteAccess<ValueType> rowWrite(rowH);
+        if( border.getLocalValues()[i]==1 ){            //if this is a border node of the grid
+            IndexType localNode = partition.getLocalValues()[i];    //this/local node of the quotient graph
+//std::cout<<  __FILE__<< " ,"<<__LINE__<<" == "<< i <<":  __"<< *comm<< ", localNode= "<< localNode << std::endl;  
+            for(IndexType j=0; j<N; j++){               //for the neighbours of the grid-node
+                //if there is an edge between i and j in the grid and the belong to different parts
+                //TODO: since the second check involves two getvalue() calls maybe it can be skipped. If we just skip it then the diagonal of the quotient graph is 1.
+                if( graph(i,j)==1 && partition(i).Scalar::getValue<IndexType>() != partition(j).Scalar::getValue<IndexType>()){
+                    //get the neighbouring quotient-node
+                    IndexType notLocalNeighbour = partition(j).Scalar::getValue<IndexType>();
+//std::cout<<  __FILE__<< " ,"<<__LINE__<<" == "<< i <<":  __"<< *comm<< ", localNode= "<< localNode << " , notLocalNeighbour="<< notLocalNeighbour << std::endl;
+                    //quotientGraph(localNode , notLocalNeighbour)=1; //add edge in quotient graph
+                    quotientGraph[localNode][notLocalNeighbour]= 1; //add edge in quotient graph
+                    row.getLocalValues()[notLocalNeighbour]= 1; 
+                    rowWrite.setValue(1, notLocalNeighbour);
+                }
+            }
+            rowWrite.release();
+            for(IndexType ii=0; ii<rowH.size(); ii++){
+                scai::hmemo::ReadAccess<ValueType> rowRead(rowH);
+                ValueType val;
+                rowRead.getValue(val, ii);
+                //std::cout<<  __FILE__<< " ,"<<__LINE__<<" == "<< ii <<":  __"<< *comm<< " , val="<< val<< std::endl;
+            }
+            //std::cout<<  __FILE__<< " ,"<<__LINE__<<" , "<< i <<":  distQ:"<< *distQ<<" ,   __"<< *comm << " , localNode="<< localNode << " , localRowIndex="<< distQ->global2local(localNode) << std::endl;
+            //graphQ.setLocalRow(rowH, distQ->global2local(localNode), scai::utilskernel::binary::BinaryOp::COPY);
+        }
+    }
+*/
+    
+//----------------------------------------------------------------------------------------
+  
 
 TEST_F(ParcoRepartTest, testPartitionBalanceStructured_Local_3D) {
     IndexType k = 8;

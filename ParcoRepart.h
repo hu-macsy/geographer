@@ -57,7 +57,24 @@ namespace ITI {
                         
                         static DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
                         
-                        static scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
+                        /**Returns the processor graph. Every processor traverses its local part of adjM: and for every
+                         * edge (u,v) that one node, say u, is not local it gets the owner processor of u.
+                         * 
+                         * @param[in] adjM The adjacency matrix of the input graph.
+                         * @return A [#PE x #PE] adjacency matrix of the processor graph.
+                         */
+                        static scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueType> &adjM);
+                        
+                        /** Returns the edges of the block graph only for the local part. Eg. if blocks 1 and 2 are local
+                         * in this processor it find the edge (1,2) ( and the edge (2,1)). But if block 1 has an edge with
+                         * block 3 that is not local, the function will NOT find this edge.
+                         * 
+                         * @param[in] adjM The adjacency matrix of the input graph.
+                         * @param[in] part The partition of the input graph.
+                         *
+                         * @return A 2 dimensional vector with the local edges of the block graph: (ret[0][i], ret[1][i])
+                        */
+                        static std::vector<std::vector<IndexType> > getLocalBlockGraphEdges( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
 
 	};
 }
