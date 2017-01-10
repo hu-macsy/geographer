@@ -121,7 +121,7 @@ TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
     std::cout<< "Number of nodes= "<< N<< " , Number of edges="<< (adjM.getNumValues()-N)/2 << std::endl;
     
     //get the partition
-    DenseVector<IndexType>partition= ParcoRepart<IndexType, ValueType>::partitionGraph( adjM, coords, dim, k, epsilon);
+    DenseVector<IndexType>partition= ParcoRepart<IndexType, ValueType>::partitionGraph( adjM, coords, k, epsilon);
 
     //calculate and print cut and imbalance
     ValueType cut= ParcoRepart<IndexType, ValueType>::computeCut(adjM, partition, true);
@@ -262,7 +262,7 @@ TEST_F(MeshIOTest, testPartitionFromFile_2D){
     EXPECT_EQ(coords2D[0].size(), N);
     
     //partition the graph
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D, dim,  k, epsilon);
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D,  k, epsilon);
     EXPECT_EQ(partition.size(), N);
  
     ValueType cut= ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true);
