@@ -718,6 +718,10 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 	const IndexType n = inputDist->getGlobalSize();
 	const IndexType localN = inputDist->getLocalSize();
 
+	if (partDist->getLocalSize() != localN) {
+		throw std::runtime_error("Partition has " + std::to_string(partDist->getLocalSize()) + " local nodes, but matrix has " + std::to_string(localN) + ".");
+	}
+
 	Scalar maxBlockScalar = part.max();
 	if (thisBlock > maxBlockScalar.getValue<IndexType>()) {
 		throw std::runtime_error(std::to_string(thisBlock) + " is not a valid block id.");
@@ -743,13 +747,14 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 	partDist->getCommunicatorPtr()->updateHalo( haloData, localData, partHalo );
 
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
-	scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
 	/**
 	 * first get nodes directly at the border to the other block
 	 */
 	std::vector<IndexType> interfaceNodes;
+
 
 	for (IndexType localI = 0; localI < localN; localI++) {
 		const IndexType beginCols = ia[localI];
@@ -768,10 +773,14 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 
 				if (neighborBlock == otherBlock) {
 					interfaceNodes.push_back(inputDist->local2global(localI));
+					//only add interface node once
+					break;
 				}
 			}
 		}
 	}
+
+	assert(interfaceNodes.size() <= localN);
 
 	IndexType lastRoundMarker = 0;
 	/**
@@ -779,11 +788,13 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 	 */
 	if (depth > 1) {
 		std::vector<bool> touched(localN, false);
+
 		std::queue<IndexType> bfsQueue;
 		for (IndexType node : interfaceNodes) {
-			touched[inputDist->global2local(node)] = true;
 			bfsQueue.push(node);
+			touched[inputDist->global2local(node)] = true;
 		}
+		assert(bfsQueue.size() == interfaceNodes.size());
 
 		for (IndexType round = 1; round < depth; round++) {
 			lastRoundMarker = interfaceNodes.size();
@@ -793,12 +804,13 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 				bfsQueue.pop();
 
 				const IndexType localI = inputDist->global2local(nextNode);
+				assert(touched[localI]);
 				const IndexType beginCols = ia[localI];
 				const IndexType endCols = ia[localI+1];
 
 				for (IndexType j = beginCols; j < endCols; j++) {
 					IndexType neighbor = ja[j];
-					if (partDist->isLocal(neighbor) && partAccess[partDist->global2local(neighbor)] == thisBlock &&
+					if (inputDist->isLocal(neighbor) && partAccess[partDist->global2local(neighbor)] == thisBlock &&
 							!touched[inputDist->global2local(neighbor)]) {
 						nextQueue.push(neighbor);
 						interfaceNodes.push_back(neighbor);
@@ -806,8 +818,11 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 					}
 				}
 			}
+			bfsQueue = nextQueue;
 		}
 	}
+
+	assert(interfaceNodes.size() <= localN);
 	return {interfaceNodes, lastRoundMarker};
 }
 
