@@ -460,75 +460,6 @@ void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( lama::CSRSparseMatr
 
 
 //-------------------------------------------------------------------------------------------------
-// it appears slower than the method above
-template<typename IndexType, typename ValueType>
-void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix_Boost( lama::CSRSparseMatrix<ValueType> &matrix, dmemo::DistributionPtr  distribution, const std::string filename){
-    IndexType N, numEdges;         //number of nodes and edges
-    std::ifstream file(filename);
-    
-    if(file.fail()) 
-        throw std::runtime_error("File "+ filename+ " failed.");
-   
-    file >>N >> numEdges;   
-
-    scai::lama::CSRStorage<double> localMatrix;
-    // in a distributed version should be something like that
-    // localMatrix.allocate( localSize, globalSize );
-    // here is not distributed, local=global
-    localMatrix.allocate( N, N );
-    
-    hmemo::HArray<IndexType> csrIA;
-    hmemo::HArray<IndexType> csrJA;
-    hmemo::HArray<double> csrValues;  
-    {
-        //TODO: for a distributed version this must change as numNZ should be the number of
-        //      the local nodes in the processor, not the global
-        // number of Non Zero values. *2 because every edge is read twice.
-        IndexType numNZ = numEdges*2;
-        hmemo::WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
-        hmemo::WriteOnlyAccess<IndexType> ja( csrJA, numNZ );
-        hmemo::WriteOnlyAccess<double> values( csrValues, numNZ );
-
-        ia[0] = 0;
-
-        std::vector<IndexType> colIndexes;
-        std::vector<int> colValues;
-        
-        IndexType rowCounter = 0; // count "local" rows
-        IndexType nnzCounter = 0; // count "local" non-zero elements
-        // read the first line and do nothing, contains the number of nodes and edges.
-        std::string line;
-        std::getline(file, line);
-        
-        //for every line, aka for all nodes
-        for ( IndexType i=0; i<N; i++ ){
-            std::getline(file, line);            
-            std::vector<ValueType> line_integers;
-            boost::spirit::qi::phrase_parse( line.begin(), line.end(), 
-                                            *boost::spirit::qi::double_,
-                                            boost::spirit::ascii::space , line_integers );
-            //for (std::vector<double>::size_type z = 0; z < line_integers.size(); ++z)
-            //      std::cout << z << ": " << line_integers[z] << std::endl;
-
-            //ia += the numbers of neighbours of i = line_integers.size()
-            ia[rowCounter + 1] = ia[rowCounter] + static_cast<IndexType>( line_integers.size() );
-            for(unsigned int j=0, len=line_integers.size(); j<len; j++){
-                // -1 because of the METIS format
-                ja[nnzCounter]= line_integers[j] -1 ;
-                // all values are 1 for undirected, no-weigths graph
-                values[nnzCounter]= 1;
-                ++nnzCounter;
-            }            
-            ++rowCounter;            
-        }        
-    }
-    
-    localMatrix.swap( csrIA, csrJA, csrValues );
-    //matrix.assign( localMatrix, distribution, distribution ); // builds also halo
-    matrix.assign(localMatrix);
-}
-
-//-------------------------------------------------------------------------------------------------
 /*File "filename" contains the coordinates of a graph. The function reads that coordinates and returns
  * the coordinates in a DenseVector where point(x,y) is in [x*dim +y].
  * Every line of the file contais 2 ValueType numbers.
@@ -627,7 +558,6 @@ template void MeshIO<int, double>::writeInFileCoords (const DenseVector<double> 
 template void MeshIO<int, double>::writeInFileCoords (const std::vector<DenseVector<double>> &coords, int dimension, int numPoints, const std::string filename);
 template CSRSparseMatrix<double>  MeshIO<int, double>::readFromFile2AdjMatrix(const std::string filename);
 template void MeshIO<int, double>::readFromFile2AdjMatrix( CSRSparseMatrix<double> &matrix, dmemo::DistributionPtr distribution, const std::string filename);
-template void MeshIO<int, double>::readFromFile2AdjMatrix_Boost( lama::CSRSparseMatrix<double> &matrix, dmemo::DistributionPtr  distribution, const std::string filename);
 template void  MeshIO<int, double>::fromFile2Coords_2D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfCoords);
 template void MeshIO<int, double>::fromFile2Coords_3D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfPoints);
 

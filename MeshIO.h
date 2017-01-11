@@ -70,8 +70,6 @@ namespace ITI {
                  */
                 static void  readFromFile2AdjMatrix( CSRSparseMatrix<ValueType> &matrix, dmemo::DistributionPtr distribution, const std::string filename);
                 
-                static void readFromFile2AdjMatrix_Boost( lama::CSRSparseMatrix<ValueType> &matrix, dmemo::DistributionPtr  distribution, const std::string filename);
-
                 /* Reads the 2D coordinates from file "filename" and returns then in a DenseVector where the coordiantes
                  * of point i are in [i*2][i*2+1].
                  */
