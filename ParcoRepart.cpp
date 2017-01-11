@@ -1042,8 +1042,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			indexTransport[j] = newIndices[j];
 		}
 
-		std::cout << "Redistributing, with " << std::to_string(additionalNodes.size()) << " new nodes and " << std::to_string(deletedNodes.size()) << " removed nodes." << std::endl;
-
 		//redistribute. This could probably be done faster by using the haloStorage already there. Maybe use joinHalo or splitHalo methods here.
 		scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
 		input.redistribute(newDistribution, input.getColDistributionPtr());
@@ -1164,10 +1162,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 			}
 
 			result += same ? -edgeweight : edgeweight;
-			std::string blockString = same ? "in same block" : "not in same block";
-			if (globalID == 711) {
-				std::cout << "Neighbor " << globalNeighbor << " is " << blockString << ", bringing total gain to " << result << std::endl;
-			}
 		}
 
 		return result;
@@ -1269,11 +1263,11 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		assert(isVeryLocal(topVertex));
 		assert(!moved[veryLocalID]);
 		if (topGain != computeGain(topVertex)) {
-			std::cout << "iter " << transfers.size() << ", queue key for " << topVertex << ": "<< topGain << ", computed gain: " << computeGain(topVertex)
-					<< ", stored gain: " << gain[veryLocalID] << std::endl;
+			throw std::runtime_error("iter " + std::to_string(transfers.size()) + ", queue key for " + std::to_string(topVertex) +
+					": " + std::to_string(topGain) + ", computed gain: " + std::to_string(computeGain(topVertex))
+					+ ", stored gain: " + std::to_string(gain[veryLocalID]));
 		}
 		assert(topGain == gain[veryLocalID]);
-		assert(topGain == computeGain(topVertex));
 
 		//move node
 		transfers.emplace_back(bestQueueIndex, topVertex);
@@ -1313,9 +1307,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 				//gain[veryLocalNeighborID] += wasInSameBlock ? edgeweight : -edgeweight;
 				gain[veryLocalNeighborID] = computeGain(neighbor);
-				if (topVertex == 110 || neighbor == 711) {
-					std::cout << "Moved " << topVertex << ", updated gain of neighbor " << neighbor << " to " << gain[veryLocalNeighborID] << std::endl;
-				}
+
 				if (wasInSameBlock) {
 					assert(currentQueue.contains(veryLocalNeighborID));
 					currentQueue.decreaseKey(-gain[veryLocalNeighborID], veryLocalNeighborID);
