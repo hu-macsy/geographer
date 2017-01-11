@@ -10,6 +10,7 @@
 #include <set>
 
 using namespace scai::lama;
+using scai::dmemo::Halo;
 
 namespace ITI {
 	template <typename IndexType, typename ValueType>
@@ -30,6 +31,13 @@ namespace ITI {
 
 			static ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool ignoreWeights = true);
 
+			/**
+			 * This method takes a (possibly distributed) partition and computes its imbalance.
+			 * The number of blocks is also a required input, since it cannot be guessed accurately from the partition vector if a block is empty.
+			 *
+			 * @param[in] part partition
+			 * @param[in] k number of blocks in partition.
+			 */
 			static ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k);
 
 			/**
@@ -57,12 +65,38 @@ namespace ITI {
 
 			static std::vector<DenseVector<IndexType>> computeCommunicationPairings(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const DenseVector<IndexType> &blocksToPEs);
 
+			/**
+			 * Computes a list of global IDs of nodes which are adjacent to nodes local on this processor, but are themselves not local.
+			 */
 			static std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
 
+			/**
+			 * Builds a halo containing all matrix entries of non-local neighbors.
+			 */
 			static scai::dmemo::Halo buildMatrixHalo(const CSRSparseMatrix<ValueType> &input);
 
+			/**
+			 * Builds a halo containing all partition entries of non-local neighbors.
+			 */
 			static scai::dmemo::Halo buildPartHalo(const CSRSparseMatrix<ValueType> &input,  const DenseVector<IndexType> &part);
 
-			static std::vector<IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, IndexType thisBlock, IndexType neighborBlock);
+			/**
+			 * Computes the border region within one block, adjacent to another block
+			 * @param[in] input Adjacency matrix of the input graph
+			 * @param[in] part Partition vector
+			 * @param[in] thisBlock block in which the border region is required
+			 * @param[in] otherBlock block to which the border region should be adjacent
+			 * @param[in] depth Width of the border region, measured in hops
+			 */
+			static std::pair<std::vector<IndexType>, IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, IndexType thisBlock, IndexType otherBlock, IndexType depth);
+
+			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted = true);
+
+			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &halo,
+					std::set<IndexType> &firstregion,  std::set<IndexType> &secondregion,
+					const std::set<IndexType> &firstDummyLayer, const std::set<IndexType> &secondDummyLayer,
+					std::pair<IndexType, IndexType> blockSizes,	const std::pair<IndexType, IndexType> blockCapacities, ValueType epsilon, const bool unweighted = true);
+
+			static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
 	};
 }

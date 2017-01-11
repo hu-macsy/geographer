@@ -175,49 +175,6 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
     */
     
 }
-//-----------------------------------------------------------------
-/* Testing reading from file using Boost. Does not seem faster.
- * */
-TEST_F(MeshIOTest, testReadGraphFromFile_Boost){
-    //string path = "./meshes/my_meshes/";
-    std::string path = "";
-    std::string file = "Grid32x32";
-    std::string filename= path + file;
-    CSRSparseMatrix<ValueType>  graph, graph2;
-    IndexType N, E;    //number of points and edges
-    
-    std::ifstream f(filename);
-    //In the METIS format the two first number in the file are the number of nodes and edges
-    f >>N >> E;
-    
-    dmemo::DistributionPtr dist( new dmemo::NoDistribution( N ));
-    //Graph = scai::lama::CSRSparseMatrix<ValueType>(dist, dist);
-    
-    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-    
-    std::cout<<"reading from file: "<< filename<< " with Boost."<< std::endl;
-    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix_Boost(graph, dist, filename );
-    EXPECT_EQ(graph.getNumColumns(), graph.getNumRows());    
-    EXPECT_EQ(N, graph.getNumColumns());
-    EXPECT_EQ(E, (graph.getNumValues())/2 );
-    
-    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
-    std::cout << "time elapsed: "<< duration<< " ms"<< std::endl;
-    
-    std::cout<< std::endl<<"reading file without Boost"<< std::endl;
-    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(graph2, dist, filename );
-    EXPECT_EQ(graph2.getNumColumns(), graph2.getNumRows());    
-    EXPECT_EQ(N, graph2.getNumColumns());
-    EXPECT_EQ(E, (graph2.getNumValues())/2 );
-    
-    EXPECT_EQ(graph.l2Norm(), graph2.l2Norm());
-    EXPECT_EQ(graph.getNumValues(), graph2.getNumValues());
-    
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::high_resolution_clock::now() -t2 ).count();
-    std::cout << "time elapsed: "<< duration<< " ms"<< std::endl;
-    
-}
 
 //-----------------------------------------------------------------
 // read a graph from a file in METIS format and its coordiantes in 2D and partiotion that graph

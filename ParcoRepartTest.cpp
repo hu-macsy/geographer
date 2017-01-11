@@ -15,6 +15,7 @@
 #include <memory>
 #include <cstdlib>
 
+#include "MeshIO.h"
 #include "ParcoRepart.h"
 #include "gtest/gtest.h"
 
@@ -31,33 +32,37 @@ class ParcoRepartTest : public ::testing::Test {
 
 
 TEST_F(ParcoRepartTest, testMinimumNeighborDistanceDistributed) {
-  IndexType nroot = 20;
-  IndexType n = nroot * nroot;
-  IndexType dimensions = 2;
+  IndexType nroot = 7;
+  IndexType n = nroot * nroot * nroot;
+  IndexType dimensions = 3;
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
   scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
   scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
 
   scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
-  scai::lama::MatrixCreator::fillRandom(a, 0.1);//TODO: make this a proper heterogenuous mesh
-  
+  std::vector<ValueType> maxCoord(dimensions, nroot);
+  std::vector<IndexType> numPoints(dimensions, nroot);
+
   scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
   scai::hmemo::ContextPtr contexPtr = scai::hmemo::Context::getHostPtr();
   
   std::vector<DenseVector<ValueType>> coordinates(dimensions);
   for(IndexType i=0; i<dimensions; i++){ 
-      coordinates[i].allocate(coordDist);
-      coordinates[i] = static_cast<ValueType>( 0 );
+	  coordinates[i].allocate(coordDist);
+	  coordinates[i] = static_cast<ValueType>( 0 );
   }
   
-  for (IndexType i = 0; i < nroot; i++) {
-    for (IndexType j = 0; j < nroot; j++) {
-      //this is slightly wasteful, since it also iterates over indices of other processors
-      // no need to check if local, since setValue skips non-local coordinates. index must always use the global value
-        coordinates[0].setValue(i*nroot + j, i);
-        coordinates[1].setValue(i*nroot + j, j);
-    }
-  }
+  MeshIO<IndexType, ValueType>::createStructured3DMesh(a, coordinates, maxCoord, numPoints);
+  a.redistribute(dist, noDistPointer);
+
+//  for (IndexType i = 0; i < nroot; i++) {
+//    for (IndexType j = 0; j < nroot; j++) {
+//      //this is slightly wasteful, since it also iterates over indices of other processors
+//      // no need to check if local, since setValue skips non-local coordinates. index must always use the global value
+//        coordinates[0].setValue(i*nroot + j, i);
+//        coordinates[1].setValue(i*nroot + j, j);
+//    }
+//  }
   
   const ValueType minDistance = ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(a, coordinates, dimensions);
   EXPECT_LE(minDistance, nroot*1.5);
@@ -66,28 +71,25 @@ TEST_F(ParcoRepartTest, testMinimumNeighborDistanceDistributed) {
 
 
 TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
-  IndexType nroot = 50;
-  IndexType n = nroot * nroot;
-  IndexType k = 10;
-  
-  scai::lama::CSRSparseMatrix<ValueType>a(n,n);
-  // for nroot > 200 (approximately), fillRandom throws an error
-  scai::lama::MatrixCreator::fillRandom(a, 0.01);
-  IndexType dim = 2;
-  ValueType epsilon = 0.05;
+  IndexType nroot = 8;
+  IndexType n = nroot * nroot * nroot;
+  IndexType k = 8;
+  IndexType dimensions = 3;
+  const ValueType epsilon = 0.05;
 
-  std::vector<DenseVector<ValueType>> coordinates(dim);
-  for(IndexType i=0; i<dim; i++){
-    coordinates[i]= DenseVector<ValueType>(n, 0);
+  scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+  
+  scai::lama::CSRSparseMatrix<ValueType>a(noDistPointer, noDistPointer);
+  std::vector<ValueType> maxCoord(dimensions, nroot);
+  std::vector<IndexType> numPoints(dimensions, nroot);
+
+  std::vector<DenseVector<ValueType>> coordinates(dimensions);
+  for(IndexType i=0; i<dimensions; i++){
+	  coordinates[i].allocate(noDistPointer);
+	  coordinates[i] = static_cast<ValueType>( 0 );
   }
   
-  for (IndexType i = 0; i < nroot; i++) {
-    for (IndexType j = 0; j < nroot; j++) {
-      //this is slightly wasteful, since it also iterates over indices of other processors
-      coordinates[0].setValue(i*nroot + j, i);
-      coordinates[1].setValue(i*nroot + j, j);
-    }
-  }
+  MeshIO<IndexType, ValueType>::createStructured3DMesh(a, coordinates, maxCoord, numPoints);
   
   scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, k, epsilon);
   
@@ -101,35 +103,32 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
 }
 
 TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
-  IndexType nroot = 16;
-  IndexType n = nroot * nroot;
-  IndexType k = 8;
-  IndexType dimensions = 2;
+  IndexType nroot = 8;
+  IndexType n = nroot * nroot * nroot;
+  IndexType dimensions = 3;
   
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+  IndexType k = comm->getSize();
+
   scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
   scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
-  scai::lama::CSRSparseMatrix<ValueType> a(dist, noDistPointer);
-  scai::lama::MatrixCreator::fillRandom(a, 0.2);//TODO: make this a proper heterogenuous mesh  
   
+  scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
+  std::vector<ValueType> maxCoord(dimensions, nroot);
+  std::vector<IndexType> numPoints(dimensions, nroot);
+
   scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+
   std::vector<DenseVector<ValueType>> coordinates(dimensions);
-
   for(IndexType i=0; i<dimensions; i++){ 
-      coordinates[i].allocate(coordDist);
-      coordinates[i] = static_cast<ValueType>( 0 );
-  }
-
-  IndexType index;
-  for (IndexType i = 0; i < nroot; i++) {
-    for (IndexType j = 0; j < nroot; j++) {
-      //this is slightly wasteful, since it also iterates over indices of other processors
-      index = i*nroot+j;
-      coordinates[0].setValue( index, i);
-      coordinates[1].setValue( index, j);
-    }
+	  coordinates[i].allocate(coordDist);
+	  coordinates[i] = static_cast<ValueType>( 0 );
   }
   
+  MeshIO<IndexType, ValueType>::createStructured3DMesh(a, coordinates, maxCoord, numPoints);
+  a.redistribute(dist, noDistPointer);
+
   const ValueType epsilon = 0.05;
 
   scai::lama::DenseVector<IndexType> partition(n, k+1);
@@ -359,6 +358,46 @@ TEST_F(ParcoRepartTest, testCommunicationScheme) {
 			EXPECT_TRUE(communicated[i][j]) << i << " and " << j << " did not communicate";
 		}
 	}
+}
+
+TEST_F(ParcoRepartTest, testGetInterfaceNodesLocal) {
+	/**
+	 * test first with complete matrix. Unsuitable, I know, but we don't have a mesh generator yet.
+	 * TODO: We now have a mesh generator. Update with it.
+	 */
+
+	  const IndexType n = 1000;
+	  const IndexType k = 10;
+
+	  //define distributions
+	  scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+	  scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+
+	  //generate random complete matrix
+	  scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
+	  scai::lama::MatrixCreator::fillRandom(a, 1);
+
+	  //generate balanced distributed partition
+	  scai::lama::DenseVector<IndexType> part(dist);
+	  for (IndexType i = 0; i < n; i++) {
+	    IndexType blockId = i % k;
+	    part.setValue(i, blockId);
+	  }
+
+	  IndexType thisBlock = 0;
+	  IndexType otherBlock = 1;
+
+	  std::vector<IndexType> interfaceNodes;
+	  IndexType lastRoundMarker;
+	  std::tie(interfaceNodes, lastRoundMarker) = ParcoRepart<IndexType, ValueType>::getInterfaceNodes(a, part, thisBlock, otherBlock, 1);
+
+	  scai::hmemo::ReadAccess<IndexType> partAccess(part.getLocalValues());
+
+	  for (IndexType node : interfaceNodes) {
+		  ASSERT_TRUE(dist->isLocal(node));
+		  EXPECT_EQ(thisBlock, partAccess[dist->global2local(node)]);
+	  }
 }
 
 /**

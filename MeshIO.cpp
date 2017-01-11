@@ -101,6 +101,14 @@ void MeshIO<IndexType, ValueType>::createRandom3DMesh( CSRSparseMatrix<ValueType
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
 
+	if (coords.size() != 3) {
+		throw std::runtime_error("Needs three coordinate vectors, one for each dimension");
+	}
+
+	if (numPoints.size() != 3) {
+		throw std::runtime_error("Needs three point counts, one for each dimension");
+	}
+
     std::vector<ValueType> offset={maxCoord[0]/numPoints[0], maxCoord[1]/numPoints[1], maxCoord[2]/numPoints[2]};
     IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
     // create the coordinates
@@ -120,13 +128,13 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
         }
     }
 
-    scai::lama::CSRStorage<double> localMatrix;
+    scai::lama::CSRStorage<ValueType> localMatrix;
     localMatrix.allocate( N, N );
     
     //create the adjacency matrix
     hmemo::HArray<IndexType> csrIA;
     hmemo::HArray<IndexType> csrJA;
-    hmemo::HArray<double> csrValues;  
+    hmemo::HArray<ValueType> csrValues;
     {
         // ja and values have size= edges of the graph
         // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
@@ -134,7 +142,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
                                 -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
         hmemo::WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
         hmemo::WriteOnlyAccess<IndexType> ja( csrJA);
-        hmemo::WriteOnlyAccess<double> values( csrValues);    
+        hmemo::WriteOnlyAccess<ValueType> values( csrValues);
         ia[0] = 0;
      
         IndexType nnzCounter = 0; // count non-zero elements
@@ -269,9 +277,9 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
  *  
  */
 
-//TODO: must write coordiantes in the filename.xyz file
+//TODO: must write coordinates in the filename.xyz file
 //      not sure what data type to use for coordinates: a) DenseVector or b)vector<DenseVector> ?
-//DONE: Made a separate function for coordiantes
+//DONE: Made a separate function for coordinates
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::writeInFileMetisFormat (const CSRSparseMatrix<ValueType> &adjM, const std::string filename){
     std::ofstream f;
@@ -452,75 +460,6 @@ void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( lama::CSRSparseMatr
 
 
 //-------------------------------------------------------------------------------------------------
-// it appears slower than the method above
-template<typename IndexType, typename ValueType>
-void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix_Boost( lama::CSRSparseMatrix<ValueType> &matrix, dmemo::DistributionPtr  distribution, const std::string filename){
-    IndexType N, numEdges;         //number of nodes and edges
-    std::ifstream file(filename);
-    
-    if(file.fail()) 
-        throw std::runtime_error("File "+ filename+ " failed.");
-   
-    file >>N >> numEdges;   
-
-    scai::lama::CSRStorage<double> localMatrix;
-    // in a distributed version should be something like that
-    // localMatrix.allocate( localSize, globalSize );
-    // here is not distributed, local=global
-    localMatrix.allocate( N, N );
-    
-    hmemo::HArray<IndexType> csrIA;
-    hmemo::HArray<IndexType> csrJA;
-    hmemo::HArray<double> csrValues;  
-    {
-        //TODO: for a distributed version this must change as numNZ should be the number of
-        //      the local nodes in the processor, not the global
-        // number of Non Zero values. *2 because every edge is read twice.
-        IndexType numNZ = numEdges*2;
-        hmemo::WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
-        hmemo::WriteOnlyAccess<IndexType> ja( csrJA, numNZ );
-        hmemo::WriteOnlyAccess<double> values( csrValues, numNZ );
-
-        ia[0] = 0;
-
-        std::vector<IndexType> colIndexes;
-        std::vector<int> colValues;
-        
-        IndexType rowCounter = 0; // count "local" rows
-        IndexType nnzCounter = 0; // count "local" non-zero elements
-        // read the first line and do nothing, contains the number of nodes and edges.
-        std::string line;
-        std::getline(file, line);
-        
-        //for every line, aka for all nodes
-        for ( IndexType i=0; i<N; i++ ){
-            std::getline(file, line);            
-            std::vector<ValueType> line_integers;
-            boost::spirit::qi::phrase_parse( line.begin(), line.end(), 
-                                            *boost::spirit::qi::double_,
-                                            boost::spirit::ascii::space , line_integers );
-            //for (std::vector<double>::size_type z = 0; z < line_integers.size(); ++z)
-            //      std::cout << z << ": " << line_integers[z] << std::endl;
-
-            //ia += the numbers of neighbours of i = line_integers.size()
-            ia[rowCounter + 1] = ia[rowCounter] + static_cast<IndexType>( line_integers.size() );
-            for(unsigned int j=0, len=line_integers.size(); j<len; j++){
-                // -1 because of the METIS format
-                ja[nnzCounter]= line_integers[j] -1 ;
-                // all values are 1 for undirected, no-weigths graph
-                values[nnzCounter]= 1;
-                ++nnzCounter;
-            }            
-            ++rowCounter;            
-        }        
-    }
-    
-    localMatrix.swap( csrIA, csrJA, csrValues );
-    //matrix.assign( localMatrix, distribution, distribution ); // builds also halo
-    matrix.assign(localMatrix);
-}
-
-//-------------------------------------------------------------------------------------------------
 /*File "filename" contains the coordinates of a graph. The function reads that coordinates and returns
  * the coordinates in a DenseVector where point(x,y) is in [x*dim +y].
  * Every line of the file contais 2 ValueType numbers.
@@ -619,7 +558,6 @@ template void MeshIO<int, double>::writeInFileCoords (const DenseVector<double> 
 template void MeshIO<int, double>::writeInFileCoords (const std::vector<DenseVector<double>> &coords, int dimension, int numPoints, const std::string filename);
 template CSRSparseMatrix<double>  MeshIO<int, double>::readFromFile2AdjMatrix(const std::string filename);
 template void MeshIO<int, double>::readFromFile2AdjMatrix( CSRSparseMatrix<double> &matrix, dmemo::DistributionPtr distribution, const std::string filename);
-template void MeshIO<int, double>::readFromFile2AdjMatrix_Boost( lama::CSRSparseMatrix<double> &matrix, dmemo::DistributionPtr  distribution, const std::string filename);
 template void  MeshIO<int, double>::fromFile2Coords_2D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfCoords);
 template void MeshIO<int, double>::fromFile2Coords_3D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfPoints);
 
