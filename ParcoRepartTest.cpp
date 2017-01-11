@@ -266,28 +266,53 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
 }
 
 TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
-  const IndexType n = 1000;
-  const IndexType k = 10;
-  const ValueType epsilon = 0.05;
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-  //generate random matrix
-  scai::lama::CSRSparseMatrix<ValueType>a(n,n);
-  scai::lama::MatrixCreator::buildPoisson(a, 3, 19, 10,10,10);
+	const IndexType n = 1000;
+	const IndexType k = comm->getSize() > 1 ? comm->getSize() : 10;
+	const ValueType epsilon = 0.05;
+	const IndexType iterations = 1;
 
-  //generate balanced partition
-  scai::lama::DenseVector<IndexType> part(n, 0);
 
-  for (IndexType i = 0; i < n; i++) {
-    IndexType blockId = i % k;
-    part.setValue(i, blockId);
-  }
+	//generate random matrix
+	scai::lama::CSRSparseMatrix<ValueType>a(n,n);
+	scai::lama::MatrixCreator::buildPoisson(a, 3, 19, 10,10,10);
 
-  //this object is only necessary since the Google test macro cannot handle multi-parameter templates in its comma resolution
-  ParcoRepart<IndexType, ValueType> repart;
+	//generate balanced partition
+	scai::lama::DenseVector<IndexType> part(a.getRowDistributionPtr());
 
-  if (!(a.getRowDistributionPtr()->isReplicated() && a.getColDistributionPtr()->isReplicated())) {
-    EXPECT_THROW(repart.replicatedMultiWayFM(a, part, k, epsilon), std::runtime_error);
-  }
+	for (IndexType i = 0; i < n; i++) {
+		IndexType blockId = i % k;
+		part.setValue(i, blockId);
+	}
+
+	ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+	for (IndexType i = 0; i < iterations; i++) {
+		ValueType gain = ParcoRepart<IndexType, ValueType>::distributedFMStep(a, part, k, epsilon);
+
+		//check correct gain calculation
+		const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+		EXPECT_EQ(cut - gain, newCut) << "Old cut " << cut << ", gain " << gain << " newCut " << newCut;
+		EXPECT_LE(newCut, cut);
+		cut = newCut;
+	}
+
+	//generate balanced partition
+	for (IndexType i = 0; i < n; i++) {
+		IndexType blockId = i % k;
+		part.setValue(i, blockId);
+	}
+
+	//check correct cut with balanced partition
+	cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+	ValueType gain = ParcoRepart<IndexType, ValueType>::distributedFMStep(a, part, k, epsilon);
+	const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+	EXPECT_EQ(cut - gain, newCut);
+	EXPECT_LE(newCut, cut);
+
+	//check for balance
+	ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k);
+	EXPECT_LE(imbalance, epsilon);
 }
 
 TEST_F(ParcoRepartTest, testCommunicationScheme) {
