@@ -14,6 +14,7 @@
 
 #include <memory>
 #include <cstdlib>
+#include <chrono>
 
 #include "ParcoRepart.h"
 #include "MeshIO.h"
@@ -457,7 +458,7 @@ for(IndexType i=0; i<graph.getLocalNumRows(); i++){
 
 //------------------------------------------------------------------------------
 
-TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges) {
+TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_2D) {
     std::string file = "Grid8x8";
     std::ifstream f(file);
     IndexType dimensions= 2, k=8;
@@ -490,18 +491,70 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges) {
     
     scai::lama::DenseVector<IndexType> partition(dist, -1);
     partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, dimensions,  k, 0.2);
-    
+    //check distributions
+    assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
+    assert( partition.getDistribution().isEqual( coords[0].getDistribution()) );
     
     // test getLocalBlockGraphEdges
+    IndexType max = partition.max().Scalar::getValue<IndexType>();
     std::vector<std::vector<IndexType> > edgesBlock =  ParcoRepart<IndexType, ValueType>::getLocalBlockGraphEdges( graph, partition);
 //std::cout<<  __FILE__<< " ,"<<__LINE__<<" __"<< *comm << " , edgesBlock.size()=" << edgesBlock.size() << std::endl;
     for(IndexType i=0; i<edgesBlock[0].size(); i++){
         std::cout<<  __FILE__<< " ,"<<__LINE__ <<" , "<< i <<":  __"<< *comm<< " , >> edge ("<< edgesBlock[0][i]<< ", " << edgesBlock[1][i] << ")" << std::endl;
+        EXPECT_LE( edgesBlock[0][i] , max);
+        EXPECT_LE( edgesBlock[1][i] , max);
+        EXPECT_GE( edgesBlock[0][i] , 0);
+        EXPECT_GE( edgesBlock[1][i] , 0);
     }
 
 }
 
+//------------------------------------------------------------------------------
 
+TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_3D) {
+    IndexType dimensions= 3, k=8;
+    std::vector<IndexType> numPoints= {8, 8, 8};
+    std::vector<ValueType> maxCoord= {100,180,130};
+    IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    
+    CSRSparseMatrix<ValueType> graph( N , N); 
+    std::vector<DenseVector<ValueType>> coords(3, DenseVector<ValueType>(N, 0));
+    
+    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+    
+    MeshIO<IndexType, ValueType>::createStructured3DMesh(graph, coords, maxCoord, numPoints);
+    graph.redistribute(dist, noDistPointer); // needed because createStructured3DMesh is not distributed 
+    coords[0].redistribute(dist);
+    coords[1].redistribute(dist);
+    coords[2].redistribute(dist);
+    
+    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
+    std::cout<<__FILE__<< "  "<< __LINE__<< " , time for creating structured3DMesh: "<< duration << " for N="<< N << std::endl;
+    
+    scai::lama::DenseVector<IndexType> partition(dist, -1);
+    partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, dimensions,  k, 0.2);
+    //check distributions
+    assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
+    assert( partition.getDistribution().isEqual( coords[0].getDistribution()) );
+    
+    // test getLocalBlockGraphEdges
+    IndexType max = partition.max().Scalar::getValue<IndexType>();
+    std::vector<std::vector<IndexType> > edgesBlock =  ParcoRepart<IndexType, ValueType>::getLocalBlockGraphEdges( graph, partition);
+//std::cout<<  __FILE__<< " ,"<<__LINE__<<" __"<< *comm << " , edgesBlock.size()=" << edgesBlock.size() << std::endl;
+    for(IndexType i=0; i<edgesBlock[0].size(); i++){
+        std::cout<<  __FILE__<< " ,"<<__LINE__ <<" , "<< i <<":  __"<< *comm<< " , >> edge ("<< edgesBlock[0][i]<< ", " << edgesBlock[1][i] << ")" << std::endl;
+        EXPECT_LE( edgesBlock[0][i] , max);
+        EXPECT_LE( edgesBlock[1][i] , max);
+        EXPECT_GE( edgesBlock[0][i] , 0);
+        EXPECT_GE( edgesBlock[1][i] , 0);
+    }
+
+}
 
 /**
 * TODO: test for correct error handling in case of inconsistent distributions

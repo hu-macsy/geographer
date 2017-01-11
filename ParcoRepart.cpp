@@ -634,7 +634,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const 
         std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and partition dist: "<< part.getDistribution() << std::endl;
         throw std::runtime_error( "Distributions: should (?) be equal.");
     }
-    
+    //TODO: Use DenseVector from start: localV and nonLocalV sizes are not known beforehand. That is why I use a std::vector and then convert it to a DenseVector. 
     std::vector<IndexType> localV, nonLocalV;
     for(IndexType i=0; i<dist->getLocalSize(); i++){    // for all local nodes 
         scai::hmemo::HArray<ValueType> localRow;        // get local row on this processor
@@ -757,6 +757,7 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getLocalB
     
     // edges[i,j] if an edge exists between blocks i and j
     std::vector< std::vector<IndexType> > edges(2);
+    std::vector<IndexType> localInd, nonLocalInd;
     
     for(IndexType i=0; i<dist->getLocalSize(); i++){    // for all local nodes 
         scai::hmemo::HArray<ValueType> localRow;        // get local row on this processor
@@ -794,9 +795,47 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getLocalB
                     }
                 } else{  // if(dist->isLocal(j)) , what TODO when j is not local?
                 // there is an edge between i and j but index j is not local in the partition so we cannot get part[j].
-                
-                    
+                    localInd.push_back(i);
+                    nonLocalInd.push_back(j);
                 }
+            }
+        }
+    }//for 
+    
+    // take care of all the non-local indices found
+    assert( localInd.size() == nonLocalInd.size() );
+    DenseVector<IndexType> nonLocalDV( nonLocalInd.size() , 0 );
+    DenseVector<IndexType> gatheredPart(nonLocalDV.size() , 0);
+    
+    //get a DenseVector grom a vector
+    for(IndexType i=0; i<nonLocalInd.size(); i++){
+        nonLocalDV.setValue(i, nonLocalInd[i]);
+    }
+    //gather all non-local indexes
+    gatheredPart.gather(part, nonLocalDV , scai::utilskernel::binary::COPY );
+    
+    assert( gatheredPart.size() == nonLocalInd.size() );
+    assert( gatheredPart.size() == localInd.size() );
+    
+    for(IndexType i=0; i<gatheredPart.size(); i++){
+        IndexType u = localPart[ localInd[i] ];         
+        IndexType v = gatheredPart.getValue(i).Scalar::getValue<IndexType>();
+        //std::cout<<  __FILE__<< " ,"<<__LINE__<<" == "<< i <<", " << j <<":  __"<< *comm<< " , u=" << u<< " , v="<< v << std::endl;   
+        assert( u < max +1);
+        assert( v < max +1);
+        if( u != v){    // the nodes belong to different blocks                  
+            bool add_edge = true;
+            for(IndexType k=0; k<edges[0].size(); k++){ //check that this edge is not already in
+                // std::cout<<  __FILE__<< " ,"<<__LINE__<<" == k="<< k <<":  __"<< *comm<< " , u=" << edges[0][k]<< " , v="<< edges[1][k] << std::endl;                            
+                if( edges[0][k]==u && edges[1][k]==v ){
+                    add_edge= false;
+                    break;      // the edge (u,v) already exists
+                }
+            }
+            if( add_edge== true){       //if this edge does not exist, add it
+                //std::cout<<  __FILE__<< " ,"<<__LINE__<< "\t __"<< *comm<<",  adding edge ("<< u<< ","<< v<< ")\n";    
+                edges[0].push_back(u);
+                edges[1].push_back(v);
             }
         }
     }

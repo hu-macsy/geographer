@@ -42,28 +42,28 @@ class MeshIOTest : public ::testing::Test {
  *  .graph.xyz the coordiantes.
  */
 TEST_F(MeshIOTest, testMesh3DCreateRandomMeshWriteInFile_Local_3D) {
-std::vector<DenseVector<ValueType>> coords;
-int numberOfPoints= 50;
-ValueType maxCoord= 1;
-std::string grFile = "meshes/randomTest5.graph";
-std::string coordFile= grFile + ".xyz";
+    std::vector<DenseVector<ValueType>> coords;
+    int numberOfPoints= 50;
+    ValueType maxCoord= 1;
+    std::string grFile = "meshes/randomTest5.graph";
+    std::string coordFile= grFile + ".xyz";
 
-scai::lama::CSRSparseMatrix<ValueType> adjM(numberOfPoints, numberOfPoints);
+    scai::lama::CSRSparseMatrix<ValueType> adjM(numberOfPoints, numberOfPoints);
 
-std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-MeshIO<IndexType, ValueType>::createRandom3DMesh(adjM, coords, numberOfPoints, maxCoord);
+    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+    MeshIO<IndexType, ValueType>::createRandom3DMesh(adjM, coords, numberOfPoints, maxCoord);
 
-std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
-std::cout<<__FILE__<< "  "<< __LINE__<< " , time for createRandom3DMesh: "<< duration << std::endl;
+    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
+    std::cout<<__FILE__<< "  "<< __LINE__<< " , time for createRandom3DMesh: "<< duration << std::endl;
 
-MeshIO<IndexType, ValueType>::writeInFileMetisFormat( adjM, grFile);
-MeshIO<IndexType, ValueType>::writeInFileCoords( coords, 3, numberOfPoints, coordFile);
+    MeshIO<IndexType, ValueType>::writeInFileMetisFormat( adjM, grFile);
+    MeshIO<IndexType, ValueType>::writeInFileCoords( coords, 3, numberOfPoints, coordFile);
 
-duration = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::high_resolution_clock::now() -t2).count();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::high_resolution_clock::now() -t2).count();
 
-std::cout<<__FILE__<< "  "<< __LINE__<< " , time to write in files: "<< duration << std::endl;
-std::cout<< "graph written in files: " << grFile<< " and "<< coordFile<< std::endl;
+    std::cout<<__FILE__<< "  "<< __LINE__<< " , time to write in files: "<< duration << std::endl;
+    std::cout<< "graph written in files: " << grFile<< " and "<< coordFile<< std::endl;
 }
 
 //----------------------------------------------------------------------------------------
@@ -73,31 +73,31 @@ std::cout<< "graph written in files: " << grFile<< " and "<< coordFile<< std::en
  * */
 
 TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
-std::vector<IndexType> numPoints= {15, 13, 22};
-std::vector<ValueType> maxCoord= {100,180,130};
-IndexType numberOfPoints= numPoints[0]*numPoints[1]*numPoints[2];
-std::vector<DenseVector<ValueType>> coords(3, DenseVector<ValueType>(numberOfPoints, 0));
-std::string grFile = "meshes/structuredTest_15_13_22.graph";
-std::string coordFile= grFile + ".xyz";
+    std::vector<IndexType> numPoints= {15, 13, 22};
+    std::vector<ValueType> maxCoord= {100,180,130};
+    IndexType numberOfPoints= numPoints[0]*numPoints[1]*numPoints[2];
+    std::vector<DenseVector<ValueType>> coords(3, DenseVector<ValueType>(numberOfPoints, 0));
+    std::string grFile = "meshes/structuredTest_15_13_22.graph";
+    std::string coordFile= grFile + ".xyz";
 
-scai::lama::CSRSparseMatrix<ValueType> adjM(numberOfPoints, numberOfPoints);
-std::cout<<__FILE__<< "  "<< __LINE__<< " , numberOfPoints=" << numberOfPoints<< std::endl;
-
-std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-
-MeshIO<IndexType, ValueType>::createStructured3DMesh(adjM, coords, maxCoord, numPoints);
-
-std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
-std::cout<<__FILE__<< "  "<< __LINE__<< " , time for creating structured3DMesh: "<< duration <<std::endl;
-
-MeshIO<IndexType, ValueType>::writeInFileMetisFormat( adjM, grFile);
-MeshIO<IndexType, ValueType>::writeInFileCoords( coords, 3, numberOfPoints, coordFile);
-
-duration = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::high_resolution_clock::now() -t2).count();
-
-std::cout<<__FILE__<< "  "<< __LINE__<< " , time to write in files: "<< duration << std::endl;
-std::cout<< "graph written in files: " << grFile<< " and "<< coordFile<< std::endl;
+    scai::lama::CSRSparseMatrix<ValueType> adjM(numberOfPoints, numberOfPoints);
+    std::cout<<__FILE__<< "  "<< __LINE__<< " , numberOfPoints=" << numberOfPoints<< std::endl;
+    
+    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+    
+    MeshIO<IndexType, ValueType>::createStructured3DMesh(adjM, coords, maxCoord, numPoints);
+    
+    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
+    std::cout<<__FILE__<< "  "<< __LINE__<< " , time for creating structured3DMesh: "<< duration <<std::endl;
+    
+    MeshIO<IndexType, ValueType>::writeInFileMetisFormat( adjM, grFile);
+    MeshIO<IndexType, ValueType>::writeInFileCoords( coords, 3, numberOfPoints, coordFile);
+    
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::high_resolution_clock::now() -t2).count();
+    
+    std::cout<<__FILE__<< "  "<< __LINE__<< " , time to write in files: "<< duration << std::endl;
+    std::cout<< "graph written in files: " << grFile<< " and "<< coordFile<< std::endl;
 }
 //-----------------------------------------------------------------
 
