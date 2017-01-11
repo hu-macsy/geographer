@@ -1249,12 +1249,12 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 				if (moved[veryLocalNeighborID]) {
 					continue;
 				}
-				bool sameBlock = bestQueueIndex == 0 ? isInFirstBlock(neighbor) : isInSecondBlock(neighbor);
+				bool wasInSameBlock = bestQueueIndex == 0 ? isInFirstBlock(neighbor) : isInSecondBlock(neighbor);
+				assert(isInFirstBlock(neighbor) != isInSecondBlock(neighbor));
 
-				//assert(gain[veryLocalNeighborID] == computeGain(neighbor));
-				gain[veryLocalNeighborID] += sameBlock ? edgeweight : -edgeweight;
-				assert(gain[veryLocalNeighborID] == computeGain(neighbor));
-				if (sameBlock) {
+				//gain[veryLocalNeighborID] += wasInSameBlock ? edgeweight : -edgeweight;
+				gain[veryLocalNeighborID] = computeGain(neighbor);
+				if (wasInSameBlock) {
 					currentQueue.decreaseKey(-gain[veryLocalNeighborID], veryLocalNeighborID);
 				} else {
 					otherQueue.decreaseKey(-gain[veryLocalNeighborID], veryLocalNeighborID);
