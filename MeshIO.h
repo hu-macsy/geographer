@@ -4,7 +4,7 @@
  *  Created on: 22.11.2016
  *      Author: tzovas
  */
-//#pragma once
+#pragma once
 
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>
@@ -16,9 +16,6 @@
 #include <scai/common/unique_ptr.hpp>
 #include <scai/lama/storage/MatrixStorage.hpp>
 
-//#include <boost/tokenizer.hpp>
-#include <boost/spirit/include/qi.hpp>
-
 #include <assert.h>
 #include <cmath>
 #include <climits>
@@ -26,6 +23,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <iterator>
 
 //----------------------------------------
 //  for parameter input from command line
