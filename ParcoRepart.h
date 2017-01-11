@@ -98,6 +98,7 @@ namespace ITI {
                         */
                         static std::vector<std::vector<IndexType> > getLocalBlockGraphEdges( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
 
+                        static scai::hmemo::HArray<IndexType> getBlockGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const int k, const IndexType root=0);
 	};
 }
 

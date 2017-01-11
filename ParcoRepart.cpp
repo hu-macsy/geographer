@@ -842,29 +842,89 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getLocalB
     return edges;
 }
 
+//-----------------------------------------------------------------------------------------
 
-/*
+
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getPEGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part) {
+scai::hmemo::HArray<IndexType> ParcoRepart<IndexType, ValueType>::getBlockGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const int k , const IndexType root) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-    const scai::dmemo::BlockDistribution dist = adjM.getRowDistribution();
     const scai::utilskernel::LArray<IndexType> localPart= part.getLocalValues();
     
-    IndexType numPEs = comm->getSize();
-    scai::dmemo::DistributionPtr distPEs ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, numPEs) );  
-    scai::dmemo::DistributionPtr noDistPEs (new scai::dmemo::NoDistribution( numPEs ));
-    scai::lama::CSRSparseMatrix<ValueType> PEgraph(distPEs, noDistPEs);    // the distributed adjacency matrix of the PEs-graph
-    // every PE must have one line of the matrix since we have numPes and the matrix is [numPes x numPEs]
-    //scai::hmemo::HArray<ValueType> row(numPEs, static_cast<ValueType>( 0 ));
-    //scai::hmemo::WriteAccess<ValueType> rowWrite(row);
+    // IndexType k = part.max(); // if K is not given as a parameter
+    // there are k blocks in the partition so the adjecency matrix for the block graph has dimensions [k x k]
+    scai::dmemo::DistributionPtr distRowBlock ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, k) );  
+    scai::dmemo::DistributionPtr distColBlock ( new scai::dmemo::NoDistribution( k ));
+    scai::lama::CSRSparseMatrix<ValueType> blockGraph( distRowBlock, distColBlock );    // the distributed adjacency matrix of the block-graph
     
-         
+    IndexType size= k*k;
+    /*
+    // only root will have full size
+    if( comm->getRank() == root){
+        size= k*k;
+    }
+    */
     
-    return PEgraph;
+    // get, on each processor, the edges of the blocks that are local
+    std::vector< std::vector<IndexType> > blockEdges = ParcoRepart<int, double>::getLocalBlockGraphEdges( adjM, part);
+    
+    // the gather function accepts a one dimensional array
+    //IndexType blockGraphMatrix[size];    
+    scai::hmemo::HArray<IndexType> sendPart(size, static_cast<ValueType>( 0 ));
+    scai::hmemo::HArray<IndexType> recvPart(size);
+    
+    for(IndexType round=0; round<comm->getSize(); round++){
+        {   // write your part 
+            scai::hmemo::WriteAccess<IndexType> sendPartWrite( sendPart );
+            for(IndexType i=0; i<blockEdges[0].size(); i++){
+                IndexType u = blockEdges[0][i];
+                IndexType v = blockEdges[1][i];
+//std::cout<<__FILE__<< "  "<< __LINE__<< " , round:"<< round<< " , __"<< *comm << " setting edge ("<< u<< ", "<< v << ") , in send-index:"<< u*k+v <<std::endl;
+                sendPartWrite[ u*k + v ] = 1;
+            }
+        }
+        comm->shiftArray(recvPart , sendPart, 1);
+        sendPart.swap(recvPart);
+    } 
+    
+        /*
+    { // print
+    scai::hmemo::ReadAccess<IndexType> sendPartRead( sendPart );
+    std::cout<< *comm <<" , sendPart"<< std::endl;
+    for(IndexType row=0; row<k; row++){
+        for(IndexType col=0; col<k; col++){
+            std::cout<< comm->getRank()<< ":("<< row<< ","<< col<< "):" << sendPartRead[ row*k +col] <<" - ";
+        }
+        std::cout<< std::endl;
+    }
+    
+    scai::hmemo::ReadAccess<IndexType> recvPartRead( recvPart );
+    std::cout<< *comm <<" , recvPart"<< std::endl;
+    for(IndexType row=0; row<k; row++){
+        for(IndexType col=0; col<k; col++){
+            std::cout<< comm->getRank()<< ":("<< row << "," << col<< "):" << recvPartRead[ row*k +col] <<" - ";
+        }
+        std::cout<< std::endl;
+    }
+    }
+    */
+    
+    /*
+    IndexType localBlockGraph [k][k];
+    
+    for(IndexType i=0; i<blockEdges[0].size(); i++){
+        IndexType u = blockEdges[0][i];
+        IndexType v = blockEdges[1][i];
+std::cout<<__FILE__<< "  "<< __LINE__<< " , __"<< *comm << " setting edge ("<< u<< ", "<< v << ")"<<std::endl;        
+        localBlockGraph[u][v] = 1;
+    }
+    
+    */
+    
+    return recvPart;
 }
-*/
+
 
 //to force instantiation
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, int dimensions,	int k,  double epsilon);
@@ -883,4 +943,7 @@ template DenseVector<int> ParcoRepart<int, double>::getBorderNodes( const CSRSpa
 template scai::lama::CSRSparseMatrix<double> ParcoRepart<int, double>::getPEGraph( const CSRSparseMatrix<double> &adjM);
 
 template std::vector<std::vector<IndexType>> ParcoRepart<int, double>::getLocalBlockGraphEdges( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part);
+
+template scai::hmemo::HArray<int> ParcoRepart<int, double>::getBlockGraph( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part, const int k, const int root );
+
 }
