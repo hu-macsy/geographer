@@ -373,40 +373,6 @@ void MeshIO<IndexType, ValueType>::createStructured2DMesh(CSRSparseMatrix<ValueT
                 }
             }
             
-            ngb_node = i +numPoints[2]*numPoints[1];     //edge 5
-            if(ngb_node>=0 && ngb_node<N){
-                DenseVector<ValueType> p2(3,0);
-                p2.setValue(0,coords[0].getValue(ngb_node));
-                p2.setValue(1,coords[1].getValue(ngb_node));
-                p2.setValue(2,coords[2].getValue(ngb_node));
-                if(dist3D(p1, p2).Scalar::getValue<ValueType>() <= max_offset )
-                {
-                ja.resize( ja.size()+1);
-                values.resize( values.size()+1);
-                ja[nnzCounter]= ngb_node;    
-                values[nnzCounter] = 1;         // unweighted edges
-                ++nnzCounter;
-                ++numRowElems;
-                }
-            }
-                
-            ngb_node = i -numPoints[2]*numPoints[1];     //edge 6
-            if(ngb_node>=0 && ngb_node<N){
-                DenseVector<ValueType> p2(3,0);
-                p2.setValue(0,coords[0].getValue(ngb_node));
-                p2.setValue(1,coords[1].getValue(ngb_node));
-                p2.setValue(2,coords[2].getValue(ngb_node));
-                if(dist3D(p1, p2).Scalar::getValue<ValueType>() <= max_offset)
-                {
-                ja.resize( ja.size()+1);
-                values.resize( values.size()+1);
-                ja[nnzCounter]= ngb_node;    //-1 for the METIS format
-                values[nnzCounter] = 1;         // unweighted edges
-                ++nnzCounter;
-                ++numRowElems;
-                }
-            }
-            
             ia[i+1] = ia[i] +static_cast<IndexType>(numRowElems);
         }//for
     }
@@ -691,6 +657,7 @@ std::cout<<  __FILE__<< " ,"<<__LINE__<<" == dist:"<< *distRow << " , local.size
     //matrix.allocate(distRow, distCol); 
 }
 
+/*
 //-------------------------------------------------------------------------------------------------
 // it appears slower than the method above
 template<typename IndexType, typename ValueType>
@@ -759,7 +726,7 @@ void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix_Boost( lama::CSRSpar
     //matrix.assign( localMatrix, distribution, distribution ); // builds also halo
     matrix.assign(localMatrix);
 }
-
+*/
 //-------------------------------------------------------------------------------------------------
 /*File "filename" contains the coordinates of a graph. The function reads that coordinates and returns
  * the coordinates in a DenseVector where point(x,y) is in [x*dim +y].
@@ -860,7 +827,7 @@ template void MeshIO<int, double>::writeInFileCoords (const std::vector<DenseVec
 template CSRSparseMatrix<double>  MeshIO<int, double>::readFromFile2AdjMatrix(const std::string filename);
 template void MeshIO<int, double>::readFromFile2AdjMatrix( CSRSparseMatrix<double> &matrix, dmemo::DistributionPtr distribution, const std::string filename);
 template void MeshIO<int, double>::readFromFile2AdjMatrixDistr( lama::CSRSparseMatrix<double> &matrix, const std::string filename);
-template void MeshIO<int, double>::readFromFile2AdjMatrix_Boost( lama::CSRSparseMatrix<double> &matrix, dmemo::DistributionPtr  distribution, const std::string filename);
+//template void MeshIO<int, double>::readFromFile2AdjMatrix_Boost( lama::CSRSparseMatrix<double> &matrix, dmemo::DistributionPtr  distribution, const std::string filename);
 template void  MeshIO<int, double>::fromFile2Coords_2D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfCoords);
 template void MeshIO<int, double>::fromFile2Coords_3D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfPoints);
 

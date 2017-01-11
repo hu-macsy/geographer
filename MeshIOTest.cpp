@@ -213,11 +213,11 @@ TEST_F(MeshIOTest, testReadFromFile_Distributed){
 }
 
 
-
+/*
 //-----------------------------------------------------------------
-/* Testing reading from file using Boost. Does not seem faster.
- * */
-TEST_F(MeshIOTest, testReadGraphFromFile_Boost){
+// Testing reading from file using Boost. Does not seem faster.
+
+ TEST_F(MeshIOTest, testReadGraphFromFile_Boost){
     //string path = "./meshes/my_meshes/";
     std::string path = "";
     std::string file = "Grid32x32";
@@ -257,6 +257,7 @@ TEST_F(MeshIOTest, testReadGraphFromFile_Boost){
     std::cout << "time elapsed: "<< duration<< " ms"<< std::endl;
     
 }
+*/
 
 //-----------------------------------------------------------------
 // read a graph from a file in METIS format and its coordiantes in 2D and partiotion that graph
