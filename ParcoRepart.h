@@ -51,7 +51,29 @@ namespace ITI {
 			*/
 			static ValueType fiducciaMattheysesRound(const CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted = true);
 
-			static ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool ignoreWeights = true);
+			static ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool ignoreWeights = true);       
+
+			/**
+			 * Builds a halo containing all matrix entries of non-local neighbors.
+			 */
+			static scai::dmemo::Halo buildMatrixHalo(const CSRSparseMatrix<ValueType> &input);
+
+			/**
+			 * Builds a halo containing all partition entries of non-local neighbors.
+			 */
+			static scai::dmemo::Halo buildPartHalo(const CSRSparseMatrix<ValueType> &input,  const DenseVector<IndexType> &part);
+
+			/**
+			 * Computes the border region within one block, adjacent to another block
+			 * @param[in] input Adjacency matrix of the input graph
+			 * @param[in] part Partition vector
+			 * @param[in] thisBlock block in which the border region is required
+			 * @param[in] otherBlock block to which the border region should be adjacent
+			 * @param[in] depth Width of the border region, measured in hops
+			 */
+			static std::pair<std::vector<IndexType>, IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, IndexType thisBlock, IndexType otherBlock, IndexType depth);
+
+			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted = true);
 
 			static ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k);
                         

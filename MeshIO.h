@@ -4,7 +4,7 @@
  *  Created on: 22.11.2016
  *      Author: tzovas
  */
-//#pragma once
+#pragma once
 
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>
@@ -16,13 +16,6 @@
 #include <scai/common/unique_ptr.hpp>
 #include <scai/lama/storage/MatrixStorage.hpp>
 
-//#include <boost/tokenizer.hpp>
-#include <boost/spirit/include/qi.hpp>
-#include <boost/config/warning_disable.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
-
 #include <assert.h>
 #include <cmath>
 #include <climits>
@@ -30,6 +23,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <iterator>
 
 //----------------------------------------
 //  for parameter input from command line
@@ -75,7 +69,7 @@ namespace ITI {
                 
                 static void readFromFile2AdjMatrixDistr( lama::CSRSparseMatrix<ValueType> &matrix, const std::string filename);
                 
-                static void readFromFile2AdjMatrix_Boost( lama::CSRSparseMatrix<ValueType> &matrix, dmemo::DistributionPtr  distribution, const std::string filename);
+                //static void readFromFile2AdjMatrix_Boost( lama::CSRSparseMatrix<ValueType> &matrix, dmemo::DistributionPtr  distribution, const std::string filename);
 
                 /* Reads the 2D coordinates from file "filename" and returns then in a DenseVector where the coordiantes
                  * of point i are in [i*2][i*2+1].
