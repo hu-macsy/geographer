@@ -132,7 +132,7 @@ ITI::PrioQueue<Key, Val>::PrioQueue(std::vector<Key>& keys) {
 
 template<class Key, class Val>
 ITI::PrioQueue<Key, Val>::PrioQueue(uint64_t len) {
-	mapValToKey.resize(len);
+	mapValToKey.resize(len, undefined);
 }
 
 template<class Key, class Val>
@@ -156,7 +156,6 @@ inline Key ITI::PrioQueue<Key, Val>::getKey(const Val& val) {
 	return mapValToKey.at(val);
 }
 	
-
 template<class Key, class Val>
 inline void ITI::PrioQueue<Key, Val>::remove(const ElemType& elem) {
 	remove(elem.second);

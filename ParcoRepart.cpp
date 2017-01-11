@@ -755,7 +755,6 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 	 */
 	std::vector<IndexType> interfaceNodes;
 
-
 	for (IndexType localI = 0; localI < localN; localI++) {
 		const IndexType beginCols = ia[localI];
 		const IndexType endCols = ia[localI+1];
@@ -839,6 +838,10 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 	if (epsilon < 0) {
 		throw std::runtime_error("Epsilon must be >= 0, not " + std::to_string(epsilon));
+	}
+
+	if (!input.checkSymmetry()) {
+		throw std::runtime_error("Input matrix must be symmetric");
 	}
 
 	/**
@@ -944,6 +947,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		 * Possible Improvements: Assemble arrays describing the subgraph, swap that.
 		 * Exchanging the partHalo is actually unnecessary, since all indices in requiredHaloIndices have the same block.
 		 */
+		IndexType numValues = input.getLocalStorage().getValues().size();
 		scai::dmemo::Halo graphHalo;
 		{
 			scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
@@ -952,6 +956,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 		CSRStorage<ValueType> haloMatrix;
 		haloMatrix.exchangeHalo( graphHalo, input.getLocalStorage(), *comm );
+		assert(input.getLocalStorage().getValues().size() == numValues);//number of edges in local part stays unchanged.
+
 
 		//why not use vectors in the FM step or use sets to begin with? Might be faster.
 		//here we only exchange one round less than gathered. The other forms a dummy border layer.
@@ -1063,6 +1069,17 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		std::pair<IndexType, IndexType> blockSizes,
 		const std::pair<IndexType, IndexType> blockCapacities, ValueType epsilon, const bool unweighted) {
 
+	std::vector<IndexType> v_intersection;
+
+	std::set_intersection(firstregion.begin(), firstregion.end(),
+			secondregion.begin(), secondregion.end(),
+						  std::back_inserter(v_intersection));
+
+	if (v_intersection.size() > 0) {
+		throw std::runtime_error("Intersection not empty.");
+	}
+
+
 	if (blockSizes.first >= blockCapacities.first && blockSizes.second >= blockCapacities.second) {
 		//cannot move any nodes, all blocks are overloaded already.
 		return 0;
@@ -1070,6 +1087,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	const IndexType globalN = inputDist->getGlobalSize();
+	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
 
 	/**
 	 * These maps are mapping the b global indices received in the border region sets onto the interval [0,b-1].
@@ -1084,6 +1102,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		assert(secondregion.count(index) == 0);
 		assert(firstDummyLayer.count(index) == 0);
 
+		assert(globalToVeryLocal.count(index) == 0);
 		globalToVeryLocal[index] = i;
 		veryLocalToGlobal[i] = index;
 		i++;
@@ -1094,6 +1113,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		assert(inputDist->isLocal(index) || matrixHalo.global2halo(index) != std::numeric_limits<IndexType>::max());
 		assert(secondDummyLayer.count(index) == 0);
 
+		assert(globalToVeryLocal.count(index) == 0);
 		globalToVeryLocal[index] = i;
 		veryLocalToGlobal[i] = index;
 		i++;
@@ -1112,6 +1132,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	auto computeGain = [&](IndexType globalID){
 		bool firstBlock = isInFirstBlock(globalID);
 		assert(firstBlock != isInSecondBlock(globalID));
+		assert(isVeryLocal(globalID));
 
 		ValueType result = 0;
 		/**
@@ -1143,6 +1164,10 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 			}
 
 			result += same ? -edgeweight : edgeweight;
+			std::string blockString = same ? "in same block" : "not in same block";
+			if (globalID == 711) {
+				std::cout << "Neighbor " << globalNeighbor << " is " << blockString << ", bringing total gain to " << result << std::endl;
+			}
 		}
 
 		return result;
@@ -1153,17 +1178,21 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	 */
 	PrioQueue<ValueType, IndexType> firstQueue(veryLocalN);
 	PrioQueue<ValueType, IndexType> secondQueue(veryLocalN);
+
 	std::vector<ValueType> gain(veryLocalN);
 
 	for (IndexType globalIndex : firstregion) {
 		IndexType veryLocalID = globalToVeryLocal.at(globalIndex);
 		gain[veryLocalID] = computeGain(globalIndex);
+		assert(!firstQueue.contains(veryLocalID));
 		firstQueue.insert(-gain[veryLocalID], veryLocalID);
 	}
 
 	for (IndexType globalIndex : secondregion) {
 		IndexType veryLocalID = globalToVeryLocal.at(globalIndex);
 		gain[veryLocalID] = computeGain(globalIndex);
+		assert(!firstQueue.contains(veryLocalID));
+		assert(!secondQueue.contains(veryLocalID));
 		secondQueue.insert(-gain[veryLocalID], veryLocalID);
 	}
 
@@ -1176,31 +1205,39 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	gainSumList.reserve(veryLocalN);
 	fillFactorList.reserve(veryLocalN);
 
+	IndexType iter = 0;
 	while (firstQueue.size() + secondQueue.size() > 0) {
 		IndexType bestQueueIndex;
 
 		/*
 		 * first check break situations
 		 */
-		if ((firstQueue.size() == 0 && blockSizes.first == blockCapacities.first)
-				 ||	(secondQueue.size() == 0 && blockSizes.second == blockCapacities.second)) {
+		if ((firstQueue.size() == 0 && blockSizes.first >= blockCapacities.first)
+				 ||	(secondQueue.size() == 0 && blockSizes.second >= blockCapacities.second)) {
 			//cannot move any nodes
 			break;
 		}
 
 		if (firstQueue.size() == 0) {
+			assert(blockSizes.first < blockCapacities.first);
 			bestQueueIndex = 1;
 		} else if (secondQueue.size() == 0) {
+			assert(blockSizes.second < blockCapacities.second);
 			bestQueueIndex = 0;
 		} else {
 			std::vector<ValueType> fullness = {double(blockSizes.first) / blockCapacities.first, double(blockSizes.second) / blockCapacities.second};
 			std::vector<ValueType> gains = {firstQueue.inspectMin().first, secondQueue.inspectMin().first};
 
-			//decide first by fullness, if fullness is equal, decide by gain
+			assert(fullness[0] <= 1);
+			assert(fullness[1] <= 1);
+			assert(fullness[0] >= 0);
+			assert(fullness[1] >= 0);
+
+			//decide first by fullness, if fullness is equal, decide by gain. Since gain was inverted before inserting into queue, smaller gain is better.
 			if (fullness[0] > fullness[1] || (fullness[0] == fullness[1] && gains[0] < gains[1])) {
-				bestQueueIndex = 1;
-			} else if (fullness[1] > fullness[0] || (fullness[0] == fullness[1] && gains[1] < gains[0])) {
 				bestQueueIndex = 0;
+			} else if (fullness[1] > fullness[0] || (fullness[0] == fullness[1] && gains[1] < gains[0])) {
+				bestQueueIndex = 1;
 			} else {
 				//tie, break randomly
 				assert(fullness[0] == fullness[1] && gains[0] == gains[1]);
@@ -1211,7 +1248,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 					bestQueueIndex = 1;
 				}
 			}
-
+			//std::cout << "Fullness: (" << fullness[0] << "," << fullness[1] << ")" << ", gains (" << gains[0] << "," << gains[1] << "), picked queue " << bestQueueIndex << std::endl;
 		}
 
 		PrioQueue<ValueType, IndexType>& currentQueue = bestQueueIndex == 0 ? firstQueue : secondQueue;
@@ -1224,12 +1261,19 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		IndexType veryLocalID;
 		ValueType topGain;
 		std::tie(topGain, veryLocalID) = currentQueue.extractMin();
+		assert(!currentQueue.contains(veryLocalID));
+		assert(!otherQueue.contains(veryLocalID));
 		topGain *= -1;
 
 		IndexType topVertex = veryLocalToGlobal.at(veryLocalID);
+		assert(isVeryLocal(topVertex));
 		assert(!moved[veryLocalID]);
-		assert(topGain == computeGain(topVertex));
+		if (topGain != computeGain(topVertex)) {
+			std::cout << "iter " << transfers.size() << ", queue key for " << topVertex << ": "<< topGain << ", computed gain: " << computeGain(topVertex)
+					<< ", stored gain: " << gain[veryLocalID] << std::endl;
+		}
 		assert(topGain == gain[veryLocalID]);
+		assert(topGain == computeGain(topVertex));
 
 		//move node
 		transfers.emplace_back(bestQueueIndex, topVertex);
@@ -1242,11 +1286,11 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 		blockSizes.first += bestQueueIndex == 0 ? -1 : 1;
 		blockSizes.second += bestQueueIndex == 0 ? 1 : -1;
+		//std::cout << "Moving " << topVertex << " from " << bestQueueIndex << ", bringing block sizes to " << blockSizes.first << ", " << blockSizes.second << std::endl;
 
 		fillFactorList.push_back(std::max(double(blockSizes.first) / blockCapacities.first, double(blockSizes.second) / blockCapacities.second));
 
 		//update gains of neighbors
-
 		const CSRStorage<ValueType>& storage = inputDist->isLocal(topVertex) ? input.getLocalStorage() : haloStorage;
 		const IndexType localID = inputDist->isLocal(topVertex) ? inputDist->global2local(topVertex) : matrixHalo.global2halo(topVertex);
 
@@ -1269,15 +1313,19 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 				//gain[veryLocalNeighborID] += wasInSameBlock ? edgeweight : -edgeweight;
 				gain[veryLocalNeighborID] = computeGain(neighbor);
+				if (topVertex == 110 || neighbor == 711) {
+					std::cout << "Moved " << topVertex << ", updated gain of neighbor " << neighbor << " to " << gain[veryLocalNeighborID] << std::endl;
+				}
 				if (wasInSameBlock) {
+					assert(currentQueue.contains(veryLocalNeighborID));
 					currentQueue.decreaseKey(-gain[veryLocalNeighborID], veryLocalNeighborID);
 				} else {
+					assert(otherQueue.contains(veryLocalNeighborID));
 					otherQueue.decreaseKey(-gain[veryLocalNeighborID], veryLocalNeighborID);
 				}
-
 			}
-
 		}
+		iter++;
 	}
 
 	/**
@@ -1315,6 +1363,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		blockSizes.second += transfers[i].first == 0 ? -1 : 1;
 
 	}
+	assert(blockSizes.first <= blockCapacities.first);
+	assert(blockSizes.second <= blockCapacities.second);
 	return maxGain;
 }
 
