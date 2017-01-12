@@ -610,7 +610,65 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
     }
 }
 
+//------------------------------------------------------------------------------
 
+TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
+     std::string file = "Grid8x8";
+    std::ifstream f(file);
+    IndexType dimensions= 2, k=16;
+    IndexType N, edges;
+    f >> N >> edges; 
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    CSRSparseMatrix<ValueType> graph( N , N);           
+    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(graph, dist, file );
+    //distrubute graph
+    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
+        
+
+    //read the array locally and messed the distribution. Left as a remainder.
+    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
+    EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
+    std::vector<DenseVector<ValueType>> coords(2);
+    coords[0].allocate(N);
+    coords[1].allocate(N);
+    coords[0]= static_cast<ValueType>( 0 );
+    coords[1]= static_cast<ValueType>( 0 );
+    
+    //fromFile2Coords_2D is not distributed, must redistribute
+    MeshIO<IndexType, ValueType>::fromFile2Coords_2D( std::string(file + ".xyz"), coords, N);
+    coords[0].redistribute(dist);
+    coords[1].redistribute(dist);
+    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
+    
+    //get the partition
+    scai::lama::DenseVector<IndexType> partition(dist, -1);
+    partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, dimensions,  k, 0.2);
+    //check distributions
+    assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
+    assert( partition.getDistribution().isEqual( coords[0].getDistribution()) );
+    
+    //get getBlockGraph
+    scai::hmemo::HArray<IndexType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, partition, k);
+    
+    // test graph coloring
+    // get a CSRSparseMatrix from the HArray
+    
+    scai::lama::SparseAssemblyStorage<ValueType> myStorage( k, k );
+    {
+    scai::hmemo::ReadAccess<IndexType> blockGraphRead( blockGraph );
+    for(IndexType row=0; row<k; row++){
+        for(IndexType col=row; col<k; col++){
+            myStorage.setValue(row, col, blockGraphRead[ row*k +col]); //Matrix[i,j] = HArray[i*k +j]
+        }
+    }
+    }
+    CSRSparseMatrix<ValueType> blockGraphMatrix( myStorage );
+    
+    scai::hmemo::HArray<IndexType>  dummy = ParcoRepart<IndexType, ValueType>::getGraphColoring_local(blockGraphMatrix);
+}
 
 
 

@@ -466,6 +466,115 @@ TEST_F(ParcoRepartTest, testPartitionBalanceStructured_Local_3D) {
     std::cout<< "cut "<< " is ="<< cut<< std::endl;
 }
 
+//------------------------------------------------------------------------------
+
+TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
+     std::string file = "Grid8x8";
+    std::ifstream f(file);
+    IndexType dimensions= 2, k=16;
+    IndexType N, edges;
+    f >> N >> edges; 
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    CSRSparseMatrix<ValueType> graph( N , N);           
+    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(graph, dist, file );
+    //distrubute graph
+    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
+        
+
+    //read the array locally and messed the distribution. Left as a remainder.
+    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
+    EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
+    std::vector<DenseVector<ValueType>> coords(2);
+    coords[0].allocate(N);
+    coords[1].allocate(N);
+    coords[0]= static_cast<ValueType>( 0 );
+    coords[1]= static_cast<ValueType>( 0 );
+    
+    //fromFile2Coords_2D is not distributed, must redistribute
+    MeshIO<IndexType, ValueType>::fromFile2Coords_2D( std::string(file + ".xyz"), coords, N);
+    coords[0].redistribute(dist);
+    coords[1].redistribute(dist);
+    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
+    
+    //get the partition
+    scai::lama::DenseVector<IndexType> partition(dist, -1);
+    partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, dimensions,  k, 0.2);
+    //check distributions
+    assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
+    assert( partition.getDistribution().isEqual( coords[0].getDistribution()) );
+    
+    //get getBlockGraph
+    scai::hmemo::HArray<IndexType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, partition, k);
+    
+    // test graph coloring
+    // get a CSRSparseMatrix from the HArray
+    
+    scai::lama::SparseAssemblyStorage<ValueType> myStorage( k, k );
+    {
+    scai::hmemo::ReadAccess<IndexType> blockGraphRead( blockGraph );
+    for(IndexType row=0; row<k; row++){
+        for(IndexType col=row; col<k; col++){
+            myStorage.setValue(row, col, blockGraphRead[ row*k +col]); //Matrix[i,j] = HArray[i*k +j]
+        }
+    }
+    }
+    CSRSparseMatrix<ValueType> blockGraphMatrix( myStorage );
+    
+    scai::hmemo::HArray<IndexType>  dummy = ParcoRepart<IndexType, ValueType>::getGraphColoring_local(blockGraphMatrix);
+}
+/*
+//--------------------------------------------------------------------
+
+//=======================================================================
+// Copyright 2013 Maciej Piechotka
+// Authors: Maciej Piechotka
+//
+// Distributed under the Boost Software License, Version 1.0. (See
+// accompanying file LICENSE_1_0.txt or copy at
+// http://www.boost.org/LICENSE_1_0.txt)
+//=======================================================================
+
+
+TEST_F(ParcoRepartTest, testBoostEdgeColoring) {
+
+  using namespace boost;
+  using namespace std;
+  typedef adjacency_list<vecS, vecS, undirectedS, no_property, size_t, no_property> Graph;
+
+  typedef std::pair<std::size_t, std::size_t> Pair;
+  Pair edges[14] = { Pair(0,3), //a-d
+                     Pair(0,5),  //a-f
+                     Pair(1,2),  //b-c
+                     Pair(1,4),  //b-e
+                     Pair(1,6),  //b-g
+                     Pair(1,9),  //b-j
+                     Pair(2,3),  //c-d
+                     Pair(2,4),  //c-e
+                     Pair(3,5),  //d-f
+                     Pair(3,8),  //d-i
+                     Pair(4,6),  //e-g
+                     Pair(5,6),  //f-g
+                     Pair(5,7),  //f-h
+                     Pair(6,7) }; //g-h
+
+  Graph G(10);
+
+  for (size_t i = 0; i < sizeof(edges)/sizeof(edges[0]); i++)
+    add_edge(edges[i].first, edges[i].second, G).first;
+
+  size_t colors = edge_coloring(G, get(edge_bundle, G));
+
+  cout << "Colored using " << colors << " colors" << endl;
+  for (size_t i = 0; i < sizeof(edges)/sizeof(edges[0]); i++) {
+    cout << "  " << (char)('a' + edges[i].first) << "-" << (char)('a' + edges[i].second) << ": " << G[edge(edges[i].first, edges[i].second, G).first] << endl;
+  }
+
+}
+*/
+
 
 /**
 * TODO: test for correct error handling in case of inconsistent distributions

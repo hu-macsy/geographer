@@ -1,11 +1,14 @@
 #pragma once
 
 #include <scai/lama.hpp>
-
 #include <scai/lama/matrix/all.hpp>
-
-
 #include <scai/lama/Vector.hpp>
+
+
+#include <boost/config.hpp>
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/edge_coloring.hpp>
+#include <boost/graph/properties.hpp>
 
 
 using namespace scai::lama;
@@ -99,6 +102,8 @@ namespace ITI {
                         static std::vector<std::vector<IndexType> > getLocalBlockGraphEdges( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
 
                         static scai::hmemo::HArray<IndexType> getBlockGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const int k, const IndexType root=0);
+                        
+                        static scai::hmemo::HArray<IndexType> getGraphColoring_local( const CSRSparseMatrix<ValueType> &adjM);
 	};
 }
 

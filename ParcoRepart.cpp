@@ -640,7 +640,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const 
         scai::hmemo::HArray<ValueType> localRow;        // get local row on this processor
         adjM.getLocalRow( localRow, i);
         scai::hmemo::ReadAccess<ValueType> readLR(localRow); 
-
         assert(readLR.size() == adjM.getNumColumns());
         for(IndexType j=0; j<N; j++){                   // for all the edges of a node
             ValueType val;
@@ -844,7 +843,7 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getLocalB
 
 //-----------------------------------------------------------------------------------------
 
-
+// in this version the graph is an HArray with size k*k and [i,j] = i*k+j
 template<typename IndexType, typename ValueType>
 scai::hmemo::HArray<IndexType> ParcoRepart<IndexType, ValueType>::getBlockGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const int k , const IndexType root) {
 
@@ -925,6 +924,44 @@ std::cout<<__FILE__<< "  "<< __LINE__<< " , __"<< *comm << " setting edge ("<< u
     return recvPart;
 }
 
+//-----------------------------------------------------------------------------------
+
+
+template<typename IndexType, typename ValueType>
+scai::hmemo::HArray<IndexType> ParcoRepart<IndexType, ValueType>::getGraphColoring_local( const CSRSparseMatrix<ValueType> &adjM) {
+    using namespace boost;
+    IndexType N= adjM.getNumRows();
+    assert( N== adjM.getNumColumns() ); // numRows = numColumns
+    
+    // use boost::Graph and boost::edge_coloring()
+    typedef adjacency_list<vecS, vecS, undirectedS, no_property, size_t, no_property> Graph;
+    typedef std::pair<std::size_t, std::size_t> Pair;
+    std::vector<std::vector<IndexType>> edges(2);
+    Graph G(N);
+    
+    for(IndexType i=0; i<N; i++){
+        for(IndexType j=0; j<N; j++){
+            if(adjM(i, j)== 1){ // there is an edge between nodes i and j. add the edge to G
+                boost::add_edge(i, j, G).first;
+                edges[0].push_back(i);  
+                edges[1].push_back(j);
+            }
+        }
+    }
+    
+    size_t colors = boost::edge_coloring(G, boost::get( boost::edge_bundle, G));
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    std::cout << *comm << ", Colored using " << colors << " colors" << std::endl;
+    for (size_t i = 0; i <edges[0].size(); i++) {
+        std::cout << "  " <<  edges[0][i] << "-" << edges[1][i] << ": " << \
+        G[ boost::edge( edges[0][i],  edges[1][i], G).first] << std::endl;
+    }
+    
+    scai::hmemo::HArray<IndexType>  ret;
+    return ret;
+}
+
 
 //to force instantiation
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, int dimensions,	int k,  double epsilon);
@@ -945,5 +982,7 @@ template scai::lama::CSRSparseMatrix<double> ParcoRepart<int, double>::getPEGrap
 template std::vector<std::vector<IndexType>> ParcoRepart<int, double>::getLocalBlockGraphEdges( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part);
 
 template scai::hmemo::HArray<int> ParcoRepart<int, double>::getBlockGraph( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part, const int k, const int root );
+
+template scai::hmemo::HArray<int> ParcoRepart<int, double>::getGraphColoring_local( const CSRSparseMatrix<double> &adjM);
 
 }
