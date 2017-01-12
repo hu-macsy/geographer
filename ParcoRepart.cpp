@@ -850,6 +850,10 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		throw std::runtime_error("Distributions of input matrix and partitions must be equal, for now.");
 	}
 
+	if (!input.getColDistributionPtr()->isReplicated()) {
+		throw std::runtime_error("Column distribution needs to be replicated.");
+	}
+
 	if (epsilon < 0) {
 		throw std::runtime_error("Epsilon must be >= 0, not " + std::to_string(epsilon));
 	}
@@ -873,7 +877,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
     const IndexType maxBlockID = maxBlockScalar.getValue<IndexType>();
 
     if (k != maxBlockID + 1) {
-    	throw std::runtime_error("Should have " + std::to_string(k) + " blocks, has maximum ID" + std::to_string(maxBlockID));
+    	throw std::runtime_error("Should have " + std::to_string(k) + " blocks, has maximum ID " + std::to_string(maxBlockID));
     }
 
     if (k != comm->getSize()) {
@@ -1147,6 +1151,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		IndexType globalID = veryLocalToGlobal.at(i);
 		const CSRStorage<ValueType>& storage = inputDist->isLocal(globalID) ? input.getLocalStorage() : haloStorage;
 		const IndexType localID = inputDist->isLocal(globalID) ? inputDist->global2local(globalID) : matrixHalo.global2halo(globalID);
+		assert(localID != nIndex);
 
 		const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
 		const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());
@@ -1154,7 +1159,11 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		const IndexType endCols = localIa[localID+1];
 		for (IndexType j = beginCols; j < endCols; j++) {
 			IndexType globalNeighbor = localJa[j];
-			if (isVeryLocal(globalNeighbor)) {
+			std::string locationString = inputDist->isLocal(globalID) ? "locally" : "in halo";
+			std::string countString = globalNeighbor != globalID && isVeryLocal(globalNeighbor) ? "counted" : "not counted";
+			//std::cout << "Thread " << comm->getRank() << ": (" << globalID << "," << globalNeighbor << ") found " << locationString << ", " << countString << std::endl;
+
+			if (globalNeighbor != globalID && isVeryLocal(globalNeighbor)) {
 				IndexType veryLocalNeighbor = globalToVeryLocal.at(globalNeighbor);
 				outDegree[i]++;
 				inDegree[veryLocalNeighbor]++;
@@ -1192,7 +1201,10 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 		for (IndexType j = beginCols; j < endCols; j++) {
 			IndexType globalNeighbor = localJa[j];
-			if (globalNeighbor == globalID) continue;
+			if (globalNeighbor == globalID) {
+				//self-loop, not counted
+				continue;
+			}
 			const ValueType edgeweight = unweighted ? 1 : localValues[j];
 			bool same;
 			if (isInSecondBlock(globalNeighbor)) {
@@ -1330,6 +1342,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		//update gains of neighbors
 		const CSRStorage<ValueType>& storage = inputDist->isLocal(topVertex) ? input.getLocalStorage() : haloStorage;
 		const IndexType localID = inputDist->isLocal(topVertex) ? inputDist->global2local(topVertex) : matrixHalo.global2halo(topVertex);
+		assert(localID != nIndex);
 
 		const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
 		const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());

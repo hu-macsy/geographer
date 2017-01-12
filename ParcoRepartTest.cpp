@@ -268,18 +268,27 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
 TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-	const IndexType n = 1000;
+	const IndexType dimX = 10;
+	const IndexType dimY = 10;
+	const IndexType dimZ = 10;
+	const IndexType n = dimX*dimY*dimZ;
 	const IndexType k = comm->getSize() > 1 ? comm->getSize() : 10;
 	const ValueType epsilon = 0.05;
 	const IndexType iterations = 1;
 
-
 	//generate random matrix
 	scai::lama::CSRSparseMatrix<ValueType>a(n,n);
-	scai::lama::MatrixCreator::buildPoisson(a, 3, 19, 10,10,10);
+	scai::lama::MatrixCreator::buildPoisson(a, 3, 19, dimX,dimY,dimZ);
+
+	scai::dmemo::DistributionPtr inputDist = a.getRowDistributionPtr();
+	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+
+	a.redistribute(inputDist, noDistPointer);//need replicated columns for FM;
+
+	ASSERT_EQ(n, inputDist->getGlobalSize());
 
 	//generate balanced partition
-	scai::lama::DenseVector<IndexType> part(a.getRowDistributionPtr());
+	scai::lama::DenseVector<IndexType> part(inputDist);
 
 	for (IndexType i = 0; i < n; i++) {
 		IndexType blockId = i % k;
