@@ -844,8 +844,11 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getLocalB
 //-----------------------------------------------------------------------------------------
 
 // in this version the graph is an HArray with size k*k and [i,j] = i*k+j
+//
+// Not distributed.
+//
 template<typename IndexType, typename ValueType>
-scai::hmemo::HArray<IndexType> ParcoRepart<IndexType, ValueType>::getBlockGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const int k , const IndexType root) {
+scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getBlockGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const int k) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -855,16 +858,9 @@ scai::hmemo::HArray<IndexType> ParcoRepart<IndexType, ValueType>::getBlockGraph(
     // there are k blocks in the partition so the adjecency matrix for the block graph has dimensions [k x k]
     scai::dmemo::DistributionPtr distRowBlock ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, k) );  
     scai::dmemo::DistributionPtr distColBlock ( new scai::dmemo::NoDistribution( k ));
-    scai::lama::CSRSparseMatrix<ValueType> blockGraph( distRowBlock, distColBlock );    // the distributed adjacency matrix of the block-graph
+    //scai::lama::CSRSparseMatrix<ValueType> blockGraph( distRowBlock, distColBlock );    // the distributed adjacency matrix of the block-graph
     
     IndexType size= k*k;
-    /*
-    // only root will have full size
-    if( comm->getRank() == root){
-        size= k*k;
-    }
-    */
-    
     // get, on each processor, the edges of the blocks that are local
     std::vector< std::vector<IndexType> > blockEdges = ParcoRepart<int, double>::getLocalBlockGraphEdges( adjM, part);
     
@@ -886,6 +882,16 @@ scai::hmemo::HArray<IndexType> ParcoRepart<IndexType, ValueType>::getBlockGraph(
         comm->shiftArray(recvPart , sendPart, 1);
         sendPart.swap(recvPart);
     } 
+    
+    // get numEdges
+    IndexType numEdges=0;
+    {
+        scai::hmemo::ReadAccess<IndexType> recvPartRead( recvPart );
+        for(IndexType i=0; i<recvPartRead.size(); i++){
+            if( recvPartRead[i]>0 )
+                ++numEdges;
+        }
+    }
     
         /*
     { // print
@@ -921,14 +927,57 @@ std::cout<<__FILE__<< "  "<< __LINE__<< " , __"<< *comm << " setting edge ("<< u
     
     */
     
-    return recvPart;
+    //convert the k*k HArray to a [k x k] CSRSparseMatrix
+    scai::lama::CSRStorage<ValueType> localMatrix;
+    localMatrix.allocate( k ,k );
+    
+    scai::hmemo::HArray<IndexType> csrIA;
+    scai::hmemo::HArray<IndexType> csrJA;
+    scai::hmemo::HArray<ValueType> csrValues; 
+    {
+        IndexType numNZ = numEdges;     // this equals the number of edges of the graph
+std::cout<< std::endl<< __FILE__<< "  "<< __LINE__<< ", __"<< *comm << " , numNZ="<< numNZ << " <> numEdges_2=" << numEdges<< std::endl;         
+        scai::hmemo::WriteOnlyAccess<IndexType> ia( csrIA, k +1 );
+        scai::hmemo::WriteOnlyAccess<IndexType> ja( csrJA, numNZ );
+        scai::hmemo::WriteOnlyAccess<ValueType> values( csrValues, numNZ );   
+        scai::hmemo::ReadAccess<IndexType> recvPartRead( recvPart );
+        ia[0]= 0;
+        
+        IndexType rowCounter = 0; // count rows
+        IndexType nnzCounter = 0; // count non-zero elements
+        
+        for(IndexType i=0; i<k; i++){
+            IndexType rowNums=0;
+            // traverse the part of the HArray that represents a row and find how many elements are in this row
+            for(IndexType j=0; j<k; j++){
+                if( recvPartRead[i*k+j] >0  ){
+                    ++rowNums;
+                }
+            }
+            ia[rowCounter+1] = ia[rowCounter] + rowNums;
+           
+            for(IndexType j=0; j<k; j++){
+                if( recvPartRead[i*k +j] >0){   // there exist edge (i,j)
+                    ja[nnzCounter] = j;
+                    values[nnzCounter] = 1;
+                    ++nnzCounter;
+                }
+            }
+            ++rowCounter;
+        }
+    }
+    
+    scai::lama::CSRSparseMatrix<ValueType> matrix;
+    localMatrix.swap( csrIA, csrJA, csrValues );
+    matrix.assign(localMatrix);
+    
+    return matrix;
 }
 
 //-----------------------------------------------------------------------------------
 
-
 template<typename IndexType, typename ValueType>
-scai::hmemo::HArray<IndexType> ParcoRepart<IndexType, ValueType>::getGraphColoring_local( const CSRSparseMatrix<ValueType> &adjM) {
+CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local( const CSRSparseMatrix<ValueType> &adjM) {
     using namespace boost;
     IndexType N= adjM.getNumRows();
     assert( N== adjM.getNumColumns() ); // numRows = numColumns
@@ -957,11 +1006,38 @@ scai::hmemo::HArray<IndexType> ParcoRepart<IndexType, ValueType>::getGraphColori
         std::cout << "  " <<  edges[0][i] << "-" << edges[1][i] << ": " << \
         G[ boost::edge( edges[0][i],  edges[1][i], G).first] << std::endl;
     }
-    
-    scai::hmemo::HArray<IndexType>  ret;
+    CSRSparseMatrix<ValueType> ret;
     return ret;
 }
 
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<IndexType> ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local( const std::vector<std::vector<IndexType>> &edgeList) {
+    using namespace boost;
+    assert( edgeList.size() == 2);
+    IndexType N= edgeList[0].size();
+    
+    // use boost::Graph and boost::edge_coloring()
+    typedef adjacency_list<vecS, vecS, undirectedS, no_property, size_t, no_property> Graph;
+    typedef std::pair<std::size_t, std::size_t> Pair;
+    Graph G(N);
+    
+    size_t colors = boost::edge_coloring(G, boost::get( boost::edge_bundle, G));
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    std::vector<IndexType> ret;
+    std::cout << *comm << ", Colored using " << colors << " colors" << std::endl;
+    for (size_t i = 0; i <edgeList[0].size(); i++) {
+        std::cout << "  " <<  edgeList[0][i] << "-" << edgeList[1][i] << ": " << \
+        G[ boost::edge( edgeList[0][i],  edgeList[1][i], G).first] << std::endl;
+        ret.push_back( G[ boost::edge( edgeList[0][i],  edgeList[1][i], G).first] );
+    }
+    
+    return ret;
+}
+
+//---------------------------------------------------------------------------------------
 
 //to force instantiation
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, int dimensions,	int k,  double epsilon);
@@ -981,8 +1057,10 @@ template scai::lama::CSRSparseMatrix<double> ParcoRepart<int, double>::getPEGrap
 
 template std::vector<std::vector<IndexType>> ParcoRepart<int, double>::getLocalBlockGraphEdges( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part);
 
-template scai::hmemo::HArray<int> ParcoRepart<int, double>::getBlockGraph( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part, const int k, const int root );
+template scai::lama::CSRSparseMatrix<double> ParcoRepart<int, double>::getBlockGraph( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part, const int k );
 
-template scai::hmemo::HArray<int> ParcoRepart<int, double>::getGraphColoring_local( const CSRSparseMatrix<double> &adjM);
+template scai::lama::CSRSparseMatrix<double>   ParcoRepart<int, double>::getGraphEdgeColoring_local( const CSRSparseMatrix<double> &adjM);
+
+template std::vector<IndexType> ParcoRepart<int, double>::getGraphEdgeColoring_local( const std::vector<std::vector<IndexType>> &edgeList );
 
 }

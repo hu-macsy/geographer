@@ -596,14 +596,14 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
     assert( partition.getDistribution().isEqual( coords[0].getDistribution()) );
     
     //test getBlockGraph
-    scai::hmemo::HArray<IndexType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, partition, k);
+    scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, partition, k);
     
     { // print
-    scai::hmemo::ReadAccess<IndexType> blockGraphRead( blockGraph );
+    //scai::hmemo::ReadAccess<IndexType> blockGraphRead( blockGraph );
     std::cout<< *comm <<" , Block Graph"<< std::endl;
     for(IndexType row=0; row<k; row++){
         for(IndexType col=0; col<k; col++){
-            std::cout<< comm->getRank()<< ":("<< row<< ","<< col<< "):" << blockGraphRead[ row*k +col] <<" - ";
+            std::cout<< comm->getRank()<< ":("<< row<< ","<< col<< "):" << blockGraph( row,col) <<" - ";
         }
         std::cout<< std::endl;
     }
@@ -651,23 +651,24 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     assert( partition.getDistribution().isEqual( coords[0].getDistribution()) );
     
     //get getBlockGraph
-    scai::hmemo::HArray<IndexType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, partition, k);
+    scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, partition, k);
     
     // test graph coloring
     // get a CSRSparseMatrix from the HArray
     
     scai::lama::SparseAssemblyStorage<ValueType> myStorage( k, k );
     {
-    scai::hmemo::ReadAccess<IndexType> blockGraphRead( blockGraph );
+    //scai::hmemo::ReadAccess<IndexType> blockGraphRead( blockGraph );
     for(IndexType row=0; row<k; row++){
         for(IndexType col=row; col<k; col++){
-            myStorage.setValue(row, col, blockGraphRead[ row*k +col]); //Matrix[i,j] = HArray[i*k +j]
+            //myStorage.setValue(row, col, blockGraphRead[ row*k +col]); //Matrix[i,j] = HArray[i*k +j]
+            myStorage.setValue(row, col, static_cast<ValueType>( blockGraph( row,col).Scalar::getValue<IndexType>()) ); 
         }
     }
     }
     CSRSparseMatrix<ValueType> blockGraphMatrix( myStorage );
     
-    scai::hmemo::HArray<IndexType>  dummy = ParcoRepart<IndexType, ValueType>::getGraphColoring_local(blockGraphMatrix);
+    scai::lama::CSRSparseMatrix<ValueType>  dummy = ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local(blockGraphMatrix);
 }
 
 

@@ -5,11 +5,8 @@
  *      Author: tzovas
  */
 
-
 #include "MeshIO.h"
 #include <chrono>
-//#include "ParcoRepart.h"
-//#include "HilbertCurve.h"
 
 namespace ITI{
 
@@ -536,9 +533,6 @@ void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( lama::CSRSparseMatr
         hmemo::WriteOnlyAccess<double> values( csrValues, numNZ );
 
         ia[0] = 0;
-
-        std::vector<IndexType> colIndexes;
-        std::vector<int> colValues;
         
         IndexType rowCounter = 0; // count "local" rows
         IndexType nnzCounter = 0; // count "local" non-zero elements

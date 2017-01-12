@@ -8,13 +8,13 @@
 
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>
+#include <scai/lama/storage/MatrixStorage.hpp>
 #include <scai/lama/Vector.hpp>
 #include <scai/lama/Scalar.hpp>
 #include <scai/dmemo/Distribution.hpp>
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/common/Math.hpp>
 #include <scai/common/unique_ptr.hpp>
-#include <scai/lama/storage/MatrixStorage.hpp>
 
 #include <assert.h>
 #include <cmath>

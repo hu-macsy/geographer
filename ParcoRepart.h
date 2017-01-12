@@ -3,7 +3,7 @@
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>
 #include <scai/lama/Vector.hpp>
-
+#include <scai/lama/storage/MatrixStorage.hpp>
 
 #include <boost/config.hpp>
 #include <boost/graph/adjacency_list.hpp>
@@ -100,10 +100,39 @@ namespace ITI {
                          * @return A 2 dimensional vector with the local edges of the block graph: (ret[0][i], ret[1][i])
                         */
                         static std::vector<std::vector<IndexType> > getLocalBlockGraphEdges( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
-
-                        static scai::hmemo::HArray<IndexType> getBlockGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const int k, const IndexType root=0);
                         
-                        static scai::hmemo::HArray<IndexType> getGraphColoring_local( const CSRSparseMatrix<ValueType> &adjM);
+                        /** Builds the block graph of the given partition. 
+                         * Creates an HArray that is passed around in numPEs (=comm->getSize()) rounds and every time
+                         * a processor writes in the array its part.
+                         * 
+                         * Not distributed.
+                         * 
+                         * @param[in] adjM The adjacency matric of the input graph.
+                         * @param[in] part The partition of the input garph.
+                         * @param[in] k Number of blocks. 
+                         * 
+                         * @return The "adjacency matrix" of the block graph. In this version is a 1-dimensional array 
+                         * with size k*k and [i,j]= i*k+j.
+                         */
+                        static scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const int k);
+                        
+                        /** Colors the edges of the graph using max_vertex_degree + 1 colors.
+                         * 
+                         * @param[in] adjM The graph given as an adjacency matrix.
+                         * 
+                         * @return The adjacency matrix of the block graph.
+                         */
+                        static scai::lama::CSRSparseMatrix<ValueType>  getGraphEdgeColoring_local( const CSRSparseMatrix<ValueType> &adjM);
+                        
+                        /** Colors the edges of the graph using max_vertex_degree + 1 colors.
+                         * 
+                         * @param[in] edgeList The graph given as the list of edges. It must have size 2 and an edge
+                         * is (edgeList[0][i] , edgeList[1][i])
+                         * 
+                         * @return A vector with the color for every edge. ret.size()=edgeList.size() and edge i has
+                         * color ret[i].
+                         */
+                        static std::vector<IndexType> getGraphEdgeColoring_local( const std::vector<std::vector<IndexType>> &edgeList );
 	};
 }
 
