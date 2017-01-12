@@ -23,6 +23,8 @@ namespace ITI{
 
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::createRandom3DMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const int numberOfPoints, const ValueType maxCoord) {
+	SCAI_REGION( "MeshIO.createRandom3DMesh" )
+
     int n = numberOfPoints;
     int i, j;
     
@@ -100,6 +102,7 @@ void MeshIO<IndexType, ValueType>::createRandom3DMesh( CSRSparseMatrix<ValueType
 // here, N= numPoints[0]*numPoints[1]*numPoints[2]
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
+	SCAI_REGION( "MeshIO.createStructured3DMesh" )
 
 	if (coords.size() != 3) {
 		throw std::runtime_error("Needs three coordinate vectors, one for each dimension");
@@ -282,6 +285,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
 //DONE: Made a separate function for coordinates
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::writeInFileMetisFormat (const CSRSparseMatrix<ValueType> &adjM, const std::string filename){
+	SCAI_REGION( "MeshIO.writeInFileMetisFormat" )
     std::ofstream f;
     f.open(filename);
     IndexType cols= adjM.getNumColumns() , rows= adjM.getNumRows();
@@ -335,6 +339,7 @@ void MeshIO<IndexType, ValueType>::writeInFileCoords (const DenseVector<ValueTyp
 // b) coords = vector<DenseVector>
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::writeInFileCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType dimension, IndexType numPoints, const std::string filename){
+	SCAI_REGION( "MeshIO.writeInFileCoords" )
     std::ofstream f;
     f.open(filename);
     IndexType i, j;
@@ -357,6 +362,7 @@ void MeshIO<IndexType, ValueType>::writeInFileCoords (const std::vector<DenseVec
  */
 template<typename IndexType, typename ValueType>
 CSRSparseMatrix<ValueType>   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( const std::string filename){
+	SCAI_REGION( "MeshIO.readFromFile2AdjMatrix" )
     IndexType N, E;         //number of nodes and edges
     std::ifstream file(filename);
     
@@ -396,6 +402,7 @@ CSRSparseMatrix<ValueType>   MeshIO<IndexType, ValueType>::readFromFile2AdjMatri
  */
 template<typename IndexType, typename ValueType>
 void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( lama::CSRSparseMatrix<ValueType> &matrix, dmemo::DistributionPtr  distribution, const std::string filename){
+	SCAI_REGION( "MeshIO.readFromFile2AdjMatrix" )
     IndexType N, numEdges;         //number of nodes and edges
     std::ifstream file(filename);
     
@@ -466,6 +473,7 @@ void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( lama::CSRSparseMatr
  */
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::fromFile2Coords_2D( const std::string filename, std::vector<DenseVector<ValueType>> &coords, IndexType numberOfPoints){
+	SCAI_REGION( "MeshIO.fromFile2Coords_2D" )
     IndexType N= numberOfPoints;
     //IndexType dim=2;
     //DenseVector<ValueType> ret(N*dim, 0);
@@ -490,6 +498,7 @@ void MeshIO<IndexType, ValueType>::fromFile2Coords_2D( const std::string filenam
  */
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::fromFile2Coords_3D( const std::string filename, std::vector<DenseVector<ValueType>> &coords, IndexType numberOfPoints){
+	SCAI_REGION( "MeshIO.fromFile2Coords_3D" )
     IndexType N= numberOfPoints;
     std::ifstream file(filename);
     
@@ -511,6 +520,7 @@ void MeshIO<IndexType, ValueType>::fromFile2Coords_3D( const std::string filenam
  */
 template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType>> MeshIO<IndexType, ValueType>::randomPoints(int numberOfPoints, int dimensions, ValueType maxCoord){
+	SCAI_REGION( "MeshIO.randomPoints" )
     int n = numberOfPoints;
     int i, j;
     std::vector<DenseVector<ValueType>> ret(dimensions);
@@ -534,6 +544,7 @@ std::vector<DenseVector<ValueType>> MeshIO<IndexType, ValueType>::randomPoints(i
 */
 template<typename IndexType, typename ValueType>
 Scalar MeshIO<IndexType, ValueType>::dist3D(DenseVector<ValueType> p1, DenseVector<ValueType> p2){
+	SCAI_REGION( "MeshIO.dist3D" )
   Scalar res0, res1, res2, res;
   res0= p1.getValue(0)-p2.getValue(0);
   res0= res0*res0;

@@ -12,7 +12,7 @@ namespace ITI{
     
 template<typename IndexType, typename ValueType>
 ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords){
-    
+	SCAI_REGION( "HilbertCurve.getHilbertIndex" )
     if (dimensions > 3 || dimensions < 2) {
         throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
     }
@@ -69,6 +69,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(const std::vector<
 template<typename IndexType, typename ValueType>
 ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
 	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
+	SCAI_REGION( "HilbertCurve.getHilbertIndex2D" )
 
         scai::dmemo::DistributionPtr coordDistX = coordinates[0].getDistributionPtr();
         scai::dmemo::DistributionPtr coordDistY = coordinates[1].getDistributionPtr();
@@ -163,6 +164,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(const std::vecto
 template<typename IndexType, typename ValueType>
 ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex_noScaling( std::vector<DenseVector<ValueType>> &coords, IndexType dimensions, IndexType index, IndexType recursionDepth,
 	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
+	SCAI_REGION( "HilbertCurve.getHilbertIndex_noScaling" )
 
         scai::dmemo::DistributionPtr coordDist = coords[0].getDistributionPtr();
 
@@ -239,6 +241,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex_noScaling( std::ve
 //-------------------------------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
 DenseVector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(ValueType index, IndexType level){
+	SCAI_REGION( "HilbertCurve.Hilbert2DIndex2Point" )
 	DenseVector<ValueType>  p(2,0), ret(2,0);
 	ValueType r;
 	IndexType q;
@@ -266,6 +269,7 @@ DenseVector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(
 template<typename IndexType, typename ValueType>
 ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
 	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
+	SCAI_REGION( "HilbertCurve.getHilbertIndex3D" )
 
 	if (dimensions != 3) {
 		throw std::logic_error("Space filling curve for 3 dimensions.");
@@ -393,6 +397,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(const std::vecto
 
 template<typename IndexType, typename ValueType>
 DenseVector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point(ValueType index, IndexType level){
+	SCAI_REGION( "HilbertCurve.Hilbert3DIndex2Point" )
 	DenseVector<ValueType>  p(3,0), ret(3,0);
 	ValueType r;
 	IndexType q;

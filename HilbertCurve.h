@@ -11,6 +11,8 @@
 #include <scai/lama/matrix/all.hpp>
 #include <scai/lama/Vector.hpp>
 #include <scai/dmemo/Distribution.hpp>
+#include <scai/tracing.hpp>
+
 
 #include <assert.h>
 #include <cmath>
