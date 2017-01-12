@@ -841,7 +841,7 @@ IndexType ITI::ParcoRepart<IndexType, ValueType>::getDegreeSum(const CSRSparseMa
 
 template<typename IndexType, typename ValueType>
 ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted) {
-	const IndexType borderRegionDepth = 4;
+	const IndexType magicBorderRegionDepth = 4;
 
 	const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
 	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
@@ -884,6 +884,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
     	throw std::runtime_error("Called with " + std::to_string(comm->getSize()) + " processors, but " + std::to_string(k) + " blocks.");
     }
 
+    ValueType gainSum = 0;
+
 	for (IndexType i = 0; i < communicationScheme.size(); i++) {
 
 		const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
@@ -908,7 +910,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		const IndexType localBlockID = comm->getRank();
 		std::vector<IndexType> interfaceNodes;
 		IndexType lastRoundMarker;
-		std::tie(interfaceNodes, lastRoundMarker)= getInterfaceNodes(input, part, localBlockID, partner, borderRegionDepth+1);
+		std::tie(interfaceNodes, lastRoundMarker)= getInterfaceNodes(input, part, localBlockID, partner, magicBorderRegionDepth+1);
 		std::sort(interfaceNodes.begin(), interfaceNodes.end());
 
 
@@ -919,6 +921,10 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 		//swap size of border region and total block size
 		IndexType blockSize = localBlockSize(part, localBlockID);
+		if (blockSize != localN) {
+			throw std::runtime_error(std::to_string(localN) + " local nodes, but only " + std::to_string(blockSize) + " of them belong to block " + std::to_string(localBlockID) + ".");
+		}
+
 		IndexType swapField[4];
 		swapField[0] = interfaceNodes.size();
 		swapField[1] = lastRoundMarker;
@@ -1003,6 +1009,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, firstRegion, secondRegion, firstDummyLayer, secondDummyLayer, blockSizes, maxBlockSizes, epsilon, unweighted);
 
 		//communicate achieved gain. PE with better solution should send their secondRegion.
+		assert(unweighted); //if this assert fails, you need to change the type of swapField back to ValueType before removing it.
 		swapField[0] = secondRegion.size();
 		swapField[1] = gain;
 		comm->swap(swapField, 2, partner);
@@ -1011,6 +1018,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			//Oh well. None of the processors managed an improvement. No need to update data structures.
 			continue;
 		}
+
+		gainSum += std::max(ValueType(swapField[1]), ValueType(gain));
 
 		bool otherWasBetter = (swapField[1] > gain || (swapField[1] == gain && partner < comm->getRank()));
 
@@ -1063,8 +1072,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		newIndices.insert(newIndices.end(), additionalNodes.begin(), additionalNodes.end());
 		std::sort(newIndices.begin(), newIndices.end());
 
-		scai::utilskernel::LArray<IndexType> indexTransport(localN);
-		for (IndexType j = 0; j < localN; j++) {
+		scai::utilskernel::LArray<IndexType> indexTransport(newIndices.size());
+		for (IndexType j = 0; j < newIndices.size(); j++) {
 			indexTransport[j] = newIndices[j];
 		}
 
@@ -1084,6 +1093,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			assert(!input.getRowDistributionPtr()->isLocal(removed));
 		}
 	}
+	return comm->sum(gainSum) / 2;
 }
 
 template<typename IndexType, typename ValueType>

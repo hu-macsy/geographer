@@ -131,9 +131,8 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
 
   const ValueType epsilon = 0.05;
 
-  scai::lama::DenseVector<IndexType> partition(n, k+1);
-  partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, k, epsilon);
-  
+  scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, k, epsilon);
+
   EXPECT_GE(k-1, partition.getLocalValues().max() );
   EXPECT_EQ(n, partition.size());
   EXPECT_EQ(0, partition.min().getValue<ValueType>());
@@ -290,9 +289,14 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 	//generate balanced partition
 	scai::lama::DenseVector<IndexType> part(inputDist);
 
-	for (IndexType i = 0; i < n; i++) {
-		IndexType blockId = i % k;
-		part.setValue(i, blockId);
+	const IndexType localN = inputDist->getLocalSize();
+
+	IndexType blockId = comm->getRank();
+
+	for (IndexType i = 0; i < localN; i++) {
+		IndexType globalID = inputDist->local2global(i);
+		assert(part.getDistributionPtr()->isLocal(globalID));
+		part.setValue(globalID, blockId);
 	}
 
 	ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
@@ -305,19 +309,6 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 		EXPECT_LE(newCut, cut);
 		cut = newCut;
 	}
-
-	//generate balanced partition
-	for (IndexType i = 0; i < n; i++) {
-		IndexType blockId = i % k;
-		part.setValue(i, blockId);
-	}
-
-	//check correct cut with balanced partition
-	cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
-	ValueType gain = ParcoRepart<IndexType, ValueType>::distributedFMStep(a, part, k, epsilon);
-	const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
-	EXPECT_EQ(cut - gain, newCut);
-	EXPECT_LE(newCut, cut);
 
 	//check for balance
 	ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k);
