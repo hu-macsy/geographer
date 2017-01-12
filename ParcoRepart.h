@@ -71,28 +71,28 @@ namespace ITI {
 			static std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
 
                         
-                        static DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
-                        
-                        /**Returns the processor graph. Every processor traverses its local part of adjM: and for every
-                         * edge (u,v) that one node, say u, is not local it gets the owner processor of u.
-                         * 
-                         * @param[in] adjM The adjacency matrix of the input graph.
-                         * @return A [#PE x #PE] adjacency matrix of the processor graph.
-                         */
-                        static scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueType> &adjM);
-                        
-                        /** Returns the edges of the block graph only for the local part. Eg. if blocks 1 and 2 are local
-                         * in this processor it finds the edge (1,2) ( and the edge (2,1)). 
-                         * Also if the other endpoint is in another processor it finds this edge: block 1 is local, it 
-                         * shares an edge with block 3 that is not local, this edge is found and returned.
-                         * 
-                         * @param[in] adjM The adjacency matrix of the input graph.
-                         * @param[in] part The partition of the input graph.
-                         *
-                         * @return A 2 dimensional vector with the edges of the local parts of the block graph:
-                         * edge (u,v) is (ret[0][i], ret[1][i]) if block u and block v are connected.
-                        */
-                        static std::vector<std::vector<IndexType> > getLocalBlockGraphEdges( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
+			static DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
+
+			/**Returns the processor graph. Every processor traverses its local part of adjM: and for every
+			 * edge (u,v) that one node, say u, is not local it gets the owner processor of u.
+			 *
+			 * @param[in] adjM The adjacency matrix of the input graph.
+			 * @return A [#PE x #PE] adjacency matrix of the processor graph.
+			 */
+			static scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueType> &adjM);
+
+			/** Returns the edges of the block graph only for the local part. Eg. if blocks 1 and 2 are local
+			 * in this processor it finds the edge (1,2) ( and the edge (2,1)).
+			 * Also if the other endpoint is in another processor it finds this edge: block 1 is local, it
+			 * shares an edge with block 3 that is not local, this edge is found and returned.
+			 *
+			 * @param[in] adjM The adjacency matrix of the input graph.
+			 * @param[in] part The partition of the input graph.
+			 *
+			 * @return A 2 dimensional vector with the edges of the local parts of the block graph:
+			 * edge (u,v) is (ret[0][i], ret[1][i]) if block u and block v are connected.
+			*/
+			static std::vector<std::vector<IndexType> > getLocalBlockGraphEdges( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
 
 			/**
 			 * Builds a halo containing all matrix entries of non-local neighbors.
@@ -116,11 +116,14 @@ namespace ITI {
 
 			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted = true);
 
+		private:
 			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &halo,
 					std::set<IndexType> &firstregion,  std::set<IndexType> &secondregion,
 					const std::set<IndexType> &firstDummyLayer, const std::set<IndexType> &secondDummyLayer,
 					std::pair<IndexType, IndexType> blockSizes,	const std::pair<IndexType, IndexType> blockCapacities, ValueType epsilon, const bool unweighted = true);
 
 			static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
+
+			static IndexType getDegreeSum(const CSRSparseMatrix<ValueType> &input, std::vector<IndexType> nodes);
 	};
 }

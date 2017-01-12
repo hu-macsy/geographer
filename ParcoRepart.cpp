@@ -826,6 +826,20 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 }
 
 template<typename IndexType, typename ValueType>
+IndexType ITI::ParcoRepart<IndexType, ValueType>::getDegreeSum(const CSRSparseMatrix<ValueType> &input, std::vector<IndexType> nodes) {
+	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
+	const scai::hmemo::ReadAccess<IndexType> localIa(localStorage.getIA());
+
+	IndexType result = 0;
+
+	for (IndexType node : nodes) {
+		IndexType localID = input.getRowDistributionPtr()->global2local(node);
+		result += localIa[localID+1] - localIa[localID];
+	}
+	return result;
+}
+
+template<typename IndexType, typename ValueType>
 ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted) {
 	const IndexType borderRegionDepth = 4;
 
@@ -893,6 +907,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		std::tie(interfaceNodes, lastRoundMarker)= getInterfaceNodes(input, part, localBlockID, partner, borderRegionDepth+1);
 		std::sort(interfaceNodes.begin(), interfaceNodes.end());
 
+
 		/**
 		 * now swap indices of nodes in border region with partner processor.
 		 * For this, first find out the length of the swap array.
@@ -900,13 +915,15 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 		//swap size of border region and total block size
 		IndexType blockSize = localBlockSize(part, localBlockID);
-		IndexType swapField[3];
+		IndexType swapField[4];
 		swapField[0] = interfaceNodes.size();
 		swapField[1] = lastRoundMarker;
 		swapField[2] = blockSize;
-		comm->swap(swapField, 3, partner);
+		swapField[3] = getDegreeSum(input, interfaceNodes);
+		comm->swap(swapField, 4, partner);
 		const IndexType otherLastRoundMarker = swapField[1];
 		const IndexType otherBlockSize = swapField[2];
+		const IndexType otherDegreeSum = swapField[3];
 		IndexType swapLength = std::max(int(swapField[0]), int(interfaceNodes.size()));
 
 		if (interfaceNodes.size() == 0) {
@@ -957,7 +974,10 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		CSRStorage<ValueType> haloMatrix;
 		haloMatrix.exchangeHalo( graphHalo, input.getLocalStorage(), *comm );
 		assert(input.getLocalStorage().getValues().size() == numValues);//number of edges in local part stays unchanged.
-
+		assert(haloMatrix.getValues().size() == otherDegreeSum);
+		for (IndexType node : requiredHaloIndices) {
+			assert(graphHalo.global2halo(node) != nIndex);
+		}
 
 		//why not use vectors in the FM step or use sets to begin with? Might be faster.
 		//here we only exchange one round less than gathered. The other forms a dummy border layer.
@@ -973,7 +993,9 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		std::pair<IndexType, IndexType> blockSizes = {blockSize, otherBlockSize};
 		std::pair<IndexType, IndexType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
 
-		//execute FM locally.
+		/**
+		 * execute FM locally
+		 */
 		ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, firstRegion, secondRegion, firstDummyLayer, secondDummyLayer, blockSizes, maxBlockSizes, epsilon, unweighted);
 
 		//communicate achieved gain. PE with better solution should send their secondRegion.
@@ -1067,17 +1089,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		std::pair<IndexType, IndexType> blockSizes,
 		const std::pair<IndexType, IndexType> blockCapacities, ValueType epsilon, const bool unweighted) {
 
-	std::vector<IndexType> v_intersection;
-
-	std::set_intersection(firstregion.begin(), firstregion.end(),
-			secondregion.begin(), secondregion.end(),
-						  std::back_inserter(v_intersection));
-
-	if (v_intersection.size() > 0) {
-		throw std::runtime_error("Intersection not empty.");
-	}
-
-
 	if (blockSizes.first >= blockCapacities.first && blockSizes.second >= blockCapacities.second) {
 		//cannot move any nodes, all blocks are overloaded already.
 		return 0;
@@ -1126,6 +1137,38 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	auto isVeryLocal = [&](IndexType globalID){return globalToVeryLocal.count(globalID) > 0;};
 	auto isInFirstBlock = [&](IndexType globalID){return firstregion.count(globalID) + firstDummyLayer.count(globalID) > 0;};
 	auto isInSecondBlock = [&](IndexType globalID){return secondregion.count(globalID) + secondDummyLayer.count(globalID) > 0;};
+
+	/**
+	 * check degree symmetry
+	 */
+	std::vector<IndexType> inDegree(veryLocalN, 0);
+	std::vector<IndexType> outDegree(veryLocalN, 0);
+	for (IndexType i = 0; i < veryLocalN; i++) {
+		IndexType globalID = veryLocalToGlobal.at(i);
+		const CSRStorage<ValueType>& storage = inputDist->isLocal(globalID) ? input.getLocalStorage() : haloStorage;
+		const IndexType localID = inputDist->isLocal(globalID) ? inputDist->global2local(globalID) : matrixHalo.global2halo(globalID);
+
+		const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
+		const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());
+		const IndexType beginCols = localIa[localID];
+		const IndexType endCols = localIa[localID+1];
+		for (IndexType j = beginCols; j < endCols; j++) {
+			IndexType globalNeighbor = localJa[j];
+			if (isVeryLocal(globalNeighbor)) {
+				IndexType veryLocalNeighbor = globalToVeryLocal.at(globalNeighbor);
+				outDegree[i]++;
+				inDegree[veryLocalNeighbor]++;
+			}
+		}
+	}
+
+	for (IndexType i = 0; i < veryLocalN; i++) {
+		if (inDegree[i] != outDegree[i]) {
+			throw std::runtime_error("Process " + std::to_string(comm->getRank()) + ": Node " + std::to_string(veryLocalToGlobal[i]) + " has " + std::to_string(inDegree[i]) + " incoming local edges but "
+					+ std::to_string(outDegree[i]) + " outgoing local edges.");
+		}
+	}
+
 
 	auto computeGain = [&](IndexType globalID){
 		bool firstBlock = isInFirstBlock(globalID);
