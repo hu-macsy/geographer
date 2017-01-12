@@ -188,13 +188,20 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	tmpPerm.sort( inversePermutation, true);
 
 	/**
+	 * The permutations given by DenseVector.sort are distributed by BlockDistributions.
+	 * However, the sorting does no guarantee that each processor has the same number of values.
+	 * Without a redistribution step, the line result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
+	 * sometimes segfaults. We can't have that.
+	 */
+	inversePermutation.redistribute(inputDist);
+	assert(inversePermutation.getDistributionPtr()->getLocalSize() == localN);
+
+	/**
 	* initial partitioning with sfc. Upgrade to chains-on-chains-partitioning later
 	*/
 	DenseVector<IndexType> result(inputDist);
         
 	for (IndexType i = 0; i < localN; i++) {
-		//The following line sometimes segfaults, since the distributed sort does not guarantee that each processor has the same number of values.
-		//TODO: add a smoothing step after the distributed sort
 		result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
 	}
         
