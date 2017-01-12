@@ -644,18 +644,14 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::computeCo
 	std::vector<DenseVector<IndexType>> result;
 
 	for (IndexType step = 1; step <= steps; step++) {
-		DenseVector<IndexType> commPerm(p,-1);
+		IndexType commPerm[p];
 
 		for (IndexType i = 0; i < p; i++) {
 			IndexType partner = i ^ step;
-			if (partner < p) {
-				commPerm.setValue(i, partner);
-			} else {
-				commPerm.setValue(i, i);
-			}
+			commPerm[i] = partner < p ? partner : i;
 		}
 
-		result.push_back(commPerm);
+		result.emplace_back(p, &commPerm[0]);
 	}
 	return result;
 }
