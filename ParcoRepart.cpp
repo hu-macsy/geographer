@@ -189,6 +189,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	DenseVector<IndexType> result(inputDist);
         
 	for (IndexType i = 0; i < localN; i++) {
+		//The following line sometimes segfaults, since the distributed sort does not guarantee that each processor has the same number of values.
+		//TODO: add a smoothing step after the distributed sort
 		result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
 	}
         
