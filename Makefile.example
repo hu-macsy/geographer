@@ -7,7 +7,7 @@ SCAI_INCLUDE=
 SCAI_LIB=
 GTEST_INCLUDE=
 GTEST_LIB=
-LFLAGS= -L$(SCAI_LIB) -L$(GTEST_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel  -lgtest
+LFLAGS= -L$(SCAI_LIB) -L$(GTEST_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lgtest
 CCFLAGS= --openmp --std=c++11 -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -DSCAI_TRACE_ON  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR
 
 all:
