@@ -111,17 +111,17 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
 
-	if( !coordDist->isEqual( *inputDist) ){
-		throw std::runtime_error( "Distributions: should be equal.");
-	}
-
 	const IndexType localN = inputDist->getLocalSize();
 	const IndexType globalN = inputDist->getGlobalSize();
 
 	if (coordDist->getLocalSize() != localN) {
 		throw std::runtime_error(std::to_string(coordDist->getLocalSize()) + " point coordinates, "
 				+ std::to_string(localN) + " rows present.");
-	}	
+	}
+
+	if( !coordDist->isEqual( *inputDist) ){
+		throw std::runtime_error( "Distributions should be equal.");
+	}
 	
 	/**
 	*	gather information for space-filling curves
@@ -199,6 +199,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			if (inputDist->isReplicated()) {
 				gain = replicatedMultiWayFM(input, result, k, epsilon);
 			} else {
+				//redistribute input matrix to partition
+				scai::utilskernel::LArray<IndexType> owners(globalN);
+				for (IndexType i = 0; i < globalN; i++) {
+					Scalar blockID = result.getValue(i);
+					owners[i] = blockID.getValue<IndexType>();
+				}
+				scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(owners, comm));
+				input.redistribute(newDistribution, input.getColDistributionPtr());
+				result.redistribute(newDistribution);
 				gain = distributedFMStep(input, result, k, epsilon);
 			}
 			ValueType oldCut = cut;
