@@ -39,7 +39,9 @@ namespace ITI {
 	template <typename IndexType, typename ValueType>
 	class MeshIO{
             public:
-                /**Creates a random 3D mesh. Adjacency matrix stored in adjM and coordinates of the points in coords.
+                /** Creates a random 3D mesh. Adjacency matrix stored in adjM and coordinates of the points in coords.
+                 *  Needs O(numberOfPoints^2) time!! Every nodes adds an edge with some of its closest neighbours.
+                 *  The time consuming part is to calculate the distance between all nodes.
                  * 
                  * @param[out] adjM The adjecency matrix of the graph to be created.
                  * @param[in] coords The 3D coordinates vector.
@@ -48,30 +50,35 @@ namespace ITI {
                  */
                 static void createRandom3DMesh( scai::lama::CSRSparseMatrix<ValueType> &adjM,  std::vector<DenseVector<ValueType>> &coords, const int numberOfPoints, const ValueType maxCoord);
                 
-                static void createStructured3DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints);
+                /** Creates a structed 3D mesh, both the adjacency matrix and the coordinates vectors.
+                 * 
+                 * @param[out] adjM The adjacency matrix of the output graph. Dimensions are [numPoints[0] x numPoints[1] x numPoints[2]].
+                 * @param[out] coords The coordinates of every graph node. coords.size()=2 and coords[i].size()=numPoints[i], so a point i(x,y,z) has coordinates (coords[0][i], coords[1][i], coords[2][i]).
+                 * @param[in] maxCoord The maximum value a coordinate can have in each dimension, maxCoord.size()=3.
+                 * @param[in] numPoints The number of points in every dimension, numPoints.size()=3.
+                 */
+                static void createStructured3DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
 
-                /* Given an adjacency matrix and a filename writes the matrix in the file using the METIS format.
+                /** Given an adjacency matrix and a filename writes the matrix in the file using the METIS format.
+                 * 
+                 * @param[in] adjM The graph's adjacency matrix.
+                 * @param[in] filename The file's name to write to/
                  */
                 static void writeInFileMetisFormat (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
                 
-                /*Given the vector of the coordinates and their dimension, writes them in file "filename".
+                /** Given the vector of the coordinates and their dimension, writes them in file "filename".
                  * Coordinates are given as a DenseVector of size dim*numPoints.
                 */
-                static void writeInFileCoords (const DenseVector<ValueType> &coords, IndexType dimension, const std::string filename);
-                
-                /* Here, coordintes are a vector of size dim and each coords[i] have numPoints.
-                 */
-                static void writeInFileCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType dimension, IndexType numPoints, const std::string filename);
+                static void writeInFileCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
                 
                 /* Reads a graph from filename in METIS format and returns the adjacency matrix.
                  */
-                static CSRSparseMatrix<ValueType>  readFromFile2AdjMatrix(const std::string filename);
                 
                 /** Reads a graph from filename in METIS format and returns the adjacency matrix.
                  * @param[in] filename The file to read from. In a METIS format.
                  * @param[out] matrix The adjacency matrix of the graph.
                  */
-                static void  readFromFile2AdjMatrix( CSRSparseMatrix<ValueType> &matrix, dmemo::DistributionPtr distribution, const std::string filename);
+                static void  readFromFile2AdjMatrix( CSRSparseMatrix<ValueType> &matrix, const std::string filename);
                 
                 /* Reads the 2D coordinates from file "filename" and returns then in a DenseVector where the coordiantes
                  * of point i are in [i*2][i*2+1].

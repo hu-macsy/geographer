@@ -45,7 +45,7 @@ TEST_F(MeshIOTest, testMesh3DCreateRandomMeshWriteInFile_Local_3D) {
 std::vector<DenseVector<ValueType>> coords;
 int numberOfPoints= 50;
 ValueType maxCoord= 1;
-std::string grFile = "meshes/randomTest5.graph";
+std::string grFile = "meshes/randomTest6.graph";
 std::string coordFile= grFile + ".xyz";
 
 scai::lama::CSRSparseMatrix<ValueType> adjM(numberOfPoints, numberOfPoints);
@@ -58,7 +58,7 @@ auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 )
 std::cout<<__FILE__<< "  "<< __LINE__<< " , time for createRandom3DMesh: "<< duration << std::endl;
 
 MeshIO<IndexType, ValueType>::writeInFileMetisFormat( adjM, grFile);
-MeshIO<IndexType, ValueType>::writeInFileCoords( coords, 3, numberOfPoints, coordFile);
+MeshIO<IndexType, ValueType>::writeInFileCoords( coords, numberOfPoints, coordFile);
 
 duration = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::high_resolution_clock::now() -t2).count();
 
@@ -73,7 +73,7 @@ std::cout<< "graph written in files: " << grFile<< " and "<< coordFile<< std::en
  * */
 
 TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
-std::vector<IndexType> numPoints= {13, 15, 17};
+std::vector<IndexType> numPoints= {11, 12, 13};
 std::vector<ValueType> maxCoord= {100,180,130};
 IndexType numberOfPoints= numPoints[0]*numPoints[1]*numPoints[2];
 std::vector<DenseVector<ValueType>> coords(3, DenseVector<ValueType>(numberOfPoints, 0));
@@ -92,7 +92,7 @@ auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 )
 std::cout<<__FILE__<< "  "<< __LINE__<< " , time for creating structured3DMesh: "<< duration <<std::endl;
 
 MeshIO<IndexType, ValueType>::writeInFileMetisFormat( adjM, grFile);
-MeshIO<IndexType, ValueType>::writeInFileCoords( coords, 3, numberOfPoints, coordFile);
+MeshIO<IndexType, ValueType>::writeInFileCoords( coords, numberOfPoints, coordFile);
 
 duration = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::high_resolution_clock::now() -t2).count();
 
@@ -150,7 +150,7 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
     
     dmemo::DistributionPtr dist( new dmemo::NoDistribution( nodes ));
     Graph = scai::lama::CSRSparseMatrix<ValueType>(dist, dist);
-    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph, dist, filename );
+    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph, filename );
     N = Graph.getNumColumns();
     EXPECT_EQ(Graph.getNumColumns(), Graph.getNumRows());
     
@@ -161,19 +161,13 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
     
     CSRSparseMatrix<ValueType> Graph2(dist, dist);
     MeshIO<IndexType, ValueType>::writeInFileMetisFormat(Graph, fileTo );
-    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph2, dist, fileTo );
+    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph2, fileTo );
     
     std::cout<< "Outpur written in file: "<< fileTo<< std::endl;
     EXPECT_EQ(Graph.getNumValues(), Graph2.getNumValues() );
     EXPECT_EQ(Graph.l2Norm(), Graph2.l2Norm() );
     EXPECT_EQ(Graph2.getNumValues(), Graph2.l1Norm() );
-    /*
-    std::cout<<"reading from file: "<< filename + string(".xyz")<< std::endl;
-    vector<DenseVector<ValueType>> coords2D({ DenseVector<ValueType>(N,0), DenseVector<ValueType>(N,0) });
-    MeshIO<IndexType, ValueType>::fromFile2Coords_2D(filename + string(".xyz"), coords2D, N );
-    EXPECT_EQ(coords2D[0].size(), N);
-    */
-    
+   
 }
 
 //-----------------------------------------------------------------
@@ -200,7 +194,7 @@ TEST_F(MeshIOTest, testPartitionFromFile_2D){
     std::cout<<"reading adjacency matrix from file: "<< grFile<<" for k="<< k<< std::endl;
     scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, nodes) );
     graph = scai::lama::CSRSparseMatrix<ValueType>(distPtr, distPtr);
-    graph =  MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( grFile );
+    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graph , grFile );
     std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
 
     // N is the number of nodes
