@@ -269,10 +269,6 @@ ValueType ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(const CSRSpars
 		throw std::runtime_error("Input partition must be replicated, for now.");
 	}
 
-	if (!input.checkSymmetry()) {
-		throw std::runtime_error("Only undirected graphs are supported, adjacency matrix must be symmetric.");
-	}
-
 	if (k == 1) {
 		//nothing to partition
 		return 0;
@@ -874,7 +870,6 @@ template<typename IndexType, typename ValueType>
 ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted) {
 	const IndexType magicBorderRegionDepth = 4;
 	SCAI_REGION( "ParcoRepart.distributedFMStep" )
-
 	const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
 	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
 
@@ -888,10 +883,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 	if (epsilon < 0) {
 		throw std::runtime_error("Epsilon must be >= 0, not " + std::to_string(epsilon));
-	}
-
-	if (!input.checkSymmetry()) {
-		throw std::runtime_error("Input matrix must be symmetric");
 	}
 
 	std::cout << "Thread " << comm->getRank() << ", entered distributed FM." << std::endl;
