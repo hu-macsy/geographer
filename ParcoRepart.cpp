@@ -204,7 +204,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	}
    
 
-	if (comm->getSize() == 1 && comm->getSize() == k) {
+	if (comm->getSize() == 1 || comm->getSize() == k) {
 		ValueType gain = 1;
 		ValueType cut = computeCut(input, result);
 
