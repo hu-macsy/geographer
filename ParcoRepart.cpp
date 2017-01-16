@@ -890,7 +890,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		throw std::runtime_error("Epsilon must be >= 0, not " + std::to_string(epsilon));
 	}
 
-	std::cout << "Thread " << comm->getRank() << ", entered distributed FM." << std::endl;
+	//std::cout << "Thread " << comm->getRank() << ", entered distributed FM." << std::endl;
 	/**
 	 * get trivial mapping for now.
 	 */
@@ -941,7 +941,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		if (partner != comm->getRank()) {
 			//processor is active this round
 
-			std::cout << "Thread " << comm->getRank() << " is active in round " << i << "." << std::endl;
+			//std::cout << "Thread " << comm->getRank() << " is active in round " << i << "." << std::endl;
 
 			/**
 			 * get indices of border nodes with breadth-first search
@@ -951,7 +951,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			std::tie(interfaceNodes, lastRoundMarker)= getInterfaceNodes(input, part, localBlockID, partner, magicBorderRegionDepth+1);
 			std::sort(interfaceNodes.begin(), interfaceNodes.end());
 
-			std::cout << "Thread " << comm->getRank() << ", round " << i << ", gathered interface nodes." << std::endl;
+			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", gathered interface nodes." << std::endl;
 
 			/**
 			 * now swap indices of nodes in border region with partner processor.
@@ -1005,7 +1005,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				requiredHaloIndices[i] = swapNodes[i];
 			}
 
-			std::cout << "Thread " << comm->getRank() << ", round " << i << ", swapped " << swapLength << " interface nodes with thread " << partner << std::endl;
+			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", swapped " << swapLength << " interface nodes with thread " << partner << std::endl;
 
 
 			assert(requiredHaloIndices.size() <= globalN - inputDist->getLocalSize());
@@ -1031,7 +1031,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				assert(graphHalo.global2halo(node) != nIndex);
 			}
 
-			std::cout << "Thread " << comm->getRank() << ", round " << i << ", got halo." << std::endl;
+			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", got halo." << std::endl;
 
 			//why not use vectors in the FM step or use sets to begin with? Might be faster.
 			//here we only exchange one round less than gathered. The other forms a dummy border layer.
@@ -1048,7 +1048,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			std::pair<IndexType, IndexType> blockSizes = {blockSize, otherBlockSize};
 			std::pair<IndexType, IndexType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
 
-			std::cout << "Thread " << comm->getRank() << ", round " << i << ", prepared sets." << std::endl;
+			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", prepared sets." << std::endl;
 
 
 			/**
@@ -1056,7 +1056,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			 */
 			ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, firstRegion, secondRegion, firstDummyLayer, secondDummyLayer, blockSizes, maxBlockSizes, epsilon, unweighted);
 
-			std::cout << "Thread " << comm->getRank() << ", round " << i << ", finished twoWayLocalFM with gain " << gain << "." << std::endl;
+			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", finished twoWayLocalFM with gain " << gain << "." << std::endl;
 
 
 			//communicate achieved gain. PE with better solution should send their secondRegion.
@@ -1118,7 +1118,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				auto it2 = std::set_difference(firstRegionCopy.begin(), firstRegionCopy.end(), firstRegion.begin(), firstRegion.end(), deletedNodes.begin());
 				deletedNodes.resize(it2-deletedNodes.begin());
 
-				std::cout << "Thread " << comm->getRank() << ", round " << i << ", lost " << deletedNodes.size() << " nodes and gained " << additionalNodes.size() << std::endl;
+				//std::cout << "Thread " << comm->getRank() << ", round " << i << ", lost " << deletedNodes.size() << " nodes and gained " << additionalNodes.size() << std::endl;
 
 				assert(std::is_sorted(additionalNodes.begin(), additionalNodes.end()));
 				assert(std::is_sorted(deletedNodes.begin(), deletedNodes.end()));
@@ -1134,7 +1134,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			}
 		} else {
 			const IndexType dummyPartner = comm->getRank() == 0 ? 1 : 0;
-			std::cout << "Thread " << comm->getRank() << " is inactive in round " << i << ", performing dummy interface and halo exchange." << std::endl;
+			//std::cout << "Thread " << comm->getRank() << " is inactive in round " << i << ", performing dummy interface and halo exchange." << std::endl;
 
 			getInterfaceNodes(input, part, localBlockID, dummyPartner, 1);
 
@@ -1159,7 +1159,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		if (participating != comm->getSize()) {
 			std::cout << participating << " of " << comm->getSize() << " threads in redistribution." << std::endl;
 		}
-		std::cout << "Thread " << comm->getRank() << ", round " << i << ", " << myGlobalIndices.size() << " indices." << std::endl;
+		//std::cout << "Thread " << comm->getRank() << ", round " << i << ", " << myGlobalIndices.size() << " indices." << std::endl;
 
 		//redistribute. This could probably be done faster by using the haloStorage already there. Maybe use joinHalo or splitHalo methods here.
 		scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
@@ -1170,18 +1170,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			part.setValue(globalId, localBlockID);
 		}
 
-		std::cout << "Thread " << comm->getRank() << ", round " << i << ", finished redistribution." << std::endl;
+		//std::cout << "Thread " << comm->getRank() << ", round " << i << ", finished redistribution." << std::endl;
 
-//		for (IndexType newNode : additionalNodes) {
-//			assert(part.getDistributionPtr()->isLocal(newNode));
-//			assert(input.getRowDistributionPtr()->isLocal(newNode));
-//			part.setValue(newNode, localBlockID);
-//		}
-//
-//		for (IndexType removed : deletedNodes) {
-//			assert(!part.getDistributionPtr()->isLocal(removed));
-//			assert(!input.getRowDistributionPtr()->isLocal(removed));
-//		}
 	}
 	return comm->sum(gainSum) / 2;
 }
@@ -1797,29 +1787,6 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getBlo
         }
     }
     
-        /*
-    { // print
-    scai::hmemo::ReadAccess<IndexType> sendPartRead( sendPart );
-    std::cout<< *comm <<" , sendPart"<< std::endl;
-    for(IndexType row=0; row<k; row++){
-        for(IndexType col=0; col<k; col++){
-            std::cout<< comm->getRank()<< ":("<< row<< ","<< col<< "):" << sendPartRead[ row*k +col] <<" - ";
-        }
-        std::cout<< std::endl;
-    }
-    
-    scai::hmemo::ReadAccess<IndexType> recvPartRead( recvPart );
-    std::cout<< *comm <<" , recvPart"<< std::endl;
-    for(IndexType row=0; row<k; row++){
-        for(IndexType col=0; col<k; col++){
-            std::cout<< comm->getRank()<< ":("<< row << "," << col<< "):" << recvPartRead[ row*k +col] <<" - ";
-        }
-        std::cout<< std::endl;
-    }
-    }
-    */
-    
-    /*
     IndexType localBlockGraph [k][k];
     
     for(IndexType i=0; i<blockEdges[0].size(); i++){
