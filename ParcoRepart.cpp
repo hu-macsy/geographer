@@ -1796,8 +1796,6 @@ std::cout<<__FILE__<< "  "<< __LINE__<< " , __"<< *comm << " setting edge ("<< u
         localBlockGraph[u][v] = 1;
     }
     
-    */
-    
     //convert the k*k HArray to a [k x k] CSRSparseMatrix
     scai::lama::CSRStorage<ValueType> localMatrix;
     localMatrix.allocate( k ,k );
