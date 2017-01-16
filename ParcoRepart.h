@@ -6,6 +6,12 @@
 
 #include <scai/lama/Vector.hpp>
 #include <scai/dmemo/Halo.hpp>
+#include <scai/lama/storage/MatrixStorage.hpp>
+
+#include <boost/config.hpp>
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/edge_coloring.hpp>
+#include <boost/graph/properties.hpp>
 
 #include <set>
 
@@ -70,7 +76,32 @@ namespace ITI {
 			 */
 			static std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
 
+			/**
+			 * Builds a halo containing all matrix entries of non-local neighbors.
+			 */
+			static scai::dmemo::Halo buildMatrixHalo(const CSRSparseMatrix<ValueType> &input);
+
+			/**
+			 * Builds a halo containing all partition entries of non-local neighbors.
+			 */
+			static scai::dmemo::Halo buildPartHalo(const CSRSparseMatrix<ValueType> &input,  const DenseVector<IndexType> &part);
+
+			/**
+			 * Computes the border region within one block, adjacent to another block
+			 * @param[in] input Adjacency matrix of the input graph
+			 * @param[in] part Partition vector
+			 * @param[in] thisBlock block in which the border region is required
+			 * @param[in] otherBlock block to which the border region should be adjacent
+			 * @param[in] depth Width of the border region, measured in hops
+			 */
+			static std::pair<std::vector<IndexType>, IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, IndexType thisBlock, IndexType otherBlock, IndexType depth);
+
+			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted = true);
                         
+                        //------------------------------------------------------------------------
+                        
+                        /** Get the borders nodes of each block.
+                         */
 			static DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
 
 			/**Returns the processor graph. Every processor traverses its local part of adjM: and for every
@@ -93,28 +124,39 @@ namespace ITI {
 			 * edge (u,v) is (ret[0][i], ret[1][i]) if block u and block v are connected.
 			*/
 			static std::vector<std::vector<IndexType> > getLocalBlockGraphEdges( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
-
-			/**
-			 * Builds a halo containing all matrix entries of non-local neighbors.
-			 */
-			static scai::dmemo::Halo buildMatrixHalo(const CSRSparseMatrix<ValueType> &input);
-
-			/**
-			 * Builds a halo containing all partition entries of non-local neighbors.
-			 */
-			static scai::dmemo::Halo buildPartHalo(const CSRSparseMatrix<ValueType> &input,  const DenseVector<IndexType> &part);
-
-			/**
-			 * Computes the border region within one block, adjacent to another block
-			 * @param[in] input Adjacency matrix of the input graph
-			 * @param[in] part Partition vector
-			 * @param[in] thisBlock block in which the border region is required
-			 * @param[in] otherBlock block to which the border region should be adjacent
-			 * @param[in] depth Width of the border region, measured in hops
-			 */
-			static std::pair<std::vector<IndexType>, IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, IndexType thisBlock, IndexType otherBlock, IndexType depth);
-
-			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted = true);
+                        
+                        /** Builds the block graph of the given partition. 
+                         * Creates an HArray that is passed around in numPEs (=comm->getSize()) rounds and every time
+                         * a processor writes in the array its part.
+                         * 
+                         * Not distributed.
+                         * 
+                         * @param[in] adjM The adjacency matric of the input graph.
+                         * @param[in] part The partition of the input garph.
+                         * @param[in] k Number of blocks. 
+                         * 
+                         * @return The "adjacency matrix" of the block graph. In this version is a 1-dimensional array 
+                         * with size k*k and [i,j]= i*k+j.
+                         */
+                        static scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const int k);
+                        
+                        /** Colors the edges of the graph using max_vertex_degree + 1 colors.
+                         * 
+                         * @param[in] adjM The graph given as an adjacency matrix.
+                         * 
+                         * @return The adjacency matrix of the block graph.
+                         */
+                        static scai::lama::CSRSparseMatrix<ValueType>  getGraphEdgeColoring_local( const CSRSparseMatrix<ValueType> &adjM);
+                        
+                        /** Colors the edges of the graph using max_vertex_degree + 1 colors.
+                         * 
+                         * @param[in] edgeList The graph given as the list of edges. It must have size 2 and an edge
+                         * is (edgeList[0][i] , edgeList[1][i])
+                         * 
+                         * @return A vector with the color for every edge. ret.size()=edgeList.size() and edge i has
+                         * color ret[i].
+                         */
+                        static std::vector<IndexType> getGraphEdgeColoring_local( const std::vector<std::vector<IndexType>> &edgeList );
 
 		private:
 			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &halo,

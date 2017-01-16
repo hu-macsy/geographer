@@ -19,8 +19,6 @@
 #include "ParcoRepart.h"
 #include "HilbertCurve.h"
 
-//using std::vector;
-
 namespace ITI {
 
 template<typename IndexType, typename ValueType>
@@ -204,10 +202,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	for (IndexType i = 0; i < localN; i++) {
 		result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
 	}
-        
+   
 	if (true) {
 		ValueType gain = 1;
 		ValueType cut = computeCut(input, result);
+
 		while (gain > 0) {
 			if (inputDist->isReplicated()) {
 				gain = replicatedMultiWayFM(input, result, k, epsilon);
@@ -219,6 +218,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 					owners[i] = blockID.getValue<IndexType>();
 				}
 				scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(owners, comm));
+                                /* // sorry for that but it throws an assertion error here at my test "ParcoRepartTest. testBorders_Distributed". Could not locate it yet!
+                                 
+                                std::cout<<__FILE__<< "  "<< __LINE__<< " __"<< *comm << " , input.colDist: "<< input.getColDistribution() << "\n input.rowDist: "<< input.getRowDistribution() << "\n newDist: "<< *newDistribution << "\n owners.size= " << owners.size()<< std::endl;  		*/		                                
 				input.redistribute(newDistribution, input.getColDistributionPtr());
 				result.redistribute(newDistribution);
 				gain = distributedFMStep(input, result, k, epsilon);
@@ -693,6 +695,9 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::nonLocalNeighbors
 	return std::vector<IndexType>(neighborSet.begin(), neighborSet.end()) ;
 }
 
+//-----------------------------------------------------------------------------------------
+
+//return: there is an edge is the block graph between blocks ret[0]-ret[1], ret[2]-ret[3] ... ret[2i]-ret[2i+1] 
 template<typename IndexType, typename ValueType>
 scai::dmemo::Halo ITI::ParcoRepart<IndexType, ValueType>::buildMatrixHalo(
 		const CSRSparseMatrix<ValueType>& input) {
@@ -1463,6 +1468,428 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	return maxGain;
 }
 
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part) {
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const scai::utilskernel::LArray<IndexType> localPart= part.getLocalValues();
+    DenseVector<IndexType> border(dist,0);
+    scai::utilskernel::LArray<IndexType> localBorder= border.getLocalValues();
+    
+    IndexType N = adjM.getNumColumns();
+    IndexType max = part.max().Scalar::getValue<IndexType>();
+    
+    if( !dist->isEqual( part.getDistribution() ) ){
+        std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and partition dist: "<< part.getDistribution() << std::endl;
+        throw std::runtime_error( "Distributions: should (?) be equal.");
+    }
+    //TODO: Use DenseVector from start: localV and nonLocalV sizes are not known beforehand. That is why I use a std::vector and then convert it to a DenseVector. 
+    std::vector<IndexType> localV, nonLocalV;
+    for(IndexType i=0; i<dist->getLocalSize(); i++){    // for all local nodes 
+        scai::hmemo::HArray<ValueType> localRow;        // get local row on this processor
+        adjM.getLocalRow( localRow, i);
+        scai::hmemo::ReadAccess<ValueType> readLR(localRow); 
+        assert(readLR.size() == adjM.getNumColumns());
+        for(IndexType j=0; j<N; j++){                   // for all the edges of a node
+            ValueType val;
+            readLR.getValue(val, j);      
+            if(val>0){                                  // i and j have an edge               
+                if(dist->isLocal(j)){      
+                    assert( localPart[ dist->global2local(j) ] < max +1 );
+                    if( localPart[i] != localPart[ dist->global2local(j) ] ){ // i and j are in different parts
+                        localBorder[i] = 1;             // then i is a border node
+                        break;                          // if this is a border node then break 
+                    }
+                } else{     // if j is not local index in this PE, store the indices and gather later
+                    localV.push_back(i);
+                    nonLocalV.push_back(j);
+                }
+            }
+        }
+    }
+
+    // take care of all the non-local indices found
+    assert( localV.size() == nonLocalV.size() );
+    DenseVector<IndexType> nonLocalDV( nonLocalV.size() , 0 );
+    DenseVector<IndexType> gatheredPart(nonLocalDV.size() , 0);
+    
+    //get a DenseVector grom a vector
+    for(IndexType i=0; i<nonLocalV.size(); i++){
+        nonLocalDV.setValue(i, nonLocalV[i]);
+    }
+    //gather all non-local indexes
+    gatheredPart.gather(part, nonLocalDV , scai::utilskernel::binary::COPY );
+
+    assert( localV.size()==nonLocalDV.size() );
+    assert( nonLocalDV.size()==gatheredPart.size() );
+    for(IndexType i=0; i<gatheredPart.size(); i++){
+        if(localPart[ localV[i]] != gatheredPart(i).Scalar::getValue<IndexType>()  ){
+            localBorder[localV[i]]=1;
+        }
+    }
+   
+    border.setValues(localBorder);
+    return border;
+}
+
+//----------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getPEGraph( const CSRSparseMatrix<ValueType> &adjM) {
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr(); 
+    
+    //std::cout<< __FILE__<< " ,"<<__LINE__<<": matrix distribution:"<< *dist<< std::endl;
+    
+    scai::hmemo::HArray<IndexType> indicesH(0); 
+    scai::hmemo::WriteAccess<IndexType> indicesHWrite(indicesH);
+
+    for(IndexType i=0; i<dist->getLocalSize(); i++){    // for all local nodes 
+        scai::hmemo::HArray<ValueType> localRow;        // get local row on this processor
+        adjM.getLocalRow( localRow, i);
+        scai::hmemo::ReadAccess<ValueType> readLR(localRow); 
+        assert(readLR.size() == adjM.getNumColumns());  
+        for(IndexType j=0; j<readLR.size(); j++){       // for all the edges of a node
+            ValueType val;
+            readLR.getValue(val, j);
+            if(val>0){                                  // i and j have an edge             
+                if( !dist->isLocal(j) ){                // if j is not a local node
+                    indicesHWrite.resize( indicesH.size() +1);  
+                    indicesHWrite[indicesHWrite.size()-1] = j;  // store the non local index
+                }
+            }
+        }
+    }
+    indicesHWrite.release();
+  
+    // find the PEs that own every non-local index
+    scai::hmemo::HArray<IndexType> owners(indicesH.size() , -1);
+    dist->computeOwners( owners, indicesH);
+    
+    // create the PE adjacency matrix to be returned
+    IndexType numPEs = comm->getSize();
+    scai::dmemo::DistributionPtr distPEs ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, numPEs) );  
+    scai::dmemo::DistributionPtr noDistPEs (new scai::dmemo::NoDistribution( numPEs ));
+    // every PE must have one row of the matrix since we have numPes and the matrix is [numPes x numPEs]
+
+    scai::lama::SparseAssemblyStorage<ValueType> myStorage( distPEs->getLocalSize(), numPEs);
+    //scai::lama::MatrixStorage<ValueType> myStorage( distPEs->getLocalSize(), numPEs);
+    scai::hmemo::ReadAccess<IndexType> readI(owners);
+    for(IndexType i=0; i<readI.size(); i++){
+        myStorage.setValue(0, readI[i], 1);
+    }
+    readI.release();
+     
+    scai::lama::CSRSparseMatrix<ValueType> PEgraph(myStorage, distPEs, noDistPEs);     
+
+    return PEgraph;
+}
+
+//-----------------------------------------------------------------------------------------
+
+//return: there is an edge is the block graph between blocks ret[0]-ret[1], ret[2]-ret[3] ... ret[2i]-ret[2i+1] 
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getLocalBlockGraphEdges( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part) {
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const scai::utilskernel::LArray<IndexType> localPart= part.getLocalValues();
+    IndexType N = adjM.getNumColumns();
+    IndexType max = part.max().Scalar::getValue<IndexType>();
+   
+    if( !dist->isEqual( part.getDistribution() ) ){
+        std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and partition dist: "<< part.getDistribution() << std::endl;
+        throw std::runtime_error( "Distributions: should (?) be equal.");
+    }
+    
+    // edges[i,j] if an edge exists between blocks i and j
+    std::vector< std::vector<IndexType> > edges(2);
+    std::vector<IndexType> localInd, nonLocalInd;
+    
+    for(IndexType i=0; i<dist->getLocalSize(); i++){    // for all local nodes 
+        scai::hmemo::HArray<ValueType> localRow;        // get local row on this processor
+        adjM.getLocalRow( localRow, i);
+        scai::hmemo::ReadAccess<ValueType> readLR(localRow); 
+        assert(readLR.size() == adjM.getNumColumns()); 
+        for(IndexType j=0; j<readLR.size(); j++){       // for all the edges of a node
+            ValueType val;
+            readLR.getValue(val, j);
+            if(val>0){                                  // i and j have an edge             
+                //TODO: probably part.getValue(j) is not correct. If true the assertion should fail at some point.
+                //edge (u,v) if the block graph
+                //TODO: remove part.getValue(j) but now only gets an edge if both i and j are local. 
+                //      when j is not local???
+                if(dist->isLocal(j)){
+                    IndexType u = localPart[i];         // partition(i)
+                    IndexType v = localPart[dist->global2local(j)]; // partition(j), 0<j<N so take the local index of j
+//std::cout<<  __FILE__<< " ,"<<__LINE__<<" == "<< i <<", " << j <<":  __"<< *comm<< " , u=" << u<< " , v="<< v << std::endl;   
+                    assert( u < max +1);
+                    assert( v < max +1);
+                    if( u != v){    // the nodes belong to different blocks                  
+                        bool add_edge = true;
+                        for(IndexType k=0; k<edges[0].size(); k++){ //check that this edge is not already in
+// std::cout<<  __FILE__<< " ,"<<__LINE__<<" == k="<< k <<":  __"<< *comm<< " , u=" << edges[0][k]<< " , v="<< edges[1][k] << std::endl;                            
+                            if( edges[0][k]==u && edges[1][k]==v ){
+                                add_edge= false;
+                                break;      // the edge (u,v) already exists
+                            }
+                        }
+                        if( add_edge== true){       //if this edge does not exist, add it
+//std::cout<<  __FILE__<< " ,"<<__LINE__<< "\t __"<< *comm<<",  adding edge ("<< u<< ","<< v<< ")\n";    
+                            edges[0].push_back(u);
+                            edges[1].push_back(v);
+                        }
+                    }
+                } else{  // if(dist->isLocal(j)) , what TODO when j is not local?
+                // there is an edge between i and j but index j is not local in the partition so we cannot get part[j].
+                    localInd.push_back(i);
+                    nonLocalInd.push_back(j);
+                }
+            }
+        }
+    }//for 
+    
+    // take care of all the non-local indices found
+    assert( localInd.size() == nonLocalInd.size() );
+    DenseVector<IndexType> nonLocalDV( nonLocalInd.size() , 0 );
+    DenseVector<IndexType> gatheredPart(nonLocalDV.size() , 0);
+    
+    //get a DenseVector grom a vector
+    for(IndexType i=0; i<nonLocalInd.size(); i++){
+        nonLocalDV.setValue(i, nonLocalInd[i]);
+    }
+    //gather all non-local indexes
+    gatheredPart.gather(part, nonLocalDV , scai::utilskernel::binary::COPY );
+    
+    assert( gatheredPart.size() == nonLocalInd.size() );
+    assert( gatheredPart.size() == localInd.size() );
+    
+    for(IndexType i=0; i<gatheredPart.size(); i++){
+        IndexType u = localPart[ localInd[i] ];         
+        IndexType v = gatheredPart.getValue(i).Scalar::getValue<IndexType>();
+        //std::cout<<  __FILE__<< " ,"<<__LINE__<<" == "<< i <<", " << j <<":  __"<< *comm<< " , u=" << u<< " , v="<< v << std::endl;   
+        assert( u < max +1);
+        assert( v < max +1);
+        if( u != v){    // the nodes belong to different blocks                  
+            bool add_edge = true;
+            for(IndexType k=0; k<edges[0].size(); k++){ //check that this edge is not already in
+                // std::cout<<  __FILE__<< " ,"<<__LINE__<<" == k="<< k <<":  __"<< *comm<< " , u=" << edges[0][k]<< " , v="<< edges[1][k] << std::endl;                            
+                if( edges[0][k]==u && edges[1][k]==v ){
+                    add_edge= false;
+                    break;      // the edge (u,v) already exists
+                }
+            }
+            if( add_edge== true){       //if this edge does not exist, add it
+                //std::cout<<  __FILE__<< " ,"<<__LINE__<< "\t __"<< *comm<<",  adding edge ("<< u<< ","<< v<< ")\n";    
+                edges[0].push_back(u);
+                edges[1].push_back(v);
+            }
+        }
+    }
+    return edges;
+}
+
+//-----------------------------------------------------------------------------------------
+
+// in this version the graph is an HArray with size k*k and [i,j] = i*k+j
+//
+// Not distributed.
+//
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getBlockGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const int k) {
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
+    const scai::utilskernel::LArray<IndexType> localPart= part.getLocalValues();
+    
+    // IndexType k = part.max(); // if K is not given as a parameter
+    // there are k blocks in the partition so the adjecency matrix for the block graph has dimensions [k x k]
+    scai::dmemo::DistributionPtr distRowBlock ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, k) );  
+    scai::dmemo::DistributionPtr distColBlock ( new scai::dmemo::NoDistribution( k ));
+    //scai::lama::CSRSparseMatrix<ValueType> blockGraph( distRowBlock, distColBlock );    // the distributed adjacency matrix of the block-graph
+    
+    IndexType size= k*k;
+    // get, on each processor, the edges of the blocks that are local
+    std::vector< std::vector<IndexType> > blockEdges = ParcoRepart<int, double>::getLocalBlockGraphEdges( adjM, part);
+    
+    // the gather function accepts a one dimensional array
+    //IndexType blockGraphMatrix[size];    
+    scai::hmemo::HArray<IndexType> sendPart(size, static_cast<ValueType>( 0 ));
+    scai::hmemo::HArray<IndexType> recvPart(size);
+    
+    for(IndexType round=0; round<comm->getSize(); round++){
+        {   // write your part 
+            scai::hmemo::WriteAccess<IndexType> sendPartWrite( sendPart );
+            for(IndexType i=0; i<blockEdges[0].size(); i++){
+                IndexType u = blockEdges[0][i];
+                IndexType v = blockEdges[1][i];
+//std::cout<<__FILE__<< "  "<< __LINE__<< " , round:"<< round<< " , __"<< *comm << " setting edge ("<< u<< ", "<< v << ") , in send-index:"<< u*k+v <<std::endl;
+                sendPartWrite[ u*k + v ] = 1;
+            }
+        }
+        comm->shiftArray(recvPart , sendPart, 1);
+        sendPart.swap(recvPart);
+    } 
+    
+    // get numEdges
+    IndexType numEdges=0;
+    {
+        scai::hmemo::ReadAccess<IndexType> recvPartRead( recvPart );
+        for(IndexType i=0; i<recvPartRead.size(); i++){
+            if( recvPartRead[i]>0 )
+                ++numEdges;
+        }
+    }
+    
+        /*
+    { // print
+    scai::hmemo::ReadAccess<IndexType> sendPartRead( sendPart );
+    std::cout<< *comm <<" , sendPart"<< std::endl;
+    for(IndexType row=0; row<k; row++){
+        for(IndexType col=0; col<k; col++){
+            std::cout<< comm->getRank()<< ":("<< row<< ","<< col<< "):" << sendPartRead[ row*k +col] <<" - ";
+        }
+        std::cout<< std::endl;
+    }
+    
+    scai::hmemo::ReadAccess<IndexType> recvPartRead( recvPart );
+    std::cout<< *comm <<" , recvPart"<< std::endl;
+    for(IndexType row=0; row<k; row++){
+        for(IndexType col=0; col<k; col++){
+            std::cout<< comm->getRank()<< ":("<< row << "," << col<< "):" << recvPartRead[ row*k +col] <<" - ";
+        }
+        std::cout<< std::endl;
+    }
+    }
+    */
+    
+    /*
+    IndexType localBlockGraph [k][k];
+    
+    for(IndexType i=0; i<blockEdges[0].size(); i++){
+        IndexType u = blockEdges[0][i];
+        IndexType v = blockEdges[1][i];
+std::cout<<__FILE__<< "  "<< __LINE__<< " , __"<< *comm << " setting edge ("<< u<< ", "<< v << ")"<<std::endl;        
+        localBlockGraph[u][v] = 1;
+    }
+    
+    */
+    
+    //convert the k*k HArray to a [k x k] CSRSparseMatrix
+    scai::lama::CSRStorage<ValueType> localMatrix;
+    localMatrix.allocate( k ,k );
+    
+    scai::hmemo::HArray<IndexType> csrIA;
+    scai::hmemo::HArray<IndexType> csrJA;
+    scai::hmemo::HArray<ValueType> csrValues; 
+    {
+        IndexType numNZ = numEdges;     // this equals the number of edges of the graph
+std::cout<< std::endl<< __FILE__<< "  "<< __LINE__<< ", __"<< *comm << " , numNZ="<< numNZ << " <> numEdges_2=" << numEdges<< std::endl;         
+        scai::hmemo::WriteOnlyAccess<IndexType> ia( csrIA, k +1 );
+        scai::hmemo::WriteOnlyAccess<IndexType> ja( csrJA, numNZ );
+        scai::hmemo::WriteOnlyAccess<ValueType> values( csrValues, numNZ );   
+        scai::hmemo::ReadAccess<IndexType> recvPartRead( recvPart );
+        ia[0]= 0;
+        
+        IndexType rowCounter = 0; // count rows
+        IndexType nnzCounter = 0; // count non-zero elements
+        
+        for(IndexType i=0; i<k; i++){
+            IndexType rowNums=0;
+            // traverse the part of the HArray that represents a row and find how many elements are in this row
+            for(IndexType j=0; j<k; j++){
+                if( recvPartRead[i*k+j] >0  ){
+                    ++rowNums;
+                }
+            }
+            ia[rowCounter+1] = ia[rowCounter] + rowNums;
+           
+            for(IndexType j=0; j<k; j++){
+                if( recvPartRead[i*k +j] >0){   // there exist edge (i,j)
+                    ja[nnzCounter] = j;
+                    values[nnzCounter] = 1;
+                    ++nnzCounter;
+                }
+            }
+            ++rowCounter;
+        }
+    }
+    
+    scai::lama::CSRSparseMatrix<ValueType> matrix;
+    localMatrix.swap( csrIA, csrJA, csrValues );
+    matrix.assign(localMatrix);
+    
+    return matrix;
+}
+
+//-----------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local( const CSRSparseMatrix<ValueType> &adjM) {
+    using namespace boost;
+    IndexType N= adjM.getNumRows();
+    assert( N== adjM.getNumColumns() ); // numRows = numColumns
+    
+    // use boost::Graph and boost::edge_coloring()
+    typedef adjacency_list<vecS, vecS, undirectedS, no_property, size_t, no_property> Graph;
+    typedef std::pair<std::size_t, std::size_t> Pair;
+    std::vector<std::vector<IndexType>> edges(2);
+    Graph G(N);
+    
+    for(IndexType i=0; i<N; i++){
+        for(IndexType j=0; j<N; j++){
+            if(adjM(i, j)== 1){ // there is an edge between nodes i and j. add the edge to G
+                boost::add_edge(i, j, G).first;
+                edges[0].push_back(i);  
+                edges[1].push_back(j);
+            }
+        }
+    }
+    
+    size_t colors = boost::edge_coloring(G, boost::get( boost::edge_bundle, G));
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    std::cout << *comm << ", Colored using " << colors << " colors" << std::endl;
+    for (size_t i = 0; i <edges[0].size(); i++) {
+        std::cout << "  " <<  edges[0][i] << "-" << edges[1][i] << ": " << \
+        G[ boost::edge( edges[0][i],  edges[1][i], G).first] << std::endl;
+    }
+    CSRSparseMatrix<ValueType> ret;
+    return ret;
+}
+
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<IndexType> ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local( const std::vector<std::vector<IndexType>> &edgeList) {
+    using namespace boost;
+    assert( edgeList.size() == 2);
+    IndexType N= edgeList[0].size();
+    
+    // use boost::Graph and boost::edge_coloring()
+    typedef adjacency_list<vecS, vecS, undirectedS, no_property, size_t, no_property> Graph;
+    typedef std::pair<std::size_t, std::size_t> Pair;
+    Graph G(N);
+    
+    size_t colors = boost::edge_coloring(G, boost::get( boost::edge_bundle, G));
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    std::vector<IndexType> ret;
+    std::cout << *comm << ", Colored using " << colors << " colors" << std::endl;
+    for (size_t i = 0; i <edgeList[0].size(); i++) {
+        std::cout << "  " <<  edgeList[0][i] << "-" << edgeList[1][i] << ": " << \
+        G[ boost::edge( edgeList[0][i],  edgeList[1][i], G).first] << std::endl;
+        ret.push_back( G[ boost::edge( edgeList[0][i],  edgeList[1][i], G).first] );
+    }
+    
+    return ret;
+}
+
+//---------------------------------------------------------------------------------------
+
 //to force instantiation
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, int k,  double epsilon);
 
@@ -1483,4 +1910,17 @@ template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildMatrixHalo(const 
 template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildPartHalo(const CSRSparseMatrix<double> &input,  const DenseVector<int> &part);
 
 template std::pair<std::vector<int>, int> ITI::ParcoRepart<int, double>::getInterfaceNodes(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, int thisBlock, int otherBlock, int depth);
+
+template DenseVector<int> ParcoRepart<int, double>::getBorderNodes( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part);
+
+template scai::lama::CSRSparseMatrix<double> ParcoRepart<int, double>::getPEGraph( const CSRSparseMatrix<double> &adjM);
+
+template std::vector<std::vector<IndexType>> ParcoRepart<int, double>::getLocalBlockGraphEdges( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part);
+
+template scai::lama::CSRSparseMatrix<double> ParcoRepart<int, double>::getBlockGraph( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part, const int k );
+
+template scai::lama::CSRSparseMatrix<double>   ParcoRepart<int, double>::getGraphEdgeColoring_local( const CSRSparseMatrix<double> &adjM);
+
+template std::vector<IndexType> ParcoRepart<int, double>::getGraphEdgeColoring_local( const std::vector<std::vector<IndexType>> &edgeList );
+
 }

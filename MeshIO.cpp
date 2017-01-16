@@ -84,7 +84,7 @@ void MeshIO<IndexType, ValueType>::createRandom3DMesh( CSRSparseMatrix<ValueType
                 if(liIndex!=kNNindex.end()) ++liIndex;
                 else  break;
             }
-        }
+        }   
     }
     
     //brute force zero in the diagonal
@@ -140,7 +140,6 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
     hmemo::HArray<IndexType> csrJA;
     hmemo::HArray<ValueType> csrValues;
     {
-        SCAI_REGION("MeshIO.createStructured3DMesh_edges")
         // ja and values have size= edges of the graph
         // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
         IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\

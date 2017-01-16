@@ -35,7 +35,8 @@ class HilbertCurveTest : public ::testing::Test {
 
 };
 
-
+/* Read from file and test hilbert indices. No sorting.
+ * */
 TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
   const IndexType dimensions = 2;
   const IndexType recursionDepth = 7;
@@ -47,8 +48,9 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
   }
   
   std::vector<ValueType> maxCoords({0,0});
+
   MeshIO<IndexType, ValueType>::fromFile2Coords_2D("./Grid32x32.xyz", coords,  N);
-  
+
   for(IndexType j=0; j<dimensions; j++){
       for (IndexType i = 0; i < N; i++){
         coords[j].setValue(i, (coords[j].getValue(i)+0.17)/8.2 );
@@ -71,12 +73,19 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
 }
 
 //-------------------------------------------------------------------------------------------------
+// Create and test a specific input in 3D.
 
 TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_3D) {
   const IndexType dimensions = 3;
   const IndexType n = 7;
   const IndexType recursionDepth = 3;
-  ValueType tempArray[dimensions*n] = {0.1, 0.1, 0.13, 0.1, 0.61, 0.36, 0.7, 0.7, 0.35, 0.65, 0.41, 0.71, 0.4, 0.13, 0.88, 0.2, 0.11, 0.9, 0.1, 0.1, 0.95};
+  ValueType tempArray[dimensions*n] = { 0.1, 0.1, 0.13,
+                                        0.1, 0.61, 0.36,
+                                        0.7, 0.7, 0.35, 
+                                        0.65, 0.41, 0.71, 
+                                        0.4, 0.13, 0.88, 
+                                        0.2, 0.11, 0.9, 
+                                        0.1, 0.1, 0.95};
   
   std::vector<DenseVector<ValueType>> coordinates(dimensions);
   for(IndexType i=0; i<dimensions; i++){ 
@@ -106,7 +115,7 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_3D) {
 
 //-----------------------------------------------------------------
 /*
- * Creates random coordinates for n points
+ * Creates random coordinates for n points in 3D
 */
 TEST_F(HilbertCurveTest, testHilbertIndexRandom_Distributed_3D) {
   const IndexType dimensions = 3;
@@ -152,22 +161,21 @@ TEST_F(HilbertCurveTest, testHilbertIndexRandom_Distributed_3D) {
     maxCoords[dim] = globalMax;
   }
 
-  DenseVector<ValueType> indices(dist, 17);
-  DenseVector<IndexType> perm(dist, 17);
+  //the hilbert indices initiated with the dummy value 19
+  DenseVector<ValueType> indices(dist, 19);
+  DenseVector<IndexType> perm(dist, 19);
+
   const IndexType localN = dist->getLocalSize();
   
   for (IndexType i = 0; i < localN; i++) {
     //check if the new function return the same index. seems OK.
     indices.getLocalValues()[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, dist->local2global(i), recursionDepth, minCoords, maxCoords);
     
-    /*
-    EXPECT_LE(indices.getLocalValues()[i], 1);
-    EXPECT_GE(indices.getLocalValues()[i], 0);
-    */
   }
   
   indices.sort(perm, true);
   
+  //check that indices are sorted
   for(IndexType i=0; i<N-1; i++){
     ValueType ind1 = indices.getValue(i ).Scalar::getValue<ValueType>(); 
     ValueType ind2 = indices.getValue(i+1 ).Scalar::getValue<ValueType>();
@@ -180,8 +188,8 @@ TEST_F(HilbertCurveTest, testHilbertIndexRandom_Distributed_3D) {
 
 /*
 * Create points in 3D in a structured, grid-like way and calculate theis hilbert index.
-* Sorts the index and the point in a myclass vector and sorts the vector
-* according to the hilbert index. Prints all the points in a file for visualisation.
+* Sort the points by its hilbert index.
+* Every processor writes its part of the coordinates in a separate file.
 */
 
 TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distributed_3D){
@@ -211,6 +219,7 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
 	++i;
  }
 
+ //the hilbert indices initiated with the dummy value 19
  DenseVector<ValueType> hilbertIndex(dist, 19);
  DenseVector<IndexType> perm(dist);
 
@@ -229,11 +238,19 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
  const IndexType localN = dist->getLocalSize();
 
   //calculate the hilbert index of the points located in the processor and sort them
- for(int i=0; i<localN; i++)
+ for(int i=0; i<localN; i++){
     hilbertIndex.getLocalValues()[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, distIndices->local2global(i), recursionDepth ,minCoords, maxCoords) ;
+    EXPECT_LE( hilbertIndex.getLocalValues()[i] , 1);
+    EXPECT_GE( hilbertIndex.getLocalValues()[i] , 0);
+}
   
   hilbertIndex.sort(perm, true);
   
+  //test sorting: hilbertIndex(i) < hilbertIdnex(i-1)
+  for(int i=1; i<localN; i++){
+      EXPECT_GE( hilbertIndex.getLocalValues()[i] , hilbertIndex.getLocalValues()[i-1]); 
+  }
+
   std::ofstream f;
   std::string fileName = std::string("meshes/my_meshes/hilbert3D_" + std::to_string(comm->getRank()) + ".plt");
   f.open(fileName);
