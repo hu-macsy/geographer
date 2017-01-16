@@ -103,11 +103,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		throw std::runtime_error("Creating " + std::to_string(k) + " blocks from " + std::to_string(n) + " elements is impossible.");
 	}
 
-    if (comm->getSize() > 1 && k != comm->getSize()) {
-    	throw std::runtime_error("For now, if partitioning in parallel, number of processes must be equal to number blocks. "
-    			"Called with " + std::to_string(comm->getSize()) + " processes, but " + std::to_string(k) + " blocks.");
-    }
-
 	if (epsilon < 0) {
 		throw std::runtime_error("Epsilon " + std::to_string(epsilon) + " is invalid.");
 	}
@@ -208,7 +203,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
 	}
    
-	if (true) {
+
+	if (comm->getSize() == 1 && comm->getSize() == k) {
 		ValueType gain = 1;
 		ValueType cut = computeCut(input, result);
 
@@ -233,6 +229,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			assert(oldCut - gain == cut);
 			std::cout << "Last FM round yielded gain of " << gain << ", for total cut of " << computeCut(input, result) << std::endl;
 		}
+	} else {
+		std::cout << "Local refinement only implemented if sequential or one block per process. Called with " << comm->getSize() << " process and " << k << " blocks." << std::endl;
+
+
 	}
 	return result;
 }
