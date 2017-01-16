@@ -230,7 +230,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			std::cout << "Last FM round yielded gain of " << gain << ", for total cut of " << computeCut(input, result) << std::endl;
 		}
 	} else {
-		std::cout << "Local refinement only implemented if sequential or one block per process. Called with " << comm->getSize() << " process and " << k << " blocks." << std::endl;
+		std::cout << "Local refinement only implemented sequentially and with one block per process. Called with " << comm->getSize() << " process and " << k << " blocks." << std::endl;
 
 
 	}

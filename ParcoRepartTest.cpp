@@ -271,7 +271,7 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 	const IndexType dimY = 10;
 	const IndexType dimZ = 10;
 	const IndexType n = dimX*dimY*dimZ;
-	const IndexType k = comm->getSize() > 1 ? comm->getSize() : 10;
+	const IndexType k = comm->getSize();
 	const ValueType epsilon = 0.05;
 	const IndexType iterations = 1;
 
