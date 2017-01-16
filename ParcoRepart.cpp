@@ -103,6 +103,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		throw std::runtime_error("Creating " + std::to_string(k) + " blocks from " + std::to_string(n) + " elements is impossible.");
 	}
 
+    if (comm->getSize() > 1 && k != comm->getSize()) {
+    	throw std::runtime_error("For now, if partitioning in parallel, number of processes must be equal to number blocks. "
+    			"Called with " + std::to_string(comm->getSize()) + " processes, but " + std::to_string(k) + " blocks.");
+    }
+
 	if (epsilon < 0) {
 		throw std::runtime_error("Epsilon " + std::to_string(epsilon) + " is invalid.");
 	}
@@ -218,9 +223,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 					owners[i] = blockID.getValue<IndexType>();
 				}
 				scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(owners, comm));
-                                /* // sorry for that but it throws an assertion error here at my test "ParcoRepartTest. testBorders_Distributed". Could not locate it yet!
-                                 
-                                std::cout<<__FILE__<< "  "<< __LINE__<< " __"<< *comm << " , input.colDist: "<< input.getColDistribution() << "\n input.rowDist: "<< input.getRowDistribution() << "\n newDist: "<< *newDistribution << "\n owners.size= " << owners.size()<< std::endl;  		*/		                                
+
 				input.redistribute(newDistribution, input.getColDistributionPtr());
 				result.redistribute(newDistribution);
 				gain = distributedFMStep(input, result, k, epsilon);
