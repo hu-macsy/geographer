@@ -234,7 +234,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				IndexType numOutgoingEdges = 0;
 				for (IndexType i = 0; i < inputDist->getLocalSize(); i++) {
 					for (IndexType j = ia[i]; j < ia[i+1]; i++) {
-						if (!inputDist->isLocal(ja[j])) numOutgoingEdges++;
+						if (!input.getRowDistributionPtr()->isLocal(ja[j])) numOutgoingEdges++;
 					}
 				}
 
@@ -249,8 +249,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		}
 	} else {
 		std::cout << "Local refinement only implemented sequentially and for one block per process. Called with " << comm->getSize() << " process and " << k << " blocks." << std::endl;
-
-
 	}
 	return result;
 }
