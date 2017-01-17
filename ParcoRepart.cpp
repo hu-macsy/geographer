@@ -226,11 +226,29 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			}
 			ValueType oldCut = cut;
 			cut = computeCut(input, result);
+			if (cut != oldCut - gain) {
+				const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
+				const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+				const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+
+				IndexType numOutgoingEdges = 0;
+				for (IndexType i = 0; i < inputDist->getLocalSize(); i++) {
+					for (IndexType j = ia[i]; j < ia[i+1]; i++) {
+						if (!inputDist->isLocal(ja[j])) numOutgoingEdges++;
+					}
+				}
+
+				IndexType sumOutgoingEdges = comm->sum(numOutgoingEdges) / 2;
+
+				throw std::runtime_error("Old cut was " + std::to_string(oldCut) + ", new cut is " + std::to_string(cut) + " with "
+						+ std::to_string(sumOutgoingEdges) + " outgoing edges, but gain is " + std::to_string(gain)+".");
+			}
+
 			assert(oldCut - gain == cut);
 			std::cout << "Last FM round yielded gain of " << gain << ", for total cut of " << computeCut(input, result) << std::endl;
 		}
 	} else {
-		std::cout << "Local refinement only implemented sequentially and with one block per process. Called with " << comm->getSize() << " process and " << k << " blocks." << std::endl;
+		std::cout << "Local refinement only implemented sequentially and for one block per process. Called with " << comm->getSize() << " process and " << k << " blocks." << std::endl;
 
 
 	}
