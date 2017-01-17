@@ -68,15 +68,24 @@ TEST_F(MeshIOTest, testMesh3DCreateRandomMeshWriteInFile_Local_3D) {
  * */
 
 TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
-    std::vector<IndexType> numPoints= {12, 13, 14};
+    std::vector<IndexType> numPoints= {8, 7, 10};
     std::vector<ValueType> maxCoord= {100,180,130};
+    // set number of points in random
+    /*
+    srand(time(NULL));
+    for(int i=0; i<3; i++){
+        numPoints[i] = (IndexType) (rand()%4 +7);
+    }
+    */
     IndexType numberOfPoints= numPoints[0]*numPoints[1]*numPoints[2];
+    
     std::vector<DenseVector<ValueType>> coords(3, DenseVector<ValueType>(numberOfPoints, 0));
-    std::string grFile = "meshes/structuredTest6.graph";
+    std::string grFile = "meshes/structuredTest7.graph";
     std::string coordFile= grFile + ".xyz";
 
+    
     scai::lama::CSRSparseMatrix<ValueType> adjM( numberOfPoints, numberOfPoints);
-    std::cout<<__FILE__<< "  "<< __LINE__<< " , numberOfPoints=" << numberOfPoints<< std::endl;
+    std::cout<<__FILE__<< "  "<< __LINE__<< " , numberOfPoints=" << numberOfPoints << " in every axis: "<< numPoints[0] << ", "<< numPoints[1] << ", "<< numPoints[2] << std::endl;
 
     {
         SCAI_REGION("testMesh3DCreateStructuredMesh_Local_3D.createStructured3DMesh" )
@@ -101,6 +110,7 @@ TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
             }
         }
     }
+    
 }
 //-----------------------------------------------------------------
 

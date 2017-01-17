@@ -96,6 +96,8 @@ namespace ITI {
                 /* Calculates the 3D distance between two points.
                  */
                 static Scalar dist3D(DenseVector<ValueType> p1, DenseVector<ValueType> p2);
+                
+                static Scalar dist3D(DenseVector<ValueType> p1, ValueType* p2);
         };//class MeshIO
         
 }//namespace ITI

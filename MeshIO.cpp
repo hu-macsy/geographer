@@ -11,6 +11,8 @@
 //#include "ParcoRepart.h"
 //#include "HilbertCurve.h"
 
+#include <scai/common/macros/assert.hpp>
+
 using std::string;
 using std::list;
 using std::ifstream;
@@ -101,6 +103,8 @@ void MeshIO<IndexType, ValueType>::createRandom3DMesh( CSRSparseMatrix<ValueType
 //-------------------------------------------------------------------------------------------------
 // coords.size()= 3 , coords[i].size()= N
 // here, N= numPoints[0]*numPoints[1]*numPoints[2]
+
+// TODO: sometimes (!!) it throws an assertion at the swap() near the end
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
 	SCAI_REGION( "MeshIO.createStructured3DMesh" )
@@ -118,6 +122,8 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
     // create the coordinates
     IndexType index=0;
     index = 0;
+    {
+    SCAI_REGION("createStructured3DMesh.setCoordinates");
     coords[0].setValue(0,0);
     coords[1].setValue(0,0);
     coords[2].setValue(0,0);
@@ -131,6 +137,13 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
             }
         }
     }
+    }
+    std::cout<<__FILE__<< "  "<< __LINE__<< ", N= "<< N << std::endl;
+    // for the occasionally failed-assertion detection
+    
+    IndexType numValues, numValues2;
+    
+    //
 
     scai::lama::CSRStorage<ValueType> localMatrix;
     localMatrix.allocate( N, N );
@@ -139,11 +152,11 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
     hmemo::HArray<IndexType> csrIA;
     hmemo::HArray<IndexType> csrJA;
     hmemo::HArray<ValueType> csrValues;
-    {
-        // ja and values have size= edges of the graph
-        // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
-        IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
+    // ja and values have size= edges of the graph
+    // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
+    IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
                                 -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
+    {    
         hmemo::WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
         hmemo::WriteOnlyAccess<IndexType> ja( csrJA);
         hmemo::WriteOnlyAccess<ValueType> values( csrValues);
@@ -152,6 +165,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
         IndexType nnzCounter = 0; // count non-zero elements
         // for every node= for every line of adjM
         for(IndexType i=0; i<N; i++){
+            //std::cout<<__FILE__<< "  "<< __LINE__<< ", i= "<< i << std::endl;            
             // connect the point with its 6 (in 3D) neighbours
             // neighbour_node: the index of a neighbour of i, can take negative values
             // but in that case we do not add it
@@ -163,117 +177,82 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
             p1.setValue(0,coords[0].getValue(i));
             p1.setValue(1,coords[1].getValue(i));
             p1.setValue(2,coords[2].getValue(i));
-            ngb_node = i +1;                            //edge 1
-            if(ngb_node>=0 && ngb_node<N){              // if the neighbour has a valid index
-                // want to do: adjM[i][ngb_node]= 1;
-                DenseVector<ValueType> p2(3,0);
-                p2.setValue(0,coords[0].getValue(ngb_node));
-                p2.setValue(1,coords[1].getValue(ngb_node));
-                p2.setValue(2,coords[2].getValue(ngb_node));
-                // we need to check distance for the nodes at the outer borders of the grid: eg:
-                // in a 4x4 grid with 16 nodes {0, 1, 2, ...} , for p1= node 3 there is an edge with
-                // p2= node 4 that we should not add (node 3 has coords (0,3) and node 4 has coords (1,0)).
-                // A way to avoid that is check if thery are close enough.
-                // TODO: maybe find another, faster way to avoid adding that kind of edges
-                if(dist3D(p1, p2).Scalar::getValue<ValueType>() <= max_offset )
-                {
-                ja.resize( ja.size()+1);
-                values.resize( values.size()+1);
-                ja[nnzCounter]= ngb_node;   
-                values[nnzCounter] = 1;         // unweighted edges
-                ++nnzCounter;
-                ++numRowElems;
+           
+            {
+            SCAI_REGION("createStructured3DMesh.setAdjacencyMatrix");
+            for(IndexType m=0; m<6; m++){
+                switch(m){
+                    case 0: ngb_node= i+1; break;
+                    case 1: ngb_node= i-1; break;
+                    case 2: ngb_node = i +numPoints[2]; break;
+                    case 3: ngb_node = i -numPoints[2]; break;
+                    case 4: ngb_node = i +numPoints[2]*numPoints[1]; break;
+                    case 5: ngb_node = i -numPoints[2]*numPoints[1]; break;
                 }
-            }
-            ngb_node = i -1;                             //edge 2
-            if(ngb_node>=0 && ngb_node<N){            
-                DenseVector<ValueType> p2(3,0);
-                p2.setValue(0,coords[0].getValue(ngb_node));
-                p2.setValue(1,coords[1].getValue(ngb_node));
-                p2.setValue(2,coords[2].getValue(ngb_node));
-                if(dist3D(p1, p2).Scalar::getValue<ValueType>() <= max_offset )
-                {
-                ja.resize( ja.size()+1);
-                values.resize( values.size()+1);
-                ja[nnzCounter]= ngb_node;    
-                values[nnzCounter] = 1;         // unweighted edges
-                ++nnzCounter;
-                ++numRowElems;
-                }
-            }
-            
-            ngb_node = i +numPoints[2];                  //edge 3
-            if(ngb_node>=0 && ngb_node<N){
-                                DenseVector<ValueType> p2(3,0);
-                p2.setValue(0,coords[0].getValue(ngb_node));
-                p2.setValue(1,coords[1].getValue(ngb_node));
-                p2.setValue(2,coords[2].getValue(ngb_node));
-                if(dist3D(p1, p2).Scalar::getValue<ValueType>() <= max_offset)
-                {
-                ja.resize( ja.size()+1);
-                values.resize( values.size()+1);
-                ja[nnzCounter]= ngb_node;    
-                values[nnzCounter] = 1;         // unweighted edges
-                ++nnzCounter;
-                ++numRowElems;
-                }
-            }
                 
-            ngb_node = i -numPoints[2];                  //edge 4
-            if(ngb_node>=0 && ngb_node<N){
-                DenseVector<ValueType> p2(3,0);
-                p2.setValue(0,coords[0].getValue(ngb_node));
-                p2.setValue(1,coords[1].getValue(ngb_node));
-                p2.setValue(2,coords[2].getValue(ngb_node));
-                if(dist3D(p1, p2).Scalar::getValue<ValueType>() <= max_offset)
-                {
-                ja.resize( ja.size()+1);
-                values.resize( values.size()+1);
-                ja[nnzCounter]= ngb_node;    
-                values[nnzCounter] = 1;         // unweighted edges
-                ++nnzCounter;
-                ++numRowElems;
+                if(ngb_node>=0 && ngb_node<N){
+                    /*
+                    DenseVector<ValueType> p2(3,0);
+                    p2.setValue(0,coords[0].getValue(ngb_node));
+                    p2.setValue(1,coords[1].getValue(ngb_node));
+                    p2.setValue(2,coords[2].getValue(ngb_node));
+                    */
+                    ValueType p2V[3];
+                    {
+                    SCAI_REGION("createStructured3DMesh.setAdjacencyMatrix.getValue");
+                    p2V[0] = coords[0].getValue(ngb_node).Scalar::getValue<ValueType>();
+                    p2V[1] = coords[1].getValue(ngb_node).Scalar::getValue<ValueType>();
+                    p2V[2] = coords[2].getValue(ngb_node).Scalar::getValue<ValueType>();
+                    }
+                    // we need to check distance for the nodes at the outer borders of the grid: eg:
+                    // in a 4x4 grid with 16 nodes {0, 1, 2, ...} , for p1= node 3 there is an edge with
+                    // p2= node 4 that we should not add (node 3 has coords (0,3) and node 4 has coords (1,0)).
+                    // A way to avoid that is check if thery are close enough.
+                    // TODO: maybe find another, faster way to avoid adding that kind of edges
+                    //if(dist3D(p1, p2).Scalar::getValue<ValueType>() <= max_offset)
+                    if(dist3D(p1, p2V).Scalar::getValue<ValueType>() <= max_offset)
+                    {
+                        SCAI_REGION("createStructured3DMesh.setAdjacencyMatrix.setCSRSparseMatrix");
+                        ja.resize( ja.size()+1);
+                        values.resize( values.size()+1);
+                        ja[nnzCounter]= ngb_node;       // -1 for the METIS format
+                        values[nnzCounter] = 1;         // unweighted edges
+                        ++nnzCounter;
+                        ++numRowElems;
+                    }
                 }
             }
-            
-            ngb_node = i +numPoints[2]*numPoints[1];     //edge 5
-            if(ngb_node>=0 && ngb_node<N){
-                DenseVector<ValueType> p2(3,0);
-                p2.setValue(0,coords[0].getValue(ngb_node));
-                p2.setValue(1,coords[1].getValue(ngb_node));
-                p2.setValue(2,coords[2].getValue(ngb_node));
-                if(dist3D(p1, p2).Scalar::getValue<ValueType>() <= max_offset )
-                {
-                ja.resize( ja.size()+1);
-                values.resize( values.size()+1);
-                ja[nnzCounter]= ngb_node;    
-                values[nnzCounter] = 1;         // unweighted edges
-                ++nnzCounter;
-                ++numRowElems;
-                }
             }
-                
-            ngb_node = i -numPoints[2]*numPoints[1];     //edge 6
-            if(ngb_node>=0 && ngb_node<N){
-                DenseVector<ValueType> p2(3,0);
-                p2.setValue(0,coords[0].getValue(ngb_node));
-                p2.setValue(1,coords[1].getValue(ngb_node));
-                p2.setValue(2,coords[2].getValue(ngb_node));
-                if(dist3D(p1, p2).Scalar::getValue<ValueType>() <= max_offset)
-                {
-                ja.resize( ja.size()+1);
-                values.resize( values.size()+1);
-                ja[nnzCounter]= ngb_node;    //-1 for the METIS format
-                values[nnzCounter] = 1;         // unweighted edges
-                ++nnzCounter;
-                ++numRowElems;
-                }
-            }
-            
             ia[i+1] = ia[i] +static_cast<IndexType>(numRowElems);
         }//for
+        numValues = ia[ ia.size()-1]; // for the assertion error
+        numValues2 = ia[ localMatrix.getNumRows() ];
     }
- 
+    // TODO: sometimes (!!) it throws an assertion at the swap()
+    // was not able to recreate "efficiently" it yet
+    //from CSRStorage.cpp // IndexType numValues = HArrayUtils::getValImpl<IndexType>( ia, N /*=mNumRows*/ );
+    
+    std::cout << __FILE__<< "  "<< __LINE__ << " , numValues= " << numValues << " <> numValues2= "<< numValues2 << " , csrValues.size()= "<< csrValues.size() << " , csrIA.size()= "<< csrIA.size() << " , csrJA.size()=" << csrJA.size() << ", numEdges="<< numEdges << std::endl;
+    
+    //
+    // rarely, with even the same input, assertion on CSRStorage line 715 fails. Although everything seems to have
+    // the correct sizes and values, occasionally ia[ localMatrix.getNumRows() ] looks like it contains rubbish,
+    // or something like that. Not sure what is happening or why!
+    // Must leave it for now.
+    
+    // the two checks bellow should fail, sometimes
+    // it has something to do with the max_offset, sometimes wrong edges are being added or not added
+    // so it should be: numEdges*2 = csrValues.size() = csrJA.size() = ia[ia.size()]
+    // but that is not always the case...
+    
+    SCAI_ASSERT_EQUAL_ERROR(numEdges*2 , csrValues.size() )
+    
+    assert(numEdges*2 == csrValues.size() );
+    if( numEdges*2 != csrValues.size() ){
+        throw std::runtime_error("error");
+    }
+    assert(numEdges*2 == csrJA.size() );
+    
     localMatrix.swap( csrIA, csrJA, csrValues );
     adjM.assign(localMatrix);
 }
@@ -487,13 +466,26 @@ Scalar MeshIO<IndexType, ValueType>::dist3D(DenseVector<ValueType> p1, DenseVect
 }
     
 //-------------------------------------------------------------------------------------------------
-
+template<typename IndexType, typename ValueType>
+Scalar MeshIO<IndexType, ValueType>::dist3D(DenseVector<ValueType> p1, ValueType *p2){
+  SCAI_REGION( "MeshIO.dist3D" )
+  Scalar res0, res1, res2, res;
+  res0= p1.getValue(0)-p2[0];
+  res0= res0*res0;
+  res1= p1.getValue(1)-p2[1];
+  res1= res1*res1;
+  res2= p1.getValue(2)-p2[2];
+  res2= res2*res2;
+  res = res0+ res1+ res2;
+  return scai::common::Math::sqrt( res.getValue<ScalarRepType>() );
+}
 
 //-------------------------------------------------------------------------------------------------
 template void MeshIO<int, double>::createRandom3DMesh(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, const int numberOfPoints,const double maxCoord);
 template void MeshIO<int, double>::createStructured3DMesh(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
 template std::vector<DenseVector<double>> MeshIO<int, double>::randomPoints(int numberOfPoints, int dimensions, double maxCoord);
 template Scalar MeshIO<int, double>::dist3D(DenseVector<double> p1, DenseVector<double> p2);
+template Scalar MeshIO<int, double>::dist3D(DenseVector<double> p1, double* p2);
 template void MeshIO<int, double>::writeInFileMetisFormat (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void MeshIO<int, double>::writeInFileCoords (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
 template void MeshIO<int, double>::readFromFile2AdjMatrix( CSRSparseMatrix<double> &matrix, const std::string filename);
