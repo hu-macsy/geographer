@@ -43,27 +43,22 @@ class MeshIOTest : public ::testing::Test {
  */
 TEST_F(MeshIOTest, testMesh3DCreateRandomMeshWriteInFile_Local_3D) {
     std::vector<DenseVector<ValueType>> coords;
-    int numberOfPoints= 50;
+    int numberOfPoints= 100;
     ValueType maxCoord= 1;
     std::string grFile = "meshes/randomTest6.graph";
     std::string coordFile= grFile + ".xyz";
 
     scai::lama::CSRSparseMatrix<ValueType> adjM(numberOfPoints, numberOfPoints);
-
-    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-    MeshIO<IndexType, ValueType>::createRandom3DMesh(adjM, coords, numberOfPoints, maxCoord);
-
-    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
-    std::cout<<__FILE__<< "  "<< __LINE__<< " , time for createRandom3DMesh: "<< duration << std::endl;
-
-    MeshIO<IndexType, ValueType>::writeInFileMetisFormat( adjM, grFile);
-    MeshIO<IndexType, ValueType>::writeInFileCoords( coords, numberOfPoints, coordFile);
-
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::high_resolution_clock::now() -t2).count();
-
-    std::cout<<__FILE__<< "  "<< __LINE__<< " , time to write in files: "<< duration << std::endl;
-    std::cout<< "graph written in files: " << grFile<< " and "<< coordFile<< std::endl;
+    {
+        SCAI_REGION("testMesh3DCreateRandomMeshWriteInFile_Local_3D.createRandom3DMesh")
+        MeshIO<IndexType, ValueType>::createRandom3DMesh(adjM, coords, numberOfPoints, maxCoord);
+    }
+    
+    {
+        SCAI_REGION("testMesh3DCreateRandomMeshWriteInFile_Local_3D.(writeInFileMetisFormat and writeInFileCoords)")
+        MeshIO<IndexType, ValueType>::writeInFileMetisFormat( adjM, grFile);
+        MeshIO<IndexType, ValueType>::writeInFileCoords( coords, numberOfPoints, coordFile);
+    }
 }
 
 //----------------------------------------------------------------------------------------
@@ -73,31 +68,39 @@ TEST_F(MeshIOTest, testMesh3DCreateRandomMeshWriteInFile_Local_3D) {
  * */
 
 TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
-    std::vector<IndexType> numPoints= {11, 12, 13};
+    std::vector<IndexType> numPoints= {12, 13, 14};
     std::vector<ValueType> maxCoord= {100,180,130};
     IndexType numberOfPoints= numPoints[0]*numPoints[1]*numPoints[2];
     std::vector<DenseVector<ValueType>> coords(3, DenseVector<ValueType>(numberOfPoints, 0));
-    std::string grFile = "meshes/structuredTest3.graph";
+    std::string grFile = "meshes/structuredTest6.graph";
     std::string coordFile= grFile + ".xyz";
 
-    scai::lama::CSRSparseMatrix<ValueType> adjM(numberOfPoints, numberOfPoints);
+    scai::lama::CSRSparseMatrix<ValueType> adjM( numberOfPoints, numberOfPoints);
     std::cout<<__FILE__<< "  "<< __LINE__<< " , numberOfPoints=" << numberOfPoints<< std::endl;
 
-    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-
-    MeshIO<IndexType, ValueType>::createStructured3DMesh(adjM, coords, maxCoord, numPoints);
-
-    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
-    std::cout<<__FILE__<< "  "<< __LINE__<< " , time for creating structured3DMesh: "<< duration <<std::endl;
-
-    MeshIO<IndexType, ValueType>::writeInFileMetisFormat( adjM, grFile);
-    MeshIO<IndexType, ValueType>::writeInFileCoords( coords, numberOfPoints, coordFile);
-
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::high_resolution_clock::now() -t2).count();
-
-    std::cout<<__FILE__<< "  "<< __LINE__<< " , time to write in files: "<< duration << std::endl;
-    std::cout<< "graph written in files: " << grFile<< " and "<< coordFile<< std::endl;
+    {
+        SCAI_REGION("testMesh3DCreateStructuredMesh_Local_3D.createStructured3DMesh" )
+        MeshIO<IndexType, ValueType>::createStructured3DMesh(adjM, coords, maxCoord, numPoints);
+    }
+    
+    {
+        SCAI_REGION("testMesh3DCreateStructuredMesh_Local_3D.(writeInFileMetisFormat and writeInFileCoords)")
+        MeshIO<IndexType, ValueType>::writeInFileMetisFormat( adjM, grFile);
+        MeshIO<IndexType, ValueType>::writeInFileCoords( coords, numberOfPoints, coordFile);
+    }
+    
+    CSRSparseMatrix<ValueType> graph = scai::lama::CSRSparseMatrix<ValueType>( numberOfPoints, numberOfPoints );
+    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graph, grFile );
+    
+    // check the two matrixes to be equal
+    {
+        SCAI_REGION("testMesh3DCreateStructuredMesh_Local_3D.checkMatricesEqual");
+        for(IndexType i=0; i<adjM.getNumRows(); i++){
+            for(IndexType j=0; j<adjM.getNumColumns(); j++){
+                EXPECT_EQ( adjM(i,j).Scalar::getValue<ValueType>() , graph(i,j).Scalar::getValue<ValueType>()  );
+            }
+        }
+    }
 }
 //-----------------------------------------------------------------
 
@@ -110,19 +113,27 @@ TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
     
     //the coordinates of the points: coords.size()= dim , coords[dim].size()= N
     std::vector<DenseVector<ValueType>> coords(3);    
+    
     //the adjacency matrix
     scai::lama::CSRSparseMatrix<ValueType> adjM(N, N);
-    //random coordinates in 3D stored in coords and the adjacency matrix in adjM
-    MeshIO<IndexType, ValueType>::createRandom3DMesh(adjM, coords, N, maxCoord);
+    {
+        SCAI_REGION("testPartitionWithRandom3DMesh_Local_3D.createRandom3DMesh");
+        //random coordinates in 3D stored in coords and the adjacency matrix in adjM
+        MeshIO<IndexType, ValueType>::createRandom3DMesh(adjM, coords, N, maxCoord);
+    }
+    //std::cout<< "Number of nodes= "<< N<< " , Number of edges="<< (adjM.getNumValues()-N)/2 << std::endl;
     
-    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
-    std::cout << "time elapsed after creating 3DMesh: "<< duration<< " ms"<< std::endl;
-    std::cout<< "Number of nodes= "<< N<< " , Number of edges="<< (adjM.getNumValues()-N)/2 << std::endl;
-    
+    SCAI_REGION_START("testPartitionWithRandom3DMesh_Local_3D.partitionGraph");
     //get the partition
-    DenseVector<IndexType>partition= ParcoRepart<IndexType, ValueType>::partitionGraph( adjM, coords, k, epsilon);
-
+    DenseVector<IndexType> partition= ParcoRepart<IndexType, ValueType>::partitionGraph( adjM, coords, k, epsilon);
+    SCAI_REGION_END("testPartitionWithRandom3DMesh_Local_3D.partitionGraph");
+    
+    // check partition
+    for(IndexType i=0; i<partition.size(); i++){
+        EXPECT_LE( partition(i).Scalar::getValue<ValueType>() , k);
+        EXPECT_GE( partition(i).Scalar::getValue<ValueType>() , 0);
+    }
+    
     //calculate and print cut and imbalance
     ValueType cut= ParcoRepart<IndexType, ValueType>::computeCut(adjM, partition, true);
     std::cout<< "# cut = "<< cut<< " , "<< std::endl;
@@ -150,7 +161,10 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
     
     dmemo::DistributionPtr dist( new dmemo::NoDistribution( nodes ));
     Graph = scai::lama::CSRSparseMatrix<ValueType>(dist, dist);
-    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph, filename );
+    {
+        SCAI_REGION("testReadAndWriteGraphFromFile.readFromFile2AdjMatrix");
+        MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph, filename );
+    }
     N = Graph.getNumColumns();
     EXPECT_EQ(Graph.getNumColumns(), Graph.getNumRows());
     
@@ -160,10 +174,12 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
     std::string fileTo= path + std::string("MY_") + file;
     
     CSRSparseMatrix<ValueType> Graph2(dist, dist);
-    MeshIO<IndexType, ValueType>::writeInFileMetisFormat(Graph, fileTo );
-    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph2, fileTo );
-    
-    std::cout<< "Outpur written in file: "<< fileTo<< std::endl;
+    {   
+        SCAI_REGION("testReadAndWriteGraphFromFile.(writeInFileMetisFormat and writeInFileCoords)");
+        MeshIO<IndexType, ValueType>::writeInFileMetisFormat(Graph, fileTo );
+        MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph2, fileTo );
+    }
+    std::cout<< "Output written in file: "<< fileTo<< std::endl;
     EXPECT_EQ(Graph.getNumValues(), Graph2.getNumValues() );
     EXPECT_EQ(Graph.l2Norm(), Graph2.l2Norm() );
     EXPECT_EQ(Graph2.getNumValues(), Graph2.l1Norm() );
@@ -215,12 +231,12 @@ TEST_F(MeshIOTest, testPartitionFromFile_2D){
     //partition the graph
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D,  k, epsilon);
     EXPECT_EQ(partition.size(), N);
- 
+    /*
     ValueType cut= ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true);
     std::cout<< "# cut = "<< cut<< std::endl;
     ValueType imbalance= ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k);
     std::cout<< "# imbalance = " << imbalance<< std::endl; 
-    
+    */ 
 }
 
 //-----------------------------------------------------------------
