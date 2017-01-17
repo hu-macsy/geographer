@@ -81,7 +81,7 @@ void MeshIO<IndexType, ValueType>::createRandom3DMesh(CSRSparseMatrix<ValueType>
     //TODO: NoDistribution should be "BLOCK"?
     dmemo::DistributionPtr rep( new dmemo::NoDistribution( n ));
     adjM.setRawDenseData( rep, rep, adjArray.get() );
-    assert(adjM.checkSymmetry() );
+    //assert(adjM.checkSymmetry() );
  
 }
 //-------------------------------------------------------------------------------------------------
@@ -809,21 +809,382 @@ Scalar MeshIO<IndexType, ValueType>::dist3D(DenseVector<ValueType> p1, DenseVect
     
 //-------------------------------------------------------------------------------------------------
 
+//-------------------------------------------------------------------------------------------------
+template<typename IndexType, typename ValueType> struct cube { 
+    ValueType x, y ,z;  // the 3D coordinated
+    ValueType edge;     // the edge length ofthe cube
+    IndexType id;       // the cube's id
+    // 6 kind of neighbours
+    std::vector<IndexType> neighbours_x0;   // left -   0
+    std::vector<IndexType> neighbours_x1;   // right -  1
+    std::vector<IndexType> neighbours_y0;   // front -  2
+    std::vector<IndexType> neighbours_y1;   // back -   3
+    std::vector<IndexType> neighbours_z0;   // bottom - 4
+    std::vector<IndexType> neighbours_z1;   // top -    5
+    
+    std::vector<std::vector<IndexType>> neighbors;
+    
+    //constructor
+    //cube (IndexType);
+    cube (IndexType len) : x(0), y(0), z(0), edge(len), id(0) { 
+        for(IndexType i=0; i<6; i++){
+            neighbors.push_back(  std::vector<IndexType>() );
+        }
+    }
+    
+    cube( ValueType a, ValueType b, ValueType c, IndexType len, IndexType ID){
+        x= a;
+        y= b;
+        z= c;
+        edge= len;
+        id= ID;
+        for(IndexType i=0; i<6; i++){
+            neighbors.push_back(  std::vector<IndexType>() );
+        }
+    }
+    
+    void print(){
+        std::cout<< "id: "<< id << " , coords: ("<< x << ", "<< y << ", "<< z << ") , edge= "<< edge << std::endl;
+    }
+    
+    // returns the corresponding neighbours
+    // dim = 0,1 or 2 for dimensions x,y and z respectively 
+    std::vector<IndexType> getNeighbours( IndexType dim, IndexType direction){
+        if( dim==0){
+            if(direction==0){
+                return neighbours_x0;
+            }else{
+                return neighbours_x1;
+            }
+        }else if( dim==1 ){
+            if(direction==0){
+                return neighbours_y0;
+            }else{
+                return neighbours_y1;
+            }
+        }else{ //dim==2
+            if(direction==0){
+                return neighbours_z0;
+            }else{
+                return neighbours_z1;
+            }
+        }
+    }
+    
+    std::vector<IndexType> getNeighbours( IndexType side){
+        assert( side < 6);
+        return neighbors[side];
+    }
+    
+    
+    
+    // given a vector it sets it according tp dim and direction
+    // dim = 0,1 or 2 for dimensions x,y and z respectively 
+    void setNeighbours( IndexType dim, IndexType direction, std::vector<IndexType> input){
+        if( dim==0){
+            if(direction==0){
+                neighbours_x0= input;
+            }else{
+                neighbours_x1= input;
+            }
+        }else if( dim==1 ){
+            if(direction==0){
+                neighbours_y0= input;
+            }else{
+                neighbours_y1= input;
+            }
+        }else{ //dim==2
+            if(direction==0){
+                neighbours_z0= input;
+            }else{
+                neighbours_z1= input;
+            }
+        }   
+    }
+    
+    void setNeighbours( IndexType side, std::vector<IndexType> input){
+        neighbors[side] = input;
+    }
+    
+    void printNeighbors(){
+        for(IndexType i=0; i<6; i++){
+            std::cout<< "Neighbors on side "<< i<< ":\t";
+            for(IndexType j=0; j< neighbors[i].size(); j++){
+                std::cout<< neighbors[i][j]<< " , ";
+            }
+            std::cout<< std::endl;
+        }
+    }
+    
+};
+//typedef struct <IndexType, ValueType>cube cube;
+
+// coords.size()= 3 , coords[i].size()= N
+// here, N= numPoints[0]*numPoints[1]*numPoints[2]
+template<typename IndexType, typename ValueType>
+void MeshIO<IndexType, ValueType>::createUnstructured3DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> startPoint, ValueType edgeLen) {
+ 
+    if(startPoint.size() != 3){
+        throw std::runtime_error("The starting point must have " + std::to_string(3) + " dimensions.");
+    }
+    
+    //std::vector<ValueType> offset={maxCoord[0]/numPoints[0], maxCoord[1]/numPoints[1], maxCoord[2]/numPoints[2]};
+    //IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
+    
+    std::vector< struct cube<IndexType, ValueType> > global_cubes; // where all cubes are stores
+    std::vector< std::pair<IndexType, IndexType>> global_edges; // where all edges are stored
+    
+    // initialize the cubes list
+    struct cube<IndexType, ValueType> tmp(startPoint[0], startPoint[1], startPoint[2], edgeLen, 0);
+    // initialize neighbor's lists as empty
+    tmp.neighbours_x0= {};
+    tmp.neighbours_x1= {};
+    tmp.neighbours_y0= {};
+    tmp.neighbours_y1= {};
+    tmp.neighbours_z0= {};
+    tmp.neighbours_z1= {}; 
+    
+    global_cubes.push_back( tmp );
+    
+    IndexType rounds= 2;
+    srand( time(NULL));
+    for(IndexType i=0; i<rounds; i++){
+        // pick a cube at random
+        IndexType rand_ind= rand() % global_cubes.size();
+        struct cube<IndexType, ValueType> fatherCube = global_cubes[rand_ind];
+        
+std::cout<<__FILE__<< "  "<< __LINE__<<", random_ind= "<< rand_ind << "  " ;
+fatherCube.print();
+        // divide cube in position rand_ind
+        // every cube is divided in 8 subcubes (sc)
+        unsigned int globalSize = global_cubes.size();
+        for(IndexType scI=0; scI<8; scI++){
+            struct cube<IndexType, ValueType> sc(0);
+            unsigned b0 = ( scI >> 0) &1;
+            unsigned b1 = ( scI >> 1) &1;
+            unsigned b2 = ( scI >> 2) &1;
+            
+            // set edge length
+            sc.edge= fatherCube.edge/2;
+            
+            // set coordinates
+            sc.x = fatherCube.x + b0*sc.edge;
+            sc.y = fatherCube.y + b1*sc.edge;
+            sc.z = fatherCube.z + b2*sc.edge;
+            
+             // set id 
+            if(scI==0){
+                // the first node/cube replaces fatherCube
+                sc.id= fatherCube.id;
+                //global_cubes[rand_ind]= sc;
+            }else{
+                // the are added to the end
+                sc.id= global_cubes.size();
+                //global_cubes.push_back(sc);            
+            }      
+            
+            /*
+            // set neighbours. Every node/cube has 6 kinds of neighbours
+            for(IndexType k=0; k<6; k++){
+                {
+                // for b0 - x
+                sc.setNeighbours( 0, b0, fatherCube.getNeighbours( 0 , b0) ); // 0 for dim x
+                //sc.setNeighbours( b0, fatherCube.getNeighbours( b0 ) ); // 0 for dim x
+                IndexType revb0;
+                if(b0==0){
+                    revb0=1;
+                }else{
+                    revb0=0;
+                }
+                std::vector<IndexType> tmp0 = sc.getNeighbours( 0, revb0);
+                std::vector<IndexType> tmp0_2 = sc.getNeighbours(revb0);
+                
+                IndexType ngb0 = scI^100;
+                if(ngb0==0){
+                    tmp0.push_back(rand_ind);
+                    //sc.neighbors[k].push_back(rand_ind);
+                }else{
+                    tmp0.push_back(global_cubes.size() +scI);
+                    //sc.neighbors[k].push_back(global_cubes.size() +scI);
+                }
+                sc.setNeighbours( 0 , revb0, tmp0 ); 
+                }
+                
+                {
+                // for b1 - y
+                sc.setNeighbours( 1, b1, fatherCube.getNeighbours( 1 , b1) ); // 0 for dim x
+                IndexType revb1;
+                if(b1==0){
+                    revb1=1;
+                }else{
+                    revb1=0;
+                }
+                std::vector<IndexType> tmp1 = sc.getNeighbours( 1, revb1);
+                IndexType ngb1 = scI^010;
+                if(ngb1==0){
+                    tmp1.push_back(rand_ind);
+                }else{
+                    tmp1.push_back(global_cubes.size() +scI);
+                }
+                sc.setNeighbours( 1 , revb1, tmp1 );
+                }
+                
+                {
+                // for b2 - z
+                sc.setNeighbours( 2, b2, fatherCube.getNeighbours( 2 , b2) ); // 0 for dim x
+                IndexType revb2;
+                if(b2==0){
+                    revb2=1;
+                }else{
+                    revb2=0;
+                }
+                std::vector<IndexType> tmp2 = sc.getNeighbours( 2, revb2);
+                IndexType ngb2 = scI^001;
+                if(ngb2==0){
+                    tmp2.push_back(rand_ind);
+                }else{
+                    tmp2.push_back(global_cubes.size() +scI);
+                }
+                sc.setNeighbours( 2 , revb2, tmp2 );
+                }
+            } // for(IndexType k=0; k<6; k++)
+            */
+            
+            
+            // the edges inherited form the fatherCube
+            sc.neighbors[b0] = fatherCube.neighbors[b0];
+            //for(IndexType m=0; m<sc.neighbors[b0].size(); m++){
+            if( ! sc.neighbors[b0].empty() ){
+                for(typename std::vector<IndexType>::iterator it=sc.neighbors[b0].begin(); it!=sc.neighbors[b0].end(); it++){
+  std::cout<<__FILE__<< "  "<< __LINE__<< ", scI:"<< scI << " ,sc.n["<< b0<< "].size()= "<< sc.neighbors[b0].size() << " , *it= "<< *it<< " , global.size():" << global_cubes.size()<<  std::endl;                  
+                    if( global_cubes[*it].x > sc.x+sc.edge || global_cubes[*it].x+global_cubes[*it].edge < sc.x){
+std::cout<< global_cubes[*it].x << " >  " <<  sc.x+sc.edge  << " || "<<  global_cubes[*it].x+global_cubes[*it].edge <<" < "<< sc.x << std::endl;
+                        sc.neighbors[b0].erase(it);
+                    }else{
+std::cout<<__FILE__<< "  "<< __LINE__<< std::endl;
+                        global_cubes[*it].neighbors[1-b0].push_back(sc.id);
+                    }
+                }
+            }
+            
+            sc.neighbors[2+b1] = fatherCube.neighbors[2+b1];
+            if( ! sc.neighbors[2+b1].empty() ){
+                for(typename std::vector<IndexType>::iterator it=sc.neighbors[2+ b1].begin(); it!=sc.neighbors[2+b1].end(); it++){
+  std::cout<<__FILE__<< "  "<< __LINE__<< ", scI:"<< scI << " ,sc.n["<< 2+b1<< "].size()= "<< sc.neighbors[2+b1].size() << " , *it= "<< *it<< " , global.size():" << global_cubes.size()<<  std::endl;                  
+                    if( global_cubes[*it].y > sc.y+sc.edge || global_cubes[*it].y+global_cubes[*it].edge < sc.y){
+std::cout<< global_cubes[*it].y << " >  " <<  sc.y+sc.edge  <<  " || "<<  global_cubes[*it].y+global_cubes[*it].edge <<" < "<< sc.y << std::endl;
+                        sc.neighbors[b1].erase(it);
+                    }else{
+                        global_cubes[*it].neighbors[3-b1].push_back(sc.id);
+                    }
+                }
+            }
+            
+            sc.neighbors[4+b2] = fatherCube.neighbors[4+b2];
+            if( ! sc.neighbors[4+b2].empty() ){
+                for(typename std::vector<IndexType>::iterator it=sc.neighbors[4+b2].begin(); it!=sc.neighbors[4+b2].end(); it++){
+  std::cout<<__FILE__<< "  "<< __LINE__<< ", scI:"<< scI << " ,sc.n["<< 4+b2 << "].size()= "<< sc.neighbors[4+b2].size() << " , *it= "<< *it<< " , global.size():" << global_cubes.size()<<  std::endl;                  
+                    if( global_cubes[*it].z > sc.z+sc.edge || global_cubes[*it].z+global_cubes[*it].edge < sc.z){
+std::cout<< global_cubes[*it].z << " >  " <<  sc.z+sc.edge  <<  " || "<<  global_cubes[*it].z+global_cubes[*it].edge<< " < "<< sc.z << std::endl;
+                        sc.neighbors[b2].erase(it);
+                    }else{
+                        global_cubes[*it].neighbors[5-b2].push_back(sc.id);
+                    }
+                }
+            }
+            
+            //set edges with brother nodes/cubes
+            IndexType ngb = scI^1;
+std::cout<<__FILE__<< "  "<< __LINE__<< " , ngb= "<< ngb<< " , glSize+ngb-1= "<< globalSize + ngb -1 << std::endl;
+            if( ngb == 0){
+                sc.neighbors[1-b0].push_back(rand_ind);
+            }else{
+                sc.neighbors[1-b0].push_back(globalSize + ngb -1);
+            }
+            ngb= scI^2;
+std::cout<<__FILE__<< "  "<< __LINE__<< " , "<< ngb<< std::endl;
+            if( ngb == 0){
+                sc.neighbors[3-b1].push_back(rand_ind);
+            }else{
+                sc.neighbors[3-b1].push_back(globalSize + ngb -1);
+            }
+            ngb= scI^4;
+std::cout<<__FILE__<< "  "<< __LINE__<< " , "<< ngb<< std::endl;
+            if( ngb == 0){
+                sc.neighbors[5-b2].push_back(rand_ind);
+            }else{
+                sc.neighbors[5-b2].push_back(globalSize + ngb -1);
+            }
+            
+            // set id 
+            // add it to the global_cubes list
+            if(scI==0){
+                // the first node/cube replaces fatherCube
+                //sc.id= fatherCube.id;
+                global_cubes[rand_ind]= sc;
+            }else{
+                // the are added to the end
+                //sc.id= global_cubes.size();
+                global_cubes.push_back(sc);            
+            }
+            
+            
+
+//sc.print();
+
+        }
+        
+        // we replace the father node (fatherCube) with the first subcube so no need to erase
+        //
+        // fatherCube must be removed from global_cubes
+        //typename std::vector<struct cube<IndexType, ValueType>>::iterator iter = std::next( global_cubes.begin(), rand_ind);
+        //global_cubes.erase(iter);
+        
+    for(int k=0; k<global_cubes.size(); k++){
+        std::cout<< k << ": "; 
+        global_cubes[k].print();
+        global_cubes[k].printNeighbors();
+    }
+        
+        // the number ids and should be equal the number of cubes/nodes
+        assert(global_cubes.size()-1 == global_cubes[ global_cubes.size()-1].id);
+//std::cout<<__FILE__<< "  "<< __LINE__<< " , global_cubes.size()= "<< global_cubes.size()<< " <> "<< global_cubes[ global_cubes.size()-1].id << std::endl; 
+        
+    }
+
+    // insert the new edges accordingly
+    // because in the process of dividing the cubes, the cube divided is deleted, the edges should be
+    // inserted after the division process is completed
+
+    // insert the ccordinates
+    
+}
 
 //-------------------------------------------------------------------------------------------------
 template void MeshIO<int, double>::createRandom3DMesh(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords,  int numberOfPoints, double maxCoord);
+
 template void MeshIO<int, double>::createStructured3DMesh(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
+
 template std::vector<DenseVector<double>> MeshIO<int, double>::randomPoints(int numberOfPoints, int dimensions, double maxCoord);
+
 template Scalar MeshIO<int, double>::dist3D(DenseVector<double> p1, DenseVector<double> p2);
+
 template void MeshIO<int, double>::writeInFileMetisFormat (const CSRSparseMatrix<double> &adjM, const std::string filename);
+
 template void MeshIO<int, double>::writeInFileCoords (const DenseVector<double> &coords, int dimension, const std::string filename);
+
 template void MeshIO<int, double>::writeInFileCoords (const std::vector<DenseVector<double>> &coords, int dimension, int numPoints, const std::string filename);
+
 template CSRSparseMatrix<double>  MeshIO<int, double>::readFromFile2AdjMatrix(const std::string filename);
+
 template void MeshIO<int, double>::readFromFile2AdjMatrix( CSRSparseMatrix<double> &matrix, dmemo::DistributionPtr distribution, const std::string filename);
+
 template void MeshIO<int, double>::readFromFile2AdjMatrixDistr( lama::CSRSparseMatrix<double> &matrix, const std::string filename);
-//template void MeshIO<int, double>::readFromFile2AdjMatrix_Boost( lama::CSRSparseMatrix<double> &matrix, dmemo::DistributionPtr  distribution, const std::string filename);
+
 template void  MeshIO<int, double>::fromFile2Coords_2D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfCoords);
+
 template void MeshIO<int, double>::fromFile2Coords_3D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfPoints);
 
+template void MeshIO<int, double>::createUnstructured3DMesh(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> startPoint, double edgeLen);
 //template double MeshIO<int, double>:: randomValueType( double max);
 } //namespace ITI

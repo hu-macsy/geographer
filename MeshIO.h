@@ -87,6 +87,8 @@ namespace ITI {
                 /* Calculates the 3D distance between two points.
                  */
                 static Scalar dist3D(DenseVector<ValueType> p1, DenseVector<ValueType> p2);
+                
+                static void createUnstructured3DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> startPoint, ValueType edgeLen);
         };//class MeshIO
         
 }//namespace ITI

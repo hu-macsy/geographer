@@ -73,11 +73,11 @@ TEST_F(MeshIOTest, testMesh3DCreateRandomMeshWriteInFile_Local_3D) {
  * */
 
 TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
-    std::vector<IndexType> numPoints= {15, 13, 22};
-    std::vector<ValueType> maxCoord= {100,180,130};
+    std::vector<IndexType> numPoints= {25, 31, 41};
+    std::vector<ValueType> maxCoord= {120,160,120};
     IndexType numberOfPoints= numPoints[0]*numPoints[1]*numPoints[2];
     std::vector<DenseVector<ValueType>> coords(3, DenseVector<ValueType>(numberOfPoints, 0));
-    std::string grFile = "meshes/structuredTest_15_13_22.graph";
+    std::string grFile = "meshes/structuredTest_21_19_27.graph";
     std::string coordFile= grFile + ".xyz";
 
     scai::lama::CSRSparseMatrix<ValueType> adjM(numberOfPoints, numberOfPoints);
@@ -91,8 +91,8 @@ TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
     std::cout<<__FILE__<< "  "<< __LINE__<< " , time for creating structured3DMesh: "<< duration <<std::endl;
     
-    MeshIO<IndexType, ValueType>::writeInFileMetisFormat( adjM, grFile);
-    MeshIO<IndexType, ValueType>::writeInFileCoords( coords, 3, numberOfPoints, coordFile);
+    //MeshIO<IndexType, ValueType>::writeInFileMetisFormat( adjM, grFile);
+    //MeshIO<IndexType, ValueType>::writeInFileCoords( coords, 3, numberOfPoints, coordFile);
     
     duration = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::high_resolution_clock::now() -t2).count();
     
@@ -313,5 +313,24 @@ TEST_F(MeshIOTest, testPartitionFromFile_2D){
 }
 
 //-----------------------------------------------------------------
+
+
+TEST_F(MeshIOTest, testRandomUnstructuredMesh_local){
+    std::vector<IndexType> numPoints= {25, 31, 41};
+    std::vector<ValueType> maxCoord= {120,160,120};
+    IndexType numberOfPoints= numPoints[0]*numPoints[1]*numPoints[2];
+    std::vector<DenseVector<ValueType>> coords(3, DenseVector<ValueType>(numberOfPoints, 0));
+    std::string grFile = "meshes/structuredTest_21_19_27.graph";
+    std::string coordFile= grFile + ".xyz";
+
+    scai::lama::CSRSparseMatrix<ValueType> adjM(numberOfPoints, numberOfPoints);
+    std::cout<<__FILE__<< "  "<< __LINE__<< " , numberOfPoints=" << numberOfPoints<< std::endl;
+    
+    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+    
+    MeshIO<IndexType, ValueType>::createUnstructured3DMesh(adjM, coords, std::vector<ValueType> {0, 0, 0} , 10);
+    
+    
+}
     
 }//namespace ITI
