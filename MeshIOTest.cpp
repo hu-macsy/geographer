@@ -105,7 +105,7 @@ TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
 //-----------------------------------------------------------------
 
 TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
-    IndexType N= 500;
+    IndexType N= 100;
     ValueType maxCoord= 1;
     IndexType dim= 3, k= 8;
     ValueType epsilon= 0.2;
