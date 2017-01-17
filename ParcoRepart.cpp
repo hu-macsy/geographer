@@ -232,8 +232,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
 				IndexType numOutgoingEdges = 0;
-				for (IndexType i = 0; i < inputDist->getLocalSize(); i++) {
-					for (IndexType j = ia[i]; j < ia[i+1]; i++) {
+				for (IndexType i = 0; i < input.getRowDistributionPtr()->getLocalSize(); i++) {
+					for (IndexType j = ia[i]; j < ia[i+1]; j++) {
 						if (!input.getRowDistributionPtr()->isLocal(ja[j])) numOutgoingEdges++;
 					}
 				}
@@ -1083,7 +1083,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 			if (swapField[1] == 0 && gain == 0) {
 				//Oh well. None of the processors managed an improvement. No need to update data structures.
-				std::cout << "Thread " << comm->getRank() << ", round " << i << " no gain here and at " << partner << "." << std::endl;
+				//std::cout << "Thread " << comm->getRank() << ", round " << i << " no gain here and at " << partner << "." << std::endl;
 
 			}	else {
 				SCAI_REGION( "ParcoRepart.distributedFMStep.loop.prepareRedist" )
@@ -1370,6 +1370,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		/*
 		 * first check break situations
 		 */
+
+		//only one block overfull,
 		if ((firstQueue.size() == 0 && blockSizes.first >= blockCapacities.first)
 				 ||	(secondQueue.size() == 0 && blockSizes.second >= blockCapacities.second)) {
 			//cannot move any nodes
@@ -1382,7 +1384,12 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		} else if (secondQueue.size() == 0) {
 			assert(blockSizes.second < blockCapacities.second);
 			bestQueueIndex = 0;
-		} else {
+		} else if (blockSizes.first >= blockCapacities.first) {
+			bestQueueIndex = 1;
+		} else if (blockSizes.second >= blockCapacities.second) {
+			bestQueueIndex = 0;
+		}
+		else {
 			std::vector<ValueType> fullness = {double(blockSizes.first) / blockCapacities.first, double(blockSizes.second) / blockCapacities.second};
 			std::vector<ValueType> gains = {firstQueue.inspectMin().first, secondQueue.inspectMin().first};
 

@@ -261,9 +261,9 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
 TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-	const IndexType dimX = 10;
-	const IndexType dimY = 10;
-	const IndexType dimZ = 10;
+	const IndexType dimX = 32;
+	const IndexType dimY = 32;
+	const IndexType dimZ = 32;
 	const IndexType n = dimX*dimY*dimZ;
 	const IndexType k = comm->getSize();
 	const ValueType epsilon = 0.05;
@@ -280,18 +280,27 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 
 	ASSERT_EQ(n, inputDist->getGlobalSize());
 
-	//generate balanced partition
-	scai::lama::DenseVector<IndexType> part(inputDist);
 
 	const IndexType localN = inputDist->getLocalSize();
 
-	IndexType blockId = comm->getRank();
-
+	//generate random partition
+	scai::lama::DenseVector<IndexType> part(inputDist);
 	for (IndexType i = 0; i < localN; i++) {
+		IndexType blockId = rand() % k;
 		IndexType globalID = inputDist->local2global(i);
-		assert(part.getDistributionPtr()->isLocal(globalID));
 		part.setValue(globalID, blockId);
 	}
+
+	//redistribute according to partition
+	scai::utilskernel::LArray<IndexType> owners(n);
+	for (IndexType i = 0; i < n; i++) {
+		Scalar blockID = part.getValue(i);
+		owners[i] = blockID.getValue<IndexType>();
+	}
+	scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(owners, comm));
+
+	a.redistribute(newDistribution, a.getColDistributionPtr());
+	part.redistribute(newDistribution);
 
 	ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
 	for (IndexType i = 0; i < iterations; i++) {
@@ -300,6 +309,7 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 		//check correct gain calculation
 		const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
 		EXPECT_EQ(cut - gain, newCut) << "Old cut " << cut << ", gain " << gain << " newCut " << newCut;
+
 		EXPECT_LE(newCut, cut);
 		cut = newCut;
 	}
