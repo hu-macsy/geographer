@@ -1,0 +1,14 @@
+=========================================
+Timing info of regions (only main thread)
+=========================================
+Time MeshIO.createStructured3DMesh (in ms) : #calls = 1, inclusive = 25703.394000, exclusive = 6005.659000
+Time MeshIO.dist3D (in ms) : #calls = 2778, inclusive = 50.980000, exclusive = 50.980000
+Time MeshIO.readFromFile2AdjMatrix (in ms) : #calls = 1, inclusive = 52.647000, exclusive = 52.647000
+Time MeshIO.writeInFileCoords (in ms) : #calls = 1, inclusive = 3.533000, exclusive = 3.533000
+Time MeshIO.writeInFileMetisFormat (in ms) : #calls = 1, inclusive = 539.384000, exclusive = 539.384000
+Time createStructured3DMesh.setAdjacencyMatrix (in ms) : #calls = 490, inclusive = 19696.962000, exclusive = 19622.052000
+Time createStructured3DMesh.setAdjacencyMatrix.getValue (in ms) : #calls = 2778, inclusive = 6.382000, exclusive = 6.382000
+Time createStructured3DMesh.setAdjacencyMatrix.setCSRSparseMatrix (in ms) : #calls = 2282, inclusive = 17.548000, exclusive = 17.548000
+Time createStructured3DMesh.setCoordinates (in ms) : #calls = 1, inclusive = 0.773000, exclusive = 0.773000
+Time testMesh3DCreateStructuredMesh_Local_3D.(writeInFileMetisFormat and writeInFileCoords) (in ms) : #calls = 1, inclusive = 542.929000, exclusive = 0.012000
+Time testMesh3DCreateStructuredMesh_Local_3D.createStructured3DMesh (in ms) : #calls = 1, inclusive = 25703.405000, exclusive = 0.011000
