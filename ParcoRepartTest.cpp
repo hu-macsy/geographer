@@ -207,6 +207,88 @@ TEST_F(ParcoRepartTest, testCut) {
   EXPECT_EQ(k*blockSize*(n-blockSize) / 2, replicatedCut);
 }
 
+TEST_F(ParcoRepartTest, testTwoWayCut) {
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+	//setup input matrix, partition and distribution
+	const IndexType dimX = 32;
+	const IndexType dimY = 32;
+	const IndexType dimZ = 32;
+	const IndexType n = dimX*dimY*dimZ;
+	const IndexType k = comm->getSize();
+	const ValueType epsilon = 0.05;
+	const IndexType iterations = 1;
+
+	//generate random matrix
+	scai::lama::CSRSparseMatrix<ValueType>a(n,n);
+	scai::lama::MatrixCreator::buildPoisson(a, 3, 19, dimX,dimY,dimZ);
+
+
+	scai::dmemo::DistributionPtr inputDist = a.getRowDistributionPtr();
+	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+
+	a.redistribute(inputDist, noDistPointer);//need replicated columns for FM;
+
+	ASSERT_EQ(n, inputDist->getGlobalSize());
+
+	const IndexType localN = inputDist->getLocalSize();
+
+	//generate random partition
+	scai::lama::DenseVector<IndexType> part(inputDist);
+	for (IndexType i = 0; i < localN; i++) {
+		IndexType blockId = rand() % k;
+		IndexType globalID = inputDist->local2global(i);
+		part.setValue(globalID, blockId);
+	}
+
+	//redistribute according to partition
+	scai::utilskernel::LArray<IndexType> owners(n);
+	for (IndexType i = 0; i < n; i++) {
+		Scalar blockID = part.getValue(i);
+		owners[i] = blockID.getValue<IndexType>();
+	}
+	scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(owners, comm));
+
+	a.redistribute(newDistribution, a.getColDistributionPtr());
+	part.redistribute(newDistribution);
+
+	//get communication scheme
+	//create trivial mapping
+	scai::lama::DenseVector<IndexType> mapping(k, 0);
+	for (IndexType i = 0; i < k; i++) {
+		mapping.setValue(i, i);
+	}
+
+	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::computeCommunicationPairings(a, part, mapping);
+
+	const CSRStorage<ValueType>& localStorage = a.getLocalStorage();
+	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+
+	const scai::hmemo::HArray<IndexType>& localData = part.getLocalValues();
+	scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildPartHalo(a, part);
+	scai::utilskernel::LArray<IndexType> haloData;
+	comm->updateHalo( haloData, localData, partHalo );
+
+	ValueType localCutSum = 0;
+	for (IndexType round = 0; round < scheme.size(); round++) {
+		scai::hmemo::ReadAccess<IndexType> commAccess(scheme[round].getLocalValues());
+		IndexType partner = commAccess[scheme[round].getDistributionPtr()->global2local(comm->getRank())];
+
+		if (partner != comm->getRank()) {
+			for (IndexType j = 0; j < ja.size(); j++) {
+				IndexType haloIndex = partHalo.global2halo(ja[j]);
+				if (haloIndex != nIndex && haloData[haloIndex] == partner) {
+					localCutSum++;
+				}
+			}
+		}
+	}
+	const ValueType globalCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+
+	EXPECT_EQ(globalCut, comm->sum(localCutSum) / 2);
+}
+
 
 TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
   const IndexType n = 1000;
@@ -389,22 +471,24 @@ TEST_F(ParcoRepartTest, testCommunicationScheme) {
 }
 
 TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
-	/**
-	 * test first with complete matrix. Unsuitable, I know, but we don't have a mesh generator yet.
-	 * TODO: We now have a mesh generator. Update with it.
-	 */
+	const IndexType dimX = 10;
+	const IndexType dimY = 10;
+	const IndexType dimZ = 10;
+	const IndexType n = dimX*dimY*dimZ;
 
-	const IndexType n = 1000;
 	const IndexType k = 10;
 
 	//define distributions
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+
+	scai::lama::CSRSparseMatrix<ValueType>a(n,n);
+	scai::lama::MatrixCreator::buildPoisson(a, 3, 19, dimX,dimY,dimZ);
+
+	scai::dmemo::DistributionPtr dist = a.getRowDistributionPtr();
 	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
 
-	//generate random complete matrix
-	scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
-	scai::lama::MatrixCreator::fillRandom(a, 1);
+	//we want replicated columns
+	a.redistribute(dist, noDistPointer);
 
 	//generate balanced distributed partition
 	scai::lama::DenseVector<IndexType> part(dist);
@@ -452,13 +536,15 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 	dist->getCommunicatorPtr()->updateHalo( haloData, localData, partHalo );
 
 	bool inFirstRound = true;
-	for (IndexType i = 0; i < lastRoundMarker; i++) {
+	for (IndexType i = 0; i < interfaceNodes.size(); i++) {
 		bool directNeighbor = false;
 		for (IndexType j = ia[i]; j < ia[i+1]; j++) {
 			IndexType neighbor = ja[j];
 			if (dist->isLocal(neighbor)) {
-				if (partAccess[dist->global2local(neighbor)] == thisBlock) {
+				if (partAccess[dist->global2local(neighbor)] == thisBlock && i < lastRoundMarker) {
 					EXPECT_EQ(1, std::count(interfaceNodes.begin(), interfaceNodes.end(), neighbor));
+				} else if (partAccess[dist->global2local(neighbor)] == otherBlock) {
+					directNeighbor = true;
 				}
 			} else {
 				IndexType haloIndex = partHalo.global2halo(neighbor);
@@ -470,6 +556,7 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 
 		if (directNeighbor) {
 			EXPECT_TRUE(inFirstRound);
+			EXPECT_LT(i, lastRoundMarker);
 		} else {
 			inFirstRound = false;
 		}
