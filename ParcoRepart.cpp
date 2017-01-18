@@ -240,8 +240,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 				IndexType sumOutgoingEdges = comm->sum(numOutgoingEdges) / 2;
 
-				throw std::runtime_error("Old cut was " + std::to_string(oldCut) + ", new cut is " + std::to_string(cut) + " with "
-						+ std::to_string(sumOutgoingEdges) + " outgoing edges, but gain is " + std::to_string(gain)+".");
+				std::cout << std::string("Old cut was " + std::to_string(oldCut) + ", new cut is " + std::to_string(cut) + " with "
+						+ std::to_string(sumOutgoingEdges) + " outgoing edges, but gain is " + std::to_string(gain)+".") << std::endl;
 			}
 
 			assert(oldCut - gain == cut);
@@ -1117,7 +1117,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			assert(unweighted); //if this assert fails, you need to change the type of swapField back to ValueType before removing it.
 			swapField[0] = secondRegion.size();
 			swapField[1] = gain;
-			comm->swap(swapField, 2, partner);
+			swapField[2] = blockSizes.second;
+			comm->swap(swapField, 3, partner);
 
 			if (swapField[1] == 0 && gain == 0) {
 				//Oh well. None of the processors managed an improvement. No need to update data structures.
@@ -1217,13 +1218,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			CSRStorage<ValueType> haloMatrix;
 			haloMatrix.exchangeHalo( graphHalo, input.getLocalStorage(), *comm );
 		}
-		const ValueType globalCut = computeCut(input, part, unweighted);
-		const ValueType intermediateGainSum = comm->sum(gainSum) / 2;
-		if (comm->getRank() == 0) {
-			std::cout << "Round " << i << ": globalCut " << globalCut << ", gain sum " << intermediateGainSum
-					<< ", projected cut " << initialCut - intermediateGainSum << std::endl;
-		}
-		assert(std::is_sorted(myGlobalIndices.begin(), myGlobalIndices.end()));
 		scai::utilskernel::LArray<IndexType> indexTransport(myGlobalIndices.size());
 		for (IndexType j = 0; j < myGlobalIndices.size(); j++) {
 			indexTransport[j] = myGlobalIndices[j];
