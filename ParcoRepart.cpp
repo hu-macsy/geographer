@@ -1188,8 +1188,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				for (IndexType node : firstRegion) {
 					if (firstRegionOld.count(node) == 0) {
 						additionalNodes.push_back(node);
-						part.setValue(node, localBlockID);
 						newIndices.push_back(node);
+						part.setValue(node, localBlockID);
 					}
 				}
 

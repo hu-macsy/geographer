@@ -472,15 +472,15 @@ TEST_F(ParcoRepartTest, testCommunicationScheme) {
 }
 
 TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
-	const IndexType dimX = 32;
-	const IndexType dimY = 32;
-	const IndexType dimZ = 32;
+	const IndexType dimX = 10;
+	const IndexType dimY = 10;
+	const IndexType dimZ = 10;
 	const IndexType n = dimX*dimY*dimZ;
-
-	const IndexType k = 10;
 
 	//define distributions
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+	const IndexType k = comm->getSize();
 
 	scai::lama::CSRSparseMatrix<ValueType>a(n,n);
 	scai::lama::MatrixCreator::buildPoisson(a, 3, 19, dimX,dimY,dimZ);
@@ -592,8 +592,8 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 				}
 
 				if (directNeighbor) {
-					//EXPECT_TRUE(inFirstRound);
-					//EXPECT_LT(i, lastRoundMarker);
+					EXPECT_TRUE(inFirstRound);
+					EXPECT_LT(i, lastRoundMarker);
 				} else {
 					inFirstRound = false;
 				}
