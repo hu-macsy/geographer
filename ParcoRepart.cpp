@@ -770,12 +770,12 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 		throw std::runtime_error("Partition has " + std::to_string(partDist->getLocalSize()) + " local nodes, but matrix has " + std::to_string(localN) + ".");
 	}
 
-	Scalar maxBlockScalar = part.max();
-	if (thisBlock > maxBlockScalar.getValue<IndexType>()) {
+	IndexType maxBlock = part.max().Scalar::getValue<IndexType>();
+	if (thisBlock > maxBlock) {
 		throw std::runtime_error(std::to_string(thisBlock) + " is not a valid block id.");
 	}
 
-	if (otherBlock > maxBlockScalar.getValue<IndexType>()) {
+	if (otherBlock > maxBlock) {
 		throw std::runtime_error(std::to_string(otherBlock) + " is not a valid block id.");
 	}
 
@@ -954,6 +954,15 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			myGlobalIndices[j] = inputDist->local2global(j);
 		}//TODO: maybe refactor this someday to be outside the loop
 
+		{
+			scai::hmemo::ReadAccess<IndexType> partAccess(part.getLocalValues());
+			for (IndexType j = 0; j < localN; j++) {
+				if (partAccess[j] != localBlockID) {
+					throw std::runtime_error("Block ID "+std::to_string(partAccess[j])+" found on process "+std::to_string(localBlockID)+".");
+				}
+			}
+		}
+
 		if (partner != comm->getRank()) {
 			//processor is active this round
 
@@ -1065,7 +1074,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			std::pair<IndexType, IndexType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
 
 			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", prepared sets." << std::endl;
-
 
 			/**
 			 * execute FM locally

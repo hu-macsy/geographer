@@ -280,7 +280,6 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 
 	ASSERT_EQ(n, inputDist->getGlobalSize());
 
-
 	const IndexType localN = inputDist->getLocalSize();
 
 	//generate random partition
@@ -389,44 +388,96 @@ TEST_F(ParcoRepartTest, testCommunicationScheme) {
 	}
 }
 
-TEST_F(ParcoRepartTest, testGetInterfaceNodesLocal) {
+TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 	/**
 	 * test first with complete matrix. Unsuitable, I know, but we don't have a mesh generator yet.
 	 * TODO: We now have a mesh generator. Update with it.
 	 */
 
-	  const IndexType n = 1000;
-	  const IndexType k = 10;
+	const IndexType n = 1000;
+	const IndexType k = 10;
 
-	  //define distributions
-	  scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
-	  scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+	//define distributions
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
 
-	  //generate random complete matrix
-	  scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
-	  scai::lama::MatrixCreator::fillRandom(a, 1);
+	//generate random complete matrix
+	scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
+	scai::lama::MatrixCreator::fillRandom(a, 1);
 
-	  //generate balanced distributed partition
-	  scai::lama::DenseVector<IndexType> part(dist);
-	  for (IndexType i = 0; i < n; i++) {
-	    IndexType blockId = i % k;
-	    part.setValue(i, blockId);
-	  }
+	//generate balanced distributed partition
+	scai::lama::DenseVector<IndexType> part(dist);
+	for (IndexType i = 0; i < n; i++) {
+		IndexType blockId = i % k;
+		part.setValue(i, blockId);
+	}
 
-	  IndexType thisBlock = 0;
-	  IndexType otherBlock = 1;
+	IndexType thisBlock = 0;
+	IndexType otherBlock = 1;
 
-	  std::vector<IndexType> interfaceNodes;
-	  IndexType lastRoundMarker;
-	  std::tie(interfaceNodes, lastRoundMarker) = ParcoRepart<IndexType, ValueType>::getInterfaceNodes(a, part, thisBlock, otherBlock, 1);
+	std::vector<IndexType> interfaceNodes;
+	IndexType lastRoundMarker;
+	std::tie(interfaceNodes, lastRoundMarker) = ParcoRepart<IndexType, ValueType>::getInterfaceNodes(a, part, thisBlock, otherBlock, 2);
 
-	  scai::hmemo::ReadAccess<IndexType> partAccess(part.getLocalValues());
+	//last round marker can only be zero if set is empty
+	EXPECT_LE(lastRoundMarker, interfaceNodes.size());
+	if (interfaceNodes.size() > 0) {
+		EXPECT_GT(lastRoundMarker, 0);
+	}
 
-	  for (IndexType node : interfaceNodes) {
-		  ASSERT_TRUE(dist->isLocal(node));
-		  EXPECT_EQ(thisBlock, partAccess[dist->global2local(node)]);
-	  }
+	//check for uniqueness
+	std::vector<IndexType> sortedCopy(interfaceNodes);
+	std::sort(sortedCopy.begin(), sortedCopy.end());
+	auto it = std::unique(sortedCopy.begin(), sortedCopy.end());
+	EXPECT_EQ(sortedCopy.end(), it);
+
+	scai::hmemo::HArray<IndexType> localData = part.getLocalValues();
+	scai::hmemo::ReadAccess<IndexType> partAccess(localData);
+
+	//test whether all returned nodes are of the specified block
+	for (IndexType node : interfaceNodes) {
+		ASSERT_TRUE(dist->isLocal(node));
+		EXPECT_EQ(thisBlock, partAccess[dist->global2local(node)]);
+	}
+
+	//test whether rounds are consistent: first nodes should have neighbors of otherBlock, later nodes not
+	//test whether last round marker is set correctly: nodes before last round marker should have neighbors in set, nodes afterwards need not
+	const CSRStorage<ValueType>& localStorage = a.getLocalStorage();
+	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+
+	scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildPartHalo(a, part);
+	scai::utilskernel::LArray<IndexType> haloData;
+	dist->getCommunicatorPtr()->updateHalo( haloData, localData, partHalo );
+
+	bool inFirstRound = true;
+	for (IndexType i = 0; i < lastRoundMarker; i++) {
+		bool directNeighbor = false;
+		for (IndexType j = ia[i]; j < ia[i+1]; j++) {
+			IndexType neighbor = ja[j];
+			if (dist->isLocal(neighbor)) {
+				if (partAccess[dist->global2local(neighbor)] == thisBlock) {
+					EXPECT_EQ(1, std::count(interfaceNodes.begin(), interfaceNodes.end(), neighbor));
+				}
+			} else {
+				IndexType haloIndex = partHalo.global2halo(neighbor);
+				if (haloIndex != nIndex && haloData[haloIndex] == otherBlock) {
+					directNeighbor = true;
+				}
+			}
+		}
+
+		if (directNeighbor) {
+			EXPECT_TRUE(inFirstRound);
+		} else {
+			inFirstRound = false;
+		}
+
+		if (i == 0) {
+			EXPECT_TRUE(directNeighbor);
+		}
+	}
 }
 //----------------------------------------------------------
 
