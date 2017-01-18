@@ -36,39 +36,29 @@ TEST_F(ParcoRepartTest, testMinimumNeighborDistanceDistributed) {
   IndexType n = nroot * nroot * nroot;
   IndexType dimensions = 3;
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
-  scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
 
-  //scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
-  scai::lama::CSRSparseMatrix<ValueType>a( n, n );  // the create3DMesh doen not work
+
+  scai::lama::CSRSparseMatrix<ValueType>a(n, n);
   std::vector<ValueType> maxCoord(dimensions, nroot);
   std::vector<IndexType> numPoints(dimensions, nroot);
-
-  scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
-  scai::hmemo::ContextPtr contexPtr = scai::hmemo::Context::getHostPtr();
   
   std::vector<DenseVector<ValueType>> coordinates(dimensions);
   for(IndexType i=0; i<dimensions; i++){ 
-	  coordinates[i].allocate(n);
-	  coordinates[i] = static_cast<ValueType>( 0 );
+	  coordinates[i] = DenseVector<IndexType>(n, 0);
   }
-
+  
   MeshIO<IndexType, ValueType>::createStructured3DMesh(a, coordinates, maxCoord, numPoints);
+
+  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+  scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+
   a.redistribute(dist, noDistPointer);
-  for(IndexType i=0; i<dimensions; i++){ 
-	  coordinates[i].redistribute(coordDist);
+  
+  for(IndexType i=0; i<dimensions; i++){
+  	  coordinates[i].redistribute(dist);
   }
-//  for (IndexType i = 0; i < nroot; i++) {
-//    for (IndexType j = 0; j < nroot; j++) {
-//      //this is slightly wasteful, since it also iterates over indices of other processors
-//      // no need to check if local, since setValue skips non-local coordinates. index must always use the global value
-//        coordinates[0].setValue(i*nroot + j, i);
-//        coordinates[1].setValue(i*nroot + j, j);
-//    }
-//  }
 
   const ValueType minDistance = ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(a, coordinates, dimensions);
-
   EXPECT_LE(minDistance, nroot*1.5);
   EXPECT_GE(minDistance, 1);
 }
@@ -788,8 +778,6 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     CSRSparseMatrix<ValueType> blockGraphMatrix( myStorage );
     
     scai::lama::CSRSparseMatrix<ValueType>  dummy = ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local(blockGraphMatrix);
-    
-    //std::vector<IndexType> coloredEdges = ParcoRepart<IndexType,ValueType>::getGraphEdgeColoring_local(blockGraphMatrix);
 }
 
 /**

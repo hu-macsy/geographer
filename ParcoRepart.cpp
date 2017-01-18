@@ -542,9 +542,6 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<Va
 	scai::utilskernel::LArray<IndexType> haloData;
 	partDist->getCommunicatorPtr()->updateHalo( haloData, localData, partHalo );
 
-	/**
-	 * first pass, compute local cut and build list of required halo indices
-	 */
 	ValueType result = 0;
 	for (IndexType i = 0; i < localN; i++) {
 		const IndexType beginCols = ia[i];
@@ -1072,9 +1069,10 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				//Oh well. None of the processors managed an improvement. No need to update data structures.
 				std::cout << "Thread " << comm->getRank() << ", round " << i << " no gain here and at " << partner << "." << std::endl;
 
-
 			}	else {
 				SCAI_REGION( "ParcoRepart.distributedFMStep.loop.prepareRedist" )
+
+				assert(std::max(ValueType(swapField[1]), ValueType(gain)) > 0);
 
 				gainSum += std::max(ValueType(swapField[1]), ValueType(gain));
 
@@ -1271,7 +1269,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 					+ std::to_string(outDegree[i]) + " outgoing local edges.");
 		}
 	}
-
 
 	auto computeGain = [&](IndexType globalID){
 		SCAI_REGION( "ParcoRepart.computeGain" )
