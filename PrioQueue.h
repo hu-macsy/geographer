@@ -62,6 +62,11 @@ public:
 	virtual ElemType extractMin();
 
 	/**
+	 * Returns the element with minimum key without removing it.
+	 */
+	virtual ElemType inspectMin();
+
+	/**
 	* Returns True iff value val is present.
 	*/
 	virtual bool contains(const Val& val);
@@ -127,7 +132,7 @@ ITI::PrioQueue<Key, Val>::PrioQueue(std::vector<Key>& keys) {
 
 template<class Key, class Val>
 ITI::PrioQueue<Key, Val>::PrioQueue(uint64_t len) {
-	mapValToKey.resize(len);
+	mapValToKey.resize(len, undefined);
 }
 
 template<class Key, class Val>
@@ -151,7 +156,6 @@ inline Key ITI::PrioQueue<Key, Val>::getKey(const Val& val) {
 	return mapValToKey.at(val);
 }
 	
-
 template<class Key, class Val>
 inline void ITI::PrioQueue<Key, Val>::remove(const ElemType& elem) {
 	remove(elem.second);
@@ -163,6 +167,14 @@ inline void ITI::PrioQueue<Key, Val>::remove(const Val& val) {
 	pqset.erase(std::make_pair(key, val));
 	mapValToKey.at(val) = undefined;
 }
+
+template<class Key, class Val>
+std::pair<Key, Val> ITI::PrioQueue<Key, Val>::inspectMin() {
+	assert(pqset.size() > 0);
+	ElemType elem = (* pqset.begin());
+	return elem;
+}
+
 
 template<class Key, class Val>
 std::pair<Key, Val> ITI::PrioQueue<Key, Val>::extractMin() {
