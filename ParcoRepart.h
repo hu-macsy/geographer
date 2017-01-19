@@ -166,6 +166,8 @@ namespace ITI {
 
 			static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
 
+			static ValueType localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input);
+
 			static IndexType getDegreeSum(const CSRSparseMatrix<ValueType> &input, std::vector<IndexType> nodes);
 
 			static ValueType computeCutTwoWay(const CSRSparseMatrix<ValueType> &input,

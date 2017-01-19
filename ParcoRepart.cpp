@@ -227,18 +227,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			ValueType oldCut = cut;
 			cut = computeCut(input, result);
 			if (cut != oldCut - gain) {
-				const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
-				const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-				const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-
-				IndexType numOutgoingEdges = 0;
-				for (IndexType i = 0; i < input.getRowDistributionPtr()->getLocalSize(); i++) {
-					for (IndexType j = ia[i]; j < ia[i+1]; j++) {
-						if (!input.getRowDistributionPtr()->isLocal(ja[j])) numOutgoingEdges++;
-					}
-				}
-
-				IndexType sumOutgoingEdges = comm->sum(numOutgoingEdges) / 2;
+				IndexType sumOutgoingEdges = comm->sum(localSumOutgoingEdges(input)) / 2;
 
 				std::cout << std::string("Old cut was " + std::to_string(oldCut) + ", new cut is " + std::to_string(cut) + " with "
 						+ std::to_string(sumOutgoingEdges) + " outgoing edges, but gain is " + std::to_string(gain)+".") << std::endl;
@@ -626,6 +615,19 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCutTwoWay(const CSRSparseMat
 }
 
 template<typename IndexType, typename ValueType>
+ValueType ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input) {
+	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
+	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+
+	IndexType numOutgoingEdges = 0;
+	for (IndexType j = 0; j < ja.numValues(); j++) {
+		if (!input.getRowDistributionPtr()->isLocal(ja[j])) numOutgoingEdges++;
+	}
+
+	return numOutgoingEdges;
+}
+
+template<typename IndexType, typename ValueType>
 IndexType ParcoRepart<IndexType, ValueType>::localBlockSize(const DenseVector<IndexType> &part, IndexType blockID) {
 	SCAI_REGION( "ParcoRepart.localBlockSize" )
 	IndexType result = 0;
@@ -809,9 +811,10 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 		throw std::runtime_error("Block IDs must be different.");
 	}
 
-	if (depth <= 0) {
-		throw std::runtime_error("Depth must be positive");
+	if (depth < 0) {
+		throw std::runtime_error("Depth must be non-negative");
 	}
+
 
 	scai::hmemo::HArray<IndexType> localData = part.getLocalValues();
 	scai::hmemo::ReadAccess<IndexType> partAccess(localData);
@@ -828,6 +831,11 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 	 * first get nodes directly at the border to the other block
 	 */
 	std::vector<IndexType> interfaceNodes;
+
+	if (depth == 0) {
+		//this was a dummy call to assure that all processes participate in the communication step
+		return {interfaceNodes, 0};
+	}
 
 	for (IndexType localI = 0; localI < localN; localI++) {
 		const IndexType beginCols = ia[localI];
@@ -996,6 +1004,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			}
 		}
 
+		ValueType gainThisRound = 0;
+
 		if (partner != comm->getRank()) {
 			//processor is active this round
 
@@ -1065,7 +1075,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", swapped " << swapLength << " interface nodes with thread " << partner << std::endl;
 
-
 			assert(requiredHaloIndices.size() <= globalN - inputDist->getLocalSize());
 
 			/*
@@ -1089,8 +1098,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				assert(graphHalo.global2halo(node) != nIndex);
 			}
 
-			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", got halo." << std::endl;
-
 			//why not use vectors in the FM step or use sets to begin with? Might be faster.
 			//here we only exchange one round less than gathered. The other forms a dummy border layer.
 			std::set<IndexType> firstRegion(interfaceNodes.begin(), interfaceNodes.begin()+lastRoundMarker);
@@ -1103,8 +1110,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			//block sizes and capacities
 			std::pair<IndexType, IndexType> blockSizes = {blockSize, otherBlockSize};
 			std::pair<IndexType, IndexType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
-
-			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", prepared sets." << std::endl;
 
 			/**
 			 * execute FM locally
@@ -1127,9 +1132,11 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			}	else {
 				SCAI_REGION( "ParcoRepart.distributedFMStep.loop.prepareRedist" )
 
-				assert(std::max(ValueType(swapField[1]), ValueType(gain)) > 0);
+				gainThisRound = std::max(ValueType(swapField[1]), ValueType(gain));
 
-				gainSum += std::max(ValueType(swapField[1]), ValueType(gain));
+				assert(gainThisRound > 0);
+
+				gainSum += gainThisRound;
 
 				bool otherWasBetter = (swapField[1] > gain || (swapField[1] == gain && partner < comm->getRank()));
 
@@ -1205,7 +1212,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			const IndexType dummyPartner = comm->getRank() == 0 ? 1 : 0;
 			//std::cout << "Thread " << comm->getRank() << " is inactive in round " << i << ", performing dummy interface and halo exchange." << std::endl;
 
-			getInterfaceNodes(input, part, localBlockID, dummyPartner, 1);
+			getInterfaceNodes(input, part, localBlockID, dummyPartner, 0);
 
 			//dummy halo update
 			std::vector<IndexType> requiredHaloIndices;
@@ -1234,9 +1241,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		input.redistribute(newDistribution, input.getColDistributionPtr());
 		part.redistribute(newDistribution);
 
-		for (IndexType globalId : myGlobalIndices) {
-			part.setValue(globalId, localBlockID);
-		}
 
 		//std::cout << "Thread " << comm->getRank() << ", round " << i << ", finished redistribution." << std::endl;
 
@@ -1591,8 +1595,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		assert(secondDummyLayer.count(node) == 0);
 	}
 
-	assert(blockSizes.first <= blockCapacities.first);
-	assert(blockSizes.second <= blockCapacities.second);
 	assert(firstregion.size() + secondregion.size() == veryLocalN);
 	return maxGain;
 }
