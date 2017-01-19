@@ -40,7 +40,7 @@ class HilbertCurveTest : public ::testing::Test {
 TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
   const IndexType dimensions = 2;
   const IndexType recursionDepth = 7;
-  IndexType N=64;
+  IndexType N=32*32;
   std::vector<DenseVector<ValueType>> coords(dimensions);
   for(IndexType i=0; i<dimensions; i++){ 
       coords[i].allocate(N);
@@ -112,6 +112,54 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_3D) {
 
 }
 
+//-----------------------------------------------------------------
+
+TEST_F(HilbertCurveTest, testHilbertIndexNoScaling_Local_3D) {
+  SCAI_REGION("testHilbertIndexNoScaling_Local_3D");
+  const IndexType dimensions = 2;
+  const IndexType recursionDepth = 10;
+  IndexType N=6400;
+  
+  srand(time(NULL));
+  std::vector<DenseVector<ValueType>> coords(dimensions);
+  for(IndexType i=0; i<dimensions; i++){ 
+      coords[i].allocate(N);
+      // random coordinate up to 100
+      ValueType val = rand()%100;
+      coords[i] = static_cast<ValueType>( val );
+  }
+  
+  std::vector<ValueType> maxCoords({0,0});
+  for(IndexType j=0; j<dimensions; j++){
+      maxCoords[j]= coords[j].max().Scalar::getValue<ValueType>();
+  }
+  
+  EXPECT_EQ(coords[0].size(), N);
+  EXPECT_EQ(coords.size(), dimensions);
+  
+  const std::vector<ValueType> minCoords({0,0});
+
+  {
+  SCAI_REGION("testHilbertIndexNoScaling_Local_3D.scaling")
+  DenseVector<ValueType> indices(N, 0);
+  for (IndexType i = 0; i < N; i++){
+    indices.setValue(i, HilbertCurve<IndexType, ValueType>::getHilbertIndex(coords, dimensions, i, recursionDepth, minCoords, maxCoords) );
+    EXPECT_LE(indices.getValue(i).getValue<ValueType>(), 1);
+    EXPECT_GE(indices.getValue(i).getValue<ValueType>(), 0);
+  }
+  }
+
+  {
+  SCAI_REGION("testHilbertIndexNoScaling_Local_3D.no_scaling")
+  DenseVector<ValueType> indices(N, 0);
+  for (IndexType i = 0; i < N; i++){
+    indices.setValue(i, HilbertCurve<IndexType, ValueType>::getHilbertIndex_noScaling(coords, dimensions, i, recursionDepth, minCoords, maxCoords) );
+    EXPECT_LE(indices.getValue(i).getValue<ValueType>(), 1);
+    EXPECT_GE(indices.getValue(i).getValue<ValueType>(), 0);
+  }
+  }
+
+}
 
 //-----------------------------------------------------------------
 /*
@@ -119,7 +167,7 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_3D) {
 */
 TEST_F(HilbertCurveTest, testHilbertIndexRandom_Distributed_3D) {
   const IndexType dimensions = 3;
-  const IndexType N = 50;
+  const IndexType N = 500;
   const IndexType recursionDepth = 7;
   
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -207,7 +255,7 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
   }
   scai::dmemo::DistributionPtr distIndices ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
 
-//points in a grid-like fashion
+  //points in a grid-like fashion
   IndexType i=0;
   ValueType indexX, indexY, indexZ;
   for(indexZ= startCoord; indexZ<=1; indexZ+=offset)

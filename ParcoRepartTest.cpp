@@ -685,6 +685,7 @@ TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
     
     
     //print
+    /*
     std::cout<<"----------------------------"<< " PE graph  "<< *comm << std::endl;    
     for(IndexType i=0; i<PEgraph.getNumRows(); i++){
         std::cout<< *comm<< ":";
@@ -693,7 +694,7 @@ TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
         }
         std::cout<< std::endl;
     }
-    
+    */
 }
 
 //------------------------------------------------------------------------------
@@ -919,6 +920,7 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     
     // test graph coloring
     // get a CSRSparseMatrix from the HArray
+    
     scai::lama::SparseAssemblyStorage<ValueType> myStorage( k, k );
     {
     //scai::hmemo::ReadAccess<IndexType> blockGraphRead( blockGraph );

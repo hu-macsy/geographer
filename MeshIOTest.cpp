@@ -29,7 +29,6 @@ typedef double ValueType;
 typedef int IndexType;
 
 using namespace scai;
-using namespace std;
 
 namespace ITI {
 
@@ -43,7 +42,7 @@ class MeshIOTest : public ::testing::Test {
  */
 TEST_F(MeshIOTest, testMesh3DCreateRandomMeshWriteInFile_Local_3D) {
     std::vector<DenseVector<ValueType>> coords;
-    int numberOfPoints= 100;
+    IndexType numberOfPoints= 20;
     ValueType maxCoord= 1;
     std::string grFile = "meshes/randomTest6.graph";
     std::string coordFile= grFile + ".xyz";
@@ -68,15 +67,24 @@ TEST_F(MeshIOTest, testMesh3DCreateRandomMeshWriteInFile_Local_3D) {
  * */
 
 TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
-    std::vector<IndexType> numPoints= {12, 13, 14};
+    std::vector<IndexType> numPoints= {8, 7, 10};
     std::vector<ValueType> maxCoord= {100,180,130};
+    // set number of points in random
+    /*
+    srand(time(NULL));
+    for(int i=0; i<3; i++){
+        numPoints[i] = (IndexType) (rand()%4 +7);
+    }
+    */
     IndexType numberOfPoints= numPoints[0]*numPoints[1]*numPoints[2];
+    
     std::vector<DenseVector<ValueType>> coords(3, DenseVector<ValueType>(numberOfPoints, 0));
-    std::string grFile = "meshes/structuredTest6.graph";
+    std::string grFile = "meshes/structuredTest7.graph";
     std::string coordFile= grFile + ".xyz";
 
+    
     scai::lama::CSRSparseMatrix<ValueType> adjM( numberOfPoints, numberOfPoints);
-    std::cout<<__FILE__<< "  "<< __LINE__<< " , numberOfPoints=" << numberOfPoints<< std::endl;
+    std::cout<<__FILE__<< "  "<< __LINE__<< " , numberOfPoints=" << numberOfPoints << " in every axis: "<< numPoints[0] << ", "<< numPoints[1] << ", "<< numPoints[2] << std::endl;
 
     {
         SCAI_REGION("testMesh3DCreateStructuredMesh_Local_3D.createStructured3DMesh" )
@@ -101,11 +109,78 @@ TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
             }
         }
     }
+    
 }
 //-----------------------------------------------------------------
 
+TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
+    std::vector<IndexType> numPoints= { 4, 5, 3};
+    std::vector<ValueType> maxCoord= {3, 44, 500};
+    // set number of points in random
+    /*
+    srand(time(NULL));
+    for(int i=0; i<3; i++){
+        numPoints[i] = (IndexType) (rand()%4 + 6);
+    }
+    */
+    IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
+    std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
+    
+    std::vector<DenseVector<ValueType>> coords(3);
+    for(IndexType i=0; i<3; i++){ 
+	  coords[i].allocate(dist);
+	  coords[i] = static_cast<ValueType>( 0 );
+    }
+    
+    scai::lama::CSRSparseMatrix<ValueType> adjM( dist, noDistPointer);
+    
+    MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
+        
+    EXPECT_EQ( adjM.getLocalNumColumns() , N);
+    EXPECT_EQ( adjM.getLocalNumRows() , coords[0].getLocalValues().size() );
+    EXPECT_EQ( true , adjM.getRowDistribution().isEqual(coords[0].getDistribution()) );
+    
+    // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
+    IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
+                                -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
+
+    EXPECT_EQ( adjM.getNumValues() , numEdges*2 );     
+    
+    {
+    SCAI_REGION("testCreateStructuredMesh_Distributed_3D.check_adjM")
+    for(IndexType i=0; i<N; i++){ 
+        DenseVector<ValueType> row;
+        adjM.getRow(row, i);
+        //std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm << " , l1Norm= "<< row.l1Norm().Scalar::getValue<ValueType>()  << std::endl;
+        // for a structured mesh every node can have at most 6 neighbours
+        EXPECT_LE( row.l1Norm().Scalar::getValue<ValueType>() , 6);
+        // and at least 3 (for the corner nodes)
+        EXPECT_GE( row.l1Norm().Scalar::getValue<ValueType>() , 3);
+        //for(IndexType j=0; j<row.size(); j++){}
+    }
+    }
+    
+    {
+    SCAI_REGION("testCreateStructuredMesh_Distributed_3D.check_coords")
+    // check every coordinate is within bounds
+    for(IndexType i=0; i<N; i++){
+        EXPECT_LE( coords[0].getValue(i).Scalar::getValue<ValueType>() , maxCoord[0]);
+        EXPECT_GE( coords[0].getValue(i).Scalar::getValue<ValueType>() , 0);
+        EXPECT_LE( coords[1].getValue(i).Scalar::getValue<ValueType>() , maxCoord[1]);
+        EXPECT_GE( coords[1].getValue(i).Scalar::getValue<ValueType>() , 0);
+        EXPECT_LE( coords[2].getValue(i).Scalar::getValue<ValueType>() , maxCoord[2]);
+        EXPECT_GE( coords[2].getValue(i).Scalar::getValue<ValueType>() , 0);
+    }
+    }
+}
+//-----------------------------------------------------------------
+/*
 TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
-    IndexType N= 100;
+    IndexType N= 40;
     ValueType maxCoord= 1;
     IndexType dim= 3, k= 8;
     ValueType epsilon= 0.2;
@@ -116,11 +191,10 @@ TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
     
     //the adjacency matrix
     scai::lama::CSRSparseMatrix<ValueType> adjM(N, N);
-    {
-        SCAI_REGION("testPartitionWithRandom3DMesh_Local_3D.createRandom3DMesh");
-        //random coordinates in 3D stored in coords and the adjacency matrix in adjM
-        MeshIO<IndexType, ValueType>::createRandom3DMesh(adjM, coords, N, maxCoord);
-    }
+    
+    //random coordinates in 3D stored in coords and the adjacency matrix in adjM
+    MeshIO<IndexType, ValueType>::createRandom3DMesh(adjM, coords, N, maxCoord);
+    
     //std::cout<< "Number of nodes= "<< N<< " , Number of edges="<< (adjM.getNumValues()-N)/2 << std::endl;
     
     SCAI_REGION_START("testPartitionWithRandom3DMesh_Local_3D.partitionGraph");
@@ -141,15 +215,14 @@ TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
     std::cout<< "# imbalance = " << imbalance<< " , "<< std::endl;
     
 }
-
+*/
 //-----------------------------------------------------------------
 /* Reads a graph from a file "filename" in METIS format, writes it back into "my_filename" and reads the graph
  * again from "my_filename".
  */
 TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
-    //string path = "./meshes/my_meshes/";
     std::string path = "";
-    std::string file = "Grid32x32";
+    std::string file = "Grid16x16";
     std::string filename= path + file;
     CSRSparseMatrix<ValueType> Graph;
     IndexType N;    //number of points     
@@ -188,7 +261,7 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
 //-----------------------------------------------------------------
 // read a graph from a file in METIS format and its coordiantes in 2D and partiotion that graph
 // usually, graph file: "file.graph", coodinates file: "file.graph.xy" or .xyz
-TEST_F(MeshIOTest, testPartitionFromFile_2D){
+TEST_F(MeshIOTest, testPartitionFromFile_local_2D){
     CSRSparseMatrix<ValueType> graph;       //the graph as an adjacency matrix  
     std::vector<DenseVector<ValueType>> coords2D(2);        //the coordiantes of each node 
     IndexType dim= 2, k= 10, i;
@@ -196,7 +269,7 @@ TEST_F(MeshIOTest, testPartitionFromFile_2D){
     
     //std::string path = "./meshes/my_meshes";s
     std::string path = "";
-    std::string file= "Grid32x32";
+    std::string file= "Grid16x16";
     std::string grFile= path +file, coordFile= path +file +".xyz";  //graph file and coordinates file
     std::fstream f(grFile);
     IndexType nodes, edges;
@@ -231,12 +304,26 @@ TEST_F(MeshIOTest, testPartitionFromFile_2D){
     //partition the graph
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D,  k, epsilon);
     EXPECT_EQ(partition.size(), N);
-    /*
-    ValueType cut= ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true);
-    std::cout<< "# cut = "<< cut<< std::endl;
-    ValueType imbalance= ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k);
-    std::cout<< "# imbalance = " << imbalance<< std::endl; 
-    */ 
+}
+//-----------------------------------------------------------------
+TEST_F(MeshIOTest, testIndex2_3DPoint){
+    std::vector<IndexType> numPoints= {4, 11, 7};
+    
+    srand(time(NULL));
+    for(int i=0; i<3; i++){
+        numPoints[i] = (IndexType) (rand()%5 + 10);
+    }
+    IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
+    
+    for(IndexType i=0; i<N; i++){
+        IndexType* ind = MeshIO<IndexType, ValueType>::index2_3DPoint(i, numPoints);
+        EXPECT_LE(ind[0] , numPoints[0]-1);
+        EXPECT_LE(ind[1] , numPoints[1]-1);
+        EXPECT_LE(ind[2] , numPoints[2]-1);
+        EXPECT_GE(ind[0] , 0);
+        EXPECT_GE(ind[1] , 0);
+        EXPECT_GE(ind[2] , 0);
+    }
 }
 
 //-----------------------------------------------------------------

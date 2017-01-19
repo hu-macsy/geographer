@@ -87,10 +87,10 @@ namespace ITI {
 
 			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted = true);
                         
-                        //------------------------------------------------------------------------
-                        
-                        /** Get the borders nodes of each block.
-                         */
+			//------------------------------------------------------------------------
+
+			/** Get the borders nodes of each block.
+			*/
 			static DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
 
 			/**Returns the processor graph. Every processor traverses its local part of adjM: and for every
@@ -129,7 +129,7 @@ namespace ITI {
 			 */
 			static scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const int k);
 
-			/**
+			/** Colors the edges of the graph using max_vertex_degree + 1 colors.
 			 *
 			 * @param[in] adjM The graph given as an adjacency matrix.
 			 *
