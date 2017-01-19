@@ -592,12 +592,10 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     graph.redistribute(dist, noDistPointer);
     
     std::vector<DenseVector<ValueType>> coords(2);
-    coords[0].allocate(N);
-    coords[1].allocate(N);
+    coords[0].allocate(dist);
+    coords[1].allocate(dist);
     coords[0]= static_cast<ValueType>( 0 );
     coords[1]= static_cast<ValueType>( 0 );
-    coords[0].redistribute(dist);
-    coords[1].redistribute(dist);
     MeshIO<IndexType, ValueType>::fromFile2Coords_2D( std::string(file + ".xyz"), coords, N);
     
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
@@ -605,20 +603,23 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     
     // get partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, k, 0.2);
+    ASSERT_EQ(N, partition.size());
   
     //get the border nodes
     scai::lama::DenseVector<IndexType> border(dist, 0);
     border = ParcoRepart<IndexType,ValueType>::getBorderNodes( graph , partition);
     
+    const scai::hmemo::ReadAccess<IndexType> localBorder(border.getLocalValues());
     for(IndexType i=0; i<dist->getLocalSize(); i++){
-        EXPECT_GE(border.getLocalValues()[i] , 0);
-        EXPECT_LE(border.getLocalValues()[i] , 1);
+        EXPECT_GE(localBorder[i] , 0);
+        EXPECT_LE(localBorder[i] , 1);
     }
     
     //partition.redistribute(dist); //not needed now
     
     // print
     int numX= 16, numY= 16;         // 2D grid dimensions
+    ASSERT_EQ(N, numX*numY);
     IndexType partViz[numX][numY];   
     IndexType bordViz[numX][numY]; 
     for(int i=0; i<numX; i++)

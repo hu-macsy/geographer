@@ -1557,63 +1557,50 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const 
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const IndexType localN = dist->getLocalSize();
     const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
     DenseVector<IndexType> border(dist,0);
-    scai::utilskernel::LArray<IndexType> localBorder= border.getLocalValues();
+    scai::utilskernel::LArray<IndexType>& localBorder= border.getLocalValues();
     
-    IndexType N = adjM.getNumColumns();
+    IndexType globalN = dist->getGlobalSize();
     IndexType max = part.max().Scalar::getValue<IndexType>();
     
     if( !dist->isEqual( part.getDistribution() ) ){
         std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and partition dist: "<< part.getDistribution() << std::endl;
         throw std::runtime_error( "Distributions: should (?) be equal.");
     }
-    //TODO: Use DenseVector from start: localV and nonLocalV sizes are not known beforehand. That is why I use a std::vector and then convert it to a DenseVector. 
-    std::vector<IndexType> localV, nonLocalV;
-    for(IndexType i=0; i<dist->getLocalSize(); i++){    // for all local nodes 
-        scai::hmemo::HArray<ValueType> localRow;        // get local row on this processor
-        adjM.getLocalRow( localRow, i);
-        scai::hmemo::ReadAccess<ValueType> readLR(localRow); 
-        assert(readLR.size() == adjM.getNumColumns());
-        for(IndexType j=0; j<N; j++){                   // for all the edges of a node
-            ValueType val;
-            readLR.getValue(val, j);      
-            if(val>0){                                  // i and j have an edge               
-                if(dist->isLocal(j)){      
-                    assert( localPart[ dist->global2local(j) ] < max +1 );
-                    if( localPart[i] != localPart[ dist->global2local(j) ] ){ // i and j are in different parts
-                        localBorder[i] = 1;             // then i is a border node
-                        break;                          // if this is a border node then break 
-                    }
-                } else{     // if j is not local index in this PE, store the indices and gather later
-                    localV.push_back(i);
-                    nonLocalV.push_back(j);
-                }
-            }
-        }
-    }
 
-    // take care of all the non-local indices found
-    assert( localV.size() == nonLocalV.size() );
-    DenseVector<IndexType> nonLocalDV( nonLocalV.size() , 0 );
-    DenseVector<IndexType> gatheredPart(nonLocalDV.size() , 0);
-    
-    //get a DenseVector grom a vector
-    for(IndexType i=0; i<nonLocalV.size(); i++){
-        nonLocalDV.setValue(i, nonLocalV[i]);
-    }
-    //gather all non-local indexes
-    gatheredPart.gather(part, nonLocalDV , scai::utilskernel::binary::COPY );
+    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-    assert( localV.size()==nonLocalDV.size() );
-    assert( nonLocalDV.size()==gatheredPart.size() );
-    for(IndexType i=0; i<gatheredPart.size(); i++){
-        if(localPart[ localV[i]] != gatheredPart(i).Scalar::getValue<IndexType>()  ){
-            localBorder[localV[i]]=1;
-        }
+	scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+
+	scai::dmemo::Halo partHalo = buildPartHalo(adjM, part);
+	scai::utilskernel::LArray<IndexType> haloData;
+	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
+
+    for(IndexType i=0; i<localN; i++){    // for all local nodes
+    	IndexType thisBlock = localPart[i];
+    	for(IndexType j=ia[i]; j<ia[i+1]; j++){                   // for all the edges of a node
+    		IndexType neighbor = ja[j];
+    		IndexType neighborBlock;
+			if (dist->isLocal(neighbor)) {
+				neighborBlock = partAccess[dist->global2local(neighbor)];
+			} else {
+				neighborBlock = haloData[partHalo.global2halo(neighbor)];
+			}
+			assert( neighborBlock < max +1 );
+			if (thisBlock != neighborBlock) {
+				localBorder[i] = 1;
+				break;
+			}
+    	}
     }
    
-    border.setValues(localBorder);
+    //border.setValues(localBorder);
+    assert(border.getDistributionPtr()->getLocalSize() == localN);
     return border;
 }
 
