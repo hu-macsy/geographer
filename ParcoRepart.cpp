@@ -1497,8 +1497,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 				bool wasInSameBlock = bestQueueIndex == 0 ? isInFirstBlock(neighbor) : isInSecondBlock(neighbor);
 				assert(isInFirstBlock(neighbor) != isInSecondBlock(neighbor));
 
-				//gain[veryLocalNeighborID] += wasInSameBlock ? edgeweight : -edgeweight;
-				gain[veryLocalNeighborID] = computeGain(neighbor);
+				gain[veryLocalNeighborID] += wasInSameBlock ? 2*edgeweight : -2*edgeweight;
 
 				if (wasInSameBlock) {
 					assert(currentQueue.contains(veryLocalNeighborID));
