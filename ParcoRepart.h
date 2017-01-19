@@ -142,21 +142,24 @@ namespace ITI {
                         
                         /** Colors the edges of the graph using max_vertex_degree + 1 colors.
                          * 
-                         * @param[in] adjM The graph given as an adjacency matrix.
+                         * @param[in] adjM The graph with N vertices given as an NxN adjacency matrix.
                          * 
-                         * @return The adjacency matrix of the block graph.
+                         * @return A 3xN vector with the edges and the color of each edge: retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge.
                          */
-                        static scai::lama::CSRSparseMatrix<ValueType>  getGraphEdgeColoring_local( const CSRSparseMatrix<ValueType> &adjM);
+                        static std::vector< std::vector<IndexType>>  getGraphEdgeColoring_local( const CSRSparseMatrix<ValueType> &adjM, IndexType& colors);
                         
                         /** Colors the edges of the graph using max_vertex_degree + 1 colors.
                          * 
                          * @param[in] edgeList The graph given as the list of edges. It must have size 2 and an edge
                          * is (edgeList[0][i] , edgeList[1][i])
+                         * @param[out] colors The number of colors we used to color the graph.
                          * 
                          * @return A vector with the color for every edge. ret.size()=edgeList.size() and edge i has
                          * color ret[i].
                          */
                         static std::vector<IndexType> getGraphEdgeColoring_local( const std::vector<std::vector<IndexType>> &edgeList );
+                        
+                        static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( const CSRSparseMatrix<ValueType> &adjM);
 
 		private:
 			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &halo,

@@ -728,7 +728,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
  *  0 - 1 - 14- 15
 */
 TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
-     std::string file = "Grid8x8";
+    std::string file = "Grid8x8";
     std::ifstream f(file);
     IndexType dimensions= 2, k=16;
     IndexType N, edges;
@@ -773,6 +773,7 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     //get getBlockGraph
     scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, partition, k);
     
+    /*
     // test graph coloring
     // get a CSRSparseMatrix from the HArray
     scai::lama::SparseAssemblyStorage<ValueType> myStorage( k, k );
@@ -786,10 +787,25 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     }
     }
     CSRSparseMatrix<ValueType> blockGraphMatrix( myStorage );
+    */
     
-    scai::lama::CSRSparseMatrix<ValueType>  dummy = ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local(blockGraphMatrix);
     
-    //std::vector<IndexType> coloredEdges = ParcoRepart<IndexType,ValueType>::getGraphEdgeColoring_local(blockGraphMatrix);
+    IndexType colors;
+    std::vector< std::vector<IndexType>>  coloring = ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local(blockGraph, colors);
+    
+    for(IndexType i=0; i<coloring[0].size(); i++){
+        std::cout<< "Edge ("<< coloring[0][i]<< ", "<< coloring[1][i]<< ") has color: "<< coloring[2][i] << std::endl;
+    }
+   
+    std::vector<DenseVector<IndexType>> communication = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
+    
+    IndexType rounds = communication.size();
+    for(IndexType i=0; i<rounds; i++){
+        for(IndexType j=0; j<k; j++){
+            std::cout<< "round " << i<< ": block "<< j << " talks with " << communication[i](j).Scalar::getValue<IndexType>() << std::endl;
+        }
+    }
+        
 }
 
 /**

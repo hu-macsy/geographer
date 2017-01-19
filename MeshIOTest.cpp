@@ -43,7 +43,7 @@ class MeshIOTest : public ::testing::Test {
  */
 TEST_F(MeshIOTest, testMesh3DCreateRandomMeshWriteInFile_Local_3D) {
     std::vector<DenseVector<ValueType>> coords;
-    int numberOfPoints= 100;
+    int numberOfPoints= 20;
     ValueType maxCoord= 1;
     std::string grFile = "meshes/randomTest6.graph";
     std::string coordFile= grFile + ".xyz";
