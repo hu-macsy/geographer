@@ -151,7 +151,7 @@ namespace ITI {
 			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &halo,
 					std::set<IndexType> &firstregion,  std::set<IndexType> &secondregion,
 					const std::set<IndexType> &firstDummyLayer, const std::set<IndexType> &secondDummyLayer,
-					std::pair<IndexType, IndexType> blockSizes,	const std::pair<IndexType, IndexType> blockCapacities, ValueType epsilon, const bool unweighted = true);
+					std::pair<IndexType, IndexType> blockSizes,	const std::pair<IndexType, IndexType> blockCapacities, const bool unweighted = true);
 
 			static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
 

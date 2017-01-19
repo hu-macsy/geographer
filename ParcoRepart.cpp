@@ -963,7 +963,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			std::vector<IndexType> interfaceNodes;
 			IndexType lastRoundMarker;
 			std::tie(interfaceNodes, lastRoundMarker)= getInterfaceNodes(input, part, localBlockID, partner, magicBorderRegionDepth+1);
-			std::sort(interfaceNodes.begin(), interfaceNodes.end());
 
 			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", gathered interface nodes." << std::endl;
 
@@ -1036,7 +1035,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			{
 				scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
 				scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, graphHalo );
-			}//TODO: halos for matrices might need to be built differently
+			}
 
 			CSRStorage<ValueType> haloMatrix;
 			haloMatrix.exchangeHalo( graphHalo, input.getLocalStorage(), *comm );
@@ -1047,13 +1046,18 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			}
 
 			//why not use vectors in the FM step or use sets to begin with? Might be faster.
-			//here we only exchange one round less than gathered. The other forms a dummy border layer.
+			//here we only exchange one round less than gathered. The last round forms a dummy border layer.
 			std::set<IndexType> firstRegion(interfaceNodes.begin(), interfaceNodes.begin()+lastRoundMarker);
 			std::set<IndexType> secondRegion(requiredHaloIndices.begin(), requiredHaloIndices.begin()+otherLastRoundMarker);
 			const std::set<IndexType> firstRegionOld = firstRegion;
 
 			std::set<IndexType> firstDummyLayer(interfaceNodes.begin()+lastRoundMarker, interfaceNodes.end());
 			std::set<IndexType> secondDummyLayer(requiredHaloIndices.begin()+otherLastRoundMarker, requiredHaloIndices.end());
+
+			assert(firstRegion.size() == lastRoundMarker);
+			assert(secondRegion.size() == otherLastRoundMarker);
+			assert(firstRegion.size() + firstDummyLayer.size() == interfaceNodes.size());
+			assert(secondRegion.size() + secondDummyLayer.size() == requiredHaloIndices.size());
 
 			//block sizes and capacities
 			std::pair<IndexType, IndexType> blockSizes = {blockSize, otherBlockSize};
@@ -1062,9 +1066,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			/**
 			 * execute FM locally
 			 */
-			ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, firstRegion, secondRegion, firstDummyLayer, secondDummyLayer, blockSizes, maxBlockSizes, epsilon, unweighted);
+			ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, firstRegion, secondRegion, firstDummyLayer, secondDummyLayer, blockSizes, maxBlockSizes, unweighted);
 
-			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", finished twoWayLocalFM with gain " << gain << "." << std::endl;
 
 			//communicate achieved gain. PE with better solution should send their secondRegion.
 			assert(unweighted); //if this assert fails, you need to change the type of swapField back to ValueType before removing it.
@@ -1150,6 +1153,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 					if (firstRegionOld.count(node) == 0) {
 						additionalNodes.push_back(node);
 						newIndices.push_back(node);
+						//the following statement probably doesn't do anything.
 						part.setValue(node, localBlockID);
 					}
 				}
@@ -1217,7 +1221,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		const Halo &matrixHalo, std::set<IndexType> &firstregion,  std::set<IndexType> &secondregion,
 		const std::set<IndexType> &firstDummyLayer, const std::set<IndexType> &secondDummyLayer,
 		std::pair<IndexType, IndexType> blockSizes,
-		const std::pair<IndexType, IndexType> blockCapacities, ValueType epsilon, const bool unweighted) {
+		const std::pair<IndexType, IndexType> blockCapacities, const bool unweighted) {
 	SCAI_REGION( "ParcoRepart.twoWayLocalFM" )
 
 	if (blockSizes.first >= blockCapacities.first && blockSizes.second >= blockCapacities.second) {
@@ -1568,7 +1572,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const 
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
-    const scai::utilskernel::LArray<IndexType> localPart= part.getLocalValues();
+    const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
     DenseVector<IndexType> border(dist,0);
     scai::utilskernel::LArray<IndexType> localBorder= border.getLocalValues();
     
@@ -1690,7 +1694,7 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getLocalB
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
-    const scai::utilskernel::LArray<IndexType> localPart= part.getLocalValues();
+    const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
     IndexType N = adjM.getNumColumns();
     IndexType max = part.max().Scalar::getValue<IndexType>();
    
@@ -1797,7 +1801,7 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getBlo
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-    const scai::utilskernel::LArray<IndexType> localPart= part.getLocalValues();
+    const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
     
     // IndexType k = part.max(); // if K is not given as a parameter
     // there are k blocks in the partition so the adjecency matrix for the block graph has dimensions [k x k]
