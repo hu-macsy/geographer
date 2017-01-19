@@ -7,8 +7,6 @@
 
 #include "MeshIO.h"
 #include <chrono>
-//#include "ParcoRepart.h"
-//#include "HilbertCurve.h"
 
 #include <scai/common/macros/assert.hpp>
 
@@ -129,6 +127,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
             }
         }
     }
+    }
 
     scai::lama::CSRStorage<ValueType> localMatrix;
     localMatrix.allocate( N, N );
@@ -157,14 +156,8 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
             // the number of neighbours for each node. Can be less that 6.
             int numRowElems= 0;
             ValueType max_offset =  *max_element(offset.begin(),offset.end());
-            DenseVector<ValueType> p1(3,0);
-            p1.setValue(0,coords[0].getValue(i));
-            p1.setValue(1,coords[1].getValue(i));
-            p1.setValue(2,coords[2].getValue(i));
             
             IndexType* thisPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( i, numPoints);
-            // thisPoint and p1 should be the same (p1 has the coords)
-            
             
             {
             SCAI_REGION("createStructured3DMesh.setAdjacencyMatrix");
@@ -173,26 +166,13 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
                 switch(m){
                     case 0: ngb_node= i+1; break;
                     case 1: ngb_node= i-1; break;
-                    case 2: ngb_node = i +numPoints[2]; break;
-                    case 3: ngb_node = i -numPoints[2]; break;
-                    case 4: ngb_node = i +numPoints[2]*numPoints[1]; break;
-                    case 5: ngb_node = i -numPoints[2]*numPoints[1]; break;
+                    case 2: ngb_node = i + numPoints[2]; break;
+                    case 3: ngb_node = i - numPoints[2]; break;
+                    case 4: ngb_node = i + numPoints[2]*numPoints[1]; break;
+                    case 5: ngb_node = i - numPoints[2]*numPoints[1]; break;
                 }
                 
                 if(ngb_node>=0 && ngb_node<N){
-                    /*
-                    DenseVector<ValueType> p2(3,0);
-                    p2.setValue(0,coords[0].getValue(ngb_node));
-                    p2.setValue(1,coords[1].getValue(ngb_node));
-                    p2.setValue(2,coords[2].getValue(ngb_node));
-                    */
-                    ValueType p2V[3];
-                    {
-                    SCAI_REGION("createStructured3DMesh.setAdjacencyMatrix.getValue");
-                    p2V[0] = coords[0].getValue(ngb_node).Scalar::getValue<ValueType>();
-                    p2V[1] = coords[1].getValue(ngb_node).Scalar::getValue<ValueType>();
-                    p2V[2] = coords[2].getValue(ngb_node).Scalar::getValue<ValueType>();
-                    }
                     IndexType* ngbPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( ngb_node, numPoints);
                     
                     // we need to check distance for the nodes at the outer borders of the grid: eg:
@@ -201,12 +181,13 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
                     // A way to avoid that is check if thery are close enough.
                     // TODO: maybe find another, faster way to avoid adding that kind of edges
                     
-                    //if(dist3D(p1, p2V).Scalar::getValue<ValueType>() <= max_offset)
                     if(dist3D( thisPoint, ngbPoint) <= 1)
                     {
-                        SCAI_REGION("createStructured3DMesh.setAdjacencyMatrix.setCSRSparseMatrix");
-                        ja.resize( ja.size()+1);
-                        values.resize( values.size()+1);
+                        {
+                            SCAI_REGION("createStructured3DMesh.setAdjacencyMatrix.resize");
+                            ja.resize( ja.size()+1);
+                            values.resize( values.size()+1);
+                        }
                         ja[nnzCounter]= ngb_node;       // -1 for the METIS format
                         values[nnzCounter] = 1;         // unweighted edges
                         ++nnzCounter;
@@ -217,14 +198,10 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
             }
             ia[i+1] = ia[i] +static_cast<IndexType>(numRowElems);
         }//for
+        SCAI_ASSERT_EQUAL_ERROR(numEdges*2 , ia[ia.size()-1] )
     }
     SCAI_ASSERT_EQUAL_ERROR(numEdges*2 , csrValues.size() )
-    
-    assert(numEdges*2 == csrValues.size() );
-    if( numEdges*2 != csrValues.size() ){
-        throw std::runtime_error("error");
-    }
-    assert(numEdges*2 == csrJA.size() );
+    SCAI_ASSERT_EQUAL_ERROR(numEdges*2 , csrJA.size() )
     
     localMatrix.swap( csrIA, csrJA, csrValues );
     adjM.assign(localMatrix);
@@ -264,13 +241,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
     IndexType planeSize= numPoints[1]*numPoints[2];
     
     IndexType startingIndex = dist->local2global(0);
-std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm <<", staring index is= "<< startingIndex << " , planeSize= "<< planeSize << " , localSize= "<< dist->getLocalSize() << std::endl;    
-        
-    DenseVector<ValueType> firstCoord(3,0); // the first local coordinate
-    firstCoord.setValue(0, (IndexType) (startingIndex/planeSize) );  
-    firstCoord.setValue(1, (IndexType) ((startingIndex%planeSize)/numPoints[2]) );
-    firstCoord.setValue(2, (IndexType) ((startingIndex%planeSize) % numPoints[2]) );
-std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm << " first local coordinate is: ("<< firstCoord(0).Scalar::getValue<ValueType>() <<", "<< firstCoord(1).Scalar::getValue<ValueType>() << ", "<< firstCoord(2).Scalar::getValue<ValueType>() << ")\n";
+       
 
     // get the local part of the coordinates vectors
     std::vector<scai::utilskernel::LArray<ValueType>> localCoords(3);
@@ -278,33 +249,12 @@ std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm << " first local coordina
         localCoords[i] = coords[i].getLocalValues();
     }
     
-    /*
-    // start from the first local coordinate and calculate the rest coordinates
-    IndexType localIndex = 0;
-    IndexType localSize = dist->getLocalSize();
-    for( IndexType indX=firstCoord(0).Scalar::getValue<ValueType>(); indX<numPoints[0]; indX++){
-        for( IndexType indY=firstCoord(1).Scalar::getValue<ValueType>(); indY<numPoints[1]; indY++){
-            for( IndexType indZ=firstCoord(2).Scalar::getValue<ValueType>(); indZ<numPoints[2]; indZ++){
-
-                localCoords[0][localIndex] = indX*offset[0];
-                localCoords[1][localIndex] = indY*offset[1];
-                localCoords[2][localIndex] = indZ*offset[2];
-                
-std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm << " , localIndex= "<< localIndex <<" setting local coordinate : ("<< localCoords[0][localIndex]<<", "<< localCoords[1][localIndex]<< ", "<< localCoords[2][localIndex]<< ")\n";
-
-                ++localIndex;
-                if( localIndex>= dist->getLocalSize())
-                    break;
-            }
-            if( localIndex>= dist->getLocalSize())
-                    break;
-        }
-        if( localIndex >= dist->getLocalSize())
-                    break;
-    }
-    */
-    
     IndexType localSize = dist->getLocalSize(); // the size of the local part
+    
+    DenseVector<ValueType> firstCoord(3,0); // the first local coordinate
+    firstCoord.setValue(0, (IndexType) (startingIndex/planeSize) );  
+    firstCoord.setValue(1, (IndexType) ((startingIndex%planeSize)/numPoints[2]) );
+    firstCoord.setValue(2, (IndexType) ((startingIndex%planeSize) % numPoints[2]) );
     
     IndexType indX = firstCoord(0).Scalar::getValue<ValueType>(); 
     IndexType indY = firstCoord(1).Scalar::getValue<ValueType>();
@@ -316,8 +266,8 @@ std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm << " , localIndex= "<< lo
         localCoords[1][i] = indY*offset[1];
         localCoords[2][i] = indZ*offset[2];
 
-//std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm << " , localIndex= "<< i <<" set local coord: ("<< localCoords[0][i]<<", "<< localCoords[1][i]<< ", "<< localCoords[2][i]<< ")\n";        
         ++indZ;
+
         if(indZ >= numPoints[2]){   // if z coord reaches maximum, set it to 0 and increase y
             indZ = 0;
             ++indY;
@@ -332,8 +282,8 @@ std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm << " , localIndex= "<< lo
     }
     // finish setting the coordinates
     
+    
     // start making the local part of the adjacency matrix
-    IndexType numValues, numValues2;
     
     scai::lama::CSRStorage<ValueType> localMatrix;
     localMatrix.allocate( adjM.getLocalNumRows() , adjM.getLocalNumColumns() );
@@ -346,7 +296,7 @@ std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm << " , localIndex= "<< lo
     IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
                                 -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
     {
-        SCAI_REGION("createStructured3DMesh_dist.setAdjacencyMatrix.setCSRSparseMatrix");
+        SCAI_REGION("createStructured3DMesh_distributed.setCSRSparseMatrix");
         
         hmemo::WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
         hmemo::WriteOnlyAccess<IndexType> ja( csrJA);
@@ -377,11 +327,11 @@ std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm << " , localIndex= "<< lo
                 if(ngb_node>=0 && ngb_node<N){
                     // get the position in the 3D of the neighbouring node
                     IndexType* ngbPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( ngb_node, numPoints);
-        //std::cout<< "this id: "<< globalInd << " , ngb: "<< ngb_node << " , dist = "<< dist3D( thisPoint, ngbPoint) << std::endl;
+                    
                     if(dist3D( thisPoint, ngbPoint) <= 1)
                     {
                         { 
-                            SCAI_REGION("createStructured3DMesh_dist.setAdjacencyMatrix.setCSRSparseMatrix.resize");
+                            SCAI_REGION("createStructured3DMesh_distributed.setCSRSparseMatrix.resize");
                             ja.resize( ja.size()+1);
                             values.resize( values.size()+1);
                         }
@@ -392,91 +342,10 @@ std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm << " , localIndex= "<< lo
                     }   
                 }
             }
-            /*
-            // the position of this node in 3D
-            IndexType* thisPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( globalInd, numPoints);
-            IndexType* ngb;
             
-            //neighbour 0
-            ngb = thisPoint;
-            --ngb[0];
-            if(ngb[0] >= 0){
-                ja.resize( ja.size()+1);
-                values.resize( values.size()+1);
-                ja[nnzCounter]= ngb_node - numPoints[2]*numPoints[1];       
-                values[nnzCounter] = 1;         // unweighted edges
-                ++nnzCounter;
-                ++numRowElems;
-            }
-            
-            //neighbour 1
-            ngb = thisPoint;
-            ++ngb[0];
-            if(ngb[0] < numPoints[0]){
-                ja.resize( ja.size()+1);
-                values.resize( values.size()+1);
-                ja[nnzCounter]= ngb_node + numPoints[2]*numPoints[1];       
-                values[nnzCounter] = 1;         // unweighted edges
-                ++nnzCounter;
-                ++numRowElems;
-            }
-            
-            //neighbour 3
-            ngb = thisPoint;
-            --ngb[1];
-            if(ngb[1] >= 0){
-                ja.resize( ja.size()+1);
-                values.resize( values.size()+1);
-                ja[nnzCounter]= ngb_node -numPoints[2];       
-                values[nnzCounter] = 1;         // unweighted edges
-                ++nnzCounter;
-                ++numRowElems;
-            }
-            
-            //neighbour 4
-            ngb = thisPoint;
-            ++ngb[1];
-            if(ngb[1] < numPoints[1]){
-                ja.resize( ja.size()+1);
-                values.resize( values.size()+1);
-                ja[nnzCounter]= ngb_node +numPoints[2];       
-                values[nnzCounter] = 1;         // unweighted edges
-                ++nnzCounter;
-                ++numRowElems;
-            }
-            
-            //neighbour 5
-            ngb = thisPoint;
-            --ngb[2];
-            if(ngb[2] >= 0){
-                ja.resize( ja.size()+1);
-                values.resize( values.size()+1);
-                ja[nnzCounter]= ngb_node -1;       
-                values[nnzCounter] = 1;         // unweighted edges
-                ++nnzCounter;
-                ++numRowElems;
-            }
-            
-            //neighbour 6
-            ngb = thisPoint;
-            ++ngb[2];
-            if(ngb[2] < numPoints[2]){
-                ja.resize( ja.size()+1);
-                values.resize( values.size()+1);
-                ja[nnzCounter]= ngb_node +1;       
-                values[nnzCounter] = 1;         // unweighted edges
-                ++nnzCounter;
-                ++numRowElems;
-            }
-            */
             ia[i+1] = ia[i] +static_cast<IndexType>(numRowElems);
         } //for(IndexType i=0; i<localSize; i++)
-        numValues = ia[ ia.size()-1]; // for the assertion error
-        numValues2 = ia[ localMatrix.getNumRows() ];
-        
     } //read/write block
-    
-    std::cout << __FILE__<< "  "<< __LINE__ << " , numValues= " << numValues << " <> numValues2= "<< numValues2 << " , csrValues.size()= "<< csrValues.size() << " , csrIA.size()= "<< csrIA.size() << " , csrJA.size()=" << csrJA.size() << ", numEdges="<< numEdges << std::endl;
     
     {
         SCAI_REGION( "MeshIO.createStructured3DMesh_distributed.swap_assign" )
