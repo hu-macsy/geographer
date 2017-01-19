@@ -138,7 +138,8 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex_noScaling( std::ve
         assert(coords[0](index)<maxCoords[0] || coords[0](index)==maxCoords[0]);
         assert(coords[1](index)>0 || coords[1](index)==0);
         assert(coords[1](index)<maxCoords[1] || coords[1](index)==maxCoords[1]);
-
+        
+        //TODO: not use getValue and setValue. Use local part of coordinates.
 	unsigned long integerIndex = 0;//TODO: also check whether this data type is long enough
 	for (IndexType i = 0; i < recursionDepth; i++) {
 		int subSquare;

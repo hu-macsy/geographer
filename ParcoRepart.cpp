@@ -1633,7 +1633,7 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getPEG
 
 //-----------------------------------------------------------------------------------------
 
-//return: there is an edge is the block graph between blocks ret[0]-ret[1], ret[2]-ret[3] ... ret[2i]-ret[2i+1] 
+//return: there is an edge in the block graph between blocks ret[0][i]-ret[1][i]
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getLocalBlockGraphEdges( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part) {
     

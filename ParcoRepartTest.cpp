@@ -61,6 +61,7 @@ TEST_F(ParcoRepartTest, testMinimumNeighborDistanceDistributed) {
   const ValueType minDistance = ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(a, coordinates, dimensions);
   EXPECT_LE(minDistance, nroot*1.5);
   EXPECT_GE(minDistance, 1);
+
 }
 
 
@@ -765,6 +766,7 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     
     // test graph coloring
     // get a CSRSparseMatrix from the HArray
+    
     scai::lama::SparseAssemblyStorage<ValueType> myStorage( k, k );
     {
     //scai::hmemo::ReadAccess<IndexType> blockGraphRead( blockGraph );

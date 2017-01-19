@@ -58,6 +58,10 @@ namespace ITI {
                  * @param[in] numPoints The number of points in every dimension, numPoints.size()=3.
                  */
                 static void createStructured3DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
+                
+                /** Creates the adjacency matrix and the coordiated vector for a 3D mesh in a distributed way.
+                 */
+                static void createStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
 
                 /** Given an adjacency matrix and a filename writes the matrix in the file using the METIS format.
                  * 
@@ -70,10 +74,7 @@ namespace ITI {
                  * Coordinates are given as a DenseVector of size dim*numPoints.
                 */
                 static void writeInFileCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
-                
-                /* Reads a graph from filename in METIS format and returns the adjacency matrix.
-                 */
-                
+           
                 /** Reads a graph from filename in METIS format and returns the adjacency matrix.
                  * @param[in] filename The file to read from. In a METIS format.
                  * @param[out] matrix The adjacency matrix of the graph.
@@ -98,6 +99,13 @@ namespace ITI {
                 static Scalar dist3D(DenseVector<ValueType> p1, DenseVector<ValueType> p2);
                 
                 static Scalar dist3D(DenseVector<ValueType> p1, ValueType* p2);
+                
+                static ValueType dist3D(IndexType* p1, IndexType* p2);
+                
+                /*  Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
+                 *  of the index in 3D. The return value is not the coordiantes of the point!
+                 */
+                static IndexType* index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints);
         };//class MeshIO
         
 }//namespace ITI
