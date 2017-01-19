@@ -883,8 +883,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		throw std::runtime_error("Epsilon must be >= 0, not " + std::to_string(epsilon));
 	}
 
-	const ValueType initialCut = computeCut(input, part, unweighted);
-
 	//std::cout << "Thread " << comm->getRank() << ", entered distributed FM." << std::endl;
 	/**
 	 * get trivial mapping for now.
@@ -949,8 +947,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		}
 
 		ValueType gainThisRound = 0;
-		ValueType preRoundLocalCut = localSumOutgoingEdges(input);
-		ValueType otherPreRoundLocalCut = preRoundLocalCut;
 
 		if (partner != comm->getRank()) {
 			//processor is active this round
@@ -977,17 +973,15 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				throw std::runtime_error(std::to_string(localN) + " local nodes, but only " + std::to_string(blockSize) + " of them belong to block " + std::to_string(localBlockID) + ".");
 			}
 
-			IndexType swapField[5];
+			IndexType swapField[4];
 			swapField[0] = interfaceNodes.size();
 			swapField[1] = lastRoundMarker;
 			swapField[2] = blockSize;
 			swapField[3] = getDegreeSum(input, interfaceNodes);
-			swapField[4] = preRoundLocalCut;
-			comm->swap(swapField, 5, partner);
+			comm->swap(swapField, 4, partner);
 			const IndexType otherLastRoundMarker = swapField[1];
 			const IndexType otherBlockSize = swapField[2];
 			const IndexType otherDegreeSum = swapField[3];
-			otherPreRoundLocalCut = swapField[4];
 			IndexType swapLength = std::max(int(swapField[0]), int(interfaceNodes.size()));
 
 			if (interfaceNodes.size() == 0) {
@@ -1200,15 +1194,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			input.redistribute(newDistribution, input.getColDistributionPtr());
 			part.redistribute(newDistribution);
 
-			ValueType postRoundLocalCut = localSumOutgoingEdges(input);
-			ValueType swapField[1];
-			swapField[0] = postRoundLocalCut;
-			comm->swap(swapField, 1, partner);//here we rely on the fact that swaps with oneself are possible.
-			ValueType difference = (preRoundLocalCut + otherPreRoundLocalCut) - (swapField[0] + postRoundLocalCut);
-			if (difference != 2*gainThisRound) {
-				std::cout << "Thread " << comm->getRank() << ", round " << i << ", own cut " << preRoundLocalCut << "->" << postRoundLocalCut << ", other cut "
-						<< otherPreRoundLocalCut << "->" << swapField[0] << ", difference/2 " << difference / 2 << ", gain " << gainThisRound << std::endl;
-			}
 		}
 		//std::cout << "Thread " << comm->getRank() << ", round " << i << ", finished redistribution." << std::endl;
 
