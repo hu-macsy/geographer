@@ -22,63 +22,6 @@
 namespace ITI {
 
 template<typename IndexType, typename ValueType>
-ValueType ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(const CSRSparseMatrix<ValueType> &input, const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions) {
-	// iterate through matrix to find closest neighbors, implying necessary recursion depth for space-filling curve
-	// here it can happen that the closest neighbor is not stored on this processor.
-
-	SCAI_REGION( "ParcoRepart.minimumNeighborDistance" )
-
-    std::vector<scai::dmemo::DistributionPtr> coordDist(dimensions);
-    for(IndexType i=0; i<dimensions; i++){
-        coordDist[i] = coordinates[i].getDistributionPtr(); 
-    }
-	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
-	const IndexType localN = inputDist->getLocalSize();
-
-	if (!input.getColDistributionPtr()->isReplicated()) {
-		throw std::runtime_error("Column of input matrix must be replicated.");
-	}
-
-	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
-    std::vector<scai::utilskernel::LArray<ValueType>> localPartOfCoords(dimensions);
-    for(IndexType i=0; i<dimensions; i++){
-        localPartOfCoords[i] = coordinates[i].getLocalValues();
-        if (localPartOfCoords[i].size() != localN) {
-        	throw std::runtime_error("Local part of coordinate vector "+ std::to_string(i) + " has size " + std::to_string(localPartOfCoords[i].size()) 
-        		+ ", but localN is " + std::to_string(localN));
-        }
-    }
-        
-	const scai::utilskernel::LArray<IndexType>& ia = localStorage.getIA();
-    const scai::utilskernel::LArray<IndexType>& ja = localStorage.getJA();
-    assert(ia.size() == localN+1);
-
-    ValueType minDistanceSquared = std::numeric_limits<ValueType>::max();
-	for (IndexType i = 0; i < localN; i++) {
-		const IndexType beginCols = ia[i];
-		const IndexType endCols = ia[i+1];
-		assert(ja.size() >= endCols);
-		for (IndexType j = beginCols; j < endCols; j++) {
-			IndexType neighbor = ja[j];
-			const IndexType globalI = inputDist->local2global(i);
-                        // just check coordDist[0]. Is is enough? If coord[0] is here so are the others.
-			if (neighbor != globalI && coordDist[0]->isLocal(neighbor)) {
-				const IndexType localNeighbor = coordDist[0]->global2local(neighbor);
-				ValueType distanceSquared = 0;
-				for (IndexType dim = 0; dim < dimensions; dim++) {
-					ValueType diff = localPartOfCoords[dim][i] -localPartOfCoords[dim][localNeighbor];
-					distanceSquared += diff*diff;
-				}
-				if (distanceSquared < minDistanceSquared) minDistanceSquared = distanceSquared;
-			}
-		}
-	}
-
-	const ValueType minDistance = std::sqrt(minDistanceSquared);
-	return minDistance;
-}
-
-template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, IndexType k,  double epsilon)
 {
 	SCAI_REGION( "ParcoRepart.partitionGraph" )
@@ -187,7 +130,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 	/**
 	 * The permutations given by DenseVector.sort are distributed by BlockDistributions.
-	 * However, the sorting does no guarantee that each processor has the same number of values.
+	 * However, the sorting does not guarantee that each processor has the same number of values.
 	 * Without a redistribution step, the line result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
 	 * sometimes segfaults. We can't have that.
 	 */
@@ -2019,8 +1962,6 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_l
 
 //to force instantiation
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, int k,  double epsilon);
-
-template double ParcoRepart<int, double>::getMinimumNeighbourDistance(const CSRSparseMatrix<double> &input, const std::vector<DenseVector<double>> &coordinates, int dimensions);
 			     
 template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int> &partition, int k);
 

@@ -31,39 +31,6 @@ class ParcoRepartTest : public ::testing::Test {
 };
 
 
-TEST_F(ParcoRepartTest, testMinimumNeighborDistanceDistributed) {
-  IndexType nroot = 7;
-  IndexType n = nroot * nroot * nroot;
-  IndexType dimensions = 3;
-  scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-
-
-  scai::lama::CSRSparseMatrix<ValueType>a(n, n);
-  std::vector<ValueType> maxCoord(dimensions, nroot);
-  std::vector<IndexType> numPoints(dimensions, nroot);
-  
-  std::vector<DenseVector<ValueType>> coordinates(dimensions);
-  for(IndexType i=0; i<dimensions; i++){ 
-	  coordinates[i] = DenseVector<IndexType>(n, 0);
-  }
-  
-  MeshIO<IndexType, ValueType>::createStructured3DMesh(a, coordinates, maxCoord, numPoints);
-
-  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
-  scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
-
-  a.redistribute(dist, noDistPointer);
-  
-  for(IndexType i=0; i<dimensions; i++){
-  	  coordinates[i].redistribute(dist);
-  }
-
-  const ValueType minDistance = ParcoRepart<IndexType, ValueType>::getMinimumNeighbourDistance(a, coordinates, dimensions);
-  EXPECT_LE(minDistance, nroot*1.5);
-  EXPECT_GE(minDistance, 1);
-}
-
-
 TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
   IndexType nroot = 8;
   IndexType n = nroot * nroot * nroot;

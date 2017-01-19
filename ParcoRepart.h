@@ -47,17 +47,6 @@ namespace ITI {
 			static ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k);
 
 			/**
-			* Returns the minimum distance between two neighbours
-			*
-			* @param[in] input Adjacency matrix of the input graph
-	 		* @param[in] coordinates Node positions. In d dimensions, coordinates of node v are at v*d ... v*d+(d-1).
-	 		* @param[in] dimensions Number of dimensions of coordinates.
-	 		*
-	 		* @return The spatial distance of the closest pair of neighbours
-			*/
-			static ValueType getMinimumNeighbourDistance(const CSRSparseMatrix<ValueType> &input, const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions);
-
-			/**
 			* Performs local refinement of a given partition
 			*
 	 		* @param[in] input Adjacency matrix of the input graph
