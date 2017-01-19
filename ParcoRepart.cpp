@@ -620,7 +620,7 @@ ValueType ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(const CSRSpar
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
 	IndexType numOutgoingEdges = 0;
-	for (IndexType j = 0; j < ja.numValues(); j++) {
+	for (IndexType j = 0; j < ja.size(); j++) {
 		if (!input.getRowDistributionPtr()->isLocal(ja[j])) numOutgoingEdges++;
 	}
 
@@ -988,6 +988,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		}
 		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[i].getLocalValues());
 		IndexType partner = commAccess[communicationScheme[i].getDistributionPtr()->global2local(comm->getRank())];
+		assert(commAccess[communicationScheme[i].getDistributionPtr()->global2local(partner)] == comm->getRank());
 
 		//copy into usable data structure with iterators
 		std::vector<IndexType> myGlobalIndices(localN);
@@ -1005,6 +1006,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		}
 
 		ValueType gainThisRound = 0;
+		ValueType preRoundLocalCut = localSumOutgoingEdges(input);
+		ValueType otherPreRoundLocalCut = preRoundLocalCut;
 
 		if (partner != comm->getRank()) {
 			//processor is active this round
@@ -1032,15 +1035,17 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				throw std::runtime_error(std::to_string(localN) + " local nodes, but only " + std::to_string(blockSize) + " of them belong to block " + std::to_string(localBlockID) + ".");
 			}
 
-			IndexType swapField[4];
+			IndexType swapField[5];
 			swapField[0] = interfaceNodes.size();
 			swapField[1] = lastRoundMarker;
 			swapField[2] = blockSize;
 			swapField[3] = getDegreeSum(input, interfaceNodes);
-			comm->swap(swapField, 4, partner);
+			swapField[4] = preRoundLocalCut;
+			comm->swap(swapField, 5, partner);
 			const IndexType otherLastRoundMarker = swapField[1];
 			const IndexType otherBlockSize = swapField[2];
 			const IndexType otherDegreeSum = swapField[3];
+			otherPreRoundLocalCut = swapField[4];
 			IndexType swapLength = std::max(int(swapField[0]), int(interfaceNodes.size()));
 
 			if (interfaceNodes.size() == 0) {
@@ -1125,6 +1130,11 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			swapField[2] = blockSizes.second;
 			comm->swap(swapField, 3, partner);
 
+			if (swapField[2] > maxBlockSizes.first) {
+				//If a block is too large after the refinement, it is only because it was too large to begin with.
+				assert(swapField[2] <= blockSize);
+			}
+
 			if (swapField[1] == 0 && gain == 0) {
 				//Oh well. None of the processors managed an improvement. No need to update data structures.
 				//std::cout << "Thread " << comm->getRank() << ", round " << i << " no gain here and at " << partner << "." << std::endl;
@@ -1183,7 +1193,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 						/**
 						 * we want to delete the value from our local indices.
-						 * We can assume that the index vector is unique and sorted and that the deletable index is present.
+						 * We can assume that the index vector is unique and sorted and that the unwanted index is present.
 						 */
 						auto deleteIterator = std::lower_bound(newIndices.begin(), newIndices.end(), node);
 						newIndices.erase(deleteIterator);
@@ -1225,23 +1235,34 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			CSRStorage<ValueType> haloMatrix;
 			haloMatrix.exchangeHalo( graphHalo, input.getLocalStorage(), *comm );
 		}
-		scai::utilskernel::LArray<IndexType> indexTransport(myGlobalIndices.size());
-		for (IndexType j = 0; j < myGlobalIndices.size(); j++) {
-			indexTransport[j] = myGlobalIndices[j];
+		{
+			SCAI_REGION( "ParcoRepart.distributedFMStep.loop.redistribute" )
+			scai::utilskernel::LArray<IndexType> indexTransport(myGlobalIndices.size());
+			for (IndexType j = 0; j < myGlobalIndices.size(); j++) {
+				indexTransport[j] = myGlobalIndices[j];
+			}
+
+			IndexType participating = comm->sum(1);
+			if (participating != comm->getSize()) {
+				std::cout << participating << " of " << comm->getSize() << " threads in redistribution." << std::endl;
+			}
+			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", " << myGlobalIndices.size() << " indices." << std::endl;
+
+			//redistribute. This could probably be done faster by using the haloStorage already there. Maybe use joinHalo or splitHalo methods here.
+			scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
+			input.redistribute(newDistribution, input.getColDistributionPtr());
+			part.redistribute(newDistribution);
+
+			ValueType postRoundLocalCut = localSumOutgoingEdges(input);
+			ValueType swapField[1];
+			swapField[0] = postRoundLocalCut;
+			comm->swap(swapField, 1, partner);//here we rely on the fact that swaps with oneself are possible.
+			ValueType difference = (preRoundLocalCut + otherPreRoundLocalCut) - (swapField[0] + postRoundLocalCut);
+			if (difference != 2*gainThisRound) {
+				std::cout << "Thread " << comm->getRank() << ", round " << i << ", own cut " << preRoundLocalCut << "->" << postRoundLocalCut << ", other cut "
+						<< otherPreRoundLocalCut << "->" << swapField[0] << ", difference/2 " << difference / 2 << ", gain " << gainThisRound << std::endl;
+			}
 		}
-
-		IndexType participating = comm->sum(1);
-		if (participating != comm->getSize()) {
-			std::cout << participating << " of " << comm->getSize() << " threads in redistribution." << std::endl;
-		}
-		//std::cout << "Thread " << comm->getRank() << ", round " << i << ", " << myGlobalIndices.size() << " indices." << std::endl;
-
-		//redistribute. This could probably be done faster by using the haloStorage already there. Maybe use joinHalo or splitHalo methods here.
-		scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
-		input.redistribute(newDistribution, input.getColDistributionPtr());
-		part.redistribute(newDistribution);
-
-
 		//std::cout << "Thread " << comm->getRank() << ", round " << i << ", finished redistribution." << std::endl;
 
 	}
