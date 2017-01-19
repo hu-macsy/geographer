@@ -532,6 +532,7 @@ TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
     
     
     //print
+    /*
     std::cout<<"----------------------------"<< " PE graph  "<< *comm << std::endl;    
     for(IndexType i=0; i<PEgraph.getNumRows(); i++){
         std::cout<< *comm<< ":";
@@ -540,7 +541,7 @@ TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
         }
         std::cout<< std::endl;
     }
-    
+    */
 }
 
 //------------------------------------------------------------------------------
