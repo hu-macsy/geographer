@@ -18,7 +18,14 @@
 using namespace scai::lama;
 using scai::dmemo::Halo;
 
+#define STRINGIZER(arg)     #arg
+#define STR_VALUE(arg)      STRINGIZER(arg)
+#define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
+
+const std::string version = BUILD_COMMIT_STRING;
+
 namespace ITI {
+
 	template <typename IndexType, typename ValueType>
 	class ParcoRepart {
 		public:
@@ -146,6 +153,8 @@ namespace ITI {
 			 * color ret[i].
 			 */
 			static std::vector<IndexType> getGraphEdgeColoring_local( const std::vector<std::vector<IndexType>> &edgeList );
+
+
 
 		private:
 			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &halo,

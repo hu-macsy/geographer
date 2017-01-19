@@ -2,13 +2,13 @@ CC=g++
 
 FILES= test_main.cpp ParcoRepartTest.cpp ParcoRepart.cpp HilbertCurve.cpp HilbertCurveTest.cpp MeshIO.cpp
 EXECUTABLE=Katanomi
-
+GIT_COMMIT=$(shell git rev-parse HEAD)
 SCAI_INCLUDE=
 SCAI_LIB=
 GTEST_INCLUDE=
 GTEST_LIB=
 LFLAGS= -L$(SCAI_LIB) -L$(GTEST_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lgtest
-CCFLAGS= --openmp --std=c++11 -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -DSCAI_TRACE_ON  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR
+CCFLAGS= --openmp --std=c++11 -g -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -DSCAI_TRACE_ON  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR -DBUILD_COMMIT=$(GIT_COMMIT)
 
 all:
 	$(CC) $(CCFLAGS) $(FILES) -o $(EXECUTABLE) $(LFLAGS)
