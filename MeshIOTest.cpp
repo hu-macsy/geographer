@@ -114,17 +114,18 @@ TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
 }
 //-----------------------------------------------------------------
 
-TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Distributed_3D) {
-    std::vector<IndexType> numPoints= {6, 5, 4};
-    std::vector<ValueType> maxCoord= {6, 5, 4};
+TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
+    std::vector<IndexType> numPoints= {29, 43, 31};
+    std::vector<ValueType> maxCoord= {3, 44, 500};
     // set number of points in random
     /*
     srand(time(NULL));
     for(int i=0; i<3; i++){
-        numPoints[i] = (IndexType) (rand()%4 +7);
+        numPoints[i] = (IndexType) (rand()%4 + 6);
     }
     */
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
+    std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -139,10 +140,48 @@ TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Distributed_3D) {
     scai::lama::CSRSparseMatrix<ValueType> adjM( dist, noDistPointer);
     
     {
-        SCAI_REGION("testMesh3DCreateStructuredMesh_Local_3D.createStructured3DMesh" )
+        //SCAI_REGION("testMesh3DCreateStructuredMesh_Distributed_3D.createStructured3DMesh" )
         MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
     }
- 
+    
+    EXPECT_EQ( adjM.getLocalNumColumns() , N);
+    EXPECT_EQ( adjM.getLocalNumRows() , coords[0].getLocalValues().size() );
+    EXPECT_EQ( true , adjM.getRowDistribution().isEqual(coords[0].getDistribution()) );
+    
+    // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
+    IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
+                                -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
+ std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm << " , adjM.getNumValues()= "<< adjM.getNumValues()<< " , numEdges= "<< numEdges << std::endl;
+    EXPECT_EQ( adjM.getNumValues() , numEdges*2 );
+     
+    /*
+    {
+    SCAI_REGION("testCreateStructuredMesh_Distributed_3D.check_adjM")
+    for(IndexType i=0; i<N; i++){ 
+        DenseVector<ValueType> row;
+        adjM.getRow(row, i);
+        //std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm << " , l1Norm= "<< row.l1Norm().Scalar::getValue<ValueType>()  << std::endl;
+        // for a structured mesh every node can have at most 6 neighbours
+        EXPECT_LE( row.l1Norm().Scalar::getValue<ValueType>() , 6);
+        // and at least 3 (for the corner nodes)
+        EXPECT_GE( row.l1Norm().Scalar::getValue<ValueType>() , 3);
+        //for(IndexType j=0; j<row.size(); j++){}
+    }
+    }
+    */
+    
+    {
+    SCAI_REGION("testCreateStructuredMesh_Distributed_3D.check_coords")
+    // check every coordinate is within bounds
+    for(IndexType i=0; i<N; i++){
+        EXPECT_LE( coords[0].getValue(i).Scalar::getValue<ValueType>() , maxCoord[0]);
+        EXPECT_GE( coords[0].getValue(i).Scalar::getValue<ValueType>() , 0);
+        EXPECT_LE( coords[1].getValue(i).Scalar::getValue<ValueType>() , maxCoord[1]);
+        EXPECT_GE( coords[1].getValue(i).Scalar::getValue<ValueType>() , 0);
+        EXPECT_LE( coords[2].getValue(i).Scalar::getValue<ValueType>() , maxCoord[2]);
+        EXPECT_GE( coords[2].getValue(i).Scalar::getValue<ValueType>() , 0);
+    }
+    }
 }
 //-----------------------------------------------------------------
 
@@ -280,7 +319,27 @@ TEST_F(MeshIOTest, testPartitionFromFile_2D){
     std::cout<< "# imbalance = " << imbalance<< std::endl; 
     */ 
 }
-
+//-----------------------------------------------------------------
+TEST_F(MeshIOTest, testIndex2_3DPoint){
+    std::vector<IndexType> numPoints= {4, 11, 7};
+    
+    srand(time(NULL));
+    for(int i=0; i<3; i++){
+        numPoints[i] = (IndexType) (rand()%5 + 10);
+    }
+    IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
+    
+    for(IndexType i=0; i<N; i++){
+        IndexType* ind = MeshIO<IndexType, ValueType>::index2_3DPoint(i, numPoints);
+        //std::cout<< i << ": to point (" << ind[0] <<", "<< ind[1]<< ", "<< ind[2]<< " )\n";
+        EXPECT_LE(ind[0] , numPoints[0]-1);
+        EXPECT_LE(ind[1] , numPoints[1]-1);
+        EXPECT_LE(ind[2] , numPoints[2]-1);
+        EXPECT_GE(ind[0] , 0);
+        EXPECT_GE(ind[1] , 0);
+        EXPECT_GE(ind[2] , 0);
+    }
+}
 //-----------------------------------------------------------------
     
 }//namespace ITI

@@ -102,6 +102,13 @@ namespace ITI {
                 static Scalar dist3D(DenseVector<ValueType> p1, DenseVector<ValueType> p2);
                 
                 static Scalar dist3D(DenseVector<ValueType> p1, ValueType* p2);
+                
+                static ValueType dist3D(IndexType* p1, IndexType* p2);
+                
+                /*  Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
+                 *  of the index in 3D. The return value is not the coordiantes of the point!
+                 */
+                static IndexType* index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints);
         };//class MeshIO
         
 }//namespace ITI
