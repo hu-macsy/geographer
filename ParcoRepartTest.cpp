@@ -491,10 +491,6 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 		IndexType partner = commAccess[scheme[round].getDistributionPtr()->global2local(comm->getRank())];
 
 		if (partner == thisBlock) {
-			const IndexType dummyPartner = comm->getRank() == 0 ? 1 : 0;
-
-			ParcoRepart<IndexType, ValueType>::getInterfaceNodes(a, part, thisBlock, dummyPartner, 1);
-
 			scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildPartHalo(a, part);
 			scai::utilskernel::LArray<IndexType> haloData;
 			comm->updateHalo( haloData, part.getLocalValues(), partHalo );
