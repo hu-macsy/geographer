@@ -42,7 +42,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(const std::vecto
 	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
 	SCAI_REGION( "HilbertCurve.getHilbertIndex2D" )
 
-    SCAI_REGION_START( "HilbertCurve.getHilbertIndex2D.checks_declarations_1")
+    
         scai::dmemo::DistributionPtr coordDistX = coordinates[0].getDistributionPtr();
         scai::dmemo::DistributionPtr coordDistY = coordinates[1].getDistributionPtr();
         
@@ -52,16 +52,13 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(const std::vecto
 	if (recursionDepth > bitsInValueType/dimensions) {
 		throw std::runtime_error("A space-filling curve that precise won't fit into the return datatype.");
 	}
-    SCAI_REGION_END( "HilbertCurve.getHilbertIndex2D.checks_declarations_1")
-    
-    SCAI_REGION_START( "HilbertCurve.getHilbertIndex2D.checks_declarations_2")
+   
 	if (!coordDistX->isLocal(index)) {
                 std::string ff(__FILE__);
                 std::string ll= std::to_string(__LINE__);
 		throw std::runtime_error(ff+ ", "+ ll+ ". Coordinate with index " + std::to_string(index) + " is not present on this process.");
 		throw std::runtime_error("Coordinate with index " + std::to_string(index) + " is not present on this process.");
 	}
-    SCAI_REGION_END( "HilbertCurve.getHilbertIndex2D.checks_declarations_2")  
     
     SCAI_REGION_START( "HilbertCurve.getHilbertIndex2D.getLocalValues")
         const std::vector<scai::utilskernel::LArray<ValueType>>& myCoords= {coordinates[0].getLocalValues(), coordinates[1].getLocalValues() } ;
@@ -218,7 +215,6 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(const std::vecto
 	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
 	SCAI_REGION( "HilbertCurve.getHilbertIndex3D" )
     
-    SCAI_REGION_START( "HilbertCurve.getHilbertIndex3D.checks_declarations_1")
 	if (dimensions != 3) {
 		throw std::logic_error("Space filling curve for 3 dimensions.");
 	}
@@ -233,19 +229,17 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(const std::vecto
 	if ((unsigned int) recursionDepth > bitsInValueType/dimensions) {
 		throw std::runtime_error("A space-filling curve that precise won't fit into the return datatype.");
 	}
-    SCAI_REGION_END( "HilbertCurve.getHilbertIndex3D.checks_declarations_1")
-    SCAI_REGION_START( "HilbertCurve.getHilbertIndex3D.checks_declarations_2")
+    
 	if (!coordDistX->isLocal(index)) {
                 std::string ff(__FILE__);
 		throw std::runtime_error(std::string(__FILE__) + ", "+ std::to_string(__LINE__)+ ". Coordinate with index " + std::to_string(index) + " is not present on this process.");
 	}
-    SCAI_REGION_END( "HilbertCurve.getHilbertIndex3D.checks_declarations_2")
     
     SCAI_REGION_START( "HilbertCurve.getHilbertIndex3D.getLocalValues")
         const std::vector<scai::utilskernel::LArray<ValueType>>& myCoords = {coordinates[0].getLocalValues(), coordinates[1].getLocalValues(), coordinates[2].getLocalValues() };
     SCAI_REGION_END( "HilbertCurve.getHilbertIndex3D.getLocalValues")	
-	std::vector<ValueType> scaledCoord(dimensions);
-    
+	
+        std::vector<ValueType> scaledCoord(dimensions);
     
 	for (IndexType dim = 0; dim < dimensions; dim++) {
             SCAI_REGION( "HilbertCurve.getHilbertIndex3D.scaling" )
