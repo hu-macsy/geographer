@@ -40,7 +40,7 @@ class HilbertCurveTest : public ::testing::Test {
 TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
   const IndexType dimensions = 2;
   const IndexType recursionDepth = 7;
-  IndexType N=32*32;
+  IndexType N=16*16;
   std::vector<DenseVector<ValueType>> coords(dimensions);
   for(IndexType i=0; i<dimensions; i++){ 
       coords[i].allocate(N);
@@ -49,7 +49,7 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
   
   std::vector<ValueType> maxCoords({0,0});
 
-  MeshIO<IndexType, ValueType>::fromFile2Coords_2D("./Grid32x32.xyz", coords,  N);
+  MeshIO<IndexType, ValueType>::fromFile2Coords_2D("./Grid16x16.xyz", coords,  N);
 
   for(IndexType j=0; j<dimensions; j++){
       for (IndexType i = 0; i < N; i++){
@@ -118,7 +118,7 @@ TEST_F(HilbertCurveTest, testHilbertIndexNoScaling_Local_3D) {
   SCAI_REGION("testHilbertIndexNoScaling_Local_3D");
   const IndexType dimensions = 2;
   const IndexType recursionDepth = 10;
-  IndexType N=6400;
+  IndexType N=200;
   
   srand(time(NULL));
   std::vector<DenseVector<ValueType>> coords(dimensions);

@@ -299,8 +299,8 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
         SCAI_REGION("createStructured3DMesh_distributed.setCSRSparseMatrix");
         
         hmemo::WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
-        hmemo::WriteOnlyAccess<IndexType> ja( csrJA);
-        hmemo::WriteOnlyAccess<ValueType> values( csrValues);
+        hmemo::WriteOnlyAccess<IndexType> ja( csrJA , 6*N);
+        hmemo::WriteOnlyAccess<ValueType> values( csrValues, 6*N);
         ia[0] = 0;
         IndexType nnzCounter = 0; // count non-zero elements
          
@@ -330,11 +330,11 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
                     
                     if(dist3D( thisPoint, ngbPoint) <= 1)
                     {
-                        { 
+                       /* { 
                             SCAI_REGION("createStructured3DMesh_distributed.setCSRSparseMatrix.resize");
                             ja.resize( ja.size()+1);
                             values.resize( values.size()+1);
-                        }
+                        } */
                         ja[nnzCounter]= ngb_node;       // -1 for the METIS format
                         values[nnzCounter] = 1;         // unweighted edges
                         ++nnzCounter;
@@ -345,6 +345,12 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
             
             ia[i+1] = ia[i] +static_cast<IndexType>(numRowElems);
         } //for(IndexType i=0; i<localSize; i++)
+        {
+        SCAI_REGION("createStructured3DMesh_distributed.setCSRSparseMatrix.resize");
+        
+        ja.resize(nnzCounter);
+        values.resize(nnzCounter);
+        }
     } //read/write block
     
     {

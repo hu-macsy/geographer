@@ -112,9 +112,11 @@ TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
     
 }
 //-----------------------------------------------------------------
-
+// Creates the part of a structured mesh in each processor ditributed and checks the matrix and the coordinates.
+// For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
+// less than 6 ones ( every node has 3,4,5, or 6 neighbours).
 TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
-    std::vector<IndexType> numPoints= { 4, 5, 3};
+    std::vector<IndexType> numPoints= { 5, 6, 4};
     std::vector<ValueType> maxCoord= {3, 44, 500};
     // set number of points in random
     /*
@@ -155,7 +157,7 @@ TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
     for(IndexType i=0; i<N; i++){ 
         DenseVector<ValueType> row;
         adjM.getRow(row, i);
-        //std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm << " , l1Norm= "<< row.l1Norm().Scalar::getValue<ValueType>()  << std::endl;
+        
         // for a structured mesh every node can have at most 6 neighbours
         EXPECT_LE( row.l1Norm().Scalar::getValue<ValueType>() , 6);
         // and at least 3 (for the corner nodes)
