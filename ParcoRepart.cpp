@@ -14,6 +14,7 @@
 #include <climits>
 #include <queue>
 #include <string>
+#include <unordered_set>
 
 #include "PrioQueue.h"
 #include "ParcoRepart.h"
@@ -73,77 +74,97 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	*/
 	std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
 	std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
-	
-	/**
-	 * get minimum / maximum of local coordinates
-	 */
-	for (IndexType dim = 0; dim < dimensions; dim++) {
-		//get local parts of coordinates
-		scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
-		for (IndexType i = 0; i < localN; i++) {
-			ValueType coord = localPartOfCoords[i];
-			if (coord < minCoords[dim]) minCoords[dim] = coord;
-			if (coord > maxCoords[dim]) maxCoords[dim] = coord;
-		}
-	}
-
-	/**
-	 * communicate to get global min / max
-	 */
-	for (IndexType dim = 0; dim < dimensions; dim++) {
-		minCoords[dim] = comm->min(minCoords[dim]);
-		maxCoords[dim] = comm->max(maxCoords[dim]);
-	}
-        
-	ValueType maxExtent = 0;
-	for (IndexType dim = 0; dim < dimensions; dim++) {
-		if (maxCoords[dim] - minCoords[dim] > maxExtent) {
-			maxExtent = maxCoords[dim] - minCoords[dim];
-		}
-	}
-
-	/**
-	* Several possibilities exist for choosing the recursion depth.
-	* Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
-	*/
-	const IndexType recursionDepth = std::log2(n);
-
-	/**
-	*	create space filling curve indices.
-	*/
-	scai::lama::DenseVector<ValueType> hilbertIndices(inputDist);
-	for (IndexType i = 0; i < localN; i++) {
-		IndexType globalIndex = inputDist->local2global(i);
-		ValueType globalHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, globalIndex, recursionDepth, minCoords, maxCoords);
-		hilbertIndices.setValue(globalIndex, globalHilbertIndex);              
-	}
-
-	/**
-	* now sort the global indices by where they are on the space-filling curve.
-	*/
-
-	scai::lama::DenseVector<IndexType> permutation, inversePermutation;
-	hilbertIndices.sort(permutation, true);
-	//permutation.redistribute(inputDist);
-	DenseVector<IndexType> tmpPerm = permutation;
-	tmpPerm.sort( inversePermutation, true);
-
-	/**
-	 * The permutations given by DenseVector.sort are distributed by BlockDistributions.
-	 * However, the sorting does not guarantee that each processor has the same number of values.
-	 * Without a redistribution step, the line result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
-	 * sometimes segfaults. We can't have that.
-	 */
-	inversePermutation.redistribute(inputDist);
-	assert(inversePermutation.getDistributionPtr()->getLocalSize() == localN);
-
-	/**
-	* initial partitioning with sfc. Upgrade to chains-on-chains-partitioning later
-	*/
 	DenseVector<IndexType> result(inputDist);
-        
-	for (IndexType i = 0; i < localN; i++) {
-		result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
+
+	{
+		SCAI_REGION( "ParcoRepart.partitionGraph.initialPartition" )
+
+		/**
+		 * get minimum / maximum of local coordinates
+		 */
+		for (IndexType dim = 0; dim < dimensions; dim++) {
+			//get local parts of coordinates
+			scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
+			for (IndexType i = 0; i < localN; i++) {
+				ValueType coord = localPartOfCoords[i];
+				if (coord < minCoords[dim]) minCoords[dim] = coord;
+				if (coord > maxCoords[dim]) maxCoords[dim] = coord;
+			}
+		}
+
+		/**
+		 * communicate to get global min / max
+		 */
+		for (IndexType dim = 0; dim < dimensions; dim++) {
+			minCoords[dim] = comm->min(minCoords[dim]);
+			maxCoords[dim] = comm->max(maxCoords[dim]);
+		}
+
+		ValueType maxExtent = 0;
+		for (IndexType dim = 0; dim < dimensions; dim++) {
+			if (maxCoords[dim] - minCoords[dim] > maxExtent) {
+				maxExtent = maxCoords[dim] - minCoords[dim];
+			}
+		}
+
+		/**
+		* Several possibilities exist for choosing the recursion depth.
+		* Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
+		*/
+		const IndexType recursionDepth = std::log2(n);
+	
+		/**
+		*	create space filling curve indices.
+		*/
+		scai::lama::DenseVector<ValueType> hilbertIndices(inputDist);
+		for (IndexType i = 0; i < localN; i++) {
+			IndexType globalIndex = inputDist->local2global(i);
+			ValueType globalHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, globalIndex, recursionDepth, minCoords, maxCoords);
+			hilbertIndices.setValue(globalIndex, globalHilbertIndex);
+		}
+
+		/**
+		* now sort the global indices by where they are on the space-filling curve.
+		*/
+
+
+
+		scai::lama::DenseVector<IndexType> permutation, inversePermutation;
+		hilbertIndices.sort(permutation, true);
+		//permutation.redistribute(inputDist);
+		DenseVector<IndexType> tmpPerm = permutation;
+		tmpPerm.sort( inversePermutation, true);
+
+		/**
+		 * The permutations given by DenseVector.sort are distributed by BlockDistributions.
+		 * However, the sorting does not guarantee that each processor has the same number of values.
+		 * Without a redistribution step, the line result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
+		 * sometimes segfaults. We can't have that.
+		 */
+		inversePermutation.redistribute(inputDist);
+		assert(inversePermutation.getDistributionPtr()->getLocalSize() == localN);
+
+		/**
+		* initial partitioning with sfc. Upgrade to chains-on-chains-partitioning later
+		*/
+
+		for (IndexType i = 0; i < localN; i++) {
+			result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
+		}
+
+		if (!inputDist->isReplicated()) {
+			SCAI_REGION( "ParcoRepart.partitionGraph.initialPartition.redistribute" )
+			//redistribute input matrix to partition
+			scai::utilskernel::LArray<IndexType> owners(globalN);
+			for (IndexType i = 0; i < globalN; i++) {
+				Scalar blockID = result.getValue(i);
+				owners[i] = blockID.getValue<IndexType>();
+			}
+			scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(owners, comm));
+
+			input.redistribute(newDistribution, input.getColDistributionPtr());
+			result.redistribute(newDistribution);
+		}
 	}
    
 
@@ -155,16 +176,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			if (inputDist->isReplicated()) {
 				gain = replicatedMultiWayFM(input, result, k, epsilon);
 			} else {
-				//redistribute input matrix to partition
-				scai::utilskernel::LArray<IndexType> owners(globalN);
-				for (IndexType i = 0; i < globalN; i++) {
-					Scalar blockID = result.getValue(i);
-					owners[i] = blockID.getValue<IndexType>();
-				}
-				scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(owners, comm));
-
-				input.redistribute(newDistribution, input.getColDistributionPtr());
-				result.redistribute(newDistribution);
 				gain = distributedFMStep(input, result, k, epsilon);
 			}
 			ValueType oldCut = cut;
@@ -733,6 +744,7 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 	SCAI_REGION( "ParcoRepart.getInterfaceNodes" )
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
+	const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
 
 	const IndexType n = inputDist->getGlobalSize();
 	const IndexType localN = inputDist->getLocalSize();
@@ -741,13 +753,13 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 		throw std::runtime_error("Partition has " + std::to_string(partDist->getLocalSize()) + " local nodes, but matrix has " + std::to_string(localN) + ".");
 	}
 
-	IndexType maxBlock = part.max().Scalar::getValue<IndexType>();
-	if (thisBlock > maxBlock) {
-		throw std::runtime_error(std::to_string(thisBlock) + " is not a valid block id.");
+	if (thisBlock != comm->getRank()) {
+		throw std::runtime_error("Currently only implemented with one block per process, block " + std::to_string(thisBlock) + " invalid for process " + std::to_string(comm->getRank()));
 	}
 
-	if (otherBlock > maxBlock) {
-		throw std::runtime_error(std::to_string(otherBlock) + " is not a valid block id.");
+
+	if (otherBlock > comm->getSize()) {
+		throw std::runtime_error("Currently only implemented with one block per process, block " + std::to_string(thisBlock) + " invalid for " + std::to_string(comm->getSize()) + " processes.");
 	}
 
 	if (thisBlock == otherBlock) {
@@ -762,44 +774,62 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 	scai::hmemo::HArray<IndexType> localData = part.getLocalValues();
 	scai::hmemo::ReadAccess<IndexType> partAccess(localData);
 
-	scai::dmemo::Halo partHalo = buildPartHalo(input, part);
-	scai::utilskernel::LArray<IndexType> haloData;
-	partDist->getCommunicatorPtr()->updateHalo( haloData, localData, partHalo );
-
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
 	/**
-	 * first get nodes directly at the border to the other block
+	 * first get internal interface nodes and nodes with non-local neighbors
 	 */
 	std::vector<IndexType> interfaceNodes;
-
-	if (depth == 0) {
-		//this was a dummy call to assure that all processes participate in the communication step
-		return {interfaceNodes, 0};
-	}
+	std::vector<IndexType> nodesWithNonLocalNeighbors;
 
 	for (IndexType localI = 0; localI < localN; localI++) {
-		const IndexType beginCols = ia[localI];
-		const IndexType endCols = ia[localI+1];
-
 		if (partAccess[localI] == thisBlock) {
-
-			for (IndexType j = beginCols; j < endCols; j++) {
+			const IndexType globalI = inputDist->local2global(localI);
+			for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
 				IndexType neighbor = ja[j];
 				IndexType neighborBlock;
 				if (partDist->isLocal(neighbor)) {
-					neighborBlock = partAccess[partDist->global2local(neighbor)];
+					if (partAccess[partDist->global2local(neighbor)] == otherBlock) {
+						interfaceNodes.push_back(globalI);
+						break;
+					}
 				} else {
-					neighborBlock = haloData[partHalo.global2halo(neighbor)];
-				}
-
-				if (neighborBlock == otherBlock) {
-					interfaceNodes.push_back(inputDist->local2global(localI));
-					//only add interface node once
+					nodesWithNonLocalNeighbors.push_back(globalI);
 					break;
 				}
+			}
+		}
+	}
+
+	/**
+	 * send nodes with non-local neighbors to partner process.
+	 * here we assume a 1-to-1-mapping of blocks to processes and a symmetric matrix
+	 */
+	IndexType swapField[1];
+	swapField[0] = nodesWithNonLocalNeighbors.size();
+	comm->swap(swapField, 1, otherBlock);
+
+	const IndexType swapLength = std::max(swapField[0], IndexType(nodesWithNonLocalNeighbors.size()));
+	IndexType swapList[swapLength];
+	for (IndexType i = 0; i < nodesWithNonLocalNeighbors.size(); i++) {
+		swapList[i] = nodesWithNonLocalNeighbors[i];
+	}
+	comm->swap(swapList, swapLength, otherBlock);
+
+	std::unordered_set<IndexType> foreignNodes;
+	//the swapList array is only partially filled, the number of received nodes is found in swapField[0]
+	for (IndexType i = 0; i < swapField[0]; i++) {
+		foreignNodes.insert(swapList[i]);
+	}
+
+	for (IndexType node : nodesWithNonLocalNeighbors) {
+		IndexType localI = inputDist->global2local(node);
+		for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
+			if (foreignNodes.count(ja[j])> 0) {
+				interfaceNodes.push_back(node);
+				break;
 			}
 		}
 	}
@@ -1160,10 +1190,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				myGlobalIndices = newIndices;
 			}
 		} else {
-			const IndexType dummyPartner = comm->getRank() == 0 ? 1 : 0;
-			//std::cout << "Thread " << comm->getRank() << " is inactive in round " << i << ", performing dummy interface and halo exchange." << std::endl;
-
-			getInterfaceNodes(input, part, localBlockID, dummyPartner, 0);
+			//std::cout << "Thread " << comm->getRank() << " is inactive in round " << i << ", performing halo exchange." << std::endl;
 
 			//dummy halo update
 			std::vector<IndexType> requiredHaloIndices;
