@@ -906,7 +906,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 	
 	//
 	
-	//std::vector<DenseVector<IndexType >> communicationScheme = computeCommunicationPairings(input, part, mapping);
+	std::vector<DenseVector<IndexType >> communicationScheme2 = computeCommunicationPairings(input, part, mapping);
         
         /* test communication with coloring
          * */
@@ -914,7 +914,30 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
         
         std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
         
+        /*
+        for(IndexType i=0; i<communicationScheme2.size(); i++){
+            for(IndexType j=0; j<communicationScheme2[i].size(); j++){
+                std::cout<< *comm<< " , scheme_2: round= "<< i << ", block1= "<< j<< " , block2= "<< communicationScheme2[i].getValue(j).Scalar::getValue<IndexType>() << std::endl;
+            }
+            std::cout<< std::endl;
+        }
+       
+       std::cout<< std::endl;
+        
+        for(IndexType i=0; i<communicationScheme.size(); i++){
+            for(IndexType j=0; j<communicationScheme[i].size(); j++){
+                std::cout<< *comm<< " , scheme_1: round= "<< i << ", block1= "<< j<< " , block2= "<< communicationScheme[i].getValue(j).Scalar::getValue<IndexType>() << std::endl;
+            }
+            std::cout<< std::endl;
+        }
+        */
+           
         //
+        //communicationScheme = communicationScheme2;
+        //
+        
+        
+        //==============================
         
     const Scalar maxBlockScalar = part.max();
     const IndexType maxBlockID = maxBlockScalar.getValue<IndexType>();
@@ -944,19 +967,22 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[i].getLocalValues());
 		
                 //
-                //IndexType partner = commAccess[communicationScheme[i].getDistributionPtr()->global2local(comm->getRank())];
+                IndexType partner2 = commAccess[communicationScheme2[i].getDistributionPtr()->global2local(comm->getRank())];
                 IndexType partner = commAccess[ comm->getRank() ];
+std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm <<" , partner1= "<< partner << " , partner2= " << partner2 << std::endl;
+                //
                 //
 
 		const IndexType localBlockID = comm->getRank();
-
+std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm << " , localBlockID= "<< localBlockID << " , partner = " << partner << std::endl;
 		//copy into usable data structure with iterators
 		std::vector<IndexType> myGlobalIndices(localN);
 		for (IndexType j = 0; j < localN; j++) {
 			myGlobalIndices[j] = inputDist->local2global(j);
 		}//TODO: maybe refactor this someday to be outside the loop
 
-		if (partner != comm->getRank()) {
+		// TODO: coloring schedule returns -1 for inactive nodes in this round 
+		if (partner != comm->getRank() && partner>0) {
 			//processor is active this round
 
 			//std::cout << "Thread " << comm->getRank() << " is active in round " << i << "." << std::endl;
@@ -969,7 +995,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			std::tie(interfaceNodes, lastRoundMarker)= getInterfaceNodes(input, part, localBlockID, partner, magicBorderRegionDepth+1);
 			std::sort(interfaceNodes.begin(), interfaceNodes.end());
 
-			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", gathered interface nodes." << std::endl;
+			std::cout << __LINE__<< ":"<< "Thread " << comm->getRank() << ", round " << i << ", gathered interface nodes." << std::endl;
 
 			/**
 			 * now swap indices of nodes in border region with partner processor.
@@ -1023,7 +1049,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				requiredHaloIndices[i] = swapNodes[i];
 			}
 
-			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", swapped " << swapLength << " interface nodes with thread " << partner << std::endl;
+			std::cout<< __LINE__<< ":" << "Thread " << comm->getRank() << ", round " << i << ", swapped " << swapLength << " interface nodes with thread " << partner << std::endl;
 
 
 			assert(requiredHaloIndices.size() <= globalN - inputDist->getLocalSize());
@@ -1036,20 +1062,27 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			 */
 			IndexType numValues = input.getLocalStorage().getValues().size();
 			scai::dmemo::Halo graphHalo;
-			{
+std::cout<< "===" << __LINE__<<  std::endl;
+for(IndexType zxc=0; zxc<requiredHaloIndices.size(); zxc++){
+    std::cout<< requiredHaloIndices[zxc] << " _ ";
+}
+std::cout<< std::endl;
+                        {
 				scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
+std::cout<< "===" << __LINE__<< " __"<< *comm<< std::endl;
 				scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, graphHalo );
 			}//TODO: halos for matrices might need to be built differently
-
+std::cout<< "===" << __LINE__<<  std::endl;
 			CSRStorage<ValueType> haloMatrix;
 			haloMatrix.exchangeHalo( graphHalo, input.getLocalStorage(), *comm );
 			assert(input.getLocalStorage().getValues().size() == numValues);//number of edges in local part stays unchanged.
 			assert(haloMatrix.getValues().size() == otherDegreeSum);
+std::cout<< "===" << __LINE__<<  std::endl;                        
 			for (IndexType node : requiredHaloIndices) {
 				assert(graphHalo.global2halo(node) != nIndex);
 			}
 
-			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", got halo." << std::endl;
+			std::cout<< __LINE__<< ":" << "Thread " << comm->getRank() << ", round " << i << ", got halo." << std::endl;
 
 			//why not use vectors in the FM step or use sets to begin with? Might be faster.
 			//here we only exchange one round less than gathered. The other forms a dummy border layer.
@@ -1066,7 +1099,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			std::pair<IndexType, IndexType> blockSizes = {blockSize, otherBlockSize};
 			std::pair<IndexType, IndexType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
 
-			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", prepared sets." << std::endl;
+			std::cout<< __LINE__<< ":" << "Thread " << comm->getRank() << ", round " << i << ", prepared sets." << std::endl;
 
 
 			/**
@@ -1074,7 +1107,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			 */
 			ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, firstRegion, secondRegion, firstDummyLayer, secondDummyLayer, blockSizes, maxBlockSizes, epsilon, unweighted);
 
-			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", finished twoWayLocalFM with gain " << gain << "." << std::endl;
+			std::cout<< __LINE__<< ":" << "Thread " << comm->getRank() << ", round " << i << ", finished twoWayLocalFM with gain " << gain << "." << std::endl;
 
 
 			//communicate achieved gain. PE with better solution should send their secondRegion.
@@ -1136,7 +1169,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				auto it2 = std::set_difference(firstRegionCopy.begin(), firstRegionCopy.end(), firstRegion.begin(), firstRegion.end(), deletedNodes.begin());
 				deletedNodes.resize(it2-deletedNodes.begin());
 
-				//std::cout << "Thread " << comm->getRank() << ", round " << i << ", lost " << deletedNodes.size() << " nodes and gained " << additionalNodes.size() << std::endl;
+				std::cout<< __LINE__<< ":" << "Thread " << comm->getRank() << ", round " << i << ", lost " << deletedNodes.size() << " nodes and gained " << additionalNodes.size() << std::endl;
 
 				assert(std::is_sorted(additionalNodes.begin(), additionalNodes.end()));
 				assert(std::is_sorted(deletedNodes.begin(), deletedNodes.end()));
@@ -1150,7 +1183,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				assert(newIndices.size() == myGlobalIndices.size()-deletedNodes.size()+additionalNodes.size());
 				myGlobalIndices = newIndices;
 			}
-		} else {
+		} //if (partner != comm->getRank() && partner>0) 
+		else {
 			const IndexType dummyPartner = comm->getRank() == 0 ? 1 : 0;
 			//std::cout << "Thread " << comm->getRank() << " is inactive in round " << i << ", performing dummy interface and halo exchange." << std::endl;
 
