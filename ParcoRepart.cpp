@@ -1063,7 +1063,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			scai::dmemo::Halo graphHalo;
 			{
 				scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
-				scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, graphHalo );
+				scai::hmemo::HArrayRef<IndexType> arrProvidedIndexes( interfaceNodes );
+				scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, arrProvidedIndexes, partner, graphHalo );
 			}
 
 			CSRStorage<ValueType> haloMatrix;
@@ -1195,16 +1196,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			SCAI_REGION( "ParcoRepart.distributedFMStep.loop.dummyUpdate" )
 			//std::cout << "Thread " << comm->getRank() << " is inactive in round " << i << ", performing halo exchange." << std::endl;
 
-			//dummy halo update
-			std::vector<IndexType> requiredHaloIndices;
-			scai::dmemo::Halo graphHalo;
-			{
-				scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
-				scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, graphHalo );
-			}
-
-			CSRStorage<ValueType> haloMatrix;
-			haloMatrix.exchangeHalo( graphHalo, input.getLocalStorage(), *comm );
 		}
 		{
 			SCAI_REGION( "ParcoRepart.distributedFMStep.loop.redistribute" )
