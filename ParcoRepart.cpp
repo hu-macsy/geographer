@@ -41,10 +41,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		throw std::runtime_error("Matrix must be quadratic.");
 	}
 
-	if (!input.isConsistent()) {
-		throw std::runtime_error("Input matrix inconsistent");
-	}
-
 	if (k > n) {
 		throw std::runtime_error("Creating " + std::to_string(k) + " blocks from " + std::to_string(n) + " elements is impossible.");
 	}
