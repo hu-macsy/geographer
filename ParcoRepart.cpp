@@ -179,7 +179,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 	if (comm->getSize() == 1 || comm->getSize() == k) {
 		ValueType gain = 1;
-		ValueType cut = computeCut(input, result);
+		ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input)) / 2;
 
 		while (gain > 0) {
 			if (inputDist->isReplicated()) {
@@ -188,7 +188,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				gain = distributedFMStep(input, result, k, epsilon);
 			}
 			ValueType oldCut = cut;
-			cut = computeCut(input, result);
+			cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input)) / 2;
 			if (cut != oldCut - gain) {
 				IndexType sumOutgoingEdges = comm->sum(localSumOutgoingEdges(input)) / 2;
 
