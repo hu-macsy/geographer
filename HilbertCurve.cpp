@@ -60,6 +60,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(const std::vector<
     
     return -1; //Something is wrong,should not reach this point
 }
+
 //-------------------------------------------------------------------------------------------------
 
 /**
@@ -70,6 +71,7 @@ template<typename IndexType, typename ValueType>
 ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
 	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
 
+        SCAI_REGION("HilbertCurve.getHilbertIndex2D")
         scai::dmemo::DistributionPtr coordDistX = coordinates[0].getDistributionPtr();
         scai::dmemo::DistributionPtr coordDistY = coordinates[1].getDistributionPtr();
         
@@ -268,6 +270,7 @@ template<typename IndexType, typename ValueType>
 ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
 	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
 
+        SCAI_REGION("HilbertCurve.getHilbertIndex3D")
 	if (dimensions != 3) {
 		throw std::logic_error("Space filling curve for 3 dimensions.");
 	}
