@@ -813,29 +813,32 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 	 * send nodes with non-local neighbors to partner process.
 	 * here we assume a 1-to-1-mapping of blocks to processes and a symmetric matrix
 	 */
-	IndexType swapField[1];
-	swapField[0] = nodesWithNonLocalNeighbors.size();
-	comm->swap(swapField, 1, otherBlock);
+	{
+		SCAI_REGION( "ParcoRepart.getInterfaceNodes.communication" )
+		IndexType swapField[1];
+		swapField[0] = nodesWithNonLocalNeighbors.size();
+		comm->swap(swapField, 1, otherBlock);
 
-	const IndexType swapLength = std::max(swapField[0], IndexType(nodesWithNonLocalNeighbors.size()));
-	IndexType swapList[swapLength];
-	for (IndexType i = 0; i < nodesWithNonLocalNeighbors.size(); i++) {
-		swapList[i] = nodesWithNonLocalNeighbors[i];
-	}
-	comm->swap(swapList, swapLength, otherBlock);
+		const IndexType swapLength = std::max(swapField[0], IndexType(nodesWithNonLocalNeighbors.size()));
+		IndexType swapList[swapLength];
+		for (IndexType i = 0; i < nodesWithNonLocalNeighbors.size(); i++) {
+			swapList[i] = nodesWithNonLocalNeighbors[i];
+		}
+		comm->swap(swapList, swapLength, otherBlock);
 
-	std::unordered_set<IndexType> foreignNodes;
-	//the swapList array is only partially filled, the number of received nodes is found in swapField[0]
-	for (IndexType i = 0; i < swapField[0]; i++) {
-		foreignNodes.insert(swapList[i]);
-	}
+		std::unordered_set<IndexType> foreignNodes;
+		//the swapList array is only partially filled, the number of received nodes is found in swapField[0]
+		for (IndexType i = 0; i < swapField[0]; i++) {
+			foreignNodes.insert(swapList[i]);
+		}
 
-	for (IndexType node : nodesWithNonLocalNeighbors) {
-		IndexType localI = inputDist->global2local(node);
-		for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
-			if (foreignNodes.count(ja[j])> 0) {
-				interfaceNodes.push_back(node);
-				break;
+		for (IndexType node : nodesWithNonLocalNeighbors) {
+			IndexType localI = inputDist->global2local(node);
+			for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
+				if (foreignNodes.count(ja[j])> 0) {
+					interfaceNodes.push_back(node);
+					break;
+				}
 			}
 		}
 	}
@@ -987,16 +990,12 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		if (partner != comm->getRank()) {
 			//processor is active this round
 
-			//std::cout << "Thread " << comm->getRank() << " is active in round " << i << "." << std::endl;
-
 			/**
 			 * get indices of border nodes with breadth-first search
 			 */
 			std::vector<IndexType> interfaceNodes;
 			IndexType lastRoundMarker;
 			std::tie(interfaceNodes, lastRoundMarker)= getInterfaceNodes(input, part, localBlockID, partner, magicBorderRegionDepth+1);
-
-			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", gathered interface nodes." << std::endl;
 
 			/**
 			 * now swap indices of nodes in border region with partner processor.
@@ -1098,7 +1097,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			 */
 			ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, firstRegion, secondRegion, firstDummyLayer, secondDummyLayer, blockSizes, maxBlockSizes, unweighted);
 
-
 			//communicate achieved gain. PE with better solution should send their secondRegion.
 			assert(unweighted); //if this assert fails, you need to change the type of swapField back to ValueType before removing it.
 			swapField[0] = secondRegion.size();
@@ -1128,10 +1126,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 				if (otherWasBetter) {
 					swapLength = swapField[0];
-					//std::cout << "Thread " << comm->getRank() << ", round " << i << " preparing to receive " << swapLength << " nodes from " << partner << "." << std::endl;
 				} else {
 					swapLength = secondRegion.size();
-					//std::cout << "Thread " << comm->getRank() << ", round " << i << " preparing to send " << swapLength << " nodes to " << partner << "." << std::endl;
 				}
 
 				ValueType resultSwap[swapLength];
@@ -1196,6 +1192,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				myGlobalIndices = newIndices;
 			}
 		} else {
+			SCAI_REGION( "ParcoRepart.distributedFMStep.loop.dummyUpdate" )
 			//std::cout << "Thread " << comm->getRank() << " is inactive in round " << i << ", performing halo exchange." << std::endl;
 
 			//dummy halo update
