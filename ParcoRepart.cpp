@@ -813,6 +813,7 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 	 * send nodes with non-local neighbors to partner process.
 	 * here we assume a 1-to-1-mapping of blocks to processes and a symmetric matrix
 	 */
+	std::unordered_set<IndexType> foreignNodes;
 	{
 		SCAI_REGION( "ParcoRepart.getInterfaceNodes.communication" )
 		IndexType swapField[1];
@@ -826,19 +827,18 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 		}
 		comm->swap(swapList, swapLength, otherBlock);
 
-		std::unordered_set<IndexType> foreignNodes;
 		//the swapList array is only partially filled, the number of received nodes is found in swapField[0]
 		for (IndexType i = 0; i < swapField[0]; i++) {
 			foreignNodes.insert(swapList[i]);
 		}
+	}
 
-		for (IndexType node : nodesWithNonLocalNeighbors) {
-			IndexType localI = inputDist->global2local(node);
-			for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
-				if (foreignNodes.count(ja[j])> 0) {
-					interfaceNodes.push_back(node);
-					break;
-				}
+	for (IndexType node : nodesWithNonLocalNeighbors) {
+		IndexType localI = inputDist->global2local(node);
+		for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
+			if (foreignNodes.count(ja[j])> 0) {
+				interfaceNodes.push_back(node);
+				break;
 			}
 		}
 	}
