@@ -641,7 +641,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
 
 
 TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
-    std::string file = "Grid8x8";
+    std::string file = "Grid16x16";
     std::ifstream f(file);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;
@@ -802,7 +802,7 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_3D) {
 //------------------------------------------------------------------------------
 
 TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
-     std::string file = "Grid8x8";
+     std::string file = "Grid16x16";
     std::ifstream f(file);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;
