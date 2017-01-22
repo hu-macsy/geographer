@@ -7,6 +7,7 @@
 
 #include <scai/dmemo/HaloBuilder.hpp>
 #include <scai/dmemo/Distribution.hpp>
+#include <scai/dmemo/GenBlockDistribution.hpp>
 #include <scai/tracing.hpp>
 
 #include <assert.h>
@@ -15,6 +16,7 @@
 #include <queue>
 #include <string>
 #include <unordered_set>
+#include <numeric>
 
 #include "PrioQueue.h"
 #include "ParcoRepart.h"
@@ -55,6 +57,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         
 	const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+	const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
 	const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
 
 	const IndexType localN = inputDist->getLocalSize();
@@ -126,9 +129,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		/**
 		* now sort the global indices by where they are on the space-filling curve.
 		*/
-
-
-
 		scai::lama::DenseVector<IndexType> permutation, inversePermutation;
 		hilbertIndices.sort(permutation, true);
 		//permutation.redistribute(inputDist);
@@ -152,21 +152,34 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
 		}
 
-		if (!inputDist->isReplicated()) {
+		if (!inputDist->isReplicated() && comm->getSize() == k) {
 			SCAI_REGION( "ParcoRepart.partitionGraph.initialPartition.redistribute" )
-			//redistribute input matrix to partition
-			scai::utilskernel::LArray<IndexType> owners(globalN);
-			for (IndexType i = 0; i < globalN; i++) {
-				Scalar blockID = result.getValue(i);
-				owners[i] = blockID.getValue<IndexType>();
-			}
-			scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(owners, comm));
+
+//			std::vector<IndexType> subsetSizes(k, 0);
+//			for (IndexType i = 0; i < localN; i++) {
+//				IndexType partID = result.getLocalValues()[i];
+//				subsetSizes[partID] += 1;
+//			}
+//
+//			for (IndexType partID = 0; partID < k; partID++) {
+//			    subsetSizes[partID] = comm->sum(subsetSizes[partID]);
+//			}
+//
+//			assert(std::accumulate(subsetSizes.begin(), subsetSizes.end(), 0) == n);
+//			std::cout << subsetSizes[comm->getRank()] << " nodes targeted for process " << comm->getRank() << std::endl;
+//
+//		    scai::dmemo::DistributionPtr permDist( new scai::dmemo::GenBlockDistribution( n, subsetSizes, comm ) );
+//		    permutation.redistribute(permDist);
+
+		    result.redistribute(noDist);
+
+			scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(result.getLocalValues(), comm));
+			//assert(newDistribution->getLocalSize() == subsetSizes[comm->getRank()]);
 
 			input.redistribute(newDistribution, input.getColDistributionPtr());
 			result.redistribute(newDistribution);
 		}
 	}
-   
 
 	if (comm->getSize() == 1 || comm->getSize() == k) {
 		ValueType gain = 1;
@@ -244,6 +257,8 @@ ValueType ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(const CSRSpars
 
 	//const ValueType oldCut = computeCut(input, part, unweighted);
 
+	scai::hmemo::ReadAccess<IndexType> partAccess(part.getLocalValues());
+
 	const IndexType optSize = ceil(double(n) / k);
 	const IndexType maxAllowablePartSize = optSize*(1+epsilon);
 
@@ -260,13 +275,13 @@ ValueType ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(const CSRSpars
 	double maxFragmentSize = 0;
 
 	for (IndexType i = 0; i < n; i++) {
-		Scalar partID = part.getValue(i);
-		assert(partID.getValue<IndexType>() >= 0);
-		assert(partID.getValue<IndexType>() < k);
-		fragmentSizes[partID.getValue<IndexType>()] += 1;
+		IndexType blockID = partAccess[i];
+		assert(blockID >= 0);
+		assert(blockID < k);
+		fragmentSizes[blockID] += 1;
 
-		if (fragmentSizes[partID.getValue<IndexType>()] < maxFragmentSize) {
-			maxFragmentSize = fragmentSizes[partID.getValue<IndexType>()];
+		if (fragmentSizes[blockID] < maxFragmentSize) {
+			maxFragmentSize = fragmentSizes[blockID];
 		}
 	}
 
@@ -292,9 +307,9 @@ ValueType ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(const CSRSpars
 		degrees[v] = endCols - beginCols;
 		for (IndexType j = beginCols; j < endCols; j++) {
 			IndexType neighbor = ja[j];
+			IndexType localNeighbor = inputDist->global2local(neighbor);
 			if (neighbor == v) continue;
-			Scalar partID = part.getValue(neighbor);
-			edgeCuts[v][partID.getValue<IndexType>()] += unweighted ? 1 : values[j];
+			edgeCuts[v][partAccess[localNeighbor]] += unweighted ? 1 : values[j];
 			totalWeight += unweighted ? 1 : values[j];
 		}
 	}
@@ -303,7 +318,6 @@ ValueType ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(const CSRSpars
 	for (IndexType v = 0; v < n; v++) {
 		ValueType maxCut = -totalWeight;
 		IndexType idAtMax = k;
-		Scalar partID = part.getValue(v);
 
 		for (IndexType fragment = 0; fragment < k; fragment++) {
 			if (unweighted) {
@@ -311,7 +325,7 @@ ValueType ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(const CSRSpars
 			}
 			assert(edgeCuts[v][fragment] >= 0);
 
-			if (fragment != partID.getValue<IndexType>() && edgeCuts[v][fragment] > maxCut && fragmentSizes[fragment] <= maxAllowablePartSize) {
+			if (fragment != partAccess[v] && edgeCuts[v][fragment] > maxCut && fragmentSizes[fragment] <= maxAllowablePartSize) {
 				idAtMax = fragment;
 				maxCut = edgeCuts[v][fragment];
 			}
@@ -321,11 +335,11 @@ ValueType ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(const CSRSpars
 		assert(maxCut >= 0);
 		if (unweighted) assert(maxCut <= degrees[v]);
 		bestTargetFragment[v] = idAtMax;
-		assert(partID.getValue<IndexType>() < queues.size());
-		if (fragmentSizes[partID.getValue<IndexType>()] > 1) {
-			ValueType key = -(maxCut-edgeCuts[v][partID.getValue<IndexType>()]);
+		assert(partAccess[v] < queues.size());
+		if (fragmentSizes[partAccess[v]] > 1) {
+			ValueType key = -(maxCut-edgeCuts[v][partAccess[v]]);
 			assert(-key <= degrees[v]);
-			queues[partID.getValue<IndexType>()].insert(key, v); //negative max gain
+			queues[partAccess[v]].insert(key, v); //negative max gain
 		}
 	}
 
@@ -366,8 +380,7 @@ ValueType ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(const CSRSpars
 			assert(topGain <= degrees[topVertex]);
 		}
 		assert(!moved[topVertex]);
-		Scalar partScalar = part.getValue(topVertex);
-		assert(partScalar.getValue<IndexType>() == partID);
+		assert(partAccess[topVertex] == partID);
 
 		//now get target partition.
 		IndexType targetFragment = bestTargetFragment[topVertex];
@@ -407,8 +420,7 @@ ValueType ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(const CSRSpars
 			const IndexType neighbour = ja[j];
 			if (!moved[neighbour]) {
 				//update edge cuts
-				Scalar neighbourBlockScalar = part.getValue(neighbour);
-				IndexType neighbourBlock = neighbourBlockScalar.getValue<IndexType>();
+				IndexType neighbourBlock = partAccess[neighbour];
 
 				edgeCuts[neighbour][partID] -= unweighted ? 1 : values[j];
 				assert(edgeCuts[neighbour][partID] >= 0);
@@ -509,8 +521,7 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<Va
 
 		const IndexType globalI = inputDist->local2global(i);
 		assert(partDist->isLocal(globalI));
-		IndexType thisBlock;
-		partAccess.getValue(thisBlock, i);
+		IndexType thisBlock = partAccess[i];
 		
 		for (IndexType j = beginCols; j < endCols; j++) {
 			IndexType neighbor = ja[j];
@@ -608,8 +619,7 @@ ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<
 	}
  	
 	for (IndexType i = 0; i < localPart.size(); i++) {
-		IndexType partID;
-		localPart.getValue(partID, i);
+		IndexType partID = localPart[i];
 		subsetSizes[partID] += 1;
 	}
 	IndexType optSize = std::ceil(n / k);
@@ -971,7 +981,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			scai::hmemo::ReadAccess<IndexType> partAccess(part.getLocalValues());
 			for (IndexType j = 0; j < localN; j++) {
 				if (partAccess[j] != localBlockID) {
-					throw std::runtime_error("Block ID "+std::to_string(partAccess[j])+" found on process "+std::to_string(localBlockID)+".");
+					throw std::runtime_error("Node "+std::to_string(partDist->local2global(j))+" with block ID "+std::to_string(partAccess[j])+" found on process "+std::to_string(localBlockID)+".");
 				}
 			}
 		}
@@ -1220,6 +1230,12 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
 			input.redistribute(newDistribution, input.getColDistributionPtr());
 			part.redistribute(newDistribution);
+			const scai::hmemo::ReadAccess<IndexType> partAccess(part.getLocalValues());
+			for (IndexType j = 0; j < partAccess.size(); j++) {
+				if (partAccess[j] != localBlockID) {
+					throw std::runtime_error("After redist: Node "+std::to_string(newDistribution->local2global(j))+" with block ID "+std::to_string(partAccess[j])+" found on process "+std::to_string(localBlockID)+".");
+				}
+			}
 
 		}
 		//std::cout << "Thread " << comm->getRank() << ", round " << i << ", finished redistribution." << std::endl;
