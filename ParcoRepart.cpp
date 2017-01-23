@@ -177,6 +177,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		}
 	}
 
+	IndexType numRefinementRounds = 0;
+
 	if (comm->getSize() == 1 || comm->getSize() == k) {
 		ValueType gain = 1;
 		ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input)) / 2;
@@ -198,6 +200,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 			assert(oldCut - gain == cut);
 			//std::cout << "Last FM round yielded gain of " << gain << ", for total cut of " << computeCut(input, result) << std::endl;
+			numRefinementRounds++;
 		}
 	} else {
 		std::cout << "Local refinement only implemented sequentially and for one block per process. Called with " << comm->getSize() << " process and " << k << " blocks." << std::endl;
@@ -1192,10 +1195,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				assert(newIndices.size() == myGlobalIndices.size()-deletedNodes.size()+additionalNodes.size());
 				myGlobalIndices = newIndices;
 			}
-		} else {
-			SCAI_REGION( "ParcoRepart.distributedFMStep.loop.dummyUpdate" )
-			//std::cout << "Thread " << comm->getRank() << " is inactive in round " << i << ", performing halo exchange." << std::endl;
-
 		}
 		{
 			SCAI_REGION( "ParcoRepart.distributedFMStep.loop.redistribute" )

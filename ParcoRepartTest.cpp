@@ -102,6 +102,10 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
 
   ParcoRepart<IndexType, ValueType> repart;
   EXPECT_LE(repart.computeImbalance(partition, k), epsilon);
+
+  const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, partition, true);
+
+  std::cout << "Partitioned graph with " << n << " nodes into " << k << " blocks with a total cut of " << cut << std::endl;
 }
 
 TEST_F(ParcoRepartTest, testImbalance) {
