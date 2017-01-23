@@ -117,8 +117,8 @@ TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
 // For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
 // less than 6 ones ( every node has 3,4,5, or 6 neighbours).
 TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
-    std::vector<IndexType> numPoints= { 135, 156, 67};
-    std::vector<ValueType> maxCoord= {3, 44, 500};
+    std::vector<IndexType> numPoints= { 100, 80, 50};
+    std::vector<ValueType> maxCoord= {441, 711, 1160};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
     std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
     
@@ -133,9 +133,17 @@ TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
     }
     
     scai::lama::CSRSparseMatrix<ValueType> adjM( dist, noDistPointer);
+    
     // create the adjacency matrix and the coordinates
     MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
-        
+    
+    // print local values 
+    /*
+    for(IndexType i=0; i<dist->getLocalSize(); i++){
+        std::cout<< i<< ": "<< *comm<< " - " <<coords[0].getLocalValues()[i] << " , " << coords[1].getLocalValues()[i] << " , " << coords[2].getLocalValues()[i] << std::endl;   
+    }
+    */
+    
     EXPECT_EQ( adjM.getLocalNumColumns() , N);
     EXPECT_EQ( adjM.getLocalNumRows() , coords[0].getLocalValues().size() );
     EXPECT_EQ( true , adjM.getRowDistribution().isEqual(coords[0].getDistribution()) );
@@ -218,6 +226,8 @@ TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
 //-----------------------------------------------------------------
 /* Reads a graph from a file "filename" in METIS format, writes it back into "my_filename" and reads the graph
  * again from "my_filename".
+ * 
+ * Occasionally throws error, probably because onw process tries to read the file while some other is still eriting in it.
  */
 TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
     std::string path = "";
@@ -231,9 +241,11 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
     //In the METIS format the two first number in the file are the number of nodes and edges
     f >>nodes >> edges; 
     
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     dmemo::DistributionPtr dist( new dmemo::NoDistribution( nodes ));
     Graph = scai::lama::CSRSparseMatrix<ValueType>(dist, dist);
     {
+        PRINT(*comm);
         SCAI_REGION("testReadAndWriteGraphFromFile.readFromFile2AdjMatrix");
         MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph, filename );
     }
@@ -249,6 +261,10 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
     {   
         SCAI_REGION("testReadAndWriteGraphFromFile.(writeInFileMetisFormat and writeInFileCoords)");
         MeshIO<IndexType, ValueType>::writeInFileMetisFormat(Graph, fileTo );
+    }
+    //PRINT(*comm);
+    {
+        SCAI_REGION("testReadAndWriteGraphFromFile.(writeInFileMetisFormat and writeInFileCoords)");
         MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph2, fileTo );
     }
     std::cout<< "Output written in file: "<< fileTo<< std::endl;
@@ -268,7 +284,7 @@ TEST_F(MeshIOTest, testPartitionFromFile_local_2D){
     
     //std::string path = "./meshes/my_meshes";s
     std::string path = "";
-    std::string file= "Grid16x16";
+    std::string file= "Grid8x8";
     std::string grFile= path +file, coordFile= path +file +".xyz";  //graph file and coordinates file
     std::fstream f(grFile);
     IndexType nodes, edges;
@@ -276,6 +292,9 @@ TEST_F(MeshIOTest, testPartitionFromFile_local_2D){
     f.close();
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    //
+    k = comm->getSize();
+    //
     
     //read the adjacency matrix from a file
     std::cout<<"reading adjacency matrix from file: "<< grFile<<" for k="<< k<< std::endl;
@@ -304,6 +323,13 @@ TEST_F(MeshIOTest, testPartitionFromFile_local_2D){
     
     EXPECT_EQ(coords2D.size(), dim);
     EXPECT_EQ(coords2D[0].size(), N);
+    
+    // print
+    /*
+    for(IndexType i=0; i<N; i++){
+        std::cout<< i<< ": "<< *comm<< " - " <<coords2D[0].getLocalValues()[i] << " , " << coords2D[1].getLocalValues()[i] << std::endl;   
+    }
+    */
     
     SCAI_REGION_START("testPartitionFromFile_local_2D.partition");
         //partition the graph

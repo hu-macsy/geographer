@@ -51,7 +51,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
   }
   
   MeshIO<IndexType, ValueType>::createStructured3DMesh(a, coordinates, maxCoord, numPoints);
-  
+    
   scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, k, epsilon);
   
   EXPECT_EQ(n, partition.size());
@@ -64,7 +64,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
 }
 
 TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
-  IndexType nroot = 8;
+  IndexType nroot = 4;
   IndexType n = nroot * nroot * nroot;
   IndexType dimensions = 3;
   
@@ -87,8 +87,10 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
 	  coordinates[i] = static_cast<ValueType>( 0 );
   }
   
-  MeshIO<IndexType, ValueType>::createStructured3DMesh(a, coordinates, maxCoord, numPoints);
-  a.redistribute(dist, noDistPointer);
+  //MeshIO<IndexType, ValueType>::createStructured3DMesh(a, coordinates, maxCoord, numPoints);
+  //a.redistribute(dist, noDistPointer);
+
+  MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(a, coordinates, maxCoord, numPoints);
 
   const ValueType epsilon = 0.05;
 

@@ -231,43 +231,34 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
     IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
 
     // create the coordinates
-    // find which should be the first local coordinate in this processor
-    
-    // a YxZ plane
-    IndexType planeSize= numPoints[1]*numPoints[2];
-    
-    IndexType startingIndex = dist->local2global(0);
        
-    SCAI_REGION_START("MeshIO.createStructured3DMesh_dist.coords_getLocal");
     // get the local part of the coordinates vectors
-    std::vector<scai::utilskernel::LArray<ValueType>> localCoords(3);
-    for(IndexType i=0; i<3; i++){
-        localCoords[i] = coords[i].getLocalValues();
-    }
-    SCAI_REGION_END("MeshIO.createStructured3DMesh_dist.coords_getLocal");
+    std::vector<scai::utilskernel::LArray<ValueType>* > localCoords(3);
     
-    SCAI_REGION_START("MeshIO.createStructured3DMesh_dist.initialization");
+    for(IndexType i=0; i<3; i++){
+        localCoords[i] = &coords[i].getLocalValues();
+    }
+    
     IndexType localSize = dist->getLocalSize(); // the size of the local part
     
-    DenseVector<ValueType> firstCoord(3,0); // the first local coordinate
-    firstCoord.setValue(0, (IndexType) (startingIndex/planeSize) );  
-    firstCoord.setValue(1, (IndexType) ((startingIndex%planeSize)/numPoints[2]) );
-    firstCoord.setValue(2, (IndexType) ((startingIndex%planeSize) % numPoints[2]) );
+    IndexType planeSize= numPoints[1]*numPoints[2]; // a YxZ plane
     
-    IndexType indX = firstCoord(0).Scalar::getValue<ValueType>(); 
-    IndexType indY = firstCoord(1).Scalar::getValue<ValueType>();
-    IndexType indZ = firstCoord(2).Scalar::getValue<ValueType>();
+    // find which should be the first local coordinate in this processor
+    IndexType startingIndex = dist->local2global(0);
     
-    SCAI_REGION_END("MeshIO.createStructured3DMesh_dist.initialization");
-    
+    IndexType indX = (IndexType) (startingIndex/planeSize) ;
+    IndexType indY = (IndexType) ((startingIndex%planeSize)/numPoints[2]);
+    IndexType indZ = (IndexType) ((startingIndex%planeSize) % numPoints[2]);
+    //PRINT( *comm<< ": " << indX << " ,"<< indY << ", "<< indZ << ", startingIndex= "<< startingIndex);
     
     for(IndexType i=0; i<localSize; i++){
         SCAI_REGION("MeshIO.createStructured3DMesh_dist.setCoordinates");
         
-        localCoords[0][i] = indX*offset[0];
-        localCoords[1][i] = indY*offset[1];
-        localCoords[2][i] = indZ*offset[2];
-
+        (*localCoords[0])[i] = indX*offset[0];
+        (*localCoords[1])[i] = indY*offset[1];
+        (*localCoords[2])[i] = indZ*offset[2];
+        //PRINT( *comm << ": "<< (*localCoords[0])[i] << "_ "<< (*localCoords[1])[i] << "_ "<< (*localCoords[2])[i]);
+        
         ++indZ;
 
         if(indZ >= numPoints[2]){   // if z coord reaches maximum, set it to 0 and increase y
@@ -286,10 +277,8 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
     
     
     // start making the local part of the adjacency matrix
-    SCAI_REGION_START("MeshIO.createStructured3DMesh_dist.localMatrix_allocate");
-        scai::lama::CSRStorage<ValueType> localMatrix;
-        localMatrix.allocate( adjM.getLocalNumRows() , adjM.getLocalNumColumns() );
-    SCAI_REGION_END("MeshIO.createStructured3DMesh_dist.localMatrix_allocate");
+    scai::lama::CSRStorage<ValueType> localMatrix;
+    localMatrix.allocate( adjM.getLocalNumRows() , adjM.getLocalNumColumns() );
     
     hmemo::HArray<IndexType> csrIA;
     hmemo::HArray<IndexType> csrJA;
@@ -364,7 +353,10 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
  */
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::writeInFileMetisFormat (const CSRSparseMatrix<ValueType> &adjM, const std::string filename){
-	SCAI_REGION( "MeshIO.writeInFileMetisFormat" )
+    SCAI_REGION( "MeshIO.writeInFileMetisFormat" )
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    //PRINT(*comm << " In writeInFileMetisFormat");
+    
     std::ofstream f;
     f.open(filename);
     IndexType cols= adjM.getNumColumns() , rows= adjM.getNumRows();
@@ -383,6 +375,7 @@ void MeshIO<IndexType, ValueType>::writeInFileMetisFormat (const CSRSparseMatrix
         f<< std::endl;
     }
     f.close();
+    //PRINT(*comm << " Leaving writeInFileMetisFormat");
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -391,6 +384,7 @@ void MeshIO<IndexType, ValueType>::writeInFileMetisFormat (const CSRSparseMatrix
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::writeInFileCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename){
     SCAI_REGION( "MeshIO.writeInFileCoords" )
+    
     std::ofstream f;
     f.open(filename);
     IndexType i, j;
@@ -417,6 +411,9 @@ void MeshIO<IndexType, ValueType>::writeInFileCoords (const std::vector<DenseVec
 template<typename IndexType, typename ValueType>
 void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( lama::CSRSparseMatrix<ValueType> &matrix,  const std::string filename){
     SCAI_REGION( "MeshIO.readFromFile2AdjMatrix" )
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    //PRINT(*comm << " In readFromFile2AdjMatrix");
+    
     IndexType N, numEdges;         //number of nodes and edges
     std::ifstream file(filename);
     
@@ -477,6 +474,7 @@ void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( lama::CSRSparseMatr
     localMatrix.swap( csrIA, csrJA, csrValues );
     //matrix.assign( localMatrix, distribution, distribution ); // builds also halo
     matrix.assign(localMatrix);
+    //PRINT(*comm << " Leaving readFromFile2AdjMatrix");
 }
 
 

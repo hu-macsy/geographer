@@ -24,7 +24,11 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <fstream>
 #include <iterator>
+
+
+#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
 //----------------------------------------
 //  for parameter input from command line
