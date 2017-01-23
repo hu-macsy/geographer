@@ -115,45 +115,46 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		/**
 		*	create space filling curve indices.
 		*/
-                
-                SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition.sfcPart")
-                // trying the new version of getHilbertIndex
+		// trying the new version of getHilbertIndex
                 
 		scai::lama::DenseVector<ValueType> hilbertIndices(inputDist);
-                // get local part of jilbert indices
-                scai::utilskernel::LArray<ValueType>& hilbertIndicesLocal = hilbertIndices.getLocalValues();
-    
-                // get read access to the local part of the coordinates
-                // TODO: should be coordAccess[dimension] but I do now how ... maybe HArray::acquireReadAccess? (harry)
-                scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
-                scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
-                // this is faulty, if dimensions=2 coordAccess2 is equal to coordAccess1
-                scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[dimensions-1].getLocalValues() );
-                
-                ValueType point[dimensions];
-		for (IndexType i = 0; i < localN; i++) {
-                        coordAccess0.getValue(point[0], i);
-                        coordAccess1.getValue(point[1], i);
-                        // TODO change how I treat different dimensions
-                        if(dimensions == 3){
-                            coordAccess2.getValue(point[2], i);
-                        }
-                        ValueType globalHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex( point, dimensions, recursionDepth, minCoords, maxCoords);                        
-                        hilbertIndicesLocal[i] = globalHilbertIndex;
+		// get local part of hilbert indices
+		scai::utilskernel::LArray<ValueType>& hilbertIndicesLocal = hilbertIndices.getLocalValues();
+
+		{
+			SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.spaceFillingCurve")
+			// get read access to the local part of the coordinates
+			// TODO: should be coordAccess[dimension] but I do now how ... maybe HArray::acquireReadAccess? (harry)
+			scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
+			scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
+			// this is faulty, if dimensions=2 coordAccess2 is equal to coordAccess1
+			scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[dimensions-1].getLocalValues() );
+
+			ValueType point[dimensions];
+			for (IndexType i = 0; i < localN; i++) {
+				coordAccess0.getValue(point[0], i);
+				coordAccess1.getValue(point[1], i);
+				// TODO change how I treat different dimensions
+				if(dimensions == 3){
+					coordAccess2.getValue(point[2], i);
+				}
+				ValueType globalHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex( point, dimensions, recursionDepth, minCoords, maxCoords);
+				hilbertIndicesLocal[i] = globalHilbertIndex;
+			}
 		}
 		
-		SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition.sfcPart")
 		
 		/**
 		* now sort the global indices by where they are on the space-filling curve.
 		*/
-        SCAI_REGION_START( "ParcoRepart.partitionGraph.initialPartition.sorting" )
 		scai::lama::DenseVector<IndexType> permutation, inversePermutation;
-		hilbertIndices.sort(permutation, true);
-		//permutation.redistribute(inputDist);
-		DenseVector<IndexType> tmpPerm = permutation;
-		tmpPerm.sort( inversePermutation, true);
-        SCAI_REGION_END( "ParcoRepart.partitionGraph.initialPartition.sorting" )
+        {
+			SCAI_REGION( "ParcoRepart.partitionGraph.initialPartition.sorting" )
+			hilbertIndices.sort(permutation, true);
+			//permutation.redistribute(inputDist);
+			DenseVector<IndexType> tmpPerm = permutation;
+			tmpPerm.sort( inversePermutation, true);
+        }
                 
 		/**
 		 * The permutations given by DenseVector.sort are distributed by BlockDistributions.
@@ -1229,8 +1230,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			}
 
 		}
-		//std::cout << "Thread " << comm->getRank() << ", round " << i << ", finished redistribution." << std::endl;
-
 	}
 	return comm->sum(gainSum) / 2;
 }
