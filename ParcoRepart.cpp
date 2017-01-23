@@ -110,7 +110,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		* Several possibilities exist for choosing the recursion depth.
 		* Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
 		*/
-		const IndexType recursionDepth = std::log2(n);
+		const IndexType recursionDepth = std::min(std::log2(n), double(21));
 	
 		/**
 		*	create space filling curve indices.
