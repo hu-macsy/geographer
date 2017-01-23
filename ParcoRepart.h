@@ -18,7 +18,15 @@
 using namespace scai::lama;
 using scai::dmemo::Halo;
 
+#define STRINGIZER(arg)     #arg
+#define STR_VALUE(arg)      STRINGIZER(arg)
+#define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
+#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
+
+const std::string version = BUILD_COMMIT_STRING;
+
 namespace ITI {
+
 	template <typename IndexType, typename ValueType>
 	class ParcoRepart {
 		public:
@@ -45,17 +53,6 @@ namespace ITI {
 			 * @param[in] k number of blocks in partition.
 			 */
 			static ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k);
-
-			/**
-			* Returns the minimum distance between two neighbours
-			*
-			* @param[in] input Adjacency matrix of the input graph
-	 		* @param[in] coordinates Node positions. In d dimensions, coordinates of node v are at v*d ... v*d+(d-1).
-	 		* @param[in] dimensions Number of dimensions of coordinates.
-	 		*
-	 		* @return The spatial distance of the closest pair of neighbours
-			*/
-			static ValueType getMinimumNeighbourDistance(const CSRSparseMatrix<ValueType> &input, const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions);
 
 			/**
 			* Performs local refinement of a given partition
@@ -125,22 +122,22 @@ namespace ITI {
 			*/
 			static std::vector<std::vector<IndexType> > getLocalBlockGraphEdges( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
                         
-                        /** Builds the block graph of the given partition. 
-                         * Creates an HArray that is passed around in numPEs (=comm->getSize()) rounds and every time
-                         * a processor writes in the array its part.
-                         * 
-                         * Not distributed.
-                         * 
-                         * @param[in] adjM The adjacency matric of the input graph.
-                         * @param[in] part The partition of the input garph.
-                         * @param[in] k Number of blocks. 
-                         * 
-                         * @return The "adjacency matrix" of the block graph. In this version is a 1-dimensional array 
-                         * with size k*k and [i,j]= i*k+j.
-                         */
-                        static scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const int k);
-                        
-                        /** Colors the edges of the graph using max_vertex_degree + 1 colors.
+			/** Builds the block graph of the given partition.
+			 * Creates an HArray that is passed around in numPEs (=comm->getSize()) rounds and every time
+			 * a processor writes in the array its part.
+			 *
+			 * Not distributed.
+			 *
+			 * @param[in] adjM The adjacency matric of the input graph.
+			 * @param[in] part The partition of the input garph.
+			 * @param[in] k Number of blocks.
+			 *
+			 * @return The "adjacency matrix" of the block graph. In this version is a 1-dimensional array
+			 * with size k*k and [i,j]= i*k+j.
+			 */
+			static scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const int k);
+
+			/** Colors the edges of the graph using max_vertex_degree + 1 colors.
                          * 
                          * @param[in] adjM The graph with N vertices given as an NxN adjacency matrix.
                          * 
@@ -148,27 +145,34 @@ namespace ITI {
                          */
                         static std::vector< std::vector<IndexType>>  getGraphEdgeColoring_local( const CSRSparseMatrix<ValueType> &adjM, IndexType& colors);
                         
-                        /** Colors the edges of the graph using max_vertex_degree + 1 colors.
-                         * 
-                         * @param[in] edgeList The graph given as the list of edges. It must have size 2 and an edge
-                         * is (edgeList[0][i] , edgeList[1][i])
-                         * @param[out] colors The number of colors we used to color the graph.
-                         * 
-                         * @return A vector with the color for every edge. ret.size()=edgeList.size() and edge i has
-                         * color ret[i].
-                         */
-                        static std::vector<IndexType> getGraphEdgeColoring_local( const std::vector<std::vector<IndexType>> &edgeList );
-                        
+			/** Colors the edges of the graph using max_vertex_degree + 1 colors.
+			 *
+			 * @param[in] edgeList The graph given as the list of edges. It must have size 2 and an edge
+			 * is (edgeList[0][i] , edgeList[1][i])
+			 *
+			 * @return A vector with the color for every edge. ret.size()=edgeList.size() and edge i has
+			 * color ret[i].
+			 */
+			static std::vector<IndexType> getGraphEdgeColoring_local( const std::vector<std::vector<IndexType>> &edgeList );
+
                         static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( const CSRSparseMatrix<ValueType> &adjM);
+
 
 		private:
 			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &halo,
 					std::set<IndexType> &firstregion,  std::set<IndexType> &secondregion,
 					const std::set<IndexType> &firstDummyLayer, const std::set<IndexType> &secondDummyLayer,
-					std::pair<IndexType, IndexType> blockSizes,	const std::pair<IndexType, IndexType> blockCapacities, ValueType epsilon, const bool unweighted = true);
+					std::pair<IndexType, IndexType> blockSizes,	const std::pair<IndexType, IndexType> blockCapacities, const bool unweighted = true);
 
 			static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
 
+			static ValueType localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input);
+
 			static IndexType getDegreeSum(const CSRSparseMatrix<ValueType> &input, std::vector<IndexType> nodes);
+
+			static ValueType computeCutTwoWay(const CSRSparseMatrix<ValueType> &input,
+					const CSRStorage<ValueType> &haloStorage, const Halo &halo,
+					const std::set<IndexType> &firstregion,  const std::set<IndexType> &secondregion,
+					const bool ignoreWeights = true);
 	};
 }
