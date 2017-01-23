@@ -175,22 +175,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		if (!inputDist->isReplicated() && comm->getSize() == k) {
 			SCAI_REGION( "ParcoRepart.partitionGraph.initialPartition.redistribute" )
 
-//			std::vector<IndexType> subsetSizes(k, 0);
-//			for (IndexType i = 0; i < localN; i++) {
-//				IndexType partID = result.getLocalValues()[i];
-//				subsetSizes[partID] += 1;
-//			}
-//
-//			for (IndexType partID = 0; partID < k; partID++) {
-//			    subsetSizes[partID] = comm->sum(subsetSizes[partID]);
-//			}
-//
-//			assert(std::accumulate(subsetSizes.begin(), subsetSizes.end(), 0) == n);
-//			std::cout << subsetSizes[comm->getRank()] << " nodes targeted for process " << comm->getRank() << std::endl;
-//
-//		    scai::dmemo::DistributionPtr permDist( new scai::dmemo::GenBlockDistribution( n, subsetSizes, comm ) );
-//		    permutation.redistribute(permDist);
-
 		    result.redistribute(noDist);
 
 			scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(result.getLocalValues(), comm));
