@@ -747,6 +747,8 @@ void ITI::ParcoRepart<IndexType, ValueType>::redistributeFromHalo(CSRSparseMatri
 		scai::hmemo::ReadAccess<IndexType> sourceIA(localStorage.getIA());
 		scai::hmemo::WriteOnlyAccess<IndexType> wSourceSizes( sourceSizes, sourceNumRows );
 	    scai::sparsekernel::OpenMPCSRUtils::offsets2sizes( wSourceSizes.get(), sourceIA.get(), sourceNumRows );
+	    //allocate
+	    scai::hmemo::WriteOnlyAccess<IndexType> wTargetIA( targetIA, targetNumRows + 1 );
 	}
 
 	scai::hmemo::HArray<IndexType> haloSizes;
@@ -764,7 +766,7 @@ void ITI::ParcoRepart<IndexType, ValueType>::redistributeFromHalo(CSRSparseMatri
 	{
 		scai::hmemo::ReadAccess<IndexType> rSourceSizes(sourceSizes);
 		scai::hmemo::ReadAccess<IndexType> rHaloSizes(haloSizes);
-	    scai::hmemo::WriteAccess<IndexType> wTargetIA( targetIA, targetNumRows + 1 );
+	    scai::hmemo::WriteAccess<IndexType> wTargetIA( targetIA );
 
 		for (IndexType i = 0; i < targetNumRows; i++) {
 			IndexType newGlobalIndex = newDist->local2global(i);
