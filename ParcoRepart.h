@@ -153,17 +153,7 @@ namespace ITI {
 			 * color ret[i].
 			 */
 			static std::vector<IndexType> getGraphEdgeColoring_local( const std::vector<std::vector<IndexType>> &edgeList );
-                        
-                        /** Given the block graph, creates an edge coloring of the graph and retuns a communication 
-                         *  scheme based on the coloring
-                         * 
-                         * @param[in] adjM The adjacency matrix of a graph.
-                         * @return std::vector.size()= number of colors used for coloring the graph. If D is the 
-                         *  maximum number of edges for a node, then nubers of colors is D or D+1. 
-                         *  vector[i].size()= number of nodes in the graph = adjM.numRows = adjMnumCols.
-                         *  return[i][j] = k : in round i, node j talks with node k. Must also be that return[i][k] = j.
-                         *  Inactive nodes have their own rank: rank[i][j] = j.
-                         */
+
                         static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( const CSRSparseMatrix<ValueType> &adjM);
 
 
