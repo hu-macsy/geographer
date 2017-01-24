@@ -966,6 +966,15 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
     ValueType gainSum = 0;
 
+	//copy into usable data structure with iterators
+	std::vector<IndexType> myGlobalIndices(input.getRowDistributionPtr()->getLocalSize());
+	{
+		const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+		for (IndexType j = 0; j < myGlobalIndices.size(); j++) {
+			myGlobalIndices[j] = inputDist->local2global(j);
+		}
+	}
+
 	for (IndexType i = 0; i < communicationScheme.size(); i++) {
 		SCAI_REGION( "ParcoRepart.distributedFMStep.loop" )
 
@@ -981,12 +990,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[i].getLocalValues());
 		IndexType partner = commAccess[communicationScheme[i].getDistributionPtr()->global2local(comm->getRank())];
 		assert(commAccess[communicationScheme[i].getDistributionPtr()->global2local(partner)] == comm->getRank());
-
-		//copy into usable data structure with iterators
-		std::vector<IndexType> myGlobalIndices(localN);
-		for (IndexType j = 0; j < localN; j++) {
-			myGlobalIndices[j] = inputDist->local2global(j);
-		}//TODO: maybe refactor this someday to be outside the loop
 
 		{
 			scai::hmemo::ReadAccess<IndexType> partAccess(part.getLocalValues());
