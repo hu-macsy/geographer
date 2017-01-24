@@ -73,11 +73,6 @@ namespace ITI {
 			static std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
 
 			/**
-			 * Builds a halo containing all matrix entries of non-local neighbors.
-			 */
-			static scai::dmemo::Halo buildMatrixHalo(const CSRSparseMatrix<ValueType> &input);
-
-			/**
 			 * Builds a halo containing all partition entries of non-local neighbors.
 			 */
 			static scai::dmemo::Halo buildPartHalo(const CSRSparseMatrix<ValueType> &input,  const DenseVector<IndexType> &part);

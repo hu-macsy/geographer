@@ -707,29 +707,6 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::nonLocalNeighbors
 	return std::vector<IndexType>(neighborSet.begin(), neighborSet.end()) ;
 }
 
-//-----------------------------------------------------------------------------------------
-
-//return: there is an edge is the block graph between blocks ret[0]-ret[1], ret[2]-ret[3] ... ret[2i]-ret[2i+1] 
-template<typename IndexType, typename ValueType>
-scai::dmemo::Halo ITI::ParcoRepart<IndexType, ValueType>::buildMatrixHalo(
-		const CSRSparseMatrix<ValueType>& input) {
-
-	SCAI_REGION( "ParcoRepart.buildMatrixHalo" )
-
-	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
-	std::vector<IndexType> requiredHaloIndices = nonLocalNeighbors(input);
-
-	assert(requiredHaloIndices.size() <= inputDist->getGlobalSize() - inputDist->getLocalSize());
-
-	scai::dmemo::Halo mHalo;
-	{
-		scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
-		scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, mHalo );
-	}
-
-	return mHalo;
-}
-
 template<typename IndexType, typename ValueType>
 scai::dmemo::Halo ITI::ParcoRepart<IndexType, ValueType>::buildPartHalo(
 		const CSRSparseMatrix<ValueType>& input, const DenseVector<IndexType> &part) {
@@ -2006,8 +1983,6 @@ template double ParcoRepart<int, double>::replicatedMultiWayFM(const CSRSparseMa
 template std::vector<DenseVector<int>> ParcoRepart<int, double>::computeCommunicationPairings(const CSRSparseMatrix<double> &input, const DenseVector<int> &part,	const DenseVector<int> &blocksToPEs);
 
 template std::vector<int> ITI::ParcoRepart<int, double>::nonLocalNeighbors(const CSRSparseMatrix<double>& input);
-
-template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildMatrixHalo(const CSRSparseMatrix<double> &input);
 
 template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildPartHalo(const CSRSparseMatrix<double> &input,  const DenseVector<int> &part);
 
