@@ -931,7 +931,8 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     IndexType rounds = communication.size();
     for(IndexType i=0; i<rounds; i++){
         for(IndexType j=0; j<k; j++){
-            std::cout<< "round " << i<< ": block "<< j << " talks with " << communication[i](j).Scalar::getValue<IndexType>() << std::endl;
+            EXPECT_LE(communication[i](j).getValue<IndexType>() , colors);
+            EXPECT_GE(communication[i](j).getValue<IndexType>() , 0);
         }
     }
      */   
