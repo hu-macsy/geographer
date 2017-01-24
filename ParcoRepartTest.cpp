@@ -938,19 +938,21 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     IndexType colors;
     std::vector< std::vector<IndexType>>  coloring = ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local(blockGraph, colors);
     
+    /*
     for(IndexType i=0; i<coloring[0].size(); i++){
         std::cout<< "Edge ("<< coloring[0][i]<< ", "<< coloring[1][i]<< ") has color: "<< coloring[2][i] << std::endl;
     }
-   
+   */
     std::vector<DenseVector<IndexType>> communication = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
     
+    /*
     IndexType rounds = communication.size();
     for(IndexType i=0; i<rounds; i++){
         for(IndexType j=0; j<k; j++){
             std::cout<< "round " << i<< ": block "<< j << " talks with " << communication[i](j).Scalar::getValue<IndexType>() << std::endl;
         }
     }
-        
+     */   
 }
 
 //-------------------------------------------------------------------------------
@@ -1018,12 +1020,14 @@ std::string file = "Grid16x16";
         std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
         
         // print the pairs
+        /*
         for(IndexType i=0; i<commScheme.size(); i++){
             for(IndexType j=0; j<commScheme[i].size(); j++){
                 PRINT( "round :"<< i<< " , PEs talking: "<< j << " with "<< commScheme[i].getValue(j).Scalar::getValue<IndexType>());
             }
             std::cout << std::endl;
         }
+        */
     }
     
     {// case 2
@@ -1039,15 +1043,6 @@ std::string file = "Grid16x16";
         // get the communication pairs
         std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
         
-        // print the pairs
-        PRINT(commScheme.size());
-        for(IndexType i=0; i<commScheme.size(); i++){
-            PRINT(commScheme[i].size());
-            for(IndexType j=0; j<commScheme[i].size(); j++){
-                PRINT( "round :"<< i<< " , PEs talking: "<< j << " with "<< commScheme[i].getValue(j).Scalar::getValue<IndexType>() );
-            }
-            std::cout << std::endl;
-        }
     }
 }
 
