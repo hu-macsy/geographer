@@ -920,16 +920,16 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     //get getBlockGraph
     scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, partition, k);
     
-    /*
-    for(IndexType i=0; i<coloring[0].size(); i++){
-        std::cout<< "Edge ("<< coloring[0][i]<< ", "<< coloring[1][i]<< ") has color: "<< coloring[2][i] << std::endl;
-    }
-   */
+    IndexType colors;
+    std::vector< std::vector<IndexType>>  coloring = ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local(blockGraph, colors);
+    
     std::vector<DenseVector<IndexType>> communication = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
     
-    /*
-    IndexType rounds = communication.size();
-    for(IndexType i=0; i<rounds; i++){
+    // as many rounds as colors
+    EXPECT_EQ(colors, communication.size());
+    // every round k entries
+    EXPECT_EQ( k, communication[0].size());
+    for(IndexType i=0; i<communication.size(); i++){
         for(IndexType j=0; j<k; j++){
             EXPECT_LE(communication[i](j).getValue<IndexType>() , colors);
             EXPECT_GE(communication[i](j).getValue<IndexType>() , 0);

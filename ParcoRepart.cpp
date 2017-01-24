@@ -1075,7 +1075,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				requiredHaloIndices[i] = swapNodes[i];
 			}
 
-			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", swapped " << swapLength << " interface nodes with thread " << partner << std::endl;
+			std::cout << "Thread " << comm->getRank() << ", round " << i << ", swapped " << swapLength << " interface nodes with thread " << partner << std::endl;
 
 			assert(requiredHaloIndices.size() <= globalN - inputDist->getLocalSize());
 
@@ -1231,7 +1231,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			if (participating != comm->getSize()) {
 				std::cout << participating << " of " << comm->getSize() << " threads in redistribution." << std::endl;
 			}
-			std::cout << "Thread " << comm->getRank() << ", round " << i << ", " << myGlobalIndices.size() << " indices." << std::endl;
+			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", " << myGlobalIndices.size() << " indices." << std::endl;
 
 			//redistribute. This could probably be done faster by using the haloStorage already there. Maybe use joinHalo or splitHalo methods here.
 			scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
@@ -1243,6 +1243,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 					throw std::runtime_error("After redist: Node "+std::to_string(newDistribution->local2global(j))+" with block ID "+std::to_string(partAccess[j])+" found on process "+std::to_string(localBlockID)+".");
 				}
 			}
+
 		}
 		//std::cout << "Thread " << comm->getRank() << ", round " << i << ", finished redistribution." << std::endl;
 
@@ -1626,6 +1627,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const 
 
 	scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
+        //TODO possible problem with buildPartHalo(adjM, part);
 	scai::dmemo::Halo partHalo = buildPartHalo(adjM, part);
 	scai::utilskernel::LArray<IndexType> haloData;
 	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
@@ -1973,8 +1975,7 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     colors = boost::edge_coloring(G, boost::get( boost::edge_bundle, G));
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    //PRINT( *comm << ", Colored using " << colors << " colors");
-    
+    PRINT( *comm << ", Colored using " << colors << " colors");
     for (size_t i = 0; i <retG[0].size(); i++) {
         //std::cout << "  " <<  retG[0][i] << "-" << retG[1][i] << ": " << \
         G[ boost::edge( retG[0][i],  retG[1][i], G).first] << std::endl;
