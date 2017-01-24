@@ -807,7 +807,7 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_3D) {
 //------------------------------------------------------------------------------
 
 TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
-     std::string file = "Grid16x16";
+    std::string file = "Grid16x16";
     std::ifstream f(file);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;
@@ -936,6 +936,97 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
         }
     }
     
+}
+
+//-------------------------------------------------------------------------------
+
+TEST_F (ParcoRepartTest, testGetLocalCommunicationWithColoring_2D) {
+
+std::string file = "Grid16x16";
+    std::ifstream f(file);
+    IndexType dimensions= 2, k=8;
+    IndexType N, edges;
+    f >> N >> edges; 
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    // for now local refinement requires k = P
+    k = comm->getSize();
+    //
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    CSRSparseMatrix<ValueType> graph( N , N);           
+    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(graph, file );
+    //distrubute graph
+    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
+        
+
+    //read the array locally and messed the distribution. Left as a remainder.
+    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
+    EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
+    std::vector<DenseVector<ValueType>> coords(2);
+    coords[0].allocate(N);
+    coords[1].allocate(N);
+    coords[0]= static_cast<ValueType>( 0 );
+    coords[1]= static_cast<ValueType>( 0 );
+    
+    //fromFile2Coords_2D is not distributed, must redistribute
+    MeshIO<IndexType, ValueType>::fromFile2Coords_2D( std::string(file + ".xyz"), coords, N);
+    coords[0].redistribute(dist);
+    coords[1].redistribute(dist);
+    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
+    
+    //scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, k, 0.2);
+    
+    //check distributions
+    //assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
+    // the next assertion fails in "this version" (commit a2fc03ab73f3af420123c491fbf9afb84be4a0c4) because partition 
+    // redistributes the graph nodes so every block is in one PE (k=P) but does NOT redistributes the coordinates.
+    //assert( partition.getDistribution().isEqual( coords[0].getDistribution()) );
+    
+    //test getBlockGraph
+    //scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, partition, k);
+    
+    // build block array by hand
+    
+    
+    // two cases
+    
+    { // case 1
+        ValueType adjArray4[16] = { 0, 1, 0, 1,
+                                    1, 0, 1, 0,
+                                    0, 1, 0, 1,
+                                    1, 0, 1, 0
+        };
+        scai::lama::CSRSparseMatrix<ValueType> blockGraph;
+        blockGraph.setRawDenseData( 4, 4, adjArray4);
+        // get the communication pairs
+        std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
+        
+        // print the pairs
+        /*
+        for(IndexType i=0; i<commScheme.size(); i++){
+            for(IndexType j=0; j<commScheme[i].size(); j++){
+                PRINT( "round :"<< i<< " , PEs talking: "<< j << " with "<< commScheme[i].getValue(j).Scalar::getValue<IndexType>());
+            }
+            std::cout << std::endl;
+        }
+        */
+    }
+    
+    {// case 2
+        ValueType adjArray2[4] = {  0, 1, 
+                                    1, 0 };
+        scai::lama::CSRSparseMatrix<ValueType> blockGraph;
+        //TODO: aparently CSRSparseMatrix.getNumValues() counts also 0 when setting via a setRawDenseData despite
+        // the documentation claiming otherwise. use l1Norm for unweigthed graphs
+        blockGraph.setRawDenseData( 2, 2, adjArray2);
+
+        //PRINT( blockGraph.getNumRows() << ", cols= " << blockGraph.getNumColumns() << "__ " << blockGraph.getNumValues()   << " @@ " << blockGraph.l1Norm() );
+        
+        // get the communication pairs
+        std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
+        
+    }
 }
 
 /**

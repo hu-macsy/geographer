@@ -1033,7 +1033,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			if (blockSize != localN) {
 				throw std::runtime_error(std::to_string(localN) + " local nodes, but only " + std::to_string(blockSize) + " of them belong to block " + std::to_string(localBlockID) + ".");
 			}
-  
+
 			IndexType swapField[4];
 			swapField[0] = interfaceNodes.size();
 			swapField[1] = lastRoundMarker;
@@ -1141,7 +1141,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				//Oh well. None of the processors managed an improvement. No need to update data structures.
 				//std::cout << "Thread " << comm->getRank() << ", round " << i << " no gain here and at " << partner << "." << std::endl;
 
-			}	else {
+			}else {
 				SCAI_REGION( "ParcoRepart.distributedFMStep.loop.prepareRedist" )
 
 				gainThisRound = std::max(ValueType(swapField[1]), ValueType(gain));
@@ -1219,21 +1219,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				assert(newIndices.size() == myGlobalIndices.size()-deletedNodes.size()+additionalNodes.size());
 				myGlobalIndices = newIndices;
 			}
-		} /*else {
-			//std::cout << "Thread " << comm->getRank() << " is inactive in round " << i << ", performing halo exchange." << std::endl;
-
-			//dummy halo update
-			std::vector<IndexType> requiredHaloIndices;
-			scai::dmemo::Halo graphHalo;
-			{
-				scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
-				scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, graphHalo );
-			}
-
-			CSRStorage<ValueType> haloMatrix;
-			haloMatrix.exchangeHalo( graphHalo, input.getLocalStorage(), *comm );
-		}
-		*/
+		} // if (partner != comm->getRank() ) 
 		{
 			SCAI_REGION( "ParcoRepart.distributedFMStep.loop.redistribute" )
 			scai::utilskernel::LArray<IndexType> indexTransport(myGlobalIndices.size());
