@@ -124,7 +124,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		{
 			SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.spaceFillingCurve")
 			// get read access to the local part of the coordinates
-			// TODO: should be coordAccess[dimension] but I do now how ... maybe HArray::acquireReadAccess? (harry)
+			// TODO: should be coordAccess[dimension] but I don't know how ... maybe HArray::acquireReadAccess? (harry)
 			scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
 			scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
 			// this is faulty, if dimensions=2 coordAccess2 is equal to coordAccess1
@@ -175,7 +175,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 		if (!inputDist->isReplicated() && comm->getSize() == k) {
 			SCAI_REGION( "ParcoRepart.partitionGraph.initialPartition.redistribute" )
-
+			//TODO: this won't scale well.
 		    result.redistribute(noDist);
 
 			scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(result.getLocalValues(), comm));
