@@ -926,20 +926,47 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		throw std::runtime_error("Epsilon must be >= 0, not " + std::to_string(epsilon));
 	}
 
-	//std::cout << "Thread " << comm->getRank() << ", entered distributed FM." << std::endl;
-	/**
-	 * get trivial mapping for now.
-	 */
-	//create trivial mapping
-	scai::lama::DenseVector<IndexType> mapping(k, 0);
-	for (IndexType i = 0; i < k; i++) {
-		mapping.setValue(i, i);
-	}
 
-	scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( input, part, k);
+        /* test communication with coloring
+         * */
         
+        scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( input, part, k);
+        
+        //PRINT( blockGraph.getNumRows() << ", cols= " << blockGraph.getNumColumns() << "__ " << blockGraph.getNumValues()   << " @@ " << blockGraph.l1Norm() );
+        
+        /*
+        for(IndexType i=0; i<blockGraph.getNumRows(); i++){
+            for(IndexType j=0; j<blockGraph.getNumColumns(); j++){
+                std::cout<< blockGraph(i,j).Scalar::getValue<IndexType>() << " -" ;
+            }
+            std::cout << std::endl;
+        }
+        */
         std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
         
+        // print the pairs
+        /*
+        PRINT(communicationScheme.size());
+        for(IndexType i=0; i<communicationScheme.size(); i++){
+            PRINT(communicationScheme[i].size());
+            for(IndexType j=0; j<communicationScheme[i].size(); j++){
+                PRINT( *comm<< ", round :"<< i<< " , PEs talking: "<< j << " with "<< communicationScheme[i].getValue(j).Scalar::getValue<IndexType>() );
+            }
+            std::cout << std::endl;
+        }
+        
+        // print the pairs
+        for(IndexType i=0; i<communicationScheme2.size(); i++){
+            for(IndexType j=0; j<communicationScheme2[i].size(); j++){
+                PRINT( *comm<< ", round :"<< i<< " , PEs talking: "<< j << " with "<< communicationScheme2[i].getValue(j).Scalar::getValue<IndexType>() );
+            }
+            std::cout << std::endl;
+        }
+        */
+        
+        //communicationScheme = communicationScheme2;
+        
+        // =======================
 
     const Scalar maxBlockScalar = part.max();
     const IndexType maxBlockID = maxBlockScalar.getValue<IndexType>();
@@ -973,16 +1000,16 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		if (!communicationScheme[i].getDistributionPtr()->isLocal(comm->getRank())) {
 			throw std::runtime_error("Scheme value for " + std::to_string(comm->getRank()) + " must be local.");
 		}
+
 		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[i].getLocalValues());
                 //scai::hmemo::ReadAccess<IndexType> commAccess2(communicationScheme2[i].getLocalValues());
                 
                 //IndexType partner2 = commAccess2[communicationScheme2[i].getDistributionPtr()->global2local(comm->getRank())];
-        
-                //PRINT( i << " <> "<< communicationScheme.size() << " , comm->Rank= "<< comm->getRank() );
-
+                
                 IndexType partner = commAccess[ comm->getRank() ];
                 
-                // ===============
+                //std::cout<< __FILE__<< "  "<< __LINE__<< " __"<< *comm <<" , partner1= "<< partner << " , partner2= " << partner2 << std::endl;
+                
 
 		assert(commAccess[communicationScheme[i].getDistributionPtr()->global2local(partner)] == comm->getRank());
 
@@ -1017,7 +1044,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			IndexType lastRoundMarker;
 			std::tie(interfaceNodes, lastRoundMarker)= getInterfaceNodes(input, part, localBlockID, partner, magicBorderRegionDepth+1);
 
-			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", gathered interface nodes." << std::endl;
+			std::cout << "Thread " << comm->getRank() << ", round " << i << ", gathered interface nodes." << std::endl;
 
 			/**
 			 * now swap indices of nodes in border region with partner processor.
@@ -1071,7 +1098,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				requiredHaloIndices[i] = swapNodes[i];
 			}
 
-			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", swapped " << swapLength << " interface nodes with thread " << partner << std::endl;
+			std::cout << "Thread " << comm->getRank() << ", round " << i << ", swapped " << swapLength << " interface nodes with thread " << partner << std::endl;
 
 			assert(requiredHaloIndices.size() <= globalN - inputDist->getLocalSize());
 
@@ -1083,10 +1110,19 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			 */
 			IndexType numValues = input.getLocalStorage().getValues().size();
 			scai::dmemo::Halo graphHalo;
+/* newer version
 			{
 				scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
 				scai::hmemo::HArrayRef<IndexType> arrProvidedIndexes( interfaceNodes );
 				scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, arrProvidedIndexes, partner, graphHalo );
+                        }
+*/
+                        
+
+			{
+				scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );                               
+				scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, graphHalo );
+
 			}
 
 			CSRStorage<ValueType> haloMatrix;
@@ -1121,6 +1157,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			 * execute FM locally
 			 */
 			ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, firstRegion, secondRegion, firstDummyLayer, secondDummyLayer, blockSizes, maxBlockSizes, unweighted);
+
 
 			//communicate achieved gain. PE with better solution should send their secondRegion.
 			assert(unweighted); //if this assert fails, you need to change the type of swapField back to ValueType before removing it.
@@ -1242,6 +1279,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			}
 
 		}
+		//std::cout << "Thread " << comm->getRank() << ", round " << i << ", finished redistribution." << std::endl;
+
 	}
 	return comm->sum(gainSum) / 2;
 }
@@ -1970,8 +2009,7 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     colors = boost::edge_coloring(G, boost::get( boost::edge_bundle, G));
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    //PRINT( *comm << ", Colored using " << colors << " colors");
-    
+    PRINT( *comm << ", Colored using " << colors << " colors");
     for (size_t i = 0; i <retG[0].size(); i++) {
         //std::cout << "  " <<  retG[0][i] << "-" << retG[1][i] << ": " << \
         G[ boost::edge( retG[0][i],  retG[1][i], G).first] << std::endl;
