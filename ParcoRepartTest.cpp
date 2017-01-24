@@ -51,7 +51,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
   }
   
   MeshIO<IndexType, ValueType>::createStructured3DMesh(a, coordinates, maxCoord, numPoints);
-    
+  
   scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, k, epsilon);
   
   EXPECT_EQ(n, partition.size());
@@ -64,7 +64,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
 }
 
 TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
-  IndexType nroot = 4;
+  IndexType nroot = 8;
   IndexType n = nroot * nroot * nroot;
   IndexType dimensions = 3;
   
@@ -595,6 +595,8 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     coords[1].allocate(dist);
     coords[0]= static_cast<ValueType>( 0 );
     coords[1]= static_cast<ValueType>( 0 );
+    coords[0].redistribute(dist);
+    coords[1].redistribute(dist);
     MeshIO<IndexType, ValueType>::fromFile2Coords_2D( std::string(file + ".xyz"), coords, N);
     
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
@@ -918,22 +920,22 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     //get getBlockGraph
     scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, partition, k);
     
-    // test graph coloring
-    // get a CSRSparseMatrix from the HArray
+    IndexType colors;
+    std::vector< std::vector<IndexType>>  coloring = ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local(blockGraph, colors);
     
-    scai::lama::SparseAssemblyStorage<ValueType> myStorage( k, k );
-    {
-    //scai::hmemo::ReadAccess<IndexType> blockGraphRead( blockGraph );
-    for(IndexType row=0; row<k; row++){
-        for(IndexType col=row; col<k; col++){
-            //myStorage.setValue(row, col, blockGraphRead[ row*k +col]); //Matrix[i,j] = HArray[i*k +j]
-            myStorage.setValue(row, col, static_cast<ValueType>( blockGraph( row,col).Scalar::getValue<IndexType>()) ); 
+    std::vector<DenseVector<IndexType>> communication = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
+    
+    // as many rounds as colors
+    EXPECT_EQ(colors, communication.size());
+    // every round k entries
+    EXPECT_EQ( k, communication[0].size());
+    for(IndexType i=0; i<communication.size(); i++){
+        for(IndexType j=0; j<k; j++){
+            EXPECT_LE(communication[i](j).getValue<IndexType>() , colors);
+            EXPECT_GE(communication[i](j).getValue<IndexType>() , 0);
         }
     }
-    }
-    CSRSparseMatrix<ValueType> blockGraphMatrix( myStorage );
     
-    scai::lama::CSRSparseMatrix<ValueType>  dummy = ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local(blockGraphMatrix);
 }
 
 /**

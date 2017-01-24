@@ -42,6 +42,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		throw std::runtime_error("Matrix must be quadratic.");
 	}
 
+	if (!input.isConsistent()) {
+		throw std::runtime_error("Input matrix inconsistent");
+	}
+
 	if (k > n) {
 		throw std::runtime_error("Creating " + std::to_string(k) + " blocks from " + std::to_string(n) + " elements is impossible.");
 	}
@@ -99,6 +103,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			minCoords[dim] = comm->min(minCoords[dim]);
 			maxCoords[dim] = comm->max(maxCoords[dim]);
 		}
+	
 
 		ValueType maxExtent = 0;
 		for (IndexType dim = 0; dim < dimensions; dim++) {
@@ -1021,16 +1026,13 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 	}
 
 	//std::cout << "Thread " << comm->getRank() << ", entered distributed FM." << std::endl;
-	/**
-	 * get trivial mapping for now.
-	 */
-	//create trivial mapping
-	scai::lama::DenseVector<IndexType> mapping(k, 0);
-	for (IndexType i = 0; i < k; i++) {
-		mapping.setValue(i, i);
-	}
 
-	std::vector<DenseVector<IndexType >> communicationScheme = computeCommunicationPairings(input, part, mapping);
+        /* test communication with coloring. get the block graph and then the communication pairs for all the rounds
+         * */
+        scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( input, part, k);
+        
+        std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
+        
 
     const Scalar maxBlockScalar = part.max();
     const IndexType maxBlockID = maxBlockScalar.getValue<IndexType>();
@@ -1073,6 +1075,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		if (!communicationScheme[i].getDistributionPtr()->isLocal(comm->getRank())) {
 			throw std::runtime_error("Scheme value for " + std::to_string(comm->getRank()) + " must be local.");
 		}
+		
 		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[i].getLocalValues());
 		IndexType partner = commAccess[communicationScheme[i].getDistributionPtr()->global2local(comm->getRank())];
 		assert(commAccess[communicationScheme[i].getDistributionPtr()->global2local(partner)] == comm->getRank());
@@ -1081,7 +1084,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			scai::hmemo::ReadAccess<IndexType> partAccess(part.getLocalValues());
 			for (IndexType j = 0; j < localN; j++) {
 				if (partAccess[j] != localBlockID) {
-					throw std::runtime_error("Node "+std::to_string(partDist->local2global(j))+" with block ID "+std::to_string(partAccess[j])+" found on process "+std::to_string(localBlockID)+".");
+					throw std::runtime_error("Block ID "+std::to_string(partAccess[j])+" found on process "+std::to_string(localBlockID)+".");
 				}
 			}
 		}
@@ -1102,6 +1105,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			IndexType lastRoundMarker;
 			std::tie(interfaceNodes, lastRoundMarker)= getInterfaceNodes(input, part, localBlockID, partner, magicBorderRegionDepth+1);
 
+			std::cout << "Thread " << comm->getRank() << ", round " << i << ", gathered interface nodes." << std::endl;
+
 			/**
 			 * now swap indices of nodes in border region with partner processor.
 			 * For this, first find out the length of the swap array.
@@ -1112,7 +1117,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			if (blockSize != localN) {
 				throw std::runtime_error(std::to_string(localN) + " local nodes, but only " + std::to_string(blockSize) + " of them belong to block " + std::to_string(localBlockID) + ".");
 			}
-
+  
 			IndexType swapField[4];
 			swapField[0] = interfaceNodes.size();
 			swapField[1] = lastRoundMarker;
@@ -1143,7 +1148,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 					swapNodes[i] = -1;
 				}
 			}
-
+ 
 			comm->swap(swapNodes, swapLength, partner);
 
 			//the number of interface nodes was stored in swapField[0] and then swapped.
@@ -1154,7 +1159,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				requiredHaloIndices[i] = swapNodes[i];
 			}
 
-			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", swapped " << swapLength << " interface nodes with thread " << partner << std::endl;
+			std::cout << "Thread " << comm->getRank() << ", round " << i << ", swapped " << swapLength << " interface nodes with thread " << partner << std::endl;
 
 			assert(requiredHaloIndices.size() <= globalN - inputDist->getLocalSize());
 
@@ -1200,6 +1205,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			 * execute FM locally
 			 */
 			ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, firstRegion, secondRegion, firstDummyLayer, secondDummyLayer, blockSizes, maxBlockSizes, unweighted);
+
 
 			//communicate achieved gain. PE with better solution should send their secondRegion.
 			assert(unweighted); //if this assert fails, you need to change the type of swapField back to ValueType before removing it.
@@ -1296,6 +1302,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				myGlobalIndices = newIndices;
 			}
 		}
+
 		{
 			SCAI_REGION( "ParcoRepart.distributedFMStep.loop.redistribute" )
 			{
@@ -1697,6 +1704,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const 
 
 	scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
+        //TODO possible problem with buildPartHalo(adjM, part);
 	scai::dmemo::Halo partHalo = buildPartHalo(adjM, part);
 	scai::utilskernel::LArray<IndexType> haloData;
 	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
@@ -2014,8 +2022,7 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getBlo
 //-----------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local( const CSRSparseMatrix<ValueType> &adjM) {
-    SCAI_REGION("ParcoRepart.getGraphEdgeColoring_local");
+std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local( const CSRSparseMatrix<ValueType> &adjM, IndexType &colors) {
     using namespace boost;
     IndexType N= adjM.getNumRows();
     assert( N== adjM.getNumColumns() ); // numRows = numColumns
@@ -2023,29 +2030,36 @@ CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getGraphEdgeColori
     // use boost::Graph and boost::edge_coloring()
     typedef adjacency_list<vecS, vecS, undirectedS, no_property, size_t, no_property> Graph;
     typedef std::pair<std::size_t, std::size_t> Pair;
-    std::vector<std::vector<IndexType>> edges(2);
+    //std::vector<std::vector<IndexType>> edges(2);
     Graph G(N);
     
+    // retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge
+    std::vector< std::vector<IndexType>> retG(3);
+    
+    // create graph G by the input adjacency matrix
+    // TODO: get ia and ja values, do not do adjM(i,j) !!!
     for(IndexType i=0; i<N; i++){
         for(IndexType j=0; j<N; j++){
             if(adjM(i, j)== 1){ // there is an edge between nodes i and j. add the edge to G
                 boost::add_edge(i, j, G).first;
-                edges[0].push_back(i);  
-                edges[1].push_back(j);
+                retG[0].push_back(i);  
+                retG[1].push_back(j);
+                //PRINT("adding edge ("<< i <<", "<< j<<")");
             }
         }
     }
     
-    size_t colors = boost::edge_coloring(G, boost::get( boost::edge_bundle, G));
+    colors = boost::edge_coloring(G, boost::get( boost::edge_bundle, G));
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    std::cout << *comm << ", Colored using " << colors << " colors" << std::endl;
-    for (size_t i = 0; i <edges[0].size(); i++) {
-        std::cout << "  " <<  edges[0][i] << "-" << edges[1][i] << ": " << \
-        G[ boost::edge( edges[0][i],  edges[1][i], G).first] << std::endl;
+    PRINT( *comm << ", Colored using " << colors << " colors");
+    for (size_t i = 0; i <retG[0].size(); i++) {
+        //std::cout << "  " <<  retG[0][i] << "-" << retG[1][i] << ": " << \
+        G[ boost::edge( retG[0][i],  retG[1][i], G).first] << std::endl;
+        retG[2].push_back( G[ boost::edge( retG[0][i],  retG[1][i], G).first] );
     }
-    CSRSparseMatrix<ValueType> ret;
-    return ret;
+    
+    return retG;
 }
 
 //---------------------------------------------------------------------------------------
@@ -2062,13 +2076,18 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_l
     typedef std::pair<std::size_t, std::size_t> Pair;
     Graph G(N);
     
+    // create the graph from the input edge list
+    for(IndexType i=0; i<N; i++){
+        boost::add_edge(edgeList[0][i], edgeList[1][i], G).first;
+    }
+    
     size_t colors = boost::edge_coloring(G, boost::get( boost::edge_bundle, G));
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     std::vector<IndexType> ret;
-    std::cout << *comm << ", Colored using " << colors << " colors" << std::endl;
+    PRINT( *comm << ", Colored using " << colors << " colors");
     for (size_t i = 0; i <edgeList[0].size(); i++) {
-        std::cout << "  " <<  edgeList[0][i] << "-" << edgeList[1][i] << ": " << \
+        //std::cout << "  " <<  edgeList[0][i] << "-" << edgeList[1][i] << ": " << \
         G[ boost::edge( edgeList[0][i],  edgeList[1][i], G).first] << std::endl;
         ret.push_back( G[ boost::edge( edgeList[0][i],  edgeList[1][i], G).first] );
     }
@@ -2077,6 +2096,62 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_l
 }
 
 //---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( const CSRSparseMatrix<ValueType> &adjM) {
+    IndexType N= adjM.getNumRows();
+    SCAI_REGION("ParcoRepart.getCommunicationPairs_local");
+    // coloring.size()=3: coloring(i,j,c) means that edge with endpoints i and j is colored with color c.
+    // and coloring[i].size()= number of edges in input graph
+
+    assert(adjM.getNumColumns() == adjM.getNumRows() );
+    // TODO: coloring seems problematic when adjM has 2 nodes and only one edge
+    // handle individually
+    if(adjM.getNumRows()==2){           // graph has 2 nodes
+        std::vector<DenseVector<IndexType>> retG(1);
+        //TODO: betNumVlaues returns number of non-zero elements plus adjM.numRows() (?!?!)
+        // use l1Norm but does not considers weighted edges
+        //TODO: aparently CSRSparseMatrix.getNumValues() counts also 0 when setting via a setRawDenseData despite
+        // the documentation claiming otherwise
+        if(adjM.l1Norm()==2){     // and one edge
+            retG[0].allocate(2);
+            retG[0].setValue(0,1);
+            retG[0].setValue(1,0);
+        }
+        return retG;
+    }
+    IndexType colors;
+    std::vector<std::vector<IndexType>> coloring = getGraphEdgeColoring_local( adjM, colors );
+    std::vector<DenseVector<IndexType>> retG(colors);
+    
+    // retG.size()= number of colors used in graph edge coloring
+    // retG[i].size()= N , all nodes not communicating have -1
+    
+    for(IndexType i=0; i<colors; i++){        
+        retG[i].allocate(N);
+        // retG[i] = static_cast<IndexType> ( -1 );    // set value -1 for blocks NOT communicating
+        // TODO: although not distributed maybe try to avoid setValue
+        // initialize so retG[i][j]=j instead of -1
+        for( IndexType j=0; j<N; j++){
+            retG[i].setValue( j, j );                               
+        }
+    }
+    
+    // for all the edges:
+    // coloring[0][i] = the first block , coloring[1][i] = the second block,
+    // coloring[2][i]= the color/round in which the two blocks shall communicate
+    for(IndexType i=0; i<coloring[0].size(); i++){
+        IndexType color = coloring[2][i]; // the color/round of this edge
+        assert(color<colors);
+        IndexType firstBlock = coloring[0][i];
+        IndexType secondBlock = coloring[1][i];
+        retG[color].setValue( firstBlock, secondBlock);
+    }
+    
+    return retG;
+}
+//---------------------------------------------------------------------------------------
+
 
 //to force instantiation
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, int k,  double epsilon);
@@ -2103,8 +2178,9 @@ template std::vector<std::vector<IndexType>> ParcoRepart<int, double>::getLocalB
 
 template scai::lama::CSRSparseMatrix<double> ParcoRepart<int, double>::getBlockGraph( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part, const int k );
 
-template scai::lama::CSRSparseMatrix<double>   ParcoRepart<int, double>::getGraphEdgeColoring_local( const CSRSparseMatrix<double> &adjM);
+template std::vector< std::vector<int>>  ParcoRepart<int, double>::getGraphEdgeColoring_local( const CSRSparseMatrix<double> &adjM, int& colors);
 
 template std::vector<IndexType> ParcoRepart<int, double>::getGraphEdgeColoring_local( const std::vector<std::vector<IndexType>> &edgeList );
 
+template std::vector<DenseVector<int>> ParcoRepart<int, double>::getCommunicationPairs_local( const CSRSparseMatrix<double> &adjM);
 }
