@@ -2061,7 +2061,8 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     colors = boost::edge_coloring(G, boost::get( boost::edge_bundle, G));
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    PRINT( *comm << ", Colored using " << colors << " colors");
+
+    //PRINT( *comm << ", Colored using " << colors << " colors");
     for (size_t i = 0; i <retG[0].size(); i++) {
         //std::cout << "  " <<  retG[0][i] << "-" << retG[1][i] << ": " << \
         G[ boost::edge( retG[0][i],  retG[1][i], G).first] << std::endl;
