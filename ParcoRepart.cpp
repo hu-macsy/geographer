@@ -1967,7 +1967,7 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
                 boost::add_edge(i, j, G).first;
                 retG[0].push_back(i);  
                 retG[1].push_back(j);
-                //PRINT("adding edge ("<< i <<", "<< j<<")");
+                PRINT("adding edge ("<< i <<", "<< j<<")");
             }
         }
     }
@@ -1977,7 +1977,7 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     PRINT( *comm << ", Colored using " << colors << " colors");
     for (size_t i = 0; i <retG[0].size(); i++) {
-        //std::cout << "  " <<  retG[0][i] << "-" << retG[1][i] << ": " << \
+        std::cout << "  " <<  retG[0][i] << "-" << retG[1][i] << ": " << \
         G[ boost::edge( retG[0][i],  retG[1][i], G).first] << std::endl;
         retG[2].push_back( G[ boost::edge( retG[0][i],  retG[1][i], G).first] );
     }
@@ -2032,7 +2032,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
     // handle individually
     if(adjM.getNumRows()==2){           // graph has 2 nodes
         std::vector<DenseVector<IndexType>> retG(1);
-        //TODO: betNumVlaues returns number of non-zero elements plus adjM.numRows() (?!?!)
+        //TODO: setNumVlaues returns number of non-zero elements plus adjM.numRows() (?!?!)
         // use l1Norm but does not considers weighted edges
         //TODO: aparently CSRSparseMatrix.getNumValues() counts also 0 when setting via a setRawDenseData despite
         // the documentation claiming otherwise
@@ -2043,10 +2043,11 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
         }
         return retG;
     }
+PRINT(N);      
     IndexType colors;
     std::vector<std::vector<IndexType>> coloring = getGraphEdgeColoring_local( adjM, colors );
     std::vector<DenseVector<IndexType>> retG(colors);
-    
+PRINT("colors= "<< colors);     
     // retG.size()= number of colors used in graph edge coloring
     // retG[i].size()= N , all nodes not communicating have -1
     
@@ -2056,10 +2057,11 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
         // TODO: although not distributed maybe try to avoid setValue
         // initialize so retG[i][j]=j instead of -1
         for( IndexType j=0; j<N; j++){
+PRINT(i << " - "<< j);
             retG[i].setValue( j, j );                               
         }
     }
-    
+PRINT("");      
     // for all the edges:
     // coloring[0][i] = the first block , coloring[1][i] = the second block,
     // coloring[2][i]= the color/round in which the two blocks shall communicate
@@ -2069,6 +2071,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
         IndexType firstBlock = coloring[0][i];
         IndexType secondBlock = coloring[1][i];
         retG[color].setValue( firstBlock, secondBlock);
+        //retG[color].setValue( secondBlock, firstBlock );
     }
     
     return retG;

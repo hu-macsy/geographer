@@ -935,7 +935,7 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
             EXPECT_GE(communication[i](j).getValue<IndexType>() , 0);
         }
     }
-     */   
+     
 }
 
 //-------------------------------------------------------------------------------
@@ -992,6 +992,33 @@ std::string file = "Grid16x16";
     // two cases
     
     { // case 1
+        ValueType adjArray[36] = {  0, 1, 0, 1, 0, 1,
+                                    1, 0, 1, 0, 1, 0,
+                                    0, 1, 0, 1, 1, 0,
+                                    1, 0, 1, 0, 0, 1,
+                                    0, 1, 1, 0, 0, 1,
+                                    1, 0, 0, 1, 1, 0
+        };
+        PRINT(*comm);        
+        scai::lama::CSRSparseMatrix<ValueType> blockGraph;
+        blockGraph.setRawDenseData( 6, 6, adjArray);
+        // get the communication pairs
+        PRINT(*comm);
+        std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
+        
+        // print the pairs
+        
+        for(IndexType i=0; i<commScheme.size(); i++){
+            for(IndexType j=0; j<commScheme[i].size(); j++){
+                PRINT( "round :"<< i<< " , PEs talking: "<< j << " with "<< commScheme[i].getValue(j).Scalar::getValue<IndexType>());
+            }
+            std::cout << std::endl;
+        }
+        
+    }
+    
+    
+    { // case 1
         ValueType adjArray4[16] = { 0, 1, 0, 1,
                                     1, 0, 1, 0,
                                     0, 1, 0, 1,
@@ -1003,14 +1030,14 @@ std::string file = "Grid16x16";
         std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
         
         // print the pairs
-        /*
+        
         for(IndexType i=0; i<commScheme.size(); i++){
             for(IndexType j=0; j<commScheme[i].size(); j++){
                 PRINT( "round :"<< i<< " , PEs talking: "<< j << " with "<< commScheme[i].getValue(j).Scalar::getValue<IndexType>());
             }
             std::cout << std::endl;
         }
-        */
+        
     }
     
     {// case 2
