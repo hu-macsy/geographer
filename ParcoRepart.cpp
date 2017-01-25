@@ -1962,12 +1962,12 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     // create graph G by the input adjacency matrix
     // TODO: get ia and ja values, do not do adjM(i,j) !!!
     for(IndexType i=0; i<N; i++){
-        for(IndexType j=0; j<N; j++){
+        for(IndexType j=i; j<N; j++){
             if(adjM(i, j)== 1){ // there is an edge between nodes i and j. add the edge to G
                 boost::add_edge(i, j, G).first;
                 retG[0].push_back(i);  
                 retG[1].push_back(j);
-                PRINT("adding edge ("<< i <<", "<< j<<")");
+                //PRINT("adding edge ("<< i <<", "<< j<<")");
             }
         }
     }
@@ -1977,7 +1977,7 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     PRINT( *comm << ", Colored using " << colors << " colors");
     for (size_t i = 0; i <retG[0].size(); i++) {
-        std::cout << "  " <<  retG[0][i] << "-" << retG[1][i] << ": " << \
+    //    std::cout << "  " <<  retG[0][i] << "-" << retG[1][i] << ": " << \
         G[ boost::edge( retG[0][i],  retG[1][i], G).first] << std::endl;
         retG[2].push_back( G[ boost::edge( retG[0][i],  retG[1][i], G).first] );
     }
@@ -2043,11 +2043,11 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
         }
         return retG;
     }
-PRINT(N);      
+
     IndexType colors;
     std::vector<std::vector<IndexType>> coloring = getGraphEdgeColoring_local( adjM, colors );
     std::vector<DenseVector<IndexType>> retG(colors);
-PRINT("colors= "<< colors);     
+
     // retG.size()= number of colors used in graph edge coloring
     // retG[i].size()= N , all nodes not communicating have -1
     
@@ -2057,11 +2057,10 @@ PRINT("colors= "<< colors);
         // TODO: although not distributed maybe try to avoid setValue
         // initialize so retG[i][j]=j instead of -1
         for( IndexType j=0; j<N; j++){
-PRINT(i << " - "<< j);
             retG[i].setValue( j, j );                               
         }
     }
-PRINT("");      
+     
     // for all the edges:
     // coloring[0][i] = the first block , coloring[1][i] = the second block,
     // coloring[2][i]= the color/round in which the two blocks shall communicate
@@ -2071,7 +2070,7 @@ PRINT("");
         IndexType firstBlock = coloring[0][i];
         IndexType secondBlock = coloring[1][i];
         retG[color].setValue( firstBlock, secondBlock);
-        //retG[color].setValue( secondBlock, firstBlock );
+        retG[color].setValue( secondBlock, firstBlock );
     }
     
     return retG;
