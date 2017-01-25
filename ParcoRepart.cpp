@@ -1082,7 +1082,11 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		IndexType partner = commAccess[commDist->global2local(comm->getRank())];
 		assert(partner < comm->getSize());
 		if (commDist->isLocal(partner)) {
-			assert(commAccess[commDist->global2local(partner)] == comm->getRank());
+			IndexType partnerOfPartner = commAccess[commDist->global2local(partner)];
+			if (partnerOfPartner != comm->getRank()) {
+				throw std::runtime_error("Process " + std::to_string(comm->getRank()) + ": Partner " + std::to_string(partner) + " has partner "
+						+ std::to_string(partnerOfPartner) + ". Expected pairings to be monogamous. Abort.");
+			}
 		}
 
 		/**
