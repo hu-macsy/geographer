@@ -900,18 +900,15 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 	std::vector<IndexType> interfaceNodes;
 	std::vector<IndexType> nodesWithNonLocalNeighbors;
 
-	for (IndexType localI = 0; localI < localN; localI++) {
-		if (partAccess[localI] == thisBlock) {
-			const IndexType globalI = inputDist->local2global(localI);
-			for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
-				IndexType neighbor = ja[j];
-				IndexType neighborBlock;
-				if (partDist->isLocal(neighbor)) {
-					if (partAccess[partDist->global2local(neighbor)] == otherBlock) {
-						interfaceNodes.push_back(globalI);
-						break;
-					}
-				} else {
+	{
+		SCAI_REGION( "ParcoRepart.getInterfaceNodes.getLocalBorder" )
+		for (IndexType localI = 0; localI < localN; localI++) {
+			const IndexType beginCols = ia[localI];
+			const IndexType endCols = ia[localI+1];
+
+			for (IndexType j = beginCols; j < endCols; j++) {
+				if (!inputDist->isLocal(ja[j])) {
+					IndexType globalI = inputDist->local2global(localI);
 					nodesWithNonLocalNeighbors.push_back(globalI);
 					break;
 				}
@@ -944,6 +941,7 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 	}
 
 	for (IndexType node : nodesWithNonLocalNeighbors) {
+		SCAI_REGION( "ParcoRepart.getInterfaceNodes.getBorderToPartner" )
 		IndexType localI = inputDist->global2local(node);
 		for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
 			if (foreignNodes.count(ja[j])> 0) {
@@ -960,6 +958,7 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 	 * now gather buffer zone with breadth-first search
 	 */
 	if (depth > 1) {
+		SCAI_REGION( "ParcoRepart.getInterfaceNodes.breadthFirstSearch" )
 		std::vector<bool> touched(localN, false);
 
 		std::queue<IndexType> bfsQueue;
