@@ -735,6 +735,8 @@ void ITI::ParcoRepart<IndexType, ValueType>::redistributeFromHalo(CSRSparseMatri
 
 	const CSRStorage<ValueType>& localStorage = matrix.getLocalStorage();
 
+	matrix.setDistributionPtr(newDist);
+
 	//check for equality
 	if (sourceNumRows == targetNumRows) {
 		bool allLocal = true;
@@ -817,7 +819,6 @@ void ITI::ParcoRepart<IndexType, ValueType>::redistributeFromHalo(CSRSparseMatri
 	scai::dmemo::Redistributor::copyV( targetValues, targetIA, LArray<IndexType>(additionalLocalNodes.size(), additionalLocalNodes.data()), haloStorage.getValues(), haloStorage.getIA(), LArray<IndexType>(numHaloIndices, localHaloIndices.data()) );
 
 	//setting CSR data
-	matrix.setDistributionPtr(newDist);
 	matrix.getLocalStorage().setCSRData(targetNumRows, globalN, numValues, targetIA, targetJA, targetValues);
 }
 
@@ -1068,6 +1069,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 		const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 		const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
+		const scai::dmemo::DistributionPtr commDist = communicationScheme[i].getDistributionPtr();
 
 		const IndexType localN = inputDist->getLocalSize();
 		assert(comm->sum(localN) == globalN);
@@ -1077,9 +1079,15 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		}
 		
 		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[i].getLocalValues());
-		IndexType partner = commAccess[communicationScheme[i].getDistributionPtr()->global2local(comm->getRank())];
-		assert(commAccess[communicationScheme[i].getDistributionPtr()->global2local(partner)] == comm->getRank());
+		IndexType partner = commAccess[commDist->global2local(comm->getRank())];
+		assert(partner < comm->getSize());
+		if (commDist->isLocal(partner)) {
+			assert(commAccess[commDist->global2local(partner)] == comm->getRank());
+		}
 
+		/**
+		 * check for validity of partition
+		 */
 		{
 			scai::hmemo::ReadAccess<IndexType> partAccess(part.getLocalValues());
 			for (IndexType j = 0; j < localN; j++) {
@@ -1324,6 +1332,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				part = DenseVector<IndexType>(newDistribution, localBlockID);
 			}
 		}
+		assert(input.getRowDistributionPtr()->isEqual(*part.getDistributionPtr()));
 	}
 	return comm->sum(gainSum) / 2;
 }
