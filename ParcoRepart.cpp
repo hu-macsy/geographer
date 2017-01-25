@@ -2052,7 +2052,7 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     // create graph G by the input adjacency matrix
     // TODO: get ia and ja values, do not do adjM(i,j) !!!
     for(IndexType i=0; i<N; i++){
-        for(IndexType j=0; j<N; j++){
+        for(IndexType j=0; j<i; j++){
             if(adjM(i, j)== 1){ // there is an edge between nodes i and j. add the edge to G
                 boost::add_edge(i, j, G).first;
                 retG[0].push_back(i);  
@@ -2122,7 +2122,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
     // handle individually
     if(adjM.getNumRows()==2){           // graph has 2 nodes
         std::vector<DenseVector<IndexType>> retG(1);
-        //TODO: betNumVlaues returns number of non-zero elements plus adjM.numRows() (?!?!)
+        //TODO: setNumVlaues returns number of non-zero elements plus adjM.numRows() (?!?!)
         // use l1Norm but does not considers weighted edges
         //TODO: aparently CSRSparseMatrix.getNumValues() counts also 0 when setting via a setRawDenseData despite
         // the documentation claiming otherwise
@@ -2159,8 +2159,9 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
         IndexType firstBlock = coloring[0][i];
         IndexType secondBlock = coloring[1][i];
         retG[color].setValue( firstBlock, secondBlock);
+        retG[color].setValue( secondBlock, firstBlock );
     }
-    
+
     return retG;
 }
 //---------------------------------------------------------------------------------------
