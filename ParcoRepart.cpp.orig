@@ -8,6 +8,7 @@
 #include <scai/dmemo/HaloBuilder.hpp>
 #include <scai/dmemo/Distribution.hpp>
 #include <scai/dmemo/GenBlockDistribution.hpp>
+#include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 #include <scai/tracing.hpp>
 
 #include <assert.h>
@@ -94,7 +95,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				if (coord > maxCoords[dim]) maxCoords[dim] = coord;
 			}
 		}
-	}
 
 		/**
 		 * communicate to get global min / max
@@ -149,10 +149,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			}
 		}
 		
-		
 		/**
 		* now sort the global indices by where they are on the space-filling curve.
 		*/
+    
 		scai::lama::DenseVector<IndexType> permutation, inversePermutation;
         {
 			SCAI_REGION( "ParcoRepart.partitionGraph.initialPartition.sorting" )
@@ -886,7 +886,7 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 
 	scai::hmemo::HArray<IndexType> localData = part.getLocalValues();
 	scai::hmemo::ReadAccess<IndexType> partAccess(localData);
-	
+
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
@@ -920,7 +920,12 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 	 * send nodes with non-local neighbors to partner process.
 	 * here we assume a 1-to-1-mapping of blocks to processes and a symmetric matrix
 	 */
+<<<<<<< HEAD
+	
+std::unordered_set<IndexType> foreignNodes;
+=======
 	std::unordered_set<IndexType> foreignNodes;
+>>>>>>> master
 	{
 		SCAI_REGION( "ParcoRepart.getInterfaceNodes.communication" )
 		IndexType swapField[1];
@@ -950,6 +955,10 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 		}
 	}
 
+<<<<<<< HEAD
+
+=======
+>>>>>>> master
 	assert(interfaceNodes.size() <= localN);
 
 	IndexType lastRoundMarker = 0;
@@ -1082,6 +1091,18 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		}
 		
 		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[i].getLocalValues());
+<<<<<<< HEAD
+                
+                IndexType partner = commAccess[ comm->getRank() ];
+                
+		assert(commAccess[communicationScheme[i].getDistributionPtr()->global2local(partner)] == comm->getRank());
+
+		//copy into usable data structure with iterators
+		std::vector<IndexType> myGlobalIndices(localN);
+		for (IndexType j = 0; j < localN; j++) {
+			myGlobalIndices[j] = inputDist->local2global(j);
+		}//TODO: maybe refactor this someday to be outside the loop
+=======
 		IndexType partner = commAccess[commDist->global2local(comm->getRank())];
 		assert(partner < comm->getSize());
 		if (commDist->isLocal(partner)) {
@@ -1091,6 +1112,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 						+ std::to_string(partnerOfPartner) + ". Expected pairings to be monogamous. Abort.");
 			}
 		}
+>>>>>>> master
 
 		/**
 		 * check for validity of partition
@@ -1105,6 +1127,12 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		}
 
 		ValueType gainThisRound = 0;
+<<<<<<< HEAD
+                 
+		if (partner != comm->getRank() ) {
+			//processor is active this round
+=======
+>>>>>>> master
 
 		scai::dmemo::Halo graphHalo;
 		CSRStorage<ValueType> haloMatrix;
@@ -1132,7 +1160,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			if (blockSize != localN) {
 				throw std::runtime_error(std::to_string(localN) + " local nodes, but only " + std::to_string(blockSize) + " of them belong to block " + std::to_string(localBlockID) + ".");
 			}
-
+  
 			IndexType swapField[4];
 			swapField[0] = interfaceNodes.size();
 			swapField[1] = lastRoundMarker;
@@ -1163,7 +1191,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 					swapNodes[i] = -1;
 				}
 			}
-
+ 
 			comm->swap(swapNodes, swapLength, partner);
 
 			//the number of interface nodes was stored in swapField[0] and then swapped.
@@ -1174,7 +1202,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				requiredHaloIndices[i] = swapNodes[i];
 			}
 
-			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", swapped " << swapLength << " interface nodes with thread " << partner << std::endl;
+			std::cout << "Thread " << comm->getRank() << ", round " << i << ", swapped " << swapLength << " interface nodes with thread " << partner << std::endl;
 
 			assert(requiredHaloIndices.size() <= globalN - inputDist->getLocalSize());
 
@@ -1221,6 +1249,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			 */
 			ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, firstRegion, secondRegion, firstDummyLayer, secondDummyLayer, blockSizes, maxBlockSizes, unweighted);
 
+
 			//communicate achieved gain. PE with better solution should send their secondRegion.
 			assert(unweighted); //if this assert fails, you need to change the type of swapField back to ValueType before removing it.
 			swapField[0] = secondRegion.size();
@@ -1237,7 +1266,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				//Oh well. None of the processors managed an improvement. No need to update data structures.
 				//std::cout << "Thread " << comm->getRank() << ", round " << i << " no gain here and at " << partner << "." << std::endl;
 
-			}	else {
+			}else {
 				SCAI_REGION( "ParcoRepart.distributedFMStep.loop.prepareRedist" )
 
 				gainThisRound = std::max(ValueType(swapField[1]), ValueType(gain));
@@ -1315,8 +1344,12 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				assert(newIndices.size() == myGlobalIndices.size()-deletedNodes.size()+additionalNodes.size());
 				myGlobalIndices = newIndices;
 			}
+<<<<<<< HEAD
+		} // if (partner != comm->getRank() ) 
+=======
 		}
 
+>>>>>>> master
 		{
 			SCAI_REGION( "ParcoRepart.distributedFMStep.loop.redistribute" )
 			{
@@ -1338,7 +1371,12 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				part = DenseVector<IndexType>(newDistribution, localBlockID);
 			}
 		}
+<<<<<<< HEAD
+		//std::cout << "Thread " << comm->getRank() << ", round " << i << ", finished redistribution." << std::endl;
+
+=======
 		assert(input.getRowDistributionPtr()->isEqual(*part.getDistributionPtr()));
+>>>>>>> master
 	}
 	return comm->sum(gainSum) / 2;
 }
@@ -1435,7 +1473,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 					+ std::to_string(outDegree[i]) + " outgoing local edges.");
 		}
 	}
-
 
 	auto computeGain = [&](IndexType globalID){
 		SCAI_REGION( "ParcoRepart.computeGain" )
@@ -1720,6 +1757,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const 
 
 	scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
+        //TODO possible problem with buildPartHalo(adjM, part);
 	scai::dmemo::Halo partHalo = buildPartHalo(adjM, part);
 	scai::utilskernel::LArray<IndexType> haloData;
 	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
@@ -2069,7 +2107,7 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     PRINT( *comm << ", Colored using " << colors << " colors");
     for (size_t i = 0; i <retG[0].size(); i++) {
-        //std::cout << "  " <<  retG[0][i] << "-" << retG[1][i] << ": " << \
+    //    std::cout << "  " <<  retG[0][i] << "-" << retG[1][i] << ": " << \
         G[ boost::edge( retG[0][i],  retG[1][i], G).first] << std::endl;
         retG[2].push_back( G[ boost::edge( retG[0][i],  retG[1][i], G).first] );
     }
@@ -2139,7 +2177,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
     IndexType colors;
     std::vector<std::vector<IndexType>> coloring = getGraphEdgeColoring_local( adjM, colors );
     std::vector<DenseVector<IndexType>> retG(colors);
-    
+
     // retG.size()= number of colors used in graph edge coloring
     // retG[i].size()= N , all nodes not communicating have -1
     
@@ -2152,7 +2190,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
             retG[i].setValue( j, j );                               
         }
     }
-    
+     
     // for all the edges:
     // coloring[0][i] = the first block , coloring[1][i] = the second block,
     // coloring[2][i]= the color/round in which the two blocks shall communicate
