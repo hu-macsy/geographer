@@ -628,7 +628,14 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
             partViz[i][j]=partition.getValue(i*numX+j).getValue<IndexType>();
             bordViz[i][j]=border.getValue(i*numX+j).getValue<IndexType>();
         }
-            
+    
+      //test getBlockGraph
+    scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, partition, k);
+    EXPECT_TRUE(blockGraph.checkSymmetry() );
+    
+    
+    
+if(comm->getRank()==0 ){            
     std::cout<<"----------------------------"<< " Partition  "<< *comm << std::endl;    
     for(int i=0; i<numX; i++){
         for(int j=0; j<numY; j++){
@@ -640,6 +647,19 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
         std::cout<< std::endl;
     }
     
+    // print
+    //scai::hmemo::ReadAccess<IndexType> blockGraphRead( blockGraph );
+    std::cout<< *comm <<" , Block Graph"<< std::endl;
+    for(IndexType row=0; row<k; row++){
+        std::cout<< row << "|\t";
+        for(IndexType col=0; col<k; col++){
+            std::cout << col<< ": " << blockGraph( row,col).Scalar::getValue<ValueType>() <<" - ";
+        }
+        std::cout<< std::endl;
+    }
+    
+}
+
 }
 
 //------------------------------------------------------------------------------
@@ -992,6 +1012,33 @@ std::string file = "Grid16x16";
     // two cases
     
     { // case 1
+        ValueType adjArray[36] = {  0, 1, 0, 1, 0, 1,
+                                    1, 0, 1, 0, 1, 0,
+                                    0, 1, 0, 1, 1, 0,
+                                    1, 0, 1, 0, 0, 1,
+                                    0, 1, 1, 0, 0, 1,
+                                    1, 0, 0, 1, 1, 0
+        };
+        PRINT(*comm);        
+        scai::lama::CSRSparseMatrix<ValueType> blockGraph;
+        blockGraph.setRawDenseData( 6, 6, adjArray);
+        // get the communication pairs
+        PRINT(*comm);
+        std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
+        
+        // print the pairs
+        
+        for(IndexType i=0; i<commScheme.size(); i++){
+            for(IndexType j=0; j<commScheme[i].size(); j++){
+                PRINT( "round :"<< i<< " , PEs talking: "<< j << " with "<< commScheme[i].getValue(j).Scalar::getValue<IndexType>());
+            }
+            std::cout << std::endl;
+        }
+        
+    }
+    
+    
+    { // case 1
         ValueType adjArray4[16] = { 0, 1, 0, 1,
                                     1, 0, 1, 0,
                                     0, 1, 0, 1,
@@ -1003,14 +1050,14 @@ std::string file = "Grid16x16";
         std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
         
         // print the pairs
-        /*
+        
         for(IndexType i=0; i<commScheme.size(); i++){
             for(IndexType j=0; j<commScheme[i].size(); j++){
                 PRINT( "round :"<< i<< " , PEs talking: "<< j << " with "<< commScheme[i].getValue(j).Scalar::getValue<IndexType>());
             }
             std::cout << std::endl;
         }
-        */
+        
     }
     
     {// case 2

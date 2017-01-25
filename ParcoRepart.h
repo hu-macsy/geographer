@@ -73,9 +73,9 @@ namespace ITI {
 			static std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
 
 			/**
-			 * Builds a halo containing all matrix entries of non-local neighbors.
+			 * redistributes a matrix from a local halo object without communication. It that is impossible, throw an error.
 			 */
-			static scai::dmemo::Halo buildMatrixHalo(const CSRSparseMatrix<ValueType> &input);
+			static void redistributeFromHalo(CSRSparseMatrix<ValueType>& matrix, scai::dmemo::DistributionPtr newDistribution, Halo& halo, CSRStorage<ValueType>& haloMatrix);
 
 			/**
 			 * Builds a halo containing all partition entries of non-local neighbors.
