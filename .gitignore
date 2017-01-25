@@ -1,8 +1,0 @@
-*.gch
-*.o
-Makefile
-.project
-.cproject
-Katanomi
-meshes/
-local/

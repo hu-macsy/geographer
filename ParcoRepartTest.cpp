@@ -634,7 +634,6 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     EXPECT_TRUE(blockGraph.checkSymmetry() );
     
     
-    
 if(comm->getRank()==0 ){            
     std::cout<<"----------------------------"<< " Partition  "<< *comm << std::endl;    
     for(int i=0; i<numX; i++){
@@ -1008,7 +1007,6 @@ std::string file = "Grid16x16";
     
     // build block array by hand
     
-    
     // two cases
     
     { // case 1
@@ -1019,22 +1017,21 @@ std::string file = "Grid16x16";
                                     0, 1, 1, 0, 0, 1,
                                     1, 0, 0, 1, 1, 0
         };
-        PRINT(*comm);        
+                
         scai::lama::CSRSparseMatrix<ValueType> blockGraph;
         blockGraph.setRawDenseData( 6, 6, adjArray);
         // get the communication pairs
-        PRINT(*comm);
         std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
         
         // print the pairs
-        
+        /*
         for(IndexType i=0; i<commScheme.size(); i++){
             for(IndexType j=0; j<commScheme[i].size(); j++){
                 PRINT( "round :"<< i<< " , PEs talking: "<< j << " with "<< commScheme[i].getValue(j).Scalar::getValue<IndexType>());
             }
             std::cout << std::endl;
         }
-        
+        */
     }
     
     
@@ -1050,14 +1047,14 @@ std::string file = "Grid16x16";
         std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
         
         // print the pairs
-        
+        /*
         for(IndexType i=0; i<commScheme.size(); i++){
             for(IndexType j=0; j<commScheme[i].size(); j++){
                 PRINT( "round :"<< i<< " , PEs talking: "<< j << " with "<< commScheme[i].getValue(j).Scalar::getValue<IndexType>());
             }
             std::cout << std::endl;
         }
-        
+        */
     }
     
     {// case 2
@@ -1068,11 +1065,8 @@ std::string file = "Grid16x16";
         // the documentation claiming otherwise. use l1Norm for unweigthed graphs
         blockGraph.setRawDenseData( 2, 2, adjArray2);
 
-        //PRINT( blockGraph.getNumRows() << ", cols= " << blockGraph.getNumColumns() << "__ " << blockGraph.getNumValues()   << " @@ " << blockGraph.l1Norm() );
-        
         // get the communication pairs
-        std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
-        
+        std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );        
     }
 }
 
