@@ -1051,13 +1051,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		throw std::runtime_error("Epsilon must be >= 0, not " + std::to_string(epsilon));
 	}
 
-    const Scalar maxBlockScalar = part.max();
-    const IndexType maxBlockID = maxBlockScalar.getValue<IndexType>();
-
-    if (k != maxBlockID + 1) {
-    	throw std::runtime_error("Should have " + std::to_string(k) + " blocks, has maximum ID " + std::to_string(maxBlockID));
-    }
-
     if (k != comm->getSize()) {
     	throw std::runtime_error("Called with " + std::to_string(comm->getSize()) + " processors, but " + std::to_string(k) + " blocks.");
     }
@@ -1088,7 +1081,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		const scai::dmemo::DistributionPtr commDist = communicationScheme[i].getDistributionPtr();
 
 		const IndexType localN = inputDist->getLocalSize();
-		assert(comm->sum(localN) == globalN);
 
 		if (!communicationScheme[i].getDistributionPtr()->isLocal(comm->getRank())) {
 			throw std::runtime_error("Scheme value for " + std::to_string(comm->getRank()) + " must be local.");
@@ -1096,6 +1088,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		
 		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[i].getLocalValues());
 		IndexType partner = commAccess[commDist->global2local(comm->getRank())];
+
 		assert(partner < comm->getSize());
 		if (commDist->isLocal(partner)) {
 			IndexType partnerOfPartner = commAccess[commDist->global2local(partner)];
@@ -1109,6 +1102,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		 * check for validity of partition
 		 */
 		{
+			SCAI_REGION( "ParcoRepart.distributedFMStep.loop.checkPartition" )
 			scai::hmemo::ReadAccess<IndexType> partAccess(part.getLocalValues());
 			for (IndexType j = 0; j < localN; j++) {
 				if (partAccess[j] != localBlockID) {
@@ -1235,12 +1229,15 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, firstRegion, secondRegion, firstDummyLayer, secondDummyLayer, blockSizes, maxBlockSizes, unweighted);
 
 
-			//communicate achieved gain. PE with better solution should send their secondRegion.
-			assert(unweighted); //if this assert fails, you need to change the type of swapField back to ValueType before removing it.
-			swapField[0] = secondRegion.size();
-			swapField[1] = gain;
-			swapField[2] = blockSizes.second;
-			comm->swap(swapField, 3, partner);
+			{
+				SCAI_REGION( "ParcoRepart.distributedFMStep.loop.swapFMResults" )
+				//communicate achieved gain. PE with better solution should send their secondRegion.
+				assert(unweighted); //if this assert fails, you need to change the type of swapField back to ValueType before removing it.
+				swapField[0] = secondRegion.size();
+				swapField[1] = gain;
+				swapField[2] = blockSizes.second;
+				comm->swap(swapField, 3, partner);
+			}
 
 			if (swapField[2] > maxBlockSizes.first) {
 				//If a block is too large after the refinement, it is only because it was too large to begin with.
@@ -1457,7 +1454,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	}
 
 	auto computeGain = [&](IndexType globalID){
-		SCAI_REGION( "ParcoRepart.computeGain" )
+		SCAI_REGION( "ParcoRepart.twoWayLocalFM.computeGain" )
 		bool firstBlock = isInFirstBlock(globalID);
 		assert(firstBlock != isInSecondBlock(globalID));
 		assert(isVeryLocal(globalID));
