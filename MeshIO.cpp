@@ -210,7 +210,6 @@ template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
     SCAI_REGION( "MeshIO.createStructured3DMesh_dist" )
     
-    
     if (coords.size() != 3) {
         throw std::runtime_error("Needs three coordinate vectors, one for each dimension");
     }
@@ -228,7 +227,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
     }
     
     std::vector<ValueType> offset={maxCoord[0]/numPoints[0], maxCoord[1]/numPoints[1], maxCoord[2]/numPoints[2]};
-    IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
+    IndexType globalN = numPoints[0]* numPoints[1]* numPoints[2];
 
     // create the coordinates
        
@@ -294,8 +293,8 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
         hmemo::WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
         // we do not know the sizes of ja and values. 6*N is safe upper bound for a structured 3D mesh
         // after all the values are written the arrays get resized
-        hmemo::WriteOnlyAccess<IndexType> ja( csrJA , 6*N);
-        hmemo::WriteOnlyAccess<ValueType> values( csrValues, 6*N);
+        hmemo::WriteOnlyAccess<IndexType> ja( csrJA , 6*localSize);
+        hmemo::WriteOnlyAccess<ValueType> values( csrValues, 6*localSize);
         ia[0] = 0;
         IndexType nnzCounter = 0; // count non-zero elements
          
@@ -318,7 +317,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
                     case 5: ngb_node = globalInd -numPoints[2]*numPoints[1]; break;
                 }
        
-                if(ngb_node>=0 && ngb_node<N){
+                if(ngb_node>=0 && ngb_node<globalN){
                     // get the position in the 3D of the neighbouring node
                     IndexType* ngbPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( ngb_node, numPoints);
                     
