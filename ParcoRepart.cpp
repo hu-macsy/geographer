@@ -739,6 +739,7 @@ void ITI::ParcoRepart<IndexType, ValueType>::redistributeFromHalo(CSRSparseMatri
 
 	//check for equality
 	if (sourceNumRows == targetNumRows) {
+		SCAI_REGION( "ParcoRepart.redistributeFromHalo.equalityCheck" )
 		bool allLocal = true;
 		for (IndexType i = 0; i < targetNumRows; i++) {
 			if (!oldDist->isLocal(newDist->local2global(i))) allLocal = false;
@@ -751,6 +752,7 @@ void ITI::ParcoRepart<IndexType, ValueType>::redistributeFromHalo(CSRSparseMatri
 
 	scai::hmemo::HArray<IndexType> sourceSizes;
 	{
+		SCAI_REGION( "ParcoRepart.redistributeFromHalo.sourceSizes" )
 		scai::hmemo::ReadAccess<IndexType> sourceIA(localStorage.getIA());
 		scai::hmemo::WriteOnlyAccess<IndexType> wSourceSizes( sourceSizes, sourceNumRows );
 	    scai::sparsekernel::OpenMPCSRUtils::offsets2sizes( wSourceSizes.get(), sourceIA.get(), sourceNumRows );
@@ -760,6 +762,7 @@ void ITI::ParcoRepart<IndexType, ValueType>::redistributeFromHalo(CSRSparseMatri
 
 	scai::hmemo::HArray<IndexType> haloSizes;
 	{
+		SCAI_REGION( "ParcoRepart.redistributeFromHalo.haloSizes" )
 		scai::hmemo::WriteOnlyAccess<IndexType> wHaloSizes( haloSizes, halo.getHaloSize() );
 		scai::hmemo::ReadAccess<IndexType> rHaloIA( haloStorage.getIA() );
 		scai::sparsekernel::OpenMPCSRUtils::offsets2sizes( wHaloSizes.get(), rHaloIA.get(), halo.getHaloSize() );
@@ -771,6 +774,7 @@ void ITI::ParcoRepart<IndexType, ValueType>::redistributeFromHalo(CSRSparseMatri
 	std::vector<IndexType> additionalLocalNodes;
 	IndexType numValues = 0;
 	{
+		SCAI_REGION( "ParcoRepart.redistributeFromHalo.targetIA" )
 		scai::hmemo::ReadAccess<IndexType> rSourceSizes(sourceSizes);
 		scai::hmemo::ReadAccess<IndexType> rHaloSizes(haloSizes);
 	    scai::hmemo::WriteAccess<IndexType> wTargetIA( targetIA );
@@ -1302,7 +1306,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 					if (firstRegionOld.count(node) == 0) {
 						additionalNodes.push_back(node);
 						newIndices.push_back(node);
-						//the following statement probably doesn't do anything.
+						//the following statement probably doesn't do anything, since node is not yet local
 						part.setValue(node, localBlockID);
 					}
 				}
@@ -1322,7 +1326,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				SCAI_REGION( "ParcoRepart.distributedFMStep.loop.redistribute.sync" )
 				IndexType participating = comm->sum(1);
 				if (participating != comm->getSize()) {
-					std::cout << participating << " of " << comm->getSize() << " threads in redistribution." << std::endl;
+					std::cout << participating << " of " << comm->getSize() << " processes in redistribution." << std::endl;
 				}
 			}
 
@@ -1331,9 +1335,15 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
 			SCAI_REGION_END( "ParcoRepart.distributedFMStep.loop.redistribute.generalDistribution" )
 
+			if (gainThisRound > 0)
 			{
+				//we changed something, need to update our data structures
 				SCAI_REGION( "ParcoRepart.distributedFMStep.loop.redistribute.updateDataStructures" )
 				redistributeFromHalo(input, newDistribution, graphHalo, haloMatrix);
+				part = DenseVector<IndexType>(newDistribution, localBlockID);
+			} else {
+				input.setDistributionPtr(newDistribution);
+				//the following is wasteful, it could be avoided if we could access DenseVector.setDistributionPtr()
 				part = DenseVector<IndexType>(newDistribution, localBlockID);
 			}
 		}
