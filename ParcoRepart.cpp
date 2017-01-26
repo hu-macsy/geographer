@@ -1361,6 +1361,41 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 }
 
 template<typename IndexType, typename ValueType>
+void ITI::ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input) {
+	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+	const IndexType localN = inputDist->getLocalSize();
+
+	const CSRStorage<ValueType>& storage = input.getLocalStorage();
+	const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
+	const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());
+
+	std::vector<IndexType> inDegree(localN, 0);
+	std::vector<IndexType> outDegree(localN, 0);
+	for (IndexType i = 0; i < localN; i++) {
+		IndexType globalI = inputDist->local2global(i);
+		const IndexType beginCols = localIa[i];
+		const IndexType endCols = localIa[i+1];
+
+		for (IndexType j = beginCols; j < endCols; j++) {
+			IndexType globalNeighbor = localJa[j];
+
+			if (globalNeighbor != globalI && inputDist->isLocal(globalNeighbor)) {
+				IndexType localNeighbor = inputDist->global2local(globalNeighbor);
+				outDegree[i]++;
+				inDegree[localNeighbor]++;
+			}
+		}
+	}
+
+	for (IndexType i = 0; i < localN; i++) {
+		if (inDegree[i] != outDegree[i]) {
+			throw std::runtime_error("Node " + std::to_string(inputDist->local2global(i)) + " has " + std::to_string(inDegree[i]) + " incoming local edges but "
+					+ std::to_string(outDegree[i]) + " outgoing local edges.");
+		}
+	}
+}
+
+template<typename IndexType, typename ValueType>
 ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
 		const Halo &matrixHalo, std::set<IndexType> &firstregion,  std::set<IndexType> &secondregion,
 		const std::set<IndexType> &firstDummyLayer, const std::set<IndexType> &secondDummyLayer,

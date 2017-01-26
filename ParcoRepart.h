@@ -96,6 +96,8 @@ namespace ITI {
 
 			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon,
 					const std::vector<DenseVector<IndexType>>& communicationScheme, bool unweighted = true);
+
+			static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
                         
 			//------------------------------------------------------------------------
 
