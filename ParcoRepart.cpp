@@ -8,6 +8,7 @@
 #include <scai/dmemo/HaloBuilder.hpp>
 #include <scai/dmemo/Distribution.hpp>
 #include <scai/dmemo/GenBlockDistribution.hpp>
+#include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 #include <scai/tracing.hpp>
 
 #include <assert.h>
@@ -94,7 +95,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				if (coord > maxCoords[dim]) maxCoords[dim] = coord;
 			}
 		}
-	}
 
 		/**
 		 * communicate to get global min / max
@@ -1718,7 +1718,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const 
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-	scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+	//scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
 	scai::dmemo::Halo partHalo = buildPartHalo(adjM, part);
 	scai::utilskernel::LArray<IndexType> haloData;
@@ -1771,9 +1771,9 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getPEG
     const CSRStorage<ValueType> localStorage = adjM.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
     const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-    scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+    //scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
-    for(IndexType i=0; i<dist->getLocalSize(); i++){                      // for all local nodes
+    for(IndexType i=0; i<dist->getLocalSize(); i++){        // for all local nodes
     	for(IndexType j=ia[i]; j<ia[i+1]; j++){             // for all the edges of a node
             if( !dist->isLocal(ja[j]) ){                    // if ja[j] is not a local node
                 // TODO: this check is needed because in small instances the "safe" upper
