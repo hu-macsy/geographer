@@ -93,6 +93,9 @@ namespace ITI {
 			static std::pair<std::vector<IndexType>, IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, IndexType thisBlock, IndexType otherBlock, IndexType depth);
 
 			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted = true);
+
+			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon,
+					const std::vector<DenseVector<IndexType>>& communicationScheme, bool unweighted = true);
                         
 			//------------------------------------------------------------------------
 

@@ -198,11 +198,18 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		ValueType gain = 1;
 		ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input)) / 2;
 
+		scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( input, result, k);
+
+		std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
+
 		while (gain > 0) {
+			if (numRefinementRounds > 0) {
+				std::cout << "Found gain " << gain << " last round, entering refinement round " << numRefinementRounds + 1 << std::endl;
+			}
 			if (inputDist->isReplicated()) {
 				gain = replicatedMultiWayFM(input, result, k, epsilon);
 			} else {
-				gain = distributedFMStep(input, result, k, epsilon);
+				gain = distributedFMStep(input, result, k, epsilon, communicationScheme);
 			}
 			ValueType oldCut = cut;
 			cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input)) / 2;
@@ -1018,6 +1025,18 @@ IndexType ITI::ParcoRepart<IndexType, ValueType>::getDegreeSum(const CSRSparseMa
 
 template<typename IndexType, typename ValueType>
 ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted) {
+	/* test communication with coloring. get the block graph and then the communication pairs for all the rounds
+	 * */
+	scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( input, part, k);
+
+	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
+
+	return distributedFMStep(input, part, k, epsilon, communicationScheme, unweighted);
+}
+
+template<typename IndexType, typename ValueType>
+ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon,
+		const std::vector<DenseVector<IndexType>>& communicationScheme, bool unweighted) {
 	const IndexType magicBorderRegionDepth = 4;
 	SCAI_REGION( "ParcoRepart.distributedFMStep" )
 	const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
@@ -1034,13 +1053,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 	if (epsilon < 0) {
 		throw std::runtime_error("Epsilon must be >= 0, not " + std::to_string(epsilon));
 	}
-
-	/* test communication with coloring. get the block graph and then the communication pairs for all the rounds
-	 * */
-	scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( input, part, k);
-
-	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
-        
 
     const Scalar maxBlockScalar = part.max();
     const IndexType maxBlockID = maxBlockScalar.getValue<IndexType>();
@@ -2187,6 +2199,8 @@ template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int
 template double ParcoRepart<int, double>::computeCut(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, bool ignoreWeights);
 
 template double ParcoRepart<int, double>::replicatedMultiWayFM(const CSRSparseMatrix<double> &input, DenseVector<int> &part, int k, double epsilon, bool unweighted);
+
+template double ParcoRepart<int, double>::distributedFMStep(CSRSparseMatrix<double> &input, DenseVector<int> &part, int k, double epsilon, bool unweighted);
 
 template std::vector<DenseVector<int>> ParcoRepart<int, double>::computeCommunicationPairings(const CSRSparseMatrix<double> &input, const DenseVector<int> &part,	const DenseVector<int> &blocksToPEs);
 
