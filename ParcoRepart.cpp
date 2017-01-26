@@ -897,7 +897,7 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 
 	scai::hmemo::HArray<IndexType> localData = part.getLocalValues();
 	scai::hmemo::ReadAccess<IndexType> partAccess(localData);
-
+	
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
@@ -1138,7 +1138,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			if (blockSize != localN) {
 				throw std::runtime_error(std::to_string(localN) + " local nodes, but only " + std::to_string(blockSize) + " of them belong to block " + std::to_string(localBlockID) + ".");
 			}
-  
+
 			IndexType swapField[4];
 			swapField[0] = interfaceNodes.size();
 			swapField[1] = lastRoundMarker;
@@ -1169,7 +1169,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 					swapNodes[i] = -1;
 				}
 			}
- 
+
 			comm->swap(swapNodes, swapLength, partner);
 
 			//the number of interface nodes was stored in swapField[0] and then swapped.
@@ -1453,6 +1453,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		}
 	}
 
+
 	auto computeGain = [&](IndexType globalID){
 		SCAI_REGION( "ParcoRepart.twoWayLocalFM.computeGain" )
 		bool firstBlock = isInFirstBlock(globalID);
@@ -1734,9 +1735,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const 
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-	scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+	//scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
-        //TODO possible problem with buildPartHalo(adjM, part);
 	scai::dmemo::Halo partHalo = buildPartHalo(adjM, part);
 	scai::utilskernel::LArray<IndexType> haloData;
 	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
@@ -1788,9 +1788,9 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getPEG
     const CSRStorage<ValueType> localStorage = adjM.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
     const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-    scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+    //scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
-    for(IndexType i=0; i<dist->getLocalSize(); i++){                      // for all local nodes
+    for(IndexType i=0; i<dist->getLocalSize(); i++){        // for all local nodes
     	for(IndexType j=ia[i]; j<ia[i+1]; j++){             // for all the edges of a node
             if( !dist->isLocal(ja[j]) ){                    // if ja[j] is not a local node
                 // TODO: this check is needed because in small instances the "safe" upper
@@ -2071,7 +2071,7 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     // create graph G by the input adjacency matrix
     // TODO: get ia and ja values, do not do adjM(i,j) !!!
     for(IndexType i=0; i<N; i++){
-        for(IndexType j=0; j<i; j++){
+        for(IndexType j=i; j<N; j++){
             if(adjM(i, j)== 1){ // there is an edge between nodes i and j. add the edge to G
                 boost::add_edge(i, j, G).first;
                 retG[0].push_back(i);  
@@ -2153,6 +2153,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
         }
         return retG;
     }
+
     IndexType colors;
     std::vector<std::vector<IndexType>> coloring = getGraphEdgeColoring_local( adjM, colors );
     std::vector<DenseVector<IndexType>> retG(colors);
@@ -2181,7 +2182,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
         retG[color].setValue( firstBlock, secondBlock);
         retG[color].setValue( secondBlock, firstBlock );
     }
-
+    
     return retG;
 }
 //---------------------------------------------------------------------------------------

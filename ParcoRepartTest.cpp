@@ -628,7 +628,13 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
             partViz[i][j]=partition.getValue(i*numX+j).getValue<IndexType>();
             bordViz[i][j]=border.getValue(i*numX+j).getValue<IndexType>();
         }
-            
+    
+      //test getBlockGraph
+    scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, partition, k);
+    EXPECT_TRUE(blockGraph.checkSymmetry() );
+    
+    
+if(comm->getRank()==0 ){            
     std::cout<<"----------------------------"<< " Partition  "<< *comm << std::endl;    
     for(int i=0; i<numX; i++){
         for(int j=0; j<numY; j++){
@@ -640,6 +646,19 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
         std::cout<< std::endl;
     }
     
+    // print
+    //scai::hmemo::ReadAccess<IndexType> blockGraphRead( blockGraph );
+    std::cout<< *comm <<" , Block Graph"<< std::endl;
+    for(IndexType row=0; row<k; row++){
+        std::cout<< row << "|\t";
+        for(IndexType col=0; col<k; col++){
+            std::cout << col<< ": " << blockGraph( row,col).Scalar::getValue<ValueType>() <<" - ";
+        }
+        std::cout<< std::endl;
+    }
+    
+}
+
 }
 
 //------------------------------------------------------------------------------
@@ -793,7 +812,7 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_3D) {
     // test getLocalBlockGraphEdges
     IndexType max = partition.max().Scalar::getValue<IndexType>();
     std::vector<std::vector<IndexType> > edgesBlock =  ParcoRepart<IndexType, ValueType>::getLocalBlockGraphEdges( graph, partition);
-
+    
     for(IndexType i=0; i<edgesBlock[0].size(); i++){
         std::cout<<  __FILE__<< " ,"<<__LINE__ <<" , "<< i <<":  __"<< *comm<< " , >> edge ("<< edgesBlock[0][i]<< ", " << edgesBlock[1][i] << ")" << std::endl;
         EXPECT_LE( edgesBlock[0][i] , max);
@@ -807,7 +826,7 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_3D) {
 //------------------------------------------------------------------------------
 
 TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
-     std::string file = "Grid16x16";
+    std::string file = "Grid16x16";
     std::ifstream f(file);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;
@@ -861,6 +880,61 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
         std::cout<< std::endl;
     }
     }
+}
+
+//------------------------------------------------------------------------------
+
+TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
+    
+    std::vector<IndexType> numPoints= { 4, 4, 4};
+    std::vector<ValueType> maxCoord= { 42, 11, 160};
+    IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
+    std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
+ 
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
+    //
+    IndexType k = comm->getSize();
+    //
+    std::vector<DenseVector<ValueType>> coords(3);
+    for(IndexType i=0; i<3; i++){ 
+	  coords[i].allocate(dist);
+	  coords[i] = static_cast<ValueType>( 0 );
+    }
+    
+    scai::lama::CSRSparseMatrix<ValueType> adjM( dist, noDistPointer);
+    
+    // create the adjacency matrix and the coordinates
+    MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
+    
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(adjM, coords, k, 0.2);
+    
+    //check distributions
+    assert( partition.getDistribution().isEqual( adjM.getRowDistribution()) );
+    // the next assertion fails in "this version" (commit a2fc03ab73f3af420123c491fbf9afb84be4a0c4) because partition 
+    // redistributes the graph nodes so every block is in one PE (k=P) but does NOT redistributes the coordinates.
+    //assert( partition.getDistribution().isEqual( coords[0].getDistribution()) );
+    
+    //test getBlockGraph
+    scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( adjM, partition, k);
+    
+        
+    //get halo (buildPartHalo) and check if block graphs is correct
+    scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildPartHalo(adjM, partition);
+    scai::hmemo::HArray<IndexType> reqIndices = partHalo.getRequiredIndexes();
+    scai::hmemo::HArray<IndexType> provIndices = partHalo.getProvidesIndexes();
+    
+    const scai::hmemo::ReadAccess<IndexType> reqIndicesRead( reqIndices);
+    const scai::hmemo::ReadAccess<IndexType> provIndicesRead( provIndices);
+    /*
+    for(IndexType i=0; i< reqIndicesRead.size(); i++){
+        PRINT(i <<": " << *comm <<" , req= "<<  reqIndicesRead[i] );
+    }
+    for(IndexType i=0; i< provIndicesRead.size(); i++){
+        PRINT(i <<": " << *comm <<" , prov= "<<  provIndicesRead[i] );
+    }
+   */
 }
 
 //------------------------------------------------------------------------------
@@ -936,6 +1010,119 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
         }
     }
     
+}
+
+//-------------------------------------------------------------------------------
+
+TEST_F (ParcoRepartTest, testGetLocalCommunicationWithColoring_2D) {
+
+std::string file = "Grid16x16";
+    std::ifstream f(file);
+    IndexType dimensions= 2, k=8;
+    IndexType N, edges;
+    f >> N >> edges; 
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    // for now local refinement requires k = P
+    k = comm->getSize();
+    //
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    CSRSparseMatrix<ValueType> graph( N , N);           
+    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(graph, file );
+    //distrubute graph
+    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
+        
+
+    //read the array locally and messed the distribution. Left as a remainder.
+    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
+    EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
+    std::vector<DenseVector<ValueType>> coords(2);
+    coords[0].allocate(N);
+    coords[1].allocate(N);
+    coords[0]= static_cast<ValueType>( 0 );
+    coords[1]= static_cast<ValueType>( 0 );
+    
+    //fromFile2Coords_2D is not distributed, must redistribute
+    MeshIO<IndexType, ValueType>::fromFile2Coords_2D( std::string(file + ".xyz"), coords, N);
+    coords[0].redistribute(dist);
+    coords[1].redistribute(dist);
+    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
+    
+    //scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, k, 0.2);
+    
+    //check distributions
+    //assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
+    // the next assertion fails in "this version" (commit a2fc03ab73f3af420123c491fbf9afb84be4a0c4) because partition 
+    // redistributes the graph nodes so every block is in one PE (k=P) but does NOT redistributes the coordinates.
+    //assert( partition.getDistribution().isEqual( coords[0].getDistribution()) );
+    
+    //test getBlockGraph
+    //scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, partition, k);
+    
+    // build block array by hand
+    
+    // two cases
+    
+    { // case 1
+        ValueType adjArray[36] = {  0, 1, 0, 1, 0, 1,
+                                    1, 0, 1, 0, 1, 0,
+                                    0, 1, 0, 1, 1, 0,
+                                    1, 0, 1, 0, 0, 1,
+                                    0, 1, 1, 0, 0, 1,
+                                    1, 0, 0, 1, 1, 0
+        };
+                
+        scai::lama::CSRSparseMatrix<ValueType> blockGraph;
+        blockGraph.setRawDenseData( 6, 6, adjArray);
+        // get the communication pairs
+        std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
+        
+        // print the pairs
+        /*
+        for(IndexType i=0; i<commScheme.size(); i++){
+            for(IndexType j=0; j<commScheme[i].size(); j++){
+                PRINT( "round :"<< i<< " , PEs talking: "<< j << " with "<< commScheme[i].getValue(j).Scalar::getValue<IndexType>());
+            }
+            std::cout << std::endl;
+        }
+        */
+    }
+    
+    
+    { // case 1
+        ValueType adjArray4[16] = { 0, 1, 0, 1,
+                                    1, 0, 1, 0,
+                                    0, 1, 0, 1,
+                                    1, 0, 1, 0
+        };
+        scai::lama::CSRSparseMatrix<ValueType> blockGraph;
+        blockGraph.setRawDenseData( 4, 4, adjArray4);
+        // get the communication pairs
+        std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
+        
+        // print the pairs
+        /*
+        for(IndexType i=0; i<commScheme.size(); i++){
+            for(IndexType j=0; j<commScheme[i].size(); j++){
+                PRINT( "round :"<< i<< " , PEs talking: "<< j << " with "<< commScheme[i].getValue(j).Scalar::getValue<IndexType>());
+            }
+            std::cout << std::endl;
+        }
+        */
+    }
+    
+    {// case 2
+        ValueType adjArray2[4] = {  0, 1, 
+                                    1, 0 };
+        scai::lama::CSRSparseMatrix<ValueType> blockGraph;
+        //TODO: aparently CSRSparseMatrix.getNumValues() counts also 0 when setting via a setRawDenseData despite
+        // the documentation claiming otherwise. use l1Norm for unweigthed graphs
+        blockGraph.setRawDenseData( 2, 2, adjArray2);
+
+        // get the communication pairs
+        std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );        
+    }
 }
 
 /**
