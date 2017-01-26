@@ -203,9 +203,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
 
 		while (gain > 0) {
-			if (numRefinementRounds > 0) {
-				std::cout << "Found gain " << gain << " last round, entering refinement round " << numRefinementRounds + 1 << std::endl;
-			}
 			if (inputDist->isReplicated()) {
 				gain = replicatedMultiWayFM(input, result, k, epsilon);
 			} else {
@@ -1141,6 +1138,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			 * For this, first find out the length of the swap array.
 			 */
 
+			SCAI_REGION_START( "ParcoRepart.distributedFMStep.loop.prepareSets" )
 			//swap size of border region and total block size
 			IndexType blockSize = localBlockSize(part, localBlockID);
 			if (blockSize != localN) {
@@ -1229,6 +1227,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			//block sizes and capacities
 			std::pair<IndexType, IndexType> blockSizes = {blockSize, otherBlockSize};
 			std::pair<IndexType, IndexType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
+			SCAI_REGION_END( "ParcoRepart.distributedFMStep.loop.prepareSets" )
 
 			/**
 			 * execute FM locally
