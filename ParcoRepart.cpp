@@ -1392,8 +1392,24 @@ void ITI::ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRS
 
 	for (IndexType i = 0; i < localN; i++) {
 		if (inDegree[i] != outDegree[i]) {
-			throw std::runtime_error("Node " + std::to_string(inputDist->local2global(i)) + " has " + std::to_string(inDegree[i]) + " incoming local edges but "
-					+ std::to_string(outDegree[i]) + " outgoing local edges.");
+			//now check in detail:
+			IndexType globalI = inputDist->local2global(i);
+			for (IndexType j = localIa[i]; j < localIa[i+1]; j++) {
+				IndexType globalNeighbor = localJa[j];
+				if (inputDist->isLocal(globalNeighbor)) {
+					IndexType localNeighbor = inputDist->global2local(globalNeighbor);
+					bool foundBackEdge = false;
+					for (IndexType y = localIa[localNeighbor]; y < localIa[localNeighbor+1]; y++) {
+						if (localJa[y] == globalI) {
+							foundBackEdge = true;
+						}
+					}
+					if (!foundBackEdge) {
+						throw std::runtime_error("Local node " + std::to_string(globalI) + " has edge to local node " + std::to_string(globalNeighbor)
+											+ " but no back edge found.");
+					}
+				}
+			}
 		}
 	}
 }
