@@ -222,7 +222,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			numRefinementRounds++;
 		}
 	} else {
-		std::cout << "Local refinement only implemented sequentially and for one block per process. Called with " << comm->getSize() << " process and " << k << " blocks." << std::endl;
+		std::cout << "Local refinement only implemented sequentially and for one block per process. Called with " << comm->getSize() << " processes and " << k << " blocks." << std::endl;
 	}
 	return result;
 }
@@ -1349,6 +1349,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				SCAI_REGION( "ParcoRepart.distributedFMStep.loop.redistribute.updateDataStructures" )
 				redistributeFromHalo(input, newDistribution, graphHalo, haloMatrix);
 				part = DenseVector<IndexType>(newDistribution, localBlockID);
+				checkLocalDegreeSymmetry(input);
 			} else {
 				input.setDistributionPtr(newDistribution);
 				//the following is wasteful, it could be avoided if we could access DenseVector.setDistributionPtr()
@@ -1362,6 +1363,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 template<typename IndexType, typename ValueType>
 void ITI::ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input) {
+	SCAI_REGION( "ParcoRepart.checkLocalDegreeSymmetry" )
+
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	const IndexType localN = inputDist->getLocalSize();
 
