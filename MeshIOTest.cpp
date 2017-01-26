@@ -223,6 +223,35 @@ TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
     
 }
 */
+
+//-----------------------------------------------------------------
+TEST_F(MeshIOTest, testWriteMetis_Dist_3D){
+    
+    std::vector<IndexType> numPoints= { 10, 10, 10};
+    std::vector<ValueType> maxCoord= { 10, 20, 30};
+    IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
+    std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
+    
+    std::vector<DenseVector<ValueType>> coords(3);
+    for(IndexType i=0; i<3; i++){ 
+	  coords[i].allocate(dist);
+	  coords[i] = static_cast<ValueType>( 0 );
+    }
+    
+    scai::lama::CSRSparseMatrix<ValueType> adjM( dist, noDistPointer);
+    
+    // create the adjacency matrix and the coordinates
+    MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
+    
+    // write the mesh in p(=number of PEs) files
+    MeshIO<IndexType, ValueType>::writeInFileMetisFormat_dist( adjM, "meshes/dist3D_");
+    
+}
+
 //-----------------------------------------------------------------
 /* Reads a graph from a file "filename" in METIS format, writes it back into "my_filename" and reads the graph
  * again from "my_filename".
@@ -230,8 +259,8 @@ TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
  * Occasionally throws error, probably because onw process tries to read the file while some other is still eriting in it.
  */
 TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
-    std::string path = "";
-    std::string file = "Grid16x16";
+    std::string path = "meshes/bigbubbles/";
+    std::string file = "bigbubbles-00020.graph";
     std::string filename= path + file;
     CSRSparseMatrix<ValueType> Graph;
     IndexType N;    //number of points     
@@ -243,34 +272,50 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     dmemo::DistributionPtr dist( new dmemo::NoDistribution( nodes ));
+    
     Graph = scai::lama::CSRSparseMatrix<ValueType>(dist, dist);
+    
+    // read graph from file
     {
-        PRINT(*comm);
         SCAI_REGION("testReadAndWriteGraphFromFile.readFromFile2AdjMatrix");
         MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph, filename );
     }
     N = Graph.getNumColumns();
     EXPECT_EQ(Graph.getNumColumns(), Graph.getNumRows());
-    
     EXPECT_EQ(nodes, Graph.getNumColumns());
     EXPECT_EQ(edges, (Graph.getNumValues())/2 );
     
     std::string fileTo= path + std::string("MY_") + file;
     
+    // write the graph you read in a new file
+    MeshIO<IndexType, ValueType>::writeInFileMetisFormat(Graph, fileTo );
+    
+    // read new graph from the new file we just written
     CSRSparseMatrix<ValueType> Graph2(dist, dist);
-    {   
-        SCAI_REGION("testReadAndWriteGraphFromFile.(writeInFileMetisFormat and writeInFileCoords)");
-        MeshIO<IndexType, ValueType>::writeInFileMetisFormat(Graph, fileTo );
-    }
-    //PRINT(*comm);
-    {
-        SCAI_REGION("testReadAndWriteGraphFromFile.(writeInFileMetisFormat and writeInFileCoords)");
-        MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph2, fileTo );
-    }
+    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph2, fileTo );
+    
+    // check that the two graphs are identical
     std::cout<< "Output written in file: "<< fileTo<< std::endl;
     EXPECT_EQ(Graph.getNumValues(), Graph2.getNumValues() );
     EXPECT_EQ(Graph.l2Norm(), Graph2.l2Norm() );
     EXPECT_EQ(Graph2.getNumValues(), Graph2.l1Norm() );
+    EXPECT_EQ( Graph.getNumRows() , Graph2.getNumColumns() );
+    
+    // check every element of the  graphs     
+    {
+        SCAI_REGION("testReadAndWriteGraphFromFile.checkArray");
+        const CSRStorage<ValueType>& localStorage = Graph.getLocalStorage();
+        scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+        
+        const CSRStorage<ValueType>& localStorage2 = Graph2.getLocalStorage();
+        scai::hmemo::ReadAccess<ValueType> values2(localStorage2.getValues());
+        
+        assert( values.size() == values2.size() );
+        
+        for(IndexType i=0; i< values.size(); i++){
+            assert( values[i] == values2[i] );
+        }
+    }
 }
 
 //-----------------------------------------------------------------

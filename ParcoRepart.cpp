@@ -892,7 +892,7 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 
 	scai::hmemo::HArray<IndexType> localData = part.getLocalValues();
 	scai::hmemo::ReadAccess<IndexType> partAccess(localData);
-
+	
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
@@ -1138,7 +1138,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			if (blockSize != localN) {
 				throw std::runtime_error(std::to_string(localN) + " local nodes, but only " + std::to_string(blockSize) + " of them belong to block " + std::to_string(localBlockID) + ".");
 			}
-  
+
 			IndexType swapField[4];
 			swapField[0] = interfaceNodes.size();
 			swapField[1] = lastRoundMarker;
@@ -1169,7 +1169,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 					swapNodes[i] = -1;
 				}
 			}
- 
+
 			comm->swap(swapNodes, swapLength, partner);
 
 			//the number of interface nodes was stored in swapField[0] and then swapped.
@@ -1180,7 +1180,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				requiredHaloIndices[i] = swapNodes[i];
 			}
 
-			std::cout << "Thread " << comm->getRank() << ", round " << i << ", swapped " << swapLength << " interface nodes with thread " << partner << std::endl;
+			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", swapped " << swapLength << " interface nodes with thread " << partner << std::endl;
 
 			assert(requiredHaloIndices.size() <= globalN - inputDist->getLocalSize());
 
@@ -1226,7 +1226,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			 * execute FM locally
 			 */
 			ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, firstRegion, secondRegion, firstDummyLayer, secondDummyLayer, blockSizes, maxBlockSizes, unweighted);
-
 
 			//communicate achieved gain. PE with better solution should send their secondRegion.
 			assert(unweighted); //if this assert fails, you need to change the type of swapField back to ValueType before removing it.
@@ -1442,6 +1441,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 					+ std::to_string(outDegree[i]) + " outgoing local edges.");
 		}
 	}
+
 
 	auto computeGain = [&](IndexType globalID){
 		SCAI_REGION( "ParcoRepart.computeGain" )
@@ -1724,9 +1724,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const 
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-	scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+	//scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
-        //TODO possible problem with buildPartHalo(adjM, part);
 	scai::dmemo::Halo partHalo = buildPartHalo(adjM, part);
 	scai::utilskernel::LArray<IndexType> haloData;
 	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
@@ -1778,9 +1777,9 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getPEG
     const CSRStorage<ValueType> localStorage = adjM.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
     const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-    scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+    //scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
-    for(IndexType i=0; i<dist->getLocalSize(); i++){                      // for all local nodes
+    for(IndexType i=0; i<dist->getLocalSize(); i++){        // for all local nodes
     	for(IndexType j=ia[i]; j<ia[i+1]; j++){             // for all the edges of a node
             if( !dist->isLocal(ja[j]) ){                    // if ja[j] is not a local node
                 // TODO: this check is needed because in small instances the "safe" upper

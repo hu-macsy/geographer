@@ -228,7 +228,6 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
     }
     
     std::vector<ValueType> offset={maxCoord[0]/numPoints[0], maxCoord[1]/numPoints[1], maxCoord[2]/numPoints[2]};
-    IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
 
     // create the coordinates
        
@@ -290,12 +289,13 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
                                 
     {
         SCAI_REGION("MeshIO.createStructured3DMesh_dist.setCSRSparseMatrix");
+        IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
         
         hmemo::WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
-        // we do not know the sizes of ja and values. 6*N is safe upper bound for a structured 3D mesh
+        // we do not know the sizes of ja and values. 6*numOfLocalNodes is safe upper bound for a structured 3D mesh
         // after all the values are written the arrays get resized
-        hmemo::WriteOnlyAccess<IndexType> ja( csrJA , 6*N);
-        hmemo::WriteOnlyAccess<ValueType> values( csrValues, 6*N);
+        hmemo::WriteOnlyAccess<IndexType> ja( csrJA , 6*adjM.getLocalNumRows() );
+        hmemo::WriteOnlyAccess<ValueType> values( csrValues, 6*adjM.getLocalNumRows() );
         ia[0] = 0;
         IndexType nnzCounter = 0; // count non-zero elements
          
@@ -358,26 +358,72 @@ void MeshIO<IndexType, ValueType>::writeInFileMetisFormat (const CSRSparseMatrix
     //PRINT(*comm << " In writeInFileMetisFormat");
     
     std::ofstream f;
-    f.open(filename);
+    std::string oldFile = filename + "OLD";
+    f.open(oldFile);
     IndexType cols= adjM.getNumColumns() , rows= adjM.getNumRows();
     IndexType i, j;
+
+    SCAI_REGION_START( "MeshIO.writeInFileMetisFormat.newVersion" )
+    // new version
+    std::ofstream fNew;
+    std::string newFile = filename;// + "NEW";
+    fNew.open(newFile);
     
-    //the l1Norm/2 is the number of edges for an undirected, unweighted graph.
-    //since is must be an adjacencey matrix cols==rows
-    assert(((int) adjM.l1Norm().Scalar::getValue<ValueType>())%2==0);
+    //assert( true == adjM.checkSymmetry() ); // this can be expensive
+    assert(((int) adjM.getNumValues())%2==0); // even number of edges
     assert(cols==rows);
-    f<<cols<<" "<< adjM.l1Norm().Scalar::getValue<ValueType>()/2<< std::endl;
     
-    for(i=0; i<rows; i++){
-        for(j=0; j<cols; j++){
-            if(adjM(i,j)==1) f<< j+1<< " ";
-        }
-        f<< std::endl;
+    // first line is number of nodes and edges 
+    fNew << cols <<" "<< adjM.getNumValues()/2 << std::endl;
+    //std::cout << cols <<" "<< adjM.getNumValues()/2 << std::endl;
+    
+    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+    const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+    const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+    //const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
+        
+    for(IndexType i=0; i< ia.size(); i++){        // for all local nodes
+    	for(IndexType j=ia[i]; j<ia[i+1]; j++){             // for all the edges of a node
+            SCAI_REGION("MeshIO.writeInFileMetisFormat.newVersion.writeInFile");
+            fNew << ja[j]+1 << " ";
+    	}
+    	fNew << std::endl;
     }
-    f.close();
-    //PRINT(*comm << " Leaving writeInFileMetisFormat");
+    fNew.close();
+    SCAI_REGION_END( "MeshIO.writeInFileMetisFormat.newVersion" )
 }
 
+//-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+void MeshIO<IndexType, ValueType>::writeInFileMetisFormat_dist (const CSRSparseMatrix<ValueType> &adjM, const std::string filename){
+    SCAI_REGION("MeshIO.writeInFileMetisFormat_dist")
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    std::string fileTo = filename + std::to_string(comm->getRank());
+    std::ofstream f(fileTo);
+    if(f.fail()) 
+        throw std::runtime_error("File "+ filename+ " failed.");
+    
+    // notice that numValues is twice the number of edges of the graph 
+    assert(((int) adjM.getNumValues())%2 == 0); // even number of edges
+    
+    IndexType localNumNodes= adjM.getLocalNumRows();
+    f<< localNumNodes <<" "<< adjM.getLocalNumValues()/2 << std::endl; // first line is number of nodes and edges 
+    
+    // get local part
+    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+    const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+    const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+        
+    for(IndexType i=0; i< ia.size(); i++){                  // for all local nodes
+    	for(IndexType j=ia[i]; j<ia[i+1]; j++){             // for all the edges of a node
+            f << ja[j]+1 << " ";                            
+    	}
+    	f << std::endl;
+    }
+    f.close();
+}
 //-------------------------------------------------------------------------------------------------
 /*Given the vector of the coordinates and their dimension, writes them in file "filename".
  */
@@ -385,8 +431,10 @@ template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::writeInFileCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename){
     SCAI_REGION( "MeshIO.writeInFileCoords" )
     
-    std::ofstream f;
-    f.open(filename);
+    std::ofstream f(filename);
+    if(f.fail()) 
+        throw std::runtime_error("File "+ filename+ " failed.");
+
     IndexType i, j;
     IndexType dimension= coords.size();
 
@@ -615,6 +663,7 @@ template void MeshIO<int, double>::createStructured3DMesh(CSRSparseMatrix<double
 template void MeshIO<int, double>::createStructured3DMesh_dist(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
 template std::vector<DenseVector<double>> MeshIO<int, double>::randomPoints(int numberOfPoints, int dimensions, double maxCoord);
 template void MeshIO<int, double>::writeInFileMetisFormat (const CSRSparseMatrix<double> &adjM, const std::string filename);
+template void MeshIO<int, double>::writeInFileMetisFormat_dist (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void MeshIO<int, double>::writeInFileCoords (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
 template void MeshIO<int, double>::readFromFile2AdjMatrix( CSRSparseMatrix<double> &matrix, const std::string filename);
 template void  MeshIO<int, double>::fromFile2Coords_2D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfCoords);
