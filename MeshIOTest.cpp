@@ -301,16 +301,7 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
     EXPECT_EQ(Graph2.getNumValues(), Graph2.l1Norm() );
     EXPECT_EQ( Graph.getNumRows() , Graph2.getNumColumns() );
     
-    // check every element of the  graphs 
-    // this is too slow !!!
-    /*
-    for(IndexType i=0; i< Graph.getNumColumns(); i++){
-        for(IndexType j=0; j< Graph2.getNumColumns(); j++){
-            assert( Graph(i,j) == Graph2(i,j) );
-        }
-    }
-    */
-    
+    // check every element of the  graphs     
     {
         SCAI_REGION("testReadAndWriteGraphFromFile.checkArray");
         const CSRStorage<ValueType>& localStorage = Graph.getLocalStorage();

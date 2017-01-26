@@ -812,9 +812,6 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_3D) {
     // test getLocalBlockGraphEdges
     IndexType max = partition.max().Scalar::getValue<IndexType>();
     std::vector<std::vector<IndexType> > edgesBlock =  ParcoRepart<IndexType, ValueType>::getLocalBlockGraphEdges( graph, partition);
-
-    
-    //get halo (buildPartHalo) and check if block graphis correct
     
     for(IndexType i=0; i<edgesBlock[0].size(); i++){
         std::cout<<  __FILE__<< " ,"<<__LINE__ <<" , "<< i <<":  __"<< *comm<< " , >> edge ("<< edgesBlock[0][i]<< ", " << edgesBlock[1][i] << ")" << std::endl;
@@ -889,7 +886,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
 
 TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
     
-    std::vector<IndexType> numPoints= { 10, 40, 50};
+    std::vector<IndexType> numPoints= { 4, 4, 4};
     std::vector<ValueType> maxCoord= { 42, 11, 160};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
     std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
@@ -922,17 +919,22 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
     //test getBlockGraph
     scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( adjM, partition, k);
     
+        
+    //get halo (buildPartHalo) and check if block graphs is correct
+    scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildPartHalo(adjM, partition);
+    scai::hmemo::HArray<IndexType> reqIndices = partHalo.getRequiredIndexes();
+    scai::hmemo::HArray<IndexType> provIndices = partHalo.getProvidesIndexes();
     
-    { // print
-    //scai::hmemo::ReadAccess<IndexType> blockGraphRead( blockGraph );
-    std::cout<< *comm <<" , Block Graph"<< std::endl;
-    for(IndexType row=0; row<k; row++){
-        for(IndexType col=0; col<k; col++){
-            std::cout<< comm->getRank()<< ":("<< row<< ","<< col<< "):" << blockGraph( row,col).Scalar::getValue<ValueType>() <<" - ";
-        }
-        std::cout<< std::endl;
+    const scai::hmemo::ReadAccess<IndexType> reqIndicesRead( reqIndices);
+    const scai::hmemo::ReadAccess<IndexType> provIndicesRead( provIndices);
+    /*
+    for(IndexType i=0; i< reqIndicesRead.size(); i++){
+        PRINT(i <<": " << *comm <<" , req= "<<  reqIndicesRead[i] );
     }
+    for(IndexType i=0; i< provIndicesRead.size(); i++){
+        PRINT(i <<": " << *comm <<" , prov= "<<  provIndicesRead[i] );
     }
+   */
 }
 
 //------------------------------------------------------------------------------

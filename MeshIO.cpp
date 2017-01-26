@@ -228,7 +228,6 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
     }
     
     std::vector<ValueType> offset={maxCoord[0]/numPoints[0], maxCoord[1]/numPoints[1], maxCoord[2]/numPoints[2]};
-    IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
 
     // create the coordinates
        
@@ -290,12 +289,13 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
                                 
     {
         SCAI_REGION("MeshIO.createStructured3DMesh_dist.setCSRSparseMatrix");
+        IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
         
         hmemo::WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
-        // we do not know the sizes of ja and values. 6*N is safe upper bound for a structured 3D mesh
+        // we do not know the sizes of ja and values. 6*numOfLocalNodes is safe upper bound for a structured 3D mesh
         // after all the values are written the arrays get resized
-        hmemo::WriteOnlyAccess<IndexType> ja( csrJA , 6*N);
-        hmemo::WriteOnlyAccess<ValueType> values( csrValues, 6*N);
+        hmemo::WriteOnlyAccess<IndexType> ja( csrJA , 6*adjM.getLocalNumRows() );
+        hmemo::WriteOnlyAccess<ValueType> values( csrValues, 6*adjM.getLocalNumRows() );
         ia[0] = 0;
         IndexType nnzCounter = 0; // count non-zero elements
          
@@ -362,33 +362,7 @@ void MeshIO<IndexType, ValueType>::writeInFileMetisFormat (const CSRSparseMatrix
     f.open(oldFile);
     IndexType cols= adjM.getNumColumns() , rows= adjM.getNumRows();
     IndexType i, j;
-    
-    //
-    /*
-    SCAI_REGION_START( "MeshIO.writeInFileMetisFormat.old_version" )
-    
-    //the l1Norm/2 is the number of edges for an undirected, unweighted graph.
-    //since is must be an adjacencey matrix cols==rows
-    assert(((int) adjM.l1Norm().Scalar::getValue<ValueType>())%2==0);
-    assert(cols==rows);
-    f<<cols<<" "<< adjM.l1Norm().Scalar::getValue<ValueType>()/2<< std::endl;
-    
-    for(i=0; i<rows; i++){
-        for(j=0; j<cols; j++){
-            SCAI_REGION("MeshIO.writeInFileMetisFormat.old_version.fors");
-            if(adjM(i,j)==1) 
-                SCAI_REGION("MeshIO.writeInFileMetisFormat.old_version.writeInFile");
-                f<< j+1<< " ";
-        }
-        f<< std::endl;
-    }
-    f.close();
-    //PRINT(*comm << " Leaving writeInFileMetisFormat");
-    
-    SCAI_REGION_END( "MeshIO.writeInFileMetisFormat.old_version" )
-    */
-    //
-    
+
     SCAI_REGION_START( "MeshIO.writeInFileMetisFormat.newVersion" )
     // new version
     std::ofstream fNew;
@@ -401,7 +375,7 @@ void MeshIO<IndexType, ValueType>::writeInFileMetisFormat (const CSRSparseMatrix
     
     // first line is number of nodes and edges 
     fNew << cols <<" "<< adjM.getNumValues()/2 << std::endl;
-    std::cout << cols <<" "<< adjM.getNumValues()/2 << std::endl;
+    //std::cout << cols <<" "<< adjM.getNumValues()/2 << std::endl;
     
     const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
