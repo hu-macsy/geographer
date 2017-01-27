@@ -2029,6 +2029,7 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getBlo
     IndexType size= k*k;
     // get, on each processor, the edges of the blocks that are local
     std::vector< std::vector<IndexType> > blockEdges = ParcoRepart<int, double>::getLocalBlockGraphEdges( adjM, part);
+    assert(blockEdges[0].size() == blockEdges[1].size());
     
     scai::hmemo::HArray<IndexType> sendPart(size, static_cast<ValueType>( 0 ));
     scai::hmemo::HArray<IndexType> recvPart(size);

@@ -112,6 +112,36 @@ TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
     }
     
 }
+
+TEST_F(MeshIOTest, testCreateStructured3DMeshLocalDegreeSymmetry) {
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	IndexType k = comm->getSize();
+
+	if (k > 16) {
+		IndexType nroot = 300;
+		IndexType n = nroot * nroot * nroot;
+		IndexType dimensions = 3;
+
+		scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+		scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+
+		scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
+		std::vector<ValueType> maxCoord(dimensions, nroot);
+		std::vector<IndexType> numPoints(dimensions, nroot);
+
+		std::vector<DenseVector<ValueType>> coordinates(dimensions);
+		for(IndexType i=0; i<dimensions; i++){
+		  coordinates[i].allocate(dist);
+		  coordinates[i] = static_cast<ValueType>( 0 );
+		}
+
+		MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(a, coordinates, maxCoord, numPoints);
+		ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(a);
+	} else {
+		std::cout << "Not tested, since called with <= 16 processes, this implies you don't have enough memory for " << n << " nodes."<< std::endl;
+	}
+}
+
 //-----------------------------------------------------------------
 // Creates the part of a structured mesh in each processor ditributed and checks the matrix and the coordinates.
 // For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
