@@ -117,7 +117,7 @@ TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
 // For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
 // less than 6 ones ( every node has 3,4,5, or 6 neighbours).
 TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
-    std::vector<IndexType> numPoints= { 100, 80, 50};
+    std::vector<IndexType> numPoints= { 200, 200, 200};
     std::vector<ValueType> maxCoord= {441, 711, 1160};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
     std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
@@ -153,6 +153,8 @@ TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
                                 -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
     EXPECT_EQ( adjM.getNumValues() , numEdges*2 );     
     
+    IndexType cntCorners= 0 , cntSides= 0, cntEdges= 0;
+    
     {
         SCAI_REGION("testCreateStructuredMesh_Distributed_3D.check_adjM_2")
         const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
@@ -164,8 +166,33 @@ TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
             EXPECT_LE( ia[i+1]-ia[i], 6 );
             // and also more than 3 which is the minimum
             EXPECT_GE( ia[i+1]-ia[i], 3 );
+            
+            // count the nodes with 3 edges
+            if(ia[i+1]-ia[i] == 3){
+                ++cntCorners;
+            }
+            // count the nodes with 4 edges
+            if(ia[i+1]-ia[i] == 4){
+                ++cntEdges;
+            }
+            // count the nodes with 4 edges
+            if(ia[i+1]-ia[i] == 5){
+                ++cntSides;
+            }
         }
     }
+    IndexType numX= numPoints[0];
+    IndexType numY= numPoints[1];
+    IndexType numZ= numPoints[2];
+    
+    //PRINT( comm->sum(cntCorners) );
+    
+    // check the global values
+    EXPECT_EQ( comm->sum(cntCorners), 8);
+    EXPECT_EQ( comm->sum(cntEdges) , 4*(numX+numY+numZ)-24);
+    EXPECT_EQ( comm->sum(cntSides) , 2*( (numX-2)*(numY-2)+ (numX-2)*(numZ-2)+ (numY-2)*(numZ-2) )  );
+    
+    PRINT(", corner nodes= "<< cntCorners << " , edge nodes= "<< cntEdges<< " , side nodes= "<< cntSides);
     
     {
     SCAI_REGION("testCreateStructuredMesh_Distributed_3D.check_coords_2")
@@ -385,12 +412,13 @@ TEST_F(MeshIOTest, testPartitionFromFile_local_2D){
 }
 //-----------------------------------------------------------------
 TEST_F(MeshIOTest, testIndex2_3DPoint){
-    std::vector<IndexType> numPoints= {9, 11, 7};
-    
+    std::vector<IndexType> numPoints= {100, 100, 100};
+    /*
     srand(time(NULL));
     for(int i=0; i<3; i++){
         numPoints[i] = (IndexType) (rand()%5 + 10);
     }
+    */
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
     
     for(IndexType i=0; i<N; i++){

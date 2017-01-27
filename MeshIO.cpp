@@ -283,7 +283,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
     hmemo::HArray<ValueType> csrValues;
     // ja and values have size= edges of the graph
     // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
-    IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
+    //IndexType numGlobalEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
                                 -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
                                 
     {
@@ -645,6 +645,7 @@ ValueType MeshIO<IndexType, ValueType>::dist3D(IndexType* p1, IndexType *p2){
 // of the index in 3D. The return value is not the coordiantes of the point!
 template<typename IndexType, typename ValueType>
 IndexType* MeshIO<IndexType, ValueType>::index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints){
+    SCAI_REGION("MeshIO.index2_3DPoint")
     // a YxZ plane
     IndexType planeSize= numPoints[1]*numPoints[2];
     IndexType* ret = (IndexType *)malloc(3* sizeof(IndexType));     // the return point
