@@ -1314,13 +1314,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 		{
 			SCAI_REGION( "ParcoRepart.distributedFMStep.loop.redistribute" )
-			{
-				SCAI_REGION( "ParcoRepart.distributedFMStep.loop.redistribute.sync" )
-				IndexType participating = comm->sum(1);
-				if (participating != comm->getSize()) {
-					std::cout << participating << " of " << comm->getSize() << " processes in redistribution." << std::endl;
-				}
-			}
 
 			SCAI_REGION_START( "ParcoRepart.distributedFMStep.loop.redistribute.generalDistribution" )
 			scai::utilskernel::LArray<IndexType> indexTransport(myGlobalIndices.size(), myGlobalIndices.data());
@@ -1333,7 +1326,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				SCAI_REGION( "ParcoRepart.distributedFMStep.loop.redistribute.updateDataStructures" )
 				redistributeFromHalo(input, newDistribution, graphHalo, haloMatrix);
 				part = DenseVector<IndexType>(newDistribution, localBlockID);
-				checkLocalDegreeSymmetry(input);
 			} else {
 				input.setDistributionPtr(newDistribution);
 				//the following is wasteful, it could be avoided if we could access DenseVector.setDistributionPtr()
