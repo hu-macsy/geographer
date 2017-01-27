@@ -88,7 +88,6 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   }
   
   MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(a, coordinates, maxCoord, numPoints);
-  ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(a);
 
   const ValueType epsilon = 0.05;
 
