@@ -2181,6 +2181,8 @@ template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int
 
 template double ParcoRepart<int, double>::computeCut(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, bool ignoreWeights);
 
+template void ParcoRepart<int, double>::checkLocalDegreeSymmetry(const CSRSparseMatrix<double> &input);
+
 template double ParcoRepart<int, double>::replicatedMultiWayFM(const CSRSparseMatrix<double> &input, DenseVector<int> &part, int k, double epsilon, bool unweighted);
 
 template double ParcoRepart<int, double>::distributedFMStep(CSRSparseMatrix<double> &input, DenseVector<int> &part, int k, double epsilon, bool unweighted);
