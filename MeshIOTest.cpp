@@ -110,18 +110,17 @@ TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
             }
         }
     }
-    
 }
 
 TEST_F(MeshIOTest, testCreateStructured3DMeshLocalDegreeSymmetry) {
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	IndexType k = comm->getSize();
 
-	if (k > 16) {
-		IndexType nroot = 300;
-		IndexType n = nroot * nroot * nroot;
-		IndexType dimensions = 3;
+	IndexType nroot = 300;
+	IndexType n = nroot * nroot * nroot;
+	IndexType dimensions = 3;
 
+	if (k > 16) {
 		scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
 		scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
 
