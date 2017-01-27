@@ -423,13 +423,13 @@ TEST_F(MeshIOTest, testIndex2_3DPoint){
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
     
     for(IndexType i=0; i<N; i++){
-        IndexType* ind = MeshIO<IndexType, ValueType>::index2_3DPoint(i, numPoints);
-        EXPECT_LE(ind[0] , numPoints[0]-1);
-        EXPECT_LE(ind[1] , numPoints[1]-1);
-        EXPECT_LE(ind[2] , numPoints[2]-1);
-        EXPECT_GE(ind[0] , 0);
-        EXPECT_GE(ind[1] , 0);
-        EXPECT_GE(ind[2] , 0);
+        std::tuple<IndexType, IndexType, IndexType> ind = MeshIO<IndexType, ValueType>::index2_3DPoint(i, numPoints);
+        EXPECT_LE(std::get<0>(ind) , numPoints[0]-1);
+        EXPECT_LE(std::get<1>(ind) , numPoints[1]-1);
+        EXPECT_LE(std::get<2>(ind) , numPoints[2]-1);
+        EXPECT_GE(std::get<0>(ind) , 0);
+        EXPECT_GE(std::get<1>(ind) , 0);
+        EXPECT_GE(std::get<2>(ind) , 0);
     }
 }
 
