@@ -142,12 +142,12 @@ namespace ITI {
 			static scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const int k);
 
 			/** Colors the edges of the graph using max_vertex_degree + 1 colors.
-                         * 
-                         * @param[in] adjM The graph with N vertices given as an NxN adjacency matrix.
-                         * 
-                         * @return A 3xN vector with the edges and the color of each edge: retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge.
-                         */
-                        static std::vector< std::vector<IndexType>>  getGraphEdgeColoring_local( const CSRSparseMatrix<ValueType> &adjM, IndexType& colors);
+			 *
+			 * @param[in] adjM The graph with N vertices given as an NxN adjacency matrix.
+			 *
+			 * @return A 3xN vector with the edges and the color of each edge: retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge.
+			 */
+			static std::vector< std::vector<IndexType>>  getGraphEdgeColoring_local( const CSRSparseMatrix<ValueType> &adjM, IndexType& colors);
                         
 			/** Colors the edges of the graph using max_vertex_degree + 1 colors.
 			 *
@@ -159,24 +159,23 @@ namespace ITI {
 			 */
 			static std::vector<IndexType> getGraphEdgeColoring_local( const std::vector<std::vector<IndexType>> &edgeList );
                         
-                        /** Given the block graph, creates an edge coloring of the graph and retuns a communication 
-                         *  scheme based on the coloring
-                         * 
-                         * @param[in] adjM The adjacency matrix of a graph.
-                         * @return std::vector.size()= number of colors used for coloring the graph. If D is the 
-                         *  maximum number of edges for a node, then nubers of colors is D or D+1. 
-                         *  vector[i].size()= number of nodes in the graph = adjM.numRows = adjMnumCols.
-                         *  return[i][j] = k : in round i, node j talks with node k. Must also be that return[i][k] = j.
-                         *  Inactive nodes have their own rank: rank[i][j] = j.
-                         */
-                        static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( const CSRSparseMatrix<ValueType> &adjM);
+			/** Given the block graph, creates an edge coloring of the graph and retuns a communication
+			 *  scheme based on the coloring
+			 *
+			 * @param[in] adjM The adjacency matrix of a graph.
+			 * @return std::vector.size()= number of colors used for coloring the graph. If D is the
+			 *  maximum number of edges for a node, then nubers of colors is D or D+1.
+			 *  vector[i].size()= number of nodes in the graph = adjM.numRows = adjMnumCols.
+			 *  return[i][j] = k : in round i, node j talks with node k. Must also be that return[i][k] = j.
+			 *  Inactive nodes have their own rank: rank[i][j] = j.
+			 */
+			static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( const CSRSparseMatrix<ValueType> &adjM);
 
 
 		private:
-			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &halo,
-					std::set<IndexType> &firstregion,  std::set<IndexType> &secondregion,
-					const std::set<IndexType> &firstDummyLayer, const std::set<IndexType> &secondDummyLayer,
-					std::pair<IndexType, IndexType> blockSizes,	const std::pair<IndexType, IndexType> blockCapacities, const bool unweighted = true);
+            static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
+                        		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::vector<bool>& assignedToSecondBlock,
+                        		const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes, const bool unweighted);
 
 			static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
 
