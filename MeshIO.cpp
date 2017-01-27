@@ -157,7 +157,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
             int numRowElems= 0;
             ValueType max_offset =  *max_element(offset.begin(),offset.end());
             
-            IndexType* thisPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( i, numPoints);
+            std::tuple<IndexType, IndexType, IndexType> thisPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( i, numPoints);
             
             {
             SCAI_REGION("createStructured3DMesh.setAdjacencyMatrix");
@@ -173,7 +173,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
                 }
                 
                 if(ngb_node>=0 && ngb_node<N){
-                    IndexType* ngbPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( ngb_node, numPoints);
+                	std::tuple<IndexType, IndexType, IndexType> ngbPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( ngb_node, numPoints);
                     
                     // we need to check distance for the nodes at the outer borders of the grid: eg:
                     // in a 4x4 grid with 16 nodes {0, 1, 2, ...} , for p1= node 3 there is an edge with
@@ -181,7 +181,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
                     // A way to avoid that is check if thery are close enough.
                     // TODO: maybe find another, faster way to avoid adding that kind of edges
                     
-                    if(dist3D( thisPoint, ngbPoint) <= 1)
+                    if(dist3DSquared( thisPoint, ngbPoint) <= 1)
                     {
                         ja[nnzCounter]= ngb_node;       // -1 for the METIS format
                         values[nnzCounter] = 1;         // unweighted edges
@@ -304,7 +304,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
             float ngb_node = globalInd;      
             int numRowElems= 0;     // the number of neighbours for each node. Can be less that 6.
             // the position of this node in 3D
-            IndexType* thisPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( globalInd, numPoints);
+            std::tuple<IndexType, IndexType, IndexType> thisPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( globalInd, numPoints);
             
             // for all 6 possible neighbours
             for(IndexType m=0; m<6; m++){
@@ -319,9 +319,9 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
        
                 if(ngb_node>=0 && ngb_node<N){
                     // get the position in the 3D of the neighbouring node
-                    IndexType* ngbPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( ngb_node, numPoints);
+                	std::tuple<IndexType, IndexType, IndexType> ngbPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( ngb_node, numPoints);
                     
-                    if(dist3D( thisPoint, ngbPoint) <= 1)
+                    if(dist3DSquared( thisPoint, ngbPoint) <= 1)
                     {
                         ja[nnzCounter]= ngb_node;       // -1 for the METIS format
                         values[nnzCounter] = 1;         // unweighted edges
@@ -628,32 +628,25 @@ Scalar MeshIO<IndexType, ValueType>::dist3D(DenseVector<ValueType> p1, ValueType
 }
 //-------------------------------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
-ValueType MeshIO<IndexType, ValueType>::dist3D(IndexType* p1, IndexType *p2){
+ValueType MeshIO<IndexType, ValueType>::dist3DSquared(std::tuple<IndexType, IndexType, IndexType> p1, std::tuple<IndexType, IndexType, IndexType> p2){
   SCAI_REGION( "MeshIO.dist3D" )
-  ValueType res0, res1, res2, res;
-  res0= p1[0]-p2[0];
-  res0= res0*res0;
-  res1= p1[1]-p2[1];
-  res1= res1*res1;
-  res2= p1[2]-p2[2];
-  res2= res2*res2;
-  res = res0+ res1+ res2;
-  return sqrt(res);
+  ValueType distX, distY, distZ;
+
+  distX = std::get<0>(p1)-std::get<0>(p2);
+  distY = std::get<1>(p1)-std::get<1>(p2);
+  distZ = std::get<2>(p1)-std::get<2>(p2);
+
+  ValueType distanceSquared = distX*distX+distY*distY+distZ*distZ;
+  return distanceSquared;
 }
 //-------------------------------------------------------------------------------------------------
 // Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
 // of the index in 3D. The return value is not the coordiantes of the point!
 template<typename IndexType, typename ValueType>
-IndexType* MeshIO<IndexType, ValueType>::index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints){
+std::tuple<IndexType, IndexType, IndexType> MeshIO<IndexType, ValueType>::index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints){
     // a YxZ plane
     IndexType planeSize= numPoints[1]*numPoints[2];
-    IndexType* ret = (IndexType *)malloc(3* sizeof(IndexType));     // the return point
-    
-    ret[0]= index/planeSize;
-    ret[1]= index % planeSize / numPoints[2];
-    ret[2]= (index % planeSize) % numPoints[2];
-    
-    return ret;
+    return std::make_tuple(index/planeSize, index % planeSize / numPoints[2], (index % planeSize) % numPoints[2]);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -669,6 +662,6 @@ template void  MeshIO<int, double>::fromFile2Coords_2D( const std::string filena
 template void MeshIO<int, double>::fromFile2Coords_3D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfPoints);
 template Scalar MeshIO<int, double>::dist3D(DenseVector<double> p1, DenseVector<double> p2);
 template Scalar MeshIO<int, double>::dist3D(DenseVector<double> p1, double* p2);
-template double MeshIO<int, double>::dist3D(int* p1, int* p2);
-template IndexType* MeshIO<int, double>::index2_3DPoint(int index,  std::vector<int> numPoints);
+template double MeshIO<int, double>::dist3DSquared(std::tuple<int, int, int> p1, std::tuple<int, int, int> p2);
+template std::tuple<IndexType, IndexType, IndexType> MeshIO<int, double>::index2_3DPoint(int index,  std::vector<int> numPoints);
 } //namespace ITI
