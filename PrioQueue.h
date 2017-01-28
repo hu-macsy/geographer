@@ -137,6 +137,7 @@ ITI::PrioQueue<Key, Val>::PrioQueue(uint64_t len) {
 
 template<class Key, class Val>
 inline void ITI::PrioQueue<Key, Val>::insert(Key key, Val value) {
+	SCAI_REGION( "PrioQueue.insert" )
 	if (value >= mapValToKey.size()) {
 		uint64_t doubledSize = 2 * mapValToKey.size();
 		assert(value < doubledSize);
@@ -178,6 +179,7 @@ std::pair<Key, Val> ITI::PrioQueue<Key, Val>::inspectMin() {
 
 template<class Key, class Val>
 std::pair<Key, Val> ITI::PrioQueue<Key, Val>::extractMin() {
+	SCAI_REGION( "PrioQueue.extractMin" )
 	assert(pqset.size() > 0);
 	ElemType elem = (* pqset.begin());
 	remove(elem);
@@ -186,6 +188,7 @@ std::pair<Key, Val> ITI::PrioQueue<Key, Val>::extractMin() {
 
 template<class Key, class Val>
 inline void ITI::PrioQueue<Key, Val>::decreaseKey(Key newKey, Val value) {
+	SCAI_REGION( "PrioQueue.decreaseKey" )
 	// find and remove element with given key
 	remove(value);
 
