@@ -66,6 +66,11 @@ namespace ITI {
                 /** Creates the adjacency matrix and the coordiated vector for a 3D mesh in a distributed way.
                  */
                 static void createStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
+                
+                /* Creates a semi-random 3D mesh.
+                 */
+                static void createRandomStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
+
 
                 /** Given an adjacency matrix and a filename writes the matrix in the file using the METIS format.
                  *  Not distributed.

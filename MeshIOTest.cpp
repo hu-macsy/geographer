@@ -211,6 +211,34 @@ TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
     }
     
 }
+
+//-----------------------------------------------------------------
+// Creates the part of a structured mesh in each processor ditributed and checks the matrix and the coordinates.
+// For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
+// less than 6 ones ( every node has 3,4,5, or 6 neighbours).
+TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
+    std::vector<IndexType> numPoints= { 30, 30, 30};
+    std::vector<ValueType> maxCoord= {441, 711, 1160};
+    IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
+    std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
+    
+    std::vector<DenseVector<ValueType>> coords(3);
+    for(IndexType i=0; i<3; i++){ 
+	  coords[i].allocate(dist);
+	  coords[i] = static_cast<ValueType>( 0 );
+    }
+    
+    scai::lama::CSRSparseMatrix<ValueType> adjM( dist, noDistPointer);
+    
+    // create the adjacency matrix and the coordinates
+    MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
+    
+    
+}
 //-----------------------------------------------------------------
 /*
 TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
