@@ -1009,7 +1009,7 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 
 template<typename IndexType, typename ValueType>
 IndexType ITI::ParcoRepart<IndexType, ValueType>::getDegreeSum(const CSRSparseMatrix<ValueType> &input, std::vector<IndexType> nodes) {
-	SCAI_REGION_START( "ParcoRepart.getDegreeSum" )
+	SCAI_REGION( "ParcoRepart.getDegreeSum" )
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::hmemo::ReadAccess<IndexType> localIa(localStorage.getIA());
 
@@ -1521,7 +1521,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		} else {
 			firstQueue.insert(-gain[i], i);
 		}
-
 	}
 
 	std::vector<bool> moved(veryLocalN, false);
@@ -1590,7 +1589,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		}
 
 		PrioQueue<ValueType, IndexType>& currentQueue = bestQueueIndex == 0 ? firstQueue : secondQueue;
-		PrioQueue<ValueType, IndexType>& otherQueue = bestQueueIndex == 0 ? secondQueue : firstQueue;
 
 		//now, we have selected a Queue.
 		IndexType veryLocalID;
@@ -1646,12 +1644,10 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 				gain[veryLocalNeighborID] += 4*edgeweight*wasInSameBlock -2*edgeweight;
 
-				if (wasInSameBlock) {
-					//assert(currentQueue.contains(veryLocalNeighborID));
-					currentQueue.decreaseKey(-gain[veryLocalNeighborID], veryLocalNeighborID);
+				if (assignedToSecondBlock[veryLocalNeighborID]) {
+					secondQueue.decreaseKey(-gain[veryLocalNeighborID], veryLocalNeighborID);
 				} else {
-					//assert(otherQueue.contains(veryLocalNeighborID));
-					otherQueue.decreaseKey(-gain[veryLocalNeighborID], veryLocalNeighborID);
+					firstQueue.decreaseKey(-gain[veryLocalNeighborID], veryLocalNeighborID);
 				}
 			}
 		}
