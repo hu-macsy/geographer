@@ -888,8 +888,8 @@ inline bool ITI::ParcoRepart<IndexType, ValueType>::hasNonLocalNeighbors(const C
 		if (!inputDist->isLocal(ja[j])) {
 			return true;
 		}
-		return false;
 	}
+	return false;
 }
 
 template<typename IndexType, typename ValueType>
@@ -952,7 +952,6 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 	if (depth < 0) {
 		throw std::runtime_error("Depth must be non-negative");
 	}
-
 
 	scai::hmemo::HArray<IndexType> localData = part.getLocalValues();
 	scai::hmemo::ReadAccess<IndexType> partAccess(localData);
@@ -1369,25 +1368,27 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				/**
 				 * update local border
 				 */
+				{
+					SCAI_REGION( "ParcoRepart.distributedFMStep.loop.updateLocalBorder" )
+					//remove old border with partner
+					const IndexType sizeOfOldBorderList = nodesWithNonLocalNeighbors.size();
 
-				//remove old border with partner
-				const IndexType sizeOfOldBorderList = nodesWithNonLocalNeighbors.size();
+					std::vector<IndexType> sortedCopyOfInterfaceNodes(interfaceNodes.begin(), interfaceNodes.end());
+					std::sort(sortedCopyOfInterfaceNodes.begin(), sortedCopyOfInterfaceNodes.end());
 
-				std::vector<IndexType> sortedCopyOfInterfaceNodes(interfaceNodes.begin(), interfaceNodes.end());
-				std::sort(sortedCopyOfInterfaceNodes.begin(), sortedCopyOfInterfaceNodes.end());
+					nodesWithNonLocalNeighbors.erase(std::remove_if(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end(), [&sortedCopyOfInterfaceNodes](IndexType globalID){
+						//could also use std::bind instead of a lambda here.
+						return std::binary_search(sortedCopyOfInterfaceNodes.begin(), sortedCopyOfInterfaceNodes.end(), globalID);
+					}), nodesWithNonLocalNeighbors.end());
 
-				nodesWithNonLocalNeighbors.erase(std::remove_if(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end(), [&sortedCopyOfInterfaceNodes](IndexType globalID){
-					//could also use std::bind instead of a lambda here.
-					return std::binary_search(sortedCopyOfInterfaceNodes.begin(), sortedCopyOfInterfaceNodes.end(), globalID);
-				}), nodesWithNonLocalNeighbors.end());
+					assert(IndexType(nodesWithNonLocalNeighbors.size()) >= sizeOfOldBorderList - IndexType(interfaceNodes.size()));
 
-				assert(IndexType(nodesWithNonLocalNeighbors.size()) >= sizeOfOldBorderList - IndexType(interfaceNodes.size()));
-
-				//now add new border
-				std::copy_if(borderRegionIDs.begin(), borderRegionIDs.end(), std::back_inserter(nodesWithNonLocalNeighbors), [&input](IndexType node){
-					return input.getRowDistributionPtr()->isLocal(node) && hasNonLocalNeighbors(input, node);
-				});
-				assert(nodesWithNonLocalNeighbors.size() <= sizeOfOldBorderList + borderRegionIDs.size());
+					//now add new border
+					std::copy_if(borderRegionIDs.begin(), borderRegionIDs.end(), std::back_inserter(nodesWithNonLocalNeighbors), [&input](IndexType node){
+						return input.getRowDistributionPtr()->isLocal(node) && hasNonLocalNeighbors(input, node);
+					});
+					assert(nodesWithNonLocalNeighbors.size() <= sizeOfOldBorderList + borderRegionIDs.size());
+				}
 			}
 		}
 	}
