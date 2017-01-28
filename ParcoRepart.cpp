@@ -1220,7 +1220,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			std::pair<IndexType, IndexType> blockSizes = {blockSize, otherBlockSize};
 			std::pair<IndexType, IndexType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
 			SCAI_REGION_END( "ParcoRepart.distributedFMStep.loop.prepareSets" )
-			//std::cout << "Process " << comm->getRank() << ", assembled border region of " << lastRoundMarker << " own nodes and " << otherLastRoundMarker << " foreign nodes." << std::endl;
 
 			/**
 			 * execute FM locally
@@ -1398,7 +1397,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes, const bool unweighted) {
 	SCAI_REGION( "ParcoRepart.twoWayLocalFM" )
 
-	const IndexType magicStoppingAfterNoGainRounds = 100;
+	const IndexType magicStoppingAfterNoGainRounds = borderRegionIDs.size();
 	const bool gainOverBalance = false;
 
 	if (blockSizes.first >= blockCapacities.first && blockSizes.second >= blockCapacities.second) {
@@ -1425,44 +1424,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	assert(globalToVeryLocal.size() == veryLocalN);
 
 	auto isInBorderRegion = [&](IndexType globalID){return globalToVeryLocal.count(globalID) > 0;};
-
-	/**
-	 * check degree symmetry
-	 */
-	SCAI_REGION_START( "ParcoRepart.twoWayLocalFM.checkDegreeSymmetry" )
-	std::vector<IndexType> inDegree(veryLocalN, 0);
-	std::vector<IndexType> outDegree(veryLocalN, 0);
-	for (IndexType i = 0; i < veryLocalN; i++) {
-		IndexType globalID = borderRegionIDs[i];
-		const CSRStorage<ValueType>& storage = inputDist->isLocal(globalID) ? input.getLocalStorage() : haloStorage;
-		const IndexType localID = inputDist->isLocal(globalID) ? inputDist->global2local(globalID) : matrixHalo.global2halo(globalID);
-		assert(localID != nIndex);
-
-		const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
-		const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());
-		const IndexType beginCols = localIa[localID];
-		const IndexType endCols = localIa[localID+1];
-		for (IndexType j = beginCols; j < endCols; j++) {
-			IndexType globalNeighbor = localJa[j];
-			//std::string locationString = inputDist->isLocal(globalID) ? "locally" : "in halo";
-			//std::string countString = globalNeighbor != globalID && isInBorderRegion(globalNeighbor) ? "counted" : "not counted";
-			//std::cout << "Thread " << comm->getRank() << ": (" << globalID << "," << globalNeighbor << ") found " << locationString << ", " << countString << std::endl;
-
-			if (isInBorderRegion(globalNeighbor)) {
-				IndexType veryLocalNeighbor = globalToVeryLocal.at(globalNeighbor);
-				outDegree[i]++;
-				inDegree[veryLocalNeighbor]++;
-			}
-		}
-	}
-
-	for (IndexType i = 0; i < veryLocalN; i++) {
-		if (inDegree[i] != outDegree[i]) {
-			throw std::runtime_error("Process " + std::to_string(comm->getRank()) + ": Node " + std::to_string(borderRegionIDs[i]) + " has " + std::to_string(inDegree[i]) + " incoming local edges but "
-					+ std::to_string(outDegree[i]) + " outgoing local edges.");
-		}
-	}
-	SCAI_REGION_END( "ParcoRepart.twoWayLocalFM.checkDegreeSymmetry" )
 
 	auto computeInitialGain = [&](IndexType veryLocalID){
 		SCAI_REGION( "ParcoRepart.twoWayLocalFM.computeGain" )
