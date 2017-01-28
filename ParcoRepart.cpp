@@ -992,6 +992,8 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 	for (IndexType node : nodesWithNonLocalNeighbors) {
 		SCAI_REGION( "ParcoRepart.getInterfaceNodes.getBorderToPartner" )
 		IndexType localI = inputDist->global2local(node);
+		assert(localI != nIndex);
+		assert(hasNonLocalNeighbors(input, node));
 		for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
 			if (foreignNodes.count(ja[j])> 0) {
 				interfaceNodes.push_back(node);
@@ -1013,7 +1015,9 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 		std::queue<IndexType> bfsQueue;
 		for (IndexType node : interfaceNodes) {
 			bfsQueue.push(node);
-			touched[inputDist->global2local(node)] = true;
+			const IndexType localID = inputDist->global2local(node);
+			assert(localID != nIndex);
+			touched[localID] = true;
 		}
 		assert(bfsQueue.size() == interfaceNodes.size());
 
@@ -1025,18 +1029,19 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 				bfsQueue.pop();
 
 				const IndexType localI = inputDist->global2local(nextNode);
+				assert(localI != nIndex);
 				assert(touched[localI]);
 				const IndexType beginCols = ia[localI];
 				const IndexType endCols = ia[localI+1];
 
 				for (IndexType j = beginCols; j < endCols; j++) {
 					IndexType neighbor = ja[j];
+					IndexType localNeighbor = inputDist->global2local(neighbor);
 					//TODO: optimize with assumption k=p
-					if (inputDist->isLocal(neighbor) && partAccess[partDist->global2local(neighbor)] == thisBlock &&
-							!touched[inputDist->global2local(neighbor)]) {
+					if (localNeighbor != nIndex && !touched[localNeighbor]) {
 						nextQueue.push(neighbor);
 						interfaceNodes.push_back(neighbor);
-						touched[inputDist->global2local(neighbor)] = true;
+						touched[localNeighbor] = true;
 					}
 				}
 			}
@@ -1380,6 +1385,9 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 						//could also use std::bind instead of a lambda here.
 						return std::binary_search(sortedCopyOfInterfaceNodes.begin(), sortedCopyOfInterfaceNodes.end(), globalID);
 					}), nodesWithNonLocalNeighbors.end());
+
+					assert(std::all_of(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end(), [&](IndexType node){return newDistribution->isLocal(node);}));
+					assert(std::all_of(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end(), [&](IndexType node){return hasNonLocalNeighbors(input, node);}));
 
 					assert(IndexType(nodesWithNonLocalNeighbors.size()) >= sizeOfOldBorderList - IndexType(interfaceNodes.size()));
 
