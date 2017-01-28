@@ -1009,6 +1009,7 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 
 template<typename IndexType, typename ValueType>
 IndexType ITI::ParcoRepart<IndexType, ValueType>::getDegreeSum(const CSRSparseMatrix<ValueType> &input, std::vector<IndexType> nodes) {
+	SCAI_REGION_START( "ParcoRepart.getDegreeSum" )
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::hmemo::ReadAccess<IndexType> localIa(localStorage.getIA());
 
@@ -1397,6 +1398,9 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes, const bool unweighted) {
 	SCAI_REGION( "ParcoRepart.twoWayLocalFM" )
 
+	const IndexType magicStoppingAfterNoGainRounds = 100;
+	const bool gainOverBalance = false;
+
 	if (blockSizes.first >= blockCapacities.first && blockSizes.second >= blockCapacities.second) {
 		//cannot move any nodes, all blocks are overloaded already.
 		std::cout << "Overloaded, cannot move anything." << std::endl;
@@ -1415,8 +1419,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 	for (IndexType i = 0; i < veryLocalN; i++) {
 		IndexType globalIndex = borderRegionIDs[i];
-		assert(inputDist->isLocal(globalIndex) || matrixHalo.global2halo(globalIndex) != nIndex);
-		assert(globalToVeryLocal.count(globalIndex) == 0);
 		globalToVeryLocal[globalIndex] = i;
 	}
 
@@ -1427,6 +1429,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	/**
 	 * check degree symmetry
 	 */
+	SCAI_REGION_START( "ParcoRepart.twoWayLocalFM.checkDegreeSymmetry" )
 	std::vector<IndexType> inDegree(veryLocalN, 0);
 	std::vector<IndexType> outDegree(veryLocalN, 0);
 	for (IndexType i = 0; i < veryLocalN; i++) {
@@ -1459,6 +1462,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 					+ std::to_string(outDegree[i]) + " outgoing local edges.");
 		}
 	}
+	SCAI_REGION_END( "ParcoRepart.twoWayLocalFM.checkDegreeSymmetry" )
 
 	auto computeInitialGain = [&](IndexType veryLocalID){
 		SCAI_REGION( "ParcoRepart.twoWayLocalFM.computeGain" )
@@ -1530,15 +1534,15 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	fillFactorList.reserve(veryLocalN);
 
 	IndexType iter = 0;
-	while (firstQueue.size() + secondQueue.size() > 0) {
+	IndexType iterWithoutGain = 0;
+	while (firstQueue.size() + secondQueue.size() > 0 && iterWithoutGain < magicStoppingAfterNoGainRounds) {
 		SCAI_REGION( "ParcoRepart.twoWayLocalFM.queueloop" )
 		IndexType bestQueueIndex;
 
+		assert(firstQueue.size() + secondQueue.size() == veryLocalN - iter);
 		/*
 		 * first check break situations
 		 */
-
-		//only one block overfull,
 		if ((firstQueue.size() == 0 && blockSizes.first >= blockCapacities.first)
 				 ||	(secondQueue.size() == 0 && blockSizes.second >= blockCapacities.second)) {
 			//cannot move any nodes
@@ -1557,6 +1561,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 			bestQueueIndex = 0;
 		}
 		else {
+			SCAI_REGION( "ParcoRepart.twoWayLocalFM.queueloop.queueselection" )
+
 			std::vector<ValueType> fullness = {double(blockSizes.first) / blockCapacities.first, double(blockSizes.second) / blockCapacities.second};
 			std::vector<ValueType> gains = {firstQueue.inspectMin().first, secondQueue.inspectMin().first};
 
@@ -1591,15 +1597,15 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		ValueType topGain;
 		std::tie(topGain, veryLocalID) = currentQueue.extractMin();
 
-		assert(!currentQueue.contains(veryLocalID));
-		assert(!otherQueue.contains(veryLocalID));
 		topGain *= -1;
 
 		IndexType topVertex = borderRegionIDs[veryLocalID];
-		assert(isInBorderRegion(topVertex));
 		assert(assignedToSecondBlock[veryLocalID] == bestQueueIndex);
 		assert(!moved[veryLocalID]);
 		assert(topGain == gain[veryLocalID]);
+
+		if (topGain > 0) iterWithoutGain = 0;
+		else iterWithoutGain++;
 
 		//move node
 		transfers.emplace_back(bestQueueIndex, veryLocalID);
@@ -1638,7 +1644,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 				ValueType edgeweight = unweighted ? 1 : localValues[j];
 				bool wasInSameBlock = (bestQueueIndex == assignedToSecondBlock[veryLocalNeighborID]);
 
-				gain[veryLocalNeighborID] += wasInSameBlock ? 2*edgeweight : -2*edgeweight;
+				gain[veryLocalNeighborID] += 4*edgeweight*wasInSameBlock -2*edgeweight;
 
 				if (wasInSameBlock) {
 					//assert(currentQueue.contains(veryLocalNeighborID));
@@ -1655,11 +1661,12 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	/**
 	* now find best partition among those tested
 	*/
+	ValueType maxGain = 0;
 	const IndexType testedNodes = gainSumList.size();
 	if (testedNodes == 0) return 0;
 
+	SCAI_REGION_START( "ParcoRepart.twoWayLocalFM.recoverBestCut" )
 	IndexType maxIndex = -1;
-	ValueType maxGain = 0;
 
 	for (IndexType i = 0; i < testedNodes; i++) {
 		if (gainSumList[i] > maxGain && fillFactorList[i] <= 1) {
@@ -1684,6 +1691,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		blockSizes.second += transfers[i].first == 0 ? -1 : 1;
 
 	}
+	SCAI_REGION_END( "ParcoRepart.twoWayLocalFM.recoverBestCut" )
 
 	return maxGain;
 }
