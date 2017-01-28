@@ -164,6 +164,7 @@ inline void ITI::PrioQueue<Key, Val>::remove(const ElemType& elem) {
 
 template<class Key, class Val>
 inline void ITI::PrioQueue<Key, Val>::remove(const Val& val) {
+	SCAI_REGION( "PrioQueue.remove" )
 	Key key = mapValToKey.at(val);
 	pqset.erase(std::make_pair(key, val));
 	mapValToKey.at(val) = undefined;
