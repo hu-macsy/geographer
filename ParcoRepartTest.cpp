@@ -64,7 +64,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
 }
 
 TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
-  IndexType nroot = 8;
+  IndexType nroot = 32;
   IndexType n = nroot * nroot * nroot;
   IndexType dimensions = 3;
   
@@ -356,9 +356,11 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 	a.redistribute(newDistribution, a.getColDistributionPtr());
 	part.redistribute(newDistribution);
 
+	std::vector<IndexType> localBorder = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(a);
+
 	ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
 	for (IndexType i = 0; i < iterations; i++) {
-		ValueType gain = ParcoRepart<IndexType, ValueType>::distributedFMStep(a, part, k, epsilon);
+		ValueType gain = ParcoRepart<IndexType, ValueType>::distributedFMStep(a, part, localBorder, k, epsilon);
 
 		//check correct gain calculation
 		const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
@@ -488,6 +490,7 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 	}
 
 	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::computeCommunicationPairings(a, part, mapping);
+	std::vector<IndexType> localBorder = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(a);
 
 	IndexType thisBlock = comm->getRank();
 
@@ -505,7 +508,7 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 
 			std::vector<IndexType> interfaceNodes;
 			IndexType lastRoundMarker;
-			std::tie(interfaceNodes, lastRoundMarker) = ParcoRepart<IndexType, ValueType>::getInterfaceNodes(a, part, thisBlock, otherBlock, 2);
+			std::tie(interfaceNodes, lastRoundMarker) = ParcoRepart<IndexType, ValueType>::getInterfaceNodes(a, part, localBorder, thisBlock, otherBlock, 2);
 
 			//last round marker can only be zero if set is empty
 			EXPECT_LE(lastRoundMarker, interfaceNodes.size());
