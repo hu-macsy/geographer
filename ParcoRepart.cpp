@@ -978,8 +978,11 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 	{
 		SCAI_REGION( "ParcoRepart.getInterfaceNodes.communication" )
 		IndexType swapField[1];
-		swapField[0] = nodesWithNonLocalNeighbors.size();
-		comm->swap(swapField, 1, otherBlock);
+		{
+			SCAI_REGION( "ParcoRepart.getInterfaceNodes.communication.syncswap" )
+			swapField[0] = nodesWithNonLocalNeighbors.size();
+			comm->swap(swapField, 1, otherBlock);
+		}
 
 		const IndexType swapLength = std::max(swapField[0], IndexType(nodesWithNonLocalNeighbors.size()));
 		IndexType swapList[swapLength];
@@ -1126,20 +1129,20 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		}
 	}
 
-	for (IndexType i = 0; i < communicationScheme.size(); i++) {
+	for (IndexType round = 0; round < communicationScheme.size(); round++) {
 		SCAI_REGION( "ParcoRepart.distributedFMStep.loop" )
 
 		const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 		const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
-		const scai::dmemo::DistributionPtr commDist = communicationScheme[i].getDistributionPtr();
+		const scai::dmemo::DistributionPtr commDist = communicationScheme[round].getDistributionPtr();
 
 		const IndexType localN = inputDist->getLocalSize();
 
-		if (!communicationScheme[i].getDistributionPtr()->isLocal(comm->getRank())) {
+		if (!communicationScheme[round].getDistributionPtr()->isLocal(comm->getRank())) {
 			throw std::runtime_error("Scheme value for " + std::to_string(comm->getRank()) + " must be local.");
 		}
 		
-		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[i].getLocalValues());
+		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[round].getLocalValues());
 		IndexType partner = commAccess[commDist->global2local(comm->getRank())];
 
 		assert(partner < comm->getSize());
@@ -1382,7 +1385,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 					SCAI_REGION( "ParcoRepart.distributedFMStep.loop.updateLocalBorder" )
 					//remove old border with partner
 					const IndexType sizeOfOldBorderList = nodesWithNonLocalNeighbors.size();
-
 					std::vector<IndexType> sortedCopyOfInterfaceNodes(interfaceNodes.begin(), interfaceNodes.end());
 					std::sort(sortedCopyOfInterfaceNodes.begin(), sortedCopyOfInterfaceNodes.end());
 
@@ -1394,11 +1396,31 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 					assert(IndexType(nodesWithNonLocalNeighbors.size()) >= sizeOfOldBorderList - IndexType(interfaceNodes.size()));
 
 					//now add new border
-					std::copy_if(borderRegionIDs.begin(), borderRegionIDs.end(), std::back_inserter(nodesWithNonLocalNeighbors), [&input](IndexType node){
-						return input.getRowDistributionPtr()->isLocal(node) && hasNonLocalNeighbors(input, node);
-					});
+					const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+
+					const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
+					const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+					const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+
+					for (IndexType i = 0; i < borderRegionIDs.size(); i++) {
+						if (!assignedToSecondBlock[i]) {
+							const IndexType localID = inputDist->global2local(borderRegionIDs[i]);
+							assert(localID != nIndex);
+
+							const IndexType beginCols = ia[localID];
+							const IndexType endCols = ia[localID+1];
+
+							for (IndexType j = beginCols; j < endCols; j++) {
+								if (!inputDist->isLocal(ja[j])) {
+									nodesWithNonLocalNeighbors.push_back(borderRegionIDs[i]);
+									break;
+								}
+							}
+						}
+					}
 					assert(nodesWithNonLocalNeighbors.size() <= sizeOfOldBorderList + borderRegionIDs.size());
 
+					//sort border nodes. This should not be necessary, but is is. TODO: find out why!
 					std::sort(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end());
 				}
 			}
