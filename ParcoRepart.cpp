@@ -1355,6 +1355,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				 */
 				for (IndexType i = 0; i < otherLastRoundMarker; i++) {
 					if (!assignedToSecondBlock[lastRoundMarker + i]) {
+						assert(requiredHaloIndices[i] == borderRegionIDs[lastRoundMarker + i]);
 						myGlobalIndices.push_back(requiredHaloIndices[i]);
 					}
 				}
@@ -1402,7 +1403,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 					std::copy_if(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end(), std::back_inserter(superfluousNodes),
 							[&comparison](IndexType node){return !std::binary_search(comparison.begin(), comparison.end(), node);});
-					std::cout << superfluousNodes.size() << " nodes that shouldn't be there." << std::endl;
+					if (superfluousNodes.size()>0) std::cout << superfluousNodes.size() << " nodes that shouldn't be there." << std::endl;
 
 					//now add new border
 					const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
@@ -1425,6 +1426,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 									break;
 								}
 							}
+						} else {
+							assert(!inputDist->isLocal(borderRegionIDs[i]));
 						}
 					}
 					assert(nodesWithNonLocalNeighbors.size() <= sizeOfOldBorderList + borderRegionIDs.size());
@@ -1434,7 +1437,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 					std::copy_if(comparison.begin(), comparison.end(), std::back_inserter(missingNodes),
 							[&nodesWithNonLocalNeighbors](IndexType node){return !std::binary_search(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end(), node);});
-					std::cout << missingNodes.size() << " missing nodes" << std::endl;
+					std::cout << missingNodes.size() << " nodes of " << comparison.size() << " missing." << std::endl;
 				}
 			}
 		}
