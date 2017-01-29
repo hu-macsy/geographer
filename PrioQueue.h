@@ -189,7 +189,8 @@ std::pair<Key, Val> ITI::PrioQueue<Key, Val>::extractMin() {
 	SCAI_REGION( "PrioQueue.extractMin" )
 	assert(pqset.size() > 0);
 	ElemType elem = (* pqset.begin());
-	remove(elem);
+	pqset.erase(elem);
+	mapValToKey.at(elem.second) = undefined;
 	return elem;
 }
 
