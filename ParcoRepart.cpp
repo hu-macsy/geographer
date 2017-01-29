@@ -1386,58 +1386,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				 */
 				{
 					SCAI_REGION( "ParcoRepart.distributedFMStep.loop.updateLocalBorder" )
-					//remove old border with partner
-					const IndexType sizeOfOldBorderList = nodesWithNonLocalNeighbors.size();
-					std::vector<IndexType> sortedCopyOfInterfaceNodes(interfaceNodes.begin(), interfaceNodes.end());
-					std::sort(sortedCopyOfInterfaceNodes.begin(), sortedCopyOfInterfaceNodes.end());
-
-					std::vector<IndexType> comparison = getNodesWithNonLocalNeighbors(input);
-					std::vector<IndexType> superfluousNodes, missingNodes;
-
-					nodesWithNonLocalNeighbors.erase(std::remove_if(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end(), [&sortedCopyOfInterfaceNodes](IndexType globalID){
-						//could also use std::bind instead of a lambda here.
-						return std::binary_search(sortedCopyOfInterfaceNodes.begin(), sortedCopyOfInterfaceNodes.end(), globalID);
-					}), nodesWithNonLocalNeighbors.end());
-
-					assert(IndexType(nodesWithNonLocalNeighbors.size()) >= sizeOfOldBorderList - IndexType(interfaceNodes.size()));
-
-					std::copy_if(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end(), std::back_inserter(superfluousNodes),
-							[&comparison](IndexType node){return !std::binary_search(comparison.begin(), comparison.end(), node);});
-					if (superfluousNodes.size()>0) std::cout << superfluousNodes.size() << " nodes that shouldn't be there." << std::endl;
-
-					//now add new border
-					const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
-
-					const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
-					const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-					const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-
-					for (IndexType i = 0; i < borderRegionIDs.size(); i++) {
-						if (!assignedToSecondBlock[i]) {
-							const IndexType localID = inputDist->global2local(borderRegionIDs[i]);
-							assert(localID != nIndex);
-
-							const IndexType beginCols = ia[localID];
-							const IndexType endCols = ia[localID+1];
-
-							for (IndexType j = beginCols; j < endCols; j++) {
-								if (!inputDist->isLocal(ja[j])) {
-									nodesWithNonLocalNeighbors.push_back(borderRegionIDs[i]);
-									break;
-								}
-							}
-						} else {
-							assert(!inputDist->isLocal(borderRegionIDs[i]));
-						}
-					}
-					assert(nodesWithNonLocalNeighbors.size() <= sizeOfOldBorderList + borderRegionIDs.size());
-
-					//sort border nodes. This should not be necessary, but is is. TODO: find out why!
-					std::sort(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end());
-
-					std::copy_if(comparison.begin(), comparison.end(), std::back_inserter(missingNodes),
-							[&nodesWithNonLocalNeighbors](IndexType node){return !std::binary_search(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end(), node);});
-					std::cout << missingNodes.size() << " nodes of " << comparison.size() << " missing." << std::endl;
+					//update local border
+					nodesWithNonLocalNeighbors = getNodesWithNonLocalNeighbors(input);
 				}
 			}
 		}
