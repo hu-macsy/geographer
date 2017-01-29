@@ -1690,12 +1690,13 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 				ValueType edgeweight = unweighted ? 1 : localValues[j];
 				bool wasInSameBlock = (bestQueueIndex == assignedToSecondBlock[veryLocalNeighborID]);
 
-				gain[veryLocalNeighborID] += 4*edgeweight*wasInSameBlock -2*edgeweight;
+				const ValueType oldGain = gain[veryLocalNeighborID];
+				gain[veryLocalNeighborID] = oldGain + 4*edgeweight*wasInSameBlock -2*edgeweight;
 
 				if (assignedToSecondBlock[veryLocalNeighborID]) {
-					secondQueue.decreaseKey(-gain[veryLocalNeighborID], veryLocalNeighborID);
+					secondQueue.updateKey(-oldGain, -gain[veryLocalNeighborID], veryLocalNeighborID);
 				} else {
-					firstQueue.decreaseKey(-gain[veryLocalNeighborID], veryLocalNeighborID);
+					firstQueue.updateKey(-oldGain, -gain[veryLocalNeighborID], veryLocalNeighborID);
 				}
 			}
 		}

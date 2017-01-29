@@ -81,7 +81,13 @@ public:
 	 * The entry is then set to @a newKey with the same value.
 	 * If the corresponding key is not present, the element will be inserted.
 	 */
-	virtual void decreaseKey(Key newKey, Val value);
+	virtual void updateKey(Key newKey, Val value);
+
+	/**
+	 * slightly optimized version of updateKey when the old key is known
+	 */
+	virtual void updateKey(Key oldKey, Key newKey, Val value);
+
 
 	/**
 	 * Removes key-value pair given by @a elem.
@@ -188,8 +194,18 @@ std::pair<Key, Val> ITI::PrioQueue<Key, Val>::extractMin() {
 }
 
 template<class Key, class Val>
-inline void ITI::PrioQueue<Key, Val>::decreaseKey(Key newKey, Val value) {
-	SCAI_REGION( "PrioQueue.decreaseKey" )
+inline void ITI::PrioQueue<Key, Val>::updateKey(Key oldKey, Key newKey, Val value) {
+	SCAI_REGION( "PrioQueue.updateKey" )
+	//slightly optimized version when old key is known, saves one hashmap access
+	pqset.erase(std::make_pair(oldKey, value));
+	pqset.insert(std::make_pair(newKey, value));
+
+	mapValToKey.at(value) = newKey;
+}
+
+template<class Key, class Val>
+inline void ITI::PrioQueue<Key, Val>::updateKey(Key newKey, Val value) {
+	SCAI_REGION( "PrioQueue.updateKey" )
 	// find and remove element with given key
 	remove(value);
 
