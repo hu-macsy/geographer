@@ -211,6 +211,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				gain = replicatedMultiWayFM(input, result, k, epsilon);
 			} else {
 				gain = distributedFMStep(input, result, nodesWithNonLocalNeighbors, k, epsilon, communicationScheme);
+				const IndexType localOutgoingEdges = localSumOutgoingEdges(input);
+
+				const IndexType maxDegree = 6;//for debug purposes
+				assert(nodesWithNonLocalNeighbors.size() <= localOutgoingEdges);
+				assert(nodesWithNonLocalNeighbors.size() >= localOutgoingEdges/maxDegree);
 			}
 			ValueType oldCut = cut;
 			cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input)) / 2;
@@ -1037,7 +1042,7 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 				for (IndexType j = beginCols; j < endCols; j++) {
 					IndexType neighbor = ja[j];
 					IndexType localNeighbor = inputDist->global2local(neighbor);
-					//TODO: optimize with assumption k=p
+					//assume k=p
 					if (localNeighbor != nIndex && !touched[localNeighbor]) {
 						nextQueue.push(neighbor);
 						interfaceNodes.push_back(neighbor);
@@ -1386,9 +1391,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 						return std::binary_search(sortedCopyOfInterfaceNodes.begin(), sortedCopyOfInterfaceNodes.end(), globalID);
 					}), nodesWithNonLocalNeighbors.end());
 
-					assert(std::all_of(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end(), [&](IndexType node){return newDistribution->isLocal(node);}));
-					assert(std::all_of(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end(), [&](IndexType node){return hasNonLocalNeighbors(input, node);}));
-
 					assert(IndexType(nodesWithNonLocalNeighbors.size()) >= sizeOfOldBorderList - IndexType(interfaceNodes.size()));
 
 					//now add new border
@@ -1396,6 +1398,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 						return input.getRowDistributionPtr()->isLocal(node) && hasNonLocalNeighbors(input, node);
 					});
 					assert(nodesWithNonLocalNeighbors.size() <= sizeOfOldBorderList + borderRegionIDs.size());
+
+					std::sort(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end());
 				}
 			}
 		}
