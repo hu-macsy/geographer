@@ -22,6 +22,7 @@
 #include <algorithm>
 
 #include "PrioQueue.h"
+#include "PrioQueueForInts.h"
 #include "ParcoRepart.h"
 #include "HilbertCurve.h"
 
