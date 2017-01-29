@@ -1001,12 +1001,18 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 		SCAI_REGION( "ParcoRepart.getInterfaceNodes.getBorderToPartner" )
 		IndexType localI = inputDist->global2local(node);
 		assert(localI != nIndex);
-		assert(hasNonLocalNeighbors(input, node));
+		bool hasNonLocal = false;
 		for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
-			if (foreignNodes.count(ja[j])> 0) {
-				interfaceNodes.push_back(node);
-				break;
+			if (!inputDist->isLocal(ja[j])) {
+				hasNonLocal = true;
+				if (foreignNodes.count(ja[j])> 0) {
+					interfaceNodes.push_back(node);
+					break;
+				}
 			}
+		}
+		if (!hasNonLocal) {
+			throw std::runtime_error("Node " + std::to_string(node) + " has " + std::to_string(ia[localI+1] - ia[localI]) + " neighbors, but all of them are local.");
 		}
 	}
 
@@ -1384,12 +1390,19 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 					std::vector<IndexType> sortedCopyOfInterfaceNodes(interfaceNodes.begin(), interfaceNodes.end());
 					std::sort(sortedCopyOfInterfaceNodes.begin(), sortedCopyOfInterfaceNodes.end());
 
+					std::vector<IndexType> comparison = getNodesWithNonLocalNeighbors(input);
+					std::vector<IndexType> superfluousNodes, missingNodes;
+
 					nodesWithNonLocalNeighbors.erase(std::remove_if(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end(), [&sortedCopyOfInterfaceNodes](IndexType globalID){
 						//could also use std::bind instead of a lambda here.
 						return std::binary_search(sortedCopyOfInterfaceNodes.begin(), sortedCopyOfInterfaceNodes.end(), globalID);
 					}), nodesWithNonLocalNeighbors.end());
 
 					assert(IndexType(nodesWithNonLocalNeighbors.size()) >= sizeOfOldBorderList - IndexType(interfaceNodes.size()));
+
+					std::copy_if(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end(), std::back_inserter(superfluousNodes),
+							[&comparison](IndexType node){return !std::binary_search(comparison.begin(), comparison.end(), node);});
+					std::cout << superfluousNodes.size() << " nodes that shouldn't be there." << std::endl;
 
 					//now add new border
 					const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
@@ -1418,6 +1431,10 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 					//sort border nodes. This should not be necessary, but is is. TODO: find out why!
 					std::sort(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end());
+
+					std::copy_if(comparison.begin(), comparison.end(), std::back_inserter(missingNodes),
+							[&nodesWithNonLocalNeighbors](IndexType node){return !std::binary_search(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end(), node);});
+					std::cout << missingNodes.size() << " missing nodes" << std::endl;
 				}
 			}
 		}
