@@ -1333,8 +1333,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 					}
 				}
 
-				std::vector<IndexType> deletedNodes;
-				std::vector<IndexType> additionalNodes;
 				/**
 				 * remove nodes
 				 */
@@ -1343,7 +1341,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 						auto deleteIterator = std::lower_bound(myGlobalIndices.begin(), myGlobalIndices.end(), interfaceNodes[i]);
 						assert(*deleteIterator == interfaceNodes[i]);
 						myGlobalIndices.erase(deleteIterator);
-						deletedNodes.push_back(interfaceNodes[i]);
 					}
 				}
 
@@ -1353,7 +1350,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				for (IndexType i = 0; i < otherLastRoundMarker; i++) {
 					if (!assignedToSecondBlock[lastRoundMarker + i]) {
 						myGlobalIndices.push_back(requiredHaloIndices[i]);
-						additionalNodes.push_back(requiredHaloIndices[i]);
 					}
 				}
 
