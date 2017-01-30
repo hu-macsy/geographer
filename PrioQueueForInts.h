@@ -24,7 +24,6 @@ typedef std::list<int> Bucket;
 
 template<class Key, class Val>
 class PrioQueueForInts {
-	//using Bucket = std::list<Key>;
 private:
 	std::vector<std::list<Key>> buckets;			// the actual buckets
 	std::vector<Bucket::iterator> nodePtr;	// keeps track of node positions
@@ -40,7 +39,7 @@ private:
 	 * @param[in] prio Priority of element to be inserted, must be in range
 	 *   [0, maxPrio].
 	 */
-	void insert(Val elem, Key prio);
+	void insert(Key prio, Val elem);
 
 public:
 	/**
@@ -69,7 +68,7 @@ public:
 	 * @param[in] elem Element whose priority is changed.
 	 * @param[in] prio New priority, must be in range [0, maxPrio].
 	 */
-	void changePrio(Val elem, Key prio);
+	void changePrio(Key prio, Val elem);
 
 	/**
 	 * @return Element with minimum priority.

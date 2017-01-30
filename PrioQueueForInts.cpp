@@ -24,13 +24,13 @@ PrioQueueForInts<Key, Val>::PrioQueueForInts(std::vector<Key>& prios, Key maxPri
 }
 
 template<typename Key, typename Val>
-void PrioQueueForInts<Key, Val>::changePrio(Val elem, Key prio) {
+void PrioQueueForInts<Key, Val>::changePrio(Key prio, Val elem) {
 	remove(elem);
 	insert(elem, prio);
 }
 
 template<typename Key, typename Val>
-void PrioQueueForInts<Key, Val>::insert(Val elem, Key prio) {
+void PrioQueueForInts<Key, Val>::insert(Key prio, Val elem) {
 	assert(0 <= prio && prio <= maxPrio);
 	assert(0 <= elem && elem < nodePtr.size());
 
