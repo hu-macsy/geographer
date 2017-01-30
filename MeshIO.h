@@ -21,11 +21,13 @@
 #include <cmath>
 #include <climits>
 #include <list>
+#include <set>
 #include <vector>
 #include <string>
 #include <iostream>
 #include <fstream>
 #include <iterator>
+#include <algorithm>
 
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
@@ -117,7 +119,7 @@ namespace ITI {
                 
                 static Scalar dist3D(DenseVector<ValueType> p1, ValueType* p2);
                 
-                static ValueType dist3D(IndexType* p1, IndexType* p2);
+                static ValueType dist3DSquared(IndexType* p1, IndexType* p2);
                 
                 /*  Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
                  *  of the index in 3D. The return value is not the coordiantes of the point!

@@ -1972,6 +1972,7 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getBlo
     scai::dmemo::DistributionPtr distRowBlock ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, k) );  
     scai::dmemo::DistributionPtr distColBlock ( new scai::dmemo::NoDistribution( k ));
     
+    // TODO: memory costly for big k
     IndexType size= k*k;
     // get, on each processor, the edges of the blocks that are local
     std::vector< std::vector<IndexType> > blockEdges = ParcoRepart<int, double>::getLocalBlockGraphEdges( adjM, part);
