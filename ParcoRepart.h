@@ -15,6 +15,8 @@
 
 #include <set>
 
+#include "Settings.h"
+
 using namespace scai::lama;
 using scai::dmemo::Halo;
 
@@ -40,7 +42,8 @@ namespace ITI {
 	 		*
 	 		* @return DenseVector with the same distribution as the input matrix, at position i is the block node i is assigned to
 	 		*/
-			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, IndexType k,  double epsilon = 0.05);
+			//static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, IndexType k,  double epsilon = 0.05);
+			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings Settings);
 
 			static ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool ignoreWeights = true);
 

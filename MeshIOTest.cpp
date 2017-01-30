@@ -146,7 +146,7 @@ TEST_F(MeshIOTest, testCreateStructured3DMeshLocalDegreeSymmetry) {
 // For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
 // less than 6 ones ( every node has 3,4,5, or 6 neighbours).
 TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
-    std::vector<IndexType> numPoints= { 100, 80, 50};
+    std::vector<IndexType> numPoints= { 200, 200, 200};
     std::vector<ValueType> maxCoord= {441, 711, 1160};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
     std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
@@ -182,6 +182,8 @@ TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
                                 -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
     EXPECT_EQ( adjM.getNumValues() , numEdges*2 );     
     
+    IndexType cntCorners= 0 , cntSides= 0, cntEdges= 0;
+    
     {
         SCAI_REGION("testCreateStructuredMesh_Distributed_3D.check_adjM_2")
         const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
@@ -193,8 +195,33 @@ TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
             EXPECT_LE( ia[i+1]-ia[i], 6 );
             // and also more than 3 which is the minimum
             EXPECT_GE( ia[i+1]-ia[i], 3 );
+            
+            // count the nodes with 3 edges
+            if(ia[i+1]-ia[i] == 3){
+                ++cntCorners;
+            }
+            // count the nodes with 4 edges
+            if(ia[i+1]-ia[i] == 4){
+                ++cntEdges;
+            }
+            // count the nodes with 4 edges
+            if(ia[i+1]-ia[i] == 5){
+                ++cntSides;
+            }
         }
     }
+    IndexType numX= numPoints[0];
+    IndexType numY= numPoints[1];
+    IndexType numZ= numPoints[2];
+    
+    //PRINT( comm->sum(cntCorners) );
+    
+    // check the global values
+    EXPECT_EQ( comm->sum(cntCorners), 8);
+    EXPECT_EQ( comm->sum(cntEdges) , 4*(numX+numY+numZ)-24);
+    EXPECT_EQ( comm->sum(cntSides) , 2*( (numX-2)*(numY-2)+ (numX-2)*(numZ-2)+ (numY-2)*(numZ-2) )  );
+    
+    PRINT(", corner nodes= "<< cntCorners << " , edge nodes= "<< cntEdges<< " , side nodes= "<< cntSides);
     
     {
     SCAI_REGION("testCreateStructuredMesh_Distributed_3D.check_coords_2")
@@ -213,6 +240,36 @@ TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
     }
     
 }
+
+/*
+//-----------------------------------------------------------------
+// Creates the part of a structured mesh in each processor ditributed and checks the matrix and the coordinates.
+// For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
+// less than 6 ones ( every node has 3,4,5, or 6 neighbours).
+TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
+    std::vector<IndexType> numPoints= { 4, 4, 4};
+    std::vector<ValueType> maxCoord= {441, 711, 1160};
+    IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
+    std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
+    
+    std::vector<DenseVector<ValueType>> coords(3);
+    for(IndexType i=0; i<3; i++){ 
+	  coords[i].allocate(dist);
+	  coords[i] = static_cast<ValueType>( 0 );
+    }
+    
+    scai::lama::CSRSparseMatrix<ValueType> adjM( dist, noDistPointer);
+    
+    // create the adjacency matrix and the coordinates
+    MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
+    
+    
+}
+*/
 //-----------------------------------------------------------------
 /*
 TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
@@ -350,7 +407,7 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
 //-----------------------------------------------------------------
 // read a graph from a file in METIS format and its coordiantes in 2D and partiotion that graph
 // usually, graph file: "file.graph", coodinates file: "file.graph.xy" or .xyz
-TEST_F(MeshIOTest, testPartitionFromFile_local_2D){
+TEST_F(MeshIOTest, testPartitionFromFile_dist_2D){
     CSRSparseMatrix<ValueType> graph;       //the graph as an adjacency matrix  
     std::vector<DenseVector<ValueType>> coords2D(2);        //the coordiantes of each node 
     IndexType dim= 2, k= 8, i;
@@ -373,10 +430,12 @@ TEST_F(MeshIOTest, testPartitionFromFile_local_2D){
     //read the adjacency matrix from a file
     std::cout<<"reading adjacency matrix from file: "<< grFile<<" for k="<< k<< std::endl;
     scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, nodes) );
+    scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( nodes ));
     
     SCAI_REGION_START("testPartitionFromFile_local_2D.readFromFile2AdjMatrix");
-        graph = scai::lama::CSRSparseMatrix<ValueType>(distPtr, distPtr);
+        graph = scai::lama::CSRSparseMatrix<ValueType>(distPtr, noDistPtr);
         MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graph , grFile );
+        graph.redistribute( distPtr , noDistPtr);
         std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
     SCAI_REGION_END("testPartitionFromFile_local_2D.readFromFile2AdjMatrix");
     
@@ -393,6 +452,8 @@ TEST_F(MeshIOTest, testPartitionFromFile_local_2D){
         coords2D[0]= static_cast<ValueType>( 0 );
         coords2D[1]= static_cast<ValueType>( 0 );
         MeshIO<IndexType, ValueType>::fromFile2Coords_2D(coordFile, coords2D, N );
+        coords2D[0].redistribute( distPtr );
+        coords2D[1].redistribute( distPtr );
     SCAI_REGION_END("testPartitionFromFile_local_2D.readFromFile2Coords_2D");        
     
     EXPECT_EQ(coords2D.size(), dim);
@@ -406,8 +467,12 @@ TEST_F(MeshIOTest, testPartitionFromFile_local_2D){
     */
     
     SCAI_REGION_START("testPartitionFromFile_local_2D.partition");
+        
+        struct Settings Settings;
+        Settings.numBlocks= k;
+        Settings.epsilon = epsilon;
         //partition the graph
-        scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D,  k, epsilon);
+        scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D, Settings );
         EXPECT_EQ(partition.size(), N);
     SCAI_REGION_END("testPartitionFromFile_local_2D.partition");
         
