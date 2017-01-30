@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
 				("borderDepth", value<int>(&settings.borderDepth)->default_value(settings.borderDepth), "Tuning parameter: Depth of border region used in each refinement step")
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to stop localFM")
 				("sfcRecursionSteps", value<int>(&settings.sfcResolution)->default_value(settings.sfcResolution), "Tuning parameter: Recursion Level of space filling curve")
-				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started)
+				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
 				;
 
 	variables_map vm;
