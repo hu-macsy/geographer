@@ -20,6 +20,7 @@
 #include <numeric>
 #include <iterator>
 #include <algorithm>
+#include <chrono>
 
 #include "PrioQueue.h"
 #include "PrioQueueForInts.h"
@@ -32,6 +33,10 @@ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, IndexType k,  double epsilon)
 {
 	SCAI_REGION( "ParcoRepart.partitionGraph" )
+
+	std::chrono::time_point<std::chrono::steady_clock> start, afterSFC, round;
+	start = std::chrono::steady_clock::now();
+
 	/**
 	* check input arguments for sanity
 	*/
@@ -207,6 +212,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 		std::vector<IndexType> nodesWithNonLocalNeighbors = getNodesWithNonLocalNeighbors(input);
 
+		if (comm->getRank() == 0) {
+			afterSFC = std::chrono::steady_clock::now();
+			std::chrono::duration<double> elapsedSeconds = afterSFC-start;
+			std::cout << "With SFC (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
+		}
+
 		while (gain > 0) {
 			if (inputDist->isReplicated()) {
 				gain = replicatedMultiWayFM(input, result, k, epsilon);
@@ -220,6 +231,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			}
 			ValueType oldCut = cut;
 			cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input)) / 2;
+			if (comm->getRank() == 0) {
+				round = std::chrono::steady_clock::now();
+				std::chrono::duration<double> elapsedSeconds = round-start;
+				std::cout << "After " << numRefinementRounds + 1 << " refinement rounds, (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
+			}
 			if (cut != oldCut - gain) {
 				IndexType sumOutgoingEdges = comm->sum(localSumOutgoingEdges(input)) / 2;
 
