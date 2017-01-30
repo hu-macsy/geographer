@@ -26,7 +26,6 @@
 #include <iostream>
 #include <fstream>
 #include <iterator>
-#include <tuple>
 
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl

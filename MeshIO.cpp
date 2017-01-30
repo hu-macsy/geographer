@@ -198,7 +198,6 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueT
     SCAI_ASSERT_EQUAL_ERROR(numEdges*2 , csrValues.size() )
     SCAI_ASSERT_EQUAL_ERROR(numEdges*2 , csrJA.size() )
     
-
     localMatrix.swap( csrIA, csrJA, csrValues );
     adjM.assign(localMatrix);
 }
@@ -264,7 +263,6 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
             indZ = 0;
             ++indY;
         }
-
         if(indY >= numPoints[1]){   // if y coord reaches maximum, set it to 0 and increase x
             indY = 0;
             ++indX;
