@@ -406,7 +406,7 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
 //-----------------------------------------------------------------
 // read a graph from a file in METIS format and its coordiantes in 2D and partiotion that graph
 // usually, graph file: "file.graph", coodinates file: "file.graph.xy" or .xyz
-TEST_F(MeshIOTest, testPartitionFromFile_local_2D){
+TEST_F(MeshIOTest, testPartitionFromFile_dist_2D){
     CSRSparseMatrix<ValueType> graph;       //the graph as an adjacency matrix  
     std::vector<DenseVector<ValueType>> coords2D(2);        //the coordiantes of each node 
     IndexType dim= 2, k= 8, i;
@@ -429,10 +429,12 @@ TEST_F(MeshIOTest, testPartitionFromFile_local_2D){
     //read the adjacency matrix from a file
     std::cout<<"reading adjacency matrix from file: "<< grFile<<" for k="<< k<< std::endl;
     scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, nodes) );
+    scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( nodes ));
     
     SCAI_REGION_START("testPartitionFromFile_local_2D.readFromFile2AdjMatrix");
-        graph = scai::lama::CSRSparseMatrix<ValueType>(distPtr, distPtr);
+        graph = scai::lama::CSRSparseMatrix<ValueType>(distPtr, noDistPtr);
         MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graph , grFile );
+        graph.redistribute( distPtr , noDistPtr);
         std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
     SCAI_REGION_END("testPartitionFromFile_local_2D.readFromFile2AdjMatrix");
     
@@ -449,6 +451,8 @@ TEST_F(MeshIOTest, testPartitionFromFile_local_2D){
         coords2D[0]= static_cast<ValueType>( 0 );
         coords2D[1]= static_cast<ValueType>( 0 );
         MeshIO<IndexType, ValueType>::fromFile2Coords_2D(coordFile, coords2D, N );
+        coords2D[0].redistribute( distPtr );
+        coords2D[1].redistribute( distPtr );
     SCAI_REGION_END("testPartitionFromFile_local_2D.readFromFile2Coords_2D");        
     
     EXPECT_EQ(coords2D.size(), dim);

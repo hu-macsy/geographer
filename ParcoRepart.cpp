@@ -27,8 +27,12 @@
 namespace ITI {
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, IndexType k,  double epsilon)
+//DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, IndexType k,  double epsilon)
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings Settings)
 {
+        IndexType k = Settings.numBlocks;
+        ValueType epsilon = Settings.epsilon;
+    
 	SCAI_REGION( "ParcoRepart.partitionGraph" )
 	/**
 	* check input arguments for sanity
@@ -1971,13 +1975,11 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getBlo
     
     // get numEdges
     IndexType numEdges=0;
-    {
-        SCAI_REGION("ParcoRepart.getBlockGraph.getNumEdges");
-        scai::hmemo::ReadAccess<IndexType> recvPartRead( recvPart );
-        for(IndexType i=0; i<recvPartRead.size(); i++){
-            if( recvPartRead[i]>0 )
-                ++numEdges;
-        }
+    
+    scai::hmemo::ReadAccess<IndexType> recvPartRead( recvPart );
+    for(IndexType i=0; i<recvPartRead.size(); i++){
+        if( recvPartRead[i]>0 )
+            ++numEdges;
     }
     
     //convert the k*k HArray to a [k x k] CSRSparseMatrix
@@ -1988,7 +1990,6 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getBlo
     scai::hmemo::HArray<IndexType> csrJA;
     scai::hmemo::HArray<ValueType> csrValues; 
     {
-        SCAI_REGION("ParcoRepart.getBlockGraph.HArray2CSR");
         IndexType numNZ = numEdges;     // this equals the number of edges of the graph
         scai::hmemo::WriteOnlyAccess<IndexType> ia( csrIA, k +1 );
         scai::hmemo::WriteOnlyAccess<IndexType> ja( csrJA, numNZ );
@@ -2165,7 +2166,8 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 
 
 //to force instantiation
-template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, int k,  double epsilon);
+//template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, int k,  double epsilon);
+template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings);
 			     
 template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int> &partition, int k);
 

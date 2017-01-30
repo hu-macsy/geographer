@@ -451,7 +451,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType* point
         assert(x>=0 && x<=1);
         assert(y>=0 && y<=1);
         assert(z>=0 && z<=1);
-	long integerIndex = 0;	//TODO: also check whether this data type is long enough
+	unsigned long integerIndex = 0;	//TODO: also check whether this data type is long enough
 
 	for (IndexType i = 0; i < recursionDepth; i++) {
 		int subSquare;
