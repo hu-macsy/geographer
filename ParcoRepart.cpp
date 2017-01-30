@@ -23,7 +23,6 @@
 #include <chrono>
 
 #include "PrioQueue.h"
-#include "PrioQueueForInts.h"
 #include "ParcoRepart.h"
 #include "HilbertCurve.h"
 
@@ -1476,7 +1475,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	SCAI_REGION( "ParcoRepart.twoWayLocalFM" )
 
 	const IndexType magicStoppingAfterNoGainRounds = borderRegionIDs.size();
-	const bool gainOverBalance = false;
+	const bool gainOverBalance = true;
 
 	if (blockSizes.first >= blockCapacities.first && blockSizes.second >= blockCapacities.second) {
 		//cannot move any nodes, all blocks are overloaded already.
@@ -1575,7 +1574,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	IndexType iterWithoutGain = 0;
 	while (firstQueue.size() + secondQueue.size() > 0 && iterWithoutGain < magicStoppingAfterNoGainRounds) {
 		SCAI_REGION( "ParcoRepart.twoWayLocalFM.queueloop" )
-		IndexType bestQueueIndex;
+		IndexType bestQueueIndex = -1;
 
 		assert(firstQueue.size() + secondQueue.size() == veryLocalN - iter);
 		/*
@@ -1609,21 +1608,41 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 			assert(fullness[0] >= 0);
 			assert(fullness[1] >= 0);
 
-			//decide first by fullness, if fullness is equal, decide by gain. Since gain was inverted before inserting into queue, smaller gain is better.
-			if (fullness[0] > fullness[1] || (fullness[0] == fullness[1] && gains[0] < gains[1])) {
-				bestQueueIndex = 0;
-			} else if (fullness[1] > fullness[0] || (fullness[0] == fullness[1] && gains[1] < gains[0])) {
-				bestQueueIndex = 1;
-			} else {
-				//tie, break randomly
-				assert(fullness[0] == fullness[1] && gains[0] == gains[1]);
-
-				if ((rand() / RAND_MAX) < 0.5) {
+			if (gainOverBalance) {
+				//decide first by gain. If gain is equal, decide by fullness
+				if (gains[0] < gains[1] || (gains[0] == gains[1] && fullness[0] > fullness[1])) {
 					bestQueueIndex = 0;
-				} else {
+				} else if (gains[1] < gains[0] || (gains[0] == gains[1] && fullness[0] < fullness[1])){
 					bestQueueIndex = 1;
+				} else {
+					//tie, break randomly
+					assert(fullness[0] == fullness[1] && gains[0] == gains[1]);
+
+					if ((rand() / RAND_MAX) < 0.5) {
+						bestQueueIndex = 0;
+					} else {
+						bestQueueIndex = 1;
+					}
+				}
+			} else {
+
+				//decide first by fullness, if fullness is equal, decide by gain. Since gain was inverted before inserting into queue, smaller gain is better.
+				if (fullness[0] > fullness[1] || (fullness[0] == fullness[1] && gains[0] < gains[1])) {
+					bestQueueIndex = 0;
+				} else if (fullness[1] > fullness[0] || (fullness[0] == fullness[1] && gains[1] < gains[0])) {
+					bestQueueIndex = 1;
+				} else {
+					//tie, break randomly
+					assert(fullness[0] == fullness[1] && gains[0] == gains[1]);
+
+					if ((rand() / RAND_MAX) < 0.5) {
+						bestQueueIndex = 0;
+					} else {
+						bestQueueIndex = 1;
+					}
 				}
 			}
+			assert(bestQueueIndex == 0 || bestQueueIndex == 1);
 			//std::cout << "Fullness: (" << fullness[0] << "," << fullness[1] << ")" << ", gains (" << gains[0] << "," << gains[1] << "), picked queue " << bestQueueIndex << std::endl;
 		}
 
