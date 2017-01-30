@@ -28,6 +28,7 @@
 #include <fstream>
 #include <iterator>
 #include <algorithm>
+#include <tuple>
 
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
@@ -119,12 +120,12 @@ namespace ITI {
                 
                 static Scalar dist3D(DenseVector<ValueType> p1, ValueType* p2);
                 
-                static ValueType dist3DSquared(IndexType* p1, IndexType* p2);
+                static ValueType dist3DSquared(std::tuple<IndexType, IndexType, IndexType> p1, std::tuple<IndexType, IndexType, IndexType> p2);
                 
                 /*  Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
                  *  of the index in 3D. The return value is not the coordiantes of the point!
                  */
-                static IndexType* index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints);
+                static std::tuple<IndexType, IndexType, IndexType> index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints);
         };//class MeshIO
         
 }//namespace ITI

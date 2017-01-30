@@ -112,6 +112,36 @@ TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
     }
     
 }
+
+TEST_F(MeshIOTest, testCreateStructured3DMeshLocalDegreeSymmetry) {
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	IndexType k = comm->getSize();
+
+	IndexType nroot = 300;
+	IndexType n = nroot * nroot * nroot;
+	IndexType dimensions = 3;
+
+	if (k > 16) {
+		scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+		scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+
+		scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
+		std::vector<ValueType> maxCoord(dimensions, nroot);
+		std::vector<IndexType> numPoints(dimensions, nroot);
+
+		std::vector<DenseVector<ValueType>> coordinates(dimensions);
+		for(IndexType i=0; i<dimensions; i++){
+		  coordinates[i].allocate(dist);
+		  coordinates[i] = static_cast<ValueType>( 0 );
+		}
+
+		MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(a, coordinates, maxCoord, numPoints);
+		ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(a);
+	} else {
+		std::cout << "Not tested, since called with <= 16 processes, this implies you don't have enough memory for " << n << " nodes."<< std::endl;
+	}
+}
+
 //-----------------------------------------------------------------
 // Creates the part of a structured mesh in each processor ditributed and checks the matrix and the coordinates.
 // For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
@@ -440,23 +470,22 @@ TEST_F(MeshIOTest, testPartitionFromFile_local_2D){
 }
 //-----------------------------------------------------------------
 TEST_F(MeshIOTest, testIndex2_3DPoint){
-    std::vector<IndexType> numPoints= {100, 100, 100};
-    /*
+    std::vector<IndexType> numPoints= {9, 11, 7};
+    
     srand(time(NULL));
     for(int i=0; i<3; i++){
         numPoints[i] = (IndexType) (rand()%5 + 10);
     }
-    */
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
     
     for(IndexType i=0; i<N; i++){
-        IndexType* ind = MeshIO<IndexType, ValueType>::index2_3DPoint(i, numPoints);
-        EXPECT_LE(ind[0] , numPoints[0]-1);
-        EXPECT_LE(ind[1] , numPoints[1]-1);
-        EXPECT_LE(ind[2] , numPoints[2]-1);
-        EXPECT_GE(ind[0] , 0);
-        EXPECT_GE(ind[1] , 0);
-        EXPECT_GE(ind[2] , 0);
+        std::tuple<IndexType, IndexType, IndexType> ind = MeshIO<IndexType, ValueType>::index2_3DPoint(i, numPoints);
+        EXPECT_LE(std::get<0>(ind) , numPoints[0]-1);
+        EXPECT_LE(std::get<1>(ind) , numPoints[1]-1);
+        EXPECT_LE(std::get<2>(ind) , numPoints[2]-1);
+        EXPECT_GE(std::get<0>(ind) , 0);
+        EXPECT_GE(std::get<1>(ind) , 0);
+        EXPECT_GE(std::get<2>(ind) , 0);
     }
 }
 
