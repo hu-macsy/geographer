@@ -285,7 +285,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
     hmemo::HArray<ValueType> csrValues;
     // ja and values have size= edges of the graph
     // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
-    //IndexType numGlobalEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
+    IndexType numGlobalEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
                                 -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
                                 
     {
@@ -338,7 +338,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
             
             ia[i+1] = ia[i] + numRowElems;
         }
-        SCAI_ASSERT_EQUAL_ERROR(numEdges*2 , comm->sum(nnzCounter));
+        SCAI_ASSERT_EQUAL_ERROR(numGlobalEdges*2 , comm->sum(nnzCounter));
         ja.resize(nnzCounter);
         values.resize(nnzCounter);
     } //read/write block
@@ -541,14 +541,14 @@ void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMa
         IndexType ngbGlobalInd;// = thisGlobalInd;    
 
         // the position of this node in 3D
-        IndexType* thisPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( thisGlobalInd, numPoints);
+        std::tuple<IndexType, IndexType, IndexType>  thisPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( thisGlobalInd, numPoints);
             
         // if point is on the faces it will have only 3 edges
         // TODO: not correct, rim nodes must have >4 edges and face nodes have >5
-        if(thisPoint[0]== 0 or thisPoint[1]== 0 or thisPoint[2]== 0){
+        if(std::get<0>(thisPoint)== 0 or std::get<1>(thisPoint)== 0 or std::get<2>(thisPoint)== 0){
             ngbUpperBound =3;
         }
-        if(thisPoint[0]== numX-1 or thisPoint[1]== numY-1 or thisPoint[2]== numZ-1){
+        if(std::get<0>(thisPoint)== numX-1 or std::get<1>(thisPoint)== numY-1 or std::get<2>(thisPoint)== numZ-1){
             ngbUpperBound =3;
         }
         
@@ -569,7 +569,7 @@ void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMa
             SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.findRelativeIndices");
             
             IndexType relativeIndex;
-            IndexType* ngbPoint;
+            std::tuple<IndexType, IndexType, IndexType>  ngbPoint;
             std::pair<std::set<int>::iterator,bool> setInsertion;
             
             do{
@@ -584,7 +584,7 @@ void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMa
                
                 // find a suitable ngbGlobalInd: not negative, not >N and close enough
                 while( /* (ngbGlobalInd==thisGlobalInd) or */ (ngbGlobalInd<0) or (ngbGlobalInd>= N) \
-                        or (dist3DSquared(thisPoint, ngbPoint)>3*boxRadius*boxRadius)){ 
+                        or (dist3DSquared(thisPoint, ngbPoint)> 3*boxRadius*boxRadius)){ 
                     randInd = (int) (rand()%(neighbourGlobalIndices.size()-1) +1 ) ;
                     relativeIndex = neighbourGlobalIndices[ randInd ];
                     relativeIndex = rand()%2==0 ? relativeIndex : -1* relativeIndex;

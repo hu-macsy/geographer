@@ -96,6 +96,8 @@ namespace ITI {
 
 			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon,
 					const std::vector<DenseVector<IndexType>>& communicationScheme, bool unweighted = true);
+
+			static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
                         
 			//------------------------------------------------------------------------
 
@@ -171,10 +173,9 @@ namespace ITI {
 
 
 		private:
-			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &halo,
-					std::set<IndexType> &firstregion,  std::set<IndexType> &secondregion,
-					const std::set<IndexType> &firstDummyLayer, const std::set<IndexType> &secondDummyLayer,
-					std::pair<IndexType, IndexType> blockSizes,	const std::pair<IndexType, IndexType> blockCapacities, const bool unweighted = true);
+            static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
+                        		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::vector<bool>& assignedToSecondBlock,
+                        		const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes, const bool unweighted);
 
 			static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
 

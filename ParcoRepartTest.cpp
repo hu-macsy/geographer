@@ -104,7 +104,9 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
 
   const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, partition, true);
 
-  std::cout << "Commit " << version << ": Partitioned graph with " << n << " nodes into " << k << " blocks with a total cut of " << cut << std::endl;
+  if (comm->getRank() == 0) {
+	  std::cout << "Commit " << version << ": Partitioned graph with " << n << " nodes into " << k << " blocks with a total cut of " << cut << std::endl;
+  }
 }
 
 TEST_F(ParcoRepartTest, testImbalance) {
