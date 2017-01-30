@@ -12,8 +12,16 @@
 namespace ITI {
 
 template<typename Key, typename Val>
+PrioQueueForInts<Key, Val>::PrioQueueForInts(uint64_t size, Key maxPrio):
+		buckets(maxPrio+1), nodePtr(size), myBucket(size, none),
+		minNotEmpty(maxPrio+1), maxNotEmpty(-1), maxPrio(maxPrio), numElems(0)
+{
+
+}
+
+template<typename Key, typename Val>
 PrioQueueForInts<Key, Val>::PrioQueueForInts(std::vector<Key>& prios, Key maxPrio):
-		buckets(maxPrio+1), nodePtr(prios.size()), myBucket(prios.size(), NetworKit::none),
+		buckets(maxPrio+1), nodePtr(prios.size()), myBucket(prios.size(), none),
 		minNotEmpty(maxPrio+1), maxNotEmpty(-1), maxPrio(maxPrio), numElems(0)
 {
 	for (Key i = 0; i < prios.size(); ++i) {
@@ -24,7 +32,7 @@ PrioQueueForInts<Key, Val>::PrioQueueForInts(std::vector<Key>& prios, Key maxPri
 }
 
 template<typename Key, typename Val>
-void PrioQueueForInts<Key, Val>::changePrio(Key prio, Val elem) {
+void PrioQueueForInts<Key, Val>::updateKey(Key prio, Val elem) {
 	remove(elem);
 	insert(elem, prio);
 }
@@ -126,4 +134,9 @@ uint64_t PrioQueueForInts<Key, Val>::size() const {
 	return numElems;
 }
 
-} /* namespace Aux */
+template int PrioQueueForInts<double, int>::extractMin();
+template bool PrioQueueForInts<double, int>::empty();
+template void PrioQueueForInts<double, int>::insert(double prio, int elem);
+template void PrioQueueForInts<double, int>::updateKey(double prio, int elem);
+
+} /* namespace ITI */

@@ -33,14 +33,6 @@ private:
 	Key maxPrio;							// maximum admissible priority
 	uint64_t numElems;							// number of elements stored
 
-	/**
-	 * Insert element @a elem with priority @a prio.
-	 * @param[in] elem Element to be inserted, must be in range [0, n).
-	 * @param[in] prio Priority of element to be inserted, must be in range
-	 *   [0, maxPrio].
-	 */
-	void insert(Key prio, Val elem);
-
 public:
 	/**
 	 * Constructor that initializes the PQ with the full batch of entries.
@@ -51,6 +43,16 @@ public:
 	 * @param[in] maxPrio Maximum priority value.
 	 */
 	PrioQueueForInts(std::vector<Key>& prios, Key maxPrio);
+
+	PrioQueueForInts(uint64_t size, Key maxPrio);
+
+	/**
+	 * Insert element @a elem with priority @a prio.
+	 * @param[in] elem Element to be inserted, must be in range [0, n).
+	 * @param[in] prio Priority of element to be inserted, must be in range
+	 *   [0, maxPrio].
+	 */
+	void insert(Key prio, Val elem);
 
 	/**
 	 * Destructor.
@@ -65,10 +67,10 @@ public:
 
 	/**
 	 * Changes priority of element @a elem to priority @a prio.
-	 * @param[in] elem Element whose priority is changed.
 	 * @param[in] prio New priority, must be in range [0, maxPrio].
+	 * @param[in] elem Element whose priority is changed.
 	 */
-	void changePrio(Key prio, Val elem);
+	void updateKey(Key prio, Val elem);
 
 	/**
 	 * @return Element with minimum priority.
