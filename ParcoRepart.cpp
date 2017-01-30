@@ -31,10 +31,10 @@ namespace ITI {
 
 template<typename IndexType, typename ValueType>
 //DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, IndexType k,  double epsilon)
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings Settings)
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings)
 {
-        IndexType k = Settings.numBlocks;
-        ValueType epsilon = Settings.epsilon;
+	IndexType k = settings.numBlocks;
+	ValueType epsilon = settings.epsilon;
     
 	SCAI_REGION( "ParcoRepart.partitionGraph" )
 
