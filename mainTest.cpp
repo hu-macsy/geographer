@@ -56,8 +56,8 @@ int main(int argc, char** argv) {
 				("numZ", value<int>(&settings.numZ)->default_value(settings.numZ), "Number of points in z dimension of generated graph")
 				("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
 				("borderDepth", value<int>(&settings.borderDepth)->default_value(settings.borderDepth), "Tuning parameter: Depth of border region used in each refinement step")
-				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to stop localFM")
-				("sfcRecursionSteps", value<int>(&settings.sfcResolution)->default_value(settings.sfcResolution), "Tuning parameter: Recursion Level of space filling curve")
+				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
+				("sfcRecursionSteps", value<int>(&settings.sfcResolution)->default_value(settings.sfcResolution), "Tuning parameter: Recursion Level of space filling curve. A value of 0 causes the recursion level to be derived from the graph size.")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
 				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
 				;
@@ -139,10 +139,16 @@ int main(int argc, char** argv) {
             coordinates[i].allocate(coordDist);
             coordinates[i] = static_cast<ValueType>( 0 );
         }
-        ITI::MeshIO<IndexType, ValueType>::fromFile2Coords_2D(coordFile, coordinates, N );
-        coordinates[0].redistribute(coordDist);
-        coordinates[1].redistribute(coordDist);
         
+        if (settings.dimensions == 2) {
+        	ITI::MeshIO<IndexType, ValueType>::fromFile2Coords_2D(coordFile, coordinates, N );
+        } else if (settings.dimensions == 3){
+        	ITI::MeshIO<IndexType, ValueType>::fromFile2Coords_3D(coordFile, coordinates, N );
+        }
+
+        for(IndexType i=0; i<settings.dimensions; i++){
+        	coordinates[i].redistribute(coordDist);
+        }
 
     } else if(vm.count("generate")){
     	if (settings.dimensions == 2) {
@@ -185,6 +191,10 @@ int main(int argc, char** argv) {
     // set the rest of the settings
     // should be passed as parameters when calling main
     
+    if (comm->getSize() > 0) {
+    	settings.numBlocks = comm->getSize();
+    }
+
     if( comm->getRank() ==0){
         if(settings.dimensions==2){
             settings.print2D(std::cout);

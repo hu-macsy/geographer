@@ -7,9 +7,9 @@ struct Settings{
     IndexType numZ = 32;
     IndexType numBlocks = 2;
     IndexType borderDepth = 4;
-    IndexType stopAfterNoGainRounds = 20;
+    IndexType stopAfterNoGainRounds = 0;
     IndexType minGainForNextRound = 1;
-    IndexType sfcResolution = 5;
+    IndexType sfcResolution = 0;
     bool gainOverBalance = false;
     double epsilon = 0.05;
     

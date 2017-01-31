@@ -95,10 +95,10 @@ namespace ITI {
 			 */
 			static std::pair<std::vector<IndexType>, IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType thisBlock, IndexType otherBlock, IndexType depth);
 
-			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType k, ValueType epsilon, bool unweighted = true);
+			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors, Settings settings);
 
-			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType k, ValueType epsilon,
-					const std::vector<DenseVector<IndexType>>& communicationScheme, bool unweighted = true);
+			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors,
+					const std::vector<DenseVector<IndexType>>& communicationScheme, Settings settings);
 
 			static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
 
@@ -182,7 +182,7 @@ namespace ITI {
 		private:
             static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
                         		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::vector<bool>& assignedToSecondBlock,
-                        		const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes, const bool unweighted);
+                        		const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes, Settings settings);
 
 			static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
 

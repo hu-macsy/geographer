@@ -366,9 +366,14 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 
 	std::vector<IndexType> localBorder = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(a);
 
+	Settings settings;
+	settings.numBlocks= k;
+	settings.epsilon = epsilon;
+
+
 	ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
 	for (IndexType i = 0; i < iterations; i++) {
-		ValueType gain = ParcoRepart<IndexType, ValueType>::distributedFMStep(a, part, localBorder, k, epsilon);
+		ValueType gain = ParcoRepart<IndexType, ValueType>::distributedFMStep(a, part, localBorder, settings);
 
 		//check correct gain calculation
 		const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);

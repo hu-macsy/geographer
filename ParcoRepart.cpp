@@ -127,7 +127,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		* Several possibilities exist for choosing the recursion depth.
 		* Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
 		*/
-		const IndexType recursionDepth = std::min(std::log2(n), double(21));
+		const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(n), double(21));
 	
 		/**
 		*	create space filling curve indices.
@@ -206,7 +206,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	IndexType numRefinementRounds = 0;
 
 	if (comm->getSize() == 1 || comm->getSize() == k) {
-		ValueType gain = 1;
+		ValueType gain = settings.minGainForNextRound;
 		ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input)) / 2;
 
 		scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( input, result, k);
@@ -221,11 +221,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			std::cout << "With SFC (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
 		}
 
-		while (gain > 0) {
+		while (gain >= settings.minGainForNextRound) {
 			if (inputDist->isReplicated()) {
 				gain = replicatedMultiWayFM(input, result, k, epsilon);
 			} else {
-				gain = distributedFMStep(input, result, nodesWithNonLocalNeighbors, k, epsilon, communicationScheme);
+				gain = distributedFMStep(input, result, nodesWithNonLocalNeighbors, communicationScheme, settings);
 				const IndexType localOutgoingEdges = localSumOutgoingEdges(input);
 
 				const IndexType maxDegree = 6;//for debug purposes
@@ -1103,20 +1103,19 @@ IndexType ITI::ParcoRepart<IndexType, ValueType>::getDegreeSum(const CSRSparseMa
 }
 
 template<typename IndexType, typename ValueType>
-ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType k, ValueType epsilon, bool unweighted) {
+ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors, Settings settings) {
 	/* test communication with coloring. get the block graph and then the communication pairs for all the rounds
 	 * */
-	scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( input, part, k);
+	scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( input, part, settings.numBlocks);
 
 	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
 
-	return distributedFMStep(input, part, nodesWithNonLocalNeighbors, k, epsilon, communicationScheme, unweighted);
+	return distributedFMStep(input, part, nodesWithNonLocalNeighbors, communicationScheme, settings);
 }
 
 template<typename IndexType, typename ValueType>
-ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType>& input, DenseVector<IndexType>& part, std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType k, ValueType epsilon,
-		const std::vector<DenseVector<IndexType>>& communicationScheme, bool unweighted) {
-	const IndexType magicBorderRegionDepth = 10;
+ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType>& input, DenseVector<IndexType>& part, std::vector<IndexType>& nodesWithNonLocalNeighbors,
+		const std::vector<DenseVector<IndexType>>& communicationScheme, Settings settings) {
 	SCAI_REGION( "ParcoRepart.distributedFMStep" )
 	const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
 	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
@@ -1129,17 +1128,17 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		throw std::runtime_error("Column distribution needs to be replicated.");
 	}
 
-	if (epsilon < 0) {
-		throw std::runtime_error("Epsilon must be >= 0, not " + std::to_string(epsilon));
+	if (settings.epsilon < 0) {
+		throw std::runtime_error("Epsilon must be >= 0, not " + std::to_string(settings.epsilon));
 	}
 
-    if (k != comm->getSize()) {
-    	throw std::runtime_error("Called with " + std::to_string(comm->getSize()) + " processors, but " + std::to_string(k) + " blocks.");
+    if (settings.numBlocks != comm->getSize()) {
+    	throw std::runtime_error("Called with " + std::to_string(comm->getSize()) + " processors, but " + std::to_string(settings.numBlocks) + " blocks.");
     }
 
     //block sizes
-    const IndexType optSize = ceil(double(globalN) / k);
-    const IndexType maxAllowableBlockSize = optSize*(1+epsilon);
+    const IndexType optSize = ceil(double(globalN) / settings.numBlocks);
+    const IndexType maxAllowableBlockSize = optSize*(1+settings.epsilon);
 
     //for now, we are assuming equal numbers of blocks and processes
     const IndexType localBlockID = comm->getRank();
@@ -1210,7 +1209,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			 */
 			std::vector<IndexType> interfaceNodes;
 			IndexType lastRoundMarker;
-			std::tie(interfaceNodes, lastRoundMarker)= getInterfaceNodes(input, part, nodesWithNonLocalNeighbors, localBlockID, partner, magicBorderRegionDepth+1);
+			std::tie(interfaceNodes, lastRoundMarker)= getInterfaceNodes(input, part, nodesWithNonLocalNeighbors, localBlockID, partner, settings.borderDepth+1);
 
 			/**
 			 * now swap indices of nodes in border region with partner processor.
@@ -1307,12 +1306,11 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			/**
 			 * execute FM locally
 			 */
-			ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, borderRegionIDs, assignedToSecondBlock, maxBlockSizes, blockSizes, unweighted);
+			ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, borderRegionIDs, assignedToSecondBlock, maxBlockSizes, blockSizes, settings);
 
 			{
 				SCAI_REGION( "ParcoRepart.distributedFMStep.loop.swapFMResults" )
 				//communicate achieved gain. PE with better solution should send their secondRegion.
-				assert(unweighted); //if this assert fails, you need to change the type of swapField back to ValueType before removing it.
 				swapField[0] = gain;
 				swapField[1] = blockSizes.second;
 				comm->swap(swapField, 3, partner);
@@ -1471,11 +1469,17 @@ void ITI::ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRS
 template<typename IndexType, typename ValueType>
 ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
 		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::vector<bool>& assignedToSecondBlock,
-		const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes, const bool unweighted) {
+		const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes, Settings settings) {
 	SCAI_REGION( "ParcoRepart.twoWayLocalFM" )
 
-	const IndexType magicStoppingAfterNoGainRounds = borderRegionIDs.size();
-	const bool gainOverBalance = true;
+	IndexType magicStoppingAfterNoGainRounds;
+	if (settings.stopAfterNoGainRounds > 0) {
+		magicStoppingAfterNoGainRounds = settings.stopAfterNoGainRounds;
+	} else {
+		magicStoppingAfterNoGainRounds = borderRegionIDs.size();
+	}
+
+	const bool gainOverBalance = settings.gainOverBalance;
 
 	if (blockSizes.first >= blockCapacities.first && blockSizes.second >= blockCapacities.second) {
 		//cannot move any nodes, all blocks are overloaded already.
@@ -1516,7 +1520,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 		const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
 		const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());
-		const scai::hmemo::ReadAccess<ValueType> localValues(storage.getValues());
 
 		const IndexType beginCols = localIa[localID];
 		const IndexType endCols = localIa[localID+1];
@@ -1528,14 +1531,12 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 				continue;
 			}
 
-			const ValueType edgeweight = unweighted ? 1 : localValues[j];
-
 			if (inputDist->isLocal(globalNeighbor)) {
 				//neighbor is in local block,
-				result += isInSecondBlock ? edgeweight : -edgeweight;
+				result += isInSecondBlock ? 1 : -1;
 			} else if (matrixHalo.global2halo(globalNeighbor) != nIndex) {
 				//neighbor is in partner block
-				result += !isInSecondBlock ? edgeweight : -edgeweight;
+				result += !isInSecondBlock ? 1 : -1;
 			} else {
 				//neighbor is from somewhere else, no effect on gain.
 			}
@@ -1697,11 +1698,10 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 				if (moved[veryLocalNeighborID]) {
 					continue;
 				}
-				ValueType edgeweight = unweighted ? 1 : localValues[j];
 				bool wasInSameBlock = (bestQueueIndex == assignedToSecondBlock[veryLocalNeighborID]);
 
 				const ValueType oldGain = gain[veryLocalNeighborID];
-				gain[veryLocalNeighborID] = oldGain + 4*edgeweight*wasInSameBlock -2*edgeweight;
+				gain[veryLocalNeighborID] = oldGain + 4*wasInSameBlock -2;
 
 				if (assignedToSecondBlock[veryLocalNeighborID]) {
 					secondQueue.updateKey(-oldGain, -gain[veryLocalNeighborID], veryLocalNeighborID);
@@ -2239,7 +2239,7 @@ template void ParcoRepart<int, double>::checkLocalDegreeSymmetry(const CSRSparse
 
 template double ParcoRepart<int, double>::replicatedMultiWayFM(const CSRSparseMatrix<double> &input, DenseVector<int> &part, int k, double epsilon, bool unweighted);
 
-template double ParcoRepart<int, double>::distributedFMStep(CSRSparseMatrix<double> &input, DenseVector<int> &part, std::vector<int>& nodesWithNonLocalNeighbors, int k, double epsilon, bool unweighted);
+template double ParcoRepart<int, double>::distributedFMStep(CSRSparseMatrix<double> &input, DenseVector<int> &part, std::vector<int>& nodesWithNonLocalNeighbors, Settings settings);
 
 template std::vector<DenseVector<int>> ParcoRepart<int, double>::computeCommunicationPairings(const CSRSparseMatrix<double> &input, const DenseVector<int> &part,	const DenseVector<int> &blocksToPEs);
 
