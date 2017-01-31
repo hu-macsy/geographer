@@ -1,14 +1,17 @@
 #pragma once
 
 struct Settings{
-    IndexType dimensions= 2;
-    IndexType numX, numY, numZ;
+    IndexType dimensions= 3;
+    IndexType numX = 32;
+    IndexType numY = 32;
+    IndexType numZ = 32;
     IndexType numBlocks = 2;
     IndexType borderDepth = 4;
-    IndexType stopAfterNoGainRounds = 20;
+    IndexType stopAfterNoGainRounds = 0;
     IndexType minGainForNextRound = 1;
-    IndexType sfcResolution = 5;
-    double epsilon = 0.2;
+    IndexType sfcResolution = 0;
+    bool gainOverBalance = false;
+    double epsilon = 0.05;
     
     void print2D(std::ostream& out){
         IndexType numPoints = numX;
