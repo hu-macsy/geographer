@@ -601,32 +601,6 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<Va
 }
 
 template<typename IndexType, typename ValueType>
-ValueType ParcoRepart<IndexType, ValueType>::computeCutTwoWay(const CSRSparseMatrix<ValueType> &input,
-		const CSRStorage<ValueType> &haloStorage, const Halo &halo,
-		const std::set<IndexType> &firstregion,  const std::set<IndexType> &secondregion, const bool ignoreWeights) {
-
-	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
-
-	ValueType cut = 0;
-	for (IndexType node : firstregion) {
-
-		const CSRStorage<ValueType>& storage = inputDist->isLocal(node) ? input.getLocalStorage() : haloStorage;
-		const IndexType localID = inputDist->isLocal(node) ? inputDist->global2local(node) : halo.global2halo(node);
-		assert(localID != nIndex);
-
-		const scai::hmemo::ReadAccess<IndexType> ia(storage.getIA());
-		const scai::hmemo::ReadAccess<IndexType> ja(storage.getJA());
-		const scai::hmemo::ReadAccess<ValueType> values(storage.getValues());
-
-		for (IndexType j = ia[localID]; j < ia[localID+1]; j++) {
-			ValueType edgeweight = ignoreWeights ? 1 : values[j];
-			if (secondregion.count(ja[j]) > 0) cut += edgeweight;
-		}
-	}
-	return cut;
-}
-
-template<typename IndexType, typename ValueType>
 ValueType ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input) {
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
