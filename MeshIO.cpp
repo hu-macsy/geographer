@@ -974,6 +974,7 @@ void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( lama::CSRSparseMatr
         
         //for every line, aka for all nodes
         for ( IndexType i=0; i<N; i++ ){
+            SCAI_REGION( "MeshIO.readFromFile2AdjMatrix.setCSRSparseMatrix")
             std::getline(file, line);            
             std::vector< std::vector<int> > line_integers;
             std::istringstream iss( line );

@@ -47,9 +47,12 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(ValueType* point, 
     if (dimensions > 3 || dimensions < 2) {
         throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
     }
-    /*    
-    if (sizeof(point) != ValueType*dimensions){
-        throw 
+    
+      /*
+    //probably wrong
+    if (sizeof(point) != sizeof( ValueType)*dimensions){
+        PRINT( sizeof(point) << " <> " <<sizeof( ValueType)*dimensions);
+        throw  std::runtime_error("Input point not correct. In file " +std::string( __FILE__) + ", line "+ std::to_string(__LINE__) );
     }
     */
     if(dimensions==3) 
