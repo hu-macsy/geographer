@@ -92,7 +92,6 @@ int main(int argc, char** argv) {
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
 
-    std::vector<IndexType> numPoints; // number of poitns in each dimension, used only for 3D
     std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -159,8 +158,12 @@ int main(int argc, char** argv) {
             
         maxCoord[0] = settings.numX;
         maxCoord[1] = settings.numY;
-        if (settings.dimensions == 3) {
-        	maxCoord[2] = settings.numZ;
+        maxCoord[2] = settings.numZ;
+
+        std::vector<IndexType> numPoints(3); // number of poitns in each dimension, used only for 3D
+
+        for (IndexType i = 0; i < 3; i++) {
+        	numPoints[i] = maxCoord[i];
         }
 
         if( comm->getRank()== 0){
