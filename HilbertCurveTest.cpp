@@ -67,7 +67,7 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
 
   DenseVector<ValueType> indices(N, 0);
   for (IndexType i = 0; i < N; i++){
-    indices.setValue(i, HilbertCurve<IndexType, ValueType>::getHilbertIndex(coords, dimensions, i, recursionDepth, minCoords, maxCoords) );
+    indices.setValue(i, HilbertCurve<IndexType, ValueType>::getHilbertIndex(coords, dimensions, i, recursionDepth , minCoords, maxCoords) );
     EXPECT_LE(indices.getValue(i).getValue<ValueType>(), 1);
     EXPECT_GE(indices.getValue(i).getValue<ValueType>(), 0);
   }
@@ -156,7 +156,7 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
 TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_3D) {
   const IndexType dimensions = 3;
   const IndexType n = 7;
-  const IndexType recursionDepth = 3;
+  const IndexType recursionDepth = 5;
   ValueType tempArray[dimensions*n] = { 0.1, 0.1, 0.13,
                                         0.1, 0.61, 0.36,
                                         0.7, 0.7, 0.35, 
@@ -400,7 +400,7 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
 TEST_F(HilbertCurveTest, testNewVsOldVersionRandom_Distributed_3D) {
   const IndexType dimensions = 3;
   const IndexType N = 1000;
-  const IndexType recursionDepth = 7;
+  const IndexType recursionDepth = 5;
   
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
   scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -416,14 +416,13 @@ TEST_F(HilbertCurveTest, testNewVsOldVersionRandom_Distributed_3D) {
   // create own part of coordinates 
   for(IndexType i=0; i<dimensions; i++){
     SCAI_REGION("testNewVsOldVersionRandom_Distributed_3D.create_coords");
-    scai::hmemo::WriteAccess<ValueType> coordWrite( coordinates[i].getLocalValues() );
-    for(IndexType j=0; j<coordWrite.size(); j++){ 
+    for(IndexType j=0; j<coordinates[i].getLocalValues().size(); j++){ 
       r= ((double) rand()/RAND_MAX);
-      coordWrite.setValue( j , r) ;
+      //coordWrite.setValue( j , r) ;           // this does not work...
+      coordinates[i].getLocalValues()[j] = r;
     }
   }
-  
-
+    
   std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
   std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
 
@@ -465,8 +464,10 @@ TEST_F(HilbertCurveTest, testNewVsOldVersionRandom_Distributed_3D) {
     coordAccess1.getValue(point[1], i);
     coordAccess2.getValue(point[2], i);
     SCAI_REGION_END("testNewVsOldVersionRandom_Distributed_3D.getPoint");      
-    
-    indices.getLocalValues()[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(point , dimensions, recursionDepth, minCoords, maxCoords);    
+
+    ValueType newHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex(point , dimensions, recursionDepth, minCoords, maxCoords);    
+  
+    indices.getLocalValues()[i] = newHilbertIndex;
     
     indicesOld.getLocalValues()[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, dist->local2global(i), recursionDepth ,minCoords, maxCoords) ;
         
