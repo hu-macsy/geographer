@@ -81,7 +81,13 @@ public:
 	 * The entry is then set to @a newKey with the same value.
 	 * If the corresponding key is not present, the element will be inserted.
 	 */
-	virtual void decreaseKey(Key newKey, Val value);
+	virtual void updateKey(Key newKey, Val value);
+
+	/**
+	 * slightly optimized version of updateKey when the old key is known
+	 */
+	virtual void updateKey(Key oldKey, Key newKey, Val value);
+
 
 	/**
 	 * Removes key-value pair given by @a elem.
@@ -137,6 +143,7 @@ ITI::PrioQueue<Key, Val>::PrioQueue(uint64_t len) {
 
 template<class Key, class Val>
 inline void ITI::PrioQueue<Key, Val>::insert(Key key, Val value) {
+	SCAI_REGION( "PrioQueue.insert" )
 	if (value >= mapValToKey.size()) {
 		uint64_t doubledSize = 2 * mapValToKey.size();
 		assert(value < doubledSize);
@@ -163,6 +170,7 @@ inline void ITI::PrioQueue<Key, Val>::remove(const ElemType& elem) {
 
 template<class Key, class Val>
 inline void ITI::PrioQueue<Key, Val>::remove(const Val& val) {
+	SCAI_REGION( "PrioQueue.remove" )
 	Key key = mapValToKey.at(val);
 	pqset.erase(std::make_pair(key, val));
 	mapValToKey.at(val) = undefined;
@@ -178,14 +186,27 @@ std::pair<Key, Val> ITI::PrioQueue<Key, Val>::inspectMin() {
 
 template<class Key, class Val>
 std::pair<Key, Val> ITI::PrioQueue<Key, Val>::extractMin() {
+	SCAI_REGION( "PrioQueue.extractMin" )
 	assert(pqset.size() > 0);
 	ElemType elem = (* pqset.begin());
-	remove(elem);
+	pqset.erase(elem);
+	mapValToKey.at(elem.second) = undefined;
 	return elem;
 }
 
 template<class Key, class Val>
-inline void ITI::PrioQueue<Key, Val>::decreaseKey(Key newKey, Val value) {
+inline void ITI::PrioQueue<Key, Val>::updateKey(Key oldKey, Key newKey, Val value) {
+	SCAI_REGION( "PrioQueue.updateKey" )
+	//slightly optimized version when old key is known, saves one hashmap access
+	pqset.erase(std::make_pair(oldKey, value));
+	pqset.insert(std::make_pair(newKey, value));
+
+	mapValToKey.at(value) = newKey;
+}
+
+template<class Key, class Val>
+inline void ITI::PrioQueue<Key, Val>::updateKey(Key newKey, Val value) {
+	SCAI_REGION( "PrioQueue.updateKey" )
 	// find and remove element with given key
 	remove(value);
 

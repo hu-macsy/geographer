@@ -67,7 +67,7 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
 
   DenseVector<ValueType> indices(N, 0);
   for (IndexType i = 0; i < N; i++){
-    indices.setValue(i, HilbertCurve<IndexType, ValueType>::getHilbertIndex(coords, dimensions, i, recursionDepth , minCoords, maxCoords) );
+    indices.setValue(i, HilbertCurve<IndexType, ValueType>::getHilbertIndex(coords, dimensions, i, recursionDepth, minCoords, maxCoords) );
     EXPECT_LE(indices.getValue(i).getValue<ValueType>(), 1);
     EXPECT_GE(indices.getValue(i).getValue<ValueType>(), 0);
   }
@@ -510,7 +510,7 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
 TEST_F(HilbertCurveTest, testNewVsOldVersionRandom_Distributed_3D) {
   const IndexType dimensions = 3;
   const IndexType N = 1000;
-  const IndexType recursionDepth = 5;
+  const IndexType recursionDepth = 7;
   
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
   scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );

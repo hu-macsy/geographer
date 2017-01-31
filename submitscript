@@ -1,1 +1,1 @@
-SCAI_TRACE=time:PREFIX=$JMS_stdout mpirun ./Katanomi --gtest_filter=\*.testPartitionBalanceDistributed --gtest_throw_on_failure --gtest_repeat=4
+SCAI_TRACE=time:PREFIX=$JMS_stdout mpirun ./KatanomiTest --gtest_filter=\*.testPartitionBalanceDistributed

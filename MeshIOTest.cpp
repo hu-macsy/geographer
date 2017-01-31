@@ -110,7 +110,6 @@ TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
             }
         }
     }
-    
 }
 
 TEST_F(MeshIOTest, testCreateStructured3DMeshLocalDegreeSymmetry) {
@@ -242,6 +241,7 @@ TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
     
 }
 
+/*
 //-----------------------------------------------------------------
 // Creates the part of a structured mesh in each processor ditributed and checks the matrix and the coordinates.
 // For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
@@ -269,6 +269,7 @@ TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
     
     
 }
+*/
 //-----------------------------------------------------------------
 /*
 TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
@@ -466,8 +467,12 @@ TEST_F(MeshIOTest, testPartitionFromFile_dist_2D){
     */
     
     SCAI_REGION_START("testPartitionFromFile_local_2D.partition");
+        
+        struct Settings Settings;
+        Settings.numBlocks= k;
+        Settings.epsilon = epsilon;
         //partition the graph
-        scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D,  k, epsilon);
+        scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D, Settings );
         EXPECT_EQ(partition.size(), N);
     SCAI_REGION_END("testPartitionFromFile_local_2D.partition");
         

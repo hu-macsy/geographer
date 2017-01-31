@@ -2,20 +2,22 @@ CC=g++
 
 FILES_GOOGLETEST= test_main.cpp ParcoRepartTest.cpp ParcoRepart.cpp HilbertCurve.cpp HilbertCurveTest.cpp MeshIO.cpp
 FILES_TEST_MAIN= mainTest.cpp ParcoRepart.cpp HilbertCurve.cpp MeshIO.cpp
-EXECUTABLE= Katanomi
-GIT_COMMIT= $(shell git rev-parse --short HEAD)
+EXECUTABLE_GOOGLETEST=KatanomiTest
+EXECUTABLE_MAIN=Katanomi
+GIT_COMMIT=$(shell git rev-parse --short HEAD)
 SCAI_INCLUDE=
 SCAI_LIB=
 GTEST_INCLUDE=
 GTEST_LIB=
-LFLAGS= -L$(SCAI_LIB) -L$(GTEST_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lgtest
+BOOST_LIB=
+LFLAGS= -L$(SCAI_LIB) -L$(GTEST_LIB) -L$(BOOST_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lscai_sparsekernel -lgtest -lboost_program_options
 CCFLAGS= --openmp --std=c++11 -g -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -DSCAI_TRACE_ON  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR -DBUILD_COMMIT=$(GIT_COMMIT)
 
 all:
-	$(CC) $(CCFLAGS) $(FILES_GOOGLETEST) -o $(EXECUTABLE) $(LFLAGS)
+	$(CC) $(CCFLAGS) $(FILES_GOOGLETEST) -o $(EXECUTABLE_GOOGLETEST) $(LFLAGS)
 
 main:
-	$(CC) $(CCFLAGS) $(FILES_TEST_MAIN) -o $(EXECUTABLE) $(LFLAGS)
+	$(CC) $(CCFLAGS) $(FILES_TEST_MAIN) -o $(EXECUTABLE_MAIN) $(LFLAGS)
 	
 clean:
 	rm -f $(EXECUTABLE)
