@@ -26,17 +26,6 @@ typedef double ValueType;
 typedef int IndexType;
 
 
-/* For 2 dimensions reads graph and coordinates from a file, for creates a structured mesh.
-*
-* Use of parameters: first is dimensions. If dimensions is 2 then a filename must follow from where
-* the adjacency matrix of the graph will be read. Also from filename.xyz we read the coordinates.
-* Last is the parameter epsilon, example:
-* ./a.out 2 myGraph 0.2
-* If dimensions are 3, then must follow three numbers, the number of points in each dimension
-* and then parameter epsilon, example:
-* ./a.out 3 50 60 70 0.2
-*/
-
 /**
  *     Settings.dimensions = dimensions;
     Settings.borderDepth = 4;
@@ -58,7 +47,8 @@ int main(int argc, char** argv) {
 	desc.add_options()
 				("help", "display options")
 				("version", "show version")
-				("file", value<std::string>(), "read graph from file. Assuming that graph is in arg.graph and coordinates are in arg.xyz")
+				("graphFile", value<std::string>(), "read graph from file")
+				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 				("numX", value<int>(&settings.numX)->default_value(settings.numX), "Number of points in x dimension of generated graph")
@@ -69,6 +59,7 @@ int main(int argc, char** argv) {
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to stop localFM")
 				("sfcRecursionSteps", value<int>(&settings.sfcResolution)->default_value(settings.sfcResolution), "Tuning parameter: Recursion Level of space filling curve")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
+				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
 				;
 
 	variables_map vm;
@@ -106,10 +97,14 @@ int main(int argc, char** argv) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-    if (vm.count("file")) {
-    	std::string baseFile = vm["file"].as<std::string>();
-    	std::string graphFile = baseFile + ".graph";  	// should be the filename for the adjacency matrix
-    	std::string coordFile = baseFile + ".xyz";
+    if (vm.count("graphFile")) {
+    	std::string graphFile = vm["graphFile"].as<std::string>();
+    	std::string coordFile;
+    	if (vm.count("coordFile")) {
+    		coordFile = vm["coordFile"].as<std::string>();
+    	} else {
+    		coordFile = graphFile + ".xyz";
+    	}
     
         std::fstream f(graphFile);
 
@@ -126,7 +121,7 @@ int main(int argc, char** argv) {
         
         if (comm->getRank() == 0)
         {
-			std::cout<< "Reading from file \""<< graphFile << "\" and .xyz for coordinates"<< std::endl;
+			std::cout<< "Reading from file \""<< graphFile << "\" for the graph and \"" << coordFile << "\" for coordinates"<< std::endl;
 			std::cout<< "Read " << N << " points." << std::endl;
         }
 

@@ -10,6 +10,7 @@ struct Settings{
     IndexType stopAfterNoGainRounds = 20;
     IndexType minGainForNextRound = 1;
     IndexType sfcResolution = 5;
+    bool gainOverBalance = false;
     double epsilon = 0.05;
     
     void print2D(std::ostream& out){
