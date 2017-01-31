@@ -42,8 +42,7 @@ class HilbertCurveTest : public ::testing::Test {
 TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
   const IndexType dimensions = 2;
   const IndexType recursionDepth = 7;
-  IndexType N= 16*16;
-  
+  IndexType N=16*16;
   std::vector<DenseVector<ValueType>> coords(dimensions);
   for(IndexType i=0; i<dimensions; i++){ 
       coords[i].allocate(N);
@@ -52,7 +51,7 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
   
   std::vector<ValueType> maxCoords({0,0});
 
-  MeshIO<IndexType, ValueType>::fromFile2Coords_2D( "Grid16x16.xyz", coords,  N);
+  MeshIO<IndexType, ValueType>::fromFile2Coords_2D("./Grid16x16.xyz", coords,  N);
 
   for(IndexType j=0; j<dimensions; j++){
       for (IndexType i = 0; i < N; i++){
@@ -68,7 +67,7 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
 
   DenseVector<ValueType> indices(N, 0);
   for (IndexType i = 0; i < N; i++){
-    indices.setValue(i, HilbertCurve<IndexType, ValueType>::getHilbertIndex(coords, dimensions, i, recursionDepth, minCoords, maxCoords) );
+    indices.setValue(i, HilbertCurve<IndexType, ValueType>::getHilbertIndex(coords, dimensions, i, recursionDepth , minCoords, maxCoords) );
     EXPECT_LE(indices.getValue(i).getValue<ValueType>(), 1);
     EXPECT_GE(indices.getValue(i).getValue<ValueType>(), 0);
   }
@@ -77,7 +76,7 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
 
 //-------------------------------------------------------------------------------------------------
 
-/* Read from file and test hilbert indices. No sorting.
+/* Read from file and test hilbert indices.
  * */
 TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
   const IndexType dimensions = 2;
@@ -85,14 +84,13 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
 
   IndexType N, edges;
   
-  std::string fileName = "meshes/hugetrace/hugetrace-00000.graph";
-  //std::string fileName = "meshes/bigbubbles/bigbubbles-00000.graph";
+  std::string fileName = "meshes/hugetrace-00000.graph";
   std::ifstream f(fileName);
   if(f.fail()) 
     throw std::runtime_error("File "+ fileName+ " failed.");
   
   f >> N>> edges;
-  PRINT("nodes= "<< N << ", edges= " << edges);  
+  PRINT("file "<< fileName<< ", nodes= "<< N << ", edges= " << edges);  
   
   std::vector<DenseVector<ValueType>> coords(dimensions);
   for(IndexType i=0; i<dimensions; i++){ 
@@ -102,18 +100,16 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
   
   std::vector<ValueType> maxCoords({0,0});
   
+  //get coords
   MeshIO<IndexType, ValueType>::fromFile2Coords_2D( fileName+".xyz", coords,  N);
 
   for(IndexType j=0; j<dimensions; j++){
       maxCoords[j]= coords[j].max().Scalar::getValue<ValueType>();
   }
-  
   EXPECT_EQ(coords[0].size(), N);
   EXPECT_EQ(coords.size(), dimensions);
   
   const std::vector<ValueType> minCoords({0,0});
-  
-PRINT("");
   
   DenseVector<ValueType> indices(N, 0);
   for (IndexType i = 0; i < N; i++){
@@ -128,18 +124,17 @@ PRINT("");
     EXPECT_GE(indices.getValue(i).getValue<ValueType>(), 0);
   }
 
-  //get partition by-hand
-  
   IndexType k=60;
   
   DenseVector<IndexType> partition( N, -1);
   DenseVector<IndexType> permutation;
   indices.sort(permutation, true);
   
+  // get graph
   scai::lama::CSRSparseMatrix<ValueType> graph(N, N);
   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graph, fileName );
 
-PRINT("");
+  //get partition by-hand
   IndexType part =0;
   for(IndexType i=0; i<N; i++){
     part = (int) i*k/N ;
@@ -153,6 +148,115 @@ PRINT("");
   ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k);
   std::cout<< "Cut = "<< cut << std::endl << "Imbalance= "<< imbalance << std::endl;
   
+}
+
+//-------------------------------------------------------------------------------------------------
+
+/* Read from file and test hilbert indices.
+ * */
+TEST_F(HilbertCurveTest, testHilbertFromFileNew_Distributed_2D) {
+  const IndexType dimensions = 2;
+  const IndexType recursionDepth = 7;
+
+  IndexType N, edges;
+  
+  //std::string fileName = "meshes/hugetrace/hugetrace-00000.graph";
+  std::string fileName = "meshes/trace/trace-00000.graph";
+  std::ifstream f(fileName);
+  if(f.fail()) 
+    throw std::runtime_error("File "+ fileName+ " failed.");
+  
+  f >> N>> edges;
+  PRINT("file "<< fileName<< ", nodes= "<< N << ", edges= " << edges);  
+  
+  std::vector<DenseVector<ValueType>> coords(dimensions);
+  for(IndexType i=0; i<dimensions; i++){ 
+      coords[i].allocate(N);
+      coords[i] = static_cast<ValueType>( 0 );
+  }
+   
+  //get coords
+  MeshIO<IndexType, ValueType>::fromFile2Coords_2D( fileName+".xyz", coords,  N);
+
+  const std::vector<ValueType> minCoords({0,0});
+  std::vector<ValueType> maxCoords({0,0});
+  for(IndexType j=0; j<dimensions; j++){
+      maxCoords[j]= coords[j].max().Scalar::getValue<ValueType>();
+  }
+  
+ 
+  EXPECT_EQ(coords[0].size(), N);
+  EXPECT_EQ(coords.size(), dimensions);
+  
+  // get graph
+  scai::lama::CSRSparseMatrix<ValueType> graph(N, N);
+  MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graph, fileName );
+  
+PRINT(" got coordinates");
+  const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( N ));
+  const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+  const scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+  
+  // redistribute
+  coords[0].redistribute( dist );
+  coords[1].redistribute( dist );
+  graph.redistribute( dist , noDist);
+  
+  const IndexType localN = dist->getLocalSize();
+  
+  DenseVector<ValueType> hilbertIndices( dist );
+  // get local part of hilbert indices
+  scai::utilskernel::LArray<ValueType>& hilbertIndicesLocal = hilbertIndices.getLocalValues();
+  
+  {
+    scai::hmemo::ReadAccess<ValueType> coordAccess0( coords[0].getLocalValues() );
+    scai::hmemo::ReadAccess<ValueType> coordAccess1( coords[1].getLocalValues() );
+    ValueType point[2];
+    for (IndexType i = 0; i < localN; i++){
+      coordAccess0.getValue(point[0], i);
+      coordAccess1.getValue(point[1], i);
+    
+      ValueType globalHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex(point, dimensions, recursionDepth, minCoords, maxCoords) ;
+      hilbertIndicesLocal[i] = globalHilbertIndex;
+      
+      EXPECT_LE( globalHilbertIndex, 1);
+      EXPECT_GE( globalHilbertIndex, 0);
+    }
+    
+  }
+PRINT("got local hilbert indices");
+
+  scai::lama::DenseVector<IndexType> permutation, inversePermutation;
+  scai::lama::DenseVector<IndexType> partition( N, -1);
+  
+  hilbertIndices.sort(permutation, true);
+  {
+    DenseVector<IndexType> tmpPerm = permutation;
+    tmpPerm.sort( inversePermutation, true);
+  }
+  
+  IndexType k=60;
+    
+  IndexType part =0;
+  for (IndexType i = 0; i < localN; i++) {
+      part = int( inversePermutation.getLocalValues()[i] *k/N);
+      partition.getLocalValues()[i] = part;
+  }
+  
+/*
+  //get partition by-hand
+  IndexType part =0;
+  for(IndexType i=0; i<N; i++){
+    part = (int) i*k/N ;
+    partition.setValue( permutation(i).Scalar::getValue<IndexType>() , part );
+    assert( part >= 0);
+    assert( part <= k);
+    
+  }
+  */
+  ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, partition, true);
+  ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k);
+  std::cout<< "Cut = "<< cut << std::endl << "Imbalance= "<< imbalance << std::endl;
   
 }
 
@@ -162,7 +266,7 @@ PRINT("");
 TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_3D) {
   const IndexType dimensions = 3;
   const IndexType n = 7;
-  const IndexType recursionDepth = 3;
+  const IndexType recursionDepth = 5;
   ValueType tempArray[dimensions*n] = { 0.1, 0.1, 0.13,
                                         0.1, 0.61, 0.36,
                                         0.7, 0.7, 0.35, 
@@ -406,7 +510,7 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
 TEST_F(HilbertCurveTest, testNewVsOldVersionRandom_Distributed_3D) {
   const IndexType dimensions = 3;
   const IndexType N = 1000;
-  const IndexType recursionDepth = 7;
+  const IndexType recursionDepth = 5;
   
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
   scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -422,14 +526,13 @@ TEST_F(HilbertCurveTest, testNewVsOldVersionRandom_Distributed_3D) {
   // create own part of coordinates 
   for(IndexType i=0; i<dimensions; i++){
     SCAI_REGION("testNewVsOldVersionRandom_Distributed_3D.create_coords");
-    scai::hmemo::WriteAccess<ValueType> coordWrite( coordinates[i].getLocalValues() );
-    for(IndexType j=0; j<coordWrite.size(); j++){ 
+    for(IndexType j=0; j<coordinates[i].getLocalValues().size(); j++){ 
       r= ((double) rand()/RAND_MAX);
-      coordWrite.setValue( j , r) ;
+      //coordWrite.setValue( j , r) ;           // this does not work...
+      coordinates[i].getLocalValues()[j] = r;
     }
   }
-  
-
+    
   std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
   std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
 
@@ -471,8 +574,10 @@ TEST_F(HilbertCurveTest, testNewVsOldVersionRandom_Distributed_3D) {
     coordAccess1.getValue(point[1], i);
     coordAccess2.getValue(point[2], i);
     SCAI_REGION_END("testNewVsOldVersionRandom_Distributed_3D.getPoint");      
-    
-    indices.getLocalValues()[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(point , dimensions, recursionDepth, minCoords, maxCoords);    
+
+    ValueType newHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex(point , dimensions, recursionDepth, minCoords, maxCoords);    
+  
+    indices.getLocalValues()[i] = newHilbertIndex;
     
     indicesOld.getLocalValues()[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, dist->local2global(i), recursionDepth ,minCoords, maxCoords) ;
         
