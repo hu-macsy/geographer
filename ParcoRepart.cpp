@@ -1453,6 +1453,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		magicStoppingAfterNoGainRounds = borderRegionIDs.size();
 	}
 
+	assert(blockCapacities.first == blockCapacities.second);
+
 	const bool gainOverBalance = settings.gainOverBalance;
 
 	if (blockSizes.first >= blockCapacities.first && blockSizes.second >= blockCapacities.second) {
@@ -1525,7 +1527,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	PrioQueue<ValueType, IndexType> firstQueue(veryLocalN);
 	PrioQueue<ValueType, IndexType> secondQueue(veryLocalN);
 
-	std::vector<ValueType> gain(veryLocalN);
+	std::vector<IndexType> gain(veryLocalN);
 
 	for (IndexType i = 0; i < veryLocalN; i++) {
 		gain[i] = computeInitialGain(i);
@@ -1537,13 +1539,13 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	}
 
 	std::vector<bool> moved(veryLocalN, false);
-	std::vector<std::pair<IndexType, IndexType>> transfers;
+	std::vector<IndexType> transfers;
 	transfers.reserve(veryLocalN);
 
 	ValueType gainSum = 0;
-	std::vector<ValueType> gainSumList, fillFactorList;
+	std::vector<IndexType> gainSumList, sizeList;
 	gainSumList.reserve(veryLocalN);
-	fillFactorList.reserve(veryLocalN);
+	sizeList.reserve(veryLocalN);
 
 	IndexType iter = 0;
 	IndexType iterWithoutGain = 0;
@@ -1631,15 +1633,12 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		topGain *= -1;
 
 		IndexType topVertex = borderRegionIDs[veryLocalID];
-		assert(assignedToSecondBlock[veryLocalID] == bestQueueIndex);
-		assert(!moved[veryLocalID]);
-		assert(topGain == gain[veryLocalID]);
 
 		if (topGain > 0) iterWithoutGain = 0;
 		else iterWithoutGain++;
 
 		//move node
-		transfers.emplace_back(bestQueueIndex, veryLocalID);
+		transfers.push_back(veryLocalID);
 		gainSum += topGain;
 		gainSumList.push_back(gainSum);
 
@@ -1650,8 +1649,9 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		blockSizes.second += bestQueueIndex == 0 ? 1 : -1;
 		//std::cout << "Moving " << topVertex << " from " << bestQueueIndex << ", bringing block sizes to " << blockSizes.first << ", " << blockSizes.second << std::endl;
 
-		fillFactorList.push_back(std::max(double(blockSizes.first) / blockCapacities.first, double(blockSizes.second) / blockCapacities.second));
+		sizeList.push_back(std::max(blockSizes.first, blockSizes.second));
 
+		SCAI_REGION_START("ParcoRepart.twoWayLocalFM.queueloop.acquireLocks")
 		//update gains of neighbors
 		const CSRStorage<ValueType>& storage = inputDist->isLocal(topVertex) ? input.getLocalStorage() : haloStorage;
 		const IndexType localID = inputDist->isLocal(topVertex) ? inputDist->global2local(topVertex) : matrixHalo.global2halo(topVertex);
@@ -1662,6 +1662,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		const scai::hmemo::ReadAccess<ValueType> localValues(storage.getValues());
 		const IndexType beginCols = localIa[localID];
 		const IndexType endCols = localIa[localID+1];
+		SCAI_REGION_END("ParcoRepart.twoWayLocalFM.queueloop.acquireLocks")
 
 		for (IndexType j = beginCols; j < endCols; j++) {
 			SCAI_REGION( "ParcoRepart.twoWayLocalFM.queueloop.gainupdate" )
@@ -1698,7 +1699,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	IndexType maxIndex = -1;
 
 	for (IndexType i = 0; i < testedNodes; i++) {
-		if (gainSumList[i] > maxGain && fillFactorList[i] <= 1) {
+		if (gainSumList[i] > maxGain && sizeList[i] <= blockCapacities.first) {
 			maxIndex = i;
 			maxGain = gainSumList[i];
 		}
@@ -1711,13 +1712,15 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	 * apply partition modifications in reverse until best is recovered
 	 */
 	for (int i = testedNodes-1; i > maxIndex; i--) {
-		assert(transfers[i].second < globalN);
+		assert(transfers[i] < globalN);
+		IndexType veryLocalID = transfers[i];
+		bool previousBlock = !assignedToSecondBlock[veryLocalID];
 
 		//apply movement in reverse
-		assignedToSecondBlock[transfers[i].second] = transfers[i].first;
+		assignedToSecondBlock[veryLocalID] = previousBlock;
 
-		blockSizes.first += transfers[i].first == 0 ? 1 : -1;
-		blockSizes.second += transfers[i].first == 0 ? -1 : 1;
+		blockSizes.first += previousBlock == 0 ? 1 : -1;
+		blockSizes.second += previousBlock == 0 ? -1 : 1;
 
 	}
 	SCAI_REGION_END( "ParcoRepart.twoWayLocalFM.recoverBestCut" )
