@@ -89,21 +89,34 @@ namespace ITI {
 			 * Computes the border region within one block, adjacent to another block
 			 * @param[in] input Adjacency matrix of the input graph
 			 * @param[in] part Partition vector
-			 * @param[in] thisBlock block in which the border region is required
 			 * @param[in] otherBlock block to which the border region should be adjacent
 			 * @param[in] depth Width of the border region, measured in hops
 			 */
-			static std::pair<std::vector<IndexType>, IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType thisBlock, IndexType otherBlock, IndexType depth);
+			static std::pair<std::vector<IndexType>, IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType otherBlock, IndexType depth);
 
 			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors, Settings settings);
 
 			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors,
 					const std::vector<DenseVector<IndexType>>& communicationScheme, Settings settings);
 
+			/**
+			 * Iterates over the local part of the adjacency matrix and counts local edges.
+			 * If an inconsistency in the graph is detected, it tries to find the inconsistent edge and throw a runtime error.
+			 * Not guaranteed to find inconsistencies. Iterates once over the edge list.
+			 */
 			static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
 
+			/**
+			 * Returns true if the node identified with globalID has a neighbor that is not local on this process.
+			 * Since this method acquires reading locks on the CSR structure, it might be expensive to call often
+			 */
 			static bool hasNonLocalNeighbors(const CSRSparseMatrix<ValueType> &input, IndexType globalID);
 
+			/**
+			 * Returns a vector of global indices of nodes which are local on this process, but have neighbors that are node.
+			 * No communication required, iterates once over the local adjacency matrix
+			 * @param[in] input Adjacency matrix of the input graph
+			 */
 			static std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
                         
 			//------------------------------------------------------------------------
@@ -188,6 +201,6 @@ namespace ITI {
 
 			static ValueType localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input);
 
-			static IndexType getDegreeSum(const CSRSparseMatrix<ValueType> &input, std::vector<IndexType> nodes);
+			static IndexType getDegreeSum(const CSRSparseMatrix<ValueType> &input, const std::vector<IndexType> &nodes);
 	};
 }
