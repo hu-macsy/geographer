@@ -533,8 +533,8 @@ void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( lama::CSRSparseMatr
 
 //-------------------------------------------------------------------------------------------------
 /*File "filename" contains the coordinates of a graph. The function reads that coordinates and returns
- * the coordinates in a DenseVector where point(x,y) is in [x*dim +y].
- * Every line of the file contais 2 ValueType numbers.
+ * the coordinates in a 2 DenseVector, one for each dmension.
+ * Every line of the file contais 3 ValueType numbers but the third number is ignored.
  */
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::fromFile2Coords_2D( const std::string filename, std::vector<DenseVector<ValueType>> &coords, IndexType numberOfPoints){

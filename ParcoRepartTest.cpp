@@ -68,7 +68,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
 }
 
 TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
-  IndexType nroot = 28;
+  IndexType nroot = 58;
   IndexType n = nroot * nroot * nroot;
   IndexType dimensions = 3;
   
@@ -685,7 +685,6 @@ if(comm->getRank()==0 ){
 
 //------------------------------------------------------------------------------
 
-
 TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
     std::string file = "Grid16x16";
     std::ifstream f(file);
@@ -730,7 +729,94 @@ TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
     EXPECT_EQ( PEgraph.getNumColumns(), comm->getSize() );
     EXPECT_EQ( PEgraph.getNumRows(), comm->getSize() );
     
+    // in the distributed version each PE has only one row, its own
+    // the getPEGraph uses a BLOCK distribution
+    scai::dmemo::DistributionPtr distPEs ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, comm->getSize() ) );
+    EXPECT_TRUE( PEgraph.getRowDistribution().isEqual( *distPEs )  );
+    EXPECT_EQ( PEgraph.getLocalNumRows() , 1);
+    EXPECT_EQ( PEgraph.getLocalNumColumns() , comm->getSize());
+    //print
+    /*
+    std::cout<<"----------------------------"<< " PE graph  "<< *comm << std::endl;    
+    for(IndexType i=0; i<PEgraph.getNumRows(); i++){
+        std::cout<< *comm<< ":";
+        for(IndexType j=0; j<PEgraph.getNumColumns(); j++){
+            std::cout<< PEgraph(i,j).Scalar::getValue<ValueType>() << "-";
+        }
+        std::cout<< std::endl;
+    }
+    */
+}
+//------------------------------------------------------------------------------
+
+
+TEST_F (ParcoRepartTest, testPEGraphBlockGraph_k_equal_p_Distributed) {
+    std::string file = "Grid16x16";
+    std::ifstream f(file);
+    IndexType dimensions= 2, k=8;
+    IndexType N, edges;
+    f >> N >> edges; 
     
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    // for now local refinement requires k = P
+    k = comm->getSize();
+    //
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    CSRSparseMatrix<ValueType> graph( N , N);           
+    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(graph, file );
+    //distrubute graph
+    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
+    
+    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
+    EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
+    std::vector<DenseVector<ValueType>> coords(2);
+    coords[0].allocate(N);
+    coords[1].allocate(N);
+    coords[0]= static_cast<ValueType>( 0 );
+    coords[1]= static_cast<ValueType>( 0 );
+    
+    //fromFile2Coords_2D is not distributed, must redistribute
+    MeshIO<IndexType, ValueType>::fromFile2Coords_2D( std::string(file + ".xyz"), coords, N);
+    coords[0].redistribute(dist);
+    coords[1].redistribute(dist);
+    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
+    
+    struct Settings Settings;
+    Settings.numBlocks= k;
+    Settings.epsilon = 0.2;
+  
+    scai::lama::DenseVector<IndexType> partition(dist, -1);
+    partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, Settings);
+
+    //get the PE graph
+    scai::lama::CSRSparseMatrix<ValueType> PEgraph =  ParcoRepart<IndexType, ValueType>::getPEGraph( graph); 
+    EXPECT_EQ( PEgraph.getNumColumns(), comm->getSize() );
+    EXPECT_EQ( PEgraph.getNumRows(), comm->getSize() );
+    
+    scai::dmemo::DistributionPtr noPEDistPtr(new scai::dmemo::NoDistribution( comm->getSize() ));
+    PEgraph.redistribute(noPEDistPtr , noPEDistPtr);
+    
+    // if local number of columns and rows equal comm->getSize() must mean that graph is not distributed but replicated
+    EXPECT_EQ( PEgraph.getLocalNumColumns() , comm->getSize() );
+    EXPECT_EQ( PEgraph.getLocalNumRows() , comm->getSize() );
+    EXPECT_EQ( comm->getSize()* PEgraph.getLocalNumValues(),  comm->sum( PEgraph.getLocalNumValues()) );
+    EXPECT_TRUE( noPEDistPtr->isReplicated() );
+    //test getBlockGraph
+    scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, partition, k);
+    
+    //when k=p block graph and PEgraph should be equal
+    EXPECT_EQ( PEgraph.getNumColumns(), blockGraph.getNumColumns() );
+    EXPECT_EQ( PEgraph.getNumRows(), blockGraph.getNumRows() );
+    EXPECT_EQ( PEgraph.getNumRows(), k);
+    
+    // !! this check is extremly costly !!
+    for(IndexType i=0; i<PEgraph.getNumRows() ; i++){
+        for(IndexType j=0; j<PEgraph.getNumColumns(); j++){
+            EXPECT_EQ( PEgraph(i,j), blockGraph(i,j) );
+        }
+    }
+
     //print
     /*
     std::cout<<"----------------------------"<< " PE graph  "<< *comm << std::endl;    

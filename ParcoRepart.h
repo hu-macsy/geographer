@@ -113,7 +113,7 @@ namespace ITI {
 			static DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
 
 			/**Returns the processor graph. Every processor traverses its local part of adjM: and for every
-			 * edge (u,v) that one node, say u, is not local it gets the owner processor of u.
+			 * edge (u,v) that one node, say u, is not local it gets the owner processor of u. The returned graph is distributed with a BLOCK distribution.
 			 *
 			 * @param[in] adjM The adjacency matrix of the input graph.
 			 * @return A [#PE x #PE] adjacency matrix of the processor graph.

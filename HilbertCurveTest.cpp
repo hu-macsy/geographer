@@ -65,9 +65,16 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
   
   const std::vector<ValueType> minCoords({0,0});
 
+  scai::hmemo::ReadAccess<ValueType> coordAccess0( coords[0].getLocalValues() );
+  scai::hmemo::ReadAccess<ValueType> coordAccess1( coords[1].getLocalValues() );
+  
+  ValueType point[2];
+    
   DenseVector<ValueType> indices(N, 0);
   for (IndexType i = 0; i < N; i++){
-    indices.setValue(i, HilbertCurve<IndexType, ValueType>::getHilbertIndex(coords, dimensions, i, recursionDepth, minCoords, maxCoords) );
+    coordAccess0.getValue(point[0], i);
+    coordAccess1.getValue(point[1], i);
+    indices.setValue(i, HilbertCurve<IndexType, ValueType>::getHilbertIndex( point, dimensions, recursionDepth, minCoords, maxCoords) );
     EXPECT_LE(indices.getValue(i).getValue<ValueType>(), 1);
     EXPECT_GE(indices.getValue(i).getValue<ValueType>(), 0);
   }
@@ -84,7 +91,7 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
 
   IndexType N, edges;
   
-  std::string fileName = "meshes/hugetrace-00000.graph";
+  std::string fileName = "meshes/trace/trace-00000.graph";
   std::ifstream f(fileName);
   if(f.fail()) 
     throw std::runtime_error("File "+ fileName+ " failed.");
@@ -143,17 +150,18 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
     assert( part <= k);
     
   }
-  
+  /*
   ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, partition, true);
   ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k);
   std::cout<< "Cut = "<< cut << std::endl << "Imbalance= "<< imbalance << std::endl;
-  
+  */
 }
 
 //-------------------------------------------------------------------------------------------------
 
 /* Read from file and test hilbert indices.
  * */
+/*
 TEST_F(HilbertCurveTest, testHilbertFromFileNew_Distributed_2D) {
   const IndexType dimensions = 2;
   const IndexType recursionDepth = 7;
@@ -243,7 +251,7 @@ PRINT("got local hilbert indices");
       partition.getLocalValues()[i] = part;
   }
   
-/*
+
   //get partition by-hand
   IndexType part =0;
   for(IndexType i=0; i<N; i++){
@@ -253,13 +261,13 @@ PRINT("got local hilbert indices");
     assert( part <= k);
     
   }
-  */
+  
   ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, partition, true);
   ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k);
   std::cout<< "Cut = "<< cut << std::endl << "Imbalance= "<< imbalance << std::endl;
   
 }
-
+*/
 //-------------------------------------------------------------------------------------------------
 // Create and test a specific input in 3D.
 
@@ -287,64 +295,24 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_3D) {
   }
   const std::vector<ValueType> minCoords({0,0,0});
   const std::vector<ValueType> maxCoords({1,1,1});
-
+  
+  scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
+  scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
+  scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[2].getLocalValues() );
+  
+  ValueType point[3];
+  
   std::vector<ValueType> indices(n);
   for (IndexType i = 0; i < n; i++) {
-    indices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(coordinates, dimensions, i, recursionDepth, minCoords, maxCoords);
+    coordAccess0.getValue(point[0], i);
+    coordAccess1.getValue(point[1], i);
+    coordAccess2.getValue(point[2], i);
+    indices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(point, dimensions, recursionDepth, minCoords, maxCoords);
     EXPECT_LE(indices[i], 1);
     EXPECT_GE(indices[i], 0);
   }
   for(int j=0;j<n-1;j++){
     EXPECT_LT(indices[j], indices[j+1]);	
-  }
-
-}
-
-//-----------------------------------------------------------------
-
-TEST_F(HilbertCurveTest, testHilbertIndexNoScaling_Local_3D) {
-  SCAI_REGION("testHilbertIndexNoScaling_Local_3D");
-  const IndexType dimensions = 2;
-  const IndexType recursionDepth = 10;
-  IndexType N=200;
-  
-  srand(time(NULL));
-  std::vector<DenseVector<ValueType>> coords(dimensions);
-  for(IndexType i=0; i<dimensions; i++){ 
-      coords[i].allocate(N);
-      // random coordinate up to 100
-      ValueType val = rand()%100;
-      coords[i] = static_cast<ValueType>( val );
-  }
-  
-  std::vector<ValueType> maxCoords({0,0});
-  for(IndexType j=0; j<dimensions; j++){
-      maxCoords[j]= coords[j].max().Scalar::getValue<ValueType>();
-  }
-  
-  EXPECT_EQ(coords[0].size(), N);
-  EXPECT_EQ(coords.size(), dimensions);
-  
-  const std::vector<ValueType> minCoords({0,0});
-
-  {
-  SCAI_REGION("testHilbertIndexNoScaling_Local_3D.scaling")
-  DenseVector<ValueType> indices(N, 0);
-  for (IndexType i = 0; i < N; i++){
-    indices.setValue(i, HilbertCurve<IndexType, ValueType>::getHilbertIndex(coords, dimensions, i, recursionDepth, minCoords, maxCoords) );
-    EXPECT_LE(indices.getValue(i).getValue<ValueType>(), 1);
-    EXPECT_GE(indices.getValue(i).getValue<ValueType>(), 0);
-  }
-  }
-
-  {
-  SCAI_REGION("testHilbertIndexNoScaling_Local_3D.no_scaling")
-  DenseVector<ValueType> indices(N, 0);
-  for (IndexType i = 0; i < N; i++){
-    indices.setValue(i, HilbertCurve<IndexType, ValueType>::getHilbertIndex_noScaling(coords, dimensions, i, recursionDepth, minCoords, maxCoords) );
-    EXPECT_LE(indices.getValue(i).getValue<ValueType>(), 1);
-    EXPECT_GE(indices.getValue(i).getValue<ValueType>(), 0);
-  }
   }
 
 }
@@ -402,10 +370,19 @@ TEST_F(HilbertCurveTest, testHilbertIndexRandom_Distributed_3D) {
   DenseVector<IndexType> perm(dist, 19);
 
   const IndexType localN = dist->getLocalSize();
+    
+  scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
+  scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
+  scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[2].getLocalValues() );
+  
+  ValueType point[3];
   
   for (IndexType i = 0; i < localN; i++) {
     //check if the new function return the same index. seems OK.
-    indices.getLocalValues()[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, dist->local2global(i), recursionDepth, minCoords, maxCoords);
+    coordAccess0.getValue(point[0], i);
+    coordAccess1.getValue(point[1], i);
+    coordAccess2.getValue(point[2], i);
+    indices.getLocalValues()[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(point, dimensions,  recursionDepth, minCoords, maxCoords);
     
   }
   
@@ -473,9 +450,19 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
   
  const IndexType localN = dist->getLocalSize();
 
+     
+  scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
+  scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
+  scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[2].getLocalValues() );
+  
+  ValueType point[3];
+  
   //calculate the hilbert index of the points located in the processor and sort them
  for(int i=0; i<localN; i++){
-    hilbertIndex.getLocalValues()[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, distIndices->local2global(i), recursionDepth ,minCoords, maxCoords) ;
+    coordAccess0.getValue(point[0], i);
+    coordAccess1.getValue(point[1], i);
+    coordAccess2.getValue(point[2], i);
+    hilbertIndex.getLocalValues()[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(point, dimensions, recursionDepth ,minCoords, maxCoords) ;
     EXPECT_LE( hilbertIndex.getLocalValues()[i] , 1);
     EXPECT_GE( hilbertIndex.getLocalValues()[i] , 0);
 }
@@ -502,105 +489,6 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
  std::cout<< "Coordinates written in file: "<< fileName << " for processor #"<< comm->getRank()<< std::endl;
   f.close();
 }
-	
-//-----------------------------------------------------------------
-//
-//Creates random coordinates for n points in 3D and test new vs old version.
-//
-TEST_F(HilbertCurveTest, testNewVsOldVersionRandom_Distributed_3D) {
-  const IndexType dimensions = 3;
-  const IndexType N = 1000;
-  const IndexType recursionDepth = 7;
-  
-  scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-  std::vector<DenseVector<ValueType>> coordinates(dimensions);
-  for(IndexType i=0; i<dimensions; i++){ 
-      coordinates[i].allocate(dist);
-      coordinates[i] = static_cast<ValueType>( 0 );
-  }
-
-  srand(time(NULL));
-  ValueType r;
-  
-  // create own part of coordinates 
-  for(IndexType i=0; i<dimensions; i++){
-    SCAI_REGION("testNewVsOldVersionRandom_Distributed_3D.create_coords");
-    for(IndexType j=0; j<coordinates[i].getLocalValues().size(); j++){ 
-      r= ((double) rand()/RAND_MAX);
-      //coordWrite.setValue( j , r) ;           // this does not work...
-      coordinates[i].getLocalValues()[j] = r;
-    }
-  }
-    
-  std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
-  std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
-
-  for (IndexType dim = 0; dim < dimensions; dim++) {
-    for (IndexType i = 0; i < N; i++) {
-      ValueType coord = coordinates[dim].getValue(i).Scalar::getValue<ValueType>();
-      if (coord < minCoords[dim]) minCoords[dim] = coord;
-      if (coord > maxCoords[dim]) maxCoords[dim] = coord;
-    }
-  }
-
-  //communicate minima/maxima over processors. Not strictly necessary right now, since the RNG creates the same vector on all processors.
-  for (IndexType dim = 0; dim < dimensions; dim++) {
-    ValueType globalMin = comm->min(minCoords[dim]);
-    ValueType globalMax = comm->max(maxCoords[dim]);
-    assert(globalMin <= minCoords[dim]);
-    assert(globalMax >= maxCoords[dim]);
-    minCoords[dim] = globalMin;
-    maxCoords[dim] = globalMax;
-  }
-
-  //the hilbert indices initiated with the dummy value 19
-  DenseVector<ValueType> indices(dist, 19);
-  DenseVector<ValueType> indicesOld(dist, 19);
-  
-  const IndexType localN = dist->getLocalSize();
-
-  scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
-  scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
-  scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[2].getLocalValues() );
-  
-  for (IndexType i = 0; i < localN; i++) {
-    //check if the new function return the same index. seems OK.
-      
-    SCAI_REGION_START("testNewVsOldVersionRandom_Distributed_3D.getPoint");
-    //ValueType point[3] = {coordinates[0].getValue(i).Scalar::getValue<ValueType>(), coordinates[1].getValue(i).Scalar::getValue<ValueType>(), coordinates[2].getValue(i).Scalar::getValue<ValueType>() };    
-    ValueType point[3];
-    coordAccess0.getValue(point[0], i);
-    coordAccess1.getValue(point[1], i);
-    coordAccess2.getValue(point[2], i);
-    SCAI_REGION_END("testNewVsOldVersionRandom_Distributed_3D.getPoint");      
-
-    ValueType newHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex(point , dimensions, recursionDepth, minCoords, maxCoords);    
-  
-    indices.getLocalValues()[i] = newHilbertIndex;
-    
-    indicesOld.getLocalValues()[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(coordinates, dimensions, dist->local2global(i), recursionDepth ,minCoords, maxCoords) ;
-        
-    EXPECT_LE(indices.getLocalValues()[i], 1);
-    EXPECT_GE(indices.getLocalValues()[i], 0);
-    EXPECT_EQ(indices.getLocalValues()[i], indicesOld.getLocalValues()[i]);
-  }
-  
-  DenseVector<IndexType> perm(dist, 19);
-  indices.sort(perm, true);
-  DenseVector<IndexType> perm2(dist, 19);
-  indicesOld.sort(perm2, true);
-  
-  //check that indices are sorted
-  for(IndexType i=0; i<N-1; i++){
-    ValueType ind1 = indices.getValue(i ).Scalar::getValue<ValueType>(); 
-    ValueType ind2 = indices.getValue(i+1 ).Scalar::getValue<ValueType>();
-    EXPECT_LE(ind1 , ind2);
-    EXPECT_EQ(perm.getValue(i ).Scalar::getValue<ValueType>() , perm2.getValue(i ).Scalar::getValue<ValueType>() );
-  }
-  
-}
-
 
 //-----------------------------------------------------------------
 //
