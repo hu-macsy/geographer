@@ -29,7 +29,6 @@
 namespace ITI {
 
 template<typename IndexType, typename ValueType>
-//DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, IndexType k,  double epsilon)
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings)
 {
 	IndexType k = settings.numBlocks;
@@ -125,7 +124,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 		/**
 		* Several possibilities exist for choosing the recursion depth.
-		* Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
+		* Either by user choice, or by the maximum fitting into the datatype, or by the graph size..
 		*/
 		const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(n), double(21));
 	
@@ -196,7 +195,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		    result.redistribute(noDist);
 
 			scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(result.getLocalValues(), comm));
-			//assert(newDistribution->getLocalSize() == subsetSizes[comm->getRank()]);
 
 			input.redistribute(newDistribution, input.getColDistributionPtr());
 			result.redistribute(newDistribution);
@@ -247,7 +245,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			}
 
 			assert(oldCut - gain == cut);
-			//std::cout << "Last FM round yielded gain of " << gain << ", for total cut of " << computeCut(input, result) << std::endl;
 			numRefinementRounds++;
 		}
 	} else {
@@ -948,8 +945,8 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 		throw std::runtime_error("Block IDs must be different.");
 	}
 
-	if (depth < 0) {
-		throw std::runtime_error("Depth must be non-negative");
+	if (depth <= 0) {
+		throw std::runtime_error("Depth must be positive");
 	}
 
 	scai::hmemo::HArray<IndexType> localData = part.getLocalValues();
@@ -1078,12 +1075,17 @@ IndexType ITI::ParcoRepart<IndexType, ValueType>::getDegreeSum(const CSRSparseMa
 
 template<typename IndexType, typename ValueType>
 ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors, Settings settings) {
-	/* test communication with coloring. get the block graph and then the communication pairs for all the rounds
-	 * */
+	/**
+	 * This is a wrapper function to allow calls without precomputing a communication schedule..
+	 */
+
+	//get block graph
 	scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( input, part, settings.numBlocks);
 
+	//color block graph and get a communication schedule
 	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
 
+	//call distributed FM-step
 	return distributedFMStep(input, part, nodesWithNonLocalNeighbors, communicationScheme, settings);
 }
 
@@ -1120,6 +1122,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
     ValueType gainSum = 0;
 
 	//copy into usable data structure with iterators
+    //TODO: we only need those if redistribution happens.
+    //Maybe hold off on creating the vector until then? On the other hand, the savings would be in those processes that are faster anyway and probably have to wait.
 	std::vector<IndexType> myGlobalIndices(input.getRowDistributionPtr()->getLocalSize());
 	{
 		const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
@@ -1128,6 +1132,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		}
 	}
 
+	//main loop, one iteration for each color of the graph coloring
 	for (IndexType round = 0; round < communicationScheme.size(); round++) {
 		SCAI_REGION( "ParcoRepart.distributedFMStep.loop" )
 
@@ -1144,6 +1149,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[round].getLocalValues());
 		IndexType partner = commAccess[commDist->global2local(comm->getRank())];
 
+		//check symmetry of communication scheme
 		assert(partner < comm->getSize());
 		if (commDist->isLocal(partner)) {
 			IndexType partnerOfPartner = commAccess[commDist->global2local(partner)];
@@ -1191,7 +1197,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			 */
 
 			SCAI_REGION_START( "ParcoRepart.distributedFMStep.loop.prepareSets" )
-			//swap size of border region and total block size
+			//swap size of border region and total block size. Block size is only needed as sanity check, could be removed in optimized version
 			IndexType blockSize = localBlockSize(part, localBlockID);
 			if (blockSize != localN) {
 				throw std::runtime_error(std::to_string(localN) + " local nodes, but only " + std::to_string(blockSize) + " of them belong to block " + std::to_string(localBlockID) + ".");
@@ -1203,22 +1209,25 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			swapField[2] = blockSize;
 			swapField[3] = getDegreeSum(input, interfaceNodes);
 			comm->swap(swapField, 4, partner);
+			//want to isolate raw array accesses as much as possible, define named variables and only use these from now
+			const IndexType otherSize = swapField[0];
 			const IndexType otherLastRoundMarker = swapField[1];
 			const IndexType otherBlockSize = swapField[2];
 			const IndexType otherDegreeSum = swapField[3];
-			IndexType swapLength = std::max(int(swapField[0]), int(interfaceNodes.size()));
 
 			if (interfaceNodes.size() == 0) {
-				if (swapLength != 0) {
-					throw std::runtime_error("Partner PE has a border region, but this PE doesn't. Looks like the block indices were allocated badly.");
+				if (otherSize != 0) {
+					throw std::runtime_error("Partner PE has a border region, but this PE doesn't. Looks like the block indices were allocated inconsistently.");
 				} else {
 					/*
-					 * These processes don't share a border and thus have no communication to do with each other.
+					 * These processes don't share a border and thus have no communication to do with each other. How did they end up in a communication scheme?
 					 * We could skip the loop entirely.
 					 */
 				}
 			}
 
+			//the two border regions might have different sizes. Swapping array is sized for the maximum of the two.
+			const IndexType swapLength = std::max(otherSize, int(interfaceNodes.size()));
 			ValueType swapNodes[swapLength];
 			for (IndexType i = 0; i < swapLength; i++) {
 				if (i < interfaceNodes.size()) {
@@ -1228,25 +1237,19 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				}
 			}
 
+			//now swap border region
 			comm->swap(swapNodes, swapLength, partner);
 
-			//the number of interface nodes was stored in swapField[0] and then swapped.
-			//swapField[0] now contains the number of nodes in the partner's border region
-			std::vector<IndexType> requiredHaloIndices(swapField[0]);
-			for (IndexType i = 0; i < swapField[0]; i++) {
-				assert(swapNodes[i] >= 0);
-				requiredHaloIndices[i] = swapNodes[i];
-			}
+			//read interface nodes of partner process from swapped array.
+			std::vector<IndexType> requiredHaloIndices(otherSize);
+			std::copy(swapNodes, swapNodes+otherSize, requiredHaloIndices.begin());
 
-			//std::cout << "Thread " << comm->getRank() << ", round " << i << ", swapped " << swapLength << " interface nodes with thread " << partner << std::endl;
-
+			//if we need more halo indices than there are non-local indices at all, something went wrong.
 			assert(requiredHaloIndices.size() <= globalN - inputDist->getLocalSize());
 
 			/*
-			 * extend halos to cover border region of other PE.
-			 * This is probably very inefficient in a general distribution where all processors need to be contacted to gather the halo.
-			 * Possible Improvements: Assemble arrays describing the subgraph, swap that.
-			 * Exchanging the partHalo is actually unnecessary, since all indices in requiredHaloIndices have the same block.
+			 * Build Halo to cover border region of other PE.
+			 * This uses a special halo builder method that doesn't require communication, since the required and provided indices are already known.
 			 */
 			IndexType numValues = input.getLocalStorage().getValues().size();
 			{
@@ -1255,15 +1258,21 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, arrProvidedIndexes, partner, graphHalo );
 			}
 
-			haloMatrix.exchangeHalo( graphHalo, input.getLocalStorage(), *comm );
-			assert(input.getLocalStorage().getValues().size() == numValues);//number of edges in local part stays unchanged.
-			assert(haloMatrix.getValues().size() == otherDegreeSum);
+			//all reqired halo indices are in the halo
 			for (IndexType node : requiredHaloIndices) {
 				assert(graphHalo.global2halo(node) != nIndex);
 			}
 
-			//why not use vectors in the FM step or use sets to begin with? Might be faster.
-			//here we only exchange one round less than gathered. The last round forms a dummy border layer.
+			/**
+			 * Exchange Halo. This only requires communication with the partner process.
+			 */
+			haloMatrix.exchangeHalo( graphHalo, input.getLocalStorage(), *comm );
+			//local part should stay unchanged, check edge number as proxy for that
+			assert(input.getLocalStorage().getValues().size() == numValues);
+			//halo matrix should have as many edges as the degree sum of the required halo indices
+			assert(haloMatrix.getValues().size() == otherDegreeSum);
+
+			//Here we only exchange one BFS-Round less than gathered, to make sure that all neighbors of the considered edges are still in the halo.
 			std::vector<IndexType> borderRegionIDs(interfaceNodes.begin(), interfaceNodes.begin()+lastRoundMarker);
 			std::vector<bool> assignedToSecondBlock(lastRoundMarker, 0);//nodes from own border region are assigned to first block
 			std::copy(requiredHaloIndices.begin(), requiredHaloIndices.begin()+otherLastRoundMarker, std::back_inserter(borderRegionIDs));
@@ -1284,10 +1293,14 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 			{
 				SCAI_REGION( "ParcoRepart.distributedFMStep.loop.swapFMResults" )
-				//communicate achieved gain. PE with better solution should send their secondRegion.
+				/**
+				 * Communicate achieved gain.
+				 * Since only two values are swapped, the tracing results measure the latency and synchronization overhead,
+				 * the difference in running times between the two local FM implementations.
+				 */
 				swapField[0] = gain;
 				swapField[1] = blockSizes.second;
-				comm->swap(swapField, 3, partner);
+				comm->swap(swapField, 2, partner);
 			}
 			const IndexType otherGain = swapField[0];
 			const IndexType otherSecondBlockSize = swapField[1];
@@ -1299,7 +1312,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 			if (otherGain == 0 && gain == 0) {
 				//Oh well. None of the processors managed an improvement. No need to update data structures.
-				//std::cout << "Thread " << comm->getRank() << ", round " << i << " no gain here and at " << partner << "." << std::endl;
 
 			}	else {
 				SCAI_REGION_START( "ParcoRepart.distributedFMStep.loop.prepareRedist" )
@@ -1313,15 +1325,12 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				//partition must be consistent, so if gains are equal, pick one of lower index.
 				bool otherWasBetter = (otherGain > gain || (otherGain == gain && partner < comm->getRank()));
 
+				//swap result of local FM
 				IndexType resultSwap[borderRegionIDs.size()];
 				std::copy(assignedToSecondBlock.begin(), assignedToSecondBlock.end(), resultSwap);
-
 				comm->swap(resultSwap, borderRegionIDs.size(), partner);
 
-				const IndexType removeOffset = otherWasBetter ? otherLastRoundMarker : 0;
-				const IndexType addOffset = otherWasBetter ? 0 : lastRoundMarker;
-
-				//keep best solution
+				//keep best solution. Since the two processes used different offsets, we can't copy them directly
 				if (otherWasBetter) {
 					for (IndexType i = 0; i < lastRoundMarker; i++) {
 						assignedToSecondBlock[i] = !(bool(resultSwap[i+otherLastRoundMarker]));//got bool array from partner, need to invert everything.
@@ -1352,9 +1361,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 					}
 				}
 
-				/**
-				 * update indices
-				 */
+				//sort indices
 				std::sort(myGlobalIndices.begin(), myGlobalIndices.end());
 				SCAI_REGION_END( "ParcoRepart.distributedFMStep.loop.prepareRedist" )
 
@@ -1374,11 +1381,10 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				SCAI_REGION_END( "ParcoRepart.distributedFMStep.loop.redistribute" )
 
 				/**
-				 * update local border
+				 * update local border. This could probably be optimized by only updating the part that could have changed in the last round.
 				 */
 				{
 					SCAI_REGION( "ParcoRepart.distributedFMStep.loop.updateLocalBorder" )
-					//update local border
 					nodesWithNonLocalNeighbors = getNodesWithNonLocalNeighbors(input);
 				}
 			}
@@ -1459,7 +1465,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 	if (blockSizes.first >= blockCapacities.first && blockSizes.second >= blockCapacities.second) {
 		//cannot move any nodes, all blocks are overloaded already.
-		std::cout << "Overloaded, cannot move anything." << std::endl;
 		return 0;
 	}
 
@@ -1467,10 +1472,11 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	const IndexType globalN = inputDist->getGlobalSize();
 	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
 
-	/**
-	 * These maps are mapping the b global indices received in the border region onto the interval [0,b-1].
-	 */
+	//the size of this border region
 	const IndexType veryLocalN = borderRegionIDs.size();
+
+	//this map provides an index from 0 to b-1 for each of the b indices in borderRegionIDs
+	//globalToVeryLocal[borderRegionIDs[i]] = i
 	std::map<IndexType, IndexType> globalToVeryLocal;
 
 	for (IndexType i = 0; i < veryLocalN; i++) {
@@ -1482,6 +1488,10 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 	auto isInBorderRegion = [&](IndexType globalID){return globalToVeryLocal.count(globalID) > 0;};
 
+	/**
+	 * This lambda computes the initial gain of each node.
+	 * TODO: This can probably be optimized by inlining to reduce the overhead of read access locks
+	 */
 	auto computeInitialGain = [&](IndexType veryLocalID){
 		SCAI_REGION( "ParcoRepart.twoWayLocalFM.computeGain" )
 		ValueType result = 0;
@@ -1494,9 +1504,11 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		const IndexType localID = inputDist->isLocal(globalID) ? inputDist->global2local(globalID) : matrixHalo.global2halo(globalID);
 		assert(localID != nIndex);
 
+		//get locks
 		const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
 		const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());
 
+		//get indices for CSR structure
 		const IndexType beginCols = localIa[localID];
 		const IndexType endCols = localIa[localID+1];
 
@@ -1523,6 +1535,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 	/**
 	 * construct and fill gain table and priority queues. Since only one target block is possible, gain table is one-dimensional.
+	 * One could probably optimize this by choosing the PrioQueueForInts, but it only supports positive keys and requires some adaptations
 	 */
 	PrioQueue<ValueType, IndexType> firstQueue(veryLocalN);
 	PrioQueue<ValueType, IndexType> secondQueue(veryLocalN);
@@ -1532,13 +1545,16 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	for (IndexType i = 0; i < veryLocalN; i++) {
 		gain[i] = computeInitialGain(i);
 		if (assignedToSecondBlock[i]) {
+			//the queues only support extractMin, since we want the maximum gain each round, we multiply it with -1
 			secondQueue.insert(-gain[i], i);
 		} else {
 			firstQueue.insert(-gain[i], i);
 		}
 	}
 
+	//whether a node was already moved
 	std::vector<bool> moved(veryLocalN, false);
+	//which node was transfered in each round
 	std::vector<IndexType> transfers;
 	transfers.reserve(veryLocalN);
 
@@ -1563,6 +1579,9 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 			break;
 		}
 
+		/*
+		 * now check situations where we have no choice, for example because one queue is empty or one block is already full
+		 */
 		if (firstQueue.size() == 0) {
 			assert(blockSizes.first < blockCapacities.first);
 			bestQueueIndex = 1;
@@ -1575,8 +1594,12 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 			bestQueueIndex = 0;
 		}
 		else {
+			/**
+			 * now the rest
+			 */
 			SCAI_REGION( "ParcoRepart.twoWayLocalFM.queueloop.queueselection" )
 
+			//could replace this with integers since the blockCapacities are assumed to be equal, saving one division.
 			std::vector<ValueType> fullness = {double(blockSizes.first) / blockCapacities.first, double(blockSizes.second) / blockCapacities.second};
 			std::vector<ValueType> gains = {firstQueue.inspectMin().first, secondQueue.inspectMin().first};
 
@@ -1620,39 +1643,43 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 				}
 			}
 			assert(bestQueueIndex == 0 || bestQueueIndex == 1);
-			//std::cout << "Fullness: (" << fullness[0] << "," << fullness[1] << ")" << ", gains (" << gains[0] << "," << gains[1] << "), picked queue " << bestQueueIndex << std::endl;
 		}
 
 		PrioQueue<ValueType, IndexType>& currentQueue = bestQueueIndex == 0 ? firstQueue : secondQueue;
 
-		//now, we have selected a Queue.
+		//Now, we have selected a Queue. Get best vertex and gain
 		IndexType veryLocalID;
 		ValueType topGain;
 		std::tie(topGain, veryLocalID) = currentQueue.extractMin();
 
+		//invert
 		topGain *= -1;
 
 		IndexType topVertex = borderRegionIDs[veryLocalID];
+
+		//here one could assert some consistency
 
 		if (topGain > 0) iterWithoutGain = 0;
 		else iterWithoutGain++;
 
 		//move node
 		transfers.push_back(veryLocalID);
-		gainSum += topGain;
-		gainSumList.push_back(gainSum);
-
 		assignedToSecondBlock[veryLocalID] = !bestQueueIndex;
 		moved[veryLocalID] = true;
 
+		//update gain sum
+		gainSum += topGain;
+		gainSumList.push_back(gainSum);
+
+		//update sizes
 		blockSizes.first += bestQueueIndex == 0 ? -1 : 1;
 		blockSizes.second += bestQueueIndex == 0 ? 1 : -1;
-		//std::cout << "Moving " << topVertex << " from " << bestQueueIndex << ", bringing block sizes to " << blockSizes.first << ", " << blockSizes.second << std::endl;
-
 		sizeList.push_back(std::max(blockSizes.first, blockSizes.second));
 
+		/**
+		 * update gains of neighbors
+		 */
 		SCAI_REGION_START("ParcoRepart.twoWayLocalFM.queueloop.acquireLocks")
-		//update gains of neighbors
 		const CSRStorage<ValueType>& storage = inputDist->isLocal(topVertex) ? input.getLocalStorage() : haloStorage;
 		const IndexType localID = inputDist->isLocal(topVertex) ? inputDist->global2local(topVertex) : matrixHalo.global2halo(topVertex);
 		assert(localID != nIndex);
@@ -1705,7 +1732,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		}
 	}
 	assert(testedNodes >= maxIndex);
-	//assert(maxIndex >= 0);
 	assert(testedNodes-1 < transfers.size());
 
 	/**
