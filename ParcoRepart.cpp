@@ -1766,7 +1766,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	return maxGain;
 }
 
-
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part) {
 
@@ -1849,7 +1848,6 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getPEG
     scai::dmemo::DistributionPtr distPEs ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, numPEs) );
     assert(distPEs->getLocalSize() == 1);
     scai::dmemo::DistributionPtr noDistPEs (new scai::dmemo::NoDistribution( numPEs ));
-    // every PE must have one row of the matrix since we have numPes and the matrix is [numPes x numPEs]
 
     SCAI_REGION_START("ParcoRepart.getPEGraph.buildMatrix");
     scai::utilskernel::LArray<IndexType> ia(2, 0, numNeighbors);
