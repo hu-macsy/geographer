@@ -7,7 +7,8 @@ prefixes = ["hugetrace-", "hugetric-"]
 
 for p in [60]:
 	for i in range(36):
-		filename = os.path.join(dirString, "hugetrace-"+'000'+'{:02d}'.format(i)+".graph")
+		formatString = '%02d' % i
+		filename = os.path.join(dirString, "hugetrace-"+'000'+formatString+".graph")
 		if not os.path.exists(filename):
 			print(filename + " does not exist.")
 		else:
