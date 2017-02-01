@@ -521,7 +521,7 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 
 			std::vector<IndexType> interfaceNodes;
 			IndexType lastRoundMarker;
-			std::tie(interfaceNodes, lastRoundMarker) = ParcoRepart<IndexType, ValueType>::getInterfaceNodes(a, part, localBorder, thisBlock, otherBlock, 2);
+			std::tie(interfaceNodes, lastRoundMarker) = ParcoRepart<IndexType, ValueType>::getInterfaceNodes(a, part, localBorder, otherBlock, 2);
 
 			//last round marker can only be zero if set is empty
 			EXPECT_LE(lastRoundMarker, interfaceNodes.size());
