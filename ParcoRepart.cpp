@@ -207,7 +207,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		ValueType gain = settings.minGainForNextRound;
 		ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input)) / 2;
 
-		scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( input, result, k);
+		scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getPEGraph(input);
 
 		std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
 
@@ -1826,60 +1826,25 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getPEG
     SCAI_REGION("ParcoRepart.getPEGraph");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr(); 
+    const IndexType numPEs = comm->getSize();
     
-    
-    SCAI_REGION_START("ParcoRepart.getPEGraph.findNonLocalNeighbours");
-    // get all the non-local indices in an HArray
-    scai::hmemo::HArray<IndexType> nonLocalIndices( dist->getLocalSize() ); 
-    // dist->getLocalSize() is a "safe" (see below) upper bound of the neighbours if this PE
-    // TODO: localSize is a way upper bound. replace with better estimate
-    // ### in special cases, eg. 8x8 grid and k=8, a block , eg. block 1 in the example,
-    // ### can have local size less than its not-local neighbours, eg, block 1 has 
-    // ### size 8 but 10 non-local neighbours !!!
-    scai::hmemo::WriteAccess<IndexType> writeNLI(nonLocalIndices, dist->getLocalSize() );
-    // count the actual neighbours and resize the array
-    IndexType actualNeighbours = 0;
-
-    const CSRStorage<ValueType> localStorage = adjM.getLocalStorage();
-    const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-    const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-    //scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
-
-    for(IndexType i=0; i<dist->getLocalSize(); i++){        // for all local nodes
-    	for(IndexType j=ia[i]; j<ia[i+1]; j++){             // for all the edges of a node
-            if( !dist->isLocal(ja[j]) ){                    // if ja[j] is not a local node
-                // TODO: this check is needed because in small instances the "safe" upper
-                //        bound is no safe and we must enlarge the array
-                if( actualNeighbours >= nonLocalIndices.size() ){
-                    writeNLI.resize(nonLocalIndices.size()+1);
-                    writeNLI[actualNeighbours] = ja[j];         // store the non local index
-                    ++actualNeighbours;
-                }else {
-                    writeNLI[actualNeighbours] = ja[j];         // store the non local index
-                    ++actualNeighbours;
-                }
-            }
-    	}
-    }
-
-    // if needed resize-shrink the array
-    if(actualNeighbours != nonLocalIndices.size() ){
-        writeNLI.resize(actualNeighbours);
-    }
-
-    //nonLocalIndices.resize(actualNeighbours);
-    writeNLI.release();
-    SCAI_REGION_END("ParcoRepart.getPEGraph.findNonLocalNeighbours");
+    std::vector<IndexType> nonLocalIndices = nonLocalNeighbors(adjM);
     
     SCAI_REGION_START("ParcoRepart.getPEGraph.getOwners");
+    scai::utilskernel::LArray<IndexType> indexTransport(nonLocalIndices.size(), nonLocalIndices.data());
     // find the PEs that own every non-local index
-        scai::hmemo::HArray<IndexType> owners(nonLocalIndices.size() , -1);
-        dist->computeOwners( owners, nonLocalIndices);
+    scai::hmemo::HArray<IndexType> owners(nonLocalIndices.size() , -1);
+    dist->computeOwners( owners, indexTransport);
     SCAI_REGION_END("ParcoRepart.getPEGraph.getOwners");
     
+    scai::hmemo::ReadAccess<IndexType> rOwners(owners);
+    std::unordered_set<IndexType> neighborPEs;
+    neighborPEs.insert(rOwners.get(), rOwners.get()+rOwners.size());
+    //std::copy(rOwners[0], rOwners[0]+rOwners.size(), std::inserter(neighborPEs, neighborPEs.end()));
+    rOwners.release();
+
     // create the PE adjacency matrix to be returned
-    IndexType numPEs = comm->getSize();
-    scai::dmemo::DistributionPtr distPEs ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, numPEs) );  
+    scai::dmemo::DistributionPtr distPEs ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, numPEs) );
     scai::dmemo::DistributionPtr noDistPEs (new scai::dmemo::NoDistribution( numPEs ));
     // every PE must have one row of the matrix since we have numPes and the matrix is [numPes x numPEs]
 
@@ -1887,11 +1852,9 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getPEG
     // TODO: this takes a significant amount of time! ### must reduce
         scai::lama::SparseAssemblyStorage<ValueType> myStorage( distPEs->getLocalSize(), numPEs);
         //scai::lama::MatrixStorage<ValueType> myStorage( distPEs->getLocalSize(), numPEs);
-        scai::hmemo::ReadAccess<IndexType> readI(owners);
-        for(IndexType i=0; i<readI.size(); i++){
-            myStorage.setValue(0, readI[i], 1);
+        for (IndexType neighbor : neighborPEs) {
+        	myStorage.setValue(0, neighbor, 1);
         }
-        readI.release();
     SCAI_REGION_END("ParcoRepart.getPEGraph.buildMatrix");
     
     scai::lama::CSRSparseMatrix<ValueType> PEgraph(myStorage, distPEs, noDistPEs);     
