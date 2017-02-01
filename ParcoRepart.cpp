@@ -2094,6 +2094,7 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getBlo
 
 template<typename IndexType, typename ValueType>
 std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local( const CSRSparseMatrix<ValueType> &adjM, IndexType &colors) {
+    SCAI_REGION("ParcoRepart.getGraphEdgeColoring_local");
     using namespace boost;
     IndexType N= adjM.getNumRows();
     assert( N== adjM.getNumColumns() ); // numRows = numColumns

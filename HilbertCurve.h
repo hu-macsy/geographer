@@ -27,8 +27,6 @@ namespace ITI {
 		public:
                         /* Wrapper function that calls either the 2D or 3D hilbert curve depending on dimensions.
                          * */
-                        static ValueType getHilbertIndex(const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
-                        
                         static ValueType getHilbertIndex(ValueType* point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
                         
 			/**
@@ -42,12 +40,8 @@ namespace ITI {
 	 		* @param[in] maxCoords A vector containing the maximal value for each dimension
 			*
 	 		* @return A value in the unit interval [0,1]
-			*/
-			static ValueType getHilbertIndex2D(const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
-                        
+			*/                        
                         static ValueType getHilbertIndex2D(ValueType* point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);                        
-
-                        static ValueType getHilbertIndex_noScaling(std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 		
 			/**
 			*Accepts a point in 3 dimensions and calculates where along the hilbert curve it lies.
@@ -61,9 +55,6 @@ namespace ITI {
 			*
 	 		* @return A value in the unit interval [0,1]
 			*/
-			static ValueType getHilbertIndex3D(const std::vector<DenseVector<ValueType>> &coordinates, IndexType dimensions, IndexType index, IndexType recursionDepth,
-			 const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
-                        
                         static ValueType getHilbertIndex3D(ValueType* point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 
 			/**
