@@ -894,16 +894,22 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::getNodesWithNonLo
 	std::vector<IndexType> result;
 
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+	if (inputDist->isReplicated()) {
+		//everything is local
+		return result;
+	}
 
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 	const IndexType localN = inputDist->getLocalSize();
 
+	//iterate over all nodes
 	for (IndexType localI = 0; localI < localN; localI++) {
 		const IndexType beginCols = ia[localI];
 		const IndexType endCols = ia[localI+1];
 
+		//over all edges
 		for (IndexType j = beginCols; j < endCols; j++) {
 			if (!inputDist->isLocal(ja[j])) {
 				IndexType globalI = inputDist->local2global(localI);
@@ -913,12 +919,13 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::getNodesWithNonLo
 		}
 	}
 
+	//nodes should have been sorted to begin with, so a subset of them will be sorted as well
 	assert(std::is_sorted(result.begin(), result.end()));
 	return result;
 }
 
 template<typename IndexType, typename ValueType>
-std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueType>::getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType thisBlock, IndexType otherBlock, IndexType depth) {
+std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueType>::getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType otherBlock, IndexType depth) {
 
 	SCAI_REGION( "ParcoRepart.getInterfaceNodes" )
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
@@ -927,15 +934,11 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 
 	const IndexType n = inputDist->getGlobalSize();
 	const IndexType localN = inputDist->getLocalSize();
+	const IndexType thisBlock = comm->getRank();
 
 	if (partDist->getLocalSize() != localN) {
 		throw std::runtime_error("Partition has " + std::to_string(partDist->getLocalSize()) + " local nodes, but matrix has " + std::to_string(localN) + ".");
 	}
-
-	if (thisBlock != comm->getRank()) {
-		throw std::runtime_error("Currently only implemented with one block per process, block " + std::to_string(thisBlock) + " invalid for process " + std::to_string(comm->getRank()));
-	}
-
 
 	if (otherBlock > comm->getSize()) {
 		throw std::runtime_error("Currently only implemented with one block per process, block " + std::to_string(thisBlock) + " invalid for " + std::to_string(comm->getSize()) + " processes.");
@@ -970,24 +973,30 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 		SCAI_REGION( "ParcoRepart.getInterfaceNodes.communication" )
 		IndexType swapField[1];
 		{
-			SCAI_REGION( "ParcoRepart.getInterfaceNodes.communication.syncswap" )
+			SCAI_REGION( "ParcoRepart.getInterfaceNodes.communication.syncswap" );
+			//swap number of local border nodes
 			swapField[0] = nodesWithNonLocalNeighbors.size();
 			comm->swap(swapField, 1, otherBlock);
 		}
-
-		const IndexType swapLength = std::max(swapField[0], IndexType(nodesWithNonLocalNeighbors.size()));
+		const IndexType otherSize = swapField[0];
+		const IndexType swapLength = std::max(otherSize, IndexType(nodesWithNonLocalNeighbors.size()));
 		IndexType swapList[swapLength];
 		for (IndexType i = 0; i < nodesWithNonLocalNeighbors.size(); i++) {
 			swapList[i] = nodesWithNonLocalNeighbors[i];
 		}
 		comm->swap(swapList, swapLength, otherBlock);
 
+		foreignNodes.reserve(otherSize);
+
 		//the swapList array is only partially filled, the number of received nodes is found in swapField[0]
-		for (IndexType i = 0; i < swapField[0]; i++) {
+		for (IndexType i = 0; i < otherSize; i++) {
 			foreignNodes.insert(swapList[i]);
 		}
 	}
 
+	/**
+	 * check which of the neighbors of our local border nodes are actually the partner's border nodes
+	 */
 	for (IndexType node : nodesWithNonLocalNeighbors) {
 		SCAI_REGION( "ParcoRepart.getInterfaceNodes.getBorderToPartner" )
 		IndexType localI = inputDist->global2local(node);
@@ -1002,6 +1011,8 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 				}
 			}
 		}
+
+		//This shouldn't happen, the list of local border nodes was incorrect!
 		if (!hasNonLocal) {
 			throw std::runtime_error("Node " + std::to_string(node) + " has " + std::to_string(ia[localI+1] - ia[localI]) + " neighbors, but all of them are local.");
 		}
@@ -1009,6 +1020,7 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 
 	assert(interfaceNodes.size() <= localN);
 
+	//keep track of which nodes were added at the last BFS round
 	IndexType lastRoundMarker = 0;
 	/**
 	 * now gather buffer zone with breadth-first search
@@ -1059,7 +1071,7 @@ std::pair<std::vector<IndexType>, IndexType> ITI::ParcoRepart<IndexType, ValueTy
 }
 
 template<typename IndexType, typename ValueType>
-IndexType ITI::ParcoRepart<IndexType, ValueType>::getDegreeSum(const CSRSparseMatrix<ValueType> &input, std::vector<IndexType> nodes) {
+IndexType ITI::ParcoRepart<IndexType, ValueType>::getDegreeSum(const CSRSparseMatrix<ValueType> &input, const std::vector<IndexType>& nodes) {
 	SCAI_REGION( "ParcoRepart.getDegreeSum" )
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::hmemo::ReadAccess<IndexType> localIa(localStorage.getIA());
@@ -1189,7 +1201,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			 */
 			std::vector<IndexType> interfaceNodes;
 			IndexType lastRoundMarker;
-			std::tie(interfaceNodes, lastRoundMarker)= getInterfaceNodes(input, part, nodesWithNonLocalNeighbors, localBlockID, partner, settings.borderDepth+1);
+			std::tie(interfaceNodes, lastRoundMarker)= getInterfaceNodes(input, part, nodesWithNonLocalNeighbors, partner, settings.borderDepth+1);
 
 			/**
 			 * now swap indices of nodes in border region with partner processor.
@@ -2231,7 +2243,6 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 
 
 //to force instantiation
-//template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, int k,  double epsilon);
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings);
 			     
 template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int> &partition, int k);
@@ -2250,7 +2261,7 @@ template std::vector<int> ITI::ParcoRepart<int, double>::nonLocalNeighbors(const
 
 template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildPartHalo(const CSRSparseMatrix<double> &input,  const DenseVector<int> &part);
 
-template std::pair<std::vector<int>, int> ITI::ParcoRepart<int, double>::getInterfaceNodes(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, const std::vector<int>& nodesWithNonLocalNeighbors, int thisBlock, int otherBlock, int depth);
+template std::pair<std::vector<int>, int> ITI::ParcoRepart<int, double>::getInterfaceNodes(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, const std::vector<int>& nodesWithNonLocalNeighbors, int otherBlock, int depth);
 
 template DenseVector<int> ParcoRepart<int, double>::getBorderNodes( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part);
 
