@@ -19,6 +19,7 @@
 
 #include <assert.h>
 #include <cmath>
+#include <set>
 #include <climits>
 #include <list>
 #include <vector>
@@ -67,6 +68,7 @@ namespace ITI {
                  */
                 static void createStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
 
+                static void createRandomStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
                 /** Given an adjacency matrix and a filename writes the matrix in the file using the METIS format.
                  *  Not distributed.
                  * 
