@@ -230,17 +230,15 @@ int main(int argc, char** argv) {
     
     
     // Reporting output to std::cout
-    
-    std::cout<<"commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
-    std::cout<< " nodes:"<< N<< " dimensions:"<< settings.dimensions <<" k:" << settings.numBlocks;
-    std::cout<< " epsilon:" << settings.epsilon << " borderDepth:"<< settings.borderDepth;
-    std::cout<< " minGainForNextRound:" << settings.minGainForNextRound;
-    std::cout<< " stopAfterNoGainRounds:"<< settings.stopAfterNoGainRounds << std::endl;
-    
-    std::cout<< "rank:"<< comm->getRank() <<" inputTime:" << inputTime.count() << " partitionTime:" << partitionTime.count() <<" reportTime:"<< reportTime.count() << std::endl;
-    
-    
     if (comm->getRank() == 0) {
+        std::cout<<"commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
+        std::cout<< " nodes:"<< N<< " dimensions:"<< settings.dimensions <<" k:" << settings.numBlocks;
+        std::cout<< " epsilon:" << settings.epsilon << " borderDepth:"<< settings.borderDepth;
+        std::cout<< " minGainForNextRound:" << settings.minGainForNextRound;
+        std::cout<< " stopAfterNoGainRounds:"<< settings.stopAfterNoGainRounds << std::endl;
+        
+        std::cout<<"inputTime:" << inputTime.count() << " partitionTime:" << partitionTime.count() <<" reportTime:"<< reportTime.count() << std::endl;
+    
     	std::cout<< "Cut is: "<< cut<< " and imbalance: "<< imbalance << std::endl;
     }
 }
