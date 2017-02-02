@@ -171,6 +171,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			//permutation.redistribute(inputDist);
 			DenseVector<IndexType> tmpPerm = permutation;
 			tmpPerm.sort( inversePermutation, true);
+PRINT(*comm<< ": "<< permutation.getLocalValues().size() << " <> " <<  hilbertIndices.getLocalValues().size());            
         }
                 
 		/**

@@ -221,7 +221,7 @@ int main(int argc, char** argv) {
     
     std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
     
-    std::chrono::time_point<std::chrono::system_clock> beforeReport;
+    std::chrono::time_point<std::chrono::system_clock> beforeReport =  std::chrono::system_clock::now();
     
     ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true); 
     ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partition, comm->getSize() );
@@ -230,6 +230,8 @@ int main(int argc, char** argv) {
     
     
     // Reporting output to std::cout
+    
+    std::freopen("outputParams", "w", stdout);
     
     std::cout<<"commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
     std::cout<< " nodes:"<< N<< " dimensions:"<< settings.dimensions <<" k:" << settings.numBlocks;
