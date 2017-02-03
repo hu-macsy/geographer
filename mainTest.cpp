@@ -17,6 +17,7 @@
 
 #include <memory>
 #include <cstdlib>
+#include <chrono>
 
 #include "MeshIO.h"
 #include "ParcoRepart.h"
@@ -27,13 +28,15 @@ typedef int IndexType;
 
 
 /**
- *     Settings.dimensions = dimensions;
-    Settings.borderDepth = 4;
-    Settings.stopAfterNoGainRounds = 10;
-    Settings.minGainForNextRound = 1;
-    Settings.sfcResolution = 9;
-    Settings.epsilon = epsilon;
-    Settings.numBlocks = comm->getSize();
+ *  Examples of use:
+ * 
+ *  for reading from file "fileName" 
+ * ./a.out --graphFile fileName --epsilon 0.05 --sfcRecursionSteps=10 --dimensions=2 --borderDepth=10  --stopAfterNoGainRounds=3 --minGainForNextGlobalRound=10
+ * 
+ * for generating a 10x20x30 mesh
+ * ./a.out --generate --numX=10 --numY=20 --numZ=30 --epsilon 0.05 --sfcRecursionSteps=10 --dimensions=3 --borderDepth=10  --stopAfterNoGainRounds=3 --minGainForNextGlobalRound=10
+ * 
+ * !! for now, when reading a file --dimensions must be 2
  */
 
 //----------------------------------------------------------------------------
@@ -96,6 +99,12 @@ int main(int argc, char** argv) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
+    /* timing information
+     */
+    std::chrono::time_point<std::chrono::system_clock> startTime;
+     
+    startTime = std::chrono::system_clock::now();
+    
     if (vm.count("graphFile")) {
     	std::string graphFile = vm["graphFile"].as<std::string>();
     	std::string coordFile;
@@ -188,12 +197,12 @@ int main(int argc, char** argv) {
     	std::cout << "Either an input file or generation parameters are needed. Call again with --file or --generate" << std::endl;
     	return 0;
     }
+    
+    // time needed to get the input
+    std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
 
     assert(N > 0);
 
-    // set the rest of the settings
-    // should be passed as parameters when calling main
-    
     if (comm->getSize() > 0) {
     	settings.numBlocks = comm->getSize();
     }
@@ -206,12 +215,30 @@ int main(int argc, char** argv) {
         }
     }
     
+    std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
+    
     scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, settings );
+    
+    std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
+    
+    std::chrono::time_point<std::chrono::system_clock> beforeReport;
     
     ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true); 
     ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partition, comm->getSize() );
     
+    std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
+    
+    
+    // Reporting output to std::cout
     if (comm->getRank() == 0) {
+        std::cout<<"commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
+        std::cout<< " nodes:"<< N<< " dimensions:"<< settings.dimensions <<" k:" << settings.numBlocks;
+        std::cout<< " epsilon:" << settings.epsilon << " borderDepth:"<< settings.borderDepth;
+        std::cout<< " minGainForNextRound:" << settings.minGainForNextRound;
+        std::cout<< " stopAfterNoGainRounds:"<< settings.stopAfterNoGainRounds << std::endl;
+        
+        std::cout<<"inputTime:" << inputTime.count() << " partitionTime:" << partitionTime.count() <<" reportTime:"<< reportTime.count() << std::endl;
+    
     	std::cout<< "Cut is: "<< cut<< " and imbalance: "<< imbalance << std::endl;
     }
 }

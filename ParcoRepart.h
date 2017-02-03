@@ -169,16 +169,6 @@ namespace ITI {
 			 */
 			static std::vector< std::vector<IndexType>>  getGraphEdgeColoring_local( const CSRSparseMatrix<ValueType> &adjM, IndexType& colors);
                         
-			/** Colors the edges of the graph using max_vertex_degree + 1 colors.
-			 *
-			 * @param[in] edgeList The graph given as the list of edges. It must have size 2 and an edge
-			 * is (edgeList[0][i] , edgeList[1][i])
-			 *
-			 * @return A vector with the color for every edge. ret.size()=edgeList.size() and edge i has
-			 * color ret[i].
-			 */
-			static std::vector<IndexType> getGraphEdgeColoring_local( const std::vector<std::vector<IndexType>> &edgeList );
-                        
 			/** Given the block graph, creates an edge coloring of the graph and retuns a communication
 			 *  scheme based on the coloring
 			 *

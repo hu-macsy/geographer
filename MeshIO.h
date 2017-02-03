@@ -109,9 +109,7 @@ namespace ITI {
                 /* Calculates the 3D distance between two points.
                  */
                 static Scalar dist3D(DenseVector<ValueType> p1, DenseVector<ValueType> p2);
-                
-                static Scalar dist3D(DenseVector<ValueType> p1, ValueType* p2);
-                
+                                
                 static ValueType dist3DSquared(std::tuple<IndexType, IndexType, IndexType> p1, std::tuple<IndexType, IndexType, IndexType> p2);
                 
                 /*  Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position

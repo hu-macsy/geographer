@@ -55,12 +55,12 @@ void MeshIO<IndexType, ValueType>::createRandom3DMesh( CSRSparseMatrix<ValueType
             p2.setValue(0, coords[0].getValue(j));
             p2.setValue(1, coords[1].getValue(j));
             p2.setValue(2, coords[2].getValue(j));
-
+            
             dist = MeshIO<IndexType, ValueType>::dist3D(p1 ,p2);
 
             liIndex= kNNindex.begin();
             for(liVal=kNNdist.begin(); liVal!=kNNdist.end(); ++liVal){
-                if(dist.getValue<ValueType>()<*liVal){
+                if(dist.getValue<ValueType>()< (*liVal)*(*liVal) ){
                     kNNindex.insert(liIndex, j);
                     kNNdist.insert(liVal , dist.getValue<ValueType>());
                     kNNindex.pop_back();
@@ -420,7 +420,7 @@ void MeshIO<IndexType, ValueType>::writeInFileMetisFormat_dist (const CSRSparseM
     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
     const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
         
-    for(IndexType i=0; i< ia.size(); i++){                  // for all local nodes
+    for(IndexType i=0; i< ia.size()-1; i++){                  // for all local nodes
     	for(IndexType j=ia[i]; j<ia[i+1]; j++){             // for all the edges of a node
             f << ja[j]+1 << " ";                            
     	}
@@ -616,25 +616,11 @@ Scalar MeshIO<IndexType, ValueType>::dist3D(DenseVector<ValueType> p1, DenseVect
   res = res0+ res1+ res2;
   return scai::common::Math::sqrt( res.getValue<ScalarRepType>() );
 }
-    
-//-------------------------------------------------------------------------------------------------
-template<typename IndexType, typename ValueType>
-Scalar MeshIO<IndexType, ValueType>::dist3D(DenseVector<ValueType> p1, ValueType *p2){
-  SCAI_REGION( "MeshIO.dist3D" )
-  Scalar res0, res1, res2, res;
-  res0= p1.getValue(0)-p2[0];
-  res0= res0*res0;
-  res1= p1.getValue(1)-p2[1];
-  res1= res1*res1;
-  res2= p1.getValue(2)-p2[2];
-  res2= res2*res2;
-  res = res0+ res1+ res2;
-  return scai::common::Math::sqrt( res.getValue<ScalarRepType>() );
-}
+
 //-------------------------------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
 ValueType MeshIO<IndexType, ValueType>::dist3DSquared(std::tuple<IndexType, IndexType, IndexType> p1, std::tuple<IndexType, IndexType, IndexType> p2){
-  SCAI_REGION( "MeshIO.dist3D" )
+  SCAI_REGION( "MeshIO.dist3DSquared" )
   ValueType distX, distY, distZ;
 
   distX = std::get<0>(p1)-std::get<0>(p2);
@@ -675,7 +661,6 @@ template void MeshIO<int, double>::readFromFile2AdjMatrix( CSRSparseMatrix<doubl
 template void  MeshIO<int, double>::fromFile2Coords_2D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfCoords);
 template void MeshIO<int, double>::fromFile2Coords_3D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfPoints);
 template Scalar MeshIO<int, double>::dist3D(DenseVector<double> p1, DenseVector<double> p2);
-template Scalar MeshIO<int, double>::dist3D(DenseVector<double> p1, double* p2);
 template double MeshIO<int, double>::dist3DSquared(std::tuple<int, int, int> p1, std::tuple<int, int, int> p2);
 template std::tuple<IndexType, IndexType, IndexType> MeshIO<int, double>::index2_3DPoint(int index,  std::vector<int> numPoints);
 } //namespace ITI
