@@ -1766,7 +1766,6 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	return maxGain;
 }
 
-
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part) {
 
@@ -1835,23 +1834,23 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getPEG
     SCAI_REGION_END("ParcoRepart.getPEGraph.getOwners");
     
     scai::hmemo::ReadAccess<IndexType> rOwners(owners);
-    std::unordered_set<IndexType> neighborPEs;
-    neighborPEs.insert(rOwners.get(), rOwners.get()+rOwners.size());
-    //std::copy(rOwners[0], rOwners[0]+rOwners.size(), std::inserter(neighborPEs, neighborPEs.end()));
+    std::vector<IndexType> neighborPEs(rOwners.get(), rOwners.get()+rOwners.size());
     rOwners.release();
+    std::sort(neighborPEs.begin(), neighborPEs.end());
+    //remove duplicates
+    neighborPEs.erase(std::unique(neighborPEs.begin(), neighborPEs.end()), neighborPEs.end());
+    const IndexType numNeighbors = neighborPEs.size();
 
     // create the PE adjacency matrix to be returned
     scai::dmemo::DistributionPtr distPEs ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, numPEs) );
+    assert(distPEs->getLocalSize() == 1);
     scai::dmemo::DistributionPtr noDistPEs (new scai::dmemo::NoDistribution( numPEs ));
-    // every PE must have one row of the matrix since we have numPes and the matrix is [numPes x numPEs]
 
     SCAI_REGION_START("ParcoRepart.getPEGraph.buildMatrix");
-    // TODO: this takes a significant amount of time! ### must reduce
-        scai::lama::SparseAssemblyStorage<ValueType> myStorage( distPEs->getLocalSize(), numPEs);
-        //scai::lama::MatrixStorage<ValueType> myStorage( distPEs->getLocalSize(), numPEs);
-        for (IndexType neighbor : neighborPEs) {
-        	myStorage.setValue(0, neighbor, 1);
-        }
+    scai::utilskernel::LArray<IndexType> ia(2, 0, numNeighbors);
+    scai::utilskernel::LArray<IndexType> ja(numNeighbors, neighborPEs.data());
+    scai::utilskernel::LArray<ValueType> values(numNeighbors, 1);
+    scai::lama::CSRStorage<ValueType> myStorage(1, numPEs, neighborPEs.size(), ia, ja, values);
     SCAI_REGION_END("ParcoRepart.getPEGraph.buildMatrix");
     
     scai::lama::CSRSparseMatrix<ValueType> PEgraph(myStorage, distPEs, noDistPEs);     
