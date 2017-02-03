@@ -68,7 +68,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
 }
 
 TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
-  IndexType nroot = 58;
+  IndexType nroot = 49;
   IndexType n = nroot * nroot * nroot;
   IndexType dimensions = 3;
   

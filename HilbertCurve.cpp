@@ -66,7 +66,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType* point
         }
     }
     
-    long integerIndex = 0;//TODO: also check whether this data type is long enough
+    unsigned long integerIndex = 0;//TODO: also check whether this data type is long enough
     for (IndexType i = 0; i < recursionDepth; i++) {
         int subSquare;
         //two dimensions only, for now
@@ -100,7 +100,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType* point
         //std::cout<< subSquare<<std::endl;
         integerIndex = (integerIndex << 2) | subSquare;	
     }
-    long divisor = 1 << (2*int(recursionDepth));
+    unsigned long divisor = size_t(1) << (2*int(recursionDepth));
     return double(integerIndex) / double(divisor);
     
 }
@@ -147,6 +147,11 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType* point
 	std::vector<ValueType> scaledCoord(dimensions);
 
 	for (IndexType dim = 0; dim < dimensions; dim++) {
+                if( (maxCoords[dim] - minCoords[dim])== 0){
+                    throw std::logic_error( std::string(__FILE__) +", " + std::to_string(__LINE__) + \
+                    ": Minimum == Maximum for dimensions " + std::to_string(dim) +" , cannot create space filling curve: min= "+\
+                    std::to_string(minCoords[dim]) +", max= " + std::to_string(maxCoords[dim]));
+                }
 		scaledCoord[dim] = (point[dim] - minCoords[dim]) / (maxCoords[dim] - minCoords[dim]);
 		if (scaledCoord[dim] < 0 || scaledCoord[dim] > 1) {
 			throw std::runtime_error("Coordinate " + std::to_string(point[dim])+" does not agree with bounds "
@@ -159,10 +164,10 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType* point
 	y= scaledCoord[1];
 	z= scaledCoord[2];
         //PRINT( x <<"__" << y<< "__"<<z );
-        assert(x>=0 && x<=1);
-        assert(y>=0 && y<=1);
-        assert(z>=0 && z<=1);
-	unsigned long integerIndex = 0;	//TODO: also check whether this data type is long enough
+        SCAI_ASSERT(x>=0 && x<=1, x);
+        SCAI_ASSERT(y>=0 && y<=1, y);
+        SCAI_ASSERT(z>=0 && z<=1, z);
+	unsigned long long integerIndex = 0;	//TODO: also check whether this data type is long enough
 
 	for (IndexType i = 0; i < recursionDepth; i++) {
 		int subSquare;
@@ -223,9 +228,10 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType* point
 				}
 		integerIndex = (integerIndex << 3) | subSquare;		
 	}
-	long divisor = 1 << (3*int(recursionDepth));
-        return double(integerIndex) / double(divisor);
-
+	unsigned long long divisor = size_t(1) << size_t(3*int(recursionDepth));
+        double ret = double(integerIndex) / double(divisor);
+        SCAI_ASSERT(ret<1, ret << " , divisor= "<< divisor << " , integerIndex=" << integerIndex <<" , recursionDepth= " << recursionDepth << ", sizeof(uns_ll)="<< sizeof(unsigned long long));
+        return ret;
 }
 
 //-------------------------------------------------------------------------------------------------

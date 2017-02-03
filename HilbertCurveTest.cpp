@@ -283,7 +283,7 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
   hilbertIndex.sort(perm, true);
   
   //test sorting: hilbertIndex(i) < hilbertIdnex(i-1)
-  for(int i=1; i<localN; i++){
+  for(int i=1; i<hilbertIndex.getLocalValues().size(); i++){
       EXPECT_GE( hilbertIndex.getLocalValues()[i] , hilbertIndex.getLocalValues()[i-1]); 
   }
 
@@ -310,7 +310,7 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
 TEST_F(HilbertCurveTest, testNewVersionRandom_Distributed_3D) {
   const IndexType dimensions = 3;
   const IndexType N = 200000;
-  const IndexType recursionDepth = 7;
+  const IndexType recursionDepth = 19;
   
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
   scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -326,10 +326,9 @@ TEST_F(HilbertCurveTest, testNewVersionRandom_Distributed_3D) {
   // create own part of coordinates 
   for(IndexType i=0; i<dimensions; i++){
     SCAI_REGION("testNewVsOldVersionRandom_Distributed_3D.create_coords");
-    scai::hmemo::WriteAccess<ValueType> coordWrite( coordinates[i].getLocalValues() );
-    for(IndexType j=0; j<coordWrite.size(); j++){ 
-      r= ((double) rand()/RAND_MAX);
-      coordWrite.setValue( j , r) ;
+    for(IndexType j=0; j<coordinates[i].getLocalValues().size(); j++){ 
+      r= ((double) rand()/RAND_MAX * 100);
+      coordinates[i].getLocalValues()[j] = r;
     }
   }
   
@@ -353,7 +352,7 @@ TEST_F(HilbertCurveTest, testNewVersionRandom_Distributed_3D) {
     minCoords[dim] = globalMin;
     maxCoords[dim] = globalMax;
   }
-
+  PRINT("max= "<< maxCoords[0] << ", "<< maxCoords[1] << ", "<< maxCoords[2]);
   //the hilbert indices initiated with the dummy value 19
   DenseVector<ValueType> indices(dist, 19);
   scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
@@ -372,6 +371,7 @@ TEST_F(HilbertCurveTest, testNewVersionRandom_Distributed_3D) {
     coordAccess1.getValue(point[1], i);
     coordAccess2.getValue(point[2], i);
     SCAI_REGION_END("testNewVsOldVersionRandom_Distributed_3D.getPoint");      
+    //PRINT(*comm<<": point ("<< point[0]<<", "<< point[1]<< ", "<< point[2] << ")" );
     
     indices.getLocalValues()[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(point , dimensions, recursionDepth, minCoords, maxCoords);    
     

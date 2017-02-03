@@ -120,9 +120,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		for (IndexType dim = 0; dim < dimensions; dim++) {
 			if (maxCoords[dim] - minCoords[dim] > maxExtent) {
 				maxExtent = maxCoords[dim] - minCoords[dim];
-			}
+			}			
 		}
-
+		
 		/**
 		* Several possibilities exist for choosing the recursion depth.
 		* Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
@@ -157,6 +157,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				}
 				ValueType globalHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex( point, dimensions, recursionDepth, minCoords, maxCoords);
 				hilbertIndicesLocal[i] = globalHilbertIndex;
+                                //SCAI_ASSERT( globalHilbertIndex < 1, *comm << " "<< globalHilbertIndex << " point ("<< point[0]<<", "<< point[1]<< ", "<< point[2] << ")");
+                                //SCAI_ASSERT( globalHilbertIndex >=0, *comm << " "<<  globalHilbertIndex);
 			}
 		}
 		
@@ -165,6 +167,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		* now sort the global indices by where they are on the space-filling curve.
 		*/
 		scai::lama::DenseVector<IndexType> permutation, inversePermutation;
+                
         {
 			SCAI_REGION( "ParcoRepart.partitionGraph.initialPartition.sorting" )
 			hilbertIndices.sort(permutation, true);
@@ -173,6 +176,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			tmpPerm.sort( inversePermutation, true);
 PRINT(*comm<< ": "<< permutation.getLocalValues().size() << " <> " <<  hilbertIndices.getLocalValues().size());            
         }
+                
                 
 		/**
 		 * The permutations given by DenseVector.sort are distributed by BlockDistributions.
@@ -189,6 +193,8 @@ PRINT(*comm<< ": "<< permutation.getLocalValues().size() << " <> " <<  hilbertIn
 
 		for (IndexType i = 0; i < localN; i++) {
 			result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
+                        //SCAI_ASSERT( int( hilbertIndicesLocal[i]*k) <k,hilbertIndicesLocal[i] ); 
+                        //result.getLocalValues()[i] = int( hilbertIndicesLocal[i]*k);
 		}
 
 		if (!inputDist->isReplicated() && comm->getSize() == k) {
