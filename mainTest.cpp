@@ -237,7 +237,7 @@ int main(int argc, char** argv) {
         std::cout<< " minGainForNextRound:" << settings.minGainForNextRound;
         std::cout<< " stopAfterNoGainRounds:"<< settings.stopAfterNoGainRounds << std::endl;
         
-        std::cout<<"inputTime:" << inputTime.count() << " partitionTime:" << partitionTime.count() <<" reportTime:"<< reportTime.count() << std::endl;
+        std::cout<<"inputTime:" << comm->max(inputTime.count()) << " partitionTime:" << comm->max(partitionTime.count()) <<" reportTime:"<< comm->max(reportTime.count()) << std::endl;
     
     	std::cout<< "Cut is: "<< cut<< " and imbalance: "<< imbalance << std::endl;
     }
