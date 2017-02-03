@@ -323,8 +323,8 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_3D) {
 */
 TEST_F(HilbertCurveTest, testHilbertIndexRandom_Distributed_3D) {
   const IndexType dimensions = 3;
-  const IndexType N = 200;
-  const IndexType recursionDepth = 7;
+  const IndexType N = 2000;
+  const IndexType recursionDepth = 11;
   
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
   scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -497,7 +497,7 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
 TEST_F(HilbertCurveTest, testNewVersionRandom_Distributed_3D) {
   const IndexType dimensions = 3;
   const IndexType N = 20000;
-  const IndexType recursionDepth = 7;
+  const IndexType recursionDepth = 12;
   
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
   scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );

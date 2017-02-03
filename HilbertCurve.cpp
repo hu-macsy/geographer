@@ -66,7 +66,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType* point
         }
     }
     
-    long integerIndex = 0;//TODO: also check whether this data type is long enough
+    unsigned long integerIndex = 0;//TODO: also check whether this data type is long enough
     for (IndexType i = 0; i < recursionDepth; i++) {
         int subSquare;
         //two dimensions only, for now
@@ -100,7 +100,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType* point
         //std::cout<< subSquare<<std::endl;
         integerIndex = (integerIndex << 2) | subSquare;	
     }
-    long divisor = 1 << (2*int(recursionDepth));
+    unsigned long divisor = size_t(1) << size_t(2*int(recursionDepth));
     return double(integerIndex) / double(divisor);
     
 }
@@ -223,8 +223,10 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType* point
 				}
 		integerIndex = (integerIndex << 3) | subSquare;		
 	}
-	long divisor = 1 << (3*int(recursionDepth));
-        return double(integerIndex) / double(divisor);
+	unsigned long divisor = size_t(1) << size_t(3*int(recursionDepth));
+        double ret = double(integerIndex) / double(divisor);
+        SCAI_ASSERT( ret<1 , ret);
+        return ret;
 
 }
 
