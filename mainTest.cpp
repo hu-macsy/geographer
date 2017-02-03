@@ -221,7 +221,7 @@ int main(int argc, char** argv) {
     
     std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
     
-    std::chrono::time_point<std::chrono::system_clock> beforeReport;
+    std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
     ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true); 
     ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partition, comm->getSize() );
@@ -230,6 +230,10 @@ int main(int argc, char** argv) {
     
     
     // Reporting output to std::cout
+    ValueType inputT = ValueType ( comm->max(inputTime.count() ));
+    ValueType partT = ValueType (comm->max(partitionTime.count()));
+    ValueType repT = ValueType (comm->max(reportTime.count()));
+        
     if (comm->getRank() == 0) {
         std::cout<<"commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
         std::cout<< " nodes:"<< N<< " dimensions:"<< settings.dimensions <<" k:" << settings.numBlocks;
@@ -237,8 +241,7 @@ int main(int argc, char** argv) {
         std::cout<< " minGainForNextRound:" << settings.minGainForNextRound;
         std::cout<< " stopAfterNoGainRounds:"<< settings.stopAfterNoGainRounds << std::endl;
         
-        std::cout<<"inputTime:" << comm->max(inputTime.count()) << " partitionTime:" << comm->max(partitionTime.count()) <<" reportTime:"<< comm->max(reportTime.count()) << std::endl;
-    
-    	std::cout<< "Cut is: "<< cut<< " and imbalance: "<< imbalance << std::endl;
+        std::cout<< "Cut is: "<< cut<< " and imbalance: "<< imbalance << std::endl;
+        std::cout<<"inputTime:" << inputT << " partitionTime:" << partT <<" reportTime:"<< repT << std::endl;
     }
 }
