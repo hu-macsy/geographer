@@ -159,7 +159,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			}
 		}
 		
-		
 		/**
 		* now sort the global indices by where they are on the space-filling curve.
 		*/
@@ -1825,7 +1824,7 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getPEG
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr(); 
     const IndexType numPEs = comm->getSize();
     
-    std::vector<IndexType> nonLocalIndices = nonLocalNeighbors(adjM);
+    const std::vector<IndexType> nonLocalIndices = nonLocalNeighbors(adjM);
     
     SCAI_REGION_START("ParcoRepart.getPEGraph.getOwners");
     scai::utilskernel::LArray<IndexType> indexTransport(nonLocalIndices.size(), nonLocalIndices.data());
@@ -1854,6 +1853,7 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getPEG
     scai::lama::CSRStorage<ValueType> myStorage(1, numPEs, neighborPEs.size(), ia, ja, values);
     SCAI_REGION_END("ParcoRepart.getPEGraph.buildMatrix");
     
+    //could be optimized with move semantics
     scai::lama::CSRSparseMatrix<ValueType> PEgraph(myStorage, distPEs, noDistPEs);
 
     return PEgraph;
@@ -2121,32 +2121,18 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
     // and coloring[i].size()= number of edges in input graph
 
     assert(adjM.getNumColumns() == adjM.getNumRows() );
-    // TODO: coloring seems problematic when adjM has 2 nodes and only one edge
-    // handle individually
-    if(adjM.getNumRows()==2){           // graph has 2 nodes
-        std::vector<DenseVector<IndexType>> retG(1);
-        //TODO: setNumVlaues returns number of non-zero elements plus adjM.numRows() (?!?!)
-        // use l1Norm but does not considers weighted edges
-        //TODO: aparently CSRSparseMatrix.getNumValues() counts also 0 when setting via a setRawDenseData despite
-        // the documentation claiming otherwise
-        if(adjM.l1Norm()==2){     // and one edge
-            retG[0].allocate(2);
-            retG[0].setValue(0,1);
-            retG[0].setValue(1,0);
-        }
-        return retG;
-    }
 
     IndexType colors;
     std::vector<std::vector<IndexType>> coloring = getGraphEdgeColoring_local( adjM, colors );
     std::vector<DenseVector<IndexType>> retG(colors);
     
-    // retG.size()= number of colors used in graph edge coloring
-    // retG[i].size()= N , all nodes not communicating have -1
+    if (adjM.getNumRows()==2) {
+    	assert(colors<=1);
+    	assert(coloring.size()<=1);
+    }
     
     for(IndexType i=0; i<colors; i++){        
         retG[i].allocate(N);
-        // retG[i] = static_cast<IndexType> ( -1 );    // set value -1 for blocks NOT communicating
         // TODO: although not distributed maybe try to avoid setValue
         // initialize so retG[i][j]=j instead of -1
         for( IndexType j=0; j<N; j++){
