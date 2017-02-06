@@ -1047,11 +1047,11 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     
     // as many rounds as colors
     EXPECT_EQ(colors, communication.size());
-    // every round k entries
-    EXPECT_EQ( k, communication[0].size());
     for(IndexType i=0; i<communication.size(); i++){
+    	// every round k entries
+    	EXPECT_EQ( k, communication[i].size());
         for(IndexType j=0; j<k; j++){
-            EXPECT_LE(communication[i](j).getValue<IndexType>() , colors);
+            EXPECT_LE(communication[i](j).getValue<IndexType>() , k);
             EXPECT_GE(communication[i](j).getValue<IndexType>() , 0);
         }
     }
