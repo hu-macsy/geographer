@@ -10,6 +10,7 @@ struct Settings{
     IndexType stopAfterNoGainRounds = 0;
     IndexType minGainForNextRound = 1;
     IndexType sfcResolution = 0;
+    IndexType numberOfRestarts = 0;
     bool gainOverBalance = false;
     double epsilon = 0.05;
     

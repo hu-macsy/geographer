@@ -63,6 +63,7 @@ int main(int argc, char** argv) {
 				("sfcRecursionSteps", value<int>(&settings.sfcResolution)->default_value(settings.sfcResolution), "Tuning parameter: Recursion Level of space filling curve. A value of 0 causes the recursion level to be derived from the graph size.")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
 				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
+				("numberOfRestarts", value<int>(&settings.numberOfRestarts)->default_value(settings.numberOfRestarts), "Tuning parameter: Restart local FM with different seeds and keep best.")
 				;
 
 	variables_map vm;
