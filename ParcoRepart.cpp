@@ -166,7 +166,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		/**
 		* now sort the global indices by where they are on the space-filling curve.
 		*/
-		scai::lama::DenseVector<IndexType> permutation, inversePermutation;
+		
+                
+                scai::lama::DenseVector<IndexType> permutation, inversePermutation;
                 
         {
 			SCAI_REGION( "ParcoRepart.partitionGraph.initialPartition.sorting" )
@@ -184,9 +186,12 @@ PRINT(*comm<< ": "<< permutation.getLocalValues().size() << " <> " <<  hilbertIn
 		 * Without a redistribution step, the line result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
 		 * sometimes segfaults. We can't have that.
 		 */
+                
+                
 		inversePermutation.redistribute(inputDist);
 		assert(inversePermutation.getDistributionPtr()->getLocalSize() == localN);
-
+                
+                
 		/**
 		* initial partitioning with sfc. Upgrade to chains-on-chains-partitioning later
 		*/
