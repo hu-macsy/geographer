@@ -106,6 +106,11 @@ int main(int argc, char** argv) {
      
     startTime = std::chrono::system_clock::now();
     
+    if (comm->getRank() == 0)
+	{
+        std::cout<< "commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :" generate") << std::endl;
+	}
+
     if (vm.count("graphFile")) {
     	std::string graphFile = vm["graphFile"].as<std::string>();
     	std::string coordFile;
@@ -236,7 +241,7 @@ int main(int argc, char** argv) {
     ValueType repT = ValueType (comm->max(reportTime.count()));
         
     if (comm->getRank() == 0) {
-        std::cout<<"commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
+        std::cout<< "commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
         std::cout<< " nodes:"<< N<< " dimensions:"<< settings.dimensions <<" k:" << settings.numBlocks;
         std::cout<< " epsilon:" << settings.epsilon << " borderDepth:"<< settings.borderDepth;
         std::cout<< " minGainForNextRound:" << settings.minGainForNextRound;
