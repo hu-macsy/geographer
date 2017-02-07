@@ -1,7 +1,8 @@
 CC=g++
 
-FILES_GOOGLETEST= test_main.cpp ParcoRepartTest.cpp ParcoRepart.cpp HilbertCurve.cpp HilbertCurveTest.cpp MeshIO.cpp
-FILES_TEST_MAIN= mainTest.cpp ParcoRepart.cpp HilbertCurve.cpp MeshIO.cpp
+SRCS=$(wildcard *.cpp)
+OBJ_GOOGLETEST= test_main.o ParcoRepartTest.o ParcoRepart.o HilbertCurve.o HilbertCurveTest.o MeshIO.o PrioQueueForInts.o
+OBJ_TEST_MAIN= mainTest.o ParcoRepart.o HilbertCurve.o MeshIO.o PrioQueueForInts.o
 EXECUTABLE_GOOGLETEST=KatanomiTest
 EXECUTABLE_MAIN=Katanomi
 GIT_COMMIT=$(shell git rev-parse --short HEAD)
@@ -13,11 +14,23 @@ BOOST_LIB=
 LFLAGS= -L$(SCAI_LIB) -L$(GTEST_LIB) -L$(BOOST_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lscai_sparsekernel -lgtest -lboost_program_options
 CCFLAGS= --openmp --std=c++11 -g -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -DSCAI_TRACE_ON  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR -DBUILD_COMMIT=$(GIT_COMMIT)
 
-all:
-	$(CC) $(CCFLAGS) $(FILES_GOOGLETEST) -o $(EXECUTABLE_GOOGLETEST) $(LFLAGS)
+all: main tests
+.PHONY: all
 
-main:
-	$(CC) $(CCFLAGS) $(FILES_TEST_MAIN) -o $(EXECUTABLE_MAIN) $(LFLAGS)
+tests: $(OBJ_GOOGLETEST)
+	$(CC) $(CCFLAGS) $(OBJ_GOOGLETEST) -o $(EXECUTABLE_GOOGLETEST) $(LFLAGS)
+
+main: $(OBJ_TEST_MAIN)
+	$(CC) $(CCFLAGS) $(OBJ_TEST_MAIN) -o $(EXECUTABLE_MAIN) $(LFLAGS)
 	
+.PHONY: clean
 clean:
-	rm -f $(EXECUTABLE)
+	rm -f $(EXECUTABLE_MAIN) $(EXECUTABLE_GOOGLETEST) $(OBJ_GOOGLETEST) $(OBJ_TEST_MAIN)
+
+depend: .depend
+
+.depend: $(SRCS)
+	rm -f ./.depend
+	$(CC) $(CCFLAGS) -MM $^ > ./.depend;
+
+include .depend
