@@ -7,6 +7,7 @@
 
 #include <scai/dmemo/HaloBuilder.hpp>
 #include <scai/dmemo/Distribution.hpp>
+#include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/dmemo/GenBlockDistribution.hpp>
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 #include <scai/tracing.hpp>
@@ -162,41 +163,37 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		/**
 		* now sort the global indices by where they are on the space-filling curve.
 		*/
-		scai::lama::DenseVector<IndexType> permutation, inversePermutation;
+		scai::lama::DenseVector<IndexType> permutation;
         {
 			SCAI_REGION( "ParcoRepart.partitionGraph.initialPartition.sorting" )
 			hilbertIndices.sort(permutation, true);
-			//permutation.redistribute(inputDist);
-			DenseVector<IndexType> tmpPerm = permutation;
-			tmpPerm.sort( inversePermutation, true);
         }
-                
-		/**
-		 * The permutations given by DenseVector.sort are distributed by BlockDistributions.
-		 * However, the sorting does not guarantee that each processor has the same number of values.
-		 * Without a redistribution step, the line result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
-		 * sometimes segfaults. We can't have that.
-		 */
-		inversePermutation.redistribute(inputDist);
-		assert(inversePermutation.getDistributionPtr()->getLocalSize() == localN);
 
 		/**
-		* initial partitioning with sfc. Upgrade to chains-on-chains-partitioning later
+		* initial partitioning with sfc.
 		*/
-
-		for (IndexType i = 0; i < localN; i++) {
-			result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
-		}
-
 		if (!inputDist->isReplicated() && comm->getSize() == k) {
 			SCAI_REGION( "ParcoRepart.partitionGraph.initialPartition.redistribute" )
-			//TODO: this won't scale well.
-		    result.redistribute(noDist);
 
-			scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(result.getLocalValues(), comm));
+			scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(n, comm));
+			permutation.redistribute(blockDist);
+			scai::hmemo::WriteAccess<IndexType> wPermutation( permutation.getLocalValues() );
+			std::sort(wPermutation.get(), wPermutation.get()+wPermutation.size());
+			wPermutation.release();
+
+			scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(n, permutation.getLocalValues(), comm));
 
 			input.redistribute(newDistribution, input.getColDistributionPtr());
-			result.redistribute(newDistribution);
+			result = DenseVector<IndexType>(newDistribution, comm->getRank());
+
+		} else {
+			scai::lama::DenseVector<IndexType> inversePermutation;
+			DenseVector<IndexType> tmpPerm = permutation;
+			tmpPerm.sort( inversePermutation, true);
+
+			for (IndexType i = 0; i < localN; i++) {
+				result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
+			}
 		}
 	}
 
