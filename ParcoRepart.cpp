@@ -1609,13 +1609,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 			SCAI_REGION( "ParcoRepart.twoWayLocalFM.queueloop.queueselection" )
 
 			//could replace this with integers since the blockCapacities are assumed to be equal, saving one division.
-			std::vector<ValueType> fullness = {double(blockSizes.first) / blockCapacities.first, double(blockSizes.second) / blockCapacities.second};
+			std::vector<IndexType> fullness = {blockSizes.first, blockSizes.second};
 			std::vector<ValueType> gains = {firstQueue.inspectMin().first, secondQueue.inspectMin().first};
-
-			assert(fullness[0] <= 1);
-			assert(fullness[1] <= 1);
-			assert(fullness[0] >= 0);
-			assert(fullness[1] >= 0);
 
 			if (gainOverBalance) {
 				//decide first by gain. If gain is equal, decide by fullness
