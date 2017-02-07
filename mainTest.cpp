@@ -214,18 +214,20 @@ int main(int argc, char** argv) {
             settings.print3D(std::cout);
         }
     }
-    
+/*    
     std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
-    
     scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, settings );
-    
     std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
+*/    
+
+    std::chrono::time_point<std::chrono::system_clock> beforePart_noSortTime =  std::chrono::system_clock::now();
+    scai::lama::DenseVector<IndexType> partition_noSort = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph_noSort( graph, coordinates, settings );
+    std::chrono::duration<double> partition_noSortTime =  std::chrono::system_clock::now() - beforePart_noSortTime;
+
     
     std::chrono::time_point<std::chrono::system_clock> beforeReport =  std::chrono::system_clock::now();
-    
-    ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true); 
-    ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partition, comm->getSize() );
-    
+  //  ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true); 
+  //  ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partition, comm->getSize() );
     std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
     
     
@@ -239,10 +241,13 @@ int main(int argc, char** argv) {
     std::cout<< " minGainForNextRound:" << settings.minGainForNextRound;
     std::cout<< " stopAfterNoGainRounds:"<< settings.stopAfterNoGainRounds << std::endl;
     
+/*
     std::cout<< "rank:"<< comm->getRank() <<" inputTime:" << inputTime.count() << " partitionTime:" << partitionTime.count() <<" reportTime:"<< reportTime.count() << std::endl;
     
     
     if (comm->getRank() == 0) {
     	std::cout<< "Cut is: "<< cut<< " and imbalance: "<< imbalance << std::endl;
     }
+*/
+
 }

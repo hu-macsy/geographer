@@ -391,7 +391,7 @@ void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMa
     
     IndexType localSize = dist->getLocalSize(); // the size of the local part
     
-    IndexType planeSize= numY*numZ; // a YxZ plane
+    IndexType planeSize= numY*numZ;             // a YxZ plane
     
     // find which should be the first local coordinate in this processor
     IndexType startingIndex = dist->local2global(0);
@@ -447,13 +447,13 @@ void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMa
     
     IndexType indexCnt= 0;              
 
-//    for(IndexType x=-boxRadius; x<=boxRadius; x++){
-//        for(IndexType y=-boxRadius; y<=boxRadius; y++){
-//                for(IndexType z=-boxRadius; z<=boxRadius; z++){
+    for(IndexType x=-boxRadius; x<=boxRadius; x++){
+        for(IndexType y=-boxRadius; y<=boxRadius; y++){
+                for(IndexType z=-boxRadius; z<=boxRadius; z++){
 // changed the code above so we find neighbours only with greater indices    
-    for(IndexType x=0; x<=boxRadius; x++){
-        for(IndexType y=0; y<=boxRadius; y++){
-            for(IndexType z=0; z<=boxRadius; z++){
+//    for(IndexType x=0; x<=boxRadius; x++){
+//        for(IndexType y=0; y<=boxRadius; y++){
+//            for(IndexType z=0; z<=boxRadius; z++){
                 // calculate the global index of a possible neighbour and insert it to the vector
                 IndexType globalNeighbourIndex= x*planeSize + y*numZ + z;
                 neighbourGlobalIndices.push_back( globalNeighbourIndex );
