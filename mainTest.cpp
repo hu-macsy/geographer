@@ -136,7 +136,6 @@ int main(int argc, char** argv) {
         if (comm->getRank() == 0)
         {
 			std::cout<< "Reading from file \""<< graphFile << "\" for the graph and \"" << coordFile << "\" for coordinates"<< std::endl;
-			std::cout<< "Read " << N << " points." << std::endl;
         }
 
         scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -147,6 +146,9 @@ int main(int argc, char** argv) {
         ITI::MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graph , graphFile );
         graph.redistribute(rowDistPtr , noDistPtr);
         // take care, when reading from file graph needs redistribution
+        if (comm->getRank() == 0) {
+        	std::cout<< "Read " << N << " points." << std::endl;
+        }
         
         scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
         for(IndexType i=0; i<settings.dimensions; i++){
@@ -158,6 +160,10 @@ int main(int argc, char** argv) {
         	ITI::MeshIO<IndexType, ValueType>::fromFile2Coords_2D(coordFile, coordinates, N );
         } else if (settings.dimensions == 3){
         	ITI::MeshIO<IndexType, ValueType>::fromFile2Coords_3D(coordFile, coordinates, N );
+        }
+
+        if (comm->getRank() == 0) {
+        	std::cout << "Read coordinates." << std::endl;
         }
 
         for(IndexType i=0; i<settings.dimensions; i++){
