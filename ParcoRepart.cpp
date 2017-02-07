@@ -2128,7 +2128,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
     
     if (adjM.getNumRows()==2) {
     	assert(colors<=1);
-    	assert(coloring.size()<=1);
+    	assert(coloring[0].size()<=1);
     }
     
     for(IndexType i=0; i<colors; i++){        
