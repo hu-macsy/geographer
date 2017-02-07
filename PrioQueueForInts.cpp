@@ -11,34 +11,34 @@
 
 namespace ITI {
 
-template<typename Key, typename Val>
-PrioQueueForInts<Key, Val>::PrioQueueForInts(uint64_t size, Key maxPrio):
+
+PrioQueueForInts::PrioQueueForInts(index size, index maxPrio):
 		buckets(maxPrio+1), nodePtr(size), myBucket(size, none),
 		minNotEmpty(maxPrio+1), maxNotEmpty(-1), maxPrio(maxPrio), numElems(0)
 {
 
 }
 
-template<typename Key, typename Val>
-PrioQueueForInts<Key, Val>::PrioQueueForInts(std::vector<Key>& prios, Key maxPrio):
+
+PrioQueueForInts::PrioQueueForInts(std::vector<index>& prios, index maxPrio):
 		buckets(maxPrio+1), nodePtr(prios.size()), myBucket(prios.size(), none),
 		minNotEmpty(maxPrio+1), maxNotEmpty(-1), maxPrio(maxPrio), numElems(0)
 {
-	for (Key i = 0; i < prios.size(); ++i) {
-		if (prios[i] != PrioQueueForInts::none) {
+	for (index i = 0; i < prios.size(); ++i) {
+		if (prios[i] != none) {
 			insert(i, prios[i]);
 		}
 	}
 }
 
-template<typename Key, typename Val>
-void PrioQueueForInts<Key, Val>::updateKey(Key prio, Val elem) {
+
+void PrioQueueForInts::updateKey(index prio, index elem) {
 	remove(elem);
 	insert(elem, prio);
 }
 
-template<typename Key, typename Val>
-void PrioQueueForInts<Key, Val>::insert(Key prio, Val elem) {
+
+void PrioQueueForInts::insert(index prio, index elem) {
 	assert(0 <= prio && prio <= maxPrio);
 	assert(0 <= elem && elem < nodePtr.size());
 
@@ -56,41 +56,43 @@ void PrioQueueForInts<Key, Val>::insert(Key prio, Val elem) {
 	}
 }
 
-template<typename Key, typename Val>
-Val PrioQueueForInts<Key, Val>::extractMin() {
+
+index PrioQueueForInts::extractMin() {
 	if (minNotEmpty > maxPrio) {
-		return PrioQueueForInts::none;
+		assert(empty());
+		return none;
 	}
 	else {
 		assert(! buckets[minNotEmpty].empty());
-		Val result = buckets[minNotEmpty].front();
+		index result = buckets[minNotEmpty].front();
 		remove(result);
 		return result;
 	}
 }
 
-template<typename Key, typename Val>
-Val PrioQueueForInts<Key, Val>::extractMax() {
+
+index PrioQueueForInts::extractMax() {
 	if (maxNotEmpty < 0) {
-		return NetworKit::none;
+		assert(empty());
+		return none;
 	}
 	else {
 		assert(! buckets[maxNotEmpty].empty());
-		Val result = buckets[maxNotEmpty].front();
+		index result = buckets[maxNotEmpty].front();
 		remove(result);
 		return result;
 	}
 }
 
-template<typename Key, typename Val>
-void PrioQueueForInts<Key, Val>::remove(Val elem) {
+
+void PrioQueueForInts::remove(index elem) {
 	assert(0 <= elem && elem < nodePtr.size());
 
-	if (myBucket[elem] != NetworKit::none) {
+	if (myBucket[elem] != none) {
 		// remove from appropriate bucket
-		Key prio = myBucket[elem];
+		index prio = myBucket[elem];
 		buckets[prio].erase(nodePtr[elem]);
-		myBucket[elem] = NetworKit::none;
+		myBucket[elem] = none;
 		--numElems;
 
 		// adjust max pointer if necessary
@@ -105,38 +107,33 @@ void PrioQueueForInts<Key, Val>::remove(Val elem) {
 	}
 }
 
-template<typename Key, typename Val>
-Val PrioQueueForInts<Key, Val>::extractAt(Key prio) {
+
+index PrioQueueForInts::extractAt(index prio) {
 	assert(0 <= prio && prio <= maxPrio);
 	if (buckets[prio].empty()) {
-		return NetworKit::none;
+		return none;
 	}
 	else {
-		Key result = buckets[prio].front();
-		myBucket[result] = NetworKit::none;
+		index result = buckets[prio].front();
+		myBucket[result] = none;
 		buckets[prio].pop_front();
 		return result;
 	}
 }
 
-template<typename Key, typename Val>
-Key PrioQueueForInts<Key, Val>::priority(Val elem) {
+
+index PrioQueueForInts::priority(index elem) const {
 	return myBucket[elem];
 }
 
-template<typename Key, typename Val>
-bool PrioQueueForInts<Key, Val>::empty() const {
+
+bool PrioQueueForInts::empty() const {
 	return (numElems == 0);
 }
 
-template<typename Key, typename Val>
-uint64_t PrioQueueForInts<Key, Val>::size() const {
+
+index PrioQueueForInts::size() const {
 	return numElems;
 }
-
-template int PrioQueueForInts<double, int>::extractMin();
-template bool PrioQueueForInts<double, int>::empty();
-template void PrioQueueForInts<double, int>::insert(double prio, int elem);
-template void PrioQueueForInts<double, int>::updateKey(double prio, int elem);
 
 } /* namespace ITI */
