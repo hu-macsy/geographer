@@ -34,7 +34,7 @@ PrioQueueForInts::PrioQueueForInts(std::vector<index>& prios, index maxPrio):
 
 void PrioQueueForInts::updateKey(index prio, index elem) {
 	remove(elem);
-	insert(elem, prio);
+	insert(prio, elem);
 }
 
 
@@ -56,6 +56,9 @@ void PrioQueueForInts::insert(index prio, index elem) {
 	}
 }
 
+index PrioQueueForInts::getMaxNotEmpty() const {
+	return maxNotEmpty;
+}
 
 index PrioQueueForInts::extractMin() {
 	if (minNotEmpty > maxPrio) {
