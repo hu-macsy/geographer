@@ -42,8 +42,8 @@ void PrioQueueForInts::insert(index prio, index elem) {
 	assert(0 <= prio && prio <= maxPrio);
 	assert(0 <= elem && elem < nodePtr.size());
 
-	buckets[prio].push_front(elem);
-	nodePtr[elem] = buckets[prio].begin();
+	nodePtr[elem] = buckets[prio].end();
+	buckets[prio].push_back(elem);
 	myBucket[elem] = prio;
 	++numElems;
 
