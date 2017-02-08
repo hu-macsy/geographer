@@ -2067,10 +2067,10 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     IndexType N= adjM.getNumRows();
     assert( N== adjM.getNumColumns() ); // numRows = numColumns
     
+    SCAI_REGION_START("ParcoRepart.coloring.convertGraph")
     // use boost::Graph and boost::edge_coloring()
     typedef adjacency_list<vecS, vecS, undirectedS, no_property, size_t, no_property> Graph;
     typedef std::pair<std::size_t, std::size_t> Pair;
-    //std::vector<std::vector<IndexType>> edges(2);
     Graph G(N);
     
     // retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge
@@ -2088,17 +2088,19 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
             }
         }
     }
+    SCAI_REGION_END("ParcoRepart.coloring.convertGraph")
     
+    SCAI_REGION_START("ParcoRepart.coloring.callBoost")
     colors = boost::edge_coloring(G, boost::get( boost::edge_bundle, G));
+    SCAI_REGION_END("ParcoRepart.coloring.callBoost")
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-    //PRINT( *comm << ", Colored using " << colors << " colors");
+    SCAI_REGION_START("ParcoRepart.coloring.convertResult")
     for (size_t i = 0; i <retG[0].size(); i++) {
-        //std::cout << "  " <<  retG[0][i] << "-" << retG[1][i] << ": " << \
-        G[ boost::edge( retG[0][i],  retG[1][i], G).first] << std::endl;
         retG[2].push_back( G[ boost::edge( retG[0][i],  retG[1][i], G).first] );
     }
+    SCAI_REGION_END("ParcoRepart.coloring.convertResult")
     
     return retG;
 }
