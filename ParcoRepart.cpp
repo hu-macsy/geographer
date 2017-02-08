@@ -2093,9 +2093,11 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     	//we replicated the matrix, so global indices are local indices
     	const IndexType globalI = i;
     	for (IndexType j = ia[i]; j < ia[i+1]; j++) {
-    		boost::add_edge(globalI, ja[i], G);
-    		retG[0].push_back(i);
-    		retG[1].push_back(j);
+    		if (globalI < ja[i]) {
+				boost::add_edge(globalI, ja[i], G);
+				retG[0].push_back(i);
+				retG[1].push_back(ja[i]);
+    		}
     	}
     }
     SCAI_REGION_END("ParcoRepart.coloring.convertGraph")
