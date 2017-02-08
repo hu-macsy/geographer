@@ -2073,7 +2073,7 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     	adjM.redistribute(noDist, noDist);
     	//throw std::runtime_error("Input matrix must be replicated.");
     }
-    SCAI_REGION_START("ParcoRepart.coloring.replicateInput")
+    SCAI_REGION_END("ParcoRepart.coloring.replicateInput")
 
     SCAI_REGION_START("ParcoRepart.coloring.convertGraph")
     // use boost::Graph and boost::edge_coloring()
