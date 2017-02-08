@@ -27,6 +27,9 @@ main: $(OBJ_TEST_MAIN)
 clean:
 	rm -f $(EXECUTABLE_MAIN) $(EXECUTABLE_GOOGLETEST) $(OBJ_GOOGLETEST) $(OBJ_TEST_MAIN)
 
+%.o: %.cpp
+	$(CC) $(CCFLAGS) -c -o $@ $<
+
 depend: .depend
 
 .depend: $(SRCS)
