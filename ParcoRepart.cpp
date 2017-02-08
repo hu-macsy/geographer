@@ -2095,7 +2095,7 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     	for (IndexType j = ia[i]; j < ia[i+1]; j++) {
     		if (globalI < ja[j]) {
 				boost::add_edge(globalI, ja[j], G);
-				retG[0].push_back(i);
+				retG[0].push_back(globalI);
 				retG[1].push_back(ja[j]);
     		}
     	}
