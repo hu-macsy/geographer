@@ -241,14 +241,15 @@ TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
     
 }
 
-/*
+
+
 //-----------------------------------------------------------------
 // Creates the part of a structured mesh in each processor ditributed and checks the matrix and the coordinates.
 // For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
 // less than 6 ones ( every node has 3,4,5, or 6 neighbours).
 TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
-    std::vector<IndexType> numPoints= { 4, 4, 4};
-    std::vector<ValueType> maxCoord= {441, 711, 1160};
+    std::vector<IndexType> numPoints= { 11, 7, 9};
+    std::vector<ValueType> maxCoord= {11, 7, 9};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
     std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
     
@@ -267,9 +268,26 @@ TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
     // create the adjacency matrix and the coordinates
     MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
     
+    // print local values 
+    /*
+    for(IndexType i=0; i<dist->getLocalSize(); i++){
+        std::cout<< i<< ": "<< *comm<< " - " <<coords[0].getLocalValues()[i] << " , " << coords[1].getLocalValues()[i] << " , " << coords[2].getLocalValues()[i] << std::endl;   
+    }
+    */
     
+    EXPECT_EQ( adjM.getLocalNumColumns() , N);
+    EXPECT_EQ( adjM.getLocalNumRows() , coords[0].getLocalValues().size() );
+    EXPECT_EQ( true , adjM.getRowDistribution().isEqual(coords[0].getDistribution()) );
+    
+    // check symmetry in every PE
+    ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
+    
+    // gather/replicate locally and test whole matrix
+    adjM.redistribute(noDistPointer, noDistPointer);
+    
+    ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
 }
-*/
+
 //-----------------------------------------------------------------
 /*
 TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {

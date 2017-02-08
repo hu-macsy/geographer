@@ -2125,7 +2125,7 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getPEG
 
     SCAI_REGION_START("ParcoRepart.getPEGraph.buildMatrix");
     // TODO: this takes a significant amount of time! ### must reduce
-PRINT(*comm << " __ "<< distPEs->getLocalSize() );
+
         scai::lama::SparseAssemblyStorage<ValueType> myStorage( distPEs->getLocalSize(), numPEs);
         SCAI_ASSERT( distPEs->getLocalSize() ==1, "Every PE must have one row of the matrix. We use a BLOCK distribution.");
         //scai::lama::MatrixStorage<ValueType> myStorage( distPEs->getLocalSize(), numPEs);
