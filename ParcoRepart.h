@@ -167,7 +167,7 @@ namespace ITI {
 			 *
 			 * @return A 3xN vector with the edges and the color of each edge: retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge.
 			 */
-			static std::vector< std::vector<IndexType>>  getGraphEdgeColoring_local( const CSRSparseMatrix<ValueType> &adjM, IndexType& colors);
+			static std::vector< std::vector<IndexType>>  getGraphEdgeColoring_local( CSRSparseMatrix<ValueType> &adjM, IndexType& colors);
                         
 			/** Given the block graph, creates an edge coloring of the graph and retuns a communication
 			 *  scheme based on the coloring
@@ -179,7 +179,7 @@ namespace ITI {
 			 *  return[i][j] = k : in round i, node j talks with node k. Must also be that return[i][k] = j.
 			 *  Inactive nodes have their own rank: rank[i][j] = j.
 			 */
-			static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( const CSRSparseMatrix<ValueType> &adjM);
+			static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM);
 
 
 		private:
