@@ -457,126 +457,147 @@ void MeshIO<IndexType, ValueType>::writeInFileCoords (const std::vector<DenseVec
  * it to the adjacency matrix as a CSRSparseMatrix.
  */
 
-//
-//TODO: throws assertion occasionally , more often when p= 3 or 5
-//
 template<typename IndexType, typename ValueType>
-void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( lama::CSRSparseMatrix<ValueType> &matrix,  const std::string filename){
-    SCAI_REGION( "MeshIO.readFromFile2AdjMatrix" )
+scai::lama::CSRSparseMatrix<ValueType> MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(const std::string filename) {
+	SCAI_REGION("MeshIO.readFromFile2AdjMatrix");
+
+	std::ifstream file(filename);
+
+	if (file.fail()) {
+		throw std::runtime_error("Reading graph from " + filename + " failed.");
+	}
+
+	IndexType globalN, globalM;
+
+	file >> globalN >> globalM;
+
+	const ValueType avgDegree = ValueType(2*globalM) / globalN;
+
+	//get distribution and local range
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    //PRINT(*comm << " In readFromFile2AdjMatrix");
-    
-    IndexType N, numEdges;         //number of nodes and edges
-    std::ifstream file(filename);
-    
-    if(file.fail()) 
-        throw std::runtime_error("File "+ filename+ " failed.");
-   
-    file >>N >> numEdges;   
+    const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
+    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 
-    scai::lama::CSRStorage<double> localMatrix;
-    // in a distributed version should be something like that
-    // localMatrix.allocate( localSize, globalSize );
-    // here is not distributed, local=global
-    localMatrix.allocate( N, N );
-    
-    hmemo::HArray<IndexType> csrIA;
-    hmemo::HArray<IndexType> csrJA;
-    hmemo::HArray<double> csrValues;  
-    {
-        //TODO: for a distributed version this must change as numNZ should be the number of
-        //      the local nodes in the processor, not the global
-        // number of Non Zero values. *2 because every edge is read twice.
-        IndexType numNZ = numEdges*2;
-        hmemo::WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
-        hmemo::WriteOnlyAccess<IndexType> ja( csrJA, numNZ );
-        hmemo::WriteOnlyAccess<double> values( csrValues, numNZ );
+    IndexType beginLocalRange, endLocalRange;
+    scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
+    const IndexType localN = endLocalRange - beginLocalRange;
 
-        ia[0] = 0;
-
-        std::vector<IndexType> colIndexes;
-        std::vector<int> colValues;
-        
-        IndexType rowCounter = 0; // count "local" rows
-        IndexType nnzCounter = 0; // count "local" non-zero elements
-        // read the first line and do nothing, contains the number of nodes and edges.
-        std::string line;
-        std::getline(file, line);
-        
-        //for every line, aka for all nodes
-        for ( IndexType i=0; i<N; i++ ){
-            std::getline(file, line);            
-            std::vector< std::vector<int> > line_integers;
-            std::istringstream iss( line );
-            line_integers.push_back( std::vector<int>( std::istream_iterator<int>(iss), std::istream_iterator<int>() ) );
-            
-            //ia += the numbers of neighbours of i = line_integers.size()
-            ia[rowCounter + 1] = ia[rowCounter] + static_cast<IndexType>( line_integers[0].size() );
-            for(unsigned int j=0, len=line_integers[0].size(); j<len; j++){
-                // -1 because of the METIS format
-                ja[nnzCounter]= line_integers[0][j] -1 ;
-                // all values are 1 for undirected, no-weigths graph    
-                values[nnzCounter]= 1;
-                ++nnzCounter;
-            }            
-            ++rowCounter;            
-        }        
+    //scroll to begin of local range. Neighbors of node i are in line i+1
+    std::string line;
+    std::getline(file, line);
+    for (IndexType i = 0; i < beginLocalRange; i++) {
+    	std::getline(file, line);
     }
-    
-    localMatrix.swap( csrIA, csrJA, csrValues );
-    //matrix.assign( localMatrix, distribution, distribution ); // builds also halo
-    matrix.assign(localMatrix);
-    //PRINT(*comm << " Leaving readFromFile2AdjMatrix");
+
+    std::vector<IndexType> ia(localN+1, 0);
+    std::vector<IndexType> ja;
+
+    //we don't know exactly how many edges we are going to have, but in a regular mesh the average degree times the local nodes is a good estimate.
+    ja.reserve(localN*avgDegree*1.1);
+
+    //now read in local edges
+    for (IndexType i = 0; i < localN; i++) {
+    	bool read = std::getline(file, line);
+    	assert(read);//if we have read past the end of the file, the node count was incorrect
+        std::stringstream ss( line );
+        std::string item;
+        std::vector<IndexType> neighbors;
+
+        while (std::getline(ss, item, ' ')) {
+        	IndexType neighbor = std::stoi(item)-1;//-1 because of METIS format
+        	if (neighbor >= globalN || neighbor < 0) {
+        		throw std::runtime_error("Found illegal neighbor " + std::to_string(neighbor) + " in line " + std::to_string(i+beginLocalRange));
+        	}
+        	//std::cout << "Converted " << item << " to " << neighbor << std::endl;
+        	neighbors.push_back(neighbor);
+        }
+
+        //set Ia array
+        ia[i+1] = ia[i] + neighbors.size();
+        //copy neighbors to Ja array
+        std::copy(neighbors.begin(), neighbors.end(), std::back_inserter(ja));
+    }
+
+    //TODO: maybe check that file is not longer than expected
+
+    file.close();
+
+    scai::utilskernel::LArray<ValueType> values(ja.size(), 1);//unweighted edges
+    assert(ja.size() == ia[localN]);
+    assert(comm->sum(localN) == globalN);
+
+    if (comm->sum(ja.size()) != 2*globalM) {
+    	throw std::runtime_error("Expected " + std::to_string(2*globalM) + " edges, got " + std::to_string(comm->sum(ja.size())));
+    }
+
+    //assign matrix
+    scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, ja.size(), scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
+    		scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()), values);
+
+    return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
 }
 
 
 //-------------------------------------------------------------------------------------------------
 /*File "filename" contains the coordinates of a graph. The function reads that coordinates and returns
  * the coordinates in a DenseVector where point(x,y) is in [x*dim +y].
- * Every line of the file contais 2 ValueType numbers.
+ * Every line of the file contains 2 ValueType numbers.
  */
 template<typename IndexType, typename ValueType>
-void MeshIO<IndexType, ValueType>::fromFile2Coords_2D( const std::string filename, std::vector<DenseVector<ValueType>> &coords, IndexType numberOfPoints){
-    SCAI_REGION( "MeshIO.fromFile2Coords_2D" )
-    IndexType N= numberOfPoints;
+std::vector<DenseVector<ValueType>> MeshIO<IndexType, ValueType>::fromFile2Coords( std::string filename, IndexType numberOfPoints, IndexType dimension){
+    SCAI_REGION( "MeshIO.fromFile2Coords" )
+    IndexType globalN= numberOfPoints;
     std::ifstream file(filename);
     
     if(file.fail()) 
         throw std::runtime_error("File "+ filename+ " failed.");
     
-    //the files, currently, contain 3 numbers in each line but z is always zero
-    for(IndexType i=0; i<N; i++){
-        ValueType x, y, z;
-        file>> x >> y >> z;
-        coords[0].setValue(i, x);
-        coords[1].setValue(i, y);
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
+
+    IndexType beginLocalRange, endLocalRange;
+    scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
+    const IndexType localN = endLocalRange - beginLocalRange;
+
+    //scroll forward to begin of local range
+    std::string line;
+    for (IndexType i = 0; i < beginLocalRange; i++) {
+    	std::getline(file, line);
     }
-}
-    
-//-------------------------------------------------------------------------------------------------
-/*File "filename" contains the 3D coordinates of a graph. The function reads that coordinates and returns
- * them in a vector<DenseVector> where point i=(x,y,z) is in coords[0][i], coords[1][i], coords[2][i].
- * Every line of the file contais 3 ValueType numbers.
- */
-template<typename IndexType, typename ValueType>
-void MeshIO<IndexType, ValueType>::fromFile2Coords_3D( const std::string filename, std::vector<DenseVector<ValueType>> &coords, IndexType numberOfPoints){
-    SCAI_REGION( "MeshIO.fromFile2Coords_3D" )
-    IndexType N= numberOfPoints;
-    std::ifstream file(filename);
-    
-    if(file.fail()) 
-        throw std::runtime_error("File "+ filename+ " failed.");
-    
-    //the files, currently, contain 3 numbers in each line
-    for(IndexType i=0; i<N; i++){
-        ValueType x, y, z;
-        file>> x >> y >> z;
-        coords[0].setValue(i, x);
-        coords[1].setValue(i, y);
-        coords[2].setValue(i, z);
+
+    //create result vector
+    std::vector<scai::utilskernel::LArray<ValueType> > coords(dimension);
+    for (IndexType dim = 0; dim < dimension; dim++) {
+    	coords[dim] = scai::utilskernel::LArray<ValueType>(localN);
     }
-    
+
+    //read local range
+    for (IndexType i = 0; i < localN; i++) {
+		bool read = std::getline(file, line);
+		assert(read);//if we have read past the end of the file, the node count was incorrect
+		std::stringstream ss( line );
+		std::string item;
+
+		IndexType dim = 0;
+		while (std::getline(ss, item, ' ') && dim < dimension) {
+			ValueType coord = std::stod(item);
+			coords[dim][i] = coord;
+			dim++;
+		}
+		if (dim < dimension) {
+			throw std::runtime_error("Only " + std::to_string(dim - 1)  + " values found, but " + std::to_string(dimension) + " expected in line '" + line + "'");
+		}
+    }
+
+    std::vector<DenseVector<ValueType> > result(dimension);
+
+    for (IndexType i = 0; i < dimension; i++) {
+    	result[i] = DenseVector<ValueType>(coords[i], dist);
+    }
+
+    return result;
 }
+
 //-------------------------------------------------------------------------------------------------
 /* Creates random points in the cube [0,maxCoord] in the given dimensions.
  */
@@ -657,9 +678,8 @@ template std::vector<DenseVector<double>> MeshIO<int, double>::randomPoints(int 
 template void MeshIO<int, double>::writeInFileMetisFormat (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void MeshIO<int, double>::writeInFileMetisFormat_dist (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void MeshIO<int, double>::writeInFileCoords (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
-template void MeshIO<int, double>::readFromFile2AdjMatrix( CSRSparseMatrix<double> &matrix, const std::string filename);
-template void  MeshIO<int, double>::fromFile2Coords_2D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfCoords);
-template void MeshIO<int, double>::fromFile2Coords_3D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfPoints);
+template CSRSparseMatrix<double> MeshIO<int, double>::readFromFile2AdjMatrix(const std::string filename);
+template std::vector<DenseVector<double>>  MeshIO<int, double>::fromFile2Coords( std::string filename, int numberOfCoords, int dimension);
 template Scalar MeshIO<int, double>::dist3D(DenseVector<double> p1, DenseVector<double> p2);
 template double MeshIO<int, double>::dist3DSquared(std::tuple<int, int, int> p1, std::tuple<int, int, int> p2);
 template std::tuple<IndexType, IndexType, IndexType> MeshIO<int, double>::index2_3DPoint(int index,  std::vector<int> numPoints);

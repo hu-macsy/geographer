@@ -43,17 +43,14 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
   const IndexType dimensions = 2;
   const IndexType recursionDepth = 7;
   IndexType N=16*16;
-  std::vector<DenseVector<ValueType>> coords(dimensions);
-  for(IndexType i=0; i<dimensions; i++){ 
-      coords[i].allocate(N);
-      coords[i] = static_cast<ValueType>( 0 );
-  }
   
   std::vector<ValueType> maxCoords({0,0});
 
-  MeshIO<IndexType, ValueType>::fromFile2Coords_2D("./Grid16x16.xyz", coords,  N);
+  std::vector<DenseVector<ValueType>> coords = MeshIO<IndexType, ValueType>::fromFile2Coords("./Grid16x16.xyz", N, dimensions);
+  const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( N ));
 
   for(IndexType j=0; j<dimensions; j++){
+	  coords[j].redistribute(noDist);
       for (IndexType i = 0; i < N; i++){
         coords[j].setValue(i, (coords[j].getValue(i)+0.17)/8.2 );
       }
@@ -98,19 +95,16 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
   
   f >> N>> edges;
   PRINT("file "<< fileName<< ", nodes= "<< N << ", edges= " << edges);  
-  
-  std::vector<DenseVector<ValueType>> coords(dimensions);
-  for(IndexType i=0; i<dimensions; i++){ 
-      coords[i].allocate(N);
-      coords[i] = static_cast<ValueType>( 0 );
-  }
-  
+
   std::vector<ValueType> maxCoords({0,0});
-  
+
   //get coords
-  MeshIO<IndexType, ValueType>::fromFile2Coords_2D( fileName+".xyz", coords,  N);
+  std::vector<DenseVector<ValueType>> coords = MeshIO<IndexType, ValueType>::fromFile2Coords( fileName+".xyz", N, dimensions);
+
+  const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
 
   for(IndexType j=0; j<dimensions; j++){
+	  coords[j].redistribute(noDist);
       maxCoords[j]= coords[j].max().Scalar::getValue<ValueType>();
   }
   EXPECT_EQ(coords[0].size(), N);
@@ -138,8 +132,7 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
   indices.sort(permutation, true);
   
   // get graph
-  scai::lama::CSRSparseMatrix<ValueType> graph(N, N);
-  MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graph, fileName );
+  scai::lama::CSRSparseMatrix<ValueType> graph = MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( fileName );
 
   //get partition by-hand
   IndexType part =0;

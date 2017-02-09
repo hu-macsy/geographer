@@ -74,8 +74,7 @@ TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
         MeshIO<IndexType, ValueType>::writeInFileCoords( coords, numberOfPoints, coordFile);
     }
     
-    CSRSparseMatrix<ValueType> graph = scai::lama::CSRSparseMatrix<ValueType>( numberOfPoints, numberOfPoints );
-    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graph, grFile );
+    CSRSparseMatrix<ValueType> graph = MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( grFile );
     
     // check the two matrixes to be equal
     {
@@ -307,12 +306,10 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     dmemo::DistributionPtr dist( new dmemo::NoDistribution( nodes ));
     
-    Graph = scai::lama::CSRSparseMatrix<ValueType>(dist, dist);
-    
     // read graph from file
     {
         SCAI_REGION("testReadAndWriteGraphFromFile.readFromFile2AdjMatrix");
-        MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph, filename );
+        Graph = MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(filename );
     }
     N = Graph.getNumColumns();
     EXPECT_EQ(Graph.getNumColumns(), Graph.getNumRows());
@@ -325,8 +322,7 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
     MeshIO<IndexType, ValueType>::writeInFileMetisFormat(Graph, fileTo );
     
     // read new graph from the new file we just written
-    CSRSparseMatrix<ValueType> Graph2(dist, dist);
-    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph2, fileTo );
+    CSRSparseMatrix<ValueType> Graph2 = MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( fileTo );
     
     // check that the two graphs are identical
     std::cout<< "Output written in file: "<< fileTo<< std::endl;
@@ -381,8 +377,7 @@ TEST_F(MeshIOTest, testPartitionFromFile_dist_2D){
     scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( nodes ));
     
     SCAI_REGION_START("testPartitionFromFile_local_2D.readFromFile2AdjMatrix");
-        graph = scai::lama::CSRSparseMatrix<ValueType>(distPtr, noDistPtr);
-        MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graph , grFile );
+        graph = MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( grFile );
         graph.redistribute( distPtr , noDistPtr);
         std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
     SCAI_REGION_END("testPartitionFromFile_local_2D.readFromFile2AdjMatrix");
@@ -395,13 +390,8 @@ TEST_F(MeshIOTest, testPartitionFromFile_dist_2D){
     std::cout<<"reading coordinates from file: "<< coordFile<< std::endl;
     
     SCAI_REGION_START("testPartitionFromFile_local_2D.readFromFile2Coords_2D");
-        coords2D[0].allocate(N);
-        coords2D[1].allocate(N);
-        coords2D[0]= static_cast<ValueType>( 0 );
-        coords2D[1]= static_cast<ValueType>( 0 );
-        MeshIO<IndexType, ValueType>::fromFile2Coords_2D(coordFile, coords2D, N );
-        coords2D[0].redistribute( distPtr );
-        coords2D[1].redistribute( distPtr );
+    std::vector<DenseVector<ValueType>> coords2D = MeshIO<IndexType, ValueType>::fromFile2Coords( coordFile, N, dimensions);
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*distPtr));
     SCAI_REGION_END("testPartitionFromFile_local_2D.readFromFile2Coords_2D");        
     
     EXPECT_EQ(coords2D.size(), dim);
