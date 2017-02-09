@@ -17,7 +17,3 @@ local/
 *.graph
 *.graph.xyz
 *.csv
-*.time.?
-*.time.??
-*.time.???
-*.time.????
