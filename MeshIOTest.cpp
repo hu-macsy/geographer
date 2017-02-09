@@ -218,7 +218,68 @@ TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
 }
 
 //-----------------------------------------------------------------
+// Creates the part of a structured mesh in each processor ditributed and checks the matrix and the coordinates.
+// For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
+// less than 6 ones ( every node has 3,4,5, or 6 neighbours).
+TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
+    std::vector<IndexType> numPoints= { 10, 2, 5};
+    std::vector<ValueType> maxCoord= {11, 14, 10};
+    IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
+    std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
+    
+    std::vector<DenseVector<ValueType>> coords(3);
+    for(IndexType i=0; i<3; i++){ 
+	  coords[i].allocate(dist);
+	  coords[i] = static_cast<ValueType>( 0 );
+    }
+    
+    scai::lama::CSRSparseMatrix<ValueType> adjM( dist, noDistPointer);
+    
+    // create the adjacency matrix and the coordinates
+    MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
+    
+    // print local coordinates
+    /*
+    for(IndexType i=0; i<dist->getLocalSize(); i++){
+        std::cout<< i<< ": "<< *comm<< " - " <<coords[0].getLocalValues()[i] << " , " << coords[1].getLocalValues()[i] << " , " << coords[2].getLocalValues()[i] << std::endl;   
+    }
+    */
+    
+    EXPECT_EQ( adjM.getLocalNumColumns() , N);
+    EXPECT_EQ( adjM.getLocalNumRows() , coords[0].getLocalValues().size() );
+    EXPECT_EQ( true , adjM.getRowDistribution().isEqual(coords[0].getDistribution()) );
+    
+    // check symmetry in every PE
+    ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
+    //PRINT(*comm<< ": "<< adjM.getLocalNumValues() );
+    //PRINT(*comm<< ": "<< comm->sum(adjM.getLocalNumValues()) );
+    
+    {
+        SCAI_REGION("testCreateRandomStructuredMesh_Distributed_3D.noDist")
+        // gather/replicate locally and test whole matrix
+        adjM.redistribute(noDistPointer, noDistPointer);
+        
+        ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
+        //PRINT(*comm<<": "<< adjM.getNumValues() );
+    }
+    
+    {
+        SCAI_REGION("testCreateRandomStructuredMesh_Distributed_3D.cyclicDist")
+        // test with a cyclic distribution
+        scai::dmemo::DistributionPtr distCyc ( scai::dmemo::Distribution::getDistributionPtr( "CYCLIC", comm, N) );
+        adjM.redistribute( distCyc, noDistPointer);
+        
+        ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
+    }
+    
+}
 
+//-----------------------------------------------------------------
+/*
 TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
     IndexType N= 40;
     ValueType maxCoord= 1;
@@ -257,6 +318,7 @@ TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
     std::cout<< "# imbalance = " << imbalance<< " , "<< std::endl;
     
 }
+*/
 
 //-----------------------------------------------------------------
 TEST_F(MeshIOTest, testWriteMetis_Dist_3D){
