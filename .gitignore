@@ -5,6 +5,11 @@ Makefile
 .cproject
 Katanomi
 KatanomiTest
+*.time.?
+*.time.??
+*.time.???
+*.time.????
+.depend
 meshes/
 local/
 .settings/
