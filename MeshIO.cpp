@@ -269,7 +269,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
         }
 
         if(indX >= numPoints[0]){   // reached end of grid
-        	assert(i == localSize - 1);
+            assert(i == localSize - 1);
         }
     }
     // finish setting the coordinates
@@ -399,7 +399,7 @@ void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMa
     IndexType indX = (IndexType) (startingIndex/planeSize) ;
     IndexType indY = (IndexType) ((startingIndex%planeSize)/numZ);
     IndexType indZ = (IndexType) ((startingIndex%planeSize) % numZ);
-    PRINT( *comm<< ": " << numX << " ,"<< numY << ", "<< numZ << ", startingIndex= "<< startingIndex);
+    PRINT( *comm<< ": " << numX << ", "<< numY << ", "<< numZ << ", startingIndex= "<< startingIndex);
     
     for(IndexType i=0; i<localSize; i++){
         SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.setCoordinates");
@@ -420,14 +420,11 @@ void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMa
             ++indX;
         }
         if(indX >= numX){   // reached and of grid
-            break;
+            assert(i == localSize - 1);
         }
     }
     // finish setting the coordinates
     // this part is the same as the structured mesh
-    
-    
-    //SCAI_REGION_START("MeshIO.createRandomStructured3DMesh_dist.setAdjacencyMatrix");
     
     /*
      * start making the local part of the adjacency matrix
@@ -436,17 +433,14 @@ void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMa
     // first find the indices of possible neighbours
     
     // the diameter of the box in which we gonna pick indices.
-    // we set it as: 1 + 5% of the minimum side length. this is >2 for sides > 20
-    IndexType boxRadius = 1 + (IndexType) (0.05 * (ValueType) *std::min_element(std::begin(numPoints), std::end(numPoints)));
+    // we set it as: 1 + 2% of the minimum side length. this is >2 for sides >50
+    IndexType boxRadius = 1 + (IndexType) (0.02 * (ValueType) *std::min_element(std::begin(numPoints), std::end(numPoints)));
     
     // radius^3 is the number of possible neighbours, here keep their indices as an array
     std::vector<IndexType> neighbourGlobalIndices;
 
     PRINT(*comm << " , boxRadius= "<< boxRadius<< " , and num of possible neighbours ="<< pow(2*boxRadius+1, 3) );
-    //PRINT(*comm << " , boxRadius= "<< boxRadius<< " , and num of possible neighbours ="<< pow(boxRadius+1, 3) );
     
-    IndexType indexCnt= 0;              
-
     for(IndexType x=-boxRadius; x<=boxRadius; x++){
         for(IndexType y=-boxRadius; y<=boxRadius; y++){
                 for(IndexType z=-boxRadius; z<=boxRadius; z++){
@@ -461,12 +455,7 @@ void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMa
         }
     }
     PRINT(*comm<<", num of neighbours inserted= "<< neighbourGlobalIndices.size() );
-/*  
-    for(IndexType i=0; i<neighbourGlobalIndices.size(); i++){
-        std::cout<< neighbourGlobalIndices[i]<< "| ";
-    }
-    std::cout<< std::endl;
-*/    
+
     // an upper bound to how many neighbours a vertex can have, 
     // at most as many neighbours as we have
     IndexType ngbUpperBound = std::min(12, (IndexType) neighbourGlobalIndices.size() ); // I do not know, just trying 12
@@ -492,6 +481,7 @@ void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMa
     
         
     for(IndexType i=0; i<localSize; i++){                   // for all local nodes
+        SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.findNgbrs");
         IndexType thisGlobalInd = dist->local2global(i);    // get the corresponding global index
         IndexType ngbGlobalInd;                             // the global id of the neighbouring nodes
 //PRINT(*comm << ": i= " << i<< ", "<< thisGlobalInd);
@@ -520,7 +510,7 @@ void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMa
         std::set<IndexType> ngbGloblaIndSet;
         
         for(IndexType j=0; j<numOfNeighbours; j++){
-            SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.findRelativeIndices");
+            SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.findNgbrs.findRelativeIndices");
             
             IndexType relativeIndex=0;
             std::tuple<IndexType, IndexType, IndexType>  ngbPoint;
@@ -587,23 +577,21 @@ void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMa
 
         // for all neighbours inserted
         for(typename std::set<IndexType>::iterator it= ngbGloblaIndSet.begin(); it!= ngbGloblaIndSet.end(); ++it ){
-
+            SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.findNgbrs.separateNonLocal");
             ngbGlobalInd = *it;
             localNgbs[i].insert( ngbGlobalInd );       // store the local edge (i, ngbGlobalInd)
 
             // for the other/symmetric edge we must check if ngbGlobalInd is local or not
-            
             if( dist->isLocal(ngbGlobalInd) ){          // if the neighbour is local
                 assert( dist->global2local(ngbGlobalInd) < localSize );
                 localNgbs[ dist->global2local(ngbGlobalInd) ].insert( dist->local2global(i) );
             } else{                                     // the neighbour is not local
-//PRINT(*comm<< ": local2global= " << thisGlobalInd <<": edge with non local index "<< ngbGlobalInd );
                 localNodeInd.push_back( thisGlobalInd );
                 nonLocalNodeInd.push_back( ngbGlobalInd );
             }
         }
     } // for(IndexType i=0; i<localSize; i++)
-PRINT(*comm << ",  num of non-local ngbs= " << nonLocalNodeInd.size() );   
+    PRINT(*comm << ",  num of non-local ngbs= " << nonLocalNodeInd.size() );   
     
 
     /* 
@@ -663,7 +651,8 @@ PRINT(*comm << ">> " << sendPart.size() );
     
     SCAI_ASSERT_EQUAL_ERROR( recvSize.size(), comm->getSize() );
     
-    for(IndexType round=0; round<numPEs; round++){    
+    for(IndexType round=0; round<numPEs; round++){
+        SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.commSize");
         {
             scai::hmemo::WriteAccess<IndexType> sendSizeWrite( sendSize );
             sendSizeWrite[ comm->getRank()] = sendPart.size();
@@ -683,6 +672,7 @@ PRINT(*comm << ">> " << sendPart.size() );
     
     
     for(IndexType round=1; round<comm->getSize(); round++){
+        SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.commNonLocalEdges");
         // to find from what PE you receive
         IndexType indexToRcv = (comm->getRank()-round+numPEs)%numPEs;
         IndexType sizeToRcv = readRcvSize[ indexToRcv ];

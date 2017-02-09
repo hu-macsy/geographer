@@ -248,8 +248,8 @@ TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
 // For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
 // less than 6 ones ( every node has 3,4,5, or 6 neighbours).
 TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
-    std::vector<IndexType> numPoints= { 11, 7, 9};
-    std::vector<ValueType> maxCoord= {11, 7, 9};
+    std::vector<IndexType> numPoints= { 10, 2, 5};
+    std::vector<ValueType> maxCoord= {11, 14, 10};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
     std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
     
@@ -268,7 +268,7 @@ TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
     // create the adjacency matrix and the coordinates
     MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
     
-    // print local values 
+    // print local coordinates
     /*
     for(IndexType i=0; i<dist->getLocalSize(); i++){
         std::cout<< i<< ": "<< *comm<< " - " <<coords[0].getLocalValues()[i] << " , " << coords[1].getLocalValues()[i] << " , " << coords[2].getLocalValues()[i] << std::endl;   
@@ -281,11 +281,27 @@ TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
     
     // check symmetry in every PE
     ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
+    //PRINT(*comm<< ": "<< adjM.getLocalNumValues() );
+    //PRINT(*comm<< ": "<< comm->sum(adjM.getLocalNumValues()) );
     
-    // gather/replicate locally and test whole matrix
-    adjM.redistribute(noDistPointer, noDistPointer);
+    {
+        SCAI_REGION("testCreateRandomStructuredMesh_Distributed_3D.noDist")
+        // gather/replicate locally and test whole matrix
+        adjM.redistribute(noDistPointer, noDistPointer);
+        
+        ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
+        //PRINT(*comm<<": "<< adjM.getNumValues() );
+    }
     
-    ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
+    {
+        SCAI_REGION("testCreateRandomStructuredMesh_Distributed_3D.cyclicDist")
+        // test with a cyclic distribution
+        scai::dmemo::DistributionPtr distCyc ( scai::dmemo::Distribution::getDistributionPtr( "CYCLIC", comm, N) );
+        adjM.redistribute( distCyc, noDistPointer);
+        
+        ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
+    }
+    
 }
 
 //-----------------------------------------------------------------
