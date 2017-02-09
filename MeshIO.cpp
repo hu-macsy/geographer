@@ -399,7 +399,7 @@ void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMa
     IndexType indX = (IndexType) (startingIndex/planeSize) ;
     IndexType indY = (IndexType) ((startingIndex%planeSize)/numZ);
     IndexType indZ = (IndexType) ((startingIndex%planeSize) % numZ);
-    PRINT( *comm<< ": " << numX << ", "<< numY << ", "<< numZ << ", startingIndex= "<< startingIndex);
+    //PRINT( *comm<< ": " << numX << ", "<< numY << ", "<< numZ << ", startingIndex= "<< startingIndex);
     
     for(IndexType i=0; i<localSize; i++){
         SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.setCoordinates");
@@ -632,7 +632,7 @@ void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMa
         sendPartWrite[2*i+1]= nonLocalNodeInd[i];
     }
     sendPartWrite.release();
-PRINT(*comm << ">> " << sendPart.size() );
+    //PRINT(*comm << ">> " << sendPart.size() );
 
     // so on the data this PE receives edge [2*i] is local on the sender and [2*i+1] non-local on the sender
     // so now [2*i+1] may be local to this PE
@@ -676,14 +676,13 @@ PRINT(*comm << ">> " << sendPart.size() );
         // to find from what PE you receive
         IndexType indexToRcv = (comm->getRank()-round+numPEs)%numPEs;
         IndexType sizeToRcv = readRcvSize[ indexToRcv ];
-PRINT("round: "<< round <<" , " << *comm << ": receive from PE: "<< indexToRcv << ", size: "<< sizeToRcv);        
+        //PRINT("round: "<< round <<" , " << *comm << ": receive from PE: "<< indexToRcv << ", size: "<< sizeToRcv);        
         recvPart.resize( sizeToRcv );
 
         scai::hmemo::ReadAccess<IndexType> sendSizeRead (sendSize);
-PRINT( *comm << " , sendPart.size= " << sendPart.size() );
+        //PRINT( *comm << " , sendPart.size= " << sendPart.size() );
         // send your local part, receive other PE's part
         comm->shiftArray( recvPart, sendPart, 1);
-PRINT( *comm << ",  recvPart.size= "<< recvPart.size() );
         
 
         // check if recvPart[2*i+1] is local, if it is must add edge [2*i+1]-[2*i]
@@ -693,8 +692,7 @@ PRINT( *comm << ",  recvPart.size= "<< recvPart.size() );
             scai::hmemo::ReadAccess<IndexType> recvPartWrite( recvPart );
             if( dist->isLocal(recvPartWrite[i+1]) ){                       // must add edge
                 IndexType localIndex=  recvPartWrite[i+1];
-                IndexType nonLocalIndex= recvPartWrite[i];
-//PRINT(*comm << ", localInd: " << localIndex << " , nonLocalInd: " << nonLocalIndex);                  
+                IndexType nonLocalIndex= recvPartWrite[i];     
                 // 0< localIndex< globalN but localNgbs.size()= localN, so must convert it to local
                 SCAI_ASSERT( dist->global2local(localIndex) < localNgbs.size(),"too large index: "<< localIndex <<" while size= "<< localNgbs.size() )
                 localNgbs[dist->global2local(localIndex) ].insert( nonLocalIndex );      // indices are global
@@ -705,19 +703,7 @@ PRINT( *comm << ",  recvPart.size= "<< recvPart.size() );
         // the data you received must be passed on, not your own again
         sendPart.resize(recvPart.size());
         sendPart.swap(recvPart);
-PRINT(*comm << ": "<< sendPart.size() );
     }
-    
-     // print
-     /*
-    for(IndexType i=0; i<localNgbs.size(); i++){
-        std::cout<< *comm << "__ "<< i <<":"<< dist->local2global(i) <<"  \t";
-        for(typename std::set<IndexType>::iterator it= localNgbs[i].begin(); it!=localNgbs[i].end(); ++it){
-            std::cout<< *it <<"-";
-        }
-        std::cout<< std::endl;
-    }
-    */
     
     
     /* 
@@ -748,7 +734,6 @@ PRINT(*comm << ": "<< sendPart.size() );
         for(IndexType i=0; i<localNgbs.size(); i++){
             nnzValues += localNgbs[i].size();
         }
-PRINT("nnzValues= " << nnzValues);
         hmemo::WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
         hmemo::WriteOnlyAccess<IndexType> ja( csrJA , nnzValues);
         hmemo::WriteOnlyAccess<ValueType> values( csrValues, nnzValues );
