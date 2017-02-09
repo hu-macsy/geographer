@@ -143,31 +143,18 @@ int main(int argc, char** argv) {
         graph = scai::lama::CSRSparseMatrix<ValueType>( rowDistPtr , noDistPtr );
 
         // read the adjacency matrix and the coordinates from a file
-        ITI::MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graph , graphFile );
+        graph = ITI::MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graphFile );
         graph.redistribute(rowDistPtr , noDistPtr);
-        // take care, when reading from file graph needs redistribution
+
+        // take care, when reading from file graph needs redistribution - Not anymore! :-)
         if (comm->getRank() == 0) {
         	std::cout<< "Read " << N << " points." << std::endl;
         }
         
-        scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-        for(IndexType i=0; i<settings.dimensions; i++){
-            coordinates[i].allocate(coordDist);
-            coordinates[i] = static_cast<ValueType>( 0 );
-        }
-        
-        if (settings.dimensions == 2) {
-        	ITI::MeshIO<IndexType, ValueType>::fromFile2Coords_2D(coordFile, coordinates, N );
-        } else if (settings.dimensions == 3){
-        	ITI::MeshIO<IndexType, ValueType>::fromFile2Coords_3D(coordFile, coordinates, N );
-        }
+        coordinates = ITI::MeshIO<IndexType, ValueType>::fromFile2Coords(coordFile, N, settings.dimensions );
 
         if (comm->getRank() == 0) {
         	std::cout << "Read coordinates." << std::endl;
-        }
-
-        for(IndexType i=0; i<settings.dimensions; i++){
-        	coordinates[i].redistribute(coordDist);
         }
 
     } else if(vm.count("generate")){

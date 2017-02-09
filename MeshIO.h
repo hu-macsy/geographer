@@ -93,16 +93,12 @@ namespace ITI {
                  * @param[in] filename The file to read from. In a METIS format.
                  * @param[out] matrix The adjacency matrix of the graph.
                  */
-                static void  readFromFile2AdjMatrix( CSRSparseMatrix<ValueType> &matrix, const std::string filename);
+                static CSRSparseMatrix<ValueType> readFromFile2AdjMatrix(const std::string filename);
                 
                 /* Reads the 2D coordinates from file "filename" and returns then in a DenseVector where the coordiantes
                  * of point i are in [i*2][i*2+1].
                  */
-                static void fromFile2Coords_2D( const std::string filename, std::vector<DenseVector<ValueType>> &coords, IndexType numberOfCoords);
-                
-                /* Reads the 3D coordinates form a file and stores them in coords. The coordinates of point i=(x,y,z) are in coords[0][i], coords[1][i], coords[2][i].
-                */
-                static void fromFile2Coords_3D( const std::string filename, std::vector<DenseVector<ValueType>> &coords, IndexType numberOfPoints);
+                static std::vector<DenseVector<ValueType>> fromFile2Coords( std::string filename, IndexType numberOfCoords, IndexType dimension);
                     
                 /* Creates random points in the cube for the given dimension, points in [0,maxCoord]^dim.
                  */
