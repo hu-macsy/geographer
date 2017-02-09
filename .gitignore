@@ -4,5 +4,6 @@ Makefile
 .project
 .cproject
 Katanomi
+KatanomiTest
 meshes/
 local/

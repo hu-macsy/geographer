@@ -18,13 +18,9 @@
 namespace ITI{
 
 template<typename IndexType, typename ValueType>
-ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(ValueType* point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords){
-    SCAI_REGION( "HilbertCurve.getHilbertIndex")
-    
-    if (dimensions > 3 || dimensions < 2) {
-        throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
-    }
-    
+ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords){
+    SCAI_REGION( "HilbertCurve.getHilbertIndex_newVersion")
+
       /*
     //probably wrong
     if (sizeof(point) != sizeof( ValueType)*dimensions){
@@ -40,15 +36,13 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(ValueType* point, 
         return HilbertCurve<IndexType, ValueType>::getHilbertIndex2D( point, dimensions, recursionDepth,
             minCoords, maxCoords);
     
-    PRINT("Something went wrong");
-    return -1; //Something is wrong,should not reach this point
-    
+    throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
 }
 
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType* point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
+ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType const* point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
     SCAI_REGION("HilbertCurve.getHilbertIndex2D")
    
     size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
@@ -100,7 +94,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType* point
         //std::cout<< subSquare<<std::endl;
         integerIndex = (integerIndex << 2) | subSquare;	
     }
-    unsigned long divisor = size_t(1) << (2*int(recursionDepth));
+    unsigned long divisor = size_t(1) << size_t(2*int(recursionDepth));
     return double(integerIndex) / double(divisor);
     
 }
@@ -132,7 +126,7 @@ DenseVector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType* point, IndexType dimensions, IndexType recursionDepth,	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
+ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const* point, IndexType dimensions, IndexType recursionDepth,	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
         SCAI_REGION("HilbertCurve.getHilbertIndex3D")
         
 	if (dimensions != 3) {
@@ -147,11 +141,6 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType* point
 	std::vector<ValueType> scaledCoord(dimensions);
 
 	for (IndexType dim = 0; dim < dimensions; dim++) {
-                if( (maxCoords[dim] - minCoords[dim])== 0){
-                    throw std::logic_error( std::string(__FILE__) +", " + std::to_string(__LINE__) + \
-                    ": Minimum == Maximum for dimensions " + std::to_string(dim) +" , cannot create space filling curve: min= "+\
-                    std::to_string(minCoords[dim]) +", max= " + std::to_string(maxCoords[dim]));
-                }
 		scaledCoord[dim] = (point[dim] - minCoords[dim]) / (maxCoords[dim] - minCoords[dim]);
 		if (scaledCoord[dim] < 0 || scaledCoord[dim] > 1) {
 			throw std::runtime_error("Coordinate " + std::to_string(point[dim])+" does not agree with bounds "
@@ -232,6 +221,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType* point
         double ret = double(integerIndex) / double(divisor);
         SCAI_ASSERT(ret<1, ret << " , divisor= "<< divisor << " , integerIndex=" << integerIndex <<" , recursionDepth= " << recursionDepth << ", sizeof(uns_ll)="<< sizeof(unsigned long long));
         return ret;
+
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -264,7 +254,7 @@ DenseVector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point(
 			case 4: ret.setValue(0, 1-p(0)/2);	ret.setValue(1, 0.5-p(1)/2);	ret.setValue(2, 0.5+p(2)/2);	return ret;
 			case 5: ret.setValue(0, 1-p(2)/2);	ret.setValue(1, 0.5+p(0)/2);	ret.setValue(2, 1-p(1)/2);	return ret;
 			case 6: ret.setValue(0, 0.5-p(2)/2);	ret.setValue(1, 0.5+p(0)/2);	ret.setValue(2, 1-p(1)/2);	return ret;
-			case 7: ret.setValue(0, p(1)/2);	ret.setValue(1, 0.5-p(2)/2);	ret.setValue(2, 1-p(0)/2);	return ret;	
+			case 7: ret.setValue(0, p(1)/2);	ret.setValue(1, 0.5-p(2)/2);	ret.setValue(2, 1-p(0)/2);	return ret;			
 		}
 	}
 	return ret;
@@ -272,11 +262,12 @@ DenseVector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point(
 
 //-------------------------------------------------------------------------------------------------
 
-template double HilbertCurve<int, double>::getHilbertIndex(double* point, int dimensions, int recursionDepth, const std::vector<double> &minCoords, const std::vector<double> &maxCoords);
+template double HilbertCurve<int, double>::getHilbertIndex(double const * point, int dimensions, int recursionDepth, const std::vector<double> &minCoords, const std::vector<double> &maxCoords);
 
-template double HilbertCurve<int, double>::getHilbertIndex2D(double* point, int dimensions, int recursionDepth,	const std::vector<double> &minCoords, const std::vector<double> &maxCoords);
 
-template double HilbertCurve<int, double>::getHilbertIndex3D(double* point, int dimensions, int recursionDepth, const std::vector<double> &minCoords, const std::vector<double> &maxCoords);
+template double HilbertCurve<int, double>::getHilbertIndex2D(double const * point, int dimensions, int recursionDepth,	const std::vector<double> &minCoords, const std::vector<double> &maxCoords);
+
+template double HilbertCurve<int, double>::getHilbertIndex3D(double const * point, int dimensions, int recursionDepth, const std::vector<double> &minCoords, const std::vector<double> &maxCoords);
 
 
 template DenseVector<double> HilbertCurve<int, double>::Hilbert2DIndex2Point(double index, int level);

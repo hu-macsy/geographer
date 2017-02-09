@@ -63,6 +63,7 @@ int main(int argc, char** argv) {
 				("sfcRecursionSteps", value<int>(&settings.sfcResolution)->default_value(settings.sfcResolution), "Tuning parameter: Recursion Level of space filling curve. A value of 0 causes the recursion level to be derived from the graph size.")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
 				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
+				("numberOfRestarts", value<int>(&settings.numberOfRestarts)->default_value(settings.numberOfRestarts), "Tuning parameter: Restart local FM with different seeds and keep best.")
 				;
 
 	variables_map vm;
@@ -105,6 +106,11 @@ int main(int argc, char** argv) {
      
     startTime = std::chrono::system_clock::now();
     
+    if (comm->getRank() == 0)
+	{
+        std::cout<< "commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :" generate") << std::endl;
+	}
+
     if (vm.count("graphFile")) {
     	std::string graphFile = vm["graphFile"].as<std::string>();
     	std::string coordFile;
@@ -130,7 +136,6 @@ int main(int argc, char** argv) {
         if (comm->getRank() == 0)
         {
 			std::cout<< "Reading from file \""<< graphFile << "\" for the graph and \"" << coordFile << "\" for coordinates"<< std::endl;
-			std::cout<< "Read " << N << " points." << std::endl;
         }
 
         scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -141,6 +146,9 @@ int main(int argc, char** argv) {
         ITI::MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graph , graphFile );
         graph.redistribute(rowDistPtr , noDistPtr);
         // take care, when reading from file graph needs redistribution
+        if (comm->getRank() == 0) {
+        	std::cout<< "Read " << N << " points." << std::endl;
+        }
         
         scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
         for(IndexType i=0; i<settings.dimensions; i++){
@@ -152,6 +160,10 @@ int main(int argc, char** argv) {
         	ITI::MeshIO<IndexType, ValueType>::fromFile2Coords_2D(coordFile, coordinates, N );
         } else if (settings.dimensions == 3){
         	ITI::MeshIO<IndexType, ValueType>::fromFile2Coords_3D(coordFile, coordinates, N );
+        }
+
+        if (comm->getRank() == 0) {
+        	std::cout << "Read coordinates." << std::endl;
         }
 
         for(IndexType i=0; i<settings.dimensions; i++){
@@ -214,40 +226,34 @@ int main(int argc, char** argv) {
             settings.print3D(std::cout);
         }
     }
-/*    
-    std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
-    scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, settings );
-    std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
-*/    
-
-    std::chrono::time_point<std::chrono::system_clock> beforePart_noSortTime =  std::chrono::system_clock::now();
-    scai::lama::DenseVector<IndexType> partition_noSort = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph_noSort( graph, coordinates, settings );
-    std::chrono::duration<double> partition_noSortTime =  std::chrono::system_clock::now() - beforePart_noSortTime;
-
     
-    std::chrono::time_point<std::chrono::system_clock> beforeReport =  std::chrono::system_clock::now();
-  //  ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true); 
-  //  ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partition, comm->getSize() );
+    std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
+    
+    scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, settings );
+    
+    std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
+    
+    std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
+    
+    ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true); 
+    ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partition, comm->getSize() );
+    
     std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
     
     
     // Reporting output to std::cout
-    
-    std::freopen("outputParams", "w", stdout);
-    
-    std::cout<<"commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
-    std::cout<< " nodes:"<< N<< " dimensions:"<< settings.dimensions <<" k:" << settings.numBlocks;
-    std::cout<< " epsilon:" << settings.epsilon << " borderDepth:"<< settings.borderDepth;
-    std::cout<< " minGainForNextRound:" << settings.minGainForNextRound;
-    std::cout<< " stopAfterNoGainRounds:"<< settings.stopAfterNoGainRounds << std::endl;
-    
-/*
-    std::cout<< "rank:"<< comm->getRank() <<" inputTime:" << inputTime.count() << " partitionTime:" << partitionTime.count() <<" reportTime:"<< reportTime.count() << std::endl;
-    
-    
+    ValueType inputT = ValueType ( comm->max(inputTime.count() ));
+    ValueType partT = ValueType (comm->max(partitionTime.count()));
+    ValueType repT = ValueType (comm->max(reportTime.count()));
+        
     if (comm->getRank() == 0) {
-    	std::cout<< "Cut is: "<< cut<< " and imbalance: "<< imbalance << std::endl;
+        std::cout<< "commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
+        std::cout<< " nodes:"<< N<< " dimensions:"<< settings.dimensions <<" k:" << settings.numBlocks;
+        std::cout<< " epsilon:" << settings.epsilon << " borderDepth:"<< settings.borderDepth;
+        std::cout<< " minGainForNextRound:" << settings.minGainForNextRound;
+        std::cout<< " stopAfterNoGainRounds:"<< settings.stopAfterNoGainRounds << std::endl;
+        
+        std::cout<< "Cut is: "<< cut<< " and imbalance: "<< imbalance << std::endl;
+        std::cout<<"inputTime:" << inputT << " partitionTime:" << partT <<" reportTime:"<< repT << std::endl;
     }
-*/
-
 }

@@ -91,21 +91,34 @@ namespace ITI {
 			 * Computes the border region within one block, adjacent to another block
 			 * @param[in] input Adjacency matrix of the input graph
 			 * @param[in] part Partition vector
-			 * @param[in] thisBlock block in which the border region is required
 			 * @param[in] otherBlock block to which the border region should be adjacent
 			 * @param[in] depth Width of the border region, measured in hops
 			 */
-			static std::pair<std::vector<IndexType>, IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType thisBlock, IndexType otherBlock, IndexType depth);
+			static std::pair<std::vector<IndexType>, IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType otherBlock, IndexType depth);
 
 			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors, Settings settings);
 
 			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors,
 					const std::vector<DenseVector<IndexType>>& communicationScheme, Settings settings);
 
+			/**
+			 * Iterates over the local part of the adjacency matrix and counts local edges.
+			 * If an inconsistency in the graph is detected, it tries to find the inconsistent edge and throw a runtime error.
+			 * Not guaranteed to find inconsistencies. Iterates once over the edge list.
+			 */
 			static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
 
+			/**
+			 * Returns true if the node identified with globalID has a neighbor that is not local on this process.
+			 * Since this method acquires reading locks on the CSR structure, it might be expensive to call often
+			 */
 			static bool hasNonLocalNeighbors(const CSRSparseMatrix<ValueType> &input, IndexType globalID);
 
+			/**
+			 * Returns a vector of global indices of nodes which are local on this process, but have neighbors that are node.
+			 * No communication required, iterates once over the local adjacency matrix
+			 * @param[in] input Adjacency matrix of the input graph
+			 */
 			static std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
                         
 			//------------------------------------------------------------------------
@@ -156,17 +169,7 @@ namespace ITI {
 			 *
 			 * @return A 3xN vector with the edges and the color of each edge: retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge.
 			 */
-			static std::vector< std::vector<IndexType>>  getGraphEdgeColoring_local( const CSRSparseMatrix<ValueType> &adjM, IndexType& colors);
-                        
-			/** Colors the edges of the graph using max_vertex_degree + 1 colors.
-			 *
-			 * @param[in] edgeList The graph given as the list of edges. It must have size 2 and an edge
-			 * is (edgeList[0][i] , edgeList[1][i])
-			 *
-			 * @return A vector with the color for every edge. ret.size()=edgeList.size() and edge i has
-			 * color ret[i].
-			 */
-			static std::vector<IndexType> getGraphEdgeColoring_local( const std::vector<std::vector<IndexType>> &edgeList );
+			static std::vector< std::vector<IndexType>>  getGraphEdgeColoring_local( CSRSparseMatrix<ValueType> &adjM, IndexType& colors);
                         
 			/** Given the block graph, creates an edge coloring of the graph and retuns a communication
 			 *  scheme based on the coloring
@@ -178,7 +181,7 @@ namespace ITI {
 			 *  return[i][j] = k : in round i, node j talks with node k. Must also be that return[i][k] = j.
 			 *  Inactive nodes have their own rank: rank[i][j] = j.
 			 */
-			static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( const CSRSparseMatrix<ValueType> &adjM);
+			static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM);
 
 
 		private:
@@ -190,11 +193,6 @@ namespace ITI {
 
 			static ValueType localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input);
 
-			static IndexType getDegreeSum(const CSRSparseMatrix<ValueType> &input, std::vector<IndexType> nodes);
-
-			static ValueType computeCutTwoWay(const CSRSparseMatrix<ValueType> &input,
-					const CSRStorage<ValueType> &haloStorage, const Halo &halo,
-					const std::set<IndexType> &firstregion,  const std::set<IndexType> &secondregion,
-					const bool ignoreWeights = true);
+			static IndexType getDegreeSum(const CSRSparseMatrix<ValueType> &input, const std::vector<IndexType> &nodes);
 	};
 }

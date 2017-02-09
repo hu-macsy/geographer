@@ -60,7 +60,7 @@ void MeshIO<IndexType, ValueType>::createRandom3DMesh( CSRSparseMatrix<ValueType
 
             liIndex= kNNindex.begin();
             for(liVal=kNNdist.begin(); liVal!=kNNdist.end(); ++liVal){
-                if(dist.getValue<ValueType>()<*liVal){
+                if(dist.getValue<ValueType>()< (*liVal)*(*liVal) ){
                     kNNindex.insert(liIndex, j);
                     kNNdist.insert(liVal , dist.getValue<ValueType>());
                     kNNindex.pop_back();
@@ -399,7 +399,7 @@ void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMa
     IndexType indX = (IndexType) (startingIndex/planeSize) ;
     IndexType indY = (IndexType) ((startingIndex%planeSize)/numZ);
     IndexType indZ = (IndexType) ((startingIndex%planeSize) % numZ);
-    PRINT( *comm<< ": " << numX << ", "<< numY << ", "<< numZ << ", startingIndex= "<< startingIndex);
+    //PRINT( *comm<< ": " << numX << ", "<< numY << ", "<< numZ << ", startingIndex= "<< startingIndex);
     
     for(IndexType i=0; i<localSize; i++){
         SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.setCoordinates");
@@ -632,7 +632,7 @@ void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMa
         sendPartWrite[2*i+1]= nonLocalNodeInd[i];
     }
     sendPartWrite.release();
-PRINT(*comm << ">> " << sendPart.size() );
+    //PRINT(*comm << ">> " << sendPart.size() );
 
     // so on the data this PE receives edge [2*i] is local on the sender and [2*i+1] non-local on the sender
     // so now [2*i+1] may be local to this PE
@@ -676,14 +676,13 @@ PRINT(*comm << ">> " << sendPart.size() );
         // to find from what PE you receive
         IndexType indexToRcv = (comm->getRank()-round+numPEs)%numPEs;
         IndexType sizeToRcv = readRcvSize[ indexToRcv ];
-PRINT("round: "<< round <<" , " << *comm << ": receive from PE: "<< indexToRcv << ", size: "<< sizeToRcv);        
+        //PRINT("round: "<< round <<" , " << *comm << ": receive from PE: "<< indexToRcv << ", size: "<< sizeToRcv);        
         recvPart.resize( sizeToRcv );
 
         scai::hmemo::ReadAccess<IndexType> sendSizeRead (sendSize);
-PRINT( *comm << " , sendPart.size= " << sendPart.size() );
+        //PRINT( *comm << " , sendPart.size= " << sendPart.size() );
         // send your local part, receive other PE's part
         comm->shiftArray( recvPart, sendPart, 1);
-PRINT( *comm << ",  recvPart.size= "<< recvPart.size() );
         
 
         // check if recvPart[2*i+1] is local, if it is must add edge [2*i+1]-[2*i]
@@ -693,8 +692,7 @@ PRINT( *comm << ",  recvPart.size= "<< recvPart.size() );
             scai::hmemo::ReadAccess<IndexType> recvPartWrite( recvPart );
             if( dist->isLocal(recvPartWrite[i+1]) ){                       // must add edge
                 IndexType localIndex=  recvPartWrite[i+1];
-                IndexType nonLocalIndex= recvPartWrite[i];
-//PRINT(*comm << ", localInd: " << localIndex << " , nonLocalInd: " << nonLocalIndex);                  
+                IndexType nonLocalIndex= recvPartWrite[i];     
                 // 0< localIndex< globalN but localNgbs.size()= localN, so must convert it to local
                 SCAI_ASSERT( dist->global2local(localIndex) < localNgbs.size(),"too large index: "<< localIndex <<" while size= "<< localNgbs.size() )
                 localNgbs[dist->global2local(localIndex) ].insert( nonLocalIndex );      // indices are global
@@ -705,19 +703,7 @@ PRINT( *comm << ",  recvPart.size= "<< recvPart.size() );
         // the data you received must be passed on, not your own again
         sendPart.resize(recvPart.size());
         sendPart.swap(recvPart);
-PRINT(*comm << ": "<< sendPart.size() );
     }
-    
-     // print
-     /*
-    for(IndexType i=0; i<localNgbs.size(); i++){
-        std::cout<< *comm << "__ "<< i <<":"<< dist->local2global(i) <<"  \t";
-        for(typename std::set<IndexType>::iterator it= localNgbs[i].begin(); it!=localNgbs[i].end(); ++it){
-            std::cout<< *it <<"-";
-        }
-        std::cout<< std::endl;
-    }
-    */
     
     
     /* 
@@ -748,7 +734,6 @@ PRINT(*comm << ": "<< sendPart.size() );
         for(IndexType i=0; i<localNgbs.size(); i++){
             nnzValues += localNgbs[i].size();
         }
-PRINT("nnzValues= " << nnzValues);
         hmemo::WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
         hmemo::WriteOnlyAccess<IndexType> ja( csrJA , nnzValues);
         hmemo::WriteOnlyAccess<ValueType> values( csrValues, nnzValues );
@@ -950,7 +935,6 @@ void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( lama::CSRSparseMatr
         
         //for every line, aka for all nodes
         for ( IndexType i=0; i<N; i++ ){
-            SCAI_REGION( "MeshIO.readFromFile2AdjMatrix.setCSRSparseMatrix")
             std::getline(file, line);            
             std::vector< std::vector<int> > line_integers;
             std::istringstream iss( line );
@@ -978,8 +962,8 @@ void   MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( lama::CSRSparseMatr
 
 //-------------------------------------------------------------------------------------------------
 /*File "filename" contains the coordinates of a graph. The function reads that coordinates and returns
- * the coordinates in a 2 DenseVector, one for each dmension.
- * Every line of the file contais 3 ValueType numbers but the third number is ignored.
+ * the coordinates in a DenseVector where point(x,y) is in [x*dim +y].
+ * Every line of the file contais 2 ValueType numbers.
  */
 template<typename IndexType, typename ValueType>
 void MeshIO<IndexType, ValueType>::fromFile2Coords_2D( const std::string filename, std::vector<DenseVector<ValueType>> &coords, IndexType numberOfPoints){
@@ -1062,25 +1046,10 @@ Scalar MeshIO<IndexType, ValueType>::dist3D(DenseVector<ValueType> p1, DenseVect
   res = res0+ res1+ res2;
   return scai::common::Math::sqrt( res.getValue<ScalarRepType>() );
 }
-    
-//-------------------------------------------------------------------------------------------------
-template<typename IndexType, typename ValueType>
-Scalar MeshIO<IndexType, ValueType>::dist3D(DenseVector<ValueType> p1, ValueType *p2){
-  SCAI_REGION( "MeshIO.dist3D" )
-  Scalar res0, res1, res2, res;
-  res0= p1.getValue(0)-p2[0];
-  res0= res0*res0;
-  res1= p1.getValue(1)-p2[1];
-  res1= res1*res1;
-  res2= p1.getValue(2)-p2[2];
-  res2= res2*res2;
-  res = res0+ res1+ res2;
-  return scai::common::Math::sqrt( res.getValue<ScalarRepType>() );
-}
 //-------------------------------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
 ValueType MeshIO<IndexType, ValueType>::dist3DSquared(std::tuple<IndexType, IndexType, IndexType> p1, std::tuple<IndexType, IndexType, IndexType> p2){
-  SCAI_REGION( "MeshIO.dist3D" )
+  SCAI_REGION( "MeshIO.dist3DSquared" )
   ValueType distX, distY, distZ;
 
   distX = std::get<0>(p1)-std::get<0>(p2);
@@ -1098,7 +1067,6 @@ std::tuple<IndexType, IndexType, IndexType> MeshIO<IndexType, ValueType>::index2
     // a YxZ plane
     IndexType planeSize= numPoints[1]*numPoints[2];
     IndexType xIndex = index/planeSize;
-//PRINT(index << "__ "<< planeSize);
     IndexType yIndex = (index % planeSize) / numPoints[2];
     IndexType zIndex = (index % planeSize) % numPoints[2];
     SCAI_ASSERT(xIndex >= 0, xIndex);
@@ -1123,7 +1091,6 @@ template void MeshIO<int, double>::readFromFile2AdjMatrix( CSRSparseMatrix<doubl
 template void  MeshIO<int, double>::fromFile2Coords_2D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfCoords);
 template void MeshIO<int, double>::fromFile2Coords_3D( const std::string filename, std::vector<DenseVector<double>> &coords, int numberOfPoints);
 template Scalar MeshIO<int, double>::dist3D(DenseVector<double> p1, DenseVector<double> p2);
-template Scalar MeshIO<int, double>::dist3D(DenseVector<double> p1, double* p2);
 template double MeshIO<int, double>::dist3DSquared(std::tuple<int, int, int> p1, std::tuple<int, int, int> p2);
 template std::tuple<IndexType, IndexType, IndexType> MeshIO<int, double>::index2_3DPoint(int index,  std::vector<int> numPoints);
 } //namespace ITI

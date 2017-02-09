@@ -20,18 +20,20 @@ namespace ITI {
  * Amortized constant running time for each operation.
  */
 
-typedef std::list<int> Bucket;
+typedef int index;
+typedef std::list<index> Bucket;
 
-template<class Key, class Val>
+constexpr static index none = std::numeric_limits<index>::max();
+
 class PrioQueueForInts {
 private:
-	std::vector<std::list<Key>> buckets;			// the actual buckets
+	std::vector<Bucket> buckets;			// the actual buckets
 	std::vector<Bucket::iterator> nodePtr;	// keeps track of node positions
-	std::vector<Key> myBucket;			// keeps track of current bucket = priority
+	std::vector<index> myBucket;			// keeps track of current bucket = priority
 	unsigned int minNotEmpty;				// current min priority
 	int maxNotEmpty;						// current max priority
-	Key maxPrio;							// maximum admissible priority
-	uint64_t numElems;							// number of elements stored
+	index maxPrio;							// maximum admissible priority
+	index numElems;							// number of elements stored
 
 public:
 	/**
@@ -42,9 +44,9 @@ public:
 	 *   not exist).
 	 * @param[in] maxPrio Maximum priority value.
 	 */
-	PrioQueueForInts(std::vector<Key>& prios, Key maxPrio);
+	PrioQueueForInts(std::vector<index>& prios, index maxPrio);
 
-	PrioQueueForInts(uint64_t size, Key maxPrio);
+	PrioQueueForInts(index size, index maxPrio);
 
 	/**
 	 * Insert element @a elem with priority @a prio.
@@ -52,7 +54,7 @@ public:
 	 * @param[in] prio Priority of element to be inserted, must be in range
 	 *   [0, maxPrio].
 	 */
-	void insert(Key prio, Val elem);
+	void insert(index prio, index elem);
 
 	/**
 	 * Destructor.
@@ -63,24 +65,28 @@ public:
 	 * Remove element with key @a key from PQ.
 	 * @param[in] elem Element to be removed.
 	 */
-	void remove(Val elem);
+	void remove(index elem);
 
 	/**
 	 * Changes priority of element @a elem to priority @a prio.
 	 * @param[in] prio New priority, must be in range [0, maxPrio].
 	 * @param[in] elem Element whose priority is changed.
 	 */
-	void updateKey(Key prio, Val elem);
+	void updateKey(index prio, index elem);
+
+	index getMinNotEmpty() const;
+
+	index getMaxNotEmpty() const;
 
 	/**
 	 * @return Element with minimum priority.
 	 */
-	Val extractMin();
+	index extractMin();
 
 	/**
 	 * @return Element with maximum priority.
 	 */
-	Val extractMax();
+	index extractMax();
 
 	/**
 	 * @return Arbitrary element with priority @a prio. Returns none
@@ -88,13 +94,13 @@ public:
 	 * @param[in] Priority for which a corresponding element shall be returned,
 	 *   must be in range [0, maxPrio].
 	 */
-	Val extractAt(Key prio);
+	index extractAt(index prio);
 
 	/**
 	 * @return Priority of elem @a elem.
 	 * @param[in] Element whose priority shall be returned.
 	 */
-	Key priority(Val elem);
+	index priority(index elem) const;
 
 	/**
 	 * @return True if priority queue does not contain any elements, otherwise false.
@@ -104,9 +110,7 @@ public:
 	/**
 	 * @return Number of elements contained in priority queue.
 	 */
-	uint64_t size() const;
-
-	const static Key none = std::numeric_limits<Key>::max();
+	index size() const;
 };
 
 } /* namespace Aux */

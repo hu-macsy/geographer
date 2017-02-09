@@ -24,6 +24,7 @@
 #include "gtest/gtest.h"
 #include "HilbertCurve.h"
 #include "MeshIO.h"
+#include "Settings.h"
 
 typedef double ValueType;
 typedef int IndexType;
@@ -36,31 +37,6 @@ class MeshIOTest : public ::testing::Test {
 
 };
 
-//-------------------------------------------------------------------------------------------------
-/* Creates a random 3D mesh and writes in a .graph file the graph in a METIS format and in the
- *  .graph.xyz the coordiantes.
- */
-/*
-TEST_F(MeshIOTest, testMesh3DCreateRandomMeshWriteInFile_Local_3D) {
-    std::vector<DenseVector<ValueType>> coords;
-    IndexType numberOfPoints= 20;
-    ValueType maxCoord= 1;
-    std::string grFile = "meshes/randomTest6.graph";
-    std::string coordFile= grFile + ".xyz";
-
-    scai::lama::CSRSparseMatrix<ValueType> adjM(numberOfPoints, numberOfPoints);
-    {
-        SCAI_REGION("testMesh3DCreateRandomMeshWriteInFile_Local_3D.createRandom3DMesh")
-        MeshIO<IndexType, ValueType>::createRandom3DMesh(adjM, coords, numberOfPoints, maxCoord);
-    }
-    
-    {
-        SCAI_REGION("testMesh3DCreateRandomMeshWriteInFile_Local_3D.(writeInFileMetisFormat and writeInFileCoords)")
-        MeshIO<IndexType, ValueType>::writeInFileMetisFormat( adjM, grFile);
-        MeshIO<IndexType, ValueType>::writeInFileCoords( coords, numberOfPoints, coordFile);
-    }
-}
-*/
 //----------------------------------------------------------------------------------------
 /* Creates a semi-structured 3D mesh given the number of points for each dimension and the maximum
  * corrdinate in each axis. Writes the graph in METIS format in a .graph file and the coordiantes
@@ -146,7 +122,7 @@ TEST_F(MeshIOTest, testCreateStructured3DMeshLocalDegreeSymmetry) {
 // For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
 // less than 6 ones ( every node has 3,4,5, or 6 neighbours).
 TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
-    std::vector<IndexType> numPoints= { 200, 200, 200};
+    std::vector<IndexType> numPoints= { 40, 40, 40};
     std::vector<ValueType> maxCoord= {441, 711, 1160};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
     std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
@@ -241,15 +217,13 @@ TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
     
 }
 
-
-
 //-----------------------------------------------------------------
 // Creates the part of a structured mesh in each processor ditributed and checks the matrix and the coordinates.
 // For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
 // less than 6 ones ( every node has 3,4,5, or 6 neighbours).
 TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
-    std::vector<IndexType> numPoints= { 10, 2, 5};
-    std::vector<ValueType> maxCoord= {11, 14, 10};
+    std::vector<IndexType> numPoints= { 4, 4, 4};
+    std::vector<ValueType> maxCoord= {441, 711, 1160};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
     std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
     
@@ -326,7 +300,9 @@ TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
     
     SCAI_REGION_START("testPartitionWithRandom3DMesh_Local_3D.partitionGraph");
     //get the partition
-    DenseVector<IndexType> partition= ParcoRepart<IndexType, ValueType>::partitionGraph( adjM, coords, k, epsilon);
+    
+    struct Settings Settings;
+    DenseVector<IndexType> partition= ParcoRepart<IndexType, ValueType>::partitionGraph( adjM, coords, Settings);
     SCAI_REGION_END("testPartitionWithRandom3DMesh_Local_3D.partitionGraph");
     
     // check partition
