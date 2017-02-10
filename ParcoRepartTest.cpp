@@ -68,7 +68,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
 }
 
 TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
-  IndexType nroot = 28;
+  IndexType nroot = 16;
   IndexType n = nroot * nroot * nroot;
   IndexType dimensions = 3;
   
@@ -191,9 +191,9 @@ TEST_F(ParcoRepartTest, testTwoWayCut) {
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	//setup input matrix, partition and distribution
-	const IndexType dimX = 32;
-	const IndexType dimY = 32;
-	const IndexType dimZ = 32;
+	const IndexType dimX = 16;
+	const IndexType dimY = 16;
+	const IndexType dimZ = 16;
 	const IndexType n = dimX*dimY*dimZ;
 	const IndexType k = comm->getSize();
 	const ValueType epsilon = 0.05;
@@ -322,9 +322,9 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
 TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-	const IndexType dimX = 32;
-	const IndexType dimY = 32;
-	const IndexType dimZ = 32;
+	const IndexType dimX = 16;
+	const IndexType dimY = 16;
+	const IndexType dimZ = 16;
 	const IndexType n = dimX*dimY*dimZ;
 	const IndexType k = comm->getSize();
 	const ValueType epsilon = 0.05;
@@ -398,7 +398,7 @@ TEST_F(ParcoRepartTest, testCommunicationScheme) {
 	 */
 
 	const IndexType n = 1000;
-	const IndexType p = 129;//purposefully not a power of two, to check what happens
+	const IndexType p = 65;//purposefully not a power of two, to check what happens
 	const IndexType k = p;
 
 	//fill random matrix
@@ -592,7 +592,7 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 //----------------------------------------------------------
 
 TEST_F (ParcoRepartTest, testBorders_Distributed) {
-    std::string file = "Grid32x32";
+    std::string file = "Grid16x16";
     std::ifstream f(file);
     IndexType dimensions= 2, k=4;
     IndexType N, edges;
@@ -634,7 +634,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     //partition.redistribute(dist); //not needed now
     
     // print
-    int numX= 32, numY= 32;         // 2D grid dimensions
+    int numX= 16, numY= 16;         // 2D grid dimensions
     ASSERT_EQ(N, numX*numY);
     IndexType partViz[numX][numY];   
     IndexType bordViz[numX][numY]; 
