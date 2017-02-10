@@ -353,7 +353,6 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
 // usually, graph file: "file.graph", coodinates file: "file.graph.xy" or .xyz
 TEST_F(MeshIOTest, testPartitionFromFile_dist_2D){
     CSRSparseMatrix<ValueType> graph;       //the graph as an adjacency matrix  
-    std::vector<DenseVector<ValueType>> coords2D(2);        //the coordiantes of each node 
     IndexType dim= 2, k= 8, i;
     ValueType epsilon= 0.1;
     
@@ -390,8 +389,8 @@ TEST_F(MeshIOTest, testPartitionFromFile_dist_2D){
     std::cout<<"reading coordinates from file: "<< coordFile<< std::endl;
     
     SCAI_REGION_START("testPartitionFromFile_local_2D.readFromFile2Coords_2D");
-    std::vector<DenseVector<ValueType>> coords2D = MeshIO<IndexType, ValueType>::fromFile2Coords( coordFile, N, dimensions);
-    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*distPtr));
+    std::vector<DenseVector<ValueType>> coords2D = MeshIO<IndexType, ValueType>::fromFile2Coords( coordFile, N, dim);
+    EXPECT_TRUE(coords2D[0].getDistributionPtr()->isEqual(*distPtr));
     SCAI_REGION_END("testPartitionFromFile_local_2D.readFromFile2Coords_2D");        
     
     EXPECT_EQ(coords2D.size(), dim);
