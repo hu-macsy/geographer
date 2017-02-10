@@ -604,18 +604,11 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     //
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph(dist, noDistPointer);
-    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(graph, file );
+    CSRSparseMatrix<ValueType> graph = MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(file );
     graph.redistribute(dist, noDistPointer);
     
-    std::vector<DenseVector<ValueType>> coords(2);
-    coords[0].allocate(dist);
-    coords[1].allocate(dist);
-    coords[0]= static_cast<ValueType>( 0 );
-    coords[1]= static_cast<ValueType>( 0 );
-    coords[0].redistribute(dist);
-    coords[1].redistribute(dist);
-    MeshIO<IndexType, ValueType>::fromFile2Coords_2D( std::string(file + ".xyz"), coords, N);
+    std::vector<DenseVector<ValueType>> coords = MeshIO<IndexType, ValueType>::fromFile2Coords( std::string(file + ".xyz"), N, dimensions);
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
     EXPECT_EQ(edges, (graph.getNumValues())/2 );   
@@ -687,34 +680,27 @@ if(comm->getRank()==0 ){
 
 TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
     std::string file = "Grid16x16";
-    std::ifstream f(file);
     IndexType dimensions= 2, k=8;
-    IndexType N, edges;
-    f >> N >> edges; 
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     // for now local refinement requires k = P
     k = comm->getSize();
     //
-    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+
+    CSRSparseMatrix<ValueType> graph = MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( file );
+
+    scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    IndexType N = dist->getGlobalSize();
+    IndexType edges = graph.getNumValues()/2;
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph( N , N);           
-    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(graph, file );
-    //distrubute graph
-    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
     
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
     EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
-    std::vector<DenseVector<ValueType>> coords(2);
-    coords[0].allocate(N);
-    coords[1].allocate(N);
-    coords[0]= static_cast<ValueType>( 0 );
-    coords[1]= static_cast<ValueType>( 0 );
     
-    //fromFile2Coords_2D is not distributed, must redistribute
-    MeshIO<IndexType, ValueType>::fromFile2Coords_2D( std::string(file + ".xyz"), coords, N);
-    coords[0].redistribute(dist);
-    coords[1].redistribute(dist);
+    //distribution should be the same
+    std::vector<DenseVector<ValueType>> coords = MeshIO<IndexType, ValueType>::fromFile2Coords( std::string(file + ".xyz"), N, dimensions);
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
+
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
     
     struct Settings Settings;
@@ -845,8 +831,7 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_2D) {
     //
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph( N , N);           
-    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(graph, file );
+    CSRSparseMatrix<ValueType> graph = MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( file );
     //distrubute graph
     graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
         
@@ -854,16 +839,10 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_2D) {
     //read the array locally and messed the distribution. Left as a remainder.
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
     EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
-    std::vector<DenseVector<ValueType>> coords(2);
-    coords[0].allocate(N);
-    coords[1].allocate(N);
-    coords[0]= static_cast<ValueType>( 0 );
-    coords[1]= static_cast<ValueType>( 0 );
     
-    //fromFile2Coords_2D is not distributed, must redistribute
-    MeshIO<IndexType, ValueType>::fromFile2Coords_2D( std::string(file + ".xyz"), coords, N);
-    coords[0].redistribute(dist);
-    coords[1].redistribute(dist);
+    //distribution should be the same
+    std::vector<DenseVector<ValueType>> coords = MeshIO<IndexType, ValueType>::fromFile2Coords( std::string(file + ".xyz"), N, dimensions);
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
     
     struct Settings Settings;
@@ -958,8 +937,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
     //
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph( N , N);           
-    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(graph, file );
+    CSRSparseMatrix<ValueType> graph = MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( file );
     //distrubute graph
     graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
         
@@ -967,16 +945,10 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
     //read the array locally and messed the distribution. Left as a remainder.
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
     EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
-    std::vector<DenseVector<ValueType>> coords(2);
-    coords[0].allocate(N);
-    coords[1].allocate(N);
-    coords[0]= static_cast<ValueType>( 0 );
-    coords[1]= static_cast<ValueType>( 0 );
     
-    //fromFile2Coords_2D is not distributed, must redistribute
-    MeshIO<IndexType, ValueType>::fromFile2Coords_2D( std::string(file + ".xyz"), coords, N);
-    coords[0].redistribute(dist);
-    coords[1].redistribute(dist);
+    //distribution should be the same
+    std::vector<DenseVector<ValueType>> coords = MeshIO<IndexType, ValueType>::fromFile2Coords( std::string(file + ".xyz"), N, dimensions);
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
     
     struct Settings Settings;
@@ -1089,25 +1061,18 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     //
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph( N , N);           
-    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(graph, file );
+    CSRSparseMatrix<ValueType> graph = MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( file );
     //distrubute graph
     graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
         
 
     //read the array locally and messed the distribution. Left as a remainder.
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
-    EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
-    std::vector<DenseVector<ValueType>> coords(2);
-    coords[0].allocate(N);
-    coords[1].allocate(N);
-    coords[0]= static_cast<ValueType>( 0 );
-    coords[1]= static_cast<ValueType>( 0 );
+    EXPECT_EQ( edges, (graph.getNumValues())/2 );
     
-    //fromFile2Coords_2D is not distributed, must redistribute
-    MeshIO<IndexType, ValueType>::fromFile2Coords_2D( std::string(file + ".xyz"), coords, N);
-    coords[0].redistribute(dist);
-    coords[1].redistribute(dist);
+    //reading coordinates
+    std::vector<DenseVector<ValueType>> coords = MeshIO<IndexType, ValueType>::fromFile2Coords( std::string(file + ".xyz"), N, dimensions);
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
     
     struct Settings Settings;
@@ -1160,25 +1125,18 @@ std::string file = "Grid16x16";
     //
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph( N , N);           
-    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(graph, file );
+    CSRSparseMatrix<ValueType> graph = MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( file );
     //distrubute graph
     graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
         
 
     //read the array locally and messed the distribution. Left as a remainder.
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
-    EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
-    std::vector<DenseVector<ValueType>> coords(2);
-    coords[0].allocate(N);
-    coords[1].allocate(N);
-    coords[0]= static_cast<ValueType>( 0 );
-    coords[1]= static_cast<ValueType>( 0 );
+    EXPECT_EQ( edges, (graph.getNumValues())/2 );
+
     
-    //fromFile2Coords_2D is not distributed, must redistribute
-    MeshIO<IndexType, ValueType>::fromFile2Coords_2D( std::string(file + ".xyz"), coords, N);
-    coords[0].redistribute(dist);
-    coords[1].redistribute(dist);
+    std::vector<DenseVector<ValueType>> coords = MeshIO<IndexType, ValueType>::fromFile2Coords( std::string(file + ".xyz"), N, dimensions);
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
     
     //scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, k, 0.2);

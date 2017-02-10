@@ -74,8 +74,7 @@ TEST_F(MeshIOTest, testMesh3DCreateStructuredMesh_Local_3D) {
         MeshIO<IndexType, ValueType>::writeInFileCoords( coords, numberOfPoints, coordFile);
     }
     
-    CSRSparseMatrix<ValueType> graph = scai::lama::CSRSparseMatrix<ValueType>( numberOfPoints, numberOfPoints );
-    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graph, grFile );
+    CSRSparseMatrix<ValueType> graph = MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( grFile );
     
     // check the two matrixes to be equal
     {
@@ -230,14 +229,15 @@ TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
-    
+        
+    scai::lama::CSRSparseMatrix<ValueType> adjM;
+    adjM =  scai::lama::CSRSparseMatrix<ValueType>( dist, noDistPointer);
+        
     std::vector<DenseVector<ValueType>> coords(3);
     for(IndexType i=0; i<3; i++){ 
 	  coords[i].allocate(dist);
 	  coords[i] = static_cast<ValueType>( 0 );
     }
-    
-    scai::lama::CSRSparseMatrix<ValueType> adjM( dist, noDistPointer);
     
     // create the adjacency matrix and the coordinates
     MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
@@ -288,46 +288,18 @@ TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
 }
 
 //-----------------------------------------------------------------
-/*
-TEST_F(MeshIOTest, testPartitionWithRandom3DMesh_Local_3D) {
-    IndexType N= 40;
-    ValueType maxCoord= 1;
-    IndexType dim= 3, k= 8;
-    ValueType epsilon= 0.2;
-    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+
+TEST_F(MeshIOTest, testCreateOctaTreeMesh_Local_3D) {
+        
+    int numberOfPoints = 20;
+    ValueType maxCoord = 1;
+    scai::lama::CSRSparseMatrix<ValueType> adjM(numberOfPoints, numberOfPoints);
+    std::vector<DenseVector<ValueType>> coords(3, DenseVector<ValueType>(numberOfPoints, 0));
+
     
-    //the coordinates of the points: coords.size()= dim , coords[dim].size()= N
-    std::vector<DenseVector<ValueType>> coords(3);    
-    
-    //the adjacency matrix
-    scai::lama::CSRSparseMatrix<ValueType> adjM(N, N);
-    
-    //random coordinates in 3D stored in coords and the adjacency matrix in adjM
-    MeshIO<IndexType, ValueType>::createRandom3DMesh(adjM, coords, N, maxCoord);
-    
-    //std::cout<< "Number of nodes= "<< N<< " , Number of edges="<< (adjM.getNumValues()-N)/2 << std::endl;
-    
-    SCAI_REGION_START("testPartitionWithRandom3DMesh_Local_3D.partitionGraph");
-    //get the partition
-    
-    struct Settings Settings;
-    DenseVector<IndexType> partition= ParcoRepart<IndexType, ValueType>::partitionGraph( adjM, coords, Settings);
-    SCAI_REGION_END("testPartitionWithRandom3DMesh_Local_3D.partitionGraph");
-    
-    // check partition
-    for(IndexType i=0; i<partition.size(); i++){
-        EXPECT_LE( partition(i).Scalar::getValue<ValueType>() , k);
-        EXPECT_GE( partition(i).Scalar::getValue<ValueType>() , 0);
-    }
-    
-    //calculate and print cut and imbalance
-    ValueType cut= ParcoRepart<IndexType, ValueType>::computeCut(adjM, partition, true);
-    std::cout<< "# cut = "<< cut<< " , "<< std::endl;
-    ValueType imbalance= ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k);
-    std::cout<< "# imbalance = " << imbalance<< " , "<< std::endl;
-    
+    ITI::MeshIO<IndexType, ValueType>::createOctaTreeMesh( adjM, coords, numberOfPoints, maxCoord);
 }
-*/
+
 
 //-----------------------------------------------------------------
 TEST_F(MeshIOTest, testWriteMetis_Dist_3D){
@@ -378,12 +350,10 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     dmemo::DistributionPtr dist( new dmemo::NoDistribution( nodes ));
     
-    Graph = scai::lama::CSRSparseMatrix<ValueType>(dist, dist);
-    
     // read graph from file
     {
         SCAI_REGION("testReadAndWriteGraphFromFile.readFromFile2AdjMatrix");
-        MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph, filename );
+        Graph = MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(filename );
     }
     N = Graph.getNumColumns();
     EXPECT_EQ(Graph.getNumColumns(), Graph.getNumRows());
@@ -396,8 +366,7 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
     MeshIO<IndexType, ValueType>::writeInFileMetisFormat(Graph, fileTo );
     
     // read new graph from the new file we just written
-    CSRSparseMatrix<ValueType> Graph2(dist, dist);
-    MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix(Graph2, fileTo );
+    CSRSparseMatrix<ValueType> Graph2 = MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( fileTo );
     
     // check that the two graphs are identical
     std::cout<< "Output written in file: "<< fileTo<< std::endl;
@@ -428,7 +397,7 @@ TEST_F(MeshIOTest, testReadAndWriteGraphFromFile){
 // usually, graph file: "file.graph", coodinates file: "file.graph.xy" or .xyz
 TEST_F(MeshIOTest, testPartitionFromFile_dist_2D){
     CSRSparseMatrix<ValueType> graph;       //the graph as an adjacency matrix  
-    std::vector<DenseVector<ValueType>> coords2D(2);        //the coordiantes of each node 
+    //std::vector<DenseVector<ValueType>> coords2D(2);        //the coordiantes of each node 
     IndexType dim= 2, k= 8, i;
     ValueType epsilon= 0.1;
     
@@ -452,8 +421,7 @@ TEST_F(MeshIOTest, testPartitionFromFile_dist_2D){
     scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( nodes ));
     
     SCAI_REGION_START("testPartitionFromFile_local_2D.readFromFile2AdjMatrix");
-        graph = scai::lama::CSRSparseMatrix<ValueType>(distPtr, noDistPtr);
-        MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graph , grFile );
+        graph = MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( grFile );
         graph.redistribute( distPtr , noDistPtr);
         std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
     SCAI_REGION_END("testPartitionFromFile_local_2D.readFromFile2AdjMatrix");
@@ -466,17 +434,12 @@ TEST_F(MeshIOTest, testPartitionFromFile_dist_2D){
     std::cout<<"reading coordinates from file: "<< coordFile<< std::endl;
     
     SCAI_REGION_START("testPartitionFromFile_local_2D.readFromFile2Coords_2D");
-        coords2D[0].allocate(N);
-        coords2D[1].allocate(N);
-        coords2D[0]= static_cast<ValueType>( 0 );
-        coords2D[1]= static_cast<ValueType>( 0 );
-        MeshIO<IndexType, ValueType>::fromFile2Coords_2D(coordFile, coords2D, N );
-        coords2D[0].redistribute( distPtr );
-        coords2D[1].redistribute( distPtr );
+    std::vector<DenseVector<ValueType>> coords = MeshIO<IndexType, ValueType>::fromFile2Coords( coordFile, N, dim);
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*distPtr));
     SCAI_REGION_END("testPartitionFromFile_local_2D.readFromFile2Coords_2D");        
     
-    EXPECT_EQ(coords2D.size(), dim);
-    EXPECT_EQ(coords2D[0].size(), N);
+    EXPECT_EQ(coords.size(), dim);
+    EXPECT_EQ(coords[0].size(), N);
     
     // print
     /*
@@ -491,7 +454,7 @@ TEST_F(MeshIOTest, testPartitionFromFile_dist_2D){
         Settings.numBlocks= k;
         Settings.epsilon = epsilon;
         //partition the graph
-        scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D, Settings );
+        scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, Settings );
         EXPECT_EQ(partition.size(), N);
     SCAI_REGION_END("testPartitionFromFile_local_2D.partition");
         
