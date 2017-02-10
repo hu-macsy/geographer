@@ -996,7 +996,7 @@ std::vector<DenseVector<ValueType>> MeshIO<IndexType, ValueType>::fromFile2Coord
     //create result vector
     std::vector<scai::utilskernel::LArray<ValueType> > coords(dimension);
     for (IndexType dim = 0; dim < dimension; dim++) {
-    	coords[dim] = scai::utilskernel::LArray<ValueType>(localN);
+    	coords[dim] = scai::utilskernel::LArray<ValueType>(localN, 0);
     }
 
     //read local range
