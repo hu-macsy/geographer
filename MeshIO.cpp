@@ -269,7 +269,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
         }
 
         if(indX >= numPoints[0]){   // reached end of grid
-        	assert(i == localSize - 1);
+            assert(i == localSize - 1);
         }
     }
     // finish setting the coordinates
@@ -326,7 +326,7 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
                     
                     if(distanceSquared <= 1)
                     {
-                        ja[nnzCounter]= ngb_node;       // -1 for the METIS format
+                        ja[nnzCounter]= ngb_node;       
                         values[nnzCounter] = 1;         // unweighted edges
                         ++nnzCounter;
                         ++numRowElems;
@@ -348,6 +348,436 @@ void MeshIO<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<V
         adjM.assign(localMatrix , adjM.getRowDistributionPtr() , adjM.getColDistributionPtr() );
     }
 }
+
+
+//-------------------------------------------------------------------------------------------------
+// coords.size()= 3 , coords[i].size()= N
+// here, N= numPoints[0]*numPoints[1]*numPoints[2]
+
+template<typename IndexType, typename ValueType>
+void MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
+    SCAI_REGION( "MeshIO.createRandomStructured3DMesh_dist" )
+    
+    if (coords.size() != 3) {
+        throw std::runtime_error("Needs three coordinate vectors, one for each dimension");
+    }
+    
+    if (numPoints.size() != 3) {
+        throw std::runtime_error("Needs three point counts, one for each dimension");
+    }
+        
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    
+    if( !dist->isEqual( coords[0].getDistribution() ) ){
+        std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and coordinates dist: "<< coords[0].getDistribution() << std::endl;
+        throw std::runtime_error( "Distributions: should (?) be equal.");
+    }
+    
+    //for simplicity
+    IndexType numX = numPoints[0] , numY= numPoints[1], numZ= numPoints[2];
+    IndexType N = numX* numY* numZ;
+    
+    std::vector<ValueType> offset={maxCoord[0]/numX, maxCoord[1]/numY, maxCoord[2]/numZ};
+
+    // create the coordinates
+       
+    // get the local part of the coordinates vectors
+    std::vector<scai::utilskernel::LArray<ValueType>* > localCoords(3);
+    
+    for(IndexType i=0; i<3; i++){
+        localCoords[i] = &coords[i].getLocalValues();
+    }
+    
+    IndexType localSize = dist->getLocalSize(); // the size of the local part
+    
+    IndexType planeSize= numY*numZ;             // a YxZ plane
+    
+    // find which should be the first local coordinate in this processor
+    IndexType startingIndex = dist->local2global(0);
+    
+    IndexType indX = (IndexType) (startingIndex/planeSize) ;
+    IndexType indY = (IndexType) ((startingIndex%planeSize)/numZ);
+    IndexType indZ = (IndexType) ((startingIndex%planeSize) % numZ);
+    //PRINT( *comm<< ": " << numX << ", "<< numY << ", "<< numZ << ", startingIndex= "<< startingIndex);
+    
+    for(IndexType i=0; i<localSize; i++){
+        SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.setCoordinates");
+        
+        (*localCoords[0])[i] = indX*offset[0];
+        (*localCoords[1])[i] = indY*offset[1];
+        (*localCoords[2])[i] = indZ*offset[2];
+        //PRINT( *comm << ": "<< (*localCoords[0])[i] << "_ "<< (*localCoords[1])[i] << "_ "<< (*localCoords[2])[i]);
+        
+        ++indZ;
+
+        if(indZ >= numZ){   // if z coord reaches maximum, set it to 0 and increase y
+            indZ = 0;
+            ++indY;
+        }
+        if(indY >= numY){   // if y coord reaches maximum, set it to 0 and increase x
+            indY = 0;
+            ++indX;
+        }
+        if(indX >= numX){   // reached and of grid
+            assert(i == localSize - 1);
+        }
+    }
+    // finish setting the coordinates
+    // this part is the same as the structured mesh
+    
+    /*
+     * start making the local part of the adjacency matrix
+    */
+    
+    // first find the indices of possible neighbours
+    
+    // the diameter of the box in which we gonna pick indices.
+    // we set it as: 1 + 2% of the minimum side length. this is >2 for sides >50
+    IndexType boxRadius = 1 + (IndexType) (0.02 * (ValueType) *std::min_element(std::begin(numPoints), std::end(numPoints)));
+    
+    // radius^3 is the number of possible neighbours, here keep their indices as an array
+    std::vector<IndexType> neighbourGlobalIndices;
+
+    PRINT(*comm << " , boxRadius= "<< boxRadius<< " , and num of possible neighbours ="<< pow(2*boxRadius+1, 3) );
+    
+    for(IndexType x=-boxRadius; x<=boxRadius; x++){
+        for(IndexType y=-boxRadius; y<=boxRadius; y++){
+                for(IndexType z=-boxRadius; z<=boxRadius; z++){
+// changed the code above so we find neighbours only with greater indices    
+//    for(IndexType x=0; x<=boxRadius; x++){
+//        for(IndexType y=0; y<=boxRadius; y++){
+//            for(IndexType z=0; z<=boxRadius; z++){
+                // calculate the global index of a possible neighbour and insert it to the vector
+                IndexType globalNeighbourIndex= x*planeSize + y*numZ + z;
+                neighbourGlobalIndices.push_back( globalNeighbourIndex );
+            }
+        }
+    }
+    PRINT(*comm<<", num of neighbours inserted= "<< neighbourGlobalIndices.size() );
+
+    // an upper bound to how many neighbours a vertex can have, 
+    // at most as many neighbours as we have
+    IndexType ngbUpperBound = std::min(12, (IndexType) neighbourGlobalIndices.size() ); // I do not know, just trying 12
+    // TODO:  maybe treat nodes in the faces differently
+    IndexType ngbLowerBound = 3;
+    srand(time(NULL));
+                                
+    /*  We must the adjacency matrix symmetric and also we do not know how many edges the graph will
+     *  have eventually and we cannot use ia, ja and values arrays to build the CSRSparseMatrix.
+     *  We will store all edges in a vector and build the matrix afterwards. 
+     *  Also we separate those edges with non-local neighbours so we can set the non-local edge
+     *  later.
+     */
+    
+                
+    // a set for every local node. localNgbs[i] keeps the neighbours of node i that are also local. We use set in order to prevent the insertion of an index multiple times
+    //std::vector< std::list<IndexType> > localNgbs(localSize);
+    std::vector< std::set<IndexType> > localNgbs(localSize);
+        
+    // two vector that keep the edges that nees to be communicated with their global indices
+    std::vector<IndexType> localNodeInd;
+    std::vector<IndexType> nonLocalNodeInd;
+    
+        
+    for(IndexType i=0; i<localSize; i++){                   // for all local nodes
+        SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.findNgbrs");
+        IndexType thisGlobalInd = dist->local2global(i);    // get the corresponding global index
+        IndexType ngbGlobalInd;                             // the global id of the neighbouring nodes
+//PRINT(*comm << ": i= " << i<< ", "<< thisGlobalInd);
+        // the position of this node in 3D
+        std::tuple<IndexType, IndexType, IndexType>  thisPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( thisGlobalInd, numPoints);
+            
+        // if point is on the faces it will have only 3 edges
+        // TODO: not correct, ridge nodes must have >4 edges and face nodes have >5
+        if(std::get<0>(thisPoint)== 0 or std::get<1>(thisPoint)== 0 or std::get<2>(thisPoint)== 0){
+            ngbUpperBound =3;
+        }
+        if(std::get<0>(thisPoint)== numX-1 or std::get<1>(thisPoint)== numY-1 or std::get<2>(thisPoint)== numZ-1){
+            ngbUpperBound =3;
+        }
+        
+        // get a random number of neighbours between 3 and ngbUpperBound
+        IndexType numOfNeighbours;
+        if(ngbUpperBound == ngbLowerBound){         //for nodes on the faces
+            numOfNeighbours = ngbUpperBound;
+        }else{
+            numOfNeighbours = ((int) rand()%(ngbUpperBound- ngbLowerBound) + ngbLowerBound);
+        }
+        assert( numOfNeighbours < neighbourGlobalIndices.size() );
+        
+        // find all the global indices of the neighbours
+        std::set<IndexType> ngbGloblaIndSet;
+        
+        for(IndexType j=0; j<numOfNeighbours; j++){
+            SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.findNgbrs.findRelativeIndices");
+            
+            IndexType relativeIndex=0;
+            std::tuple<IndexType, IndexType, IndexType>  ngbPoint;
+            std::pair<std::set<int>::iterator,bool> setInsertion;
+            setInsertion.second= false;
+            
+            do{
+                //int randInd = (int) (rand()%(neighbourGlobalIndices.size()-1) +1 ) ;
+                // pick a random index (of those allowed) to greate edge
+                unsigned long randInd= (unsigned long) rand()%neighbourGlobalIndices.size() ;
+
+                // not 0 to avoid thisGlobalInd == ngbGlobalInd
+                while( relativeIndex==0){
+                    randInd= (unsigned long) rand()%neighbourGlobalIndices.size();
+                    assert(randInd < neighbourGlobalIndices.size());
+                    relativeIndex = neighbourGlobalIndices[ randInd ];
+                }
+                // neighbour's relative index, relative to thisIndex (this + or - a value)
+                relativeIndex = neighbourGlobalIndices[ randInd ];
+                
+                // the global neighbour's index. At this point it can be <0 or >N, ensure this not happens
+                ngbGlobalInd = thisGlobalInd + relativeIndex;
+               
+                // find a suitable ngbGlobalInd: not same as this, not negative, not >N and close enough
+                while( /*(ngbGlobalInd==thisGlobalInd) or*/  (ngbGlobalInd<0) or (ngbGlobalInd>= N) ){
+                    // pick new index at random
+                    randInd= (unsigned long) rand()%neighbourGlobalIndices.size();
+                    relativeIndex = neighbourGlobalIndices[ randInd ];
+                    while( relativeIndex==0){
+                        randInd= (unsigned long) rand()%neighbourGlobalIndices.size();
+                        assert(randInd < neighbourGlobalIndices.size());
+                        relativeIndex = neighbourGlobalIndices[ randInd ];
+                    }
+                    
+                    ngbGlobalInd = thisGlobalInd + relativeIndex;
+                    
+                }
+                assert( ngbGlobalInd < N);
+                assert( ngbGlobalInd >= 0);
+                
+                // so here, the neighbour's global index should be: >0 && <N
+                ngbPoint = MeshIO<IndexType, ValueType>::index2_3DPoint( ngbGlobalInd, numPoints);
+                // if the two points are too far, recalculate neighbour index
+                if( dist3DSquared(thisPoint, ngbPoint)> 3*boxRadius*boxRadius ){
+                    continue;
+                }
+                
+                // at this point ngbGlobalInd should be valid: >0 && <N && close enough
+                // but we may have already inserted
+                
+                // insert the index to the set. if it already exists then setInsertion.second = false
+                setInsertion = ngbGloblaIndSet.insert(ngbGlobalInd);
+          
+            }while(setInsertion.second==false);
+            //finally, we inserted a valid (>0 && <N && close enough) neighbour
+
+        } // for(IndexType j=0; j<numOfNeighbours; j++)
+        
+
+        //
+        // from here, ngbGloblaIndSet has all the valid global neighbours
+        //
+        SCAI_ASSERT_EQUAL_ERROR(ngbGloblaIndSet.size(), numOfNeighbours);
+
+        // for all neighbours inserted
+        for(typename std::set<IndexType>::iterator it= ngbGloblaIndSet.begin(); it!= ngbGloblaIndSet.end(); ++it ){
+            SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.findNgbrs.separateNonLocal");
+            ngbGlobalInd = *it;
+            localNgbs[i].insert( ngbGlobalInd );       // store the local edge (i, ngbGlobalInd)
+
+            // for the other/symmetric edge we must check if ngbGlobalInd is local or not
+            if( dist->isLocal(ngbGlobalInd) ){          // if the neighbour is local
+                assert( dist->global2local(ngbGlobalInd) < localSize );
+                localNgbs[ dist->global2local(ngbGlobalInd) ].insert( dist->local2global(i) );
+            } else{                                     // the neighbour is not local
+                localNodeInd.push_back( thisGlobalInd );
+                nonLocalNodeInd.push_back( ngbGlobalInd );
+            }
+        }
+    } // for(IndexType i=0; i<localSize; i++)
+    PRINT(*comm << ",  num of non-local ngbs= " << nonLocalNodeInd.size() );   
+    
+
+    /* 
+     * communicate the non-local edges that we must set.
+     * idea:
+     * we have an edge (u,v) where u is local but v is non-local. In the local part of
+     * the adjacency matrix we set adjM(u,v)=1 but must also set adjM(v,u)=1 but v
+     * is not local. Store in two vectors the indices: in localNodeInd insert u and on
+     * nonLocalNodeInd insert v. Now the edge (v,u) is (localNodeInd[i], nonLocalNodeInd[i]).
+     * Make two HArrays of the vectors and pass them around. When you receive the corresponding
+     * arrays on will not have local indices (is the localNodeInd from another PE) but there
+     * might be local indices in the other array, the nonLocalNodeInd from the other PE.
+     * Check if there is an index that is local for you. On array arrRcvPossiblyLocalInd
+     * there might be a local index. Suppose that arrRcvPossiblyLocalInd[i] is local, that
+     * means that you must add the edge (arrRcvPossiblyLocalInd[i], arrRcvNonLocalInd[i]).
+     * After you checked the whole array pass on the array you just received, not your own
+     * data again, se very pair of arrays localNodeInd and nonLocalNodeInd will be seen
+     */
+    // build 2 HArrays from vectors to send data to other PEs
+    // first round send your own data, then send what you received
+    /*
+    SCAI_ASSERT_EQUAL_ERROR(localNodeInd.size() , nonLocalNodeInd.size() );
+    scai::hmemo::HArrayRef<IndexType> arrSendLocalNodeInd( localNodeInd );
+    scai::hmemo::HArrayRef<IndexType> arrSendNonLocalInd( nonLocalNodeInd );
+    */
+    
+    /* The 2 arrays idea does not seem to work. We will use 1 array and edges wil be
+     * in indices [0]-[1] , [2]-[3] .... [i]-[i+1]
+     */
+    
+    SCAI_ASSERT( localNodeInd.size() == nonLocalNodeInd.size(), __FILE__<<", "<< __LINE__<< ": sizes should match" );
+    
+    // [2*i] is the local endpoint, [2*i+1] is the non-local endpoint
+    scai::hmemo::HArray<IndexType> sendPart(2* localNodeInd.size());
+    scai::hmemo::WriteAccess<IndexType> sendPartWrite( sendPart );
+    for(IndexType i=0; i< localNodeInd.size(); i++){
+        sendPartWrite[2*i]= localNodeInd[i];
+        sendPartWrite[2*i+1]= nonLocalNodeInd[i];
+    }
+    sendPartWrite.release();
+    //PRINT(*comm << ">> " << sendPart.size() );
+
+    // so on the data this PE receives edge [2*i] is local on the sender and [2*i+1] non-local on the sender
+    // so now [2*i+1] may be local to this PE
+    scai::hmemo::HArray<IndexType> recvPart;
+    
+    // this array contains local indices of other PEs.
+    //scai::hmemo::HArray<IndexType> arrRcvNonLocalInd;
+    // this array might contains local indices of this PE.
+    // they must be the same size
+
+    IndexType numPEs = comm->getSize();
+    
+    // the size of what you gonna send nad what you will receive
+    scai::hmemo::HArray<IndexType> sendSize( numPEs,  0 );
+    scai::hmemo::HArray<IndexType> recvSize( numPEs,  0  );    
+    
+    SCAI_ASSERT_EQUAL_ERROR( recvSize.size(), comm->getSize() );
+    
+    for(IndexType round=0; round<numPEs; round++){
+        SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.commSize");
+        {
+            scai::hmemo::WriteAccess<IndexType> sendSizeWrite( sendSize );
+            sendSizeWrite[ comm->getRank()] = sendPart.size();
+        }
+        //PRINT(*comm <<" _"<< recvSize.size() << " ## "<< sendSize.size() );        
+        // communicate first the size of waht you will send and what you will receive
+        comm->shiftArray( recvSize, sendSize, 1);
+        sendSize.swap( recvSize );
+    }
+    
+    scai::hmemo::ReadAccess<IndexType> readRcvSize( recvSize);
+    
+    for(IndexType ii=0; ii<recvSize.size(); ii++){
+        PRINT(*comm<<"| "<< readRcvSize[ii]);
+    }
+
+    
+    
+    for(IndexType round=1; round<comm->getSize(); round++){
+        SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.commNonLocalEdges");
+        // to find from what PE you receive
+        IndexType indexToRcv = (comm->getRank()-round+numPEs)%numPEs;
+        IndexType sizeToRcv = readRcvSize[ indexToRcv ];
+        //PRINT("round: "<< round <<" , " << *comm << ": receive from PE: "<< indexToRcv << ", size: "<< sizeToRcv);        
+        recvPart.resize( sizeToRcv );
+
+        scai::hmemo::ReadAccess<IndexType> sendSizeRead (sendSize);
+        //PRINT( *comm << " , sendPart.size= " << sendPart.size() );
+        // send your local part, receive other PE's part
+        comm->shiftArray( recvPart, sendPart, 1);
+        
+
+        // check if recvPart[2*i+1] is local, if it is must add edge [2*i+1]-[2*i]
+        // the symmetric edge [2*i]-[2*i+1] is already been set to the PE that send the part
+        // Note that send and recv parts should contain global indices
+        for(IndexType i=0; i<recvPart.size(); i=i+2){        
+            scai::hmemo::ReadAccess<IndexType> recvPartWrite( recvPart );
+            if( dist->isLocal(recvPartWrite[i+1]) ){                       // must add edge
+                IndexType localIndex=  recvPartWrite[i+1];
+                IndexType nonLocalIndex= recvPartWrite[i];     
+                // 0< localIndex< globalN but localNgbs.size()= localN, so must convert it to local
+                SCAI_ASSERT( dist->global2local(localIndex) < localNgbs.size(),"too large index: "<< localIndex <<" while size= "<< localNgbs.size() )
+                localNgbs[dist->global2local(localIndex) ].insert( nonLocalIndex );      // indices are global
+            }
+            // if not local do not do anything
+        }
+        
+        // the data you received must be passed on, not your own again
+        sendPart.resize(recvPart.size());
+        sendPart.swap(recvPart);
+    }
+    
+    
+    /* 
+     * after gathering all non local indices, set the CSR sparse matrix
+     * all the edges to be set should be in localNgbs:
+     * localNgbs is a vector with sets, localNgbs.size()= localN and each set localNgbs[i]
+     * has stored the neighbours of node i. Care to change between global and local indices 
+     * when neccessary.
+     */
+    
+    
+    scai::lama::CSRStorage<ValueType> localMatrix;
+    localMatrix.allocate( adjM.getLocalNumRows() , adjM.getLocalNumColumns() );
+    
+    hmemo::HArray<IndexType> csrIA;
+    hmemo::HArray<IndexType> csrJA;
+    hmemo::HArray<ValueType> csrValues;
+    // ja.size() = values.size() = number of edges of the graph
+    
+    IndexType nnzCounter = 0; // count non-zero elements
+    
+    {
+        SCAI_REGION("MeshIO.createRandomStructured3DMesh_dist.setCSRSparseMatrix");
+        IndexType globalN= numX* numY* numZ;
+        
+        // Summing the size of all sets. This is the number of all edges.
+        IndexType nnzValues=0;
+        for(IndexType i=0; i<localNgbs.size(); i++){
+            nnzValues += localNgbs[i].size();
+        }
+        hmemo::WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
+        hmemo::WriteOnlyAccess<IndexType> ja( csrJA , nnzValues);
+        hmemo::WriteOnlyAccess<ValueType> values( csrValues, nnzValues );
+        ia[0] = 0;
+         
+        /*TODO:
+         * if the 2  assertions never fail then we can save some time
+         * since resizing is never done and there is no need to count the non-zero values
+         * and the numRowElems
+         */
+        
+        
+        for(IndexType i=0; i<localSize; i++){               // for all local nodes
+            // for all the neighbours of node i
+            IndexType numRowElems= 0;   // should be == localNgbs[i].size()
+            for(typename std::set<IndexType>::iterator it= localNgbs[i].begin(); it!=localNgbs[i].end(); ++it){
+                IndexType ngbGlobalInd = *it;       // the global index og the neighbour
+                ja[nnzCounter] = ngbGlobalInd;
+                values[nnzCounter] = 1;
+                SCAI_ASSERT( nnzCounter < nnzValues, __FILE__<<" ,"<<__LINE__<< ": nnzValues not calculated properly")
+                ++nnzCounter;
+                ++numRowElems;
+            }
+            ia[i+1] = ia[i] + numRowElems;
+            //PRINT(numRowElems << " should be == "<< localNgbs[i].size() );
+            SCAI_ASSERT(numRowElems == localNgbs[i].size(),  __FILE__<<" ,"<<__LINE__<<"something is wrong");
+            ia[i+1] = ia[i] +static_cast<IndexType>(numRowElems);
+        } //for(IndexType i=0; i<localSize; i++)
+        ja.resize(nnzCounter);
+        values.resize(nnzCounter);
+        //PRINT("nnz afterwards= " << nnzCounter << " should be == "<< nnzValues);
+        SCAI_ASSERT_EQUAL_ERROR( nnzCounter, nnzValues);
+    } //read/write block
+    
+    
+    {
+        SCAI_REGION( "MeshIO.createRandomStructured3DMesh_dist.swap_assign" )
+        localMatrix.swap( csrIA, csrJA, csrValues );
+        adjM.assign(localMatrix , adjM.getRowDistributionPtr() , adjM.getColDistributionPtr() );
+    }
+    
+    //SCAI_REGION_END("MeshIO.createRandomStructured3DMesh_dist.setAdjacencyMatrix");
+}
+
 //-------------------------------------------------------------------------------------------------
 /*Given the adjacency matrix it writes it in the file "filename" using the METIS format. In the
  * METIS format the first line has two numbers, first is the number on vertices and the second
@@ -539,9 +969,7 @@ scai::lama::CSRSparseMatrix<ValueType> MeshIO<IndexType, ValueType>::readFromFil
 
 
 //-------------------------------------------------------------------------------------------------
-/*File "filename" contains the coordinates of a graph. The function reads that coordinates and returns
- * the coordinates in a DenseVector where point(x,y) is in [x*dim +y].
- * Every line of the file contains 2 ValueType numbers.
+/*File "filename" contains the coordinates of a graph. The function reads these coordinates and returns a vector of DenseVectors, one for each dimension
  */
 template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType>> MeshIO<IndexType, ValueType>::fromFile2Coords( std::string filename, IndexType numberOfPoints, IndexType dimension){
@@ -661,9 +1089,9 @@ std::tuple<IndexType, IndexType, IndexType> MeshIO<IndexType, ValueType>::index2
     IndexType xIndex = index/planeSize;
     IndexType yIndex = (index % planeSize) / numPoints[2];
     IndexType zIndex = (index % planeSize) % numPoints[2];
-    assert(xIndex >= 0);
-    assert(yIndex >= 0);
-    assert(zIndex >= 0);
+    SCAI_ASSERT(xIndex >= 0, xIndex);
+    SCAI_ASSERT(yIndex >= 0, yIndex);
+    SCAI_ASSERT(zIndex >= 0, zIndex);
     assert(xIndex < numPoints[0]);
     assert(yIndex < numPoints[1]);
     assert(zIndex < numPoints[2]);
@@ -674,6 +1102,7 @@ std::tuple<IndexType, IndexType, IndexType> MeshIO<IndexType, ValueType>::index2
 template void MeshIO<int, double>::createRandom3DMesh(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, const int numberOfPoints,const double maxCoord);
 template void MeshIO<int, double>::createStructured3DMesh(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
 template void MeshIO<int, double>::createStructured3DMesh_dist(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
+template void MeshIO<int, double>::createRandomStructured3DMesh_dist(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
 template std::vector<DenseVector<double>> MeshIO<int, double>::randomPoints(int numberOfPoints, int dimensions, double maxCoord);
 template void MeshIO<int, double>::writeInFileMetisFormat (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void MeshIO<int, double>::writeInFileMetisFormat_dist (const CSRSparseMatrix<double> &adjM, const std::string filename);
