@@ -40,6 +40,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	std::chrono::time_point<std::chrono::steady_clock> start, afterSFC, round;
 	start = std::chrono::steady_clock::now();
 
+	SCAI_REGION_START("ParcoRepart.partitionGraph.inputCheck")
 	/**
 	* check input arguments for sanity
 	*/
@@ -83,13 +84,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	if( !coordDist->isEqual( *inputDist) ){
 		throw std::runtime_error( "Distributions should be equal.");
 	}
+	SCAI_REGION_END("ParcoRepart.partitionGraph.inputCheck")
 	
 	/**
 	*	gather information for space-filling curves
 	*/
 	std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
 	std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
-	DenseVector<IndexType> result(inputDist);
+	DenseVector<IndexType> result;
 
 	{
 		SCAI_REGION( "ParcoRepart.partitionGraph.initialPartition" )
@@ -191,6 +193,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			DenseVector<IndexType> tmpPerm = permutation;
 			tmpPerm.sort( inversePermutation, true);
 
+			result.allocate(inputDist);
+
 			for (IndexType i = 0; i < localN; i++) {
 				result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/n);
 			}
@@ -234,13 +238,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				std::cout << "After " << numRefinementRounds + 1 << " refinement rounds, (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
 			}
 			if (cut != oldCut - gain) {
-				IndexType sumOutgoingEdges = comm->sum(localSumOutgoingEdges(input)) / 2;
-
-				std::cout << std::string("Old cut was " + std::to_string(oldCut) + ", new cut is " + std::to_string(cut) + " with "
-						+ std::to_string(sumOutgoingEdges) + " outgoing edges, but gain is " + std::to_string(gain)+".") << std::endl;
+				throw std::logic_error("Old cut was " + std::to_string(oldCut) + ", new cut is " + std::to_string(cut) + " but gain is " + std::to_string(gain)+".");
 			}
 
-			assert(oldCut - gain == cut);
 			numRefinementRounds++;
 		}
 	} else {
@@ -595,6 +595,7 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<Va
 
 template<typename IndexType, typename ValueType>
 ValueType ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input) {
+	SCAI_REGION( "ParcoRepart.localSumOutgoingEdges" )
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
@@ -1319,7 +1320,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 				assert(otherSecondBlockSize <= blockSize);
 			}
 
-			if (otherGain == 0 && gain == 0) {
+			if (otherGain <= 0 && gain <= 0) {
 				//Oh well. None of the processors managed an improvement. No need to update data structures.
 
 			}	else {
@@ -1759,6 +1760,167 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 }
 
 template<typename IndexType, typename ValueType>
+IndexType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalCut(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
+		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<bool>& assignedToSecondBlock) {
+
+	//initialize map
+	std::map<IndexType, IndexType> globalToVeryLocal;
+	for (IndexType i = 0; i < borderRegionIDs.size(); i++) {
+		IndexType globalIndex = borderRegionIDs[i];
+		globalToVeryLocal[globalIndex] = i;
+	}
+
+	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+
+	auto isInBorderRegion = [&](IndexType globalID){return globalToVeryLocal.count(globalID) > 0;};
+
+	//compute cut
+	IndexType cut = 0;
+	for (IndexType i = 0; i < borderRegionIDs.size(); i++) {
+		const IndexType globalID = borderRegionIDs[i];
+		const CSRStorage<ValueType>& storage = inputDist->isLocal(globalID) ? input.getLocalStorage() : haloStorage;
+		const IndexType localID = inputDist->isLocal(globalID) ? inputDist->global2local(globalID) : matrixHalo.global2halo(globalID);
+		assert(localID != nIndex);
+
+		const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
+		const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());
+
+		const IndexType beginCols = localIa[localID];
+		const IndexType endCols = localIa[localID+1];
+
+		for (IndexType j = beginCols; j < endCols; j++) {
+			const IndexType globalNeighbor = localJa[j];
+			if (globalNeighbor == globalID) {
+				//self-loop, not counted
+				continue;
+			}
+
+			bool neighborIsInOtherBlock;
+			if (isInBorderRegion(globalNeighbor)) {
+				const IndexType veryLocalNeighbor = globalToVeryLocal.at(globalNeighbor);
+				if (veryLocalNeighbor < i) {
+					continue;//only count edges once
+				}
+				neighborIsInOtherBlock = (assignedToSecondBlock[i] != assignedToSecondBlock[veryLocalNeighbor]);
+			} else {
+				if (assignedToSecondBlock[i]) {
+					neighborIsInOtherBlock = inputDist->isLocal(globalNeighbor);
+				} else {
+					neighborIsInOtherBlock = (matrixHalo.global2halo(globalNeighbor) != nIndex);
+				}
+			}
+
+			cut += neighborIsInOtherBlock;
+		}
+	}
+	return cut;
+}
+
+template<typename IndexType, typename ValueType>
+ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
+		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::vector<bool>& assignedToSecondBlock,
+		const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes, Settings settings) {
+
+	//get old cut and block sizes
+	const IndexType veryLocalN = borderRegionIDs.size();
+	const IndexType oldCut = twoWayLocalCut(input, haloStorage, matrixHalo, borderRegionIDs, assignedToSecondBlock);
+	const IndexType firstBlockSize = std::distance(assignedToSecondBlock.begin(), std::lower_bound(assignedToSecondBlock.begin(), assignedToSecondBlock.end(), 1));
+	const IndexType secondBlockSize = veryLocalN - firstBlockSize;
+
+	//call diffusion
+	std::vector<ValueType> load = twoWayLocalDiffusion(input, haloStorage, matrixHalo, borderRegionIDs, assignedToSecondBlock, settings);
+
+	//update cut, block sizes and result
+	for (IndexType i = 0; i < veryLocalN; i++) {
+		if ((load[i] < 0) != assignedToSecondBlock[i]) {
+			//std::cout << i << " has load " << load[i] << ", assigned to block " << assignedToSecondBlock[i]+1 << std::endl;
+		}
+		assignedToSecondBlock[i] = load[i] < 0;
+	}
+
+	//get new cut and block sizes
+	const IndexType newCut = twoWayLocalCut(input, haloStorage, matrixHalo, borderRegionIDs, assignedToSecondBlock);
+	const IndexType newSecondBlockSize = std::accumulate(assignedToSecondBlock.begin(), assignedToSecondBlock.end(), 0);
+	const IndexType newFirstBlockSize = veryLocalN - secondBlockSize;
+
+	blockSizes.first += newFirstBlockSize - firstBlockSize;
+	blockSizes.second += newSecondBlockSize - secondBlockSize;
+
+	return oldCut - newCut;
+}
+
+template<typename IndexType, typename ValueType>
+std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
+		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<bool>& assignedToSecondBlock, Settings settings) {
+
+	//settings and constants
+	const IndexType magicNumberDiffusionSteps = 5*settings.borderDepth;
+	const ValueType degreeEstimate = ValueType(haloStorage.getNumValues()) / matrixHalo.getHaloSize();
+	const ValueType magicNumberAlpha = 1/(degreeEstimate+1);
+	const ValueType magicNumberDiffusionLoad = 1;
+	const IndexType veryLocalN = borderRegionIDs.size();
+
+	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+
+	const IndexType firstBlockSize = std::distance(assignedToSecondBlock.begin(), std::lower_bound(assignedToSecondBlock.begin(), assignedToSecondBlock.end(), 1));
+	const IndexType secondBlockSize = veryLocalN - firstBlockSize;
+	const ValueType initialLoadPerNodeInFirstBlock = magicNumberDiffusionLoad / firstBlockSize;
+	const ValueType initialLoadPerNodeInSecondBlock = -magicNumberDiffusionLoad / secondBlockSize;
+
+	//assign initial diffusion load
+	std::vector<ValueType> result(veryLocalN);
+	for (IndexType i = 0; i < veryLocalN; i++) {
+		result[i] = assignedToSecondBlock[i] ? initialLoadPerNodeInSecondBlock : initialLoadPerNodeInFirstBlock;
+	}
+
+	//this map provides an index from 0 to b-1 for each of the b indices in borderRegionIDs
+	//globalToVeryLocal[borderRegionIDs[i]] = i
+	std::map<IndexType, IndexType> globalToVeryLocal;
+
+	for (IndexType i = 0; i < veryLocalN; i++) {
+		IndexType globalIndex = borderRegionIDs[i];
+		globalToVeryLocal[globalIndex] = i;
+	}
+
+	assert(globalToVeryLocal.size() == veryLocalN);
+
+	auto isInBorderRegion = [&](IndexType globalID){return globalToVeryLocal.count(globalID) > 0;};
+
+	//perform diffusion
+	for (IndexType round = 0; round < magicNumberDiffusionSteps; round++) {
+		std::vector<ValueType> nextDiffusionValues(veryLocalN, 0);
+		//diffusion update
+		for (IndexType i = 0; i < veryLocalN; i++) {
+			const ValueType oldDiffusionValue = result[i];
+			const IndexType globalID = borderRegionIDs[i];
+			const CSRStorage<ValueType>& storage = inputDist->isLocal(globalID) ? input.getLocalStorage() : haloStorage;
+			const IndexType localID = inputDist->isLocal(globalID) ? inputDist->global2local(globalID) : matrixHalo.global2halo(globalID);
+			assert(localID != nIndex);
+
+			const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
+			const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());
+
+			const IndexType beginCols = localIa[localID];
+			const IndexType endCols = localIa[localID+1];
+
+			double delta = 0;
+			for (IndexType j = beginCols; j < endCols; j++) {
+				const IndexType neighbor = localJa[j];
+				if (isInBorderRegion(neighbor)) {
+					const IndexType veryLocalNeighbor = globalToVeryLocal.at(neighbor);
+					delta += result[veryLocalNeighbor] - oldDiffusionValue;
+				}
+			}
+			nextDiffusionValues[i] = oldDiffusionValue + delta * magicNumberAlpha;
+			assert (std::abs(nextDiffusionValues[i]) <= magicNumberDiffusionLoad);
+		}
+		result.swap(nextDiffusionValues);
+	}
+
+	return result;
+}
+
+template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -2067,15 +2229,12 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     IndexType N= adjM.getNumRows();
     assert( N== adjM.getNumColumns() ); // numRows = numColumns
     
-    SCAI_REGION_START("ParcoRepart.coloring.replicateInput")
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
     if (!adjM.getRowDistributionPtr()->isReplicated()) {
     	adjM.redistribute(noDist, noDist);
     	//throw std::runtime_error("Input matrix must be replicated.");
     }
-    SCAI_REGION_END("ParcoRepart.coloring.replicateInput")
 
-    SCAI_REGION_START("ParcoRepart.coloring.convertGraph")
     // use boost::Graph and boost::edge_coloring()
     typedef adjacency_list<vecS, vecS, undirectedS, no_property, size_t, no_property> Graph;
     typedef std::pair<std::size_t, std::size_t> Pair;
@@ -2100,19 +2259,14 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     		}
     	}
     }
-    SCAI_REGION_END("ParcoRepart.coloring.convertGraph")
     
-    SCAI_REGION_START("ParcoRepart.coloring.callBoost")
     colors = boost::edge_coloring(G, boost::get( boost::edge_bundle, G));
-    SCAI_REGION_END("ParcoRepart.coloring.callBoost")
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-    SCAI_REGION_START("ParcoRepart.coloring.convertResult")
     for (size_t i = 0; i <retG[0].size(); i++) {
         retG[2].push_back( G[ boost::edge( retG[0][i],  retG[1][i], G).first] );
     }
-    SCAI_REGION_END("ParcoRepart.coloring.convertResult")
     
     return retG;
 }

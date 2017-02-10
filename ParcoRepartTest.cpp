@@ -592,7 +592,7 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 //----------------------------------------------------------
 
 TEST_F (ParcoRepartTest, testBorders_Distributed) {
-    std::string file = "Grid16x16";
+    std::string file = "Grid32x32";
     std::ifstream f(file);
     IndexType dimensions= 2, k=4;
     IndexType N, edges;
@@ -634,7 +634,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     //partition.redistribute(dist); //not needed now
     
     // print
-    int numX= 16, numY= 16;         // 2D grid dimensions
+    int numX= 32, numY= 32;         // 2D grid dimensions
     ASSERT_EQ(N, numX*numY);
     IndexType partViz[numX][numY];   
     IndexType bordViz[numX][numY]; 
