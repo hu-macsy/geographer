@@ -69,24 +69,26 @@ namespace ITI {
                 static void createStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
 
                 static void createRandomStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
+                
                 /** Given an adjacency matrix and a filename writes the matrix in the file using the METIS format.
                  *  Not distributed.
                  * 
                  * @param[in] adjM The graph's adjacency matrix.
-                 * @param[in] filename The file's name to write to/
+                 * @param[in] filename The file's name to write to.
                  */
                 static void writeInFileMetisFormat (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
                 
                 /** Given an adjacency matrix and a filename writes the local part of matrix in the file using the METIS format.
-                 *  Every proccesor adds his rank in the end of hte file name.
+                 *  Every proccesor adds his rank in the end of the file name.
+                 * 
                  * @param[in] adjM The graph's adjacency matrix.
-                 * @param[in] filename The file's name to write to/
+                 * @param[in] filename The file's name to write to.
                  */
                 static void writeInFileMetisFormat_dist (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
                 
                 /** Given the vector of the coordinates and their dimension, writes them in file "filename".
-                 * Coordinates are given as a DenseVector of size dim*numPoints.
-                */
+                 * 
+                 */
                 static void writeInFileCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
            
                 /** Reads a graph from filename in METIS format and returns the adjacency matrix.

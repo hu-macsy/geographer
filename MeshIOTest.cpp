@@ -222,7 +222,7 @@ TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
 // For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
 // less than 6 ones ( every node has 3,4,5, or 6 neighbours).
 TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
-    std::vector<IndexType> numPoints= { 4, 4, 4};
+    std::vector<IndexType> numPoints= { 140, 240, 190};
     std::vector<ValueType> maxCoord= {441, 711, 1160};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
     std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
@@ -255,6 +255,9 @@ TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
     
     // check symmetry in every PE
     ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
+    if (!adjM.isConsistent()) {
+	throw std::runtime_error("Input matrix inconsistent");
+    }
     //PRINT(*comm<< ": "<< adjM.getLocalNumValues() );
     //PRINT(*comm<< ": "<< comm->sum(adjM.getLocalNumValues()) );
     
@@ -265,6 +268,9 @@ TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
         
         ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
         //PRINT(*comm<<": "<< adjM.getNumValues() );
+        if (!adjM.isConsistent()) {
+            throw std::runtime_error("Input matrix inconsistent");
+        }
     }
     
     {
@@ -274,6 +280,9 @@ TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
         adjM.redistribute( distCyc, noDistPointer);
         
         ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
+        if (!adjM.isConsistent()) {
+            throw std::runtime_error("Input matrix inconsistent");
+        }
     }
     
 }

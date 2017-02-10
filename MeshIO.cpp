@@ -18,6 +18,15 @@ using std::ofstream;
 using std::endl;
 using std::istringstream;
 
+
+struct rectancle{
+
+    std::tuple<IndexType, IndexType, IndexType> bottomPoint;
+    std::tuple<IndexType, IndexType, IndexType> topPoint;
+    
+};
+
+
 namespace ITI{
 
 template<typename IndexType, typename ValueType>
