@@ -138,15 +138,12 @@ int main(int argc, char** argv) {
 			std::cout<< "Reading from file \""<< graphFile << "\" for the graph and \"" << coordFile << "\" for coordinates"<< std::endl;
         }
 
-        scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-        scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
-        graph = scai::lama::CSRSparseMatrix<ValueType>( rowDistPtr , noDistPtr );
-
         // read the adjacency matrix and the coordinates from a file
         graph = ITI::MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graphFile );
-        graph.redistribute(rowDistPtr , noDistPtr);
+        scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
+        scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
+        assert(graph.getColDistribution().isEqual(*noDistPtr));
 
-        // take care, when reading from file graph needs redistribution - Not anymore! :-)
         if (comm->getRank() == 0) {
         	std::cout<< "Read " << N << " points." << std::endl;
         }
@@ -168,7 +165,7 @@ int main(int argc, char** argv) {
         maxCoord[1] = settings.numY;
         maxCoord[2] = settings.numZ;
 
-        std::vector<IndexType> numPoints(3); // number of poitns in each dimension, used only for 3D
+        std::vector<IndexType> numPoints(3); // number of points in each dimension, used only for 3D
 
         for (IndexType i = 0; i < 3; i++) {
         	numPoints[i] = maxCoord[i];

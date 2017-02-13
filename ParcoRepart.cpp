@@ -1854,7 +1854,7 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffus
 		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<bool>& assignedToSecondBlock, Settings settings) {
 
 	//settings and constants
-	const IndexType magicNumberDiffusionSteps = 5*settings.borderDepth;
+	const IndexType magicNumberDiffusionSteps = 1.2*settings.borderDepth;
 	const ValueType degreeEstimate = ValueType(haloStorage.getNumValues()) / matrixHalo.getHaloSize();
 	const ValueType magicNumberAlpha = 1/(degreeEstimate+1);
 	const ValueType magicNumberDiffusionLoad = 1;
