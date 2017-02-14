@@ -144,7 +144,7 @@ ITI::PrioQueue<Key, Val>::PrioQueue(uint64_t len) {
 template<class Key, class Val>
 inline void ITI::PrioQueue<Key, Val>::insert(Key key, Val value) {
 	SCAI_REGION( "PrioQueue.insert" )
-	if (value >= mapValToKey.size()) {
+	while (value >= mapValToKey.size()) {
 		uint64_t doubledSize = 2 * mapValToKey.size();
 		assert(value < doubledSize);
 		mapValToKey.resize(doubledSize);
@@ -197,7 +197,7 @@ std::pair<Key, Val> ITI::PrioQueue<Key, Val>::extractMin() {
 template<class Key, class Val>
 inline void ITI::PrioQueue<Key, Val>::updateKey(Key oldKey, Key newKey, Val value) {
 	SCAI_REGION( "PrioQueue.updateKey" )
-	//slightly optimized version when old key is known, saves one hashmap access
+	//slightly optimized version when old key is known, saves one vector access
 	pqset.erase(std::make_pair(oldKey, value));
 	pqset.insert(std::make_pair(newKey, value));
 
