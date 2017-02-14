@@ -1780,8 +1780,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 template<typename IndexType, typename ValueType>
 IndexType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalCut(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
-		const std::vector<bool>& assignedToSecondBlock) {
+		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<bool>& assignedToSecondBlock) {
 
 	//initialize map
 	std::map<IndexType, IndexType> globalToVeryLocal;
