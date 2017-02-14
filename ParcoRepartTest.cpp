@@ -520,8 +520,9 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 			IndexType otherBlock = partner;
 
 			std::vector<IndexType> interfaceNodes;
-			IndexType lastRoundMarker;
-			std::tie(interfaceNodes, lastRoundMarker) = ParcoRepart<IndexType, ValueType>::getInterfaceNodes(a, part, localBorder, otherBlock, 2);
+			std::vector<IndexType> roundMarkers;
+			std::tie(interfaceNodes, roundMarkers) = ParcoRepart<IndexType, ValueType>::getInterfaceNodes(a, part, localBorder, otherBlock, 2);
+			IndexType lastRoundMarker = roundMarkers[roundMarkers.size()-1];
 
 			//last round marker can only be zero if set is empty
 			EXPECT_LE(lastRoundMarker, interfaceNodes.size());
@@ -546,6 +547,7 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 
 			//test whether rounds are consistent: first nodes should have neighbors of otherBlock, later nodes not
 			//test whether last round marker is set correctly: nodes before last round marker should have neighbors in set, nodes afterwards need not
+			//TODO: extend test case to check for other round markers
 			const CSRStorage<ValueType>& localStorage = a.getLocalStorage();
 			const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 			const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());

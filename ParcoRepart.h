@@ -92,7 +92,7 @@ namespace ITI {
 			 * @param[in] otherBlock block to which the border region should be adjacent
 			 * @param[in] depth Width of the border region, measured in hops
 			 */
-			static std::pair<std::vector<IndexType>, IndexType> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType otherBlock, IndexType depth);
+			static std::pair<std::vector<IndexType>, std::vector<IndexType>> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType otherBlock, IndexType depth);
 
 			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors, Settings settings);
 
