@@ -21,6 +21,7 @@
 #include <numeric>
 #include <iterator>
 #include <algorithm>
+#include <tuple>
 #include <chrono>
 
 #include "PrioQueue.h"
@@ -1500,7 +1501,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 	/**
 	 * This lambda computes the initial gain of each node.
-	 * TODO: This can probably be optimized by inlining to reduce the overhead of read access locks
+	 * Inlining to reduce the overhead of read access locks didn't give any performance benefit.
 	 */
 	auto computeInitialGain = [&](IndexType veryLocalID){
 		SCAI_REGION( "ParcoRepart.twoWayLocalFM.computeGain" )
@@ -1547,18 +1548,24 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	 * construct and fill gain table and priority queues. Since only one target block is possible, gain table is one-dimensional.
 	 * One could probably optimize this by choosing the PrioQueueForInts, but it only supports positive keys and requires some adaptations
 	 */
-	PrioQueue<ValueType, IndexType> firstQueue(veryLocalN);
-	PrioQueue<ValueType, IndexType> secondQueue(veryLocalN);
+	PrioQueue<std::pair<IndexType, ValueType>, IndexType> firstQueue(veryLocalN);
+	PrioQueue<std::pair<IndexType, ValueType>, IndexType> secondQueue(veryLocalN);
 
 	std::vector<IndexType> gain(veryLocalN);
 
+	std::vector<ValueType> load = twoWayLocalDiffusion(input, haloStorage, matrixHalo, borderRegionIDs, assignedToSecondBlock, settings);
+	assert(load.size() == veryLocalN);
+	//assert(*std::max_element(load.begin(), load.end()) <= 1);
+	//assert(*std::min_element(load.begin(), load.end()) >= -1);
+
 	for (IndexType i = 0; i < veryLocalN; i++) {
 		gain[i] = computeInitialGain(i);
+		const ValueType tieBreakingKey = std::abs(load[i]);
 		if (assignedToSecondBlock[i]) {
 			//the queues only support extractMin, since we want the maximum gain each round, we multiply it with -1
-			secondQueue.insert(-gain[i], i);
+			secondQueue.insert(std::make_pair(-gain[i], tieBreakingKey), i);
 		} else {
-			firstQueue.insert(-gain[i], i);
+			firstQueue.insert(std::make_pair(-gain[i], tieBreakingKey), i);
 		}
 	}
 
@@ -1611,7 +1618,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 			//could replace this with integers since the blockCapacities are assumed to be equal, saving one division.
 			std::vector<IndexType> fullness = {blockSizes.first, blockSizes.second};
-			std::vector<ValueType> gains = {firstQueue.inspectMin().first, secondQueue.inspectMin().first};
+			std::vector<ValueType> gains = {firstQueue.inspectMin().first.first, secondQueue.inspectMin().first.first};
 
 			if (gainOverBalance) {
 				//decide first by gain. If gain is equal, decide by fullness
@@ -1650,16 +1657,12 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 			assert(bestQueueIndex == 0 || bestQueueIndex == 1);
 		}
 
-		PrioQueue<ValueType, IndexType>& currentQueue = bestQueueIndex == 0 ? firstQueue : secondQueue;
+		PrioQueue<std::pair<IndexType, ValueType>, IndexType>& currentQueue = bestQueueIndex == 0 ? firstQueue : secondQueue;
 
 		//Now, we have selected a Queue. Get best vertex and gain
 		IndexType veryLocalID;
-		ValueType topGain;
-		std::tie(topGain, veryLocalID) = currentQueue.extractMin();
-
-		//invert
-		topGain *= -1;
-
+		std::tie(std::ignore, veryLocalID) = currentQueue.extractMin();
+		ValueType topGain = gain[veryLocalID];
 		IndexType topVertex = borderRegionIDs[veryLocalID];
 
 		//here one could assert some consistency
@@ -1709,11 +1712,15 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 				const ValueType oldGain = gain[veryLocalNeighborID];
 				gain[veryLocalNeighborID] = oldGain + 4*wasInSameBlock -2;
+				//const ValueType absNeighborLoad = std::abs(load[veryLocalNeighborID]);
+				const ValueType tieBreakingKey = std::abs(load[veryLocalNeighborID]);
+				const std::pair<IndexType, ValueType> oldKey = std::make_pair(-oldGain, tieBreakingKey);
+				const std::pair<IndexType, ValueType> newKey = std::make_pair(-gain[veryLocalNeighborID], tieBreakingKey);
 
 				if (assignedToSecondBlock[veryLocalNeighborID]) {
-					secondQueue.updateKey(-oldGain, -gain[veryLocalNeighborID], veryLocalNeighborID);
+					secondQueue.updateKey(oldKey, newKey, veryLocalNeighborID);
 				} else {
-					firstQueue.updateKey(-oldGain, -gain[veryLocalNeighborID], veryLocalNeighborID);
+					firstQueue.updateKey(oldKey, newKey, veryLocalNeighborID);
 				}
 			}
 		}
