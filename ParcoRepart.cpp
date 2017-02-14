@@ -1627,45 +1627,26 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 			 * now the rest
 			 */
 			SCAI_REGION( "ParcoRepart.twoWayLocalFM.queueloop.queueselection" )
-
-			//could replace this with integers since the blockCapacities are assumed to be equal, saving one division.
-			std::vector<IndexType> fullness = {blockSizes.first, blockSizes.second};
-			std::vector<IndexType> gains = {firstQueue.inspectMin().first.first, secondQueue.inspectMin().first.first};
+			std::pair<IndexType, IndexType> firstComparisonPair;
+			std::pair<IndexType, IndexType> secondComparisonPair;
 
 			if (gainOverBalance) {
-				//decide first by gain. If gain is equal, decide by fullness
-				if (gains[0] < gains[1] || (gains[0] == gains[1] && fullness[0] > fullness[1])) {
-					bestQueueIndex = 0;
-				} else if (gains[1] < gains[0] || (gains[0] == gains[1] && fullness[0] < fullness[1])){
-					bestQueueIndex = 1;
-				} else {
-					//tie, break randomly
-					assert(fullness[0] == fullness[1] && gains[0] == gains[1]);
-
-					if ((rand() / RAND_MAX) < 0.5) {
-						bestQueueIndex = 0;
-					} else {
-						bestQueueIndex = 1;
-					}
-				}
+				firstComparisonPair = {-firstQueue.inspectMin().first.first, blockSizes.first};
+				firstComparisonPair = {-secondQueue.inspectMin().first.first, blockSizes.second};
 			} else {
-
-				//decide first by fullness, if fullness is equal, decide by gain. Since gain was inverted before inserting into queue, smaller gain is better.
-				if (fullness[0] > fullness[1] || (fullness[0] == fullness[1] && gains[0] < gains[1])) {
-					bestQueueIndex = 0;
-				} else if (fullness[1] > fullness[0] || (fullness[0] == fullness[1] && gains[1] < gains[0])) {
-					bestQueueIndex = 1;
-				} else {
-					//tie, break randomly
-					assert(fullness[0] == fullness[1] && gains[0] == gains[1]);
-
-					if ((rand() / RAND_MAX) < 0.5) {
-						bestQueueIndex = 0;
-					} else {
-						bestQueueIndex = 1;
-					}
-				}
+				firstComparisonPair = {blockSizes.first, -firstQueue.inspectMin().first.first};
+				secondComparisonPair = {blockSizes.second, -secondQueue.inspectMin().first.first};
 			}
+
+			if (firstComparisonPair > secondComparisonPair) {
+				bestQueueIndex = 0;
+			} else if (secondComparisonPair > firstComparisonPair) {
+				bestQueueIndex = 1;
+			} else {
+				//tie, break randomly
+				bestQueueIndex = (double(rand()) / RAND_MAX < 0.5);
+			}
+
 			assert(bestQueueIndex == 0 || bestQueueIndex == 1);
 		}
 
