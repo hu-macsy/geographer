@@ -1618,7 +1618,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 			//could replace this with integers since the blockCapacities are assumed to be equal, saving one division.
 			std::vector<IndexType> fullness = {blockSizes.first, blockSizes.second};
-			std::vector<ValueType> gains = {firstQueue.inspectMin().first.first, secondQueue.inspectMin().first.first};
+			std::vector<IndexType> gains = {firstQueue.inspectMin().first.first, secondQueue.inspectMin().first.first};
 
 			if (gainOverBalance) {
 				//decide first by gain. If gain is equal, decide by fullness
@@ -1860,6 +1860,7 @@ template<typename IndexType, typename ValueType>
 std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
 		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<bool>& assignedToSecondBlock, Settings settings) {
 
+	SCAI_REGION( "ParcoRepart.twoWayLocalDiffusion" )
 	//settings and constants
 	const IndexType magicNumberDiffusionSteps = 1.2*settings.borderDepth;
 	const ValueType degreeEstimate = ValueType(haloStorage.getNumValues()) / matrixHalo.getHaloSize();
