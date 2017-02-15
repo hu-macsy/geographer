@@ -22,8 +22,8 @@ TEST_F(QuadTreeTest, testCartesianEuclidQuery) {
 
 	assert(n > 0);
 
-	vector<Point<double> > positions(n);
-	vector<index> content(n);
+	std::vector<Point<double> > positions(n);
+	std::vector<index> content(n);
 
 	QuadTreeCartesianEuclid<index> quad({0,0}, {1,1}, true);
 	for (index i = 0; i < n; i++) {
@@ -32,8 +32,6 @@ TEST_F(QuadTreeTest, testCartesianEuclidQuery) {
 		content[i] = i;
 		quad.addContent(i, pos);
 	}
-
-
 
 	EXPECT_EQ(n, quad.size());
 	quad.recount();
@@ -45,7 +43,7 @@ TEST_F(QuadTreeTest, testCartesianEuclidQuery) {
 		index query = (double(rand()) / RAND_MAX)*(n);
 		double acc = double(rand()) / RAND_MAX ;
 		auto edgeProb = [acc](double distance) -> double {return acc;};
-		vector<index> near;
+		std::vector<index> near;
 		quad.getElementsProbabilistically(positions[query], edgeProb, near);
 		EXPECT_NEAR(near.size(), acc*n, std::max(acc*n*0.25, 10.0));
 	}
@@ -54,9 +52,9 @@ TEST_F(QuadTreeTest, testCartesianEuclidQuery) {
 		index query = (double(rand()) / RAND_MAX)*(n);
 		double threshold = double(rand()) / RAND_MAX;
 		auto edgeProb = [threshold](double distance) -> double {return distance <= threshold ? 1 : 0;};
-		vector<index> near;
+		std::vector<index> near;
 		quad.getElementsProbabilistically(positions[query], edgeProb, near);
-		vector<index> circleDenizens;
+		std::vector<index> circleDenizens;
 		quad.getElementsInEuclideanCircle(positions[query], threshold, circleDenizens);
 		EXPECT_EQ(near.size(), circleDenizens.size());
 	}
@@ -64,7 +62,7 @@ TEST_F(QuadTreeTest, testCartesianEuclidQuery) {
 	//TODO: some test about appropriate subtrees and leaves
 
 	auto edgeProb = [](double distance) -> double {return 1;};
-	vector<index> near;
+	std::vector<index> near;
 	quad.getElementsProbabilistically(positions[0], edgeProb, near);
 	EXPECT_EQ(n, near.size());
 
@@ -83,9 +81,9 @@ TEST_F(QuadTreeTest, testPolarEuclidQuery) {
 	 */
 	double maxR = 2;
 	count n = 10000;
-	vector<double> angles(n);
-	vector<double> radii(n);
-	vector<index> content(n);
+	std::vector<double> angles(n);
+	std::vector<double> radii(n);
+	std::vector<index> content(n);
 
 	double minPhi = 0;
 	double maxPhi = 2*M_PI;
@@ -99,7 +97,7 @@ TEST_F(QuadTreeTest, testPolarEuclidQuery) {
 	std::uniform_real_distribution<double> rdist{minR, maxR};
 
 	/**
-	 * fill vectors
+	 * fill std::vectors
 	 */
 	for (index i = 0; i < n; i++) {
 		angles[i] = (double(rand()) / RAND_MAX)*(2*M_PI);
@@ -117,7 +115,7 @@ TEST_F(QuadTreeTest, testPolarEuclidQuery) {
 		index query = (double(rand()) / RAND_MAX)*(n);
 		double acc = double(rand()) / RAND_MAX ;
 		auto edgeProb = [acc](double distance) -> double {return acc;};
-		vector<index> near;
+		std::vector<index> near;
 		tree.getElementsProbabilistically({angles[query], radii[query]}, edgeProb, near);
 		EXPECT_NEAR(near.size(), acc*n, std::max(acc*n*0.25, 10.0));
 	}
@@ -125,7 +123,7 @@ TEST_F(QuadTreeTest, testPolarEuclidQuery) {
 	//TODO: some test about appropriate subtrees and leaves
 
 	auto edgeProb = [](double distance) -> double {return 1;};
-	vector<index> near;
+	std::vector<index> near;
 	tree.getElementsProbabilistically({angles[0], radii[0]}, edgeProb, near);
 	EXPECT_EQ(n, near.size());
 
@@ -141,9 +139,9 @@ TEST_F(QuadTreeTest, testQuadTreePolarEuclidInsertion) {
 	 */
 	double maxR = 2;
 	count n = 1000;
-	vector<double> angles(n);
-	vector<double> radii(n);
-	vector<index> content(n);
+	std::vector<double> angles(n);
+	std::vector<double> radii(n);
+	std::vector<index> content(n);
 
 	double minPhi = 0;
 	double maxPhi = 2*M_PI;
@@ -171,7 +169,7 @@ TEST_F(QuadTreeTest, testQuadTreePolarEuclidInsertion) {
 	/**
 	 * elements are returned
 	 */
-	vector<index> returned = tree.getElements();
+	std::vector<index> returned = tree.getElements();
 	EXPECT_EQ(n, returned.size());
 	sort(returned.begin(), returned.end());
 	for (index i = 0; i < returned.size(); i++) {
@@ -236,7 +234,7 @@ TEST_F(QuadTreeTest, benchCartesianQuadProbabilisticQueryUniform) {
 		std::vector<Point<double> > coordVector;
 		QuadTreeCartesianEuclid<index> quad(minCoords, maxCoords);
 		for (index i = 0; i < n; i++) {
-			vector<double> coords(dim);
+			std::vector<double> coords(dim);
 			for (index j = 0; j < dim; j++) {
 				coords[j] = double(rand()) / RAND_MAX;
 			}
@@ -267,7 +265,7 @@ TEST_F(QuadTreeTest, benchCartesianKDProbabilisticQueryUniform) {
 		std::vector<Point<double> > coordVector;
 		KDTreeEuclidean<index, true> tree(minCoords, maxCoords);
 		for (index i = 0; i < n; i++) {
-			vector<double> coords(dim);
+			std::vector<double> coords(dim);
 			for (index j = 0; j < dim; j++) {
 				coords[j] = double(rand()) / RAND_MAX;
 			}

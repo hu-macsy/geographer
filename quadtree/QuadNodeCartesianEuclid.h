@@ -15,11 +15,6 @@
 #include <assert.h>
 #include "SpatialCell.h"
 
-using std::vector;
-using std::min;
-using std::max;
-using std::cos;
-
 namespace ITI {
 
 template <class T>
@@ -51,7 +46,7 @@ public:
 		assert(this->isLeaf);
 		assert(this->children.size() == 0);
 		const count dimension = this->minCoords.getDimensions();
-		vector<double> middle(dimension);
+		std::vector<double> middle(dimension);
 		if (splitTheoretical) {
 			//Euclidean space is distributed equally
 			for (index d = 0; d < dimension; d++) {
@@ -61,7 +56,7 @@ public:
 			//median of points
 			const count numPoints = this->positions.size();
 			assert(numPoints > 0);//otherwise, why split?
-			vector<vector<double> > sorted(dimension);
+			std::vector<std::vector<double> > sorted(dimension);
 			for (index d = 0; d < dimension; d++) {
 				sorted[d].resize(numPoints);
 				for (index i = 0; i < numPoints; i++) {
@@ -75,8 +70,8 @@ public:
 		}
 		count childCount = pow(2,dimension);
 		for (index i = 0; i < childCount; i++) {
-			vector<double> lowerValues(dimension);
-			vector<double> upperValues(dimension);
+			std::vector<double> lowerValues(dimension);
+			std::vector<double> upperValues(dimension);
 			index bitCopy = i;
 			for (index d = 0; d < dimension; d++) {
 				if (bitCopy & 1) {

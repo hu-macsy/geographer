@@ -16,11 +16,6 @@
 
 #include "SpatialCell.h"
 
-using std::vector;
-using std::min;
-using std::max;
-using std::cos;
-
 namespace ITI {
 
 template <class T>
@@ -63,8 +58,8 @@ public:
 		} else {
 			//median of points
 			const index n = this->positions.size();
-			vector<double> angles(n);
-			vector<double> radii(n);
+			std::vector<double> angles(n);
+			std::vector<double> radii(n);
 			for (index i = 0; i < n; i++) {
 				angles[i] = this->positions[i][0];
 				radii[i] = this->positions[i][1];

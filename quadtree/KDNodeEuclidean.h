@@ -59,7 +59,7 @@ public:
 		}
 
 		//find median
-		vector<double> sorted(numPoints);
+		std::vector<double> sorted(numPoints);
 		for (index i = 0; i < numPoints; i++) {
 			sorted[i] = this->positions[i][mostSpreadDimension];
 		}
