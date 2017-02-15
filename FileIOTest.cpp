@@ -25,14 +25,21 @@
 #include "gtest/gtest.h"
 #include "HilbertCurve.h"
 #include "FileIO.h"
+#include "MeshGenerator.h"
 #include "Settings.h"
 
+typedef double ValueType;
+typedef int IndexType;
 
 namespace ITI {
 
 class FileIOTest : public ::testing::Test {
 
 };
+
+TEST_F(FileIOTest, testReadQuadTree){
+
+}
 
 //-----------------------------------------------------------------
 TEST_F(FileIOTest, testWriteMetis_Dist_3D){
@@ -58,7 +65,7 @@ TEST_F(FileIOTest, testWriteMetis_Dist_3D){
     MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
 
     // write the mesh in p(=number of PEs) files
-    IO<IndexType, ValueType>::writeGraphToDistributedFiles( adjM, "meshes/dist3D_");
+    FileIO<IndexType, ValueType>::writeGraphDistributed( adjM, "meshes/dist3D_");
 
 }
 
@@ -86,7 +93,7 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
     // read graph from file
     {
         SCAI_REGION("testReadAndWriteGraphFromFile.readGraphFromFile");
-        Graph = IO<IndexType, ValueType>::readGraphFromFile(filename);
+        Graph = FileIO<IndexType, ValueType>::readGraph(filename);
     }
     N = Graph.getNumColumns();
     EXPECT_EQ(Graph.getNumColumns(), Graph.getNumRows());
@@ -96,10 +103,10 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
     std::string fileTo= path + std::string("MY_") + file;
 
     // write the graph you read in a new file
-    readGraphFromFileexType, ValueType>::writeGraphToFile(Graph, fileTo );
+    FileIO<IndexType, ValueType>::writeGraph(Graph, fileTo );
 
     // read new graph from the new file we just written
-    CSRSparseMatrix<ValueType> Graph2 = IO<IndexType, ValueType>::readGraphFromFile( fileTo );
+    CSRSparseMatrix<ValueType> Graph2 = FileIO<IndexType, ValueType>::readGraph( fileTo );
 
     // check that the two graphs are identical
     std::cout<< "Output written in file: "<< fileTo<< std::endl;
@@ -126,8 +133,8 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
 }
 
 //-----------------------------------------------------------------
-// read a graph from a file in METIS format and its coordiantes in 2D and partiotion that graph
-// usually, graph file: "file.graph", coodinates file: "file.graph.xy" or .xyz
+// read a graph from a file in METIS format and its coordinates in 2D and partition that graph
+// usually, graph file: "file.graph", coordinates file: "file.graph.xy" or .xyz
 TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     CSRSparseMatrix<ValueType> graph;       //the graph as an adjacency matrix
     IndexType dim= 2, k= 8, i;
@@ -153,7 +160,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( nodes ));
 
     SCAI_REGION_START("testPartitionFromFile_local_2D.readGraphFromFile");
-        graph = IO<IndexType, ValueType>::readGraphFromFile( grFile );
+        graph = FileIO<IndexType, ValueType>::readGraph( grFile );
         graph.redistribute( distPtr , noDistPtr);
         std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
     SCAI_REGION_END("testPartitionFromFile_local_2D.readGraphFromFile");
@@ -166,7 +173,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     std::cout<<"reading coordinates from file: "<< coordFile<< std::endl;
 
     SCAI_REGION_START("testPartitionFromFile_local_2D.readFromFile2Coords_2D");
-    std::vector<DenseVector<ValueType>> coords2D = IO<IndexType, ValueType>::readCoordsFromFile( coordFile, N, dim);
+    std::vector<DenseVector<ValueType>> coords2D = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dim);
     EXPECT_TRUE(coords2D[0].getDistributionPtr()->isEqual(*distPtr));
     SCAI_REGION_END("testPartitionFromFile_local_2D.readFromFile2Coords_2D");
 

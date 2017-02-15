@@ -54,7 +54,7 @@ namespace ITI {
                  */
                 static void createRandom3DMesh( scai::lama::CSRSparseMatrix<ValueType> &adjM,  std::vector<DenseVector<ValueType>> &coords, const int numberOfPoints, const ValueType maxCoord);
                 
-                /** Creates a structed 3D mesh, both the adjacency matrix and the coordinates vectors.
+                /** Creates a structured 3D mesh, both the adjacency matrix and the coordinates vectors.
                  * 
                  * @param[out] adjM The adjacency matrix of the output graph. Dimensions are [numPoints[0] x numPoints[1] x numPoints[2]].
                  * @param[out] coords The coordinates of every graph node. coords.size()=2 and coords[i].size()=numPoints[i], so a point i(x,y,z) has coordinates (coords[0][i], coords[1][i], coords[2][i]).
@@ -63,7 +63,7 @@ namespace ITI {
                  */
                 static void createStructured3DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
                 
-                /** Creates the adjacency matrix and the coordiated vector for a 3D mesh in a distributed way.
+                /** Creates the adjacency matrix and the coordinate vector for a 3D mesh in a distributed way.
                  */
                 static void createStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
 
