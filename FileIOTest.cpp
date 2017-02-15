@@ -24,18 +24,18 @@
 #include "ParcoRepart.h"
 #include "gtest/gtest.h"
 #include "HilbertCurve.h"
-#include "IO.h"
+#include "FileIO.h"
 #include "Settings.h"
 
 
 namespace ITI {
 
-class IOTest : public ::testing::Test {
+class FileIOTest : public ::testing::Test {
 
 };
 
 //-----------------------------------------------------------------
-TEST_F(IOTest, testWriteMetis_Dist_3D){
+TEST_F(FileIOTest, testWriteMetis_Dist_3D){
 
     std::vector<IndexType> numPoints= { 10, 10, 10};
     std::vector<ValueType> maxCoord= { 10, 20, 30};
@@ -68,7 +68,7 @@ TEST_F(IOTest, testWriteMetis_Dist_3D){
  *
  * Occasionally throws error, probably because onw process tries to read the file while some other is still eriting in it.
  */
-TEST_F(IOTest, testReadAndWriteGraphFromFile){
+TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
     std::string path = "meshes/bigbubbles/";
     std::string file = "bigbubbles-00010.graph";
     std::string filename= path + file;
@@ -128,7 +128,7 @@ TEST_F(IOTest, testReadAndWriteGraphFromFile){
 //-----------------------------------------------------------------
 // read a graph from a file in METIS format and its coordiantes in 2D and partiotion that graph
 // usually, graph file: "file.graph", coodinates file: "file.graph.xy" or .xyz
-TEST_F(IOTest, testPartitionFromFile_dist_2D){
+TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     CSRSparseMatrix<ValueType> graph;       //the graph as an adjacency matrix
     IndexType dim= 2, k= 8, i;
     ValueType epsilon= 0.1;

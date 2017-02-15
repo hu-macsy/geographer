@@ -20,7 +20,7 @@
 #include <chrono>
 
 #include "MeshGenerator.h"
-#include "IO.h"
+#include "FileIO.h"
 #include "ParcoRepart.h"
 #include "Settings.h"
 
@@ -140,7 +140,7 @@ int main(int argc, char** argv) {
         }
 
         // read the adjacency matrix and the coordinates from a file
-        graph = ITI::IO<IndexType, ValueType>::readGraphFromFile( graphFile );
+        graph = ITI::FileIO<IndexType, ValueType>::readGraphFromFile( graphFile );
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
         assert(graph.getColDistribution().isEqual(*noDistPtr));
@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
         	std::cout<< "Read " << N << " points." << std::endl;
         }
         
-        coordinates = ITI::IO<IndexType, ValueType>::readCoordsFromFile(coordFile, N, settings.dimensions );
+        coordinates = ITI::FileIO<IndexType, ValueType>::readCoordsFromFile(coordFile, N, settings.dimensions );
 
         if (comm->getRank() == 0) {
         	std::cout << "Read coordinates." << std::endl;

@@ -70,11 +70,11 @@ TEST_F(MeshGeneratorTest, testMesh3DCreateStructuredMesh_Local_3D) {
     
     {
         SCAI_REGION("testMesh3DCreateStructuredMesh_Local_3D.(writeInFileMetisFormat and writeInFileCoords)")
-        IO<IndexType, ValueType>::writeGraphToFile( adjM, grFile);
-        IO<IndexType, ValueType>::writeCoordsToFile( coords, numberOfPoints, coordFile);
+        FileIO<IndexType, ValueType>::writeGraphToFile( adjM, grFile);
+        FileIO<IndexType, ValueType>::writeCoordsToFile( coords, numberOfPoints, coordFile);
     }
     
-    CSRSparseMatrix<ValueType> graph = IO<IndexType, ValueType>::readGraphFromFile( grFile );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraphFromFile( grFile );
     
     // check the two matrixes to be equal
     {

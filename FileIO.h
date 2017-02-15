@@ -18,7 +18,7 @@ using namespace scai::lama;
 
 namespace ITI {
 template <typename IndexType, typename ValueType>
-class IO {
+class FileIO {
 
 public:
 	/** Given an adjacency matrix and a filename writes the matrix in the file using the METIS format.
