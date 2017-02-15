@@ -26,6 +26,10 @@
 #include "MeshIO.h"
 #include "Settings.h"
 
+#include "fromNetworKit/SpatialTree.h"
+#include "fromNetworKit/SpatialCell.h"
+#include "fromNetworKit/Random.h"
+
 typedef double ValueType;
 typedef int IndexType;
 
@@ -221,7 +225,7 @@ TEST_F(MeshIOTest, testCreateStructuredMesh_Distributed_3D) {
 // For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
 // less than 6 ones ( every node has 3,4,5, or 6 neighbours).
 TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
-    std::vector<IndexType> numPoints= { 140, 240, 190};
+    std::vector<IndexType> numPoints= { 140, 24, 190};
     std::vector<ValueType> maxCoord= {441, 711, 1160};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
     std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
@@ -292,12 +296,17 @@ TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
 TEST_F(MeshIOTest, testCreateOctaTreeMesh_Local_3D) {
         
     int numberOfPoints = 20;
-    ValueType maxCoord = 1;
+    //ValueType maxCoord = 1;
     scai::lama::CSRSparseMatrix<ValueType> adjM(numberOfPoints, numberOfPoints);
     std::vector<DenseVector<ValueType>> coords(3, DenseVector<ValueType>(numberOfPoints, 0));
 
+    Point<double> maxCoord(10.0, 10.0, 10.0);
+    Point<double> minCoord(0.0, 0.0, 0.0);
+    ITI::SpatialTree<double> spatTree(minCoord, maxCoord, 2);
     
-    ITI::MeshIO<IndexType, ValueType>::createOctaTreeMesh( adjM, coords, numberOfPoints, maxCoord);
+    Point<double> p(1.0, 0.0, 2.0);
+    spatTree.addContent(0, p);
+    
 }
 
 

@@ -191,9 +191,11 @@ int main(int argc, char** argv) {
 
         // create the adjacency matrix and the coordinates
         ITI::MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist( graph, coordinates, maxCoord, numPoints);
+        
         if(comm->getRank()==0){
-            nodes= graph.getNumRows();
-            edges= graph.getNumValues()/2;		std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
+            IndexType nodes= graph.getNumRows();
+            IndexType edges= graph.getNumValues()/2;	
+            std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
 	}
 
 
