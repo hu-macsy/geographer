@@ -47,7 +47,7 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
   
   std::vector<ValueType> maxCoords({0,0});
 
-  std::vector<DenseVector<ValueType>> coords =  FileIO<IndexType, ValueType>::readCoordsFromFile("./Grid16x16.xyz", N, dimensions);
+  std::vector<DenseVector<ValueType>> coords =  FileIO<IndexType, ValueType>::readCoords("./Grid16x16.xyz", N, dimensions);
   const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( N ));
 
   for(IndexType j=0; j<dimensions; j++){
@@ -100,7 +100,7 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
   std::vector<ValueType> maxCoords({0,0});
 
   //get coords
-  std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoordsFromFile( fileName+".xyz", N, dimensions);
+  std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( fileName+".xyz", N, dimensions);
 
   const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
 
@@ -133,7 +133,7 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
   indices.sort(permutation, true);
   
   // get graph
-  scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraphFromFile( fileName );
+  scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( fileName );
 
   //get partition by-hand
   IndexType part =0;

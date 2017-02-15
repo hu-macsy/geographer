@@ -37,7 +37,7 @@ namespace ITI {
  *
  */
 template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writeGraphToFile (const CSRSparseMatrix<ValueType> &adjM, const std::string filename){
+void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename){
     SCAI_REGION( "IO.writeInFileMetisFormat" )
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     //PRINT(*comm << " In writeInFileMetisFormat");
@@ -81,7 +81,7 @@ void FileIO<IndexType, ValueType>::writeGraphToFile (const CSRSparseMatrix<Value
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writeGraphToDistributedFiles (const CSRSparseMatrix<ValueType> &adjM, const std::string filename){
+void FileIO<IndexType, ValueType>::writeGraphDistributed (const CSRSparseMatrix<ValueType> &adjM, const std::string filename){
     SCAI_REGION("IO.writeInFileMetisFormat_dist")
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -113,7 +113,7 @@ void FileIO<IndexType, ValueType>::writeGraphToDistributedFiles (const CSRSparse
 /*Given the vector of the coordinates and their dimension, writes them in file "filename".
  */
 template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writeCoordsToFile (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename){
+void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename){
     SCAI_REGION( "IO.writeInFileCoords" )
 
     std::ofstream f(filename);
@@ -139,7 +139,7 @@ void FileIO<IndexType, ValueType>::writeCoordsToFile (const std::vector<DenseVec
  */
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphFromFile(const std::string filename) {
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename) {
 	SCAI_REGION("IO.readFromFile2AdjMatrix");
 
 	std::ifstream file(filename);
@@ -223,7 +223,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphFr
 /*File "filename" contains the coordinates of a graph. The function reads these coordinates and returns a vector of DenseVectors, one for each dimension
  */
 template<typename IndexType, typename ValueType>
-std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsFromFile( std::string filename, IndexType numberOfPoints, IndexType dimension){
+std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( std::string filename, IndexType numberOfPoints, IndexType dimension){
     SCAI_REGION( "IO.fromFile2Coords" )
     IndexType globalN= numberOfPoints;
     std::ifstream file(filename);
@@ -277,11 +277,11 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsFrom
     return result;
 }
 
-template void FileIO<int, double>::writeGraphToFile (const CSRSparseMatrix<double> &adjM, const std::string filename);
-template void FileIO<int, double>::writeGraphToDistributedFiles (const CSRSparseMatrix<double> &adjM, const std::string filename);
-template void FileIO<int, double>::writeCoordsToFile (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
-template CSRSparseMatrix<double> FileIO<int, double>::readGraphFromFile(const std::string filename);
-template std::vector<DenseVector<double>>  FileIO<int, double>::readCoordsFromFile( std::string filename, int numberOfCoords, int dimension);
+template void FileIO<int, double>::writeGraph (const CSRSparseMatrix<double> &adjM, const std::string filename);
+template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<double> &adjM, const std::string filename);
+template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
+template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::string filename);
+template std::vector<DenseVector<double>>  FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension);
 
 
 } /* namespace ITI */

@@ -607,10 +607,10 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     //
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraphFromFile(file );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     graph.redistribute(dist, noDistPointer);
     
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoordsFromFile( std::string(file + ".xyz"), N, dimensions);
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
@@ -691,7 +691,7 @@ TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
     k = comm->getSize();
     //
 
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraphFromFile( file );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
 
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
     IndexType N = dist->getGlobalSize();
@@ -702,7 +702,7 @@ TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
     EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
     
     //distribution should be the same
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoordsFromFile( std::string(file + ".xyz"), N, dimensions);
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
 
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
@@ -748,7 +748,7 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_2D) {
     //
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraphFromFile( file );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     //distrubute graph
     graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
         
@@ -758,7 +758,7 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_2D) {
     EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
     
     //distribution should be the same
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoordsFromFile( std::string(file + ".xyz"), N, dimensions);
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
     
@@ -854,7 +854,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
     //
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraphFromFile( file );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     //distrubute graph
     graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
         
@@ -864,7 +864,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
     EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
     
     //distribution should be the same
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoordsFromFile( std::string(file + ".xyz"), N, dimensions);
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
     
@@ -978,7 +978,7 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     //
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraphFromFile( file );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     //distrubute graph
     graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
         
@@ -988,7 +988,7 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     EXPECT_EQ( edges, (graph.getNumValues())/2 );
     
     //reading coordinates
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoordsFromFile( std::string(file + ".xyz"), N, dimensions);
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
     
@@ -1042,7 +1042,7 @@ std::string file = "Grid16x16";
     //
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraphFromFile( file );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     //distrubute graph
     graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
         
@@ -1052,7 +1052,7 @@ std::string file = "Grid16x16";
     EXPECT_EQ( edges, (graph.getNumValues())/2 );
 
     
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoordsFromFile( std::string(file + ".xyz"), N, dimensions);
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
     
