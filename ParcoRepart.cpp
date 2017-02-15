@@ -28,6 +28,8 @@
 #include "ParcoRepart.h"
 #include "HilbertCurve.h"
 
+#include "quadtree/QuadTreeCartesianEuclid.h"
+
 namespace ITI {
 
 template<typename IndexType, typename ValueType>
