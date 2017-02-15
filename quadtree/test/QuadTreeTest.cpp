@@ -221,7 +221,7 @@ TEST_F(QuadTreeTest, testQuadNodeCartesianDistances) {
 	EXPECT_LE(distanceQueryToCell, minDistance);
 }
 
-TEST_F(QuadTreeTest, benchCartesianQuadProbabilisticQueryUniform) {
+TEST_F(QuadTreeTest, DISABLED_benchCartesianQuadProbabilisticQueryUniform) {
 	const index maxDim = 10;
 	const count n = 50000;
 	std::vector<Point<double> > points;
@@ -252,7 +252,7 @@ TEST_F(QuadTreeTest, benchCartesianQuadProbabilisticQueryUniform) {
 	}
 }
 
-TEST_F(QuadTreeTest, benchCartesianKDProbabilisticQueryUniform) {
+TEST_F(QuadTreeTest, DISABLED_benchCartesianKDProbabilisticQueryUniform) {
 	const index maxDim = 10;
 	const count n = 50000;
 	std::vector<Point<double> > points;
@@ -283,7 +283,7 @@ TEST_F(QuadTreeTest, benchCartesianKDProbabilisticQueryUniform) {
 	}
 }
 
-TEST_F(QuadTreeTest, benchPolarQuadProbabilisticQueryUniform) {
+TEST_F(QuadTreeTest, DISABLED_benchPolarQuadProbabilisticQueryUniform) {
 	const count n = 50000;
 	std::vector<Point<double> > points;
 	auto edgeProb = [n](double distance) -> double {return std::min<double>(1, (1/(distance*n)));};
@@ -310,7 +310,7 @@ TEST_F(QuadTreeTest, benchPolarQuadProbabilisticQueryUniform) {
 	}
 }
 
-TEST_F(QuadTreeTest, benchPolarKDProbabilisticQueryUniform) {
+TEST_F(QuadTreeTest, DISABLED_benchPolarKDProbabilisticQueryUniform) {
 	const count n = 50000;
 	std::vector<Point<double> > points;
 	auto edgeProb = [n](double distance) -> double {return std::min<double>(1, (1/(distance*n)));};
@@ -321,7 +321,7 @@ TEST_F(QuadTreeTest, benchPolarKDProbabilisticQueryUniform) {
 	std::vector<Point<double> > coordVector;
 	KDTreeEuclidean<index,false> tree(minCoords, maxCoords);
 	for (index i = 0; i < n; i++) {
-		vector<double> coords = {(double(rand()) / RAND_MAX)*2*M_PI, double(rand()) / RAND_MAX};
+		std::vector<double> coords = {(double(rand()) / RAND_MAX)*2*M_PI, double(rand()) / RAND_MAX};
 		tree.addContent(i, coords);
 		coordVector.push_back(coords);
 	}
