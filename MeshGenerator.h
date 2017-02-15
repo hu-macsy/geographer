@@ -22,7 +22,6 @@
 #include <set>
 #include <climits>
 #include <list>
-#include <vector>
 #include <string>
 #include <iostream>
 #include <fstream>
@@ -42,7 +41,7 @@ using namespace scai::lama;
 
 namespace ITI {
 	template <typename IndexType, typename ValueType>
-	class MeshIO{
+	class MeshGenerator{
             public:
                 /** Creates a random 3D mesh. Adjacency matrix stored in adjM and coordinates of the points in coords.
                  *  Needs O(numberOfPoints^2) time!! Every nodes adds an edge with some of its closest neighbours.
@@ -69,36 +68,7 @@ namespace ITI {
                 static void createStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
 
                 static void createRandomStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
-                /** Given an adjacency matrix and a filename writes the matrix in the file using the METIS format.
-                 *  Not distributed.
-                 * 
-                 * @param[in] adjM The graph's adjacency matrix.
-                 * @param[in] filename The file's name to write to/
-                 */
-                static void writeInFileMetisFormat (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
                 
-                /** Given an adjacency matrix and a filename writes the local part of matrix in the file using the METIS format.
-                 *  Every proccesor adds his rank in the end of hte file name.
-                 * @param[in] adjM The graph's adjacency matrix.
-                 * @param[in] filename The file's name to write to/
-                 */
-                static void writeInFileMetisFormat_dist (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
-                
-                /** Given the vector of the coordinates and their dimension, writes them in file "filename".
-                 * Coordinates are given as a DenseVector of size dim*numPoints.
-                */
-                static void writeInFileCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
-           
-                /** Reads a graph from filename in METIS format and returns the adjacency matrix.
-                 * @param[in] filename The file to read from. In a METIS format.
-                 * @param[out] matrix The adjacency matrix of the graph.
-                 */
-                static CSRSparseMatrix<ValueType> readFromFile2AdjMatrix(const std::string filename);
-                
-                /* Reads the 2D coordinates from file "filename" and returns then in a DenseVector where the coordiantes
-                 * of point i are in [i*2][i*2+1].
-                 */
-                static std::vector<DenseVector<ValueType>> fromFile2Coords( std::string filename, IndexType numberOfCoords, IndexType dimension);
                     
                 /* Creates random points in the cube for the given dimension, points in [0,maxCoord]^dim.
                  */
@@ -114,6 +84,6 @@ namespace ITI {
                  *  of the index in 3D. The return value is not the coordiantes of the point!
                  */
                 static std::tuple<IndexType, IndexType, IndexType> index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints);
-        };//class MeshIO
+        };//class MeshGenerator
         
 }//namespace ITI

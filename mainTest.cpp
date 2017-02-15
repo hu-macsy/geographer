@@ -19,7 +19,8 @@
 #include <cstdlib>
 #include <chrono>
 
-#include "MeshIO.h"
+#include "MeshGenerator.h"
+#include "IO.h"
 #include "ParcoRepart.h"
 #include "Settings.h"
 
@@ -139,7 +140,7 @@ int main(int argc, char** argv) {
         }
 
         // read the adjacency matrix and the coordinates from a file
-        graph = ITI::MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graphFile );
+        graph = ITI::IO<IndexType, ValueType>::readGraphFromFile( graphFile );
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
         assert(graph.getColDistribution().isEqual(*noDistPtr));
@@ -148,7 +149,7 @@ int main(int argc, char** argv) {
         	std::cout<< "Read " << N << " points." << std::endl;
         }
         
-        coordinates = ITI::MeshIO<IndexType, ValueType>::fromFile2Coords(coordFile, N, settings.dimensions );
+        coordinates = ITI::IO<IndexType, ValueType>::readCoordsFromFile(coordFile, N, settings.dimensions );
 
         if (comm->getRank() == 0) {
         	std::cout << "Read coordinates." << std::endl;
@@ -187,7 +188,7 @@ int main(int argc, char** argv) {
         }
 
         // create the adjacency matrix and the coordinates
-        ITI::MeshIO<IndexType, ValueType>::createStructured3DMesh_dist( graph, coordinates, maxCoord, numPoints);
+        ITI::MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist( graph, coordinates, maxCoord, numPoints);
 
     } else{
     	std::cout << "Either an input file or generation parameters are needed. Call again with --file or --generate" << std::endl;
