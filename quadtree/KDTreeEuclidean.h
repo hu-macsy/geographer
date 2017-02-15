@@ -12,8 +12,6 @@
 #include "SpatialTree.h"
 #include "KDNodeEuclidean.h"
 
-using std::vector;
-
 namespace ITI {
 
 template <class T, bool cartesian=true>

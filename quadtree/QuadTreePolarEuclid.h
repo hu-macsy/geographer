@@ -36,7 +36,7 @@ public:
 		this->root = std::shared_ptr<QuadNodePolarEuclid<T>>(new QuadNodePolarEuclid<T>(minCoords, maxCoords, capacity, theoreticalSplit, balance));
 	}
 
-	QuadTreePolarEuclid(const vector<double> &angles, const vector<double> &radii, const vector<T> &content, bool theoreticalSplit=false, count capacity=1000, double balance = 0.5) {
+	QuadTreePolarEuclid(const std::vector<double> &angles, const std::vector<double> &radii, const std::vector<T> &content, bool theoreticalSplit=false, count capacity=1000, double balance = 0.5) {
 		const count n = angles.size();
 		assert(angles.size() == radii.size());
 		assert(radii.size() == content.size());
@@ -65,11 +65,11 @@ public:
 		return this->root->removeContent(toRemove, {angle, r});
 	}
 
-	void extractCoordinates(vector<double> &anglesContainer, vector<double> &radiiContainer) const {
+	void extractCoordinates(std::vector<double> &anglesContainer, std::vector<double> &radiiContainer) const {
 		this->root->getCoordinates(anglesContainer, radiiContainer);
 	}
 
-	void getElementsInEuclideanCircle(const Point<double> circleCenter, const double radius, vector<T> &circleDenizens) const {
+	void getElementsInEuclideanCircle(const Point<double> circleCenter, const double radius, std::vector<T> &circleDenizens) const {
 		this->root->getElementsInCircle(circleCenter, radius, circleDenizens);
 	}
 

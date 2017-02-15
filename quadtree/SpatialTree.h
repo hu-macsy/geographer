@@ -25,11 +25,11 @@ public:
 		return root->removeContent(content, coords);
 	}
 
-	void getElementsInCircle(const Point<double> query, const double radius, vector<T> &circleDenizens) const {
+	void getElementsInCircle(const Point<double> query, const double radius, std::vector<T> &circleDenizens) const {
 		root->getElementsInCircle(query, radius, circleDenizens);
 	}
 
-	count getElementsProbabilistically(Point<double> query, std::function<double(double)> prob, vector<T> &circleDenizens) {
+	count getElementsProbabilistically(Point<double> query, std::function<double(double)> prob, std::vector<T> &circleDenizens) {
 		return root->getElementsProbabilistically(query, prob, circleDenizens);
 	}
 
@@ -60,7 +60,7 @@ public:
 	 *
 	 * @return vector<T> of elements
 	 */
-	vector<T> getElements() const {
+	std::vector<T> getElements() const {
 		return root->getElements();
 	}
 

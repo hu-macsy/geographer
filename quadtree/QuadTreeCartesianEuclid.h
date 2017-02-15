@@ -33,11 +33,11 @@ public:
 		this->root = std::shared_ptr<QuadNodeCartesianEuclid<T> >(new QuadNodeCartesianEuclid<T>(lower, upper, capacity, theoreticalSplit));
 	}
 
-	void extractCoordinates(vector<Point<double> > &posContainer) const {
+	void extractCoordinates(std::vector<Point<double> > &posContainer) const {
 		this->root->getCoordinates(posContainer);
 	}
 
-	void getElementsInEuclideanCircle(const Point<double> circleCenter, const double radius, vector<T> &circleDenizens) const {
+	void getElementsInEuclideanCircle(const Point<double> circleCenter, const double radius, std::vector<T> &circleDenizens) const {
 		this->getElementsInCircle(circleCenter, radius, circleDenizens);
 	}
 
