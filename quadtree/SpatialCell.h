@@ -15,7 +15,6 @@
 
 namespace ITI {
 
-template <class T>
 class SpatialCell {
 	friend class QuadTreeTest;
 public:
@@ -41,29 +40,12 @@ public:
 	virtual std::pair<double, double> distances(const Point<double> &query) const = 0;
 	virtual double distance(const Point<double> &query, index k) const = 0;
 
-	void getCoordinates(std::vector<double> &anglesContainer, std::vector<double> &radiiContainer) const {
-		assert(minCoords.getDimensions() == 2);
-		if (this->isLeaf) {
-			for (Point<double> pos : positions) {
-				anglesContainer.push_back(pos[0]);
-				radiiContainer.push_back(pos[1]);
-			}
-		}
-		else {
-			assert(this->content.size() == 0);
-
-			for (index i = 0; i < children.size(); i++) {
-				this->children[i]->getCoordinates(anglesContainer, radiiContainer);
-			}
-		}
-	}
-
 	virtual void coarsen() {
 		assert(this->height() == 2);
 		assert(content.size() == 0);
 		assert(positions.size() == 0);
 
-		std::vector<T> allContent;
+		std::vector<int> allContent;
 		std::vector<Point<double> > allPositions;
 		for (index i = 0; i < this->children.size(); i++) {
 			allContent.insert(allContent.end(), children[i]->content.begin(), children[i]->content.end());
@@ -80,15 +62,11 @@ public:
 	}
 
 	/**
-	 * Remove content at polar coordinates (angle, R). May cause coarsening of the quadtree
-	 *
-	 * @param input Content to be removed
-	 * @param angle Angular coordinate
-	 * @param R Radial coordinate
+	 * Remove content. May cause coarsening of the quadtree
 	 *
 	 * @return True if content was found and removed, false otherwise
 	 */
-	bool removeContent(T input, const Point<double> &pos) {
+	bool removeContent(int input, const Point<double> &pos) {
 		if (!this->responsible(pos)) return false;
 		if (this->isLeaf) {
 			index i = 0;
@@ -137,7 +115,7 @@ public:
 		return distances(query).first > radius;
 	}
 
-	virtual void getElementsInCircle(Point<double> center, double radius, std::vector<T> &result) const {
+	virtual void getElementsInCircle(Point<double> center, double radius, std::vector<int> &result) const {
 		if (outOfReach(center, radius)) {
 			return;
 		}
@@ -157,7 +135,7 @@ public:
 		}
 	}
 
-	virtual void addContent(T input, const Point<double> &coords) {
+	virtual void addContent(int input, const Point<double> &coords) {
 		assert(content.size() == positions.size());
 		assert(this->responsible(coords));
 		if (isLeaf) {
@@ -214,7 +192,7 @@ public:
 		}
 	}
 
-	virtual count getElementsProbabilistically(const Point<double> &query, std::function<double(double)> prob, std::vector<T> &result) {
+	virtual count getElementsProbabilistically(const Point<double> &query, std::function<double(double)> prob, std::vector<int> &result) {
 		auto distancePair = distances(query);
 		double probUB = prob(distancePair.first);
 		double probLB = prob(distancePair.second);
@@ -288,7 +266,7 @@ public:
 		return candidatesTested;
 	}
 
-	virtual void maybeGetKthElement(double upperBound, Point<double> query, std::function<double(double)> prob, index k, std::vector<T> &circleDenizens) {
+	virtual void maybeGetKthElement(double upperBound, Point<double> query, std::function<double(double)> prob, index k, std::vector<int> &circleDenizens) {
 			assert(k < size());
 			if (isLeaf) {
 				queries++;
@@ -433,16 +411,16 @@ public:
 	 *
 	 * @return std::vector of content type T
 	 */
-	std::vector<T> getElements() const {
+	std::vector<int> getElements() const {
 		if (isLeaf) {
 			return content;
 		} else {
 			assert(content.size() == 0);
 			assert(positions.size() == 0);
 
-			std::vector<T> result;
+			std::vector<int> result;
 			for (index i = 0; i < children.size(); i++) {
-				std::vector<T> subresult = children[i]->getElements();
+				std::vector<int> subresult = children[i]->getElements();
 				result.insert(result.end(), subresult.begin(), subresult.end());
 			}
 			return result;
@@ -474,7 +452,6 @@ public:
 
 	index indexSubtree(index nextID) {
 		index result = nextID;
-		assert(this->children.size() == 4 || this->children.size() == 0);
 		for (int i = 0; i < this->children.size(); i++) {
 			result = this->children[i]->indexSubtree(result);
 		}
@@ -486,7 +463,7 @@ public:
 		if (!this->responsible(query)) return none;
 		if (this->isLeaf) return getID();
 		else {
-			for (int i = 0; i < 4; i++) {
+			for (int i = 0; i < children.size(); i++) {
 				index childresult = this->children[i]->getCellID(query);
 				if (childresult != none) return childresult;
 			}
@@ -498,7 +475,7 @@ public:
 		if (this->isLeaf) return getID();
 		else {
 			index result = -1;
-			for (int i = 0; i < 4; i++) {
+			for (int i = 0; i < children.size(); i++) {
 				result = std::max(this->children[i]->getMaxIDInSubtree(), result);
 			}
 			return std::max(result, getID());
@@ -515,7 +492,7 @@ public:
 			}
 			offset += this->size();
 		} else {
-			for (int i = 0; i < 4; i++) {
+			for (int i = 0; i < children.size(); i++) {
 				offset = this->children[i]->reindex(offset);
 			}
 		}
@@ -525,9 +502,9 @@ public:
 protected:
 	Point<double> minCoords;
 	Point<double> maxCoords;
-	std::vector<T> content;
+	std::vector<int> content;
 	std::vector<Point<double> > positions;
-	std::vector<std::shared_ptr<SpatialCell<T> > > children;
+	std::vector<std::shared_ptr<SpatialCell> > children;
 	bool isLeaf;
 	count capacity;
 	index subTreeSize;

@@ -14,13 +14,13 @@
 
 namespace ITI {
 
-template <class T, bool cartesian=true>
-class KDTreeEuclidean: public ITI::SpatialTree<T> {
+template <bool cartesian=true>
+class KDTreeEuclidean: public ITI::SpatialTree {
 public:
 	KDTreeEuclidean() = default;
 	virtual ~KDTreeEuclidean() = default;
 	KDTreeEuclidean(const Point<double> &minCoords, const Point<double> &maxCoords, count capacity=1000) {
-		this->root = std::shared_ptr<KDNodeEuclidean<T, cartesian> >(new KDNodeEuclidean<T, cartesian>(minCoords, maxCoords, capacity));
+		this->root = std::shared_ptr<KDNodeEuclidean<cartesian> >(new KDNodeEuclidean<cartesian>(minCoords, maxCoords, capacity));
 	}
 };
 

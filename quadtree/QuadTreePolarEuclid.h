@@ -18,8 +18,7 @@
 
 namespace ITI {
 
-template <class T>
-class QuadTreePolarEuclid : public SpatialTree<T>{
+class QuadTreePolarEuclid : public SpatialTree{
 
 public:
 	~QuadTreePolarEuclid() = default;
@@ -33,10 +32,10 @@ public:
 	 */
 	QuadTreePolarEuclid(Point<double> minCoords = {0,0}, Point<double> maxCoords = {2*M_PI, 1}, bool theoreticalSplit=false, count capacity=1000, double balance = 0.5)
 	{
-		this->root = std::shared_ptr<QuadNodePolarEuclid<T>>(new QuadNodePolarEuclid<T>(minCoords, maxCoords, capacity, theoreticalSplit, balance));
+		this->root = std::shared_ptr<QuadNodePolarEuclid>(new QuadNodePolarEuclid(minCoords, maxCoords, capacity, theoreticalSplit, balance));
 	}
 
-	QuadTreePolarEuclid(const std::vector<double> &angles, const std::vector<double> &radii, const std::vector<T> &content, bool theoreticalSplit=false, count capacity=1000, double balance = 0.5) {
+	QuadTreePolarEuclid(const std::vector<double> &angles, const std::vector<double> &radii, const std::vector<int> &content, bool theoreticalSplit=false, count capacity=1000, double balance = 0.5) {
 		const count n = angles.size();
 		assert(angles.size() == radii.size());
 		assert(radii.size() == content.size());

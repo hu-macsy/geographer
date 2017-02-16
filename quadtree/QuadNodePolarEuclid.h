@@ -18,8 +18,7 @@
 
 namespace ITI {
 
-template <class T>
-class QuadNodePolarEuclid : public ITI::SpatialCell<T> {
+class QuadNodePolarEuclid : public ITI::SpatialCell {
 	friend class QuadTreeTest;
 private:
 	static const long unsigned sanityNodeLimit = 10E15; //just assuming, for debug purposes, that this algorithm never runs on machines with more than 4 Petabyte RAM
@@ -33,7 +32,7 @@ public:
 	 *
 	 */
 	QuadNodePolarEuclid(Point<double> minCoords = {0,0}, Point<double> maxCoords = {2*M_PI, 1}, unsigned capacity = 1000, bool splitTheoretical = false, double balance = 0.5)
-	: SpatialCell<T>(minCoords, maxCoords, capacity) {
+	: SpatialCell(minCoords, maxCoords, capacity) {
 		if (balance <= 0 || balance >= 1) throw std::runtime_error("Quadtree balance parameter must be between 0 and 1.");
 		if (minCoords.getDimensions() != 2) throw std::runtime_error("Currently only supported for two dimensions");
 		this->balance = balance;
@@ -73,10 +72,10 @@ public:
 		assert(middleR < maxR);
 		assert(middleR > minR);
 
-		std::shared_ptr<QuadNodePolarEuclid<T> > southwest(new QuadNodePolarEuclid<T>({leftAngle, minR}, {middleAngle, middleR}, this->capacity, splitTheoretical, balance));
-		std::shared_ptr<QuadNodePolarEuclid<T> > southeast(new QuadNodePolarEuclid<T>({middleAngle, minR}, {rightAngle, middleR}, this->capacity, splitTheoretical, balance));
-		std::shared_ptr<QuadNodePolarEuclid<T> > northwest(new QuadNodePolarEuclid<T>({leftAngle, middleR}, {middleAngle, maxR}, this->capacity, splitTheoretical, balance));
-		std::shared_ptr<QuadNodePolarEuclid<T> > northeast(new QuadNodePolarEuclid<T>({middleAngle, middleR}, {rightAngle, maxR}, this->capacity, splitTheoretical, balance));
+		std::shared_ptr<QuadNodePolarEuclid > southwest(new QuadNodePolarEuclid({leftAngle, minR}, {middleAngle, middleR}, this->capacity, splitTheoretical, balance));
+		std::shared_ptr<QuadNodePolarEuclid > southeast(new QuadNodePolarEuclid({middleAngle, minR}, {rightAngle, middleR}, this->capacity, splitTheoretical, balance));
+		std::shared_ptr<QuadNodePolarEuclid > northwest(new QuadNodePolarEuclid({leftAngle, middleR}, {middleAngle, maxR}, this->capacity, splitTheoretical, balance));
+		std::shared_ptr<QuadNodePolarEuclid > northeast(new QuadNodePolarEuclid({middleAngle, middleR}, {rightAngle, maxR}, this->capacity, splitTheoretical, balance));
 		this->children = {southwest, southeast, northwest, northeast};
 		this->isLeaf = false;
 	}

@@ -11,25 +11,24 @@
 
 namespace ITI {
 
-template <class T>
 class SpatialTree {
 public:
 	SpatialTree() = default;
 	virtual ~SpatialTree() = default;
 
-	void addContent(T content, const Point<double> &coords) {
+	void addContent(int content, const Point<double> &coords) {
 		root->addContent(content, coords);
 	}
 
-	bool removeContent(T content, const Point<double> &coords) {
+	bool removeContent(int content, const Point<double> &coords) {
 		return root->removeContent(content, coords);
 	}
 
-	void getElementsInCircle(const Point<double> query, const double radius, std::vector<T> &circleDenizens) const {
+	void getElementsInCircle(const Point<double> query, const double radius, std::vector<int> &circleDenizens) const {
 		root->getElementsInCircle(query, radius, circleDenizens);
 	}
 
-	count getElementsProbabilistically(Point<double> query, std::function<double(double)> prob, std::vector<T> &circleDenizens) {
+	count getElementsProbabilistically(Point<double> query, std::function<double(double)> prob, std::vector<int> &circleDenizens) {
 		return root->getElementsProbabilistically(query, prob, circleDenizens);
 	}
 
@@ -60,12 +59,12 @@ public:
 	 *
 	 * @return vector<T> of elements
 	 */
-	std::vector<T> getElements() const {
+	std::vector<int> getElements() const {
 		return root->getElements();
 	}
 
 protected:
-	std::shared_ptr<SpatialCell<T>> root;
+	std::shared_ptr<SpatialCell> root;
 };
 
 } /* namespace ITI */

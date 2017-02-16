@@ -17,8 +17,7 @@
 
 namespace ITI {
 
-template <class T>
-class QuadNodeCartesianEuclid : public ITI::SpatialCell<T> {
+class QuadNodeCartesianEuclid : public ITI::SpatialCell {
 	friend class QuadTreeTest;
 private:
 	static const long unsigned sanityNodeLimit = 10E15; //just assuming, for debug purposes, that this algorithm never runs on machines with more than 4 Petabyte RAM
@@ -38,7 +37,7 @@ public:
 	 *
 	 */
 	QuadNodeCartesianEuclid(Point<double> lower = Point<double>({0.0, 0.0}), Point<double> upper = Point<double>({1.0, 1.0}), unsigned capacity = 1000, bool splitTheoretical = false)
-	: SpatialCell<T>(lower, upper, capacity)	{
+	: SpatialCell(lower, upper, capacity)	{
 		this->splitTheoretical = splitTheoretical;
 	}
 
@@ -83,7 +82,7 @@ public:
 				}
 				bitCopy = bitCopy >> 1;
 			}
-			std::shared_ptr<QuadNodeCartesianEuclid<T> > child(new QuadNodeCartesianEuclid<T>(Point<double>(lowerValues), Point<double>(upperValues), this->capacity, splitTheoretical));
+			std::shared_ptr<QuadNodeCartesianEuclid> child(new QuadNodeCartesianEuclid(Point<double>(lowerValues), Point<double>(upperValues), this->capacity, splitTheoretical));
 			assert(child->isLeaf);
 			this->children.push_back(child);
 		}

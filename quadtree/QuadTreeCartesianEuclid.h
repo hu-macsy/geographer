@@ -18,8 +18,7 @@
 
 namespace ITI {
 
-template <class T>
-class QuadTreeCartesianEuclid : public ITI::SpatialTree<T> {
+class QuadTreeCartesianEuclid : public ITI::SpatialTree {
 	friend class QuadTreeCartesianEuclidTest;
 public:
 	/**
@@ -30,14 +29,14 @@ public:
 	 *
 	 */
 	QuadTreeCartesianEuclid(Point<double> lower = Point<double>({0.0, 0.0}), Point<double> upper = Point<double>({1.0, 1.0}), bool theoreticalSplit=true, count capacity=1000) {
-		this->root = std::shared_ptr<QuadNodeCartesianEuclid<T> >(new QuadNodeCartesianEuclid<T>(lower, upper, capacity, theoreticalSplit));
+		this->root = std::shared_ptr<QuadNodeCartesianEuclid>(new QuadNodeCartesianEuclid(lower, upper, capacity, theoreticalSplit));
 	}
 
-	void extractCoordinates(std::vector<Point<double> > &posContainer) const {
-		this->root->getCoordinates(posContainer);
-	}
+//	void extractCoordinates(std::vector<Point<double> > &posContainer) const {
+//		this->root->getCoordinates(posContainer);
+//	}
 
-	void getElementsInEuclideanCircle(const Point<double> circleCenter, const double radius, std::vector<T> &circleDenizens) const {
+	void getElementsInEuclideanCircle(const Point<double> circleCenter, const double radius, std::vector<int> &circleDenizens) const {
 		this->getElementsInCircle(circleCenter, radius, circleDenizens);
 	}
 
