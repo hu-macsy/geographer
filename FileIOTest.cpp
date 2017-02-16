@@ -37,10 +37,6 @@ class FileIOTest : public ::testing::Test {
 
 };
 
-TEST_F(FileIOTest, testReadQuadTree){
-
-}
-
 //-----------------------------------------------------------------
 TEST_F(FileIOTest, testWriteMetis_Dist_3D){
 
@@ -200,5 +196,14 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     SCAI_REGION_END("testPartitionFromFile_local_2D.partition");
 
 }
+
+TEST_F(FileIOTest, testReadQuadTree){
+	std::string filename = "cells.dat";
+
+	std::vector<std::set<std::shared_ptr<SpatialCell> > > edgeList = FileIO<IndexType, ValueType>::readQuadTree(filename);
+	IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
+	std::cout << "Read Quadtree with " << edgeList.size() << " nodes and " << m << " edges." << std::endl;
+}
+
 
 } /* namespace ITI */

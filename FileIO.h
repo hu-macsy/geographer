@@ -11,10 +11,14 @@
 #include <scai/lama/matrix/CSRSparseMatrix.hpp>
 #include <scai/lama/DenseVector.hpp>
 
+#include "quadtree/QuadTreeCartesianEuclid.h"
+
 using namespace scai;
 using namespace scai::lama;
 
 #include <vector>
+#include <set>
+#include <memory>
 
 namespace ITI {
 template <typename IndexType, typename ValueType>
@@ -30,7 +34,7 @@ public:
 	static void writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
 
 	/** Given an adjacency matrix and a filename writes the local part of matrix in the file using the METIS format.
-	 *  Every proccesor adds his rank in the end of hte file name.
+	 *  Every proccesor adds his rank in the end of the file name.
 	 * @param[in] adjM The graph's adjacency matrix.
 	 * @param[in] filename The file's name to write to/
 	 */
@@ -51,6 +55,14 @@ public:
 	 * of point i are in [i*2][i*2+1].
 	 */
 	static std::vector<DenseVector<ValueType>> readCoords ( std::string filename, IndexType numberOfCoords, IndexType dimension);
+
+	/**
+	 * Reads a quadtree as specified in the format of Michael Selzer
+	 */
+	static std::vector<std::set<std::shared_ptr<SpatialCell> > > readQuadTree( std::string filename );
+
+private:
+	static std::pair<std::vector<ValueType>, std::vector<ValueType>> getBoundingCoords(std::vector<ValueType> centralCoords, IndexType level);
 };
 
 } /* namespace ITI */
