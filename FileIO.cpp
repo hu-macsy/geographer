@@ -386,7 +386,7 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 
 			//check for pending edges of parent
 			if (pendingEdges.count(parentCoords) > 0) {
-				std::cout << "Found pending edges for parent " << parentCoords[0] << ", " << parentCoords[1] << ", " << parentCoords[2] << std::endl;
+				//std::cout << "Found pending edges for parent " << parentCoords[0] << ", " << parentCoords[1] << ", " << parentCoords[2] << std::endl;
 				std::set<std::vector<ValueType>> thisNodesPendingEdges = pendingEdges.at(parentCoords);
 				for (std::vector<ValueType> otherCoords : thisNodesPendingEdges) {
 					confirmedEdges[parentCoords].insert(otherCoords);
@@ -395,7 +395,9 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 				pendingEdges.erase(parentCoords);
 			}
 		}
+		assert(nodeMap.count(parentCoords));
 		nodeMap[parentCoords]->addChild(quadNodePointer);
+		assert(nodeMap[parentCoords]->height() > 1);
 
 		//check own edges, possibly add to pending
 		for (IndexType i = 0; i < 2*dimension; i++) {
@@ -419,18 +421,23 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 
 			if (nodeMap.count(possibleNeighborCoords)) {
 				// this is actually not necessary, since if the other node was before this one,
-				// the edges were added to the pending list and processed above
+				// the edges were added to the pending list and processed above - except if it was an implicitly referenced parent node.
 				confirmedEdges[ownCoords].insert(possibleNeighborCoords);
 				confirmedEdges[possibleNeighborCoords].insert(ownCoords);
 			} else {
+				//create empty set if not yet done
 				if (pendingEdges.count(possibleNeighborCoords) == 0) {
 					pendingEdges[possibleNeighborCoords] = {};
 				}
+				//target doesn't exist yet, can't have confirmed edges
 				assert(confirmedEdges.count(possibleNeighborCoords) == 0);
+
+				//if edge is already there, it was duplicate
 				if (pendingEdges[possibleNeighborCoords].count(ownCoords)) {
 					duplicateNeighbors++;
-					//std::cout << "Duplicate neighbor for " << ownCoords[0] << ", " << ownCoords[1] << ", " << ownCoords[2] << std::endl;
 				}
+
+				//finally, add pending edge
 				pendingEdges[possibleNeighborCoords].insert(ownCoords);
 			}
 		}
@@ -494,7 +501,7 @@ template void FileIO<int, double>::writeGraph (const CSRSparseMatrix<double> &ad
 template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
 template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::string filename);
-template std::vector<DenseVector<double>>  FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension);
+template std::vector<DenseVector<double>> FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension);
 template std::vector<std::set<std::shared_ptr<SpatialCell> > >  FileIO<int, double>::readQuadTree( std::string filename );
 
 
