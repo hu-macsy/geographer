@@ -73,7 +73,7 @@ TEST_F(FileIOTest, testWriteMetis_Dist_3D){
 /* Reads a graph from a file "filename" in METIS format, writes it back into "my_filename" and reads the graph
  * again from "my_filename".
  *
- * Occasionally throws error, probably because onw process tries to read the file while some other is still eriting in it.
+ * Occasionally throws error, probably because own process tries to read the file while some other is still writing in it.
  */
 TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
     std::string path = "meshes/bigbubbles/";
@@ -104,6 +104,8 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
 
     // write the graph you read in a new file
     FileIO<IndexType, ValueType>::writeGraph(Graph, fileTo );
+
+    comm->synchronize();
 
     // read new graph from the new file we just written
     CSRSparseMatrix<ValueType> Graph2 = FileIO<IndexType, ValueType>::readGraph( fileTo );
