@@ -80,6 +80,12 @@ public:
 		this->isLeaf = false;
 	}
 
+	bool isConsistent() const override {
+		if (this->children.size() != 0 && this->children.size() != 4) return false;
+		//TODO: check for region coverage
+		return true;
+	}
+
 	virtual std::pair<double, double> distances(const Point<double> &query) const override {
 		return this->EuclideanPolarDistances(query);
 	}

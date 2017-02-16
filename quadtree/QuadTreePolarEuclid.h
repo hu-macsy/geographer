@@ -35,7 +35,7 @@ public:
 		this->root = std::shared_ptr<QuadNodePolarEuclid>(new QuadNodePolarEuclid(minCoords, maxCoords, capacity, theoreticalSplit, balance));
 	}
 
-	QuadTreePolarEuclid(const std::vector<double> &angles, const std::vector<double> &radii, const std::vector<int> &content, bool theoreticalSplit=false, count capacity=1000, double balance = 0.5) {
+	QuadTreePolarEuclid(const std::vector<double> &angles, const std::vector<double> &radii, const std::vector<index > &content, bool theoreticalSplit=false, count capacity=1000, double balance = 0.5) {
 		const count n = angles.size();
 		assert(angles.size() == radii.size());
 		assert(radii.size() == content.size());
@@ -47,7 +47,7 @@ public:
 		minRadius = *radiiMinMax.first;
 		maxAngle = std::nextafter(*angleMinMax.second, std::numeric_limits<double>::max());
 		maxRadius = std::nextafter(*radiiMinMax.second, std::numeric_limits<double>::max());
-		this->root = std::shared_ptr<QuadNodePolarEuclid<T>>(new QuadNodePolarEuclid<T>({minAngle, minRadius}, {maxAngle, maxRadius}, capacity, theoreticalSplit, balance));
+		this->root = std::shared_ptr<QuadNodePolarEuclid>(new QuadNodePolarEuclid({minAngle, minRadius}, {maxAngle, maxRadius}, capacity, theoreticalSplit, balance));
 
 		for (index i = 0; i < n; i++) {
 			assert(content[i] < n);
@@ -60,15 +60,11 @@ public:
 	 * @param angle angular coordinate of x
 	 * @param R radial coordinate of x
 	 */
-	bool removeContent(T toRemove, double angle, double r) {
+	bool removeContent(int toRemove, double angle, double r) {
 		return this->root->removeContent(toRemove, {angle, r});
 	}
 
-	void extractCoordinates(std::vector<double> &anglesContainer, std::vector<double> &radiiContainer) const {
-		this->root->getCoordinates(anglesContainer, radiiContainer);
-	}
-
-	void getElementsInEuclideanCircle(const Point<double> circleCenter, const double radius, std::vector<T> &circleDenizens) const {
+	void getElementsInEuclideanCircle(const Point<double> circleCenter, const double radius, std::vector<index> &circleDenizens) const {
 		this->root->getElementsInCircle(circleCenter, radius, circleDenizens);
 	}
 
@@ -83,11 +79,6 @@ public:
 	index getCellID(double phi, double r) const {
 		return this->root->getCellID({phi, r});
 	}
-
-	double getMaxRadius() const {
-		return this->maxCoords[1];
-	}
-
 };
 }
 

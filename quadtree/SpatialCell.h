@@ -39,13 +39,39 @@ public:
 	virtual void split() = 0;
 	virtual std::pair<double, double> distances(const Point<double> &query) const = 0;
 	virtual double distance(const Point<double> &query, index k) const = 0;
+	virtual bool isConsistent() const = 0;
+
+	void addChild(std::shared_ptr<SpatialCell> child) {
+		assert(this->distances(child->maxCoords).first == 0);
+		if (!this->responsible(child->minCoords)) {
+			throw std::runtime_error("Node with corners " + std::to_string(this->minCoords[0]) + ", "
+					+ std::to_string(this->minCoords[1]) + ", " + std::to_string(this->minCoords[2])
+					+ " not responsible for " + std::to_string(child->minCoords[0]) + ", " + std::to_string(child->minCoords[1]) + ", " + std::to_string(child->minCoords[2]));
+		}
+
+		for (std::shared_ptr<SpatialCell> previousChild : this->children) {
+			assert(!previousChild->responsible(child->minCoords));
+			assert(!child->responsible(previousChild->minCoords));
+		}
+		if (isLeaf) {
+			assert(children.size() == 0);
+		} else {
+			assert(children.size() > 0);
+		}
+		children.push_back(child);
+		isLeaf = false;
+	}
+
+	virtual count getNumberOfChildren() const {
+		return children.size();
+	}
 
 	virtual void coarsen() {
 		assert(this->height() == 2);
 		assert(content.size() == 0);
 		assert(positions.size() == 0);
 
-		std::vector<int> allContent;
+		std::vector<index> allContent;
 		std::vector<Point<double> > allPositions;
 		for (index i = 0; i < this->children.size(); i++) {
 			allContent.insert(allContent.end(), children[i]->content.begin(), children[i]->content.end());
@@ -66,7 +92,7 @@ public:
 	 *
 	 * @return True if content was found and removed, false otherwise
 	 */
-	bool removeContent(int input, const Point<double> &pos) {
+	bool removeContent(index input, const Point<double> &pos) {
 		if (!this->responsible(pos)) return false;
 		if (this->isLeaf) {
 			index i = 0;
@@ -115,7 +141,7 @@ public:
 		return distances(query).first > radius;
 	}
 
-	virtual void getElementsInCircle(Point<double> center, double radius, std::vector<int> &result) const {
+	virtual void getElementsInCircle(Point<double> center, double radius, std::vector<index> &result) const {
 		if (outOfReach(center, radius)) {
 			return;
 		}
@@ -135,7 +161,7 @@ public:
 		}
 	}
 
-	virtual void addContent(int input, const Point<double> &coords) {
+	virtual void addContent(index input, const Point<double> &coords) {
 		assert(content.size() == positions.size());
 		assert(this->responsible(coords));
 		if (isLeaf) {
@@ -192,7 +218,7 @@ public:
 		}
 	}
 
-	virtual count getElementsProbabilistically(const Point<double> &query, std::function<double(double)> prob, std::vector<int> &result) {
+	virtual count getElementsProbabilistically(const Point<double> &query, std::function<double(double)> prob, std::vector<index> &result) {
 		auto distancePair = distances(query);
 		double probUB = prob(distancePair.first);
 		double probLB = prob(distancePair.second);
@@ -266,7 +292,7 @@ public:
 		return candidatesTested;
 	}
 
-	virtual void maybeGetKthElement(double upperBound, Point<double> query, std::function<double(double)> prob, index k, std::vector<int> &circleDenizens) {
+	virtual void maybeGetKthElement(double upperBound, Point<double> query, std::function<double(double)> prob, index k, std::vector<index> &circleDenizens) {
 			assert(k < size());
 			if (isLeaf) {
 				queries++;
@@ -411,16 +437,16 @@ public:
 	 *
 	 * @return std::vector of content type T
 	 */
-	std::vector<int> getElements() const {
+	std::vector<index> getElements() const {
 		if (isLeaf) {
 			return content;
 		} else {
 			assert(content.size() == 0);
 			assert(positions.size() == 0);
 
-			std::vector<int> result;
+			std::vector<index> result;
 			for (index i = 0; i < children.size(); i++) {
-				std::vector<int> subresult = children[i]->getElements();
+				std::vector<index> subresult = children[i]->getElements();
 				result.insert(result.end(), subresult.begin(), subresult.end());
 			}
 			return result;
@@ -502,7 +528,7 @@ public:
 protected:
 	Point<double> minCoords;
 	Point<double> maxCoords;
-	std::vector<int> content;
+	std::vector<index> content;
 	std::vector<Point<double> > positions;
 	std::vector<std::shared_ptr<SpatialCell> > children;
 	bool isLeaf;

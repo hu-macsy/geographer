@@ -12,7 +12,7 @@
 namespace ITI {
 
 template <bool cartesian=true>
-class KDNodeEuclidean: public ITI::SpatialCell<T> {
+class KDNodeEuclidean: public ITI::SpatialCell {
 public:
 	KDNodeEuclidean() = default;
 	virtual ~KDNodeEuclidean() = default;
@@ -79,6 +79,15 @@ public:
 
 		this->children = {firstChild, secondChild};
 		this->isLeaf = false;
+	}
+
+	bool isConsistent() const override {
+		if (this->isLeaf) {
+			return (this->children.size() == 0);
+		} else {
+			return (this->children.size() == 2);
+		}
+		//TODO: check for region coverage
 	}
 
 	std::pair<double, double> distances(const Point<double> &query) const override {

@@ -89,6 +89,23 @@ public:
 		this->isLeaf = false;
 	}
 
+	bool isConsistent() const override {
+		if (this->isLeaf) {
+			if (this->children.size() != 0) {
+				std::cout << children.size() << " children found in node marked as leaf." << std::endl;
+				return false;
+			}
+		} else {
+			index expectedChildren = (1 << minCoords.getDimensions());
+			if (this->children.size() != expectedChildren) {
+				std::cout << "Expected " << expectedChildren << " children in internal node, got " << children.size() << std::endl;
+				return false;
+			}
+		}
+		//TODO: check for region coverage
+		return true;
+	}
+
 	virtual std::pair<double, double> distances(const Point<double> &query) const override {
 		return this->EuclideanCartesianDistances(query);
 	}

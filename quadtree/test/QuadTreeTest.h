@@ -22,8 +22,7 @@ public:
 	virtual ~QuadTreeTest() = default;
 
 protected:
-	template <class T>
-	std::vector<std::shared_ptr<SpatialCell<T> > > getChildren(std::shared_ptr<SpatialCell<T> > node) {
+	std::vector<std::shared_ptr<SpatialCell > > getChildren(std::shared_ptr<SpatialCell> node) {
 		return node->children;
 	}
 };

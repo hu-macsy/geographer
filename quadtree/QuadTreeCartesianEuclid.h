@@ -36,7 +36,7 @@ public:
 //		this->root->getCoordinates(posContainer);
 //	}
 
-	void getElementsInEuclideanCircle(const Point<double> circleCenter, const double radius, std::vector<int> &circleDenizens) const {
+	void getElementsInEuclideanCircle(const Point<double> circleCenter, const double radius, std::vector<index> &circleDenizens) const {
 		this->getElementsInCircle(circleCenter, radius, circleDenizens);
 	}
 

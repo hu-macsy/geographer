@@ -25,7 +25,7 @@ TEST_F(QuadTreeTest, testCartesianEuclidQuery) {
 	std::vector<Point<double> > positions(n);
 	std::vector<index> content(n);
 
-	QuadTreeCartesianEuclid<index> quad({0,0}, {1,1}, true);
+	QuadTreeCartesianEuclid quad({0,0}, {1,1}, true);
 	for (index i = 0; i < n; i++) {
 		Point<double> pos = Point<double>({double(rand()) / RAND_MAX, double(rand()) / RAND_MAX});
 		positions[i] = pos;
@@ -106,7 +106,7 @@ TEST_F(QuadTreeTest, testPolarEuclidQuery) {
 	}
 
 	const bool splitTheoretical = true;
-	QuadTreePolarEuclid<index> tree(angles, radii, content, splitTheoretical);
+	QuadTreePolarEuclid tree(angles, radii, content, splitTheoretical);
 	EXPECT_EQ(n, tree.size());
 
 	tree.trim();
@@ -163,7 +163,7 @@ TEST_F(QuadTreeTest, testQuadTreePolarEuclidInsertion) {
 		content[i] = i;
 	}
 
-	QuadTreePolarEuclid<index> tree(angles, radii, content);
+	QuadTreePolarEuclid tree(angles, radii, content);
 	EXPECT_EQ(n, tree.size());
 
 	/**
@@ -184,7 +184,7 @@ TEST_F(QuadTreeTest, testQuadNodePolarEuclidDistanceBounds) {
 	Point<double> interior = {2.35602,0.129449};
 	Point<double> projected = {2.35619,0.129449};
 
-	QuadNodePolarEuclid<index> testNode(lowerLeft, upperRight);
+	QuadNodePolarEuclid testNode(lowerLeft, upperRight);
 	ASSERT_TRUE(testNode.responsible(interior));
 	EXPECT_LE(testNode.distances(query).first, testNode.euclidDistancePolar(query[0], query[1], interior[0], interior[1]));
 
@@ -206,7 +206,7 @@ TEST_F(QuadTreeTest, testQuadNodeCartesianDistances) {
 
 	Point<double> query({0.81847946542324035, 0.91885035291473593});
 
-	QuadNodeCartesianEuclid<index> node(lower, upper, 1000);
+	QuadNodeCartesianEuclid node(lower, upper, 1000);
 	//count steps = 100;
 	Point<double> posAtMin = lower;
 	double minDistance = posAtMin.distance(query);
@@ -232,7 +232,7 @@ TEST_F(QuadTreeTest, DISABLED_benchCartesianQuadProbabilisticQueryUniform) {
 		std::vector<double> maxCoords(dim, 1);
 
 		std::vector<Point<double> > coordVector;
-		QuadTreeCartesianEuclid<index> quad(minCoords, maxCoords);
+		QuadTreeCartesianEuclid quad(minCoords, maxCoords);
 		for (index i = 0; i < n; i++) {
 			std::vector<double> coords(dim);
 			for (index j = 0; j < dim; j++) {
@@ -263,7 +263,7 @@ TEST_F(QuadTreeTest, DISABLED_benchCartesianKDProbabilisticQueryUniform) {
 		std::vector<double> maxCoords(dim, 1);
 
 		std::vector<Point<double> > coordVector;
-		KDTreeEuclidean<index, true> tree(minCoords, maxCoords);
+		KDTreeEuclidean<true> tree(minCoords, maxCoords);
 		for (index i = 0; i < n; i++) {
 			std::vector<double> coords(dim);
 			for (index j = 0; j < dim; j++) {
@@ -294,7 +294,7 @@ TEST_F(QuadTreeTest, DISABLED_benchPolarQuadProbabilisticQueryUniform) {
 	maxCoords[1] = 1;
 
 	std::vector<Point<double> > coordVector;
-	QuadTreePolarEuclid<index> quad(minCoords, maxCoords);
+	QuadTreePolarEuclid quad(minCoords, maxCoords);
 	for (index i = 0; i < n; i++) {
 		Point<double> coords = {(double(rand()) / RAND_MAX)*2*M_PI, double(rand()) / RAND_MAX};
 		quad.addContent(i, coords);
@@ -319,7 +319,7 @@ TEST_F(QuadTreeTest, DISABLED_benchPolarKDProbabilisticQueryUniform) {
 	std::vector<double> maxCoords({2*M_PI, 1});
 
 	std::vector<Point<double> > coordVector;
-	KDTreeEuclidean<index,false> tree(minCoords, maxCoords);
+	KDTreeEuclidean<false> tree(minCoords, maxCoords);
 	for (index i = 0; i < n; i++) {
 		std::vector<double> coords = {(double(rand()) / RAND_MAX)*2*M_PI, double(rand()) / RAND_MAX};
 		tree.addContent(i, coords);
