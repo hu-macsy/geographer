@@ -308,6 +308,8 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
     std::map<std::vector<ValueType>, std::set<std::vector<ValueType>>> pendingEdges;
     std::map<std::vector<ValueType>, std::set<std::vector<ValueType>>> confirmedEdges;
 
+    IndexType duplicateNeighbors = 0;
+
     std::string line;
     while (std::getline(file, line)) {
     	std::vector<ValueType> values;
@@ -317,7 +319,7 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 		std::string comparison("timestep");
 		std::string prefix(line.begin(), line.begin()+comparison.size());
 		if (prefix == comparison) {
-			std::cout << "Caught other timestep. Abort.";
+			std::cout << "Caught other timestep. Skip remainder of file." << std::endl;
 			break;
 		}
 
@@ -349,6 +351,8 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 		const std::vector<ValueType> ownCoords = {values[0], values[1], values[2]};
 		const ValueType level = values[3];
 		const std::vector<ValueType> parentCoords = {values[4], values[5], values[6]};
+
+		assert(ownCoords != parentCoords);
 
 		assert(*std::min_element(ownCoords.begin(), ownCoords.end()) >= 0);
 
@@ -382,6 +386,7 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 
 			//check for pending edges of parent
 			if (pendingEdges.count(parentCoords) > 0) {
+				std::cout << "Found pending edges for parent " << parentCoords[0] << ", " << parentCoords[1] << ", " << parentCoords[2] << std::endl;
 				std::set<std::vector<ValueType>> thisNodesPendingEdges = pendingEdges.at(parentCoords);
 				for (std::vector<ValueType> otherCoords : thisNodesPendingEdges) {
 					confirmedEdges[parentCoords].insert(otherCoords);
@@ -394,20 +399,37 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 
 		//check own edges, possibly add to pending
 		for (IndexType i = 0; i < 2*dimension; i++) {
-			const IndexType beginIndex = 2*dimension+1*i*dimension;
+			const IndexType beginIndex = 2*dimension+1+i*dimension;
 			const IndexType endIndex = beginIndex+dimension;
 			assert(endIndex <= values.size());
+			if (i == 2*dimension -1) {
+				assert(endIndex == values.size());
+			}
 			const std::vector<ValueType> possibleNeighborCoords(values.begin()+beginIndex, values.begin()+endIndex);
+			assert(possibleNeighborCoords.size() == dimension);
+
 			if (possibleNeighborCoords[0] == -1) {
+				assert(possibleNeighborCoords[1] == -1);
+				assert(possibleNeighborCoords[2] == -1);
 				continue;
+			} else {
+				assert(possibleNeighborCoords[1] != -1);
+				assert(possibleNeighborCoords[2] != -1);
 			}
 
 			if (nodeMap.count(possibleNeighborCoords)) {
+				// this is actually not necessary, since if the other node was before this one,
+				// the edges were added to the pending list and processed above
 				confirmedEdges[ownCoords].insert(possibleNeighborCoords);
 				confirmedEdges[possibleNeighborCoords].insert(ownCoords);
 			} else {
 				if (pendingEdges.count(possibleNeighborCoords) == 0) {
 					pendingEdges[possibleNeighborCoords] = {};
+				}
+				assert(confirmedEdges.count(possibleNeighborCoords) == 0);
+				if (pendingEdges[possibleNeighborCoords].count(ownCoords)) {
+					duplicateNeighbors++;
+					//std::cout << "Duplicate neighbor for " << ownCoords[0] << ", " << ownCoords[1] << ", " << ownCoords[2] << std::endl;
 				}
 				pendingEdges[possibleNeighborCoords].insert(ownCoords);
 			}
@@ -415,9 +437,16 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
     }
 
     file.close();
-    std::cout << "Read file, found or created " << nodeMap.size() << " nodes and at least " << pendingEdges.size() << " pending edges." << std::endl;
+    std::cout << "Read file, found or created " << nodeMap.size() << " nodes and pending edges for " << pendingEdges.size() << " ghost nodes." << std::endl;
+    if (duplicateNeighbors > 0) {
+    	std::cout << "Found " << duplicateNeighbors << " duplicate neighbors." << std::endl;
+    }
 
     assert(confirmedEdges.size() == nodeMap.size());
+
+    for (auto pendingSets : pendingEdges) {
+    	assert(nodeMap.count(pendingSets.first) == 0);
+    }
 
     //check whether all nodes have either no or the full amount of children
     for (std::pair<std::vector<ValueType>, std::shared_ptr<SpatialCell>> elems : nodeMap) {
@@ -432,6 +461,8 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 
     IndexType i = 0;
     IndexType totalEdges = 0;
+    IndexType numLeaves = 0;
+    IndexType leafEdges = 0;
     std::vector<std::set<std::shared_ptr<SpatialCell> > > result(nodeMap.size());
     for (std::pair<std::vector<ValueType>, std::set<std::vector<ValueType> > > edgeSet : confirmedEdges) {
     	result[i] = {};
@@ -442,15 +473,20 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
     	}
     	assert(result[i].size() == edgeSet.second.size());
 
-    	if (result[i].size() == 0 && nodeMap[edgeSet.first]->height() == 1) {
-    		//only parent nodes are allowed to have no edges.
-    		throw std::runtime_error("Node at " + std::to_string(edgeSet.first[0]) + ", " + std::to_string(edgeSet.first[1]) + ", " + std::to_string(edgeSet.first[2])
-    		+ " is isolated leaf node.");
+    	if (nodeMap[edgeSet.first]->height() == 1) {
+    		numLeaves++;
+    		leafEdges += result[i].size();
+    		if (result[i].size() == 0) {
+				//only parent nodes are allowed to have no edges.
+				throw std::runtime_error("Node at " + std::to_string(edgeSet.first[0]) + ", " + std::to_string(edgeSet.first[1]) + ", " + std::to_string(edgeSet.first[2])
+				+ " is isolated leaf node.");
+			}
     	}
+
     	i++;
     }
     assert(nodeMap.size() == i++);
-    std::cout << "Read " << totalEdges << " confirmed edges." << std::endl;
+    std::cout << "Read " << totalEdges << " confirmed edges, among them " << leafEdges << " edges between " << numLeaves << " leaves." << std::endl;
     return result;
 }
 
