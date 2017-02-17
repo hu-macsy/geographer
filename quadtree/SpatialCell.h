@@ -472,8 +472,12 @@ public:
 	}
 
 	index getID() const {
-			return ID;
-		}
+		return ID;
+	}
+
+	void setID(index newID) {
+		ID = newID;
+	}
 
 
 	index indexSubtree(index nextID) {
@@ -508,7 +512,7 @@ public:
 		}
 	}
 
-	count reindex(count offset) {
+	count reindexContent(count offset) {
 		if (this->isLeaf)
 		{
 			#pragma omp task
@@ -519,7 +523,7 @@ public:
 			offset += this->size();
 		} else {
 			for (int i = 0; i < children.size(); i++) {
-				offset = this->children[i]->reindex(offset);
+				offset = this->children[i]->reindexContent(offset);
 			}
 		}
 		return offset;

@@ -311,6 +311,7 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
     IndexType duplicateNeighbors = 0;
 
     std::string line;
+    IndexType nodeID = 0;
     while (std::getline(file, line)) {
     	std::vector<ValueType> values;
     	std::stringstream ss( line );
@@ -361,6 +362,8 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 
 		//create own cell and add to node map
 		std::shared_ptr<QuadNodeCartesianEuclid> quadNodePointer(new QuadNodeCartesianEuclid(minCoords, maxCoords));
+		quadNodePointer->setID(nodeID);
+		nodeID++;
 		assert(nodeMap.count(ownCoords) == 0);
 		nodeMap[ownCoords] = quadNodePointer;
 		assert(confirmedEdges.count(ownCoords) == 0);
@@ -380,6 +383,8 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 		if (parentCoords[0] != -1 && nodeMap.count(parentCoords) == 0) {
 			std::tie(minCoords, maxCoords) = getBoundingCoords(parentCoords, level+1);
 			std::shared_ptr<QuadNodeCartesianEuclid> parentPointer(new QuadNodeCartesianEuclid(minCoords, maxCoords));
+			parentPointer->setID(nodeID);
+			nodeID++;
 			nodeMap[parentCoords] = parentPointer;
 			assert(confirmedEdges.count(parentCoords) == 0);
 			confirmedEdges[parentCoords] = {};

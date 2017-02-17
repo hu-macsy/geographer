@@ -44,12 +44,12 @@ public:
 		root->trim();
 	}
 
-	void reindex() {
+	void reindexContent() {
 		#pragma omp parallel
 		{
 			#pragma omp single nowait
 			{
-				root->reindex(0);
+				root->reindexContent(0);
 			}
 		}
 	}
