@@ -18,24 +18,6 @@ using std::ofstream;
 using std::endl;
 using std::istringstream;
 
-/*
-struct rectancle{
-    IndexType id;
-    std::tuple<IndexType, IndexType, IndexType> bottomCorner;
-    std::tuple<IndexType, IndexType, IndexType> topCorner;
-    
-    // 6 kinds of neighbours
-    std::vector<IndexType> xMin;    // left  - side of rect that x is minimum
-    std::vector<IndexType> xMax;    // right - x is maximum
-    std::vector<IndexType> yMin;    // front - y is minimum
-    std::vector<IndexType> yMax;    // back  - y is maximum
-    std::vector<IndexType> zMin;    // bottom- z is minimum
-    std::vector<IndexType> zMax;    // top   - z is maximum
-    
-    // upon division in 8 subrectancles the inner connections are ...
-    
-};
-*/
 
 namespace ITI{
 
@@ -631,12 +613,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
      */
     // build 2 HArrays from vectors to send data to other PEs
     // first round send your own data, then send what you received
-    /*
-    SCAI_ASSERT_EQUAL_ERROR(localNodeInd.size() , nonLocalNodeInd.size() );
-    scai::hmemo::HArrayRef<IndexType> arrSendLocalNodeInd( localNodeInd );
-    scai::hmemo::HArrayRef<IndexType> arrSendNonLocalInd( nonLocalNodeInd );
-    */
-    
+
     /* The 2 arrays idea does not seem to work. We will use 1 array and edges wil be
      * in indices [0]-[1] , [2]-[3] .... [i]-[i+1]
      */

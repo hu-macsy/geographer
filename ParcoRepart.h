@@ -184,13 +184,10 @@ namespace ITI {
 			static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM);
 
 		private:
-            static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-                        		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
-                        		std::vector<bool>& assignedToSecondBlock, const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes,
-                        		Settings settings);
+                    
+            static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,std::vector<bool>& assignedToSecondBlock, const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes,Settings settings);
 
-            static IndexType twoWayLocalCut(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-            		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<bool>& assignedToSecondBlock);
+            static IndexType twoWayLocalCut(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<bool>& assignedToSecondBlock);
 
             static ValueType twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
                                     		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,

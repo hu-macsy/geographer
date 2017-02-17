@@ -13,6 +13,7 @@
 #include <functional>
 #include <memory>
 #include <set>
+#include <list>
 
 #include "Point.h"
 
@@ -537,6 +538,7 @@ public:
          */
 	template<typename IndexType, typename ValueType>
 	scai::lama::CSRSparseMatrix<ValueType> getSubTreeAsGraph() {
+            SCAI_REGION("getSubTreeAsGraph");
             // index the tree to keep track of graph neighbours
             //this->ID= indexSubtree(1);
             unsigned int treeSize= indexSubtree(0);
@@ -548,31 +550,33 @@ public:
            
             // not recursive, keep a frontier of the nodes to be checked
             // start with this and add every child
-            // TODO: change to list and pop last seen element
-    ////// not sure if this is the right way. At least it works for now
-            std::vector<std::shared_ptr<SpatialCell>> frontier;
-            frontier.push_back( this->shared_from_this() );
-    //////
-            PRINT("root ID: " << frontier[0]->getID() << ", and treeSize= "<< treeSize);
+            std::list<std::shared_ptr<SpatialCell>> frontier;
 
-            for(unsigned int frontierI=0; frontierI<frontier.size(); frontierI++){
-                
-                std::shared_ptr<SpatialCell> thisNode = frontier[frontierI];
-        //PRINT(frontierI<< ": thisNode ID: " << thisNode->getID()); 
+////// not sure if this is the right way to use shared_from_this. At least it works for now
+            frontier.push_back( this->shared_from_this() );
+
+            //PRINT("root ID: " << frontier[0]->getID() << ", and treeSize= "<< treeSize);
+
+            for(std::list<std::shared_ptr<SpatialCell>>::iterator frontIt=frontier.begin(); frontIt!=frontier.end(); frontIt++){
+        
+                SCAI_REGION("getSubTreeAsGraph.inFrontier");
+                std::shared_ptr<SpatialCell> thisNode = *frontIt;
                 // connect children in the graph
                 // for all children
                 for(unsigned int c=0; c<thisNode->children.size(); c++){
+                    
                     std::shared_ptr<SpatialCell> child = thisNode->children[c];
+                    
                     // if not indexed
                     if(child->getID() == -1){
                         PRINT("Got cell ID= -1.");
                         throw std::logic_error("Tree not indexed?");
                     }
+                    
                     // for all siblings
                     for(unsigned int s=c+1; s<thisNode->children.size(); s++){
                         std::shared_ptr<SpatialCell> sibling = thisNode->children[s];
                         // if cells are adjacent add -it- to your graph neighbours list
-                        
                         if( child->isAdjacent( *sibling) ){
                             assert( child->getID() < graphNgbrsCells.size() );
                             assert( sibling->getID() < graphNgbrsCells.size() );
@@ -596,51 +600,47 @@ public:
                     frontier.push_back(child);
                 }
             
-            // now all children are checked and we set the pointers, if this node is not a leaf
-            // then it is not needed anymore. Reset/delete pointers pointing to this and from
-            // this to others.
-            
-            if( !thisNode->isLeaf ){
-                PRINT("Node "<< thisNode->getID() << " is not a leaf node");   
-                assert(thisNode->getID() < graphNgbrsCells.size() );
-                //std::shared_ptr<SpatialCell> la(thisNode);
-                // first remove this->ID from others
-                for(typename std::set<std::shared_ptr<SpatialCell>>::iterator graphNgb= graphNgbrsCells[thisNode->getID()].begin(); graphNgb!=graphNgbrsCells[thisNode->getID()].end(); graphNgb++){
-           
-                    assert( graphNgb->get()->getID() < graphNgbrsCells.size());
-                    std::set<std::shared_ptr<SpatialCell>>& ngbSet = graphNgbrsCells[graphNgb->get()->getID()];
-                    
-                    typename std::set<std::shared_ptr<SpatialCell>>::iterator fnd= ngbSet.find(std::shared_ptr<SpatialCell>(thisNode) ) ;
-
-PRINT(ngbSet.size()<<" __ "<< fnd->get()->getID() );     
-
-                    std::shared_ptr<SpatialCell> found;
-                    if( fnd != ngbSet.end() ){
-                        PRINT("Node ID: "<< thisNode->getID() << " WAS found in the set of node "<< graphNgb->get()->getID());
-                        // erase the shared_ptr from the set
-                        ngbSet.erase(fnd);
-                    }else{
-                        PRINT("Node ID: "<< thisNode->getID() << " was NOT found in the set of node "<< graphNgb->get()->getID());
-                    }
-                }
-                                
-                // empty this set too 
-                graphNgbrsCells[thisNode->getID()].clear();
+                // now all children are checked and we set the pointers, if this node is not a leaf
+                // then it is not needed anymore. Reset/delete pointers pointing to this and from
+                // this to others.
                 
-            }
+                if( !thisNode->isLeaf ){
+                    //PRINT("Node "<< thisNode->getID() << " is not a leaf node");   
+                    assert(thisNode->getID() < graphNgbrsCells.size() );
+                    
+                    // first remove this->ID from others in the graphNgbrsCells vector<set>
+                    for(typename std::set<std::shared_ptr<SpatialCell>>::iterator graphNgb= graphNgbrsCells[thisNode->getID()].begin(); graphNgb!=graphNgbrsCells[thisNode->getID()].end(); graphNgb++){
             
+                        assert( graphNgb->get()->getID() < graphNgbrsCells.size());
+                        // the neigbours of thisNode->graphNgb. this->ID must be in there somewhere
+                        std::set<std::shared_ptr<SpatialCell>>& ngbSet = graphNgbrsCells[graphNgb->get()->getID()];
+                        
+                        typename std::set<std::shared_ptr<SpatialCell>>::iterator fnd= ngbSet.find(std::shared_ptr<SpatialCell>(thisNode) ) ;
+
+                        if( fnd != ngbSet.end() ){
+                            //PRINT("Node ID: "<< thisNode->getID() << " WAS found in the set of node "<< graphNgb->get()->getID());
+                            // erase the shared_ptr from the set
+                            ngbSet.erase(fnd);
+                        }else{
+                            // in principle this must never occur.
+                            // TODO: shange the warning to an assertion or error 
+                            PRINT("\n WARNING:\nNode ID: "<< thisNode->getID() << " was NOT found in the set of node "<< graphNgb->get()->getID());
+                        }
+                    }
+                                    
+                    // empty this set too 
+                    graphNgbrsCells[thisNode->getID()].clear();
+                    
+                }
             
-PRINT( "frontierI= "<<frontierI << ", front size= "<<  frontier.size() <<": "<< getVSsize(graphNgbrsCells) );  
+            } //for(unsigned int frontierI=0; frontierI<frontier.size(); frontierI++)
             
-            }
-            
-            /*
-             * REMEMBER: graphNgbrsCells.size()== treeSize, not leafSize
-             */
 
             /*
              * Before making the CSR sparse matrix must reindex because leaves do not have
              * sequencial indices.
+             *
+             * REMEMBER: graphNgbrsCells.size()== treeSize, not leafSize
              */
             
             index leafIndex = 0, non_leaves= 0;
@@ -655,7 +655,7 @@ PRINT( "frontierI= "<<frontierI << ", front size= "<<  frontier.size() <<": "<< 
                     ++non_leaves;
                 }
             }
-PRINT( leafIndex << " | " << countLeaves() << " ,  non-leaves= " << non_leaves );
+            PRINT(" leaf nodes= " << countLeaves() << " ,  non-leaves= " << non_leaves );
             assert( leafIndex == countLeaves() );
             
             /* 
@@ -664,26 +664,26 @@ PRINT( leafIndex << " | " << countLeaves() << " ,  non-leaves= " << non_leaves )
 
             IndexType nnzValues = getVSsize(graphNgbrsCells);
             IndexType N = numLeaves;
-PRINT( nnzValues << " <> "<< countLeaves() );            
-            //assert(countLeaves() == graphNgbrsCells.size() );
-                        
+          
             //create the adjacency matrix
             scai::hmemo::HArray<IndexType> csrIA;
             scai::hmemo::HArray<IndexType> csrJA;
             scai::hmemo::HArray<ValueType> csrValues;
             
             {
+                SCAI_REGION("getSubTreeAsGraph.getCSRMatrix");
                 scai::hmemo::WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
                 scai::hmemo::WriteOnlyAccess<IndexType> ja( csrJA, nnzValues);
                 scai::hmemo::WriteOnlyAccess<ValueType> values( csrValues, nnzValues);
                 ia[0] = 0;
                 
-                // count non-zero elements, needed for debug reasons
+                // count non-zero elements
                 IndexType nnzCounter = 0; 
                 
                 // since we do not have distribution traverse all rows
                 for(IndexType i=0; i<graphNgbrsCells.size(); i++){
-                    // should be == graphNgbrsCells[i].size(), if this is correct then no need to count and
+                    // TODO:
+                    // should be numRowElems == graphNgbrsCells[i].size(), if this is correct then no need to count and
                     // we just do after the for: ia[i+1] = ia[i] + graphNgbrsCells[i].size() 
                     IndexType numRowElems= 0;
                     // the index of the leaves since -i- traverses also non-leaf nodes
@@ -721,7 +721,7 @@ PRINT( nnzValues << " <> "<< countLeaves() );
                 //PRINT("nnz afterwards= " << nnzCounter << " should be == "<< nnzValues);
                 SCAI_ASSERT_EQUAL_ERROR( nnzCounter, nnzValues);
 
-PRINT(csrIA.size() << " _ " << csrJA.size() << " @ " << csrValues.size() );                
+                //PRINT(csrIA.size() << " _ " << csrJA.size() << " @ " << csrValues.size() );                
             }
                     
             scai::lama::CSRStorage<ValueType> localMatrix( N, N, nnzValues, csrIA, csrJA, csrValues );

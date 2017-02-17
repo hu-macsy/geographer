@@ -25,6 +25,7 @@
 #include "HilbertCurve.h"
 #include "MeshGenerator.h"
 #include "Settings.h"
+#include "FileIO.h"
 
 typedef double ValueType;
 typedef int IndexType;
@@ -70,11 +71,11 @@ TEST_F(MeshGeneratorTest, testMesh3DCreateStructuredMesh_Local_3D) {
     
     {
         SCAI_REGION("testMesh3DCreateStructuredMesh_Local_3D.(writeInFileMetisFormat and writeInFileCoords)")
-        FileIO<IndexType, ValueType>::writeGraphToFile( adjM, grFile);
-        FileIO<IndexType, ValueType>::writeCoordsToFile( coords, numberOfPoints, coordFile);
+        FileIO<IndexType, ValueType>::writeGraph( adjM, grFile);
+        FileIO<IndexType, ValueType>::writeCoords( coords, numberOfPoints, coordFile);
     }
     
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraphFromFile( grFile );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( grFile );
     
     // check the two matrixes to be equal
     {
@@ -311,7 +312,7 @@ TEST_F(MeshGeneratorTest, testWriteMetis_Dist_3D){
     MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
     
     // write the mesh in p(=number of PEs) files
-    FileIO<IndexType, ValueType>::writeDistributed( adjM, "meshes/dist3D_");
+    FileIO<IndexType, ValueType>::writeGraphDistributed( adjM, "meshes/dist3D_");
     
 }
 
