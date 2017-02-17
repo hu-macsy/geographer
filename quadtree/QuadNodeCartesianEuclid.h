@@ -15,6 +15,11 @@
 #include <assert.h>
 #include "SpatialCell.h"
 
+using std::vector;
+using std::min;
+using std::max;
+using std::cos;
+
 namespace ITI {
 
 class QuadNodeCartesianEuclid : public ITI::SpatialCell {

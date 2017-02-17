@@ -7,15 +7,21 @@
 
 #pragma once
 
+#include <scai/lama/matrix/all.hpp>
+
 #include <vector>
 #include <functional>
 #include <memory>
+#include <set>
+#include <list>
 
 #include "Point.h"
 
+#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
+
 namespace ITI {
 
-class SpatialCell {
+class SpatialCell : public std::enable_shared_from_this<SpatialCell>{
 	friend class QuadTreeTest;
 public:
 	SpatialCell() = default;
@@ -528,6 +534,288 @@ public:
 		}
 		return offset;
 	}
+	
+//-------------------------------------------------------------------------------------------
+    
+	/* Returns the sub tree starting from this node as the adjacency list/matrix of a graph.
+         * Whenever I use "graph" I mean in the final graph, not the tree.
+         */
+	template<typename IndexType, typename ValueType>
+	scai::lama::CSRSparseMatrix<ValueType> getSubTreeAsGraph() {
+            SCAI_REGION("getSubTreeAsGraph");
+            // index the tree to keep track of graph neighbours
+            //this->ID= indexSubtree(1);
+            unsigned int treeSize= indexSubtree(0);
+
+            // graphNeighbours[i]: the indices of the neighbours of node i in the final graph, not of the tree
+            std::vector<std::set<index>> graphNgbrsID(treeSize);
+            
+            std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells( treeSize );
+           
+            // not recursive, keep a frontier of the nodes to be checked
+            // start with this and add every child
+            std::list<std::shared_ptr<SpatialCell>> frontier;
+
+////// not sure if this is the right way to use shared_from_this. At least it works for now
+            frontier.push_back( this->shared_from_this() );
+
+            //PRINT("root ID: " << frontier[0]->getID() << ", and treeSize= "<< treeSize);
+
+            for(std::list<std::shared_ptr<SpatialCell>>::iterator frontIt=frontier.begin(); frontIt!=frontier.end(); frontIt++){
+        
+                SCAI_REGION("getSubTreeAsGraph.inFrontier");
+                std::shared_ptr<SpatialCell> thisNode = *frontIt;
+                // connect children in the graph
+                // for all children
+                for(unsigned int c=0; c<thisNode->children.size(); c++){
+                    
+                    std::shared_ptr<SpatialCell> child = thisNode->children[c];
+                    
+                    // if not indexed
+                    if(child->getID() == -1){
+                        PRINT("Got cell ID= -1.");
+                        throw std::logic_error("Tree not indexed?");
+                    }
+                    
+                    // for all siblings
+                    for(unsigned int s=c+1; s<thisNode->children.size(); s++){
+                        std::shared_ptr<SpatialCell> sibling = thisNode->children[s];
+                        // if cells are adjacent add -it- to your graph neighbours list
+                        if( child->isAdjacent( *sibling) ){
+                            assert( child->getID() < graphNgbrsCells.size() );
+                            assert( sibling->getID() < graphNgbrsCells.size() );
+                            graphNgbrsCells[child->getID()].insert(sibling);
+                            graphNgbrsCells[sibling->getID()].insert(child);
+                        }
+                    }
+                    
+                    // check this child with all the neighbours of father in the graph
+                    // graphNgb is a neighbouring cell of this node as a shared_ptr
+                    for(typename std::set<std::shared_ptr<SpatialCell>>::iterator graphNgb= graphNgbrsCells[thisNode->ID].begin(); graphNgb!=graphNgbrsCells[thisNode->getID()].end(); graphNgb++){
+                        if( child->isAdjacent(*graphNgb->get()) ){                          
+                            assert( child->getID() < graphNgbrsCells.size() );
+                            assert( graphNgb->get()->getID() < graphNgbrsCells.size() );
+                            graphNgbrsCells[child->getID()].insert(*graphNgb );
+                            graphNgbrsCells[graphNgb->get()->getID()].insert(child);
+                        } 
+                    }
+
+                    //when finished with this child, push it to frontier
+                    frontier.push_back(child);
+                }
+            
+                // now all children are checked and we set the pointers, if this node is not a leaf
+                // then it is not needed anymore. Reset/delete pointers pointing to this and from
+                // this to others.
+                
+                if( !thisNode->isLeaf ){
+                    //PRINT("Node "<< thisNode->getID() << " is not a leaf node");   
+                    assert(thisNode->getID() < graphNgbrsCells.size() );
+                    
+                    // first remove this->ID from others in the graphNgbrsCells vector<set>
+                    for(typename std::set<std::shared_ptr<SpatialCell>>::iterator graphNgb= graphNgbrsCells[thisNode->getID()].begin(); graphNgb!=graphNgbrsCells[thisNode->getID()].end(); graphNgb++){
+            
+                        assert( graphNgb->get()->getID() < graphNgbrsCells.size());
+                        // the neigbours of thisNode->graphNgb. this->ID must be in there somewhere
+                        std::set<std::shared_ptr<SpatialCell>>& ngbSet = graphNgbrsCells[graphNgb->get()->getID()];
+                        
+                        typename std::set<std::shared_ptr<SpatialCell>>::iterator fnd= ngbSet.find(std::shared_ptr<SpatialCell>(thisNode) ) ;
+
+                        if( fnd != ngbSet.end() ){
+                            //PRINT("Node ID: "<< thisNode->getID() << " WAS found in the set of node "<< graphNgb->get()->getID());
+                            // erase the shared_ptr from the set
+                            ngbSet.erase(fnd);
+                        }else{
+                            // in principle this must never occur.
+                            // TODO: shange the warning to an assertion or error 
+                            PRINT("\n WARNING:\nNode ID: "<< thisNode->getID() << " was NOT found in the set of node "<< graphNgb->get()->getID());
+                        }
+                    }
+                                    
+                    // empty this set too 
+                    graphNgbrsCells[thisNode->getID()].clear();
+                    
+                }
+            
+            } //for(unsigned int frontierI=0; frontierI<frontier.size(); frontierI++)
+            
+
+            /*
+             * Before making the CSR sparse matrix must reindex because leaves do not have
+             * sequencial indices.
+             *
+             * REMEMBER: graphNgbrsCells.size()== treeSize, not leafSize
+             */
+            
+            index leafIndex = 0, non_leaves= 0;
+            index numLeaves = countLeaves();
+            std::vector<index> leafIndexMapping(treeSize);
+            for(index i=0; i<graphNgbrsCells.size(); i++){
+                //if a set has size 0 then it is not a leaf so set -1
+                if( graphNgbrsCells[i].size() != 0){
+                    leafIndexMapping[i]= leafIndex++;
+                }else{
+                    leafIndexMapping[i]= -1;
+                    ++non_leaves;
+                }
+            }
+            PRINT(" leaf nodes= " << countLeaves() << " ,  non-leaves= " << non_leaves );
+            assert( leafIndex == countLeaves() );
+            
+            /* 
+             * from the graphNgbrsCells vector set the CSR sparse matrix
+             */
+
+            IndexType nnzValues = getVSsize(graphNgbrsCells);
+            IndexType N = numLeaves;
+          
+            //create the adjacency matrix
+            scai::hmemo::HArray<IndexType> csrIA;
+            scai::hmemo::HArray<IndexType> csrJA;
+            scai::hmemo::HArray<ValueType> csrValues;
+            
+            {
+                SCAI_REGION("getSubTreeAsGraph.getCSRMatrix");
+                scai::hmemo::WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
+                scai::hmemo::WriteOnlyAccess<IndexType> ja( csrJA, nnzValues);
+                scai::hmemo::WriteOnlyAccess<ValueType> values( csrValues, nnzValues);
+                ia[0] = 0;
+                
+                // count non-zero elements
+                IndexType nnzCounter = 0; 
+                
+                // since we do not have distribution traverse all rows
+                for(IndexType i=0; i<graphNgbrsCells.size(); i++){
+                    // TODO:
+                    // should be numRowElems == graphNgbrsCells[i].size(), if this is correct then no need to count and
+                    // we just do after the for: ia[i+1] = ia[i] + graphNgbrsCells[i].size() 
+                    IndexType numRowElems= 0;
+                    // the index of the leaves since -i- traverses also non-leaf nodes
+                    index leafIndex= -1;
+                    assert( i< leafIndexMapping.size() );
+                    if(leafIndexMapping[i]==-1){
+                        continue;
+                    }else{
+                        leafIndex = leafIndexMapping[i];
+                    }
+                    // graphNgb is a neighbouring cell of this node as a shared_ptr
+                    for(typename std::set<std::shared_ptr<SpatialCell>>::iterator graphNgb= graphNgbrsCells[i].begin(); graphNgb!=graphNgbrsCells[i].end(); graphNgb++){
+                        // all nodes must be leaves                
+                        assert( graphNgb->get()->isLeaf );
+                        // not -i- since it also includes non-leaf nodes, use leafIndex instead
+                        IndexType ngbGlobalInd = leafIndex;
+                        assert( nnzCounter< ja.size() );
+                        SCAI_ASSERT( nnzCounter < nnzValues, __FILE__<<" ,"<<__LINE__<< ": nnzValues not calculated properly")
+                        ja[nnzCounter] = ngbGlobalInd;
+                        values[nnzCounter] = 1;
+                        ++nnzCounter;
+                        ++numRowElems;
+                    }
+                    assert(leafIndex+1< ia.size() );
+                    ia[leafIndex+1] = ia[leafIndex] + numRowElems;
+                    SCAI_ASSERT(numRowElems == graphNgbrsCells[i].size(),  __FILE__<<" ,"<<__LINE__<<"something is wrong");
+                }
+                //TODO: probably resize is never needed (if everything is counted correctly)
+                assert(ja.size() == values.size() );
+                if( ja.size()!=nnzCounter){
+                    PRINT("resizing since ja.size= "<< ja.size() << " and nnzCounter= "<< nnzCounter);                    
+                    ja.resize(nnzCounter);
+                    values.resize(nnzCounter);
+                }
+                //PRINT("nnz afterwards= " << nnzCounter << " should be == "<< nnzValues);
+                SCAI_ASSERT_EQUAL_ERROR( nnzCounter, nnzValues);
+
+                //PRINT(csrIA.size() << " _ " << csrJA.size() << " @ " << csrValues.size() );                
+            }
+                    
+            scai::lama::CSRStorage<ValueType> localMatrix( N, N, nnzValues, csrIA, csrJA, csrValues );
+            //localMatrix.allocate( N, N );
+            //localMatrix.swap( csrIA, csrJA, csrValues );
+            
+            scai::lama::CSRSparseMatrix<ValueType> ret(localMatrix);
+            //graphNgbrsCells.clear();
+            return ret;
+        }
+        
+        
+        static int getVSsize(std::vector< std::set<std::shared_ptr<SpatialCell>>> input){
+            int size= 0;
+            for(int i=0; i<input.size(); i++){
+                for(typename std::set<std::shared_ptr<SpatialCell>>::iterator graphNgb= input[i].begin(); graphNgb!=input[i].end(); graphNgb++){
+                    ++size;
+                    //PRINT(graphNgb->get()->getID());
+                }
+            }
+            return size;
+        }
+        
+        
+        /* Checks if two cells are adjacent and share an area. If they have an edge or a corner in common
+         * then the test is false.
+         * TODO: it does not test is on cell is inside another (well, this cannot happen in a quadTree).
+         * TODO: remove the dimension warning if there nothing to warn about.
+         * */
+        
+        bool isAdjacent(SpatialCell& other){
+            int dim = minCoords.getDimensions();
+            if(dim!=3){
+                //std::cout<<"Dimension != 3: WARNING, It could work but not sure...."<< std::endl;
+            }
+//PRINT("this: "<< minCoords[0]<<", "<<minCoords[1]<<" - "<< maxCoords[0]<<", "<<maxCoords[1]);
+//PRINT("other: "<< other.minCoords[0]<<", "<< other.minCoords[1]<<" - "<< other.maxCoords[0]<<", "<< other.maxCoords[1]);
+            // if 0 or 1 OK, if 2 cells share just an edge, if 3 they share a corner
+            int strictEqualities= 0;
+            for(int d=0; d<dim; d++){
+                // this ensures that share a face but not sure if edge or corner
+                if(maxCoords[d]< other.minCoords[d]){
+                    return false;
+                }else if(minCoords[d]> other.maxCoords[d]){
+                    return false;
+                }
+                
+                // this rules out if they share only an edge or a corner
+                if( maxCoords[d]== other.minCoords[d] or minCoords[d]== other.maxCoords[d]){
+                    ++strictEqualities;
+                }
+            }
+            
+            // for arbitrary dimension this can be >d-2 (?)
+            if(dim==2){
+                if( strictEqualities > 1){
+                    return false;
+                }
+            }else {
+                if( strictEqualities > dim-2){
+                    return false;
+                }
+            }
+            // if none of the above failed
+            
+            return true;
+        }
+        
+        
+        /* Returns the 2^dim corners of the cell.
+         */
+        std::vector<Point<double>> getCorners(){
+        
+            int dim = minCoords.getDimensions();
+            std::vector<Point<double>> corners(pow(2,dim));
+            assert(corners.size() % 2 == 0);//if this assert fails, we had some floating point bug in the exponentiation
+            for(int i=0; i<corners.size(); i++){
+                int bitCopy= i;
+                std::vector<double> point(dim, 0.0);
+                for(int d=0; d<dim; d++){
+                    point[d]= minCoords[d]+ (bitCopy & 1)* maxCoords[d];
+                    bitCopy = bitCopy >> 1;
+                }
+                corners[i] = Point<double>(point);
+            }
+            return corners;
+        }
+	
+	
+//-------------------------------------------------------------------------------------
 
 protected:
 	Point<double> minCoords;

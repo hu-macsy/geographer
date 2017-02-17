@@ -130,7 +130,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 		/**
 		* Several possibilities exist for choosing the recursion depth.
-		* Either by user choice, or by the maximum fitting into the datatype, or by the graph size..
+		* Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
 		*/
 		const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(n), double(21));
 	
@@ -164,6 +164,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				hilbertIndicesLocal[i] = globalHilbertIndex;
 			}
 		}
+		
 		
 		/**
 		* now sort the global indices by where they are on the space-filling curve.
@@ -2000,6 +2001,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const 
     	}
     }
    
+    //border.setValues(localBorder);
     assert(border.getDistributionPtr()->getLocalSize() == localN);
     return border;
 }
@@ -2178,7 +2180,6 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getBlo
     
     // TODO: memory costly for big k
     IndexType size= k*k;
-    
     // get, on each processor, the edges of the blocks that are local
     std::vector< std::vector<IndexType> > blockEdges = ParcoRepart<int, double>::getLocalBlockGraphEdges( adjM, part);
     assert(blockEdges[0].size() == blockEdges[1].size());
@@ -2273,6 +2274,7 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     // use boost::Graph and boost::edge_coloring()
     typedef adjacency_list<vecS, vecS, undirectedS, no_property, size_t, no_property> Graph;
     typedef std::pair<std::size_t, std::size_t> Pair;
+    //std::vector<std::vector<IndexType>> edges(2);
     Graph G(N);
     
     // retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge

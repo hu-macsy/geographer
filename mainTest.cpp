@@ -189,6 +189,13 @@ int main(int argc, char** argv) {
 
         // create the adjacency matrix and the coordinates
         ITI::MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist( graph, coordinates, maxCoord, numPoints);
+        
+        if(comm->getRank()==0){
+            IndexType nodes= graph.getNumRows();
+            IndexType edges= graph.getNumValues()/2;	
+            std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
+	}
+
 
     } else{
     	std::cout << "Either an input file or generation parameters are needed. Call again with --file or --generate" << std::endl;
