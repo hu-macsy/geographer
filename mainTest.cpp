@@ -19,7 +19,8 @@
 #include <cstdlib>
 #include <chrono>
 
-#include "MeshIO.h"
+#include "MeshGenerator.h"
+#include "FileIO.h"
 #include "ParcoRepart.h"
 #include "Settings.h"
 
@@ -138,20 +139,17 @@ int main(int argc, char** argv) {
 			std::cout<< "Reading from file \""<< graphFile << "\" for the graph and \"" << coordFile << "\" for coordinates"<< std::endl;
         }
 
-        scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-        scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
-        graph = scai::lama::CSRSparseMatrix<ValueType>( rowDistPtr , noDistPtr );
-
         // read the adjacency matrix and the coordinates from a file
-        graph = ITI::MeshIO<IndexType, ValueType>::readFromFile2AdjMatrix( graphFile );
-        graph.redistribute(rowDistPtr , noDistPtr);
+        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+        scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
+        scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
+        assert(graph.getColDistribution().isEqual(*noDistPtr));
 
-        // take care, when reading from file graph needs redistribution - Not anymore! :-)
         if (comm->getRank() == 0) {
         	std::cout<< "Read " << N << " points." << std::endl;
         }
         
-        coordinates = ITI::MeshIO<IndexType, ValueType>::fromFile2Coords(coordFile, N, settings.dimensions );
+        coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions );
 
         if (comm->getRank() == 0) {
         	std::cout << "Read coordinates." << std::endl;
@@ -168,7 +166,7 @@ int main(int argc, char** argv) {
         maxCoord[1] = settings.numY;
         maxCoord[2] = settings.numZ;
 
-        std::vector<IndexType> numPoints(3); // number of poitns in each dimension, used only for 3D
+        std::vector<IndexType> numPoints(3); // number of points in each dimension, used only for 3D
 
         for (IndexType i = 0; i < 3; i++) {
         	numPoints[i] = maxCoord[i];
@@ -190,7 +188,7 @@ int main(int argc, char** argv) {
         }
 
         // create the adjacency matrix and the coordinates
-        ITI::MeshIO<IndexType, ValueType>::createRandomStructured3DMesh_dist( graph, coordinates, maxCoord, numPoints);
+        ITI::MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist( graph, coordinates, maxCoord, numPoints);
         
         if(comm->getRank()==0){
             IndexType nodes= graph.getNumRows();
