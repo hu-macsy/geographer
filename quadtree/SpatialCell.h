@@ -541,22 +541,23 @@ public:
          * Whenever I use "graph" I mean in the final graph, not the tree.
          */
 	template<typename IndexType, typename ValueType>
-	scai::lama::CSRSparseMatrix<ValueType> getSubTreeAsGraph() {
+	scai::lama::CSRSparseMatrix<ValueType> getSubTreeAsGraph(std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells) {
             SCAI_REGION("getSubTreeAsGraph");
             // index the tree to keep track of graph neighbours
             //this->ID= indexSubtree(1);
-            unsigned int treeSize= indexSubtree(0);
+            unsigned int treeSize= graphNgbrsCells.size();
 
             // graphNeighbours[i]: the indices of the neighbours of node i in the final graph, not of the tree
             std::vector<std::set<index>> graphNgbrsID(treeSize);
             
-            std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells( treeSize );
+            // get that as an input
+            //std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells( treeSize );
            
             // not recursive, keep a frontier of the nodes to be checked
             // start with this and add every child
             std::list<std::shared_ptr<SpatialCell>> frontier;
 
-////// not sure if this is the right way to use shared_from_this. At least it works for now
+            //WARNING: not sure if this is the right way to use shared_from_this. At least it works for now
             frontier.push_back( this->shared_from_this() );
 
             //PRINT("root ID: " << frontier[0]->getID() << ", and treeSize= "<< treeSize);
