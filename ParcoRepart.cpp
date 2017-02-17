@@ -1155,20 +1155,20 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 	}
 
 	//main loop, one iteration for each color of the graph coloring
-	for (IndexType round = 0; round < communicationScheme.size(); round++) {
+	for (IndexType color = 0; color < communicationScheme.size(); color++) {
 		SCAI_REGION( "ParcoRepart.distributedFMStep.loop" )
 
 		const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 		const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
-		const scai::dmemo::DistributionPtr commDist = communicationScheme[round].getDistributionPtr();
+		const scai::dmemo::DistributionPtr commDist = communicationScheme[color].getDistributionPtr();
 
 		const IndexType localN = inputDist->getLocalSize();
 
-		if (!communicationScheme[round].getDistributionPtr()->isLocal(comm->getRank())) {
+		if (!communicationScheme[color].getDistributionPtr()->isLocal(comm->getRank())) {
 			throw std::runtime_error("Scheme value for " + std::to_string(comm->getRank()) + " must be local.");
 		}
 		
-		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[round].getLocalValues());
+		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[color].getLocalValues());
 		IndexType partner = commAccess[commDist->global2local(comm->getRank())];
 
 		//check symmetry of communication scheme
@@ -1348,7 +1348,7 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 				gainThisRound = std::max(IndexType(otherGain), IndexType(gain));
 
 				assert(gainThisRound > 0);
-				gainPerRound[round] = gainThisRound;
+				gainPerRound[color] = gainThisRound;
 
 				gainSum += gainThisRound;
 
@@ -1421,8 +1421,8 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 		}
 	}
 	comm->synchronize();
-	for (IndexType i = 0; i < gainPerRound.size(); i++) {
-		gainPerRound[i] = comm->sum(gainPerRound[i]) / 2;
+	for (IndexType color = 0; color < gainPerRound.size(); color++) {
+		gainPerRound[color] = comm->sum(gainPerRound[color]) / 2;
 	}
 	return gainPerRound;
 }
