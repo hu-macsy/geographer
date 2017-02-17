@@ -64,8 +64,8 @@ public:
 	}
         
 	template<typename IndexType, typename ValueType>
-	scai::lama::CSRSparseMatrix<ValueType>  getTreeAsGraph(){
-		return root->getSubTreeAsGraph<IndexType, ValueType>();
+	scai::lama::CSRSparseMatrix<ValueType>  getTreeAsGraph( std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells ){
+		return root->getSubTreeAsGraph<IndexType, ValueType>( graphNgbrsCells );
 	}
         
         
