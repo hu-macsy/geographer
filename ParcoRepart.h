@@ -183,15 +183,16 @@ namespace ITI {
 			 */
 			static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM);
 
-
 		private:
-            static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-                        		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::vector<bool>& assignedToSecondBlock,
-                        		const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes, Settings settings);
+                        static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const \
+                        CSRStorage<ValueType> &haloStorage,  const Halo &matrixHalo, const std::vector<IndexType>& \
+                        borderRegionIDs, std::vector<bool>& assignedToSecondBlock, \
+                        const std::pair<IndexType, IndexType> blockCapacities, \
+                        std::pair<IndexType, IndexType>& blockSizes, Settings settings);
 
 			static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
 
-			static ValueType localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input);
+                        static ValueType localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input);
 
 			static IndexType getDegreeSum(const CSRSparseMatrix<ValueType> &input, const std::vector<IndexType> &nodes);
 	};

@@ -26,10 +26,6 @@
 #include "MeshIO.h"
 #include "Settings.h"
 
-#include "fromNetworKit/SpatialTree.h"
-#include "fromNetworKit/SpatialCell.h"
-#include "fromNetworKit/Random.h"
-
 typedef double ValueType;
 typedef int IndexType;
 
@@ -290,25 +286,6 @@ TEST_F(MeshIOTest, testCreateRandomStructuredMesh_Distributed_3D) {
     }
     
 }
-
-//-----------------------------------------------------------------
-
-TEST_F(MeshIOTest, testCreateOctaTreeMesh_Local_3D) {
-        
-    int numberOfPoints = 20;
-    //ValueType maxCoord = 1;
-    scai::lama::CSRSparseMatrix<ValueType> adjM(numberOfPoints, numberOfPoints);
-    std::vector<DenseVector<ValueType>> coords(3, DenseVector<ValueType>(numberOfPoints, 0));
-
-    Point<double> maxCoord(10.0, 10.0, 10.0);
-    Point<double> minCoord(0.0, 0.0, 0.0);
-    ITI::SpatialTree<double> spatTree(minCoord, maxCoord, 2);
-    
-    Point<double> p(1.0, 0.0, 2.0);
-    spatTree.addContent(0, p);
-    
-}
-
 
 //-----------------------------------------------------------------
 TEST_F(MeshIOTest, testWriteMetis_Dist_3D){
