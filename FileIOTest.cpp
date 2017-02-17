@@ -198,7 +198,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
 }
 
 TEST_F(FileIOTest, testReadQuadTree){
-	std::string filename = "cells.dat";
+	std::string filename = "octree_timestep_0.dat";
 
 	std::vector<std::set<std::shared_ptr<SpatialCell> > > edgeList = FileIO<IndexType, ValueType>::readQuadTree(filename);
 	IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});

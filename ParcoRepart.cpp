@@ -227,12 +227,16 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			if (inputDist->isReplicated()) {
 				gain = replicatedMultiWayFM(input, result, k, epsilon);
 			} else {
-				gain = distributedFMStep(input, result, nodesWithNonLocalNeighbors, communicationScheme, settings);
-				const IndexType localOutgoingEdges = localSumOutgoingEdges(input);
+				std::vector<IndexType> gainPerRound = distributedFMStep(input, result, nodesWithNonLocalNeighbors, communicationScheme, settings);
+				gain = std::accumulate(gainPerRound.begin(), gainPerRound.end(), 0);
 
-				const IndexType maxDegree = 6;//for debug purposes
-				assert(nodesWithNonLocalNeighbors.size() <= localOutgoingEdges);
-				assert(nodesWithNonLocalNeighbors.size() >= localOutgoingEdges/maxDegree);
+				for (IndexType i = 0; i < gainPerRound.size(); i++) {
+					if (gainPerRound[i] == 0) {
+						//remove this color from future rounds. This is not terrible efficient, since it causes multiple copies, but all vectors are small and this method isn't called too often.
+						communicationScheme.erase(communicationScheme.begin()+i);
+						gainPerRound.erase(gainPerRound.begin()+i);
+					}
+				}
 			}
 			ValueType oldCut = cut;
 			cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input)) / 2;
@@ -1087,7 +1091,7 @@ IndexType ITI::ParcoRepart<IndexType, ValueType>::getDegreeSum(const CSRSparseMa
 }
 
 template<typename IndexType, typename ValueType>
-ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors, Settings settings) {
+std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors, Settings settings) {
 	/**
 	 * This is a wrapper function to allow calls without precomputing a communication schedule..
 	 */
@@ -1103,7 +1107,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 }
 
 template<typename IndexType, typename ValueType>
-ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType>& input, DenseVector<IndexType>& part, std::vector<IndexType>& nodesWithNonLocalNeighbors,
+std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType>& input, DenseVector<IndexType>& part, std::vector<IndexType>& nodesWithNonLocalNeighbors,
 		const std::vector<DenseVector<IndexType>>& communicationScheme, Settings settings) {
 	SCAI_REGION( "ParcoRepart.distributedFMStep" )
 	const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
@@ -1132,7 +1136,8 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
     //for now, we are assuming equal numbers of blocks and processes
     const IndexType localBlockID = comm->getRank();
 
-    ValueType gainSum = 0;
+    IndexType gainSum = 0;
+    std::vector<IndexType> gainPerRound(communicationScheme.size(), 0);
 
 	//copy into usable data structure with iterators
     //TODO: we only need those if redistribution happens.
@@ -1188,7 +1193,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			}
 		}
 
-		ValueType gainThisRound = 0;
+		IndexType gainThisRound = 0;
 
 		scai::dmemo::Halo graphHalo;
 		CSRStorage<ValueType> haloMatrix;
@@ -1245,7 +1250,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 
 			//the two border regions might have different sizes. Swapping array is sized for the maximum of the two.
 			const IndexType swapLength = std::max(otherSize, int(interfaceNodes.size()));
-			ValueType swapNodes[swapLength];
+			IndexType swapNodes[swapLength];
 			for (IndexType i = 0; i < swapLength; i++) {
 				if (i < interfaceNodes.size()) {
 					swapNodes[i] = interfaceNodes[i];
@@ -1309,7 +1314,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			/**
 			 * execute FM locally
 			 */
-			ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, borderRegionIDs, secondRoundMarkers, assignedToSecondBlock, maxBlockSizes, blockSizes, settings);
+			IndexType gain = twoWayLocalFM(input, haloMatrix, graphHalo, borderRegionIDs, secondRoundMarkers, assignedToSecondBlock, maxBlockSizes, blockSizes, settings);
 
 			{
 				SCAI_REGION( "ParcoRepart.distributedFMStep.loop.swapFMResults" )
@@ -1336,9 +1341,10 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			}	else {
 				SCAI_REGION_START( "ParcoRepart.distributedFMStep.loop.prepareRedist" )
 
-				gainThisRound = std::max(ValueType(otherGain), ValueType(gain));
+				gainThisRound = std::max(IndexType(otherGain), IndexType(gain));
 
 				assert(gainThisRound > 0);
+				gainPerRound[round] = gainThisRound;
 
 				gainSum += gainThisRound;
 
@@ -1410,7 +1416,11 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 			}
 		}
 	}
-	return comm->sum(gainSum) / 2;
+	comm->synchronize();
+	for (IndexType i = 0; i < gainPerRound.size(); i++) {
+		gainPerRound[i] = comm->sum(gainPerRound[i]) / 2;
+	}
+	return gainPerRound;
 }
 
 template<typename IndexType, typename ValueType>
@@ -2365,7 +2375,7 @@ template void ParcoRepart<int, double>::checkLocalDegreeSymmetry(const CSRSparse
 
 template double ParcoRepart<int, double>::replicatedMultiWayFM(const CSRSparseMatrix<double> &input, DenseVector<int> &part, int k, double epsilon, bool unweighted);
 
-template double ParcoRepart<int, double>::distributedFMStep(CSRSparseMatrix<double> &input, DenseVector<int> &part, std::vector<int>& nodesWithNonLocalNeighbors, Settings settings);
+template std::vector<int> ParcoRepart<int, double>::distributedFMStep(CSRSparseMatrix<double> &input, DenseVector<int> &part, std::vector<int>& nodesWithNonLocalNeighbors, Settings settings);
 
 template std::vector<DenseVector<int>> ParcoRepart<int, double>::computeCommunicationPairings(const CSRSparseMatrix<double> &input, const DenseVector<int> &part,	const DenseVector<int> &blocksToPEs);
 
