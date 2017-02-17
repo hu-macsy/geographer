@@ -156,6 +156,41 @@ TEST_F(ParcoRepartTest, testImbalance) {
   EXPECT_EQ((n/std::ceil(n/k))-1, imbalance);
 }
 
+TEST_F(ParcoRepartTest, testDistanceFromBlockCenter) {
+	const IndexType nroot = 16;
+	const IndexType n = nroot * nroot * nroot;
+	const IndexType dimensions = 3;
+
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+	scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+
+	scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
+	std::vector<ValueType> maxCoord(dimensions, nroot);
+	std::vector<IndexType> numPoints(dimensions, nroot);
+
+	scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+
+	std::vector<DenseVector<ValueType>> coordinates(dimensions);
+	for(IndexType i=0; i<dimensions; i++){
+	  coordinates[i].allocate(coordDist);
+	  coordinates[i] = static_cast<ValueType>( 0 );
+	}
+
+	MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(a, coordinates, maxCoord, numPoints);
+
+	const IndexType localN = dist->getLocalSize();
+
+	std::vector<ValueType> distances = ParcoRepart<IndexType, ValueType>::distanceFromBlockCenter(coordinates);
+	EXPECT_EQ(localN, distances.size());
+	const ValueType maxPossibleDistance = pow(dimensions*(nroot*nroot),0.5);
+
+	for (IndexType i = 0; i < distances.size(); i++) {
+		EXPECT_LE(distances[i], maxPossibleDistance);
+	}
+}
+
 TEST_F(ParcoRepartTest, testCut) {
   const IndexType n = 1000;
   const IndexType k = 10;

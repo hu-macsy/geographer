@@ -75,6 +75,8 @@ namespace ITI {
 			 */
 			static std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
 
+			static std::vector<ValueType> distanceFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates);
+
 			/**
 			 * redistributes a matrix from a local halo object without communication. It that is impossible, throw an error.
 			 */

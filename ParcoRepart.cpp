@@ -120,7 +120,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			maxCoords[dim] = comm->max(maxCoords[dim]);
 		}
 	
-
 		ValueType maxExtent = 0;
 		for (IndexType dim = 0; dim < dimensions; dim++) {
 			if (maxCoords[dim] - minCoords[dim] > maxExtent) {
@@ -724,6 +723,32 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::nonLocalNeighbors
 		}
 	}
 	return std::vector<IndexType>(neighborSet.begin(), neighborSet.end()) ;
+}
+
+template<typename IndexType, typename ValueType>
+std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::distanceFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates) {
+	SCAI_REGION("ParcoRepart.distanceFromBlockCenter");
+
+	const IndexType localN = coordinates[0].getDistributionPtr()->getLocalSize();
+	const IndexType dimensions = coordinates.size();
+
+	std::vector<ValueType> geometricCenter(dimensions);
+	for (IndexType dim = 0; dim < dimensions; dim++) {
+		const scai::utilskernel::LArray<ValueType>& localValues = coordinates[dim].getLocalValues();
+		assert(localValues.size() == localN);
+		geometricCenter[dim] = localValues.sum() / localN;
+	}
+
+	std::vector<ValueType> result(localN);
+	for (IndexType i = 0; i < localN; i++) {
+		ValueType distanceSquared = 0;
+		for (IndexType dim = 0; dim < dimensions; dim++) {
+			const ValueType diff = coordinates[dim].getLocalValues()[i] - geometricCenter[dim];
+			distanceSquared += diff*diff;
+		}
+		result[i] = pow(distanceSquared, 0.5);
+	}
+	return result;
 }
 
 template<typename IndexType, typename ValueType>
@@ -2383,6 +2408,8 @@ template std::vector<int> ParcoRepart<int, double>::distributedFMStep(CSRSparseM
 template std::vector<DenseVector<int>> ParcoRepart<int, double>::computeCommunicationPairings(const CSRSparseMatrix<double> &input, const DenseVector<int> &part,	const DenseVector<int> &blocksToPEs);
 
 template std::vector<int> ITI::ParcoRepart<int, double>::nonLocalNeighbors(const CSRSparseMatrix<double>& input);
+
+template std::vector<double> ITI::ParcoRepart<int, double>::distanceFromBlockCenter(const std::vector<DenseVector<double>> &coordinates);
 
 template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildPartHalo(const CSRSparseMatrix<double> &input,  const DenseVector<int> &part);
 
