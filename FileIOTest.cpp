@@ -167,7 +167,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     IndexType N= graph.getNumColumns();
     EXPECT_EQ(nodes,N);
 
-    //read the coordiantes from a file
+    //read the coordinates from a file
     std::cout<<"reading coordinates from file: "<< coordFile<< std::endl;
 
     SCAI_REGION_START("testPartitionFromFile_local_2D.readFromFile2Coords_2D");
@@ -198,7 +198,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
 }
 
 TEST_F(FileIOTest, testReadQuadTree){
-	std::string filename = "cells.dat";
+	std::string filename = "octree_timestep_0.dat";
 
 	std::vector<std::set<std::shared_ptr<SpatialCell> > > edgeList = FileIO<IndexType, ValueType>::readQuadTree(filename);
 	IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
