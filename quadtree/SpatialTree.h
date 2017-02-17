@@ -62,7 +62,13 @@ public:
 	std::vector<index> getElements() const {
 		return root->getElements();
 	}
-
+        
+	template<typename IndexType, typename ValueType>
+	scai::lama::CSRSparseMatrix<ValueType>  getTreeAsGraph(){
+		return root->getSubTreeAsGraph<IndexType, ValueType>();
+	}
+        
+        
 protected:
 	std::shared_ptr<SpatialCell> root;
 };

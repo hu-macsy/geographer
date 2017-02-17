@@ -9,7 +9,11 @@
 #include <cmath>
 #include <algorithm>
 
+#include <scai/lama/matrix/all.hpp>
+
 #include "QuadTreeTest.h"
+//#include "../../MeshIO.h"
+//#include "../../ParcoRepart.h"
 
 #include "../QuadTreeCartesianEuclid.h"
 #include "../QuadTreePolarEuclid.h"
@@ -17,6 +21,73 @@
 
 namespace ITI {
 
+typedef double ValueType;
+typedef int IndexType;
+  
+TEST_F(QuadTreeTest, testGetGraphMatrixFromTree) {
+	count n = 2;
+
+	vector<Point<double> > positions(n);
+	vector<index> content(n);
+
+        //Point<double> min(0.0, 0.0, 0.0);
+        //Point<double> max(1.0, 1.0, 1.0);
+        Point<double> min(0.0, 0.0);
+        Point<double> max(2.0, 2.0);
+        index capacity = 1;
+        
+	QuadTreeCartesianEuclid quad(min, max, true, capacity);
+    index i=0;
+	/*
+        for (i = 0; i < n; i++) {
+		//Point<double> pos = Point<double>({double(rand()) / RAND_MAX, double(rand()) / RAND_MAX, double(rand()) / RAND_MAX});
+                Point<double> pos = Point<double>({double(rand()) / RAND_MAX, double(rand()) / RAND_MAX});
+		positions[i] = pos;
+		content[i] = i;
+		quad.addContent(i, pos);
+	}
+	*/
+	quad.addContent(i, Point<double>({0.2, 0.2}) );
+	quad.addContent(i, Point<double>({0.8, 0.7}) );
+	quad.addContent(i, Point<double>({1.4, 0.7}) );
+	quad.addContent(i, Point<double>({1.8, 0.3}) );
+
+	quad.addContent(i, Point<double>({0.2, 0.8}) );
+	quad.addContent(i, Point<double>({0.2, 0.84}) );
+	
+	PRINT(quad.countLeaves() );
+	index N= quad.countLeaves();
+
+	scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>();
+
+	graph.checkSymmetry();
+	graph.isConsistent();
+	EXPECT_EQ( graph.getNumRows(), N);
+	EXPECT_EQ( graph.getNumColumns(), N);
+
+	const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
+	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+        
+	// 20 is too large upper bound. Should be around 24 for 3D and 8 (or 10) for 2D
+	IndexType upBound= 20;
+	std::vector<IndexType> degreeCount( upBound, 0 );
+	for(IndexType i=0; i<N; i++){
+		IndexType nodeDegree = ia[i+1] -ia[i];
+		if( nodeDegree > upBound){
+			throw std::logic_error( "Node with large degree, more than " + upBound );
+		}
+		++degreeCount[nodeDegree];
+	}
+	for(int i=0; i<degreeCount.size(); i++){
+		if(  degreeCount[i] !=0 ){
+			std::cout << "degree " << i << ": "<< degreeCount[i]<< std::endl;
+		}
+	}
+
+	PRINT(graph.getNumValues() << " $$ " << graph.l1Norm() );
+}
+    
 TEST_F(QuadTreeTest, testCartesianEuclidQuery) {
 	count n = 10000;
 
@@ -97,7 +168,7 @@ TEST_F(QuadTreeTest, testPolarEuclidQuery) {
 	std::uniform_real_distribution<double> rdist{minR, maxR};
 
 	/**
-	 * fill std::vectors
+	 * fill vectors
 	 */
 	for (index i = 0; i < n; i++) {
 		angles[i] = (double(rand()) / RAND_MAX)*(2*M_PI);
@@ -193,7 +264,6 @@ TEST_F(QuadTreeTest, testQuadNodePolarEuclidDistanceBounds) {
 	EXPECT_LE(testNode.distances(query).first, testNode.euclidDistancePolar(1.5708, 0.706942, 3.81656, 1.18321));
 	EXPECT_LE(testNode.distances(query).first, testNode.euclidDistancePolar(1.5708, 0.706942, 3.81656, 1.18321));
 }
-
 
 TEST_F(QuadTreeTest, testQuadNodeCartesianDistances) {
 	Point<double> lower({0.24997519780061023, 0.7499644402803205});

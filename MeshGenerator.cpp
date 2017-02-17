@@ -731,6 +731,9 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
      * localNgbs is a vector with sets, localNgbs.size()= localN and each set localNgbs[i]
      * has stored the neighbours of node i. Care to change between global and local indices 
      * when neccessary.
+     *
+     * remember:
+     * std::vector< std::set<IndexType> > localNgbs(localSize);
      */
     
     
@@ -769,7 +772,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
             // for all the neighbours of node i
             IndexType numRowElems= 0;   // should be == localNgbs[i].size()
             for(typename std::set<IndexType>::iterator it= localNgbs[i].begin(); it!=localNgbs[i].end(); ++it){
-                IndexType ngbGlobalInd = *it;       // the global index og the neighbour
+                IndexType ngbGlobalInd = *it;       // the global index of the neighbour
                 ja[nnzCounter] = ngbGlobalInd;
                 values[nnzCounter] = 1;
                 SCAI_ASSERT( nnzCounter < nnzValues, __FILE__<<" ,"<<__LINE__<< ": nnzValues not calculated properly")
@@ -779,7 +782,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
             ia[i+1] = ia[i] + numRowElems;
             //PRINT(numRowElems << " should be == "<< localNgbs[i].size() );
             SCAI_ASSERT(numRowElems == localNgbs[i].size(),  __FILE__<<" ,"<<__LINE__<<"something is wrong");
-            ia[i+1] = ia[i] +static_cast<IndexType>(numRowElems);
+            //ia[i+1] = ia[i] +static_cast<IndexType>(numRowElems);
         } //for(IndexType i=0; i<localSize; i++)
         ja.resize(nnzCounter);
         values.resize(nnzCounter);

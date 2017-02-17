@@ -26,10 +26,6 @@
 #include "MeshGenerator.h"
 #include "Settings.h"
 
-//#include "quadtree/SpatialTree.h"
-//#include "quadtree/SpatialCell.h"
-//#include "quadtree/Random.h"
-
 typedef double ValueType;
 typedef int IndexType;
 

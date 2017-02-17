@@ -41,6 +41,7 @@ protected:
 public:
 	Point() { data = {0.0, 0.0}; }
 	Point(T x, T y) { data = {x, y}; }
+	Point(T x, T y, T z) { data = {x, y, z}; }
 	Point(count dimension) : data(std::vector<T>(dimension, 0.0)) {}
 	Point(std::vector<T>& values): data(values) {}
 	virtual ~Point() {}
