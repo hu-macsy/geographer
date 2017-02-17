@@ -374,7 +374,8 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 
 	ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
 	for (IndexType i = 0; i < iterations; i++) {
-		ValueType gain = ParcoRepart<IndexType, ValueType>::distributedFMStep(a, part, localBorder, settings);
+		std::vector<IndexType> gainPerRound = ParcoRepart<IndexType, ValueType>::distributedFMStep(a, part, localBorder, settings);
+		IndexType gain = std::accumulate(gainPerRound.begin(), gainPerRound.end(), 0);
 
 		//check correct gain calculation
 		const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
