@@ -29,10 +29,6 @@
 #include <iterator>
 #include <tuple>    
 
-            
-typedef double ValueType;
-typedef int IndexType;
-            
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 

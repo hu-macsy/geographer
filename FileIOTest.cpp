@@ -167,7 +167,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     IndexType N= graph.getNumColumns();
     EXPECT_EQ(nodes,N);
 
-    //read the coordiantes from a file
+    //read the coordinates from a file
     std::cout<<"reading coordinates from file: "<< coordFile<< std::endl;
 
     SCAI_REGION_START("testPartitionFromFile_local_2D.readFromFile2Coords_2D");
