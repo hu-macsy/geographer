@@ -24,6 +24,51 @@ namespace ITI {
 typedef double ValueType;
 typedef int IndexType;
   
+
+TEST_F(QuadTreeTest, testGetGraphFromForest){
+    
+    // every forest[i] is a pointer to the root of a tree
+    std::vector<std::shared_ptr<SpatialCell>> forest;
+    
+    IndexType n= 10;
+    vector<Point<double> > positions(n);
+    vector<index> content(n);
+
+    Point<double> min(0.0, 0.0);
+    Point<double> max(1.0, 1.0);
+    index capacity = 1;
+    
+    QuadTreeCartesianEuclid quad(min, max, true, capacity);
+    index i=0;
+    srand(time(NULL));
+    
+    for (i = 0; i < n; i++) {
+        Point<double> pos = Point<double>({double(rand()) / RAND_MAX, double(rand()) / RAND_MAX, double(rand()) / RAND_MAX});
+        positions[i] = pos;
+        content[i] = i;
+        quad.addContent(i, pos);
+    }
+	
+    forest.push_back(quad.getRoot());
+    // make more trees and pass them to the forest
+    // CARE though, indexing should be one for all trees, maybe a forestIndex() routine or just a for 
+    IndexType globIndexing=0;
+    for(IndexType i=0; i<forest.size(); i++){
+        // no tested, should index all trees properly
+        globIndexing = forest[i]->indexSubtree( globIndexing );
+    }
+    
+    
+    IndexType forestSize = forest.size();
+    
+    // graphNgbrsPtrs[i]= a set with pointers to the neighbours of -i- in the CSR matrix/graph
+    std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsPtrs(forestSize);
+    
+    scai::lama::CSRSparseMatrix<ValueType> graph= SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsPtrs, forest);
+}
+
+
+
 TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
 	count n = 2500;
 
