@@ -229,11 +229,16 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				std::vector<IndexType> gainPerRound = distributedFMStep(input, result, nodesWithNonLocalNeighbors, communicationScheme, settings);
 				gain = std::accumulate(gainPerRound.begin(), gainPerRound.end(), 0);
 
-				for (IndexType i = 0; i < gainPerRound.size(); i++) {
-					if (gainPerRound[i] == 0) {
-						//remove this color from future rounds. This is not terrible efficient, since it causes multiple copies, but all vectors are small and this method isn't called too often.
-						communicationScheme.erase(communicationScheme.begin()+i);
-						gainPerRound.erase(gainPerRound.begin()+i);
+				if (settings.skipNonGainColors) {
+					IndexType i = 0;
+					while (i < gainPerRound.size()) {
+						if (gainPerRound[i] == 0) {
+							//remove this color from future rounds. This is not terrible efficient, since it causes multiple copies, but all vectors are small and this method isn't called too often.
+							communicationScheme.erase(communicationScheme.begin()+i);
+							gainPerRound.erase(gainPerRound.begin()+i);
+						} else {
+							i++;
+						}
 					}
 				}
 			}

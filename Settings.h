@@ -12,6 +12,7 @@ struct Settings{
     IndexType sfcResolution = 0;
     IndexType numberOfRestarts = 0;
     bool gainOverBalance = false;
+    bool skipNonGainColors = false;
     double epsilon = 0.05;
     
     void print2D(std::ostream& out){
