@@ -640,7 +640,7 @@ public:
                     for(int d=0; d<dimension; d++){
                         assert(d<coords.size());
                         assert(d< maxCoords.getDimensions());
-                        ValueType thisCoord = thisNode->maxCoords[d] + double(thisNode->maxCoords[d] - thisNode->minCoords[d])/ 2;
+                        ValueType thisCoord = thisNode->minCoords[d] + double(thisNode->maxCoords[d] - thisNode->minCoords[d])/ 2;
                         //PRINT("max= "<< thisNode->maxCoords[d] <<", min= "<< thisNode->minCoords[d] << ", mean= "<< thisCoord);                        
                         coords[d].push_back(thisCoord);
                     }
