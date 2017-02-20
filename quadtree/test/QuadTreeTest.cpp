@@ -299,6 +299,16 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
         std::vector<std::vector<ValueType>> coords( dimension );
         
 	scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>(graphNgbrsCells, coords);
+        /*
+        //print graph
+        for(int i=0; i<graph.getNumRows(); i++){
+            std::cout << i <<": \t";
+            for(int j=0; j<graph.getNumColumns(); j++){
+                std::cout<< j << ":"<< graph.getValue(i,j).Scalar::getValue<ValueType>() << " , ";
+            }
+            std::cout<< std::endl;
+        }
+        */
         
         // checkSymmetry is really expensive for big graphs, used only for small instances
 	graph.checkSymmetry();
@@ -306,39 +316,40 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
 
 	EXPECT_EQ( graph.getNumRows(), N);
 	EXPECT_EQ( graph.getNumColumns(), N);
-
-	const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
-	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-        
-        // 20 is too large upper bound. Should be around 24 for 3D and 8 (or 10) for 2D
-        //TODO: maybe 30 is not so large... find another way to do it or skip it entirely
-        IndexType upBound= 50;
-        std::vector<IndexType> degreeCount( upBound, 0 );
-        for(IndexType i=0; i<N; i++){
-            IndexType nodeDegree = ia[i+1] -ia[i];
-            if( nodeDegree > upBound){
-                throw std::logic_error( "Node with large degree, degree= "+  std::to_string(nodeDegree) + " > current upper bound= " + std::to_string(upBound) );
+        {
+            const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
+            const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+            const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+            
+            // 20 is too large upper bound. Should be around 24 for 3D and 8 (or 10) for 2D
+            //TODO: maybe 30 is not so large... find another way to do it or skip it entirely
+            IndexType upBound= 50;
+            std::vector<IndexType> degreeCount( upBound, 0 );
+            for(IndexType i=0; i<N; i++){
+                IndexType nodeDegree = ia[i+1] -ia[i];
+                if( nodeDegree > upBound){
+                    throw std::logic_error( "Node with large degree, degree= "+  std::to_string(nodeDegree) + " > current upper bound= " + std::to_string(upBound) );
+                }
+                ++degreeCount[nodeDegree];
             }
-            ++degreeCount[nodeDegree];
+            
+            IndexType numEdges = 0;
+            IndexType maxDegree = 0;
+            std::cout<< "\t Num of nodes"<< std::endl;
+            for(int i=0; i<degreeCount.size(); i++){
+                if(  degreeCount[i] !=0 ){
+                    std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
+                    numEdges += i*degreeCount[i];
+                    maxDegree = i;
+                }
+            }
+            EXPECT_EQ(numEdges, graph.getNumValues() );
+            
+            ValueType averageDegree = ValueType( numEdges)/N;
+        
+            PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
         }
         
-        IndexType numEdges = 0;
-        IndexType maxDegree = 0;
-        std::cout<< "\t Num of nodes"<< std::endl;
-        for(int i=0; i<degreeCount.size(); i++){
-            if(  degreeCount[i] !=0 ){
-                std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
-                numEdges += i*degreeCount[i];
-                maxDegree = i;
-            }
-        }
-        EXPECT_EQ(numEdges, graph.getNumValues() );
-        
-        ValueType averageDegree = ValueType( numEdges)/N;
-        
-        PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
-    
         // communicate/distribute graph
     
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -350,19 +361,32 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
         
         graph.redistribute( dist, noDistPointer);
         
-        /*
-        //TODO: coordinates vector is missing
-        scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordinates, Settings);
+        //TODO: change coords data type to vector<double> ? or the way we copy to a DenseVector
+        std::vector<DenseVector<ValueType>> coordsDV(dimension);
         
+        for(int d=0; d<dimension; d++){
+            coordsDV[d].allocate(coords[d].size() );
+            for(IndexType j=0; j<coords[d].size(); j++){
+                coordsDV[d].setValue(j , coords[d][j]);
+            }
+            coordsDV[d].redistribute(dist);
+        }
+        const ValueType epsilon = 0.05;        
+        struct Settings Settings;
+        Settings.numBlocks= k;
+        Settings.epsilon = epsilon;
+  
+        scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordsDV, Settings);
+
         ParcoRepart<IndexType, ValueType> repart;
         EXPECT_LE(repart.computeImbalance(partition, k), epsilon);
 
-        const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, partition, true);
+        const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true);
 
         if (comm->getRank() == 0) {
-            std::cout << "Commit " << version << ": Partitioned graph with " << n << " nodes into " << k << " blocks with a total cut of " << cut << std::endl;
+            std::cout << "Commit " << version << ": Partitioned graph with " << N << " nodes into " << k << " blocks with a total cut of " << cut << std::endl;
         }
-        */
+        
 }
 
 
