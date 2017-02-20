@@ -11,6 +11,8 @@ struct Settings{
     IndexType minGainForNextRound = 1;
     IndexType sfcResolution = 0;
     IndexType numberOfRestarts = 0;
+    bool useTieBreaking = true;
+    bool breakTiesWithDiffusion = false;
     bool gainOverBalance = false;
     bool skipNonGainColors = false;
     double epsilon = 0.05;

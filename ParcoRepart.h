@@ -78,8 +78,8 @@ namespace ITI {
 			 */
 			static void redistributeFromHalo(CSRSparseMatrix<ValueType>& matrix, scai::dmemo::DistributionPtr newDistribution, Halo& halo, CSRStorage<ValueType>& haloMatrix);
 
-			static void redistributeFromHalo(DenseVector<IndexType>& input, scai::dmemo::DistributionPtr newDist, Halo& halo, scai::utilskernel::LArray<IndexType>& haloData);
-
+			template<typename T>
+			static void redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, Halo& halo, scai::utilskernel::LArray<T>& haloData);
 
 			/**
 			 * Builds a halo containing all non-local neighbors.
@@ -95,10 +95,11 @@ namespace ITI {
 			 */
 			static std::pair<std::vector<IndexType>, std::vector<IndexType>> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType otherBlock, IndexType depth);
 
-			static std::vector<IndexType> distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors, Settings settings);
+			static std::vector<IndexType> distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
 
 			static std::vector<IndexType> distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors,
-					DenseVector<IndexType> &nodeWeights, const std::vector<DenseVector<IndexType>>& communicationScheme, Settings settings);
+					DenseVector<IndexType> &nodeWeights, const std::vector<DenseVector<IndexType>>& communicationScheme, std::vector<DenseVector<ValueType>> &coordinates,
+					std::vector<ValueType> &distances, Settings settings);
 
 			/**
 			 * Iterates over the local part of the adjacency matrix and counts local edges.
@@ -186,7 +187,7 @@ namespace ITI {
             static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
 					const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<IndexType>& nodeWeights, std::pair<IndexType, IndexType> secondRoundMarkers,
 					std::vector<bool>& assignedToSecondBlock, const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes,
-					Settings settings);
+					std::vector<ValueType> tieBreakingKeys, Settings settings);
 
             static IndexType twoWayLocalCut(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
             		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<bool>& assignedToSecondBlock);

@@ -84,11 +84,9 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   std::vector<ValueType> maxCoord(dimensions, nroot);
   std::vector<IndexType> numPoints(dimensions, nroot);
 
-  scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
-
   std::vector<DenseVector<ValueType>> coordinates(dimensions);
   for(IndexType i=0; i<dimensions; i++){ 
-	  coordinates[i].allocate(coordDist);
+	  coordinates[i].allocate(dist);
 	  coordinates[i] = static_cast<ValueType>( 0 );
   }
   
@@ -358,21 +356,30 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
 
 TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	std::string file = "Grid32x32";
 	const IndexType k = comm->getSize();
 	const ValueType epsilon = 0.05;
 	const IndexType iterations = 1;
 
 	srand(time(NULL));
 
-	//load matrix
-	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
-	const IndexType n = graph.getRowDistributionPtr()->getGlobalSize();
+	IndexType nroot = 16;
+	IndexType n = nroot * nroot * nroot;
+	IndexType dimensions = 3;
 
-	scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
+	scai::dmemo::DistributionPtr inputDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
 	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
 
-	graph.redistribute(inputDist, noDistPointer);//need replicated columns for FM;
+	scai::lama::CSRSparseMatrix<ValueType>graph(inputDist, noDistPointer);
+	std::vector<ValueType> maxCoord(dimensions, nroot);
+	std::vector<IndexType> numPoints(dimensions, nroot);
+
+	std::vector<DenseVector<ValueType>> coordinates(dimensions);
+	for(IndexType i=0; i<dimensions; i++){
+	  coordinates[i].allocate(inputDist);
+	  coordinates[i] = static_cast<ValueType>( 0 );
+	}
+
+	MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(graph, coordinates, maxCoord, numPoints);
 
 	ASSERT_EQ(n, inputDist->getGlobalSize());
 
@@ -397,6 +404,10 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 	graph.redistribute(newDistribution, graph.getColDistributionPtr());
 	part.redistribute(newDistribution);
 
+	for (IndexType dim = 0; dim < dimensions; dim++) {
+		coordinates[dim].redistribute(newDistribution);
+	}
+
 	std::vector<IndexType> localBorder = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(graph);
 
 	Settings settings;
@@ -407,7 +418,7 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 	ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
 	ASSERT_GE(cut, 0);
 	for (IndexType i = 0; i < iterations; i++) {
-		std::vector<IndexType> gainPerRound = ParcoRepart<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, settings);
+		std::vector<IndexType> gainPerRound = ParcoRepart<IndexType, ValueType>::distributedFMStep(graph, part, coordinates, settings);
 		IndexType gain = std::accumulate(gainPerRound.begin(), gainPerRound.end(), 0);
 
 		//check correct gain calculation
