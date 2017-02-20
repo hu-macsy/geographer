@@ -642,15 +642,15 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 //----------------------------------------------------------
 
 TEST_F (ParcoRepartTest, testBorders_Distributed) {
-    std::string file = "Grid16x16";
+    std::string file = "Grid32x32";
     std::ifstream f(file);
-    IndexType dimensions= 2, k=4;
+    IndexType dimensions= 2;
     IndexType N, edges;
     f >> N >> edges; 
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     // for now local refinement requires k = P
-    k = comm->getSize();
+    IndexType k = comm->getSize();
     //
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
@@ -663,12 +663,12 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
     EXPECT_EQ(edges, (graph.getNumValues())/2 );   
     
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
   
     // get partition
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, Settings);
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
     ASSERT_EQ(N, partition.size());
   
     //get the border nodes
@@ -684,7 +684,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     //partition.redistribute(dist); //not needed now
     
     // print
-    int numX= 16, numY= 16;         // 2D grid dimensions
+    int numX= 32, numY= 32;         // 2D grid dimensions
     ASSERT_EQ(N, numX*numY);
     IndexType partViz[numX][numY];   
     IndexType bordViz[numX][numY]; 
@@ -698,7 +698,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, partition, k);
     EXPECT_TRUE(blockGraph.checkSymmetry() );
     
-    
+    comm->synchronize();
 if(comm->getRank()==0 ){            
     std::cout<<"----------------------------"<< " Partition  "<< *comm << std::endl;    
     for(int i=0; i<numX; i++){
@@ -723,6 +723,7 @@ if(comm->getRank()==0 ){
     }
     
 }
+comm->synchronize();
 
 }
 
