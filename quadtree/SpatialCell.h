@@ -675,13 +675,23 @@ public:
             // this assertion is not correct in the case where we get a forest
             //assert( leafIndex == countLeaves() );
             
+            //print graphNgbrsCells 
+            for(int i=0; i< graphNgbrsCells.size(); i++){
+                for(typename std::set<std::shared_ptr<SpatialCell>>::iterator graphNgb= graphNgbrsCells[i].begin(); graphNgb!=graphNgbrsCells[i].end(); graphNgb++){
+                        // the neigbours of thisNode->graphNgb. this->ID must be in there somewhere
+                        std::set<std::shared_ptr<SpatialCell>>& ngbSet = graphNgbrsCells[graphNgb->get()->getID()];
+                        //PRINT(i<< ": "<< graphNgb->get()->getID() );
+                    }
+            }
+            
+            
             /* 
              * from the graphNgbrsCells vector set the CSR sparse matrix
              */
 
             IndexType nnzValues = getVSsize(graphNgbrsCells);
             IndexType N = numLeaves;
-          
+            
             //create the adjacency matrix
             scai::hmemo::HArray<IndexType> csrIA;
             scai::hmemo::HArray<IndexType> csrJA;
@@ -706,19 +716,25 @@ public:
                     // the index of the leaves since -i- traverses also non-leaf nodes
                     index leafIndex= -1;
                     assert( i< leafIndexMapping.size() );
+                    
                     if(leafIndexMapping[i]==-1){
                         continue;
                     }else{
                         leafIndex = leafIndexMapping[i];
                     }
+                    
                     // graphNgb is a neighbouring cell of this node as a shared_ptr
                     for(typename std::set<std::shared_ptr<SpatialCell>>::iterator graphNgb= graphNgbrsCells[i].begin(); graphNgb!=graphNgbrsCells[i].end(); graphNgb++){                    
                         // all nodes must be leaves                
                         assert( graphNgb->get()->isLeaf );
                         // not -i- since it also includes non-leaf nodes, use leafIndex instead
-                        IndexType ngbGlobalInd = leafIndex;
+                        assert( graphNgb->get()->getID() < leafIndexMapping.size() );
+                        IndexType ngbGlobalInd = leafIndexMapping[ graphNgb->get()->getID() ];
+                        //PRINT("from treeIndex: "<< graphNgb->get()->getID() ", to leafIndex= "<< ngbGlobalInd);
+                        assert( ngbGlobalInd>= 0);
+                        assert( ngbGlobalInd< numLeaves);
                         assert( nnzCounter< ja.size() );
-                        SCAI_ASSERT( nnzCounter < nnzValues, __FILE__<<" ,"<<__LINE__<< ": nnzValues not calculated properly")
+                        SCAI_ASSERT( nnzCounter < nnzValues, __FILE__<<" ,"<<__LINE__<< ": nnzValues not calculated properly")                   
                         ja[nnzCounter] = ngbGlobalInd;
                         values[nnzCounter] = 1;
                         ++nnzCounter;
@@ -742,7 +758,7 @@ public:
                     
             scai::lama::CSRStorage<ValueType> localMatrix( N, N, nnzValues, csrIA, csrJA, csrValues );            
             scai::lama::CSRSparseMatrix<ValueType> ret(localMatrix);
-        
+
             return ret;
         }
         
