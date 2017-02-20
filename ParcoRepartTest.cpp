@@ -281,7 +281,7 @@ TEST_F(ParcoRepartTest, testTwoWayCut) {
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
 	const scai::hmemo::HArray<IndexType>& localData = part.getLocalValues();
-	scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildPartHalo(a, part);
+	scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildNeighborHalo(a);
 	scai::utilskernel::LArray<IndexType> haloData;
 	comm->updateHalo( haloData, localData, partHalo );
 
@@ -549,7 +549,7 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 		IndexType partner = commAccess[scheme[round].getDistributionPtr()->global2local(comm->getRank())];
 
 		if (partner == thisBlock) {
-			scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildPartHalo(a, part);
+			scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildNeighborHalo(a);
 			scai::utilskernel::LArray<IndexType> haloData;
 			comm->updateHalo( haloData, part.getLocalValues(), partHalo );
 
@@ -589,7 +589,7 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 			const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 			const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
-			scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildPartHalo(a, part);
+			scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildNeighborHalo(a);
 			scai::utilskernel::LArray<IndexType> haloData;
 			comm->updateHalo( haloData, localData, partHalo );
 
@@ -974,7 +974,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
     
         
     //get halo (buildPartHalo) and check if block graphs is correct
-    scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildPartHalo(adjM, partition);
+    scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildNeighborHalo(adjM);
     scai::hmemo::HArray<IndexType> reqIndices = partHalo.getRequiredIndexes();
     scai::hmemo::HArray<IndexType> provIndices = partHalo.getProvidesIndexes();
     

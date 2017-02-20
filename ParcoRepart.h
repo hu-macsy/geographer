@@ -83,9 +83,9 @@ namespace ITI {
 			static void redistributeFromHalo(CSRSparseMatrix<ValueType>& matrix, scai::dmemo::DistributionPtr newDistribution, Halo& halo, CSRStorage<ValueType>& haloMatrix);
 
 			/**
-			 * Builds a halo containing all partition entries of non-local neighbors.
+			 * Builds a halo containing all non-local neighbors.
 			 */
-			static scai::dmemo::Halo buildPartHalo(const CSRSparseMatrix<ValueType> &input,  const DenseVector<IndexType> &part);
+			static scai::dmemo::Halo buildNeighborHalo(const CSRSparseMatrix<ValueType> &input);
 
 			/**
 			 * Computes the border region within one block, adjacent to another block

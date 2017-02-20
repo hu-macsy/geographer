@@ -560,7 +560,7 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<Va
 
 	scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
-	scai::dmemo::Halo partHalo = buildPartHalo(input, part);
+	scai::dmemo::Halo partHalo = buildNeighborHalo(input);
 	scai::utilskernel::LArray<IndexType> haloData;
 	partDist->getCommunicatorPtr()->updateHalo( haloData, localData, partHalo );
 
@@ -907,26 +907,18 @@ void ITI::ParcoRepart<IndexType, ValueType>::redistributeFromHalo(CSRSparseMatri
 }
 
 template<typename IndexType, typename ValueType>
-scai::dmemo::Halo ITI::ParcoRepart<IndexType, ValueType>::buildPartHalo(
-		const CSRSparseMatrix<ValueType>& input, const DenseVector<IndexType> &part) {
+scai::dmemo::Halo ITI::ParcoRepart<IndexType, ValueType>::buildNeighborHalo(const CSRSparseMatrix<ValueType>& input) {
 
 	SCAI_REGION( "ParcoRepart.buildPartHalo" )
 
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
-	const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
-
-	if (inputDist->getLocalSize() != partDist->getLocalSize()) {
-		throw std::runtime_error("Input matrix and partition must have the same distribution.");
-	}
 
 	std::vector<IndexType> requiredHaloIndices = nonLocalNeighbors(input);
-
-	assert(requiredHaloIndices.size() <= partDist->getGlobalSize() - partDist->getLocalSize());
 
 	scai::dmemo::Halo Halo;
 	{
 		scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
-		scai::dmemo::HaloBuilder::build( *partDist, arrRequiredIndexes, Halo );
+		scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, Halo );
 	}
 
 	return Halo;
@@ -2053,7 +2045,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const 
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-	scai::dmemo::Halo partHalo = buildPartHalo(adjM, part);
+	scai::dmemo::Halo partHalo = buildNeighborHalo(adjM);
 	scai::utilskernel::LArray<IndexType> haloData;
 	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
 
@@ -2446,7 +2438,7 @@ template std::vector<int> ITI::ParcoRepart<int, double>::nonLocalNeighbors(const
 
 template std::vector<double> ITI::ParcoRepart<int, double>::distancesFromBlockCenter(const std::vector<DenseVector<double>> &coordinates);
 
-template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildPartHalo(const CSRSparseMatrix<double> &input,  const DenseVector<int> &part);
+template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildNeighborHalo(const CSRSparseMatrix<double> &input);
 
 template std::pair<std::vector<int>, std::vector<int>> ITI::ParcoRepart<int, double>::getInterfaceNodes(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, const std::vector<int>& nodesWithNonLocalNeighbors, int otherBlock, int depth);
 
