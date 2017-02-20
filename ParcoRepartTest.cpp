@@ -213,13 +213,13 @@ TEST_F(ParcoRepartTest, testCut) {
 
   //cut should be 10*900 / 2
   const IndexType blockSize = n / k;
-  const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, false);
   EXPECT_EQ(k*blockSize*(n-blockSize) / 2, cut);
 
   //now convert distributed into replicated partition vector and compare again
   part.redistribute(noDistPointer);
   a.redistribute(noDistPointer, noDistPointer);
-  const ValueType replicatedCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  const ValueType replicatedCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, false);
   EXPECT_EQ(k*blockSize*(n-blockSize) / 2, replicatedCut);
 }
 
@@ -299,25 +299,26 @@ TEST_F(ParcoRepartTest, testTwoWayCut) {
 			}
 		}
 	}
-	const ValueType globalCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+	const ValueType globalCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, false);
 
 	EXPECT_EQ(globalCut, comm->sum(localCutSum) / 2);
 }
 
 
 TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
-  const IndexType n = 1000;
+  std::string file = "Grid32x32";
   const IndexType k = 10;
   const ValueType epsilon = 0.05;
   const IndexType iterations = 1;
 
   //generate random matrix
-  scai::lama::CSRSparseMatrix<ValueType>a(n,n);
-  scai::lama::MatrixCreator::buildPoisson(a, 3, 19, 10,10,10);
+
+  CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+  const IndexType n = graph.getRowDistributionPtr()->getGlobalSize();
 
   //we want a replicated matrix
   scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
-  a.redistribute(noDistPointer, noDistPointer);
+  graph.redistribute(noDistPointer, noDistPointer);
 
   //generate random partition
   scai::lama::DenseVector<IndexType> part(n, 0);
@@ -326,12 +327,12 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
     part.setValue(i, blockId);
   }
 
-  ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
   for (IndexType i = 0; i < iterations; i++) {
-    ValueType gain = ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(a, part, k, epsilon);
+    ValueType gain = ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(graph, part, k, epsilon);
 
     //check correct gain calculation
-    const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+    const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
     EXPECT_EQ(cut - gain, newCut) << "Old cut " << cut << ", gain " << gain << " newCut " << newCut;
     EXPECT_LE(newCut, cut);
     cut = newCut;
@@ -344,9 +345,9 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
   }
 
   //check correct cut with balanced partition
-  cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
-  ValueType gain = ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(a, part, k, epsilon);
-  const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
+  ValueType gain = ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(graph, part, k, epsilon);
+  const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
   EXPECT_EQ(cut - gain, newCut);
   EXPECT_LE(newCut, cut);
 
@@ -357,25 +358,21 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
 
 TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-
-	const IndexType dimX = 16;
-	const IndexType dimY = 16;
-	const IndexType dimZ = 16;
-	const IndexType n = dimX*dimY*dimZ;
+	std::string file = "Grid32x32";
 	const IndexType k = comm->getSize();
 	const ValueType epsilon = 0.05;
 	const IndexType iterations = 1;
 
 	srand(time(NULL));
 
-	//generate random matrix
-	scai::lama::CSRSparseMatrix<ValueType>a(n,n);
-	scai::lama::MatrixCreator::buildPoisson(a, 3, 19, dimX,dimY,dimZ);
+	//load matrix
+	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+	const IndexType n = graph.getRowDistributionPtr()->getGlobalSize();
 
-	scai::dmemo::DistributionPtr inputDist = a.getRowDistributionPtr();
+	scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
 	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
 
-	a.redistribute(inputDist, noDistPointer);//need replicated columns for FM;
+	graph.redistribute(inputDist, noDistPointer);//need replicated columns for FM;
 
 	ASSERT_EQ(n, inputDist->getGlobalSize());
 
@@ -397,23 +394,24 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 	}
 	scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(owners, comm));
 
-	a.redistribute(newDistribution, a.getColDistributionPtr());
+	graph.redistribute(newDistribution, graph.getColDistributionPtr());
 	part.redistribute(newDistribution);
 
-	std::vector<IndexType> localBorder = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(a);
+	std::vector<IndexType> localBorder = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(graph);
 
 	Settings settings;
 	settings.numBlocks= k;
 	settings.epsilon = epsilon;
 
 
-	ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+	ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
+	ASSERT_GE(cut, 0);
 	for (IndexType i = 0; i < iterations; i++) {
-		std::vector<IndexType> gainPerRound = ParcoRepart<IndexType, ValueType>::distributedFMStep(a, part, localBorder, settings);
+		std::vector<IndexType> gainPerRound = ParcoRepart<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, settings);
 		IndexType gain = std::accumulate(gainPerRound.begin(), gainPerRound.end(), 0);
 
 		//check correct gain calculation
-		const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+		const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
 		EXPECT_EQ(cut - gain, newCut) << "Old cut " << cut << ", gain " << gain << " newCut " << newCut;
 
 		EXPECT_LE(newCut, cut);
