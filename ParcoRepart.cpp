@@ -214,7 +214,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 		std::vector<IndexType> nodesWithNonLocalNeighbors = getNodesWithNonLocalNeighbors(input);
 
-		std::vector<double> distances = distancesFromBlockCenter(coordinates);
+		std::vector<double> distances;
+		if (settings.useGeometricTieBreaking) {
+			std::vector<double> distances = distancesFromBlockCenter(coordinates);
+		}
 
 		DenseVector<IndexType> nonWeights = DenseVector<IndexType>(0,1);
 
@@ -231,7 +234,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				std::vector<IndexType> gainPerRound = distributedFMStep(input, result, nodesWithNonLocalNeighbors, nonWeights, communicationScheme, coordinates, distances, settings);
 				gain = std::accumulate(gainPerRound.begin(), gainPerRound.end(), 0);
 
-				if (settings.skipNonGainColors) {
+				if (settings.skipNoGainColors) {
 					IndexType i = 0;
 					while (i < gainPerRound.size()) {
 						if (gainPerRound[i] == 0) {
@@ -1226,9 +1229,11 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 		throw std::runtime_error("Column distribution needs to be replicated.");
 	}
 
-	for (IndexType dim = 0; dim < coordinates.size(); dim++) {
-		if (coordinates[dim].getDistributionPtr()->getLocalSize() != input.getRowDistributionPtr()->getLocalSize()) {
-			throw std::runtime_error("Coordinate distribution must be equal to matrix distribution");
+	if (settings.useGeometricTieBreaking) {
+		for (IndexType dim = 0; dim < coordinates.size(); dim++) {
+			if (coordinates[dim].getDistributionPtr()->getLocalSize() != input.getRowDistributionPtr()->getLocalSize()) {
+				throw std::runtime_error("Coordinate distribution must be equal to matrix distribution");
+			}
 		}
 	}
 
@@ -1388,10 +1393,12 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 
 			//swap distances used for tie breaking
 			ValueType distanceSwap[swapLength];
-			for (IndexType i = 0; i < interfaceNodes.size(); i++) {
-				distanceSwap[i] = distances[inputDist->global2local(interfaceNodes[i])];
+			if (settings.useGeometricTieBreaking) {
+				for (IndexType i = 0; i < interfaceNodes.size(); i++) {
+					distanceSwap[i] = distances[inputDist->global2local(interfaceNodes[i])];
+				}
+				comm->swap(distanceSwap, swapLength, partner);
 			}
-			comm->swap(distanceSwap, swapLength, partner);
 
 			/*
 			 * Build Halo to cover border region of other PE.
@@ -1458,12 +1465,19 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 			std::pair<IndexType, IndexType> secondRoundMarkers = {secondRoundMarker, otherSecondRoundMarker};
 
 			//tie breaking keys
-			std::vector<ValueType> tieBreakingKeys(borderRegionSize);
-			for (IndexType i = 0; i < lastRoundMarker; i++) {
-				tieBreakingKeys[i] = -distances[inputDist->global2local(interfaceNodes[i])];
+			std::vector<ValueType> tieBreakingKeys(borderRegionSize, 0);
+
+			if (settings.useGeometricTieBreaking) {
+				for (IndexType i = 0; i < lastRoundMarker; i++) {
+					tieBreakingKeys[i] = -distances[inputDist->global2local(interfaceNodes[i])];
+				}
+				for (IndexType i = lastRoundMarker; i < borderRegionSize; i++) {
+					tieBreakingKeys[i] = -distanceSwap[i-lastRoundMarker];
+				}
 			}
-			for (IndexType i = lastRoundMarker; i < borderRegionSize; i++) {
-				tieBreakingKeys[i] = -distanceSwap[i-lastRoundMarker];
+
+			if (settings.useDiffusionTieBreaking) {
+
 			}
 
 			SCAI_REGION_END( "ParcoRepart.distributedFMStep.loop.prepareSets" )

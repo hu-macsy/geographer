@@ -11,10 +11,10 @@ struct Settings{
     IndexType minGainForNextRound = 1;
     IndexType sfcResolution = 0;
     IndexType numberOfRestarts = 0;
-    bool useTieBreaking = true;
-    bool breakTiesWithDiffusion = false;
+    bool useDiffusionTieBreaking = false;
+    bool useGeometricTieBreaking = false;
     bool gainOverBalance = false;
-    bool skipNonGainColors = false;
+    bool skipNoGainColors = false;
     double epsilon = 0.05;
     
     void print2D(std::ostream& out){
