@@ -53,6 +53,10 @@ public:
 			}
 		}
 	}
+	
+	std::shared_ptr<SpatialCell> getRoot(){
+            return root;
+        }
 
 	/**
 	 * Get all elements, regardless of position
@@ -64,8 +68,30 @@ public:
 	}
         
 	template<typename IndexType, typename ValueType>
-	scai::lama::CSRSparseMatrix<ValueType>  getTreeAsGraph( std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells ){
+	scai::lama::CSRSparseMatrix<ValueType>  getTreeAsGraph( std::vector< std::set<std::shared_ptr<SpatialCell>>>& graphNgbrsCells ){
 		return root->getSubTreeAsGraph<IndexType, ValueType>( graphNgbrsCells );
+	}
+        
+        
+        template<typename IndexType, typename ValueType>
+	static scai::lama::CSRSparseMatrix<ValueType>  getGraphFromForest( std::vector< std::set<std::shared_ptr<SpatialCell>>>& graphNgbrsCells, std::vector<std::shared_ptr<SpatialCell>>& cellPtrVector ){
+            IndexType forestSize = cellPtrVector.size();
+            //  both vectors must have the sime size = forestSize
+            assert( forestSize == graphNgbrsCells.size() );
+            
+            std::shared_ptr<SpatialCell> onlyChild;
+            IndexType maxHeight= -1;
+            for(IndexType i=0; i<forestSize; i++){
+                std::shared_ptr<SpatialCell> thisNode = cellPtrVector[i];
+                if( thisNode->height() > maxHeight){
+                    onlyChild = thisNode;
+                }
+            }
+            
+            std::shared_ptr<SpatialCell> dummyRoot;
+            dummyRoot->addChild( onlyChild );
+            
+            return dummyRoot->getSubTreeAsGraph<IndexType, ValueType>( graphNgbrsCells );
 	}
         
         
