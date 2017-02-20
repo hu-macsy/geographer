@@ -12,6 +12,7 @@
 #include <scai/utilskernel/LArray.hpp>
 #include <scai/lama/Vector.hpp>
 
+#include <algorithm>
 #include <memory>
 #include <cstdlib>
 
