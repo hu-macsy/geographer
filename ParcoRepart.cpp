@@ -216,7 +216,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 		std::vector<double> distances;
 		if (settings.useGeometricTieBreaking) {
-			std::vector<double> distances = distancesFromBlockCenter(coordinates);
+			distances = distancesFromBlockCenter(coordinates);
 		}
 
 		DenseVector<IndexType> nonWeights = DenseVector<IndexType>(0,1);
@@ -1235,6 +1235,7 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 				throw std::runtime_error("Coordinate distribution must be equal to matrix distribution");
 			}
 		}
+		assert(distances.size() == input.getRowDistributionPtr()->getLocalSize());
 	}
 
 	if (settings.epsilon < 0) {
