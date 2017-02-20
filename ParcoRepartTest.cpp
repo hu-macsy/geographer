@@ -156,7 +156,7 @@ TEST_F(ParcoRepartTest, testImbalance) {
   EXPECT_EQ((n/std::ceil(n/k))-1, imbalance);
 }
 
-TEST_F(ParcoRepartTest, testDistanceFromBlockCenter) {
+TEST_F(ParcoRepartTest, testDistancesFromBlockCenter) {
 	const IndexType nroot = 16;
 	const IndexType n = nroot * nroot * nroot;
 	const IndexType dimensions = 3;
@@ -182,7 +182,7 @@ TEST_F(ParcoRepartTest, testDistanceFromBlockCenter) {
 
 	const IndexType localN = dist->getLocalSize();
 
-	std::vector<ValueType> distances = ParcoRepart<IndexType, ValueType>::distanceFromBlockCenter(coordinates);
+	std::vector<ValueType> distances = ParcoRepart<IndexType, ValueType>::distancesFromBlockCenter(coordinates);
 	EXPECT_EQ(localN, distances.size());
 	const ValueType maxPossibleDistance = pow(dimensions*(nroot*nroot),0.5);
 

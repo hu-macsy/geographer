@@ -54,7 +54,7 @@ namespace ITI {
 			 * @param[in] part partition
 			 * @param[in] k number of blocks in partition.
 			 */
-			static ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k);
+			static ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<IndexType> &nodeWeights = {});
 
 			/**
 			* Performs local refinement of a given partition
@@ -75,7 +75,7 @@ namespace ITI {
 			 */
 			static std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
 
-			static std::vector<ValueType> distanceFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates);
+			static std::vector<ValueType> distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates);
 
 			/**
 			 * redistributes a matrix from a local halo object without communication. It that is impossible, throw an error.

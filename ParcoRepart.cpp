@@ -634,24 +634,58 @@ IndexType ParcoRepart<IndexType, ValueType>::localBlockSize(const DenseVector<In
 }
 
 template<typename IndexType, typename ValueType>
-ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<IndexType> &part, IndexType k) {
+ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<IndexType> &nodeWeights) {
 	SCAI_REGION( "ParcoRepart.computeImbalance" )
-	const IndexType n = part.getDistributionPtr()->getGlobalSize();
-	std::vector<IndexType> subsetSizes(k, 0);
-	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
-	const Scalar maxK = part.max();
-	if (maxK.getValue<IndexType>() >= k) {
-		throw std::runtime_error("Block id " + std::to_string(maxK.getValue<IndexType>()) + " found in partition with supposedly" + std::to_string(k) + " blocks.");
-	}
- 	
-	for (IndexType i = 0; i < localPart.size(); i++) {
-		IndexType partID = localPart[i];
-		subsetSizes[partID] += 1;
-	}
-	IndexType optSize = std::ceil(n / k);
+	const IndexType globalN = part.getDistributionPtr()->getGlobalSize();
+	const IndexType localN = part.getDistributionPtr()->getLocalSize();
+	const IndexType weightsSize = nodeWeights.getDistributionPtr()->getGlobalSize();
+	const bool weighted = (weightsSize != 0);
 
-	//if we don't have the full partition locally, 
+	IndexType minWeight, maxWeight;
+	if (weighted) {
+		assert(weightsSize == globalN);
+		assert(nodeWeights.getDistributionPtr()->getLocalSize() == localN);
+		minWeight = nodeWeights.min().Scalar::getValue<IndexType>();
+		maxWeight = nodeWeights.max().Scalar::getValue<IndexType>();
+	} else {
+		minWeight = 1;
+		maxWeight = 1;
+	}
+
+	std::vector<IndexType> subsetSizes(k, 0);
+	const IndexType minK = part.min().Scalar::getValue<IndexType>();
+	const IndexType maxK = part.max().Scalar::getValue<IndexType>();
+
+	if (minK < 0) {
+		throw std::runtime_error("Block id " + std::to_string(minK) + " found in partition with supposedly" + std::to_string(k) + " blocks.");
+	}
+
+	if (maxK >= k) {
+		throw std::runtime_error("Block id " + std::to_string(maxK) + " found in partition with supposedly" + std::to_string(k) + " blocks.");
+	}
+
+	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
+	scai::hmemo::ReadAccess<IndexType> localWeight(nodeWeights.getLocalValues());
+	assert(localPart.size() == localN);
+ 	
+	IndexType weightSum = 0;
+	for (IndexType i = 0; i < localN; i++) {
+		IndexType partID = localPart[i];
+		IndexType weight = weighted ? localWeight[i] : 1;
+		subsetSizes[partID] += weight;
+		weightSum += weight;
+	}
+
+	IndexType optSize;
 	scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
+	if (weighted) {
+		//get global weight sum
+		weightSum = comm->sum(weightSum);
+		optSize = std::ceil(weightSum + (maxWeight - minWeight) / k);
+	} else {
+		optSize = std::ceil(globalN / k);
+	}
+
 	if (!part.getDistribution().isReplicated()) {
 	  //sum block sizes over all processes
 	  for (IndexType partID = 0; partID < k; partID++) {
@@ -660,6 +694,7 @@ ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<
 	}
 	
 	IndexType maxBlockSize = *std::max_element(subsetSizes.begin(), subsetSizes.end());
+	assert(maxBlockSize >= optSize);
 	return ((maxBlockSize - optSize)/ optSize);
 }
 
@@ -726,7 +761,7 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::nonLocalNeighbors
 }
 
 template<typename IndexType, typename ValueType>
-std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::distanceFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates) {
+std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates) {
 	SCAI_REGION("ParcoRepart.distanceFromBlockCenter");
 
 	const IndexType localN = coordinates[0].getDistributionPtr()->getLocalSize();
@@ -2395,7 +2430,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 //to force instantiation
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings);
 			     
-template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int> &partition, int k);
+template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int> &partition, int k, const DenseVector<int> &nodeWeights);
 
 template double ParcoRepart<int, double>::computeCut(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, bool ignoreWeights);
 
@@ -2409,7 +2444,7 @@ template std::vector<DenseVector<int>> ParcoRepart<int, double>::computeCommunic
 
 template std::vector<int> ITI::ParcoRepart<int, double>::nonLocalNeighbors(const CSRSparseMatrix<double>& input);
 
-template std::vector<double> ITI::ParcoRepart<int, double>::distanceFromBlockCenter(const std::vector<DenseVector<double>> &coordinates);
+template std::vector<double> ITI::ParcoRepart<int, double>::distancesFromBlockCenter(const std::vector<DenseVector<double>> &coordinates);
 
 template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildPartHalo(const CSRSparseMatrix<double> &input,  const DenseVector<int> &part);
 
