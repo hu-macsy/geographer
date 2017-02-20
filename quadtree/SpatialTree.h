@@ -68,30 +68,48 @@ public:
 	}
         
 	template<typename IndexType, typename ValueType>
-	scai::lama::CSRSparseMatrix<ValueType>  getTreeAsGraph( std::vector< std::set<std::shared_ptr<SpatialCell>>>& graphNgbrsCells ){
-		return root->getSubTreeAsGraph<IndexType, ValueType>( graphNgbrsCells );
+	scai::lama::CSRSparseMatrix<ValueType>  getTreeAsGraph( std::vector< std::set<std::shared_ptr<SpatialCell>>>& graphNgbrsCells, std::vector<std::vector<ValueType>>& coords ){
+		return root->getSubTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coords );
 	}
         
         
         template<typename IndexType, typename ValueType>
-	static scai::lama::CSRSparseMatrix<ValueType>  getGraphFromForest( std::vector< std::set<std::shared_ptr<SpatialCell>>>& graphNgbrsCells, std::vector<std::shared_ptr<SpatialCell>>& cellPtrVector ){
-            IndexType forestSize = cellPtrVector.size();
+	static scai::lama::CSRSparseMatrix<ValueType>  getGraphFromForest( std::vector< std::set<std::shared_ptr<SpatialCell>>>& graphNgbrsCells, std::vector<std::shared_ptr<SpatialCell>>& treePtrVector,  std::vector<std::vector<ValueType>>& coords){
+            IndexType numTrees = treePtrVector.size();
             //  both vectors must have the sime size = forestSize
+            IndexType forestSize = treePtrVector[numTrees-1]->getID()+1;
+            //PRINT("graphNgbrsCells.size()= " << graphNgbrsCells.size() << ", forest size= " << forestSize);      
             assert( forestSize == graphNgbrsCells.size() );
             
             std::shared_ptr<SpatialCell> onlyChild;
-            IndexType maxHeight= -1;
-            for(IndexType i=0; i<forestSize; i++){
-                std::shared_ptr<SpatialCell> thisNode = cellPtrVector[i];
-                if( thisNode->height() > maxHeight){
-                    onlyChild = thisNode;
-                }
+            if(treePtrVector.size()!=0){
+                onlyChild= treePtrVector[0];
+            }else{
+                throw std::runtime_error("Input vector is empty.");
             }
             
-            std::shared_ptr<SpatialCell> dummyRoot;
-            dummyRoot->addChild( onlyChild );
+            int maxHeight= 0;
+            for(IndexType i=0; i<numTrees; i++){
+                std::shared_ptr<SpatialCell> thisNode = treePtrVector[i];
+                if( thisNode->height() > maxHeight){
+                    onlyChild = thisNode;
+                    maxHeight = thisNode->height();
+                }
+            }
+            PRINT("numTrees= "<< numTrees);            
+            std::shared_ptr<SpatialCell> dummyRoot= onlyChild;
+
+            // convert the tree vector to a queue for the starting frontier
+            std::queue<std::shared_ptr<SpatialCell>> frontier;
+            for(int i=0; i< numTrees; i++){
+                frontier.push( treePtrVector[i] );
+            }
+            /* since we use a frontier as an input, dummy node should not be needed at all
+             * maybe only to call getSubTreeAsGraph.
+             * TODO: turn getSubTreeAsGraph to static ??
+             * */
             
-            return dummyRoot->getSubTreeAsGraph<IndexType, ValueType>( graphNgbrsCells );
+            return dummyRoot->getSubTreeAsGraph<IndexType, ValueType>( graphNgbrsCells , coords, frontier);
 	}
         
         

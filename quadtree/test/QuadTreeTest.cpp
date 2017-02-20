@@ -25,12 +25,12 @@ typedef double ValueType;
 typedef int IndexType;
   
 
-TEST_F(QuadTreeTest, testGetGraphFromForest){
+TEST_F(QuadTreeTest, testGetGraphFromForestRandom_2D){
     
     // every forest[i] is a pointer to the root of a tree
     std::vector<std::shared_ptr<SpatialCell>> forest;
     
-    IndexType n= 10;
+    IndexType n= 2;
     vector<Point<double> > positions(n);
     vector<index> content(n);
 
@@ -39,38 +39,143 @@ TEST_F(QuadTreeTest, testGetGraphFromForest){
     index capacity = 1;
     
     QuadTreeCartesianEuclid quad(min, max, true, capacity);
+    QuadTreeCartesianEuclid quad2(min, max, true, capacity);
     index i=0;
     srand(time(NULL));
     
     for (i = 0; i < n; i++) {
-        Point<double> pos = Point<double>({double(rand()) / RAND_MAX, double(rand()) / RAND_MAX, double(rand()) / RAND_MAX});
-        positions[i] = pos;
-        content[i] = i;
+        Point<double> pos = Point<double>({double(rand()) / RAND_MAX, double(rand()) / RAND_MAX});
+        Point<double> pos2 = Point<double>({double(rand()) / RAND_MAX, double(rand()) / RAND_MAX});
         quad.addContent(i, pos);
+        quad2.addContent(i, pos2);
     }
 	
     forest.push_back(quad.getRoot());
+    forest.push_back(quad2.getRoot());
+
     // make more trees and pass them to the forest
     // CARE though, indexing should be one for all trees, maybe a forestIndex() routine or just a for 
     IndexType globIndexing=0;
     for(IndexType i=0; i<forest.size(); i++){
-        // no tested, should index all trees properly
         globIndexing = forest[i]->indexSubtree( globIndexing );
     }
+
+    IndexType numTrees = forest.size();
+
     
+    // ^^ forest created ^^
     
-    IndexType forestSize = forest.size();
-    
+
     // graphNgbrsPtrs[i]= a set with pointers to the neighbours of -i- in the CSR matrix/graph
-    std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsPtrs(forestSize);
+    std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsPtrs( globIndexing );
+    //WARNING: this kind of edges must be symmetric
+    graphNgbrsPtrs[forest[0]->getID()].insert( std::shared_ptr<SpatialCell> (forest[1]) );
+    graphNgbrsPtrs[forest[1]->getID()].insert( std::shared_ptr<SpatialCell> (forest[0]) );
     
-    scai::lama::CSRSparseMatrix<ValueType> graph= SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsPtrs, forest);
+    PRINT("num trees= " << numTrees << ", globIndex= " << globIndexing);       
+    int dimension = 2;
+    std::vector<std::vector<ValueType>> coords( dimension );
+    scai::lama::CSRSparseMatrix<ValueType> graph= SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsPtrs,  forest, coords);
+
+    // checkSymmetry is really expensive for big graphs, used only for small instances
+    graph.checkSymmetry();
+    graph.isConsistent();
 }
 
 
 
+TEST_F(QuadTreeTest, testGetGraphFromForestByHand_2D){
+    
+    // every forest[i] is a pointer to the root of a tree
+    std::vector<std::shared_ptr<SpatialCell>> forest;
+    
+    IndexType n= 2;
+    vector<Point<double> > positions(n);
+    vector<index> content(n);
+
+    Point<double> min(0.0, 0.0);
+    Point<double> max(1.0, 1.0);
+    index capacity = 1;
+    index i=0;
+    
+    QuadTreeCartesianEuclid quad0(min, max, true, capacity);
+    quad0.addContent( i++, Point<double>({0.4, 0.3}) );
+    quad0.addContent( i++, Point<double>({0.4, 0.8}) );
+
+    QuadTreeCartesianEuclid quad1( Point<double>({1.0, 0.0}), Point<double>({2.0, 1.0}), true, capacity);
+    quad1.addContent(i++, Point<double>({1.3, 0.2}));
+    quad1.addContent(i++, Point<double>({1.3, 0.8}));
+    
+    QuadTreeCartesianEuclid quad2( Point<double>({0.0, 1.0}), Point<double>({1.0, 2.0}), true, capacity);
+    quad2.addContent( i++, Point<double>({0.6, 1.1}) );
+    quad2.addContent( i++, Point<double>({0.6, 1.8}) );
+    
+    QuadTreeCartesianEuclid quad3( Point<double>({1.0, 1.0}), Point<double>({2.0, 2.0}), true, capacity);
+    quad3.addContent( i++, Point<double>({1.3, 1.2}) );
+    quad3.addContent( i++, Point<double>({1.3, 1.8}) );
+ 
+    forest.push_back(quad0.getRoot());
+    forest.push_back(quad1.getRoot());
+    forest.push_back(quad2.getRoot());
+    forest.push_back(quad3.getRoot());
+    
+    // make more trees and pass them to the forest
+    // CARE though, indexing should be one for all trees, maybe a forestIndex() routine or just a for 
+    IndexType globIndexing=0;
+    for(IndexType i=0; i<forest.size(); i++){
+        globIndexing = forest[i]->indexSubtree( globIndexing );
+    }
+
+    IndexType numTrees = forest.size();
+    for(i=0; i<numTrees; i++){
+        PRINT(i << ",forest root id= "<< forest[i]->getID());
+    }
+    
+    // ^^ forest created ^^
+    
+
+    // graphNgbrsPtrs[i]= a set with pointers to the neighbours of -i- in the CSR matrix/graph
+    std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsPtrs( globIndexing );
+    //WARNING: this kind of edges must be symmetric
+    
+    // quad0 connects with quad1 and 2
+    graphNgbrsPtrs[forest[0]->getID()].insert( std::shared_ptr<SpatialCell> (forest[1]) );
+    graphNgbrsPtrs[forest[1]->getID()].insert( std::shared_ptr<SpatialCell> (forest[0]) );
+    graphNgbrsPtrs[forest[0]->getID()].insert( std::shared_ptr<SpatialCell> (forest[2]) );
+    graphNgbrsPtrs[forest[2]->getID()].insert( std::shared_ptr<SpatialCell> (forest[0]) );
+    
+    // quad1 connects with 0 and 3
+    graphNgbrsPtrs[forest[1]->getID()].insert( std::shared_ptr<SpatialCell> (forest[3]) );
+    graphNgbrsPtrs[forest[3]->getID()].insert( std::shared_ptr<SpatialCell> (forest[1]) );
+    
+    graphNgbrsPtrs[forest[2]->getID()].insert( std::shared_ptr<SpatialCell> (forest[3]) );
+    graphNgbrsPtrs[forest[3]->getID()].insert( std::shared_ptr<SpatialCell> (forest[2]) );
+    
+    int dimension = 2;
+    std::vector<std::vector<ValueType>> coords( dimension );
+    PRINT("num trees= " << numTrees << ", globInde= " << globIndexing);        
+    scai::lama::CSRSparseMatrix<ValueType> graph= SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsPtrs,  forest, coords);
+    
+    EXPECT_EQ(coords.size(), dimension);
+    EXPECT_EQ(coords[0].size(), graph.getNumRows());
+    
+    // check coords are the same
+    for(int d=0; d<coords.size(); d++){
+        for(int i=0; i<coords[d].size(); i++){
+            std::cout << coords[d][i] << ", ";
+        }
+        std::cout<< std::endl;
+    }
+
+    // checkSymmetry is really expensive for big graphs, used only for small instances
+    graph.checkSymmetry();
+    graph.isConsistent();
+    PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() );
+}
+
+
 TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
-	count n = 2500;
+	count n = 500;
 
 	vector<Point<double> > positions(n);
 	vector<index> content(n);
@@ -99,12 +204,15 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
         // A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
         // of -i- in the output graph, not the quad tree.
         std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells( treeSize );
+        int dimension = 3;
+        std::vector<std::vector<ValueType>> coords( dimension );
         
-	scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>( graphNgbrsCells );
+	scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>( graphNgbrsCells, coords );
 
         // checkSymmetry is really expensive for big graphs, used only for small instances
-	// graph.checkSymmetry();
+        graph.checkSymmetry();
 	graph.isConsistent();
+        
         //EXPECT_EQ( graph.getNumRows(), graph.getNumColumns() );
 	EXPECT_EQ( graph.getNumRows(), N);
 	EXPECT_EQ( graph.getNumColumns(), N);
@@ -113,7 +221,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
 	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
         
-        // 20 is too large upper bound. Should be around 24 for 3D and 8 (or 10) for 2D
+        // 50 is too large upper bound (is it?). Should be around 24 for 3D and 8 (or 10) for 2D
         //TODO: maybe 30 is not so large... find another way to do it or skip it entirely
         IndexType upBound= 50;
         std::vector<IndexType> degreeCount( upBound, 0 );
@@ -144,9 +252,10 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
 }
 
 
+
 TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
 
-        count n = 2500;
+        count n = 500;
 
 	vector<Point<double> > positions(n);
 	vector<index> content(n);
@@ -174,11 +283,13 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
         // A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
         // of -i- in the output graph, not the quad tree.
         std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells( treeSize );
+        int dimension = 3;
+        std::vector<std::vector<ValueType>> coords( dimension );
         
-	scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>(graphNgbrsCells);
+	scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>(graphNgbrsCells, coords);
         
         // checkSymmetry is really expensive for big graphs, used only for small instances
-	// graph.checkSymmetry();
+	graph.checkSymmetry();
 	graph.isConsistent();
 
 	EXPECT_EQ( graph.getNumRows(), N);
@@ -216,7 +327,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
         
         PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
     
-        // communicate distribute graph
+        // communicate/distribute graph
     
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -277,8 +388,10 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_2D) {
     // A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
     // of -i- in the output graph, not the quad tree.
     std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells( treeSize );
+    int dimension = 2;
+    std::vector<std::vector<ValueType>> coords( dimension );
         
-    scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>(graphNgbrsCells);
+    scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>(graphNgbrsCells, coords);
     
     // checkSymmetry is really expensive for big graphs, used only for small instances
     graph.checkSymmetry();
