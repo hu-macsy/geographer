@@ -1477,7 +1477,10 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 			}
 
 			if (settings.useDiffusionTieBreaking) {
-
+				std::vector<ValueType> load = twoWayLocalDiffusion(input, haloMatrix, graphHalo, borderRegionIDs, secondRoundMarkers, assignedToSecondBlock, settings);
+				for (IndexType i = 0; i < borderRegionSize; i++) {
+					tieBreakingKeys[i] = std::abs(load[i]);
+				}
 			}
 
 			SCAI_REGION_END( "ParcoRepart.distributedFMStep.loop.prepareSets" )
@@ -1591,6 +1594,7 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 				/**
 				 * update coordinates and block distances
 				 */
+				if (settings.useGeometricTieBreaking)
 				{
 					SCAI_REGION( "ParcoRepart.distributedFMStep.loop.updateBlockDistances" )
 
