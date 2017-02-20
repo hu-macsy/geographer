@@ -546,20 +546,8 @@ public:
             std::vector<std::set<index>> graphNgbrsID(treeSize);
             
             const IndexType dimension = minCoords.getDimensions();
-            // size of coords should be = leafSize so this uses at most double memory than required
-            // after traversing the tree we delete not needed coords
-            // TODO: find way to use from now coords[i].size()=leafSize
-            /*
-            std::vector<scai::lama::DenseVector<ValueType>> coords( dimension );
-            for(int d=0; d<dimension; d++){
-                coords[d].allocate(treeSize);
-                coords[d] = static_cast<ValueType>(0); 
-            }
-            */
             
             assert(coords.size() != 0);
-            PRINT(coords[0].size() );
-            
             
             // not recursive, keep a frontier of the nodes to be checked
             // start with this and add every child
@@ -610,7 +598,6 @@ public:
                     }
 
                     //when finished with this child, push it to frontier
-                    //frontier.push_back(child);
                     frontier.push(child);
                 }
             
@@ -746,16 +733,12 @@ public:
                 }
                 //PRINT("nnz afterwards= " << nnzCounter << " should be == "<< nnzValues);
                 SCAI_ASSERT_EQUAL_ERROR( nnzCounter, nnzValues);
-
-                //PRINT(csrIA.size() << " _ " << csrJA.size() << " @ " << csrValues.size() );                
+                
             }
                     
-            scai::lama::CSRStorage<ValueType> localMatrix( N, N, nnzValues, csrIA, csrJA, csrValues );
-            //localMatrix.allocate( N, N );
-            //localMatrix.swap( csrIA, csrJA, csrValues );
-            
+            scai::lama::CSRStorage<ValueType> localMatrix( N, N, nnzValues, csrIA, csrJA, csrValues );            
             scai::lama::CSRSparseMatrix<ValueType> ret(localMatrix);
-            //graphNgbrsCells.clear();
+        
             return ret;
         }
         
@@ -783,8 +766,7 @@ public:
             if(dim!=3){
                 //std::cout<<"Dimension != 3: WARNING, It could work but not sure...."<< std::endl;
             }
-//PRINT("this: "<< minCoords[0]<<", "<<minCoords[1]<<" - "<< maxCoords[0]<<", "<<maxCoords[1]);
-//PRINT("other: "<< other.minCoords[0]<<", "<< other.minCoords[1]<<" - "<< other.maxCoords[0]<<", "<< other.maxCoords[1]);
+
             // if 0 or 1 OK, if 2 cells share just an edge, if 3 they share a corner
             int strictEqualities= 0;
             for(int d=0; d<dim; d++){

@@ -128,7 +128,7 @@ TEST_F(QuadTreeTest, testGetGraphFromForestByHand_2D){
 
     IndexType numTrees = forest.size();
     for(i=0; i<numTrees; i++){
-        PRINT(i << ", id= "<< forest[i]->getID());
+        PRINT(i << ",forest root id= "<< forest[i]->getID());
     }
     
     // ^^ forest created ^^
