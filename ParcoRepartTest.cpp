@@ -12,6 +12,7 @@
 #include <scai/utilskernel/LArray.hpp>
 #include <scai/lama/Vector.hpp>
 
+#include <algorithm>
 #include <memory>
 #include <cstdlib>
 
@@ -84,11 +85,9 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   std::vector<ValueType> maxCoord(dimensions, nroot);
   std::vector<IndexType> numPoints(dimensions, nroot);
 
-  scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
-
   std::vector<DenseVector<ValueType>> coordinates(dimensions);
   for(IndexType i=0; i<dimensions; i++){ 
-	  coordinates[i].allocate(coordDist);
+	  coordinates[i].allocate(dist);
 	  coordinates[i] = static_cast<ValueType>( 0 );
   }
   
@@ -156,6 +155,41 @@ TEST_F(ParcoRepartTest, testImbalance) {
   EXPECT_EQ((n/std::ceil(n/k))-1, imbalance);
 }
 
+TEST_F(ParcoRepartTest, testDistancesFromBlockCenter) {
+	const IndexType nroot = 16;
+	const IndexType n = nroot * nroot * nroot;
+	const IndexType dimensions = 3;
+
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+	scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+
+	scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
+	std::vector<ValueType> maxCoord(dimensions, nroot);
+	std::vector<IndexType> numPoints(dimensions, nroot);
+
+	scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+
+	std::vector<DenseVector<ValueType>> coordinates(dimensions);
+	for(IndexType i=0; i<dimensions; i++){
+	  coordinates[i].allocate(coordDist);
+	  coordinates[i] = static_cast<ValueType>( 0 );
+	}
+
+	MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(a, coordinates, maxCoord, numPoints);
+
+	const IndexType localN = dist->getLocalSize();
+
+	std::vector<ValueType> distances = ParcoRepart<IndexType, ValueType>::distancesFromBlockCenter(coordinates);
+	EXPECT_EQ(localN, distances.size());
+	const ValueType maxPossibleDistance = pow(dimensions*(nroot*nroot),0.5);
+
+	for (IndexType i = 0; i < distances.size(); i++) {
+		EXPECT_LE(distances[i], maxPossibleDistance);
+	}
+}
+
 TEST_F(ParcoRepartTest, testCut) {
   const IndexType n = 1000;
   const IndexType k = 10;
@@ -178,13 +212,13 @@ TEST_F(ParcoRepartTest, testCut) {
 
   //cut should be 10*900 / 2
   const IndexType blockSize = n / k;
-  const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, false);
   EXPECT_EQ(k*blockSize*(n-blockSize) / 2, cut);
 
   //now convert distributed into replicated partition vector and compare again
   part.redistribute(noDistPointer);
   a.redistribute(noDistPointer, noDistPointer);
-  const ValueType replicatedCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  const ValueType replicatedCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, false);
   EXPECT_EQ(k*blockSize*(n-blockSize) / 2, replicatedCut);
 }
 
@@ -246,7 +280,7 @@ TEST_F(ParcoRepartTest, testTwoWayCut) {
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
 	const scai::hmemo::HArray<IndexType>& localData = part.getLocalValues();
-	scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildPartHalo(a, part);
+	scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildNeighborHalo(a);
 	scai::utilskernel::LArray<IndexType> haloData;
 	comm->updateHalo( haloData, localData, partHalo );
 
@@ -264,25 +298,26 @@ TEST_F(ParcoRepartTest, testTwoWayCut) {
 			}
 		}
 	}
-	const ValueType globalCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+	const ValueType globalCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, false);
 
 	EXPECT_EQ(globalCut, comm->sum(localCutSum) / 2);
 }
 
 
 TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
-  const IndexType n = 1000;
+  std::string file = "Grid32x32";
   const IndexType k = 10;
   const ValueType epsilon = 0.05;
   const IndexType iterations = 1;
 
   //generate random matrix
-  scai::lama::CSRSparseMatrix<ValueType>a(n,n);
-  scai::lama::MatrixCreator::buildPoisson(a, 3, 19, 10,10,10);
+
+  CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+  const IndexType n = graph.getRowDistributionPtr()->getGlobalSize();
 
   //we want a replicated matrix
   scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
-  a.redistribute(noDistPointer, noDistPointer);
+  graph.redistribute(noDistPointer, noDistPointer);
 
   //generate random partition
   scai::lama::DenseVector<IndexType> part(n, 0);
@@ -291,12 +326,12 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
     part.setValue(i, blockId);
   }
 
-  ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
   for (IndexType i = 0; i < iterations; i++) {
-    ValueType gain = ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(a, part, k, epsilon);
+    ValueType gain = ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(graph, part, k, epsilon);
 
     //check correct gain calculation
-    const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+    const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
     EXPECT_EQ(cut - gain, newCut) << "Old cut " << cut << ", gain " << gain << " newCut " << newCut;
     EXPECT_LE(newCut, cut);
     cut = newCut;
@@ -309,9 +344,9 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
   }
 
   //check correct cut with balanced partition
-  cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
-  ValueType gain = ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(a, part, k, epsilon);
-  const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+  cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
+  ValueType gain = ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(graph, part, k, epsilon);
+  const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
   EXPECT_EQ(cut - gain, newCut);
   EXPECT_LE(newCut, cut);
 
@@ -322,25 +357,30 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesLocal) {
 
 TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-
-	const IndexType dimX = 16;
-	const IndexType dimY = 16;
-	const IndexType dimZ = 16;
-	const IndexType n = dimX*dimY*dimZ;
 	const IndexType k = comm->getSize();
 	const ValueType epsilon = 0.05;
 	const IndexType iterations = 1;
 
 	srand(time(NULL));
 
-	//generate random matrix
-	scai::lama::CSRSparseMatrix<ValueType>a(n,n);
-	scai::lama::MatrixCreator::buildPoisson(a, 3, 19, dimX,dimY,dimZ);
+	IndexType nroot = 16;
+	IndexType n = nroot * nroot * nroot;
+	IndexType dimensions = 3;
 
-	scai::dmemo::DistributionPtr inputDist = a.getRowDistributionPtr();
+	scai::dmemo::DistributionPtr inputDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
 	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
 
-	a.redistribute(inputDist, noDistPointer);//need replicated columns for FM;
+	scai::lama::CSRSparseMatrix<ValueType>graph(inputDist, noDistPointer);
+	std::vector<ValueType> maxCoord(dimensions, nroot);
+	std::vector<IndexType> numPoints(dimensions, nroot);
+
+	std::vector<DenseVector<ValueType>> coordinates(dimensions);
+	for(IndexType i=0; i<dimensions; i++){
+	  coordinates[i].allocate(inputDist);
+	  coordinates[i] = static_cast<ValueType>( 0 );
+	}
+
+	MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(graph, coordinates, maxCoord, numPoints);
 
 	ASSERT_EQ(n, inputDist->getGlobalSize());
 
@@ -362,23 +402,29 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 	}
 	scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(owners, comm));
 
-	a.redistribute(newDistribution, a.getColDistributionPtr());
+	graph.redistribute(newDistribution, graph.getColDistributionPtr());
 	part.redistribute(newDistribution);
 
-	std::vector<IndexType> localBorder = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(a);
+	for (IndexType dim = 0; dim < dimensions; dim++) {
+		coordinates[dim].redistribute(newDistribution);
+	}
+
+	std::vector<IndexType> localBorder = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(graph);
 
 	Settings settings;
 	settings.numBlocks= k;
 	settings.epsilon = epsilon;
 
 
-	ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+	ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
+	ASSERT_GE(cut, 0);
 	for (IndexType i = 0; i < iterations; i++) {
-		std::vector<IndexType> gainPerRound = ParcoRepart<IndexType, ValueType>::distributedFMStep(a, part, localBorder, settings);
-		IndexType gain = std::accumulate(gainPerRound.begin(), gainPerRound.end(), 0);
+		std::vector<IndexType> gainPerRound = ParcoRepart<IndexType, ValueType>::distributedFMStep(graph, part, coordinates, settings);
+		IndexType gain = 0;
+		for (IndexType roundGain : gainPerRound) gain += roundGain;
 
 		//check correct gain calculation
-		const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(a, part, true);
+		const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
 		EXPECT_EQ(cut - gain, newCut) << "Old cut " << cut << ", gain " << gain << " newCut " << newCut;
 
 		EXPECT_LE(newCut, cut);
@@ -514,7 +560,7 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 		IndexType partner = commAccess[scheme[round].getDistributionPtr()->global2local(comm->getRank())];
 
 		if (partner == thisBlock) {
-			scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildPartHalo(a, part);
+			scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildNeighborHalo(a);
 			scai::utilskernel::LArray<IndexType> haloData;
 			comm->updateHalo( haloData, part.getLocalValues(), partHalo );
 
@@ -554,7 +600,7 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 			const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 			const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
-			scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildPartHalo(a, part);
+			scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildNeighborHalo(a);
 			scai::utilskernel::LArray<IndexType> haloData;
 			comm->updateHalo( haloData, localData, partHalo );
 
@@ -1016,7 +1062,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
     
         
     //get halo (buildPartHalo) and check if block graphs is correct
-    scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildPartHalo(adjM, partition);
+    scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildNeighborHalo(adjM);
     scai::hmemo::HArray<IndexType> reqIndices = partHalo.getRequiredIndexes();
     scai::hmemo::HArray<IndexType> provIndices = partHalo.getProvidesIndexes();
     

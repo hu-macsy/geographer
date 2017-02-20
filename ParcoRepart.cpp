@@ -79,11 +79,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	const IndexType localN = inputDist->getLocalSize();
 	const IndexType globalN = inputDist->getGlobalSize();
 
-	if (coordDist->getLocalSize() != localN) {
-		throw std::runtime_error(std::to_string(coordDist->getLocalSize()) + " point coordinates, "
-				+ std::to_string(localN) + " rows present.");
-	}
-
 	if( !coordDist->isEqual( *inputDist) ){
 		throw std::runtime_error( "Distributions should be equal.");
 	}
@@ -120,7 +115,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			maxCoords[dim] = comm->max(maxCoords[dim]);
 		}
 	
-
 		ValueType maxExtent = 0;
 		for (IndexType dim = 0; dim < dimensions; dim++) {
 			if (maxCoords[dim] - minCoords[dim] > maxExtent) {
@@ -192,6 +186,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			input.redistribute(newDistribution, input.getColDistributionPtr());
 			result = DenseVector<IndexType>(newDistribution, comm->getRank());
 
+			for (IndexType dim = 0; dim < dimensions; dim++) {
+				coordinates[dim].redistribute(newDistribution);
+			}
+
 		} else {
 			scai::lama::DenseVector<IndexType> inversePermutation;
 			DenseVector<IndexType> tmpPerm = permutation;
@@ -209,13 +207,20 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 	if (comm->getSize() == 1 || comm->getSize() == k) {
 		ValueType gain = settings.minGainForNextRound;
-		ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input)) / 2;
+		ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
 
 		scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getPEGraph(input);
 
 		std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
 
 		std::vector<IndexType> nodesWithNonLocalNeighbors = getNodesWithNonLocalNeighbors(input);
+
+		std::vector<double> distances;
+		if (settings.useGeometricTieBreaking) {
+			distances = distancesFromBlockCenter(coordinates);
+		}
+
+		DenseVector<IndexType> nonWeights = DenseVector<IndexType>(0,1);
 
 		if (comm->getRank() == 0) {
 			afterSFC = std::chrono::steady_clock::now();
@@ -227,19 +232,24 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			if (inputDist->isReplicated()) {
 				gain = replicatedMultiWayFM(input, result, k, epsilon);
 			} else {
-				std::vector<IndexType> gainPerRound = distributedFMStep(input, result, nodesWithNonLocalNeighbors, communicationScheme, settings);
+				std::vector<IndexType> gainPerRound = distributedFMStep(input, result, nodesWithNonLocalNeighbors, nonWeights, communicationScheme, coordinates, distances, settings);
 				gain = std::accumulate(gainPerRound.begin(), gainPerRound.end(), 0);
 
-				for (IndexType i = 0; i < gainPerRound.size(); i++) {
-					if (gainPerRound[i] == 0) {
-						//remove this color from future rounds. This is not terrible efficient, since it causes multiple copies, but all vectors are small and this method isn't called too often.
-						communicationScheme.erase(communicationScheme.begin()+i);
-						gainPerRound.erase(gainPerRound.begin()+i);
+				if (settings.skipNoGainColors) {
+					IndexType i = 0;
+					while (i < gainPerRound.size()) {
+						if (gainPerRound[i] == 0) {
+							//remove this color from future rounds. This is not terrible efficient, since it causes multiple copies, but all vectors are small and this method isn't called too often.
+							communicationScheme.erase(communicationScheme.begin()+i);
+							gainPerRound.erase(gainPerRound.begin()+i);
+						} else {
+							i++;
+						}
 					}
 				}
 			}
 			ValueType oldCut = cut;
-			cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input)) / 2;
+			cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
 			if (comm->getRank() == 0) {
 				round = std::chrono::steady_clock::now();
 				std::chrono::duration<double> elapsedSeconds = round-start;
@@ -535,7 +545,7 @@ ValueType ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(const CSRSpars
 }
 
 template<typename IndexType, typename ValueType>
-ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const bool ignoreWeights) {
+ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const bool weighted) {
 	SCAI_REGION( "ParcoRepart.computeCut" )
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
@@ -557,7 +567,7 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<Va
 
 	scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
-	scai::dmemo::Halo partHalo = buildPartHalo(input, part);
+	scai::dmemo::Halo partHalo = buildNeighborHalo(input);
 	scai::utilskernel::LArray<IndexType> haloData;
 	partDist->getCommunicatorPtr()->updateHalo( haloData, localData, partHalo );
 
@@ -584,10 +594,10 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<Va
 			}
 
 			if (neighborBlock != thisBlock) {
-				if (ignoreWeights) {
-					result++;
-				} else {
+				if (weighted) {
 					result += values[j];
+				} else {
+					result++;
 				}
 			}
 		}
@@ -602,17 +612,18 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<Va
 }
 
 template<typename IndexType, typename ValueType>
-ValueType ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input) {
+ValueType ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input, const bool weighted) {
 	SCAI_REGION( "ParcoRepart.localSumOutgoingEdges" )
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+	const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
-	IndexType numOutgoingEdges = 0;
+	IndexType sumOutgoingEdgeWeights = 0;
 	for (IndexType j = 0; j < ja.size(); j++) {
-		if (!input.getRowDistributionPtr()->isLocal(ja[j])) numOutgoingEdges++;
+		if (!input.getRowDistributionPtr()->isLocal(ja[j])) sumOutgoingEdgeWeights += weighted ? values[j] : 1;
 	}
 
-	return numOutgoingEdges;
+	return sumOutgoingEdgeWeights;
 }
 
 template<typename IndexType, typename ValueType>
@@ -626,29 +637,70 @@ IndexType ParcoRepart<IndexType, ValueType>::localBlockSize(const DenseVector<In
 			result++;
 		}
 	}
-
 	return result;
 }
 
 template<typename IndexType, typename ValueType>
-ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<IndexType> &part, IndexType k) {
+ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<IndexType> &nodeWeights) {
 	SCAI_REGION( "ParcoRepart.computeImbalance" )
-	const IndexType n = part.getDistributionPtr()->getGlobalSize();
-	std::vector<IndexType> subsetSizes(k, 0);
-	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
-	const Scalar maxK = part.max();
-	if (maxK.getValue<IndexType>() >= k) {
-		throw std::runtime_error("Block id " + std::to_string(maxK.getValue<IndexType>()) + " found in partition with supposedly" + std::to_string(k) + " blocks.");
-	}
- 	
-	for (IndexType i = 0; i < localPart.size(); i++) {
-		IndexType partID = localPart[i];
-		subsetSizes[partID] += 1;
-	}
-	IndexType optSize = std::ceil(n / k);
+	const IndexType globalN = part.getDistributionPtr()->getGlobalSize();
+	const IndexType localN = part.getDistributionPtr()->getLocalSize();
+	const IndexType weightsSize = nodeWeights.getDistributionPtr()->getGlobalSize();
+	const bool weighted = (weightsSize != 0);
 
-	//if we don't have the full partition locally, 
+	IndexType minWeight, maxWeight;
+	if (weighted) {
+		assert(weightsSize == globalN);
+		assert(nodeWeights.getDistributionPtr()->getLocalSize() == localN);
+		minWeight = nodeWeights.min().Scalar::getValue<IndexType>();
+		maxWeight = nodeWeights.max().Scalar::getValue<IndexType>();
+	} else {
+		minWeight = 1;
+		maxWeight = 1;
+	}
+
+	if (maxWeight <= 0) {
+		throw std::runtime_error("Node weight vector given, but all weights non-positive.");
+	}
+
+	if (minWeight < 0) {
+		throw std::runtime_error("Negative node weights not supported.");
+	}
+
+	std::vector<IndexType> subsetSizes(k, 0);
+	const IndexType minK = part.min().Scalar::getValue<IndexType>();
+	const IndexType maxK = part.max().Scalar::getValue<IndexType>();
+
+	if (minK < 0) {
+		throw std::runtime_error("Block id " + std::to_string(minK) + " found in partition with supposedly" + std::to_string(k) + " blocks.");
+	}
+
+	if (maxK >= k) {
+		throw std::runtime_error("Block id " + std::to_string(maxK) + " found in partition with supposedly" + std::to_string(k) + " blocks.");
+	}
+
+	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
+	scai::hmemo::ReadAccess<IndexType> localWeight(nodeWeights.getLocalValues());
+	assert(localPart.size() == localN);
+ 	
+	IndexType weightSum = 0;
+	for (IndexType i = 0; i < localN; i++) {
+		IndexType partID = localPart[i];
+		IndexType weight = weighted ? localWeight[i] : 1;
+		subsetSizes[partID] += weight;
+		weightSum += weight;
+	}
+
+	IndexType optSize;
 	scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
+	if (weighted) {
+		//get global weight sum
+		weightSum = comm->sum(weightSum);
+		optSize = std::ceil(weightSum + (maxWeight - minWeight) / k);
+	} else {
+		optSize = std::ceil(globalN / k);
+	}
+
 	if (!part.getDistribution().isReplicated()) {
 	  //sum block sizes over all processes
 	  for (IndexType partID = 0; partID < k; partID++) {
@@ -657,6 +709,7 @@ ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<
 	}
 	
 	IndexType maxBlockSize = *std::max_element(subsetSizes.begin(), subsetSizes.end());
+	assert(maxBlockSize >= optSize);
 	return ((maxBlockSize - optSize)/ optSize);
 }
 
@@ -720,6 +773,60 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::nonLocalNeighbors
 		}
 	}
 	return std::vector<IndexType>(neighborSet.begin(), neighborSet.end()) ;
+}
+
+template<typename IndexType, typename ValueType>
+std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates) {
+	SCAI_REGION("ParcoRepart.distanceFromBlockCenter");
+
+	const IndexType localN = coordinates[0].getDistributionPtr()->getLocalSize();
+	const IndexType dimensions = coordinates.size();
+
+	std::vector<ValueType> geometricCenter(dimensions);
+	for (IndexType dim = 0; dim < dimensions; dim++) {
+		const scai::utilskernel::LArray<ValueType>& localValues = coordinates[dim].getLocalValues();
+		assert(localValues.size() == localN);
+		geometricCenter[dim] = localValues.sum() / localN;
+	}
+
+	std::vector<ValueType> result(localN);
+	for (IndexType i = 0; i < localN; i++) {
+		ValueType distanceSquared = 0;
+		for (IndexType dim = 0; dim < dimensions; dim++) {
+			const ValueType diff = coordinates[dim].getLocalValues()[i] - geometricCenter[dim];
+			distanceSquared += diff*diff;
+		}
+		result[i] = pow(distanceSquared, 0.5);
+	}
+	return result;
+}
+
+template<typename IndexType, typename ValueType>
+template<typename T>
+void ITI::ParcoRepart<IndexType, ValueType>::redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, Halo& halo, scai::utilskernel::LArray<T>& haloData) {
+	SCAI_REGION( "ParcoRepart.redistributeFromHalo.Vector" )
+
+	using scai::utilskernel::LArray;
+
+	scai::dmemo::DistributionPtr oldDist = input.getDistributionPtr();
+	const IndexType newLocalN = newDist->getLocalSize();
+
+	//TOOD: could speed this up by using read and write accesses
+	LArray<T>& oldLocalValues = input.getLocalValues();
+
+	LArray<T> newLocalValues(newLocalN);
+	for (IndexType i = 0; i < newLocalN; i++) {
+		const IndexType globalI = newDist->local2global(i);
+		if (oldDist->isLocal(globalI)) {
+			newLocalValues[i] = oldLocalValues[oldDist->global2local(globalI)];
+		} else {
+			const IndexType localI = halo.global2halo(globalI);
+			assert(localI != nIndex);
+			newLocalValues[i] = haloData[localI];
+		}
+	}
+
+	input.swap(newLocalValues, newDist);
 }
 
 template<typename IndexType, typename ValueType>
@@ -843,26 +950,18 @@ void ITI::ParcoRepart<IndexType, ValueType>::redistributeFromHalo(CSRSparseMatri
 }
 
 template<typename IndexType, typename ValueType>
-scai::dmemo::Halo ITI::ParcoRepart<IndexType, ValueType>::buildPartHalo(
-		const CSRSparseMatrix<ValueType>& input, const DenseVector<IndexType> &part) {
+scai::dmemo::Halo ITI::ParcoRepart<IndexType, ValueType>::buildNeighborHalo(const CSRSparseMatrix<ValueType>& input) {
 
 	SCAI_REGION( "ParcoRepart.buildPartHalo" )
 
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
-	const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
-
-	if (inputDist->getLocalSize() != partDist->getLocalSize()) {
-		throw std::runtime_error("Input matrix and partition must have the same distribution.");
-	}
 
 	std::vector<IndexType> requiredHaloIndices = nonLocalNeighbors(input);
-
-	assert(requiredHaloIndices.size() <= partDist->getGlobalSize() - partDist->getLocalSize());
 
 	scai::dmemo::Halo Halo;
 	{
 		scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
-		scai::dmemo::HaloBuilder::build( *partDist, arrRequiredIndexes, Halo );
+		scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, Halo );
 	}
 
 	return Halo;
@@ -1091,10 +1190,12 @@ IndexType ITI::ParcoRepart<IndexType, ValueType>::getDegreeSum(const CSRSparseMa
 }
 
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors, Settings settings) {
+std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<DenseVector<ValueType>> &coordinates, Settings settings) {
 	/**
 	 * This is a wrapper function to allow calls without precomputing a communication schedule..
 	 */
+
+	std::vector<IndexType> nodesWithNonLocalNeighbors = getNodesWithNonLocalNeighbors(input);
 
 	//get block graph
 	scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( input, part, settings.numBlocks);
@@ -1102,13 +1203,21 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 	//color block graph and get a communication schedule
 	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
 
+	//get uniform node weights
+	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(input.getRowDistributionPtr(), 1);
+	//DenseVector<IndexType> nonWeights = DenseVector<IndexType>(0, 1);
+
+	//get distances
+	std::vector<double> distances = distancesFromBlockCenter(coordinates);
+
 	//call distributed FM-step
-	return distributedFMStep(input, part, nodesWithNonLocalNeighbors, communicationScheme, settings);
+	return distributedFMStep(input, part, nodesWithNonLocalNeighbors, uniformWeights, communicationScheme, coordinates, distances, settings);
 }
 
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType>& input, DenseVector<IndexType>& part, std::vector<IndexType>& nodesWithNonLocalNeighbors,
-		const std::vector<DenseVector<IndexType>>& communicationScheme, Settings settings) {
+		DenseVector<IndexType> &nodeWeights, const std::vector<DenseVector<IndexType>>& communicationScheme, std::vector<DenseVector<ValueType>> &coordinates,
+		std::vector<ValueType> &distances, Settings settings) {
 	SCAI_REGION( "ParcoRepart.distributedFMStep" )
 	const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
 	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
@@ -1121,6 +1230,15 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 		throw std::runtime_error("Column distribution needs to be replicated.");
 	}
 
+	if (settings.useGeometricTieBreaking) {
+		for (IndexType dim = 0; dim < coordinates.size(); dim++) {
+			if (coordinates[dim].getDistributionPtr()->getLocalSize() != input.getRowDistributionPtr()->getLocalSize()) {
+				throw std::runtime_error("Coordinate distribution must be equal to matrix distribution");
+			}
+		}
+		assert(distances.size() == input.getRowDistributionPtr()->getLocalSize());
+	}
+
 	if (settings.epsilon < 0) {
 		throw std::runtime_error("Epsilon must be >= 0, not " + std::to_string(settings.epsilon));
 	}
@@ -1129,12 +1247,18 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
     	throw std::runtime_error("Called with " + std::to_string(comm->getSize()) + " processors, but " + std::to_string(settings.numBlocks) + " blocks.");
     }
 
-    //block sizes
+    //block sizes TODO: adapt for weighted case
     const IndexType optSize = ceil(double(globalN) / settings.numBlocks);
     const IndexType maxAllowableBlockSize = optSize*(1+settings.epsilon);
 
     //for now, we are assuming equal numbers of blocks and processes
     const IndexType localBlockID = comm->getRank();
+
+    const bool nodesWeighted = nodeWeights.getDistributionPtr()->getGlobalSize() > 0;
+    if (nodesWeighted && nodeWeights.getDistributionPtr()->getLocalSize() != input.getRowDistributionPtr()->getLocalSize()) {
+    	throw std::runtime_error("Node weights have " + std::to_string(nodeWeights.getDistributionPtr()->getLocalSize()) + " local values, should be "
+    			+ std::to_string(input.getRowDistributionPtr()->getLocalSize()));
+    }
 
     IndexType gainSum = 0;
     std::vector<IndexType> gainPerRound(communicationScheme.size(), 0);
@@ -1151,20 +1275,20 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 	}
 
 	//main loop, one iteration for each color of the graph coloring
-	for (IndexType round = 0; round < communicationScheme.size(); round++) {
+	for (IndexType color = 0; color < communicationScheme.size(); color++) {
 		SCAI_REGION( "ParcoRepart.distributedFMStep.loop" )
 
 		const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 		const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
-		const scai::dmemo::DistributionPtr commDist = communicationScheme[round].getDistributionPtr();
+		const scai::dmemo::DistributionPtr commDist = communicationScheme[color].getDistributionPtr();
 
 		const IndexType localN = inputDist->getLocalSize();
 
-		if (!communicationScheme[round].getDistributionPtr()->isLocal(comm->getRank())) {
+		if (!communicationScheme[color].getDistributionPtr()->isLocal(comm->getRank())) {
 			throw std::runtime_error("Scheme value for " + std::to_string(comm->getRank()) + " must be local.");
 		}
 		
-		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[round].getLocalValues());
+		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[color].getLocalValues());
 		IndexType partner = commAccess[commDist->global2local(comm->getRank())];
 
 		//check symmetry of communication scheme
@@ -1197,7 +1321,7 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 
 		scai::dmemo::Halo graphHalo;
 		CSRStorage<ValueType> haloMatrix;
-
+		scai::utilskernel::LArray<IndexType> nodeWeightHaloData;
 
 		if (partner != comm->getRank()) {
 			//processor is active this round
@@ -1269,6 +1393,15 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 			//if we need more halo indices than there are non-local indices at all, something went wrong.
 			assert(requiredHaloIndices.size() <= globalN - inputDist->getLocalSize());
 
+			//swap distances used for tie breaking
+			ValueType distanceSwap[swapLength];
+			if (settings.useGeometricTieBreaking) {
+				for (IndexType i = 0; i < interfaceNodes.size(); i++) {
+					distanceSwap[i] = distances[inputDist->global2local(interfaceNodes[i])];
+				}
+				comm->swap(distanceSwap, swapLength, partner);
+			}
+
 			/*
 			 * Build Halo to cover border region of other PE.
 			 * This uses a special halo builder method that doesn't require communication, since the required and provided indices are already known.
@@ -1280,7 +1413,7 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 				scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, arrProvidedIndexes, partner, graphHalo );
 			}
 
-			//all reqired halo indices are in the halo
+			//all required halo indices are in the halo
 			for (IndexType node : requiredHaloIndices) {
 				assert(graphHalo.global2halo(node) != nIndex);
 			}
@@ -1303,18 +1436,61 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 
 			const IndexType borderRegionSize = borderRegionIDs.size();
 
+			/**
+			 * If nodes are weighted, exchange Halo for node weights
+			 */
+			std::vector<IndexType> borderNodeWeights = {};
+			if (nodesWeighted) {
+				const scai::utilskernel::LArray<IndexType>& localWeights = nodeWeights.getLocalValues();
+				assert(localWeights.size() == localN);
+				comm->updateHalo( nodeWeightHaloData, localWeights, graphHalo );
+				borderNodeWeights.resize(borderRegionSize);
+				for (IndexType i = 0; i < borderRegionSize; i++) {
+					const IndexType globalI = borderRegionIDs[i];
+					if (inputDist->isLocal(globalI)) {
+						const IndexType localI = inputDist->global2local(globalI);
+						borderNodeWeights[i] = localWeights[localI];
+					} else {
+						const IndexType localI = graphHalo.global2halo(globalI);
+						assert(localI != nIndex);
+						borderNodeWeights[i] = nodeWeightHaloData[localI];
+					}
+					assert(borderNodeWeights[i] > 0);
+				}
+			}
+
 			//block sizes and capacities
 			std::pair<IndexType, IndexType> blockSizes = {blockSize, otherBlockSize};
 			std::pair<IndexType, IndexType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
 
 			//second round markers
 			std::pair<IndexType, IndexType> secondRoundMarkers = {secondRoundMarker, otherSecondRoundMarker};
+
+			//tie breaking keys
+			std::vector<ValueType> tieBreakingKeys(borderRegionSize, 0);
+
+			if (settings.useGeometricTieBreaking) {
+				for (IndexType i = 0; i < lastRoundMarker; i++) {
+					tieBreakingKeys[i] = -distances[inputDist->global2local(interfaceNodes[i])];
+				}
+				for (IndexType i = lastRoundMarker; i < borderRegionSize; i++) {
+					tieBreakingKeys[i] = -distanceSwap[i-lastRoundMarker];
+				}
+			}
+
+			if (settings.useDiffusionTieBreaking) {
+				std::vector<ValueType> load = twoWayLocalDiffusion(input, haloMatrix, graphHalo, borderRegionIDs, secondRoundMarkers, assignedToSecondBlock, settings);
+				for (IndexType i = 0; i < borderRegionSize; i++) {
+					tieBreakingKeys[i] = std::abs(load[i]);
+				}
+			}
+
 			SCAI_REGION_END( "ParcoRepart.distributedFMStep.loop.prepareSets" )
 
 			/**
 			 * execute FM locally
 			 */
-			IndexType gain = twoWayLocalFM(input, haloMatrix, graphHalo, borderRegionIDs, secondRoundMarkers, assignedToSecondBlock, maxBlockSizes, blockSizes, settings);
+			IndexType gain = twoWayLocalFM(input, haloMatrix, graphHalo, borderRegionIDs, borderNodeWeights, secondRoundMarkers, assignedToSecondBlock, maxBlockSizes, blockSizes, tieBreakingKeys, settings);
 
 			{
 				SCAI_REGION( "ParcoRepart.distributedFMStep.loop.swapFMResults" )
@@ -1344,7 +1520,7 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 				gainThisRound = std::max(IndexType(otherGain), IndexType(gain));
 
 				assert(gainThisRound > 0);
-				gainPerRound[round] = gainThisRound;
+				gainPerRound[color] = gainThisRound;
 
 				gainSum += gainThisRound;
 
@@ -1402,6 +1578,9 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 					SCAI_REGION( "ParcoRepart.distributedFMStep.loop.redistribute.updateDataStructures" )
 					redistributeFromHalo(input, newDistribution, graphHalo, haloMatrix);
 					part = DenseVector<IndexType>(newDistribution, localBlockID);
+					if (nodesWeighted) {
+						redistributeFromHalo<IndexType>(nodeWeights, newDistribution, graphHalo, nodeWeightHaloData);
+					}
 				}
 				assert(input.getRowDistributionPtr()->isEqual(*part.getDistributionPtr()));
 				SCAI_REGION_END( "ParcoRepart.distributedFMStep.loop.redistribute" )
@@ -1413,12 +1592,29 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 					SCAI_REGION( "ParcoRepart.distributedFMStep.loop.updateLocalBorder" )
 					nodesWithNonLocalNeighbors = getNodesWithNonLocalNeighbors(input);
 				}
+
+				/**
+				 * update coordinates and block distances
+				 */
+				if (settings.useGeometricTieBreaking)
+				{
+					SCAI_REGION( "ParcoRepart.distributedFMStep.loop.updateBlockDistances" )
+
+					for (IndexType dim = 0; dim < coordinates.size(); dim++) {
+						scai::utilskernel::LArray<ValueType>& localCoords = coordinates[dim].getLocalValues();
+						scai::utilskernel::LArray<ValueType> haloData;
+						comm->updateHalo( haloData, localCoords, graphHalo );
+						redistributeFromHalo<ValueType>(coordinates[dim], newDistribution, graphHalo, haloData);
+					}
+
+					distances = distancesFromBlockCenter(coordinates);
+				}
 			}
 		}
 	}
 	comm->synchronize();
-	for (IndexType i = 0; i < gainPerRound.size(); i++) {
-		gainPerRound[i] = comm->sum(gainPerRound[i]) / 2;
+	for (IndexType color = 0; color < gainPerRound.size(); color++) {
+		gainPerRound[color] = comm->sum(gainPerRound[color]) / 2;
 	}
 	return gainPerRound;
 }
@@ -1478,9 +1674,9 @@ void ITI::ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRS
 
 template<typename IndexType, typename ValueType>
 ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
+		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<IndexType>& nodeWeights, std::pair<IndexType, IndexType> secondRoundMarkers,
 		std::vector<bool>& assignedToSecondBlock, const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes,
-		Settings settings) {
+		std::vector<ValueType> tieBreakingKeys, Settings settings) {
 	SCAI_REGION( "ParcoRepart.twoWayLocalFM" )
 
 	IndexType magicStoppingAfterNoGainRounds;
@@ -1491,7 +1687,15 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 	}
 
 	assert(blockCapacities.first == blockCapacities.second);
+	const bool nodesWeighted = (nodeWeights.size() != 0);
+	const bool edgesWeighted = nodesWeighted;//TODO: adapt this, change interface
 
+	if (edgesWeighted) {
+		ValueType maxWeight = input.getLocalStorage().getValues().max();
+		if (maxWeight == 0) {
+			throw std::runtime_error("Edges were given as weighted, but maximum weight is zero.");
+		}
+	}
 
 	const bool gainOverBalance = settings.gainOverBalance;
 
@@ -1506,6 +1710,10 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 	//the size of this border region
 	const IndexType veryLocalN = borderRegionIDs.size();
+	assert(tieBreakingKeys.size() == veryLocalN);
+	if (nodesWeighted) {
+		assert(nodeWeights.size() == veryLocalN);
+	}
 
 	const IndexType firstBlockSize = std::distance(assignedToSecondBlock.begin(), std::lower_bound(assignedToSecondBlock.begin(), assignedToSecondBlock.end(), 1));
 	assert(secondRoundMarkers.first <= firstBlockSize);
@@ -1543,6 +1751,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		//get locks
 		const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
 		const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());
+		const scai::hmemo::ReadAccess<ValueType> values(storage.getValues());
 
 		//get indices for CSR structure
 		const IndexType beginCols = localIa[localID];
@@ -1555,12 +1764,14 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 				continue;
 			}
 
+			const IndexType weight = edgesWeighted ? values[j] : 1;
+
 			if (inputDist->isLocal(globalNeighbor)) {
 				//neighbor is in local block,
-				result += isInSecondBlock ? 1 : -1;
+				result += isInSecondBlock ? weight : -weight;
 			} else if (matrixHalo.global2halo(globalNeighbor) != nIndex) {
 				//neighbor is in partner block
-				result += !isInSecondBlock ? 1 : -1;
+				result += !isInSecondBlock ? weight : -weight;
 			} else {
 				//neighbor is from somewhere else, no effect on gain.
 			}
@@ -1578,14 +1789,9 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 	std::vector<IndexType> gain(veryLocalN);
 
-	std::vector<ValueType> load = twoWayLocalDiffusion(input, haloStorage, matrixHalo, borderRegionIDs, secondRoundMarkers, assignedToSecondBlock, settings);
-	assert(load.size() == veryLocalN);
-	//assert(*std::max_element(load.begin(), load.end()) <= 1);
-	//assert(*std::min_element(load.begin(), load.end()) >= -1);
-
 	for (IndexType i = 0; i < veryLocalN; i++) {
 		gain[i] = computeInitialGain(i);
-		const ValueType tieBreakingKey = std::abs(load[i]);
+		const ValueType tieBreakingKey = tieBreakingKeys[i];
 		if (assignedToSecondBlock[i]) {
 			//the queues only support extractMin, since we want the maximum gain each round, we multiply it with -1
 			secondQueue.insert(std::make_pair(-gain[i], tieBreakingKey), i);
@@ -1686,8 +1892,9 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 		gainSumList.push_back(gainSum);
 
 		//update sizes
-		blockSizes.first += bestQueueIndex == 0 ? -1 : 1;
-		blockSizes.second += bestQueueIndex == 0 ? 1 : -1;
+		const IndexType nodeWeight = nodesWeighted ? nodeWeights[veryLocalID] : 1;
+		blockSizes.first += bestQueueIndex == 0 ? -nodeWeight : nodeWeight;
+		blockSizes.second += bestQueueIndex == 0 ? nodeWeight : -nodeWeight;
 		sizeList.push_back(std::max(blockSizes.first, blockSizes.second));
 
 		/**
@@ -1715,11 +1922,12 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 					continue;
 				}
 				bool wasInSameBlock = (bestQueueIndex == assignedToSecondBlock[veryLocalNeighborID]);
-
+				const ValueType edgeWeight = edgesWeighted ? localValues[j] : 1;
 				const ValueType oldGain = gain[veryLocalNeighborID];
-				gain[veryLocalNeighborID] = oldGain + 4*wasInSameBlock -2;
-				//const ValueType absNeighborLoad = std::abs(load[veryLocalNeighborID]);
-				const ValueType tieBreakingKey = std::abs(load[veryLocalNeighborID]);
+				//gain change is twice the value of the affected edge. Direction depends on block assignment.
+				gain[veryLocalNeighborID] = oldGain + 2*(2*wasInSameBlock - 1)*edgeWeight;
+
+				const ValueType tieBreakingKey = tieBreakingKeys[veryLocalNeighborID];
 				const std::pair<IndexType, ValueType> oldKey = std::make_pair(-oldGain, tieBreakingKey);
 				const std::pair<IndexType, ValueType> newKey = std::make_pair(-gain[veryLocalNeighborID], tieBreakingKey);
 
@@ -1762,9 +1970,9 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalFM(const CSRSparseM
 
 		//apply movement in reverse
 		assignedToSecondBlock[veryLocalID] = previousBlock;
-
-		blockSizes.first += previousBlock == 0 ? 1 : -1;
-		blockSizes.second += previousBlock == 0 ? -1 : 1;
+		const IndexType nodeWeight = nodesWeighted ? nodeWeights[veryLocalID] : 1;
+		blockSizes.first += previousBlock == 0 ? nodeWeight : -nodeWeight;
+		blockSizes.second += previousBlock == 0 ? -nodeWeight : nodeWeight;
 
 	}
 	SCAI_REGION_END( "ParcoRepart.twoWayLocalFM.recoverBestCut" )
@@ -1989,7 +2197,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const 
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-	scai::dmemo::Halo partHalo = buildPartHalo(adjM, part);
+	scai::dmemo::Halo partHalo = buildNeighborHalo(adjM);
 	scai::utilskernel::LArray<IndexType> haloData;
 	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
 
@@ -2367,7 +2575,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 //to force instantiation
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings);
 			     
-template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int> &partition, int k);
+template double ParcoRepart<int, double>::computeImbalance(const DenseVector<int> &partition, int k, const DenseVector<int> &nodeWeights);
 
 template double ParcoRepart<int, double>::computeCut(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, bool ignoreWeights);
 
@@ -2375,13 +2583,15 @@ template void ParcoRepart<int, double>::checkLocalDegreeSymmetry(const CSRSparse
 
 template double ParcoRepart<int, double>::replicatedMultiWayFM(const CSRSparseMatrix<double> &input, DenseVector<int> &part, int k, double epsilon, bool unweighted);
 
-template std::vector<int> ParcoRepart<int, double>::distributedFMStep(CSRSparseMatrix<double> &input, DenseVector<int> &part, std::vector<int>& nodesWithNonLocalNeighbors, Settings settings);
+template std::vector<int> ParcoRepart<int, double>::distributedFMStep(CSRSparseMatrix<double> &input, DenseVector<int> &part, std::vector<DenseVector<double>> &coordinates, Settings settings);
 
 template std::vector<DenseVector<int>> ParcoRepart<int, double>::computeCommunicationPairings(const CSRSparseMatrix<double> &input, const DenseVector<int> &part,	const DenseVector<int> &blocksToPEs);
 
 template std::vector<int> ITI::ParcoRepart<int, double>::nonLocalNeighbors(const CSRSparseMatrix<double>& input);
 
-template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildPartHalo(const CSRSparseMatrix<double> &input,  const DenseVector<int> &part);
+template std::vector<double> ITI::ParcoRepart<int, double>::distancesFromBlockCenter(const std::vector<DenseVector<double>> &coordinates);
+
+template scai::dmemo::Halo ITI::ParcoRepart<int, double>::buildNeighborHalo(const CSRSparseMatrix<double> &input);
 
 template std::pair<std::vector<int>, std::vector<int>> ITI::ParcoRepart<int, double>::getInterfaceNodes(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, const std::vector<int>& nodesWithNonLocalNeighbors, int otherBlock, int depth);
 
