@@ -409,7 +409,8 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 	ASSERT_GE(cut, 0);
 	for (IndexType i = 0; i < iterations; i++) {
 		std::vector<IndexType> gainPerRound = ParcoRepart<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, settings);
-		IndexType gain = std::accumulate(gainPerRound.begin(), gainPerRound.end(), 0);
+		IndexType gain = 0;
+		for (IndexType roundGain : gainPerRound) gain += roundGain;
 
 		//check correct gain calculation
 		const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
