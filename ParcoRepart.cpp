@@ -695,7 +695,7 @@ ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<
 	if (weighted) {
 		//get global weight sum
 		weightSum = comm->sum(weightSum);
-		optSize = std::ceil(weightSum + (maxWeight - minWeight) / k);
+		optSize = std::ceil(weightSum / k + (maxWeight - minWeight));
 	} else {
 		optSize = std::ceil(globalN / k);
 	}
@@ -708,7 +708,9 @@ ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<
 	}
 	
 	IndexType maxBlockSize = *std::max_element(subsetSizes.begin(), subsetSizes.end());
-	assert(maxBlockSize >= optSize);
+	if (!weighted) {
+		assert(maxBlockSize >= optSize);
+	}
 	return ((maxBlockSize - optSize)/ optSize);
 }
 

@@ -415,11 +415,31 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 	settings.numBlocks= k;
 	settings.epsilon = epsilon;
 
+	//get block graph
+	scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, part, settings.numBlocks);
+
+	//color block graph and get a communication schedule
+	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
+
+	//get random node weights
+	DenseVector<IndexType> weights;
+	weights.setRandom(graph.getRowDistributionPtr(), 1);
+	IndexType minNodeWeight = weights.min().Scalar::getValue<IndexType>();
+	IndexType maxNodeWeight = weights.max().Scalar::getValue<IndexType>();
+	if (comm->getRank() == 0) {
+		std::cout << "Max node weight: " << maxNodeWeight << std::endl;
+		std::cout << "Min node weight: " << minNodeWeight << std::endl;
+	}
+	//DenseVector<IndexType> nonWeights = DenseVector<IndexType>(0, 1);
+
+	//get distances
+	std::vector<double> distances = ParcoRepart<IndexType,ValueType>::distancesFromBlockCenter(coordinates);
 
 	ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
 	ASSERT_GE(cut, 0);
 	for (IndexType i = 0; i < iterations; i++) {
-		std::vector<IndexType> gainPerRound = ParcoRepart<IndexType, ValueType>::distributedFMStep(graph, part, coordinates, settings);
+		std::vector<IndexType> gainPerRound = ParcoRepart<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights,
+				communicationScheme, coordinates, distances, settings);
 		IndexType gain = 0;
 		for (IndexType roundGain : gainPerRound) gain += roundGain;
 
@@ -432,7 +452,7 @@ TEST_F(ParcoRepartTest, testFiducciaMattheysesDistributed) {
 	}
 
 	//check for balance
-	ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k);
+	ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k, weights);
 	EXPECT_LE(imbalance, epsilon);
 }
 
