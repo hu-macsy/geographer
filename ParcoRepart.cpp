@@ -811,19 +811,22 @@ void ITI::ParcoRepart<IndexType, ValueType>::redistributeFromHalo(DenseVector<T>
 
 	scai::dmemo::DistributionPtr oldDist = input.getDistributionPtr();
 	const IndexType newLocalN = newDist->getLocalSize();
+	LArray<T> newLocalValues;
 
-	//TOOD: could speed this up by using read and write accesses
-	LArray<T>& oldLocalValues = input.getLocalValues();
+	{
+		scai::hmemo::ReadAccess<T> rOldLocalValues(input.getLocalValues());
+		scai::hmemo::ReadAccess<T> rHaloData(haloData);
 
-	LArray<T> newLocalValues(newLocalN);
-	for (IndexType i = 0; i < newLocalN; i++) {
-		const IndexType globalI = newDist->local2global(i);
-		if (oldDist->isLocal(globalI)) {
-			newLocalValues[i] = oldLocalValues[oldDist->global2local(globalI)];
-		} else {
-			const IndexType localI = halo.global2halo(globalI);
-			assert(localI != nIndex);
-			newLocalValues[i] = haloData[localI];
+		scai::hmemo::WriteOnlyAccess<T> wNewLocalValues(newLocalValues, newLocalN);
+		for (IndexType i = 0; i < newLocalN; i++) {
+			const IndexType globalI = newDist->local2global(i);
+			if (oldDist->isLocal(globalI)) {
+				wNewLocalValues[i] = rOldLocalValues[oldDist->global2local(globalI)];
+			} else {
+				const IndexType localI = halo.global2halo(globalI);
+				assert(localI != nIndex);
+				wNewLocalValues[i] = rHaloData[localI];
+			}
 		}
 	}
 
