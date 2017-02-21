@@ -2058,16 +2058,17 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffusion(const CSR
 	std::vector<ValueType> load = twoWayLocalDiffusion(input, haloStorage, matrixHalo, borderRegionIDs, secondRoundMarkers, assignedToSecondBlock, settings);
 
 	//update cut, block sizes and result
+	IndexType newSecondBlockSize = 0;
 	for (IndexType i = 0; i < veryLocalN; i++) {
 		if ((load[i] < 0) != assignedToSecondBlock[i]) {
 			//std::cout << i << " has load " << load[i] << ", assigned to block " << assignedToSecondBlock[i]+1 << std::endl;
 		}
 		assignedToSecondBlock[i] = load[i] < 0;
+		newSecondBlockSize += assignedToSecondBlock[i];
 	}
 
 	//get new cut and block sizes
 	const IndexType newCut = twoWayLocalCut(input, haloStorage, matrixHalo, borderRegionIDs, assignedToSecondBlock);
-	const IndexType newSecondBlockSize = std::accumulate(assignedToSecondBlock.begin(), assignedToSecondBlock.end(), 0);
 	const IndexType newFirstBlockSize = veryLocalN - secondBlockSize;
 
 	blockSizes.first += newFirstBlockSize - firstBlockSize;

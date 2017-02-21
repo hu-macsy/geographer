@@ -201,7 +201,11 @@ TEST_F(FileIOTest, testReadQuadTree){
 	std::string filename = "octree_timestep_0.dat";
 
 	std::vector<std::set<std::shared_ptr<SpatialCell> > > edgeList = FileIO<IndexType, ValueType>::readQuadTree(filename);
-	IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
+	IndexType m = 0;
+	for (std::set<std::shared_ptr<SpatialCell> > edgeSet : edgeList) {
+		m += edgeSet.size();
+	}
+
 	std::cout << "Read Quadtree with " << edgeList.size() << " nodes and " << m << " edges." << std::endl;
 }
 
