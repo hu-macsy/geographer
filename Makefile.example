@@ -1,7 +1,7 @@
 CC=g++
 
 SRCS=$(wildcard *.cpp)
-OBJ_GOOGLETEST= test_main.o ParcoRepartTest.o ParcoRepart.o HilbertCurve.o HilbertCurveTest.o MeshGenerator.o FileIO.o PrioQueueForInts.o quadtree/test/QuadTreeTest.o
+OBJ_GOOGLETEST= test_main.o ParcoRepartTest.o ParcoRepart.o HilbertCurve.o HilbertCurveTest.o MeshGenerator.o FileIO.o FileIOTest.o PrioQueueForInts.o quadtree/test/QuadTreeTest.o
 OBJ_TEST_MAIN= mainTest.o ParcoRepart.o HilbertCurve.o MeshGenerator.o FileIO.o PrioQueueForInts.o
 EXECUTABLE_GOOGLETEST=KatanomiTest
 EXECUTABLE_MAIN=Katanomi

@@ -232,7 +232,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				gain = replicatedMultiWayFM(input, result, k, epsilon);
 			} else {
 				std::vector<IndexType> gainPerRound = distributedFMStep(input, result, nodesWithNonLocalNeighbors, nonWeights, communicationScheme, coordinates, distances, settings);
-				gain = std::accumulate(gainPerRound.begin(), gainPerRound.end(), 0);
+				gain = 0;
+				for (IndexType roundGain : gainPerRound) gain += roundGain;
 
 				if (settings.skipNoGainColors) {
 					IndexType i = 0;
