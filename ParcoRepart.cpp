@@ -2569,8 +2569,120 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
     
     return retG;
 }
+
 //---------------------------------------------------------------------------------------
 
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& adjM){
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
+    
+    // get local data of the adjacency matrix
+    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+    scai::hmemo::ReadAccess<IndexType> ia( localStorage.getIA() );
+    scai::hmemo::ReadAccess<IndexType> ja( localStorage.getJA() );
+    scai::hmemo::ReadAccess<ValueType> values( localStorage.getValues() );
+
+    // localN= number of local nodes
+    IndexType localN= adjM.getLocalNumRows();
+    
+    // ia must have size localN+1
+    PRINT(ia.size()-1 << ", localN= "<< localN);
+    assert(ia.size()-1 == localN );
+    
+    //mainly for debugging reasons
+    IndexType totalNbrs= 0;
+    
+    // the vector<vector> to return
+    // matching[0][i]-matching[1][i] are the endopoints of an edge that is matched
+    std::vector<std::vector<IndexType>> matching(2);
+    
+    // keep track of which nodes are already matched
+    std::vector<bool> matched(localN, false);
+    
+    // localNode is the local index of a node
+    for(IndexType localNode=0; localNode<ia.size()-1; localNode++){
+        // if the node is already matched go to the next one;
+        if(matched[localNode]){
+            continue;
+        }
+        // get all the neighbours of the node
+        IndexType numNgbrs = ia[localNode+1]-ia[localNode];
+        totalNbrs += numNgbrs;
+        
+        std::vector<IndexType> ngbrs(numNgbrs);
+
+        // ngbrs contains the indices of all neighbours of localNode
+        // these are global indices: 0<ngbr[i]<globalN
+        for(IndexType j=0; j<numNgbrs; j++){
+            ngbrs[j] = ja[ ia[localNode]+ j];         
+        }
+        
+        //thisNodeEdgeWeights contains the weigth of each edge
+        std::vector<IndexType> thisNodeEdgeWeights(numNgbrs);
+        for(IndexType j=0; j<numNgbrs; j++){
+            thisNodeEdgeWeights[j] = values[ ia[localNode]+ j];
+        }
+        
+        // the global index of the neighbor with the highest edge
+        IndexType globalNgbr;
+        do{
+            // 0< relativeIndex < numNgbrs
+            IndexType relativeIndex = std::distance(thisNodeEdgeWeights.begin() , std::max_element(thisNodeEdgeWeights.begin(), thisNodeEdgeWeights.end()) );
+            assert( relativeIndex < numNgbrs);
+            globalNgbr = ja[ ia[localNode]+relativeIndex];
+            
+            if( !distPtr->isLocal(globalNgbr) ){
+                PRINT("neighbour " << globalNgbr <<" is not local.");               
+                // WARNING: DO NOT erase, it meses up the indices, just set weight to -1
+                // if not local, remove this edge and try another edge
+                // do not that: ngbrs.erase(ngbrs.begin()+ relativeIndex);
+                // neither that: thisNodeEdgeWeights.erase(thisNodeEdgeWeights.begin()+ relativeIndex);
+                thisNodeEdgeWeights[relativeIndex] = -1;
+            }else{
+                // if we found a local edge => globalNgbr is also present locally
+                // TODO: check all edges of the neighbour to find the maximum edge there too
+                break;
+            }
+        }while(ngbrs.size()>0);
+        
+        if(ngbrs.size()==0){
+            PRINT("For node "<< localNode << " all neighbours are non-local.");
+            continue;
+            // continue to go to the next node since this has no local neighbours.
+        }
+        
+        // at this point -globalNgbr- is the local node with the heaviest edge
+        // and should be matched with -localNode-.
+        // So, actually, globalNgbr is also local....
+        assert( distPtr->isLocal(globalNgbr));
+        
+        // now, we need the global index of -localNode-
+        // WARNING: care whether an index is local or global
+        
+        /*
+        // WARNING: the commented version returns global indices => 0< indices <globalN
+        matching[0].push_back( distPtr->local2global(localNode) );
+        matching[1].push_back( globalNgbr );
+        */
+        
+        matching[0].push_back( localNode );
+        matching[1].push_back( distPtr->global2local(globalNgbr) );
+        
+        // mark nodes are matched
+        matched[localNode]= true;
+        matched[distPtr->global2local(globalNgbr) ]= true;
+        //PRINT(*comm << ", contracting nodes (local indices): "<< localNode <<" - "<< distPtr->global2local(globalNgbr) );
+    }
+    
+    //PRINT(ia[ia.size()-1] << " <> "<< totalNbrs);
+    assert(ia[ia.size()-1] >= totalNbrs);
+    
+    return matching;
+}
+
+//---------------------------------------------------------------------------------------
 
 //to force instantiation
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings);
@@ -2606,4 +2718,7 @@ template scai::lama::CSRSparseMatrix<double> ParcoRepart<int, double>::getBlockG
 template std::vector< std::vector<int>>  ParcoRepart<int, double>::getGraphEdgeColoring_local( CSRSparseMatrix<double> &adjM, int& colors);
 
 template std::vector<DenseVector<int>> ParcoRepart<int, double>::getCommunicationPairs_local( CSRSparseMatrix<double> &adjM);
+
+template std::vector<std::vector<int>> ParcoRepart<int, double>::maxLocalMatching(scai::lama::CSRSparseMatrix<double>& graph);
+
 }
