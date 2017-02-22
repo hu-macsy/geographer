@@ -2355,7 +2355,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& adjM){
+std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& adjM){
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -2378,7 +2378,8 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalM
     
     // the vector<vector> to return
     // matching[0][i]-matching[1][i] are the endopoints of an edge that is matched
-    std::vector<std::vector<IndexType>> matching(2);
+    //std::vector<std::vector<IndexType>> matching(2);
+    std::vector<std::pair<IndexType,IndexType>> matching;
     
     // keep track of which nodes are already matched
     std::vector<bool> matched(localN, false);
@@ -2393,6 +2394,8 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalM
         IndexType numNgbrs = ia[localNode+1]-ia[localNode];
         totalNbrs += numNgbrs;
         
+        //TODO: change to just scan values part once and keep the ngbrIndex with 
+        // heaviest edge and local
         std::vector<IndexType> ngbrs(numNgbrs);
 
         // ngbrs contains the indices of all neighbours of localNode
@@ -2464,8 +2467,9 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalM
         matching[1].push_back( globalNgbr );
         */
 
-        matching[0].push_back( localNode );
-        matching[1].push_back( distPtr->global2local(globalNgbr) );
+        //matching[0].push_back( localNode );
+        //matching[1].push_back( distPtr->global2local(globalNgbr) );
+        matching.push_back( std::pair<IndexType,IndexType> (localNode, distPtr->global2local(globalNgbr) ) );
         
         // mark nodes are matched
         matched[localNode]= true;
@@ -2479,6 +2483,36 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalM
     return matching;
 }
 
+//---------------------------------------------------------------------------------------
+
+/*
+template<typename IndexType, typename ValueType>
+ ParcoRepart<IndexType, ValueType>::coarsening(scai::lama::CSRSparseMatrix<ValueType>& adjM){
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
+    
+    // get local data of the adjacency matrix
+    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+    scai::hmemo::ReadAccess<IndexType> ia( localStorage.getIA() );
+    scai::hmemo::ReadAccess<IndexType> ja( localStorage.getJA() );
+    scai::hmemo::ReadAccess<ValueType> values( localStorage.getValues() );
+
+    // localN= number of local nodes
+    IndexType localN= adjM.getLocalNumRows();
+    
+    // ia must have size localN+1
+    //PRINT(ia.size()-1 << ", localN= "<< localN);
+    assert(ia.size()-1 == localN );
+     
+    //get a matching, the returned indices are from 0 to localN
+    std::vector<std::vector<IndexType>> matching = ParcoRepart<IndexType, ValueType>::maxLocalMatching( adjM );
+    
+    std::vector<IndexType> localMapping(localN,-1);
+    Indextype currIndex=0;
+    
+ }
+*/
 //---------------------------------------------------------------------------------------
 
 //to force instantiation
@@ -2514,6 +2548,6 @@ template std::vector< std::vector<int>>  ParcoRepart<int, double>::getGraphEdgeC
 
 template std::vector<DenseVector<int>> ParcoRepart<int, double>::getCommunicationPairs_local( CSRSparseMatrix<double> &adjM);
 
-template std::vector<std::vector<int>> ParcoRepart<int, double>::maxLocalMatching(scai::lama::CSRSparseMatrix<double>& graph);
+template std::vector<std::pair<int,int>> ParcoRepart<int, double>::maxLocalMatching(scai::lama::CSRSparseMatrix<double>& graph);
 
 }
