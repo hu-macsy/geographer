@@ -120,7 +120,7 @@ namespace ITI {
 			 * @param[in] input Adjacency matrix of the input graph
 			 */
 			static std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
-                        
+
 			//------------------------------------------------------------------------
 
 			/** Get the borders nodes of each block.
@@ -128,7 +128,7 @@ namespace ITI {
 			static DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
 
 			/**Returns the processor graph. Every processor traverses its local part of adjM: and for every
-			 * edge (u,v) that one node, say u, is not local it gets the owner processor of u.
+			 * edge (u,v) that one node, say u, is not local it gets the owner processor of u. The returned graph is distributed with a BLOCK distribution.
 			 *
 			 * @param[in] adjM The adjacency matrix of the input graph.
 			 * @return A [#PE x #PE] adjacency matrix of the processor graph.
@@ -170,7 +170,7 @@ namespace ITI {
 			 * @return A 3xN vector with the edges and the color of each edge: retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge.
 			 */
 			static std::vector< std::vector<IndexType>>  getGraphEdgeColoring_local( CSRSparseMatrix<ValueType> &adjM, IndexType& colors);
-                        
+
 			/** Given the block graph, creates an edge coloring of the graph and returns a communication
 			 *  scheme based on the coloring
 			 *
@@ -183,23 +183,27 @@ namespace ITI {
 			 */
 			static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM);
 
+			static std::vector<std::vector<IndexType>> maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& graph);
+
+			template<typename T>
+			static DenseVector<T> computeGlobalPrefixSum(DenseVector<T> input);
+
 		private:
-            static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-					const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<IndexType>& nodeWeights, std::pair<IndexType, IndexType> secondRoundMarkers,
-					std::vector<bool>& assignedToSecondBlock, const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes,
-					std::vector<ValueType> tieBreakingKeys, Settings settings);
+			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
+				const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<IndexType>& nodeWeights, std::pair<IndexType, IndexType> secondRoundMarkers,
+				std::vector<bool>& assignedToSecondBlock, const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes,
+				std::vector<ValueType> tieBreakingKeys, Settings settings);
 
-            static IndexType twoWayLocalCut(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-            		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<bool>& assignedToSecondBlock);
+			static IndexType twoWayLocalCut(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<bool>& assignedToSecondBlock);
 
-            static ValueType twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-					const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
-					std::vector<bool>& assignedToSecondBlock, const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes,
-					Settings settings);
+			static ValueType twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
+				const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
+				std::vector<bool>& assignedToSecondBlock, const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes,
+				Settings settings);
 
-            static std::vector<ValueType> twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-            		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
-            		const std::vector<bool>& assignedToSecondBlock, Settings settings);
+			static std::vector<ValueType> twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
+				const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
+				const std::vector<bool>& assignedToSecondBlock, Settings settings);
 
 			static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
 

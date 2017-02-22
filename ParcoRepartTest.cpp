@@ -661,6 +661,48 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 }
 //----------------------------------------------------------
 
+TEST_F (ParcoRepartTest, testComputeGlobalPrefixSum) {
+	const IndexType globalN = 20;
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+	//test for a DenseVector consisting of only 1s
+	scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, globalN) );
+	const IndexType localN = dist->getLocalSize();
+
+	DenseVector<IndexType> vector(dist, 1);
+	DenseVector<IndexType> prefixSum = ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum<IndexType>(vector);
+
+	ASSERT_EQ(localN, prefixSum.getDistributionPtr()->getLocalSize());
+	if (comm->getRank() == 0) {
+		ASSERT_EQ(1, prefixSum.getLocalValues()[0]);
+	}
+
+	{
+		scai::hmemo::ReadAccess<IndexType> rPrefixSum(prefixSum.getLocalValues());
+		for (IndexType i = 0; i < localN; i++) {
+			EXPECT_EQ(dist->local2global(i)+1, rPrefixSum[i]);
+		}
+	}
+
+	//test for a DenseVector consisting of zeros and ones
+	DenseVector<IndexType> mixedVector(dist);
+	{
+		scai::hmemo::WriteOnlyAccess<IndexType> wMixed(mixedVector.getLocalValues(), localN);
+		for (IndexType i = 0; i < localN; i++) {
+			wMixed[i] = i % 2;
+		}
+	}
+
+	prefixSum = ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum<IndexType>(vector);
+	{
+		scai::hmemo::ReadAccess<IndexType> rPrefixSum(prefixSum.getLocalValues());
+		for (IndexType i = 0; i < localN; i++) {
+			EXPECT_LE(rPrefixSum[i], dist->local2global(i)+1);
+			EXPECT_GE(rPrefixSum[i], (dist->local2global(i)+1) / 2 - comm->getSize());
+		}
+	}
+}
+
 TEST_F (ParcoRepartTest, testBorders_Distributed) {
     std::string file = "Grid16x16";
     std::ifstream f(file);
