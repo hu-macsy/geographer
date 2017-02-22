@@ -2625,6 +2625,9 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalM
             thisNodeEdgeWeights[j] = values[ ia[localNode]+ j];
         }
         
+        // flag for the case all neighbours are non-local
+        bool breakFlag=false;
+        
         // the global index of the neighbor with the highest edge
         IndexType globalNgbr;
         do{
@@ -2634,7 +2637,7 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalM
             globalNgbr = ja[ ia[localNode]+relativeIndex];
             
             if( !distPtr->isLocal(globalNgbr) ){
-                PRINT("neighbour " << globalNgbr <<" is not local.");               
+                PRINT(*comm << ", neighbour " << globalNgbr <<" is not local.");               
                 // WARNING: DO NOT erase, it meses up the indices, just set weight to -1
                 // if not local, remove this edge and try another edge
                 // do not that: ngbrs.erase(ngbrs.begin()+ relativeIndex);
@@ -2645,12 +2648,24 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalM
                 // TODO: check all edges of the neighbour to find the maximum edge there too
                 break;
             }
+            
+            // if all neighbours are non-local then every entry in thisNodeEdgeWeights is -1
+            // so its sum must be -numNgbrs
+            int totalEdgeWeight=0;
+            for(auto& w:thisNodeEdgeWeights){
+                totalEdgeWeight += w;
+            }
+            if(totalEdgeWeight == -numNgbrs){
+                PRINT("For node "<< localNode << " all neighbours are non-local.");
+                breakFlag=true;
+                break;
+                // continue to the next node since this has no local neighbours.
+            }
+        
         }while(ngbrs.size()>0);
         
-        if(ngbrs.size()==0){
-            PRINT("For node "<< localNode << " all neighbours are non-local.");
-            continue;
-            // continue to go to the next node since this has no local neighbours.
+        if(breakFlag){
+            break;
         }
         
         // at this point -globalNgbr- is the local node with the heaviest edge
@@ -2666,7 +2681,7 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalM
         matching[0].push_back( distPtr->local2global(localNode) );
         matching[1].push_back( globalNgbr );
         */
-        
+
         matching[0].push_back( localNode );
         matching[1].push_back( distPtr->global2local(globalNgbr) );
         

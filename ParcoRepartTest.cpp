@@ -1320,9 +1320,10 @@ TEST_F (ParcoRepartTest, testGetMatchingGrid_2D) {
     }
     
     { // print
-        std::cout<<"matched edges for "<< *comm << " :" << std::endl;
+        std::cout<<"matched edges for "<< *comm << " (local indices) :" << std::endl;
         for(int i=0; i<matching[0].size(); i++){
-            std::cout<< i<< ": ("<< dist->local2global(matching[0][i])<< ":" << dist->local2global(matching[1][i]) << ") # ";
+            //std::cout<< i<< ":global  ("<< dist->local2global(matching[0][i])<< ":" << dist->local2global(matching[1][i]) << ") # ";
+            std::cout<< i<< ": ("<< matching[0][i] << ":" << matching[1][i] << ") # ";
         }
     }
 }
