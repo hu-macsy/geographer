@@ -1297,10 +1297,13 @@ TEST_F (ParcoRepartTest, testGetMatchingGrid_2D) {
     //check distributions
     assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
 
-    std::vector<std::vector<IndexType>> matching = ParcoRepart<IndexType, ValueType>::maxLocalMatching( graph );
-    assert( matching[0].size() == matching[1].size() );
+    //std::vector<std::vector<IndexType>> matching = ParcoRepart<IndexType, ValueType>::maxLocalMatching( graph );
+    std::vector<std::pair<IndexType,IndexType>> matching = ParcoRepart<IndexType, ValueType>::maxLocalMatching( graph );
+    //assert( matching[0].size() == matching[1].size() );
     
     // check matching to see if a node appears twice somewhere
+    // for an matching as std::vector<std::vector<IndexType>> (2)
+    /*
     for(int i=0; i<matching[0].size(); i++){
         IndexType thisNodeGlob = matching[0][i];
         assert( thisNodeGlob < N);
@@ -1318,12 +1321,20 @@ TEST_F (ParcoRepartTest, testGetMatchingGrid_2D) {
             }
         }
     }
-    
+    */
+    for(int i=0; i<matching.size(); i++){
+        IndexType thisNodeGlob = matching[0].first;
+        assert( thisNodeGlob!= matching[0].second );
+            for(int j=i+1; j<matching.size(); j++){
+                assert( thisNodeGlob != matching[j].first);
+                assert( thisNodeGlob != matching[j].second);
+            }
+    }
     { // print
         std::cout<<"matched edges for "<< *comm << " (local indices) :" << std::endl;
-        for(int i=0; i<matching[0].size(); i++){
+        for(int i=0; i<matching.size(); i++){
             //std::cout<< i<< ":global  ("<< dist->local2global(matching[0][i])<< ":" << dist->local2global(matching[1][i]) << ") # ";
-            std::cout<< i<< ": ("<< matching[0][i] << ":" << matching[1][i] << ") # ";
+            std::cout<< i<< ": ("<< matching[i].first << ":" << matching[i].second << ") # ";
         }
     }
 }

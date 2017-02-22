@@ -183,7 +183,8 @@ namespace ITI {
 			 */
 			static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM);
                         
-                        static std::vector<std::vector<IndexType>> maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& graph);
+                        //static std::vector<std::vector<IndexType>> maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& graph);
+                        static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& graph);
 
 		private:
             static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
