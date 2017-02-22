@@ -662,7 +662,7 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 //----------------------------------------------------------
 
 TEST_F (ParcoRepartTest, testComputeGlobalPrefixSum) {
-	const IndexType globalN = 20;
+	const IndexType globalN = 14764;
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	//test for a DenseVector consisting of only 1s
@@ -693,14 +693,25 @@ TEST_F (ParcoRepartTest, testComputeGlobalPrefixSum) {
 		}
 	}
 
-	prefixSum = ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum<IndexType>(vector);
-	{
-		scai::hmemo::ReadAccess<IndexType> rPrefixSum(prefixSum.getLocalValues());
-		for (IndexType i = 0; i < localN; i++) {
-			EXPECT_LE(rPrefixSum[i], dist->local2global(i)+1);
-			EXPECT_GE(rPrefixSum[i], (dist->local2global(i)+1) / 2 - comm->getSize());
-		}
+	prefixSum = ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum<IndexType>(mixedVector);
+
+	//test for equality with std::partial_sum
+	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(globalN));
+	mixedVector.redistribute(noDistPointer);
+	prefixSum.redistribute(noDistPointer);
+
+	scai::hmemo::ReadAccess<IndexType> rMixed(mixedVector.getLocalValues());
+	scai::hmemo::ReadAccess<IndexType> rPrefixSum(prefixSum.getLocalValues());
+	ASSERT_EQ(globalN, rMixed.size());
+	ASSERT_EQ(globalN, rPrefixSum.size());
+
+	std::vector<IndexType> comparison(globalN);
+	std::partial_sum(rMixed.get(), rMixed.get()+globalN, comparison.begin());
+
+	for (IndexType i = 0; i < globalN; i++) {
+		EXPECT_EQ(comparison[i], rPrefixSum[i]);
 	}
+	EXPECT_TRUE(std::equal(comparison.begin(), comparison.end(), rPrefixSum.get()));
 }
 
 TEST_F (ParcoRepartTest, testBorders_Distributed) {
