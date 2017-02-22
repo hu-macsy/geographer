@@ -2588,7 +2588,6 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalM
     IndexType localN= adjM.getLocalNumRows();
     
     // ia must have size localN+1
-    PRINT(ia.size()-1 << ", localN= "<< localN);
     assert(ia.size()-1 == localN );
     
     //mainly for debugging reasons
@@ -2637,11 +2636,8 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalM
             globalNgbr = ja[ ia[localNode]+relativeIndex];
             
             if( !distPtr->isLocal(globalNgbr) ){
-                PRINT(*comm << ", neighbour " << globalNgbr <<" is not local.");               
                 // WARNING: DO NOT erase, it meses up the indices, just set weight to -1
-                // if not local, remove this edge and try another edge
-                // do not that: ngbrs.erase(ngbrs.begin()+ relativeIndex);
-                // neither that: thisNodeEdgeWeights.erase(thisNodeEdgeWeights.begin()+ relativeIndex);
+                // if not local, make edge lighter and try another edge
                 thisNodeEdgeWeights[relativeIndex] = -1;
             }else{
                 // if we found a local edge => globalNgbr is also present locally
@@ -2675,12 +2671,6 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalM
         
         // now, we need the global index of -localNode-
         // WARNING: care whether an index is local or global
-        
-        /*
-        // WARNING: the commented version returns global indices => 0< indices <globalN
-        matching[0].push_back( distPtr->local2global(localNode) );
-        matching[1].push_back( globalNgbr );
-        */
 
         matching[0].push_back( localNode );
         matching[1].push_back( distPtr->global2local(globalNgbr) );
