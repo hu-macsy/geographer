@@ -2675,8 +2675,6 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
         // now, we need the global index of -localNode-
         // WARNING: care whether an index is local or global
 
-        //matching[0].push_back( localNode );
-        //matching[1].push_back( distPtr->global2local(globalNgbr) );
         matching.push_back( std::pair<IndexType,IndexType> (localNode, distPtr->global2local(globalNgbr) ) );
         
         // mark nodes are matched
@@ -2685,42 +2683,11 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
         //PRINT(*comm << ", contracting nodes (local indices): "<< localNode <<" - "<< distPtr->global2local(globalNgbr) );
     }
     
-    //PRINT(ia[ia.size()-1] << " <> "<< totalNbrs);
     assert(ia[ia.size()-1] >= totalNbrs);
     
     return matching;
 }
 
-//---------------------------------------------------------------------------------------
-
-/*
-template<typename IndexType, typename ValueType>
- ParcoRepart<IndexType, ValueType>::coarsening(scai::lama::CSRSparseMatrix<ValueType>& adjM){
-
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-    
-    // get local data of the adjacency matrix
-    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-    scai::hmemo::ReadAccess<IndexType> ia( localStorage.getIA() );
-    scai::hmemo::ReadAccess<IndexType> ja( localStorage.getJA() );
-    scai::hmemo::ReadAccess<ValueType> values( localStorage.getValues() );
-
-    // localN= number of local nodes
-    IndexType localN= adjM.getLocalNumRows();
-    
-    // ia must have size localN+1
-    //PRINT(ia.size()-1 << ", localN= "<< localN);
-    assert(ia.size()-1 == localN );
-     
-    //get a matching, the returned indices are from 0 to localN
-    std::vector<std::vector<IndexType>> matching = ParcoRepart<IndexType, ValueType>::maxLocalMatching( adjM );
-    
-    std::vector<IndexType> localMapping(localN,-1);
-    Indextype currIndex=0;
-    
- }
-*/
 //---------------------------------------------------------------------------------------
 
 //to force instantiation

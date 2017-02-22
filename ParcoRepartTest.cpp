@@ -1303,25 +1303,6 @@ TEST_F (ParcoRepartTest, testGetMatchingGrid_2D) {
     
     // check matching to see if a node appears twice somewhere
     // for an matching as std::vector<std::vector<IndexType>> (2)
-    /*
-    for(int i=0; i<matching[0].size(); i++){
-        IndexType thisNodeGlob = matching[0][i];
-        assert( thisNodeGlob < N);
-        assert( thisNodeGlob >= 0);
-        for(int j=i+1; j<matching[0].size(); j++){
-            if(matching[0][j]== thisNodeGlob){
-                PRINT("Matching not valid, node "<< thisNodeGlob << " appears in position "<< i << " and " << j);
-                throw std::logic_error("Matching not valid.");
-            }
-        }
-        for(int j=0; j<matching[1].size(); j++){
-            if(matching[1][j]== thisNodeGlob){
-                PRINT("Matching not valid, node "<< thisNodeGlob << " appears in position "<< i << " and " << j);
-                throw std::logic_error("Matching not valid.");
-            }
-        }
-    }
-    */
     for(int i=0; i<matching.size(); i++){
         IndexType thisNodeGlob = matching[0].first;
         assert( thisNodeGlob!= matching[0].second );
@@ -1330,6 +1311,7 @@ TEST_F (ParcoRepartTest, testGetMatchingGrid_2D) {
                 assert( thisNodeGlob != matching[j].second);
             }
     }
+    
     { // print
         std::cout<<"matched edges for "<< *comm << " (local indices) :" << std::endl;
         for(int i=0; i<matching.size(); i++){
