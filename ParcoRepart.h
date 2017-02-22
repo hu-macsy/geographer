@@ -182,6 +182,8 @@ namespace ITI {
 			 *  Inactive nodes have their own rank: rank[i][j] = j.
 			 */
 			static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM);
+                        
+                        static std::vector<std::vector<IndexType>> maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& graph);
 
 		private:
                     

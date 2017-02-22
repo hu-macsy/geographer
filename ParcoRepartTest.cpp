@@ -1209,6 +1209,79 @@ std::string file = "Grid16x16";
     }
 }
 
+
+
+//------------------------------------------------------------------------------
+
+TEST_F (ParcoRepartTest, testGetMatchingGrid_2D) {
+    std::string file = "Grid8x8";
+    std::ifstream f(file);
+    IndexType dimensions= 2, k=8;
+    IndexType N, edges;
+    f >> N >> edges; 
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    // for now local refinement requires k = P
+    k = comm->getSize();
+    //
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    //distrubute graph
+    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
+        
+
+    //read the array locally and messed the distribution. Left as a remainder.
+    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
+    EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
+    
+    //distribution should be the same
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
+    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
+    
+    struct Settings Settings;
+    Settings.numBlocks= k;
+    Settings.epsilon = 0.2;
+  
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, Settings);
+    
+    //check distributions
+    assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
+
+    std::vector<std::vector<IndexType>> matching = ParcoRepart<IndexType, ValueType>::maxLocalMatching( graph );
+    assert( matching[0].size() == matching[1].size() );
+    
+    // check matching to see if a node appears twice somewhere
+    for(int i=0; i<matching[0].size(); i++){
+        IndexType thisNodeGlob = matching[0][i];
+        assert( thisNodeGlob < N);
+        assert( thisNodeGlob >= 0);
+        for(int j=i+1; j<matching[0].size(); j++){
+            if(matching[0][j]== thisNodeGlob){
+                PRINT("Matching not valid, node "<< thisNodeGlob << " appears in position "<< i << " and " << j);
+                throw std::logic_error("Matching not valid.");
+            }
+        }
+        for(int j=0; j<matching[1].size(); j++){
+            if(matching[1][j]== thisNodeGlob){
+                PRINT("Matching not valid, node "<< thisNodeGlob << " appears in position "<< i << " and " << j);
+                throw std::logic_error("Matching not valid.");
+            }
+        }
+    }
+    
+    { // print
+        std::cout<<"matched edges for "<< *comm << " :" << std::endl;
+        for(int i=0; i<matching[0].size(); i++){
+            std::cout<< i<< ": ("<< dist->local2global(matching[0][i])<< ":" << dist->local2global(matching[1][i]) << ") # ";
+        }
+    }
+}
+
+
+//------------------------------------------------------------------------------
+
 /**
 * TODO: test for correct error handling in case of inconsistent distributions
 */
