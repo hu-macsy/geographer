@@ -9,7 +9,11 @@
 #include <cmath>
 #include <algorithm>
 
+#include <scai/lama/matrix/all.hpp>
+
 #include "QuadTreeTest.h"
+//#include "../../MeshIO.h"
+#include "../../ParcoRepart.h"
 
 #include "../QuadTreeCartesianEuclid.h"
 #include "../QuadTreePolarEuclid.h"
@@ -17,6 +21,473 @@
 
 namespace ITI {
 
+typedef double ValueType;
+typedef int IndexType;
+  
+
+TEST_F(QuadTreeTest, testGetGraphFromForestRandom_2D){
+    
+    // every forest[i] is a pointer to the root of a tree
+    std::vector<std::shared_ptr<SpatialCell>> forest;
+    
+    IndexType n= 2;
+    vector<Point<double> > positions(n);
+    vector<index> content(n);
+
+    Point<double> min(0.0, 0.0);
+    Point<double> max(1.0, 1.0);
+    index capacity = 1;
+    
+    QuadTreeCartesianEuclid quad(min, max, true, capacity);
+    QuadTreeCartesianEuclid quad2(min, max, true, capacity);
+    index i=0;
+    srand(time(NULL));
+    
+    for (i = 0; i < n; i++) {
+        Point<double> pos = Point<double>({double(rand()) / RAND_MAX, double(rand()) / RAND_MAX});
+        Point<double> pos2 = Point<double>({double(rand()) / RAND_MAX, double(rand()) / RAND_MAX});
+        quad.addContent(i, pos);
+        quad2.addContent(i, pos2);
+    }
+	
+    forest.push_back(quad.getRoot());
+    forest.push_back(quad2.getRoot());
+
+    // make more trees and pass them to the forest
+    // CARE though, indexing should be one for all trees, maybe a forestIndex() routine or just a for 
+    IndexType globIndexing=0;
+    for(IndexType i=0; i<forest.size(); i++){
+        globIndexing = forest[i]->indexSubtree( globIndexing );
+    }
+
+    IndexType numTrees = forest.size();
+
+    
+    // ^^ forest created ^^
+    
+
+    // graphNgbrsPtrs[i]= a set with pointers to the neighbours of -i- in the CSR matrix/graph
+    std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsPtrs( globIndexing );
+    //WARNING: this kind of edges must be symmetric
+    graphNgbrsPtrs[forest[0]->getID()].insert( std::shared_ptr<SpatialCell> (forest[1]) );
+    graphNgbrsPtrs[forest[1]->getID()].insert( std::shared_ptr<SpatialCell> (forest[0]) );
+    
+    PRINT("num trees= " << numTrees << ", globIndex= " << globIndexing);       
+    int dimension = 2;
+    std::vector<std::vector<ValueType>> coords( dimension );
+    scai::lama::CSRSparseMatrix<ValueType> graph= SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsPtrs,  forest, coords);
+
+    // checkSymmetry is really expensive for big graphs, used only for small instances
+    graph.checkSymmetry();
+    graph.isConsistent();
+}
+
+
+
+TEST_F(QuadTreeTest, testGetGraphFromForestByHand_2D){
+    
+    // every forest[i] is a pointer to the root of a tree
+    std::vector<std::shared_ptr<SpatialCell>> forest;
+    
+    IndexType n= 2;
+    vector<Point<double> > positions(n);
+    vector<index> content(n);
+
+    Point<double> min(0.0, 0.0);
+    Point<double> max(1.0, 1.0);
+    index capacity = 1;
+    index i=0;
+    
+    QuadTreeCartesianEuclid quad0(min, max, true, capacity);
+    quad0.addContent( i++, Point<double>({0.4, 0.3}) );
+    quad0.addContent( i++, Point<double>({0.4, 0.8}) );
+
+    QuadTreeCartesianEuclid quad1( Point<double>({1.0, 0.0}), Point<double>({2.0, 1.0}), true, capacity);
+    quad1.addContent(i++, Point<double>({1.3, 0.2}));
+    quad1.addContent(i++, Point<double>({1.3, 0.8}));
+    
+    QuadTreeCartesianEuclid quad2( Point<double>({0.0, 1.0}), Point<double>({1.0, 2.0}), true, capacity);
+    quad2.addContent( i++, Point<double>({0.6, 1.1}) );
+    quad2.addContent( i++, Point<double>({0.6, 1.8}) );
+    
+    QuadTreeCartesianEuclid quad3( Point<double>({1.0, 1.0}), Point<double>({2.0, 2.0}), true, capacity);
+    quad3.addContent( i++, Point<double>({1.3, 1.2}) );
+    quad3.addContent( i++, Point<double>({1.3, 1.8}) );
+ 
+    forest.push_back(quad0.getRoot());
+    forest.push_back(quad1.getRoot());
+    forest.push_back(quad2.getRoot());
+    forest.push_back(quad3.getRoot());
+    
+    // make more trees and pass them to the forest
+    // CARE though, indexing should be one for all trees, maybe a forestIndex() routine or just a for 
+    IndexType globIndexing=0;
+    for(IndexType i=0; i<forest.size(); i++){
+        globIndexing = forest[i]->indexSubtree( globIndexing );
+    }
+
+    IndexType numTrees = forest.size();
+    for(i=0; i<numTrees; i++){
+        PRINT(i << ",forest root id= "<< forest[i]->getID());
+    }
+    
+    // ^^ forest created ^^
+    
+
+    // graphNgbrsPtrs[i]= a set with pointers to the neighbours of -i- in the CSR matrix/graph
+    std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsPtrs( globIndexing );
+    //WARNING: this kind of edges must be symmetric
+    
+    // quad0 connects with quad1 and 2
+    graphNgbrsPtrs[forest[0]->getID()].insert( std::shared_ptr<SpatialCell> (forest[1]) );
+    graphNgbrsPtrs[forest[1]->getID()].insert( std::shared_ptr<SpatialCell> (forest[0]) );
+    graphNgbrsPtrs[forest[0]->getID()].insert( std::shared_ptr<SpatialCell> (forest[2]) );
+    graphNgbrsPtrs[forest[2]->getID()].insert( std::shared_ptr<SpatialCell> (forest[0]) );
+    
+    // quad1 connects with 0 and 3
+    graphNgbrsPtrs[forest[1]->getID()].insert( std::shared_ptr<SpatialCell> (forest[3]) );
+    graphNgbrsPtrs[forest[3]->getID()].insert( std::shared_ptr<SpatialCell> (forest[1]) );
+    
+    graphNgbrsPtrs[forest[2]->getID()].insert( std::shared_ptr<SpatialCell> (forest[3]) );
+    graphNgbrsPtrs[forest[3]->getID()].insert( std::shared_ptr<SpatialCell> (forest[2]) );
+    
+    int dimension = 2;
+    std::vector<std::vector<ValueType>> coords( dimension );
+    PRINT("num trees= " << numTrees << ", globInde= " << globIndexing);        
+    scai::lama::CSRSparseMatrix<ValueType> graph= SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsPtrs,  forest, coords);
+    
+    EXPECT_EQ(coords.size(), dimension);
+    EXPECT_EQ(coords[0].size(), graph.getNumRows());
+    
+    // check coords are the same
+    for(int d=0; d<coords.size(); d++){
+        for(int i=0; i<coords[d].size(); i++){
+            std::cout << coords[d][i] << ", ";
+        }
+        std::cout<< std::endl;
+    }
+
+    // checkSymmetry is really expensive for big graphs, used only for small instances
+    graph.checkSymmetry();
+    graph.isConsistent();
+    
+    //print graph
+    for(int i=0; i<graph.getNumRows(); i++){
+        std::cout << i <<": ";
+        for(int j=0; j<graph.getNumColumns(); j++){
+            std::cout<< j << ":"<< graph(i,j).Scalar::getValue<ValueType>() << " , ";
+        }
+        std::cout<< std::endl;
+    }
+    PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() );
+}
+
+
+TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
+	count n = 3500;
+
+	vector<Point<double> > positions(n);
+	vector<index> content(n);
+
+        Point<double> min(0.0, 0.0, 0.0);
+        Point<double> max(1.0, 1.0, 1.0);
+        index capacity = 1;
+        
+	QuadTreeCartesianEuclid quad(min, max, true, capacity);
+        index i=0;
+        srand(time(NULL));
+    
+        for (i = 0; i < n; i++) {
+		Point<double> pos = Point<double>({double(rand()) / RAND_MAX, double(rand()) / RAND_MAX, double(rand()) / RAND_MAX});
+		positions[i] = pos;
+		content[i] = i;
+		quad.addContent(i, pos);
+	}
+	
+	PRINT("Num of leaves= N = "<< quad.countLeaves() );
+	index N= quad.countLeaves();
+        
+        // index the tree
+        index treeSize = quad.indexSubtree(0);
+        
+        // A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
+        // of -i- in the output graph, not the quad tree.
+        std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells( treeSize );
+        int dimension = 3;
+        std::vector<std::vector<ValueType>> coords( dimension );
+        
+	scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>( graphNgbrsCells, coords );
+
+        // checkSymmetry is really expensive for big graphs, used only for small instances
+        //graph.checkSymmetry();
+	graph.isConsistent();
+        
+        //EXPECT_EQ( graph.getNumRows(), graph.getNumColumns() );
+	EXPECT_EQ( graph.getNumRows(), N);
+	EXPECT_EQ( graph.getNumColumns(), N);
+
+	const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
+	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+        
+        // 50 is too large upper bound (is it?). Should be around 24 for 3D and 8 (or 10) for 2D
+        //TODO: maybe 30 is not so large... find another way to do it or skip it entirely
+        IndexType upBound= 50;
+        std::vector<IndexType> degreeCount( upBound*2, 0 );
+        
+        for(IndexType i=0; i<N; i++){
+            IndexType nodeDegree = ia[i+1] -ia[i];
+            if( nodeDegree > upBound){
+               //throw std::warning( "Node with large degree, degree= "+  std::to_string(nodeDegree) + " > current upper bound= " + std::to_string(upBound) );
+                // throw as a warning for now
+                PRINT("WARNING: degree too high= "<< nodeDegree);
+            }
+            ++degreeCount[nodeDegree];
+        }
+        
+        IndexType numEdges = 0;
+        IndexType maxDegree = 0;
+        std::cout<< "\t Num of nodes"<< std::endl;
+        for(int i=0; i<degreeCount.size(); i++){
+            if(  degreeCount[i] !=0 ){
+                std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
+                numEdges += i*degreeCount[i];
+                maxDegree = i;
+            }
+        }
+        EXPECT_EQ(numEdges, graph.getNumValues() );
+        
+        ValueType averageDegree = ValueType( numEdges)/N;
+        
+        PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
+        
+}
+
+
+
+TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
+
+        count n = 500;
+
+	vector<Point<double> > positions(n);
+	vector<index> content(n);
+
+        Point<double> min(0.0, 0.0, 0.0);
+        Point<double> max(1.0, 1.0, 1.0);
+        index capacity = 1;
+        
+	QuadTreeCartesianEuclid quad(min, max, true, capacity);
+        index i=0;
+        srand(time(NULL));
+    
+        for (i = 0; i < n; i++) {
+		Point<double> pos = Point<double>({double(rand()) / RAND_MAX, double(rand()) / RAND_MAX, double(rand()) / RAND_MAX});
+		positions[i] = pos;
+		content[i] = i;
+		quad.addContent(i, pos);
+	}
+	
+	PRINT("Num of leaves= N = "<< quad.countLeaves() );
+	index N= quad.countLeaves();
+        // index the tree
+        index treeSize = quad.indexSubtree(0);
+        
+        // A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
+        // of -i- in the output graph, not the quad tree.
+        std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells( treeSize );
+        int dimension = 3;
+        std::vector<std::vector<ValueType>> coords( dimension );
+        
+	scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>(graphNgbrsCells, coords);
+        /*
+        //print graph
+        for(int i=0; i<graph.getNumRows(); i++){
+            std::cout << i <<": \t";
+            for(int j=0; j<graph.getNumColumns(); j++){
+                std::cout<< j << ":"<< graph.getValue(i,j).Scalar::getValue<ValueType>() << " , ";
+            }
+            std::cout<< std::endl;
+        }
+        */
+        
+        // checkSymmetry is really expensive for big graphs, used only for small instances
+	graph.checkSymmetry();
+	graph.isConsistent();
+
+	EXPECT_EQ( graph.getNumRows(), N);
+	EXPECT_EQ( graph.getNumColumns(), N);
+        {
+            const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
+            const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+            const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+            
+            // 20 is too large upper bound. Should be around 24 for 3D and 8 (or 10) for 2D
+            //TODO: maybe 30 is not so large... find another way to do it or skip it entirely
+            IndexType upBound= 50;
+            std::vector<IndexType> degreeCount( upBound, 0 );
+            for(IndexType i=0; i<N; i++){
+                IndexType nodeDegree = ia[i+1] -ia[i];
+                if( nodeDegree > upBound){
+                    throw std::logic_error( "Node with large degree, degree= "+  std::to_string(nodeDegree) + " > current upper bound= " + std::to_string(upBound) );
+                }
+                ++degreeCount[nodeDegree];
+            }
+            
+            IndexType numEdges = 0;
+            IndexType maxDegree = 0;
+            std::cout<< "\t Num of nodes"<< std::endl;
+            for(int i=0; i<degreeCount.size(); i++){
+                if(  degreeCount[i] !=0 ){
+                    std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
+                    numEdges += i*degreeCount[i];
+                    maxDegree = i;
+                }
+            }
+            EXPECT_EQ(numEdges, graph.getNumValues() );
+            
+            ValueType averageDegree = ValueType( numEdges)/N;
+        
+            PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
+        }
+        
+        // communicate/distribute graph
+    
+        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+        IndexType k = comm->getSize();
+
+        scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+        scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
+        
+        graph.redistribute( dist, noDistPointer);
+        
+        //TODO: change coords data type to vector<double> ? or the way we copy to a DenseVector
+        std::vector<DenseVector<ValueType>> coordsDV(dimension);
+        
+        for(int d=0; d<dimension; d++){
+            coordsDV[d].allocate(coords[d].size() );
+            for(IndexType j=0; j<coords[d].size(); j++){
+                coordsDV[d].setValue(j , coords[d][j]);
+            }
+            coordsDV[d].redistribute(dist);
+        }
+        const ValueType epsilon = 0.05;        
+        struct Settings Settings;
+        Settings.numBlocks= k;
+        Settings.epsilon = epsilon;
+  
+        scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordsDV, Settings);
+
+        ParcoRepart<IndexType, ValueType> repart;
+        EXPECT_LE(repart.computeImbalance(partition, k), epsilon);
+
+        const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true);
+
+        if (comm->getRank() == 0) {
+            std::cout << "Commit " << version << ": Partitioned graph with " << N << " nodes into " << k << " blocks with a total cut of " << cut << std::endl;
+        }
+        
+}
+
+
+TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_2D) {
+    
+    index n=8;
+    vector<Point<double> > positions(n);
+    vector<index> content(n);
+    
+    Point<double> min(0.0, 0.0);
+    Point<double> max(2.0, 2.0);
+    index capacity = 1;
+        
+    // the quadtree 
+    QuadTreeCartesianEuclid quad(min, max, true, capacity);
+    
+    index i=0;
+    // 2D points
+    quad.addContent(i++, Point<double>({0.2, 0.2}) );
+    quad.addContent(i++, Point<double>({0.8, 0.7}) );
+    quad.addContent(i++, Point<double>({1.4, 0.7}) );
+    quad.addContent(i++, Point<double>({1.8, 0.3}) );
+    
+    quad.addContent(i++, Point<double>({0.2, 0.8}) );
+    quad.addContent(i++, Point<double>({0.2, 0.6}) );
+    
+    quad.addContent(i++, Point<double>({0.7, 1.1}) );
+    quad.addContent(i++, Point<double>({0.2, 1.6}) );
+    
+    PRINT("Num of leaves= N = "<< quad.countLeaves() );
+    index N= quad.countLeaves();
+    // index the tree
+    index treeSize = quad.indexSubtree(0);
+        
+    // A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
+    // of -i- in the output graph, not the quad tree.
+    std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells( treeSize );
+    int dimension = 2;
+    std::vector<std::vector<ValueType>> coords( dimension );
+        
+    scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>(graphNgbrsCells, coords);
+    
+    /*
+    //print graph
+    for(int i=0; i<graph.getNumRows(); i++){
+        std::cout << i <<": \t";
+        for(int j=0; j<graph.getNumColumns(); j++){
+            std::cout<< j << ":"<< graph.getValue(i,j).Scalar::getValue<ValueType>() << " , ";
+        }
+        std::cout<< std::endl;
+    }
+    */
+        
+    // checkSymmetry is really expensive for big graphs, used only for small instances
+    graph.checkSymmetry();
+    graph.isConsistent();
+    
+    EXPECT_EQ( graph.getNumRows(), N);
+    EXPECT_EQ( graph.getNumColumns(), N);
+    
+    const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
+    const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+    const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+    
+    // 20 is too large upper bound. Should be around 24 for 3D and 8 (or 10) for 2D
+    //TODO: maybe 20 is not so large... find another way to do it or skip it entirely
+    IndexType upBound= 20;
+    std::vector<IndexType> degreeCount( upBound, 0 );
+    for(IndexType i=0; i<N; i++){
+        IndexType nodeDegree = ia[i+1] -ia[i];
+        if( nodeDegree > upBound){
+            throw std::logic_error( "Node with large degree, degree= "+  std::to_string(nodeDegree) + " > current upper bound= " + std::to_string(upBound) );
+        }
+        PRINT("node "<< i << " has edges with nodes (from "<< ia[i]<< " to "<< ia[i+1]<<"): ");
+        for(int ii=ia[i]; ii<ia[i+1]; ii++){
+            std::cout<< ja[ii] << ", ";
+        }
+        std::cout<< std::endl;
+        ++degreeCount[nodeDegree];
+    }
+    
+    IndexType numEdges = 0;
+    IndexType maxDegree = 0;
+        std::cout<< "\t Num of nodes"<< std::endl;    
+    for(int i=0; i<degreeCount.size(); i++){
+        if(  degreeCount[i] !=0 ){
+            std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
+            numEdges += i*degreeCount[i];
+            maxDegree = i;
+        }
+    }
+    EXPECT_EQ(numEdges, graph.getNumValues() );
+    
+    ValueType averageDegree = ValueType( numEdges)/N;
+        
+    PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);   
+
+	
+    
+}
+    
 TEST_F(QuadTreeTest, testCartesianEuclidQuery) {
 	count n = 10000;
 
@@ -32,6 +503,8 @@ TEST_F(QuadTreeTest, testCartesianEuclidQuery) {
 		content[i] = i;
 		quad.addContent(i, pos);
 	}
+
+
 
 	EXPECT_EQ(n, quad.size());
 	quad.recount();
@@ -97,7 +570,7 @@ TEST_F(QuadTreeTest, testPolarEuclidQuery) {
 	std::uniform_real_distribution<double> rdist{minR, maxR};
 
 	/**
-	 * fill std::vectors
+	 * fill vectors
 	 */
 	for (index i = 0; i < n; i++) {
 		angles[i] = (double(rand()) / RAND_MAX)*(2*M_PI);

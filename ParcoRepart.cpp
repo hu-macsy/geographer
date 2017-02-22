@@ -124,7 +124,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 		/**
 		* Several possibilities exist for choosing the recursion depth.
-		* Either by user choice, or by the maximum fitting into the datatype, or by the graph size..
+		* Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
 		*/
 		const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(n), double(21));
 	
@@ -158,6 +158,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				hilbertIndicesLocal[i] = globalHilbertIndex;
 			}
 		}
+		
 		
 		/**
 		* now sort the global indices by where they are on the space-filling curve.
@@ -2574,10 +2575,11 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
     
     return retG;
 }
+
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& adjM){
+std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& adjM){
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -2592,15 +2594,15 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalM
     IndexType localN= adjM.getLocalNumRows();
     
     // ia must have size localN+1
-    PRINT(ia.size()-1 << ", localN= "<< localN);
     assert(ia.size()-1 == localN );
     
     //mainly for debugging reasons
     IndexType totalNbrs= 0;
     
     // the vector<vector> to return
-    // matching[0][i]-matching[1][i] are the endpoints of an edge that is matched
-    std::vector<std::vector<IndexType>> matching(2);
+    // matching[0][i]-matching[1][i] are the endopoints of an edge that is matched
+    //std::vector<std::vector<IndexType>> matching(2);
+    std::vector<std::pair<IndexType,IndexType>> matching;
     
     // keep track of which nodes are already matched
     std::vector<bool> matched(localN, false);
@@ -2615,9 +2617,11 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalM
         IndexType numNgbrs = ia[localNode+1]-ia[localNode];
         totalNbrs += numNgbrs;
         
+        //TODO: change to just scan values part once and keep the ngbrIndex with 
+        // heaviest edge and local
         std::vector<IndexType> ngbrs(numNgbrs);
 
-        // ngbrs contains the indices of all neighbors of localNode
+        // ngbrs contains the indices of all neighbours of localNode
         // these are global indices: 0<ngbr[i]<globalN
         for(IndexType j=0; j<numNgbrs; j++){
             ngbrs[j] = ja[ ia[localNode]+ j];         
@@ -2641,10 +2645,8 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalM
             globalNgbr = ja[ ia[localNode]+relativeIndex];
             
             if( !distPtr->isLocal(globalNgbr) ){
-                // WARNING: DO NOT erase, it messes up the indices, just set weight to -1
-                // if not local, remove this edge and try another edge
-                // do not that: ngbrs.erase(ngbrs.begin()+ relativeIndex);
-                // neither that: thisNodeEdgeWeights.erase(thisNodeEdgeWeights.begin()+ relativeIndex);
+                // WARNING: DO NOT erase, it meses up the indices, just set weight to -1
+                // if not local, make edge lighter and try another edge
                 thisNodeEdgeWeights[relativeIndex] = -1;
             }else{
                 // if we found a local edge => globalNgbr is also present locally
@@ -2678,15 +2680,8 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalM
         
         // now, we need the global index of -localNode-
         // WARNING: care whether an index is local or global
-        
-        /*
-        // WARNING: the commented version returns global indices => 0< indices <globalN
-        matching[0].push_back( distPtr->local2global(localNode) );
-        matching[1].push_back( globalNgbr );
-        */
-        
-        matching[0].push_back( localNode );
-        matching[1].push_back( distPtr->global2local(globalNgbr) );
+
+        matching.push_back( std::pair<IndexType,IndexType> (localNode, distPtr->global2local(globalNgbr) ) );
         
         // mark nodes are matched
         matched[localNode]= true;
@@ -2694,7 +2689,6 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalM
         //PRINT(*comm << ", contracting nodes (local indices): "<< localNode <<" - "<< distPtr->global2local(globalNgbr) );
     }
     
-    //PRINT(ia[ia.size()-1] << " <> "<< totalNbrs);
     assert(ia[ia.size()-1] >= totalNbrs);
     
     return matching;
@@ -2788,7 +2782,7 @@ template std::vector< std::vector<int>>  ParcoRepart<int, double>::getGraphEdgeC
 
 template std::vector<DenseVector<int>> ParcoRepart<int, double>::getCommunicationPairs_local( CSRSparseMatrix<double> &adjM);
 
-template std::vector<std::vector<int>> ParcoRepart<int, double>::maxLocalMatching(scai::lama::CSRSparseMatrix<double>& graph);
+template std::vector<std::pair<int,int>> ParcoRepart<int, double>::maxLocalMatching(scai::lama::CSRSparseMatrix<double>& graph);
 
 template DenseVector<int> ParcoRepart<int, double>::computeGlobalPrefixSum(DenseVector<int> input);
 

@@ -153,6 +153,14 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
 	file >> globalN >> globalM;
 
+	if (globalN < 0) {
+		throw std::runtime_error("Invalid node count: " + std::to_string(globalN));
+	}
+
+	if (globalM < 0) {
+		throw std::runtime_error("Invalid edge count: " + std::to_string(globalM));
+	}
+
 	const ValueType avgDegree = ValueType(2*globalM) / globalN;
 
 	//get distribution and local range
@@ -163,6 +171,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     IndexType beginLocalRange, endLocalRange;
     scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
     const IndexType localN = endLocalRange - beginLocalRange;
+    assert(localN >= 0);
+    assert(localN <= globalN);
 
     //scroll to begin of local range. Neighbors of node i are in line i+1
     std::string line;
