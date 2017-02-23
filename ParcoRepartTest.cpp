@@ -1210,11 +1210,11 @@ std::string file = "Grid16x16";
 }
 
 
-
 //------------------------------------------------------------------------------
 
 TEST_F (ParcoRepartTest, testGetMatchingGrid_2D) {
-    std::string file = "Grid8x8";
+    //std::string file = "Grid8x8";                         // the easy case
+    std::string file = "./meshes/rotation/rotation-00000.graph";     // a harder instance
     std::ifstream f(file);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;
@@ -1244,10 +1244,10 @@ TEST_F (ParcoRepartTest, testGetMatchingGrid_2D) {
     Settings.numBlocks= k;
     Settings.epsilon = 0.2;
   
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, Settings);
+    //scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, Settings);
     
     //check distributions
-    assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
+    //assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
 
     //std::vector<std::vector<IndexType>> matching = ParcoRepart<IndexType, ValueType>::maxLocalMatching( graph );
     std::vector<std::pair<IndexType,IndexType>> matching = ParcoRepart<IndexType, ValueType>::maxLocalMatching( graph );
@@ -1282,6 +1282,8 @@ TEST_F (ParcoRepartTest, testGetMatchingGrid_2D) {
                 assert( thisNodeGlob != matching[j].second);
             }
     }
+    
+    /*
     { // print
         std::cout<<"matched edges for "<< *comm << " (local indices) :" << std::endl;
         for(int i=0; i<matching.size(); i++){
@@ -1289,8 +1291,52 @@ TEST_F (ParcoRepartTest, testGetMatchingGrid_2D) {
             std::cout<< i<< ": ("<< matching[i].first << ":" << matching[i].second << ") # ";
         }
     }
+    */
 }
 
+
+//------------------------------------------------------------------------------
+
+TEST_F (ParcoRepartTest, testCoarseningGrid_2D) {
+     std::string file = "Grid8x8";
+    std::ifstream f(file);
+    IndexType dimensions= 2, k=8;
+    IndexType N, edges;
+    f >> N >> edges; 
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    // for now local refinement requires k = P
+    k = comm->getSize();
+    //
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    //distrubute graph
+    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
+        
+
+    //read the array locally and messed the distribution. Left as a remainder.
+    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
+    EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
+    
+    //distribution should be the same
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
+    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
+    
+    struct Settings Settings;
+    Settings.numBlocks= k;
+    Settings.epsilon = 0.2;
+  
+    //scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, Settings);
+    
+    //check distributions
+    //assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
+
+    // coarsen the graph
+    ParcoRepart<IndexType, ValueType>::coarsening(graph);
+    
+}
 
 //------------------------------------------------------------------------------
 

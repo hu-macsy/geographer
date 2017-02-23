@@ -185,6 +185,8 @@ namespace ITI {
                         
                         //static std::vector<std::vector<IndexType>> maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& graph);
                         static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& graph);
+                        
+                        static void coarsening(scai::lama::CSRSparseMatrix<ValueType>& graph);
 
 		private:
                     
