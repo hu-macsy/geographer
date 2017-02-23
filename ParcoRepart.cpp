@@ -2085,7 +2085,7 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffus
 
 	SCAI_REGION( "ParcoRepart.twoWayLocalDiffusion" )
 	//settings and constants
-	const IndexType magicNumberDiffusionSteps = 1.2*settings.borderDepth;
+	const IndexType magicNumberDiffusionSteps = settings.diffusionRounds;
 	const ValueType degreeEstimate = ValueType(haloStorage.getNumValues()) / matrixHalo.getHaloSize();
 	const ValueType magicNumberAlpha = 1/(degreeEstimate+1);
 	const ValueType magicNumberDiffusionLoad = 1;
