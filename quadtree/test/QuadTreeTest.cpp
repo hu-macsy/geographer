@@ -8,6 +8,7 @@
 #include <stack>
 #include <cmath>
 #include <algorithm>
+#include <random>
 
 #include <scai/lama/matrix/all.hpp>
 

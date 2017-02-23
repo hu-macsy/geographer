@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <memory>
 #include <cstdlib>
+#include <numeric>
 
 #include "MeshGenerator.h"
 #include "FileIO.h"
