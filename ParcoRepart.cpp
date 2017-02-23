@@ -2695,9 +2695,17 @@ PRINT("matchIndex= "<< matchIndex<< ", newRowCounter= "<< newRowCounter << ", nn
     // the coarsening is done, need to evaluate new global indices according to the coarsening
     // at this point edges are contracted but the new nodes still have edges to previous/old indices/nodes
     
-    
  }
 
+ 
+//---------------------------------------------------------------------------------------
+
+
+template<typename IndexType, typename ValueType>
+ void ParcoRepart<IndexType, ValueType>::uncoarsening(scai::lama::CSRSparseMatrix<ValueType>& adjM){
+     
+
+}    
 //---------------------------------------------------------------------------------------
 
 //to force instantiation

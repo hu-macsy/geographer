@@ -1310,7 +1310,7 @@ TEST_F (ParcoRepartTest, testCoarseningGrid_2D) {
     //
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     //distrubute graph
     graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
         
@@ -1328,13 +1328,21 @@ TEST_F (ParcoRepartTest, testCoarseningGrid_2D) {
     Settings.numBlocks= k;
     Settings.epsilon = 0.2;
   
-    //scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, Settings);
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, Settings);
     
     //check distributions
     //assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
 
     // coarsen the graph
-    ParcoRepart<IndexType, ValueType>::coarsening(graph);
+    scai::lama::CSRSparseMatrix<ValueType> coarsendGraph = ParcoRepart<IndexType, ValueType>::coarsening(graph);
+    
+    // edge weights must be the same
+    EXPECT_EQ(graph.l1Norm() , coarsendGraph.l1Norm() );
+    
+    coarsendGraph.checkSymmetry();
+    coarsendGraph.isConsistent();
+    
+    
     
 }
 
