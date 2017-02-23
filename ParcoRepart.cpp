@@ -2105,7 +2105,7 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffus
 	}
 
 	//mark nodes in border as active, rest as inactive
-	std::vector<bool> active(veryLocalN, true);
+	std::vector<bool> active(veryLocalN, false);
 	for (IndexType i = 0; i < secondRoundMarkers.first; i++) {
 		active[i] = true;
 	}
@@ -2113,8 +2113,6 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffus
 		active[i] = true;
 	}
 
-	//std::cout << 0 << ", " << secondRoundMarkers.first << ", " << firstBlockSize << ", " << firstBlockSize + secondRoundMarkers.second << std::endl;
-	//std::cout << std::accumulate(active.begin(), active.end(), 0) << " active nodes from " << veryLocalN << " total." << std::endl;
 
 	//this map provides an index from 0 to b-1 for each of the b indices in borderRegionIDs
 	//globalToVeryLocal[borderRegionIDs[i]] = i
@@ -2125,14 +2123,16 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffus
 		globalToVeryLocal[globalIndex] = i;
 	}
 
+	//assert that all indices were unique
 	assert(globalToVeryLocal.size() == veryLocalN);
 
 	auto isInBorderRegion = [&](IndexType globalID){return globalToVeryLocal.count(globalID) > 0;};
 
 	//perform diffusion
 	for (IndexType round = 0; round < magicNumberDiffusionSteps; round++) {
-		std::vector<ValueType> nextDiffusionValues(veryLocalN, 0);
+		std::vector<ValueType> nextDiffusionValues(result);
 		std::vector<bool> nextActive(veryLocalN, false);
+
 		//diffusion update
 		for (IndexType i = 0; i < veryLocalN; i++) {
 			if (!active[i]) {
@@ -2152,7 +2152,7 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffus
 			const IndexType beginCols = localIa[localID];
 			const IndexType endCols = localIa[localID+1];
 
-			double delta = 0;
+			double delta = 0.0;
 			for (IndexType j = beginCols; j < endCols; j++) {
 				const IndexType neighbor = localJa[j];
 				if (isInBorderRegion(neighbor)) {
@@ -2167,13 +2167,11 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffus
 					nextActive[veryLocalNeighbor] = true;
 				}
 			}
-			//if (!active[i]) {
-			//	assert(delta == 0);
-			//}
-			//assert(delta != 0);
+
 			nextDiffusionValues[i] = oldDiffusionValue + delta * magicNumberAlpha;
 			assert (std::abs(nextDiffusionValues[i]) <= magicNumberDiffusionLoad);
 		}
+
 		result.swap(nextDiffusionValues);
 		active.swap(nextActive);
 	}
@@ -2721,10 +2719,12 @@ DenseVector<T> ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum(DenseVe
     comm->gather(allOffsets, 1, 0, localSum);
 
     //compute prefix sum of offsets.
-    std::vector<T> offsetPrefixSum(p+1);
+    std::vector<T> offsetPrefixSum(p+1, 0);
     if (comm->getRank() == 0) {
+    	//shift begin of output by one, since the first offset is 0
     	std::partial_sum(allOffsets, allOffsets+p, offsetPrefixSum.begin()+1);
     }
+
     //remove last value, since it would be the offset for the p+1th processor
     offsetPrefixSum.resize(p);
 
