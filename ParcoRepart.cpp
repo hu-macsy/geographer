@@ -186,8 +186,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			input.redistribute(newDistribution, input.getColDistributionPtr());
 			result = DenseVector<IndexType>(newDistribution, comm->getRank());
 
-			for (IndexType dim = 0; dim < dimensions; dim++) {
-				coordinates[dim].redistribute(newDistribution);
+			if (settings.useGeometricTieBreaking) {
+				for (IndexType dim = 0; dim < dimensions; dim++) {
+					coordinates[dim].redistribute(newDistribution);
+				}
 			}
 
 		} else {
