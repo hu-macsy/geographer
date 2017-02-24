@@ -1179,7 +1179,7 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::ParcoRepart<Index
 
 	assert(interfaceNodes.size() <= localN);
 	assert(roundMarkers.size() == depth);
-	return {interfaceNodes, roundMarkers};
+	return std::make_pair(std::move(interfaceNodes), std::move(roundMarkers));
 }
 
 template<typename IndexType, typename ValueType>
