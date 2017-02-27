@@ -95,6 +95,9 @@ namespace ITI {
 			 */
 			static std::pair<std::vector<IndexType>, std::vector<IndexType>> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType otherBlock, IndexType depth);
 
+			static IndexType multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<IndexType> &nodeWeights,
+					std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+
 			static std::vector<IndexType> distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
 
 			static std::vector<IndexType> distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors,
@@ -147,7 +150,7 @@ namespace ITI {
 			 * edge (u,v) is (ret[0][i], ret[1][i]) if block u and block v are connected.
 			*/
 			static std::vector<std::vector<IndexType> > getLocalBlockGraphEdges( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
-                        
+			
 			/** Builds the block graph of the given partition.
 			 * Creates an HArray that is passed around in numPEs (=comm->getSize()) rounds and every time
 			 * a processor writes in the array its part.
@@ -189,6 +192,12 @@ namespace ITI {
 			static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& graph);
 
 			static DenseVector<ValueType> projectToCoarse(const DenseVector<ValueType>& input, const DenseVector<IndexType>& fineToCoarse);
+
+			static DenseVector<IndexType> sumToCoarse(const DenseVector<IndexType>& input, const DenseVector<IndexType>& fineToCoarse);
+
+			static scai::dmemo::DistributionPtr projectToCoarse(const DenseVector<IndexType>& fineToCoarse);
+
+			static scai::dmemo::DistributionPtr projectToFine(scai::dmemo::DistributionPtr, const DenseVector<IndexType>& fineToCoarse);
 
 			template<typename T>
 			static DenseVector<T> projectToFine(const DenseVector<T>& input, const DenseVector<IndexType>& fineToCoarse);
