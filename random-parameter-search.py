@@ -3,7 +3,7 @@ import os
 import math
 import random
 
-iterations = 45
+iterations = 50
 dimension = 2
 minExp = -1.5
 maxExp = 1
@@ -27,6 +27,7 @@ for i in range(iterations):
 	tieBreakingStrategy = random.randint(0,2)
 	useDiffusionTieBreaking = int(tieBreakingStrategy == 1)
 	useGeometricTieBreaking = int(tieBreakingStrategy == 2)
+	multiLevelRounds = random.randint(0,5)
 
 	if not useDiffusionTieBreaking:
 		useGeometricTieBreaking = random.randint(0,1)
@@ -34,4 +35,4 @@ for i in range(iterations):
 	if not os.path.exists(filename):
 		print(filename + " does not exist.")
 	else:
-		call(["job_submit", "-p", str(p), "-c", "p", "-t", str(10), "-m", str(int(4000)), "-N", "c", "submitscriptpass", "--graphFile="+filename, "--borderDepth="+str(borderDepth), "--stopAfterNoGainRounds="+str(stopAfterNoGainRounds), "--minGainForNextGlobalRound="+str(minGainForNextGlobalRound), "--gainOverBalance="+str(gainOverBalance), "--skipNoGainColors="+str(skipNoGainColors), "--useDiffusionTieBreaking="+str(useDiffusionTieBreaking), "--useGeometricTieBreaking="+str(useGeometricTieBreaking), "--dimensions="+str(dimension)])
+		call(["job_submit", "-p", str(p), "-c", "p", "-t", str(10), "-m", str(int(4000)), "-N", "c", "submitscriptpass", "--graphFile="+filename, "--borderDepth="+str(borderDepth), "--stopAfterNoGainRounds="+str(stopAfterNoGainRounds), "--minGainForNextGlobalRound="+str(minGainForNextGlobalRound), "--gainOverBalance="+str(gainOverBalance), "--skipNoGainColors="+str(skipNoGainColors), "--useDiffusionTieBreaking="+str(useDiffusionTieBreaking), "--useGeometricTieBreaking="+str(useGeometricTieBreaking), "--multiLevelRounds="+str(multiLevelRounds), "--dimensions="+str(dimension)])
