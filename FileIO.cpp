@@ -153,6 +153,14 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
 	file >> globalN >> globalM;
 
+	if (globalN < 0) {
+		throw std::runtime_error("Invalid node count: " + std::to_string(globalN));
+	}
+
+	if (globalM < 0) {
+		throw std::runtime_error("Invalid edge count: " + std::to_string(globalM));
+	}
+
 	const ValueType avgDegree = ValueType(2*globalM) / globalN;
 
 	//get distribution and local range
@@ -163,6 +171,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     IndexType beginLocalRange, endLocalRange;
     scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
     const IndexType localN = endLocalRange - beginLocalRange;
+    assert(localN >= 0);
+    assert(localN <= globalN);
 
     //scroll to begin of local range. Neighbors of node i are in line i+1
     std::string line;
@@ -311,6 +321,7 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
     IndexType duplicateNeighbors = 0;
 
     std::string line;
+    IndexType nodeID = 0;
     while (std::getline(file, line)) {
     	std::vector<ValueType> values;
     	std::stringstream ss( line );
@@ -361,6 +372,8 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 
 		//create own cell and add to node map
 		std::shared_ptr<QuadNodeCartesianEuclid> quadNodePointer(new QuadNodeCartesianEuclid(minCoords, maxCoords));
+		quadNodePointer->setID(nodeID);
+		nodeID++;
 		assert(nodeMap.count(ownCoords) == 0);
 		nodeMap[ownCoords] = quadNodePointer;
 		assert(confirmedEdges.count(ownCoords) == 0);
@@ -380,6 +393,8 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 		if (parentCoords[0] != -1 && nodeMap.count(parentCoords) == 0) {
 			std::tie(minCoords, maxCoords) = getBoundingCoords(parentCoords, level+1);
 			std::shared_ptr<QuadNodeCartesianEuclid> parentPointer(new QuadNodeCartesianEuclid(minCoords, maxCoords));
+			parentPointer->setID(nodeID);
+			nodeID++;
 			nodeMap[parentCoords] = parentPointer;
 			assert(confirmedEdges.count(parentCoords) == 0);
 			confirmedEdges[parentCoords] = {};
@@ -460,9 +475,8 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
     	bool consistent = elems.second->isConsistent();
     	if (!consistent) {
     		std::vector<ValueType> coords = elems.first;
-    		throw std::runtime_error("Node at " + std::to_string(coords[0]) + ", " + std::to_string(coords[1]) + ", " + std::to_string(coords[2]) + " inconsistent.");
+    		std::cout << "Warning: " << std::string("Node at " + std::to_string(coords[0]) + ", " + std::to_string(coords[1]) + ", " + std::to_string(coords[2]) + " inconsistent.");
     	}
-    	assert(elems.second->isConsistent());
     	assert(pendingEdges.count(elems.first) == 0);//list of pending edges was erased when node was handled, new edges should not be added to pending list
     }
 

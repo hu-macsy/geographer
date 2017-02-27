@@ -479,8 +479,12 @@ public:
 	}
 
 	index getID() const {
-			return ID;
-		}
+		return ID;
+	}
+
+	void setID(index newID) {
+		ID = newID;
+	}
 
 
 	index indexSubtree(index nextID) {
@@ -515,7 +519,7 @@ public:
 		}
 	}
 
-	count reindex(count offset) {
+	count reindexContent(count offset) {
 		if (this->isLeaf)
 		{
 			#pragma omp task
@@ -526,7 +530,7 @@ public:
 			offset += this->size();
 		} else {
 			for (int i = 0; i < children.size(); i++) {
-				offset = this->children[i]->reindex(offset);
+				offset = this->children[i]->reindexContent(offset);
 			}
 		}
 		return offset;
@@ -636,7 +640,7 @@ public:
                     for(int d=0; d<dimension; d++){
                         assert(d<coords.size());
                         assert(d< maxCoords.getDimensions());
-                        ValueType thisCoord = thisNode->maxCoords[d] + double(thisNode->maxCoords[d] - thisNode->minCoords[d])/ 2;
+                        ValueType thisCoord = thisNode->minCoords[d] + double(thisNode->maxCoords[d] - thisNode->minCoords[d])/ 2;
                         //PRINT("max= "<< thisNode->maxCoords[d] <<", min= "<< thisNode->minCoords[d] << ", mean= "<< thisCoord);                        
                         coords[d].push_back(thisCoord);
                     }

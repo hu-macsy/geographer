@@ -8,6 +8,7 @@
 #include <stack>
 #include <cmath>
 #include <algorithm>
+#include <random>
 
 #include <scai/lama/matrix/all.hpp>
 
@@ -493,8 +494,8 @@ TEST_F(QuadTreeTest, testCartesianEuclidQuery) {
 
 	assert(n > 0);
 
-	vector<Point<double> > positions(n);
-	vector<index> content(n);
+	std::vector<Point<double> > positions(n);
+	std::vector<index> content(n);
 
 	QuadTreeCartesianEuclid quad({0,0}, {1,1}, true);
 	for (index i = 0; i < n; i++) {

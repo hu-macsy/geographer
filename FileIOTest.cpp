@@ -167,7 +167,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     IndexType N= graph.getNumColumns();
     EXPECT_EQ(nodes,N);
 
-    //read the coordiantes from a file
+    //read the coordinates from a file
     std::cout<<"reading coordinates from file: "<< coordFile<< std::endl;
 
     SCAI_REGION_START("testPartitionFromFile_local_2D.readFromFile2Coords_2D");
@@ -178,13 +178,6 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     EXPECT_EQ(coords2D.size(), dim);
     EXPECT_EQ(coords2D[0].size(), N);
 
-    // print
-    /*
-    for(IndexType i=0; i<N; i++){
-        std::cout<< i<< ": "<< *comm<< " - " <<coords2D[0].getLocalValues()[i] << " , " << coords2D[1].getLocalValues()[i] << std::endl;
-    }
-    */
-
     SCAI_REGION_START("testPartitionFromFile_local_2D.partition");
 
         struct Settings Settings;
@@ -194,14 +187,17 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
         scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D, Settings );
         EXPECT_EQ(partition.size(), N);
     SCAI_REGION_END("testPartitionFromFile_local_2D.partition");
-
 }
 
 TEST_F(FileIOTest, testReadQuadTree){
-	std::string filename = "cells.dat";
+	std::string filename = "octree_timestep_0.dat";
 
 	std::vector<std::set<std::shared_ptr<SpatialCell> > > edgeList = FileIO<IndexType, ValueType>::readQuadTree(filename);
-	IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
+	IndexType m = 0;
+	for (std::set<std::shared_ptr<SpatialCell> > edgeSet : edgeList) {
+		m += edgeSet.size();
+	}
+
 	std::cout << "Read Quadtree with " << edgeList.size() << " nodes and " << m << " edges." << std::endl;
 }
 

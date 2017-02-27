@@ -36,18 +36,12 @@ namespace ITI {
 	 		*
 	 		* @param[in] input Adjacency matrix of the input graph
 	 		* @param[in] coordinates Node positions
-	 		* @param[in] dimensions Number of dimensions of coordinates.
-	 		* @param[in] k Number of desired blocks
-	 		* @param[in] epsilon Tolerance of block size
-	 		*
-	 		* @return DenseVector with the same distribution as the input matrix, at position i is the block node i is assigned to
+		 		*
+	 		* @return Distributed DenseVector	, at position i is the block node i is assigned to
 	 		*/
-			//static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, IndexType k,  double epsilon = 0.05);
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings Settings);
-                        
-                        static DenseVector<IndexType> partitionGraph_noSort(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings Settings);
 
-			static ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool ignoreWeights = true);
+			static ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool weighted = false);
 
 			/**
 			 * This method takes a (possibly distributed) partition and computes its imbalance.
@@ -56,7 +50,7 @@ namespace ITI {
 			 * @param[in] part partition
 			 * @param[in] k number of blocks in partition.
 			 */
-			static ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k);
+			static ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<IndexType> &nodeWeights = {});
 
 			/**
 			* Performs local refinement of a given partition
@@ -77,15 +71,20 @@ namespace ITI {
 			 */
 			static std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
 
+			static std::vector<ValueType> distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates);
+
 			/**
 			 * redistributes a matrix from a local halo object without communication. It that is impossible, throw an error.
 			 */
 			static void redistributeFromHalo(CSRSparseMatrix<ValueType>& matrix, scai::dmemo::DistributionPtr newDistribution, Halo& halo, CSRStorage<ValueType>& haloMatrix);
 
+			template<typename T>
+			static void redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, Halo& halo, scai::utilskernel::LArray<T>& haloData);
+
 			/**
-			 * Builds a halo containing all partition entries of non-local neighbors.
+			 * Builds a halo containing all non-local neighbors.
 			 */
-			static scai::dmemo::Halo buildPartHalo(const CSRSparseMatrix<ValueType> &input,  const DenseVector<IndexType> &part);
+			static scai::dmemo::Halo buildNeighborHalo(const CSRSparseMatrix<ValueType> &input);
 
 			/**
 			 * Computes the border region within one block, adjacent to another block
@@ -96,10 +95,11 @@ namespace ITI {
 			 */
 			static std::pair<std::vector<IndexType>, std::vector<IndexType>> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType otherBlock, IndexType depth);
 
-			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors, Settings settings);
+			static std::vector<IndexType> distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
 
-			static ValueType distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors,
-					const std::vector<DenseVector<IndexType>>& communicationScheme, Settings settings);
+			static std::vector<IndexType> distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors,
+					DenseVector<IndexType> &nodeWeights, const std::vector<DenseVector<IndexType>>& communicationScheme, std::vector<DenseVector<ValueType>> &coordinates,
+					std::vector<ValueType> &distances, Settings settings);
 
 			/**
 			 * Iterates over the local part of the adjacency matrix and counts local edges.
@@ -120,7 +120,7 @@ namespace ITI {
 			 * @param[in] input Adjacency matrix of the input graph
 			 */
 			static std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
-                        
+
 			//------------------------------------------------------------------------
 
 			/** Get the borders nodes of each block.
@@ -170,43 +170,48 @@ namespace ITI {
 			 * @return A 3xN vector with the edges and the color of each edge: retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge.
 			 */
 			static std::vector< std::vector<IndexType>>  getGraphEdgeColoring_local( CSRSparseMatrix<ValueType> &adjM, IndexType& colors);
-                        
-			/** Given the block graph, creates an edge coloring of the graph and retuns a communication
+
+			/** Given the block graph, creates an edge coloring of the graph and returns a communication
 			 *  scheme based on the coloring
 			 *
 			 * @param[in] adjM The adjacency matrix of a graph.
 			 * @return std::vector.size()= number of colors used for coloring the graph. If D is the
-			 *  maximum number of edges for a node, then nubers of colors is D or D+1.
+			 *  maximum number of edges for a node, then numbers of colors is D or D+1.
 			 *  vector[i].size()= number of nodes in the graph = adjM.numRows = adjMnumCols.
 			 *  return[i][j] = k : in round i, node j talks with node k. Must also be that return[i][k] = j.
 			 *  Inactive nodes have their own rank: rank[i][j] = j.
 			 */
 			static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM);
-                        
-                        //static std::vector<std::vector<IndexType>> maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& graph);
-                        static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& graph);
+
                         
                         static void coarsening(scai::lama::CSRSparseMatrix<ValueType>& graph);
 
+			static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& graph);
+
+
+			template<typename T>
+			static DenseVector<T> computeGlobalPrefixSum(DenseVector<T> input);
+
 		private:
-                    
-            static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,std::vector<bool>& assignedToSecondBlock, const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes,Settings settings);
+			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
+				const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<IndexType>& nodeWeights, std::pair<IndexType, IndexType> secondRoundMarkers,
+				std::vector<bool>& assignedToSecondBlock, const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes,
+				std::vector<ValueType> tieBreakingKeys, Settings settings);
 
-            static IndexType twoWayLocalCut(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<bool>& assignedToSecondBlock);
+			static IndexType twoWayLocalCut(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<bool>& assignedToSecondBlock);
 
-            static ValueType twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-                                    		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
-                                    		std::vector<bool>& assignedToSecondBlock, const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes,
-                                    		Settings settings);
+			static ValueType twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
+				const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
+				std::vector<bool>& assignedToSecondBlock, const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes,
+				Settings settings);
 
-            static std::vector<ValueType> twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-            		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
-            		const std::vector<bool>& assignedToSecondBlock, Settings settings);
-
+			static std::vector<ValueType> twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
+				const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
+				const std::vector<bool>& assignedToSecondBlock, Settings settings);
 
 			static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
 
-			static ValueType localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input);
+			static ValueType localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input, const bool weighted);
 
 			static IndexType getDegreeSum(const CSRSparseMatrix<ValueType> &input, const std::vector<IndexType> &nodes);
 	};
