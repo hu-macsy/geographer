@@ -262,12 +262,11 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
         PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
         
 }
-
-
+    
 
 TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
 
-        count n = 500;
+        count n = 2500;
 
 	vector<Point<double> > positions(n);
 	vector<index> content(n);

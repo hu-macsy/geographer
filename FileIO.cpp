@@ -128,7 +128,7 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
     assert(coords[0].size() == numPoints);
     for(i=0; i<numPoints; i++){
         for(j=0; j<dimension; j++)
-            f<< coords[j].getValue(i).Scalar::getValue<ValueType>() << " ";
+            f<< std::setprecision(15)<< coords[j].getValue(i).Scalar::getValue<ValueType>() << " ";
         f<< std::endl;
     }
 

@@ -485,7 +485,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
         SCAI_REGION("MeshGenerator.createRandomStructured3DMesh_dist.findNgbrs");
         IndexType thisGlobalInd = dist->local2global(i);    // get the corresponding global index
         IndexType ngbGlobalInd;                             // the global id of the neighbouring nodes
-//PRINT(*comm << ": i= " << i<< ", "<< thisGlobalInd);
+        //PRINT(*comm << ": i= " << i<< ", "<< thisGlobalInd);
         // the position of this node in 3D
         std::tuple<IndexType, IndexType, IndexType>  thisPoint = MeshGenerator<IndexType, ValueType>::index2_3DPoint( thisGlobalInd, numPoints);
             
@@ -778,6 +778,129 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
 }
 
 //-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const int dimension, const int numberOfAreas, const int pointsPerArea, const ValueType maxVal) {
+    /*
+    auto randomPoint= [](Point<ValueType> min, Point<ValueType> max, std::default_random_engine gen ){
+        int dim= min.getDimensions();
+        Point<ValueType> retP(dim);
+        for(int d=0; d<dim; d++){
+            std::uniform_real_distribution<ValueType> dist(min[d], max[d]);
+            retP[d] = dist(gen);
+        }
+        return retP;
+    };
+    */
+        
+    srand(time(NULL));
+
+    Point<ValueType> minCoord(dimension);
+    Point<ValueType> maxCoord(dimension);
+    for(int i=0; i< dimension; i++){
+        minCoord[i]= 0;
+        maxCoord[i]= maxVal;
+    }
+    IndexType capacity = 1;
+    
+    // the quad tree 
+    QuadTreeCartesianEuclid quad(minCoord, maxCoord, true, capacity);
+
+    // create points and add them in the tree
+    std::random_device rd;
+    std::default_random_engine generator(rd());
+    //std::mt19937 generator(rd());
+    std::vector<std::normal_distribution<ValueType>> distForDim(dimension);
+    for(int n=0; n<numberOfAreas; n++){
+
+        Point<ValueType> randPoint(dimension);
+        
+        for(int d=0; d<dimension; d++){
+            std::uniform_real_distribution<ValueType> dist(minCoord[d], maxCoord[d]);
+            randPoint[d] = dist(generator);
+            // create a distribution for every dimension
+            //TODO: maybe also pick deviation in random
+            ValueType deviation = (ValueType) rand()/RAND_MAX + 0.4;
+            distForDim[d] = std::normal_distribution<ValueType> (randPoint[d], deviation);
+        }
+        randPoint.print();
+        
+        IndexType numPoints = pointsPerArea;
+        
+        for(int i=0; i<numPoints; i++){
+            Point<ValueType> pInRange(dimension);
+            for(int d=0; d< dimension; d++){
+                ValueType thisCoord = distForDim[d](generator)+ (ValueType) rand()/RAND_MAX;
+                // if it is out of bounds pick again
+                while(thisCoord<=minCoord[d] or thisCoord>=maxCoord[d]){
+                    thisCoord = distForDim[d](generator)+ (ValueType) rand()/RAND_MAX ;
+                }
+                assert(thisCoord > minCoord[d]);
+                assert(thisCoord < maxCoord[d]);
+                pInRange[d] = thisCoord; 
+            }
+            //pInRange.print();
+            quad.addContent(0,pInRange);
+        }
+    }
+
+    // add random points to keep tree balanced
+    for(int i=0; i<pointsPerArea; i++){
+        Point<ValueType> p(dimension);
+        for(int d=0; d<dimension; d++){
+            //std::uniform_real_distribution<ValueType> dist(minCoord[d], maxCoord[d]);
+            //p[d] = dist(generator);
+            p[d]= ((ValueType) rand()/RAND_MAX) * maxCoord[d];
+        }
+        quad.addContent(0, p);
+    }
+    
+
+    //TODO: add points not at random, to cover holes
+    /*
+    int numGridPointsPerDim= 10;
+    int numGridPoints= std::pow(numGridPointsPerDim, dimension);    
+    std::vector<Point<ValueType>> gridPoints(numGridPoints, Point<ValueType>(dimension));
+    for(int d=0; d<dimension; d++){
+        ValueType offset = double (maxCoord[d]-minCoord[d])/ numGridPointsPerDim;
+        for(int plane=0; plane<numGridPointsPerDim; plane++){
+            int planeSize = std::pow(numGridPointsPerDim, dimension-1);
+            for(int p=0; p<planeSize; p++){
+                ValueType noise = (ValueType) rand()/RAND_MAX;
+                assert(p*plane < gridPoints.size() );
+                gridPoints[p*plane][d]=  offset*( ValueType(plane) ) + noise;
+    PRINT(noise << " _ " << gridPoints[p][d] );
+            }
+        }
+    }
+    */
+    
+    PRINT("Num of leaves= N = "<< quad.countLeaves() );
+    IndexType numLeaves= quad.countLeaves();
+    IndexType treeSize = quad.indexSubtree(0);
+    
+    // the quad tree is created. extract is as a CSR matrix
+    // graphNgbrsCells is just empty now
+    std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells( treeSize );
+    std::vector<std::vector<ValueType>> coordsV( dimension );
+        
+    adjM= quad.getTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coordsV );
+    assert(adjM.getNumRows() == coordsV[0].size());
+    
+    // copy from vector to DenseVector
+    for(int d=0; d<dimension; d++){
+        coords[d].allocate(coordsV[d].size());
+        for(unsigned int i=0; i<coordsV[d].size(); i++){
+            ValueType thisCoord = coordsV[d][i];
+            coords[d].setValue(i, thisCoord);
+            assert(thisCoord>= minCoord[d]);
+            assert(thisCoord<= maxCoord[d]);
+        }
+    }
+    
+    
+}    
+//----------------------------------------------------------------------------------------------
 /* Creates random points in the cube [0,maxCoord] in the given dimensions.
  */
 template<typename IndexType, typename ValueType>
@@ -787,14 +910,14 @@ std::vector<DenseVector<ValueType>> MeshGenerator<IndexType, ValueType>::randomP
     int i, j;
     std::vector<DenseVector<ValueType>> ret(dimensions);
     for (i=0; i<dimensions; i++)
-        ret[i] = DenseVector<ValueType>(numberOfPoints, 0);
+        ret[i] = DenseVector<ValueType>(dimensions, 0);
     
     srand(time(NULL));
     ValueType r;
     for(i=0; i<n; i++){
         for(j=0; j<dimensions; j++){
             r= ((ValueType) rand()/RAND_MAX) * maxCoord;
-            ret[j].setValue(i, r);
+            ret[i].setValue(j, r);
         }
     }
     return ret;
@@ -854,6 +977,7 @@ template void MeshGenerator<int, double>::createRandom3DMesh(CSRSparseMatrix<dou
 template void MeshGenerator<int, double>::createStructured3DMesh(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
 template void MeshGenerator<int, double>::createStructured3DMesh_dist(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
 template void MeshGenerator<int, double>::createRandomStructured3DMesh_dist(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
+template void MeshGenerator<int, double>::createQuadMesh( CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords,const int dimensions, const int numberOfPoints,  const int pointsPerArea, const double maxCoord);
 template std::vector<DenseVector<double>> MeshGenerator<int, double>::randomPoints(int numberOfPoints, int dimensions, double maxCoord);
 template Scalar MeshGenerator<int, double>::dist3D(DenseVector<double> p1, DenseVector<double> p2);
 template double MeshGenerator<int, double>::dist3DSquared(std::tuple<int, int, int> p1, std::tuple<int, int, int> p2);

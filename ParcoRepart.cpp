@@ -2301,10 +2301,17 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
+    std::vector<IndexType> numEdgesForColor(colors,0);
     for (size_t i = 0; i <retG[0].size(); i++) {
         retG[2].push_back( G[ boost::edge( retG[0][i],  retG[1][i], G).first] );
+        ++numEdgesForColor[ G[ boost::edge( retG[0][i],  retG[1][i], G).first]];
     }
     
+    if(comm->getRank()==0){
+        for(int i=0; i<numEdgesForColor.size(); i++){
+            PRINT("color " <<i <<": num of edges: "<< numEdgesForColor[i] );
+        }
+    }
     return retG;
 }
 
@@ -2700,12 +2707,12 @@ PRINT("matchIndex= "<< matchIndex<< ", newRowCounter= "<< newRowCounter << ", nn
  
 //---------------------------------------------------------------------------------------
 
-
+/*
 template<typename IndexType, typename ValueType>
  void ParcoRepart<IndexType, ValueType>::uncoarsening(scai::lama::CSRSparseMatrix<ValueType>& adjM){
-     
-
-}    
+    
+}   
+*/
 //---------------------------------------------------------------------------------------
 
 //to force instantiation

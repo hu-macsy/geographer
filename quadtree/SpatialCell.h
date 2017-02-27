@@ -636,7 +636,7 @@ public:
                     for(int d=0; d<dimension; d++){
                         assert(d<coords.size());
                         assert(d< maxCoords.getDimensions());
-                        ValueType thisCoord = thisNode->maxCoords[d] + double(thisNode->maxCoords[d] - thisNode->minCoords[d])/ 2;
+                        ValueType thisCoord = thisNode->minCoords[d] + double(thisNode->maxCoords[d] - thisNode->minCoords[d])/ 2;
                         //PRINT("max= "<< thisNode->maxCoords[d] <<", min= "<< thisNode->minCoords[d] << ", mean= "<< thisCoord);                        
                         coords[d].push_back(thisCoord);
                     }
@@ -669,7 +669,7 @@ public:
             index numLeaves = leafIndex;
             PRINT(" numLeaves= " << leafIndex  << " ,  non-leaves= " << non_leaves );
             // this assertion is not correct in the case where we get a forest
-            //assert( leafIndex == countLeaves() );
+            SCAI_ASSERT( leafIndex == countLeaves(), leafIndex << " >< "<< countLeaves() );
             
             //print graphNgbrsCells 
             for(int i=0; i< graphNgbrsCells.size(); i++){
@@ -702,6 +702,7 @@ public:
                 
                 // count non-zero elements
                 IndexType nnzCounter = 0; 
+                index leafIndex= -1;
                 
                 // since we do not have distribution traverse all rows
                 for(IndexType i=0; i<graphNgbrsCells.size(); i++){
@@ -710,12 +711,13 @@ public:
                     // we just do after the for: ia[i+1] = ia[i] + graphNgbrsCells[i].size() 
                     IndexType numRowElems= 0;
                     // the index of the leaves since -i- traverses also non-leaf nodes
-                    index leafIndex= -1;
-                    assert( i< leafIndexMapping.size() );
                     
-                    if(leafIndexMapping[i]==-1){
+                    assert( i< leafIndexMapping.size() );
+                    if(leafIndexMapping[i]==-1){    // is not a leaf
                         continue;
                     }else{
+                        // leaf indices are sequenrial
+                        SCAI_ASSERT_EQUAL_ERROR(leafIndex , leafIndexMapping[i]-1);
                         leafIndex = leafIndexMapping[i];
                     }
                     
@@ -728,7 +730,7 @@ public:
                         IndexType ngbGlobalInd = leafIndexMapping[ graphNgb->get()->getID() ];
                         //PRINT("from treeIndex: "<< graphNgb->get()->getID() ", to leafIndex= "<< ngbGlobalInd);
                         assert( ngbGlobalInd>= 0);
-                        assert( ngbGlobalInd< numLeaves);
+                        SCAI_ASSERT( ngbGlobalInd<= numLeaves, "Global indexing: " << ngbGlobalInd << " shoould be less () at this point) than the number of leaves: "<< numLeaves );
                         assert( nnzCounter< ja.size() );
                         SCAI_ASSERT( nnzCounter < nnzValues, __FILE__<<" ,"<<__LINE__<< ": nnzValues not calculated properly")                   
                         ja[nnzCounter] = ngbGlobalInd;
@@ -736,7 +738,7 @@ public:
                         ++nnzCounter;
                         ++numRowElems;
                     }
-                    assert(leafIndex+1< ia.size() );
+                    SCAI_ASSERT(leafIndex < ia.size(), "Leaf index: "<<leafIndex << " , ia.size: "<< ia.size()  );
                     ia[leafIndex+1] = ia[leafIndex] + numRowElems;
                     SCAI_ASSERT(numRowElems == graphNgbrsCells[i].size(),  __FILE__<<" ,"<<__LINE__<<"something is wrong");
                 }
