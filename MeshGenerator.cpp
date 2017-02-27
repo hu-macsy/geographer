@@ -845,6 +845,7 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
 
     // add random points to keep tree balanced
     for(int i=0; i<pointsPerArea; i++){
+        SCAI_REGION("MeshGenerator.createQuadMesh.randomPoints")
         Point<ValueType> p(dimension);
         for(int d=0; d<dimension; d++){
             //std::uniform_real_distribution<ValueType> dist(minCoord[d], maxCoord[d]);
@@ -852,7 +853,7 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
             p[d]= ((ValueType) rand()/RAND_MAX) * maxCoord[d];
         }
         quad.addContent(0, p);
-    }
+    }   
     
 
     //TODO: add points not at random, to cover holes
@@ -888,6 +889,7 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
     
     // copy from vector to DenseVector
     for(int d=0; d<dimension; d++){
+        SCAI_REGION("MeshGenerator.createQuadMesh.copyToDenseVector")
         coords[d].allocate(coordsV[d].size());
         for(unsigned int i=0; i<coordsV[d].size(); i++){
             ValueType thisCoord = coordsV[d][i];

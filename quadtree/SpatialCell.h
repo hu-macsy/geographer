@@ -669,9 +669,10 @@ public:
             index numLeaves = leafIndex;
             //PRINT(" numLeaves= " << leafIndex  << " ,  non-leaves= " << non_leaves );
             // this assertion is not correct in the case where we get a forest
-            SCAI_ASSERT( leafIndex == countLeaves(), leafIndex << " >< "<< countLeaves() );
+            //SCAI_ASSERT( leafIndex == countLeaves(), leafIndex << " >< "<< countLeaves() );
             
             //print graphNgbrsCells 
+            /*
             for(int i=0; i< graphNgbrsCells.size(); i++){
                 for(typename std::set<std::shared_ptr<SpatialCell>>::iterator graphNgb= graphNgbrsCells[i].begin(); graphNgb!=graphNgbrsCells[i].end(); graphNgb++){
                         // the neigbours of thisNode->graphNgb. this->ID must be in there somewhere
@@ -679,7 +680,7 @@ public:
                         //PRINT(i<< ": "<< graphNgb->get()->getID() );
                     }
             }
-            
+            */
             
             /* 
              * from the graphNgbrsCells vector set the CSR sparse matrix

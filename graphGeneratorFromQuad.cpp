@@ -32,12 +32,12 @@ typedef int IndexType;
 
 int main(int argc, char** argv){
 
-    IndexType maxNumberOfAreas= 50;
+    IndexType maxNumberOfAreas= 29;
     const IndexType pointsPerArea= 200000;
     const IndexType dimension = 2;
     const ValueType maxCoord = 100;
 
-    for(int numberOfAreas=26; numberOfAreas<maxNumberOfAreas; numberOfAreas+=2){
+    for(int numberOfAreas=28; numberOfAreas<maxNumberOfAreas; numberOfAreas+=2){
         std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
         scai::lama::CSRSparseMatrix<ValueType> graph;
