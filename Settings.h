@@ -11,6 +11,7 @@ struct Settings{
     IndexType minGainForNextRound = 1;
     IndexType sfcResolution = 0;
     IndexType numberOfRestarts = 0;
+    IndexType diffusionRounds = 20;
     bool useDiffusionTieBreaking = false;
     bool useGeometricTieBreaking = false;
     bool gainOverBalance = false;

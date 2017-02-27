@@ -36,7 +36,7 @@ namespace ITI {
 	 		*
 	 		* @param[in] input Adjacency matrix of the input graph
 	 		* @param[in] coordinates Node positions
-	 		*
+		 		*
 	 		* @return Distributed DenseVector	, at position i is the block node i is assigned to
 	 		*/
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings Settings);
@@ -183,11 +183,14 @@ namespace ITI {
 			 */
 			static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM);
 
-			static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& graph);
+
+			static void coarsen(const CSRSparseMatrix<ValueType>& inputGraph, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations = 1);
+
+			static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& graph);
 
 
 			template<typename T>
-			static DenseVector<T> computeGlobalPrefixSum(DenseVector<T> input);
+			static DenseVector<T> computeGlobalPrefixSum(DenseVector<T> input, T offset = 0);
 
 		private:
 			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,

@@ -178,13 +178,6 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     EXPECT_EQ(coords2D.size(), dim);
     EXPECT_EQ(coords2D[0].size(), N);
 
-    // print
-    /*
-    for(IndexType i=0; i<N; i++){
-        std::cout<< i<< ": "<< *comm<< " - " <<coords2D[0].getLocalValues()[i] << " , " << coords2D[1].getLocalValues()[i] << std::endl;
-    }
-    */
-
     SCAI_REGION_START("testPartitionFromFile_local_2D.partition");
 
         struct Settings Settings;
@@ -194,7 +187,6 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
         scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D, Settings );
         EXPECT_EQ(partition.size(), N);
     SCAI_REGION_END("testPartitionFromFile_local_2D.partition");
-
 }
 
 TEST_F(FileIOTest, testReadQuadTree){

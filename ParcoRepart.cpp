@@ -187,8 +187,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			input.redistribute(newDistribution, input.getColDistributionPtr());
 			result = DenseVector<IndexType>(newDistribution, comm->getRank());
 
-			for (IndexType dim = 0; dim < dimensions; dim++) {
-				coordinates[dim].redistribute(newDistribution);
+			if (settings.useGeometricTieBreaking) {
+				for (IndexType dim = 0; dim < dimensions; dim++) {
+					coordinates[dim].redistribute(newDistribution);
+				}
 			}
 
 		} else {
@@ -2087,7 +2089,7 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffus
 
 	SCAI_REGION( "ParcoRepart.twoWayLocalDiffusion" )
 	//settings and constants
-	const IndexType magicNumberDiffusionSteps = 1.2*settings.borderDepth;
+	const IndexType magicNumberDiffusionSteps = settings.diffusionRounds;
 	const ValueType degreeEstimate = ValueType(haloStorage.getNumValues()) / matrixHalo.getHaloSize();
 	const ValueType magicNumberAlpha = 1/(degreeEstimate+1);
 	const ValueType magicNumberDiffusionLoad = 1;
@@ -2107,7 +2109,7 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffus
 	}
 
 	//mark nodes in border as active, rest as inactive
-	std::vector<bool> active(veryLocalN, true);
+	std::vector<bool> active(veryLocalN, false);
 	for (IndexType i = 0; i < secondRoundMarkers.first; i++) {
 		active[i] = true;
 	}
@@ -2115,8 +2117,6 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffus
 		active[i] = true;
 	}
 
-	//std::cout << 0 << ", " << secondRoundMarkers.first << ", " << firstBlockSize << ", " << firstBlockSize + secondRoundMarkers.second << std::endl;
-	//std::cout << std::accumulate(active.begin(), active.end(), 0) << " active nodes from " << veryLocalN << " total." << std::endl;
 
 	//this map provides an index from 0 to b-1 for each of the b indices in borderRegionIDs
 	//globalToVeryLocal[borderRegionIDs[i]] = i
@@ -2127,14 +2127,16 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffus
 		globalToVeryLocal[globalIndex] = i;
 	}
 
+	//assert that all indices were unique
 	assert(globalToVeryLocal.size() == veryLocalN);
 
 	auto isInBorderRegion = [&](IndexType globalID){return globalToVeryLocal.count(globalID) > 0;};
 
 	//perform diffusion
 	for (IndexType round = 0; round < magicNumberDiffusionSteps; round++) {
-		std::vector<ValueType> nextDiffusionValues(veryLocalN, 0);
+		std::vector<ValueType> nextDiffusionValues(result);
 		std::vector<bool> nextActive(veryLocalN, false);
+
 		//diffusion update
 		for (IndexType i = 0; i < veryLocalN; i++) {
 			if (!active[i]) {
@@ -2154,7 +2156,7 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffus
 			const IndexType beginCols = localIa[localID];
 			const IndexType endCols = localIa[localID+1];
 
-			double delta = 0;
+			double delta = 0.0;
 			for (IndexType j = beginCols; j < endCols; j++) {
 				const IndexType neighbor = localJa[j];
 				if (isInBorderRegion(neighbor)) {
@@ -2169,13 +2171,11 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffus
 					nextActive[veryLocalNeighbor] = true;
 				}
 			}
-			//if (!active[i]) {
-			//	assert(delta == 0);
-			//}
-			//assert(delta != 0);
+
 			nextDiffusionValues[i] = oldDiffusionValue + delta * magicNumberAlpha;
 			assert (std::abs(nextDiffusionValues[i]) <= magicNumberDiffusionLoad);
 		}
+
 		result.swap(nextDiffusionValues);
 		active.swap(nextActive);
 	}
@@ -2581,7 +2581,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& adjM){
+std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& adjM){
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -2593,7 +2593,7 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
     scai::hmemo::ReadAccess<ValueType> values( localStorage.getValues() );
 
     // localN= number of local nodes
-    IndexType localN= adjM.getLocalNumRows();
+    const IndexType localN= adjM.getLocalNumRows();
     
     // ia must have size localN+1
     assert(ia.size()-1 == localN );
@@ -2610,85 +2610,40 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
     std::vector<bool> matched(localN, false);
     
     // localNode is the local index of a node
-    for(IndexType localNode=0; localNode<ia.size()-1; localNode++){
+    for(IndexType localNode=0; localNode<localN; localNode++){
         // if the node is already matched go to the next one;
         if(matched[localNode]){
             continue;
         }
-        // get all the neighbours of the node
-        IndexType numNgbrs = ia[localNode+1]-ia[localNode];
-        totalNbrs += numNgbrs;
         
-        //TODO: change to just scan values part once and keep the ngbrIndex with 
-        // heaviest edge and local
-        std::vector<IndexType> ngbrs(numNgbrs);
+        IndexType bestTarget = -1;
+        const IndexType endCols = ia[localNode+1];
+        for (IndexType j = ia[localNode]; j < endCols; j++) {
+        	IndexType localNeighbor = distPtr->global2local(ja[j]);
+        	if (localNeighbor != nIndex && localNeighbor != localNode && !matched[localNeighbor]) {
+        		//neighbor is local and unmatched, possible partner
+        		if (bestTarget < 0 || values[j] > values[bestTarget]) {
+        			bestTarget = j;
+        		}
+        	}
+        }
 
-        // ngbrs contains the indices of all neighbours of localNode
-        // these are global indices: 0<ngbr[i]<globalN
-        for(IndexType j=0; j<numNgbrs; j++){
-            ngbrs[j] = ja[ ia[localNode]+ j];         
-        }
-        
-        //thisNodeEdgeWeights contains the weigth of each edge
-        std::vector<IndexType> thisNodeEdgeWeights(numNgbrs);
-        for(IndexType j=0; j<numNgbrs; j++){
-            thisNodeEdgeWeights[j] = values[ ia[localNode]+ j];
-        }
-        
-        // flag for the case all neighbours are non-local
-        bool breakFlag=false;
-        
-        // the global index of the neighbor with the highest edge
-        IndexType globalNgbr;
-        do{
-            // 0< relativeIndex < numNgbrs
-            IndexType relativeIndex = std::distance(thisNodeEdgeWeights.begin() , std::max_element(thisNodeEdgeWeights.begin(), thisNodeEdgeWeights.end()) );
-            assert( relativeIndex < numNgbrs);
-            globalNgbr = ja[ ia[localNode]+relativeIndex];
-            
-            if( !distPtr->isLocal(globalNgbr) ){
-                // WARNING: DO NOT erase, it meses up the indices, just set weight to -1
-                // if not local, make edge lighter and try another edge
-                thisNodeEdgeWeights[relativeIndex] = -1;
-            }else{
-                // if we found a local edge => globalNgbr is also present locally
-                // TODO: check all edges of the neighbour to find the maximum edge there too
-                break;
-            }
-            
-            // if all neighbours are non-local then every entry in thisNodeEdgeWeights is -1
-            // so its sum must be -numNgbrs
-            int totalEdgeWeight=0;
-            for(auto& w:thisNodeEdgeWeights){
-                totalEdgeWeight += w;
-            }
-            if(totalEdgeWeight == -numNgbrs){
-                PRINT("For node "<< localNode << " all neighbours are non-local.");
-                breakFlag=true;
-                break;
-                // continue to the next node since this has no local neighbours.
-            }
-        
-        }while(ngbrs.size()>0);
-        
-        if(breakFlag){
-            break;
-        }
-        
-        // at this point -globalNgbr- is the local node with the heaviest edge
-        // and should be matched with -localNode-.
-        // So, actually, globalNgbr is also local....
-        assert( distPtr->isLocal(globalNgbr));
-        
-        // now, we need the global index of -localNode-
-        // WARNING: care whether an index is local or global
+        if (bestTarget > 0) {
+        	IndexType globalNgbr = ja[bestTarget];
 
-        matching.push_back( std::pair<IndexType,IndexType> (localNode, distPtr->global2local(globalNgbr) ) );
-        
-        // mark nodes are matched
-        matched[localNode]= true;
-        matched[distPtr->global2local(globalNgbr) ]= true;
-        //PRINT(*comm << ", contracting nodes (local indices): "<< localNode <<" - "<< distPtr->global2local(globalNgbr) );
+			// at this point -globalNgbr- is the local node with the heaviest edge
+			// and should be matched with -localNode-.
+			// So, actually, globalNgbr is also local....
+			assert( distPtr->isLocal(globalNgbr));
+			IndexType localNgbr = distPtr->global2local(globalNgbr);
+
+			matching.push_back( std::pair<IndexType,IndexType> (localNode, localNgbr) );
+
+			// mark nodes are matched
+			matched[localNode]= true;
+			matched[localNgbr]= true;
+			PRINT(*comm << ", contracting nodes (local indices): "<< localNode <<" - "<< localNgbr );
+        }
     }
     
     assert(ia[ia.size()-1] >= totalNbrs);
@@ -2700,7 +2655,7 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
 
 template<typename IndexType, typename ValueType>
 template<typename T>
-DenseVector<T> ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum(DenseVector<T> input) {
+DenseVector<T> ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum(DenseVector<T> input, T globalOffset) {
 	scai::dmemo::CommunicatorPtr comm = input.getDistributionPtr()->getCommunicatorPtr();
 
 	const IndexType p = comm->getSize();
@@ -2723,10 +2678,12 @@ DenseVector<T> ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum(DenseVe
     comm->gather(allOffsets, 1, 0, localSum);
 
     //compute prefix sum of offsets.
-    std::vector<T> offsetPrefixSum(p+1);
+    std::vector<T> offsetPrefixSum(p+1, 0);
     if (comm->getRank() == 0) {
+    	//shift begin of output by one, since the first offset is 0
     	std::partial_sum(allOffsets, allOffsets+p, offsetPrefixSum.begin()+1);
     }
+
     //remove last value, since it would be the offset for the p+1th processor
     offsetPrefixSum.resize(p);
 
@@ -2738,13 +2695,215 @@ DenseVector<T> ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum(DenseVe
     DenseVector<T> result(input.getDistributionPtr());
     scai::hmemo::WriteOnlyAccess<T> wResult(result.getLocalValues(), localN);
     for (IndexType i = 0; i < localN; i++) {
-    	wResult[i] = localPrefixSum[i] + myOffset[0];
+    	wResult[i] = localPrefixSum[i] + myOffset[0] + globalOffset;
     }
 
     return result;
 }
 
+//-------------------------------------------------------------------------------
 
+template<typename IndexType, typename ValueType>
+void ParcoRepart<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations) {
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
+    
+    // get local data of the adjacency matrix
+    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+    scai::hmemo::ReadAccess<IndexType> ia( localStorage.getIA() );
+    scai::hmemo::ReadAccess<IndexType> ja( localStorage.getJA() );
+    scai::hmemo::ReadAccess<ValueType> values( localStorage.getValues() );
+
+    // localN= number of local nodes
+    IndexType localN= adjM.getLocalNumRows();
+    IndexType globalN = adjM.getNumColumns();
+    
+    // ia must have size localN+1
+    assert(ia.size()-1 == localN );
+     
+    //get a matching, the returned indices are from 0 to localN
+    std::vector<std::pair<IndexType,IndexType>> matching = ParcoRepart<IndexType, ValueType>::maxLocalMatching( adjM );
+    
+    std::vector<IndexType> localMatchingPartner(localN, -1);
+
+    // number of new local nodes
+    IndexType newLocalN = localN - matching.size();
+
+    //sort the matching according to its first element
+    std::sort(matching.begin(), matching.end());
+
+    //get new global indices by computing a prefix sum over the preserved nodes
+    DenseVector<IndexType> preserved(distPtr, 1);
+    {
+		scai::hmemo::WriteAccess<IndexType> localPreserved(preserved.getLocalValues());
+
+		for (IndexType i = 0; i < matching.size(); i++) {
+			assert(matching[i].first != matching[i].second);
+			assert(matching[i].first < localN);
+			assert(matching[i].second < localN);
+			assert(matching[i].first >= 0);
+			assert(matching[i].second >= 0);
+			localMatchingPartner[matching[i].first] = matching[i].second;
+			localMatchingPartner[matching[i].second] = matching[i].first;
+			if (matching[i].first < matching[i].second) {
+				localPreserved[matching[i].second] = 0;
+			} else if (matching[i].second < matching[i].first) {
+				localPreserved[matching[i].first] = 0;
+			}
+		}
+    }
+
+    //fill gaps in index list. This might be expensive.
+    scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(globalN, comm));
+    preserved.redistribute(blockDist);
+    fineToCoarse = computeGlobalPrefixSum(preserved, -1);
+    const IndexType newGlobalN = fineToCoarse.max().Scalar::getValue<IndexType>() + 1;
+    fineToCoarse.redistribute(distPtr);
+
+    //set new indices for contracted nodes
+    {
+		scai::hmemo::WriteAccess<IndexType> wFineToCoarse(fineToCoarse.getLocalValues());
+		assert(wFineToCoarse.size() == localN);
+		IndexType nonMatched = 0;
+
+		for (IndexType i = 0; i < localN; i++) {
+			if (localMatchingPartner[i] < 0) {
+				localMatchingPartner[i] = i;
+				nonMatched++;
+			}
+
+			if (localMatchingPartner[i] < i) {
+				wFineToCoarse[i] = wFineToCoarse[localMatchingPartner[i]];
+			}
+		}
+
+	    for (IndexType i = 0; i < localN; i++) {
+	    	//assert(distPtr->isLocal(wFineToCoarse[i]));
+	    	//assert(distPtr->global2local(wFineToCoarse[i]) < newLocalN);
+	    	assert(localMatchingPartner[i] < localN);
+	    }
+	    assert(nonMatched == localN - matching.size()*2);
+    }
+    assert(fineToCoarse.max().Scalar::getValue<IndexType>() + 1 == newGlobalN);
+    assert(newGlobalN <= globalN);
+    assert(newGlobalN == comm->sum(newLocalN));
+
+    //build halo of new global indices
+    Halo halo = buildNeighborHalo(adjM);
+    scai::utilskernel::LArray<IndexType> haloData;
+    comm->updateHalo(haloData, fineToCoarse.getLocalValues(), halo);
+    
+    scai::hmemo::ReadAccess<IndexType> localFineToCoarse(fineToCoarse.getLocalValues());
+
+    //create new coarsened CSR matrix
+    scai::hmemo::HArray<IndexType> newIA;
+    scai::hmemo::HArray<IndexType> newJA;
+    scai::hmemo::HArray<ValueType> newValues;
+    
+    // this is larger, need to resize afterwards
+    IndexType nnzValues = values.size() - matching.size();
+
+    {
+        SCAI_REGION("coarsening.getCSRMatrix");
+        // this is larger, need to resize afterwards
+        scai::hmemo::WriteOnlyAccess<IndexType> newIAWrite( newIA, newLocalN +1 );
+        scai::hmemo::WriteOnlyAccess<IndexType> newJAWrite( newJA, nnzValues);
+        scai::hmemo::WriteOnlyAccess<ValueType> newValuesWrite( newValues, nnzValues);
+        newIAWrite[0] = 0;
+        IndexType iaIndex = 1;
+        IndexType jaIndex = 0;
+        
+        //for all rows before the coarsening
+        for(IndexType i=0; i<localN; i++){
+            IndexType matchingPartner = localMatchingPartner[i];
+            //duplicate code is evil. Maybe use a lambda instead?
+            if (matchingPartner >= i) {
+            	std::map<IndexType, ValueType> outgoingEdges;
+
+            	//add edges for this node
+            	for (IndexType j = ia[i]; j < ia[i+1]; j++) {
+            		IndexType oldNeighbor = ja[j];
+            		IndexType newGlobalNeighbor;
+            		IndexType localID = distPtr->global2local(oldNeighbor);
+            		if (localID == matchingPartner) {
+            			continue;//no self loops!
+            		}
+            		if (localID != nIndex) {
+            			newGlobalNeighbor = localFineToCoarse[localID];
+            		} else {
+            			IndexType haloID = halo.global2halo(oldNeighbor);
+            			assert(haloID != nIndex);
+            			newGlobalNeighbor = haloData[haloID];
+            		}
+            		//make sure entry exists
+            		if (outgoingEdges.count(newGlobalNeighbor) == 0) {
+            			outgoingEdges[newGlobalNeighbor] = 0;
+            		}
+            		outgoingEdges[newGlobalNeighbor] += values[j];
+            	}
+
+            	//add edges for matching partner
+				if (matchingPartner > i) {
+					for (IndexType j = ia[matchingPartner]; j < ia[matchingPartner+1]; j++) {
+						IndexType oldNeighbor = ja[j];
+						IndexType localID = distPtr->global2local(oldNeighbor);
+						IndexType newGlobalNeighbor;
+						if (localID == i) {
+							continue;//no self loops!
+						}
+						if (localID != nIndex) {
+							newGlobalNeighbor = localFineToCoarse[localID];
+						} else {
+							IndexType haloID = halo.global2halo(oldNeighbor);
+							assert(haloID != nIndex);
+							newGlobalNeighbor = haloData[haloID];
+						}
+						//make sure entry exists
+						if (outgoingEdges.count(newGlobalNeighbor) == 0) {
+							outgoingEdges[newGlobalNeighbor] = 0;
+						}
+						outgoingEdges[newGlobalNeighbor] += values[j];
+					}
+				}
+
+				//write new matrix entries. Since entries in std::map are sorted by their keys, we can just iterate over them
+				for (std::pair<IndexType, ValueType> entry : outgoingEdges) {
+					assert(jaIndex < newJAWrite.size());
+					newJAWrite[jaIndex] = entry.first;
+					newValuesWrite[jaIndex] = entry.second;
+					jaIndex++;
+				}
+				assert(iaIndex < newIAWrite.size());
+				newIAWrite[iaIndex] = jaIndex;
+				iaIndex++;
+            }
+        }
+        
+        newJA.resize(jaIndex);
+        newValues.resize(jaIndex);
+        nnzValues = jaIndex;
+    }
+    
+    //create distribution object for coarse graph
+    scai::utilskernel::LArray<IndexType> myGlobalIndices(fineToCoarse.getLocalValues());
+    scai::hmemo::WriteAccess<IndexType> wIndices(myGlobalIndices);
+    assert(wIndices.size() == localN);
+    std::sort(wIndices.get(), wIndices.get() + localN);
+    auto newEnd = std::unique(wIndices.get(), wIndices.get() + localN);
+    wIndices.resize(std::distance(wIndices.get(), newEnd));
+    assert(wIndices.size() == newLocalN);
+    wIndices.release();
+
+
+	const scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(newGlobalN, myGlobalIndices, comm));
+	const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(newGlobalN));
+
+    CSRStorage<ValueType> storage;
+    storage.setCSRDataSwap(newLocalN, newGlobalN, nnzValues, newIA, newJA, newValues, scai::hmemo::ContextPtr());
+    coarseGraph = CSRSparseMatrix<ValueType>(newDist, noDist);
+    coarseGraph.swapLocalStorage(storage);
+ }
 
 
 //---------------------------------------------------------------------------------------
@@ -2784,8 +2943,10 @@ template std::vector< std::vector<int>>  ParcoRepart<int, double>::getGraphEdgeC
 
 template std::vector<DenseVector<int>> ParcoRepart<int, double>::getCommunicationPairs_local( CSRSparseMatrix<double> &adjM);
 
-template std::vector<std::pair<int,int>> ParcoRepart<int, double>::maxLocalMatching(scai::lama::CSRSparseMatrix<double>& graph);
+template std::vector<std::pair<int,int>> ParcoRepart<int, double>::maxLocalMatching(const scai::lama::CSRSparseMatrix<double>& graph);
 
-template DenseVector<int> ParcoRepart<int, double>::computeGlobalPrefixSum(DenseVector<int> input);
+template void ParcoRepart<int, double>::coarsen(const CSRSparseMatrix<double>& inputGraph, CSRSparseMatrix<double>& coarseGraph, DenseVector<int>& fineToCoarse, int iterations);
+
+template DenseVector<int> ParcoRepart<int, double>::computeGlobalPrefixSum(DenseVector<int> input, int offset);
 
 }

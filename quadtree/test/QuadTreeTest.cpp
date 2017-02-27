@@ -8,6 +8,7 @@
 #include <stack>
 #include <cmath>
 #include <algorithm>
+#include <random>
 
 #include <scai/lama/matrix/all.hpp>
 
@@ -172,6 +173,7 @@ TEST_F(QuadTreeTest, testGetGraphFromForestByHand_2D){
     graph.isConsistent();
     
     //print graph
+    /*
     for(int i=0; i<graph.getNumRows(); i++){
         std::cout << i <<": ";
         for(int j=0; j<graph.getNumColumns(); j++){
@@ -179,6 +181,7 @@ TEST_F(QuadTreeTest, testGetGraphFromForestByHand_2D){
         }
         std::cout<< std::endl;
     }
+    */
     PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() );
 }
 
@@ -204,7 +207,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
 		quad.addContent(i, pos);
 	}
 	
-	PRINT("Num of leaves= N = "<< quad.countLeaves() );
+	//PRINT("Num of leaves= N = "<< quad.countLeaves() );
 	index N= quad.countLeaves();
         
         // index the tree
@@ -250,7 +253,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
         std::cout<< "\t Num of nodes"<< std::endl;
         for(int i=0; i<degreeCount.size(); i++){
             if(  degreeCount[i] !=0 ){
-                std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
+                //PRINT("degree " << i << ":   "<< degreeCount[i]);
                 numEdges += i*degreeCount[i];
                 maxDegree = i;
             }
@@ -334,7 +337,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
             
             IndexType numEdges = 0;
             IndexType maxDegree = 0;
-            std::cout<< "\t Num of nodes"<< std::endl;
+            //std::cout<< "\t Num of nodes"<< std::endl;
             for(int i=0; i<degreeCount.size(); i++){
                 if(  degreeCount[i] !=0 ){
                     //std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
@@ -346,7 +349,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
             
             ValueType averageDegree = ValueType( numEdges)/N;
         
-            PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
+            //PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
         }
         
         // communicate/distribute graph
@@ -459,11 +462,13 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_2D) {
         if( nodeDegree > upBound){
             throw std::logic_error( "Node with large degree, degree= "+  std::to_string(nodeDegree) + " > current upper bound= " + std::to_string(upBound) );
         }
+        /*
         PRINT("node "<< i << " has edges with nodes (from "<< ia[i]<< " to "<< ia[i+1]<<"): ");
         for(int ii=ia[i]; ii<ia[i+1]; ii++){
             std::cout<< ja[ii] << ", ";
         }
         std::cout<< std::endl;
+        */
         ++degreeCount[nodeDegree];
     }
     
@@ -483,10 +488,11 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_2D) {
         
     PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);   
 
-	
-    
 }
-    
+
+
+//
+
 TEST_F(QuadTreeTest, testCartesianEuclidQuery) {
 	count n = 10000;
 
@@ -545,7 +551,7 @@ TEST_F(QuadTreeTest, testCartesianEuclidQuery) {
 }
 
 
-//
+
 
 TEST_F(QuadTreeTest, testPolarEuclidQuery) {
 	/**
