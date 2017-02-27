@@ -183,14 +183,14 @@ namespace ITI {
 			 */
 			static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM);
 
-                        
-                        static void coarsening(scai::lama::CSRSparseMatrix<ValueType>& graph);
 
-			static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& graph);
+			static void coarsen(const CSRSparseMatrix<ValueType>& inputGraph, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations = 1);
+
+			static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& graph);
 
 
 			template<typename T>
-			static DenseVector<T> computeGlobalPrefixSum(DenseVector<T> input);
+			static DenseVector<T> computeGlobalPrefixSum(DenseVector<T> input, T offset = 0);
 
 		private:
 			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,

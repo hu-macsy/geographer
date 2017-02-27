@@ -2579,7 +2579,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalMatching(scai::lama::CSRSparseMatrix<ValueType>& adjM){
+std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& adjM){
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -2591,7 +2591,7 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
     scai::hmemo::ReadAccess<ValueType> values( localStorage.getValues() );
 
     // localN= number of local nodes
-    IndexType localN= adjM.getLocalNumRows();
+    const IndexType localN= adjM.getLocalNumRows();
     
     // ia must have size localN+1
     assert(ia.size()-1 == localN );
@@ -2608,85 +2608,40 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
     std::vector<bool> matched(localN, false);
     
     // localNode is the local index of a node
-    for(IndexType localNode=0; localNode<ia.size()-1; localNode++){
+    for(IndexType localNode=0; localNode<localN; localNode++){
         // if the node is already matched go to the next one;
         if(matched[localNode]){
             continue;
         }
-        // get all the neighbours of the node
-        IndexType numNgbrs = ia[localNode+1]-ia[localNode];
-        totalNbrs += numNgbrs;
         
-        //TODO: change to just scan values part once and keep the ngbrIndex with 
-        // heaviest edge and local
-        std::vector<IndexType> ngbrs(numNgbrs);
+        IndexType bestTarget = -1;
+        const IndexType endCols = ia[localNode+1];
+        for (IndexType j = ia[localNode]; j < endCols; j++) {
+        	IndexType localNeighbor = distPtr->global2local(ja[j]);
+        	if (localNeighbor != nIndex && localNeighbor != localNode && !matched[localNeighbor]) {
+        		//neighbor is local and unmatched, possible partner
+        		if (bestTarget < 0 || values[j] > values[bestTarget]) {
+        			bestTarget = j;
+        		}
+        	}
+        }
 
-        // ngbrs contains the indices of all neighbours of localNode
-        // these are global indices: 0<ngbr[i]<globalN
-        for(IndexType j=0; j<numNgbrs; j++){
-            ngbrs[j] = ja[ ia[localNode]+ j];         
-        }
-        
-        //thisNodeEdgeWeights contains the weigth of each edge
-        std::vector<IndexType> thisNodeEdgeWeights(numNgbrs);
-        for(IndexType j=0; j<numNgbrs; j++){
-            thisNodeEdgeWeights[j] = values[ ia[localNode]+ j];
-        }
-        
-        // flag for the case all neighbours are non-local
-        bool breakFlag=false;
-        
-        // the global index of the neighbor with the highest edge
-        IndexType globalNgbr;
-        do{
-            // 0< relativeIndex < numNgbrs
-            IndexType relativeIndex = std::distance(thisNodeEdgeWeights.begin() , std::max_element(thisNodeEdgeWeights.begin(), thisNodeEdgeWeights.end()) );
-            assert( relativeIndex < numNgbrs);
-            globalNgbr = ja[ ia[localNode]+relativeIndex];
-            
-            if( !distPtr->isLocal(globalNgbr) ){
-                // WARNING: DO NOT erase, it meses up the indices, just set weight to -1
-                // if not local, make edge lighter and try another edge
-                thisNodeEdgeWeights[relativeIndex] = -1;
-            }else{
-                // if we found a local edge => globalNgbr is also present locally
-                // TODO: check all edges of the neighbour to find the maximum edge there too
-                break;
-            }
-            
-            // if all neighbours are non-local then every entry in thisNodeEdgeWeights is -1
-            // so its sum must be -numNgbrs
-            int totalEdgeWeight=0;
-            for(auto& w:thisNodeEdgeWeights){
-                totalEdgeWeight += w;
-            }
-            if(totalEdgeWeight == -numNgbrs){
-                PRINT("For node "<< localNode << " all neighbours are non-local.");
-                breakFlag=true;
-                break;
-                // continue to the next node since this has no local neighbours.
-            }
-        
-        }while(ngbrs.size()>0);
-        
-        if(breakFlag){
-            break;
-        }
-        
-        // at this point -globalNgbr- is the local node with the heaviest edge
-        // and should be matched with -localNode-.
-        // So, actually, globalNgbr is also local....
-        assert( distPtr->isLocal(globalNgbr));
-        
-        // now, we need the global index of -localNode-
-        // WARNING: care whether an index is local or global
+        if (bestTarget > 0) {
+        	IndexType globalNgbr = ja[bestTarget];
 
-        matching.push_back( std::pair<IndexType,IndexType> (localNode, distPtr->global2local(globalNgbr) ) );
-        
-        // mark nodes are matched
-        matched[localNode]= true;
-        matched[distPtr->global2local(globalNgbr) ]= true;
-        PRINT(*comm << ", contracting nodes (local indices): "<< localNode <<" - "<< distPtr->global2local(globalNgbr) );
+			// at this point -globalNgbr- is the local node with the heaviest edge
+			// and should be matched with -localNode-.
+			// So, actually, globalNgbr is also local....
+			assert( distPtr->isLocal(globalNgbr));
+			IndexType localNgbr = distPtr->global2local(globalNgbr);
+
+			matching.push_back( std::pair<IndexType,IndexType> (localNode, localNgbr) );
+
+			// mark nodes are matched
+			matched[localNode]= true;
+			matched[localNgbr]= true;
+			PRINT(*comm << ", contracting nodes (local indices): "<< localNode <<" - "<< localNgbr );
+        }
     }
     
     assert(ia[ia.size()-1] >= totalNbrs);
@@ -2698,7 +2653,7 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
 
 template<typename IndexType, typename ValueType>
 template<typename T>
-DenseVector<T> ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum(DenseVector<T> input) {
+DenseVector<T> ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum(DenseVector<T> input, T globalOffset) {
 	scai::dmemo::CommunicatorPtr comm = input.getDistributionPtr()->getCommunicatorPtr();
 
 	const IndexType p = comm->getSize();
@@ -2738,7 +2693,7 @@ DenseVector<T> ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum(DenseVe
     DenseVector<T> result(input.getDistributionPtr());
     scai::hmemo::WriteOnlyAccess<T> wResult(result.getLocalValues(), localN);
     for (IndexType i = 0; i < localN; i++) {
-    	wResult[i] = localPrefixSum[i] + myOffset[0];
+    	wResult[i] = localPrefixSum[i] + myOffset[0] + globalOffset;
     }
 
     return result;
@@ -2746,7 +2701,7 @@ DenseVector<T> ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum(DenseVe
 
 
 template<typename IndexType, typename ValueType>
- void ParcoRepart<IndexType, ValueType>::coarsening(scai::lama::CSRSparseMatrix<ValueType>& adjM){
+void ParcoRepart<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -2762,54 +2717,82 @@ template<typename IndexType, typename ValueType>
     IndexType globalN = adjM.getNumColumns();
     
     // ia must have size localN+1
-    //PRINT(ia.size()-1 << ", localN= "<< localN);
     assert(ia.size()-1 == localN );
      
     //get a matching, the returned indices are from 0 to localN
     std::vector<std::pair<IndexType,IndexType>> matching = ParcoRepart<IndexType, ValueType>::maxLocalMatching( adjM );
     
-    // number of new local nodes 
-    IndexType newLocalN = localN- matching.size();
-    
-    //sort the matching accordign to its first element
-    std::sort(matching.begin(), matching.end(), 
-              [](const std::pair<IndexType,IndexType>& left, const std::pair<IndexType,IndexType>& right){
-                return left.first< right.first;
-    });
-    
-/*
-    // the local mapping from the unmatched/original indices to the matches ones
-    // contains local indices : 0< localMapping[i]< newLocalN
-    std::vector<IndexType> localMapping(localN,-1);
-    //create the new mapping in advance
-    IndexType currIndex= 0;
-    IndexType matchIndex= 0;
-    for(IndexType i=0; i<localN; i++){
-        // if this index already has benn mapped
-        if( localMapping[i]!=-1 ){
-            continue;
-        }
-        std::pair<IndexType,IndexType> currEdge= matching[matchIndex];
-        // if this node is not in the matching
-        if(i<currEdge.first){
-            SCAI_ASSERT( currIndex < newLocalN, "wrong index in maping");
-            localMapping[i]= currIndex;
-            ++currIndex;
-        }else{ // this node is matched
-            // both old node are mapped to the same new node
-            SCAI_ASSERT( currIndex < newLocalN, "wrong index in maping");
-            localMapping[currEdge.first]= currIndex;
-            localMapping[currEdge.second]= currIndex;
-            ++currIndex;
-            ++matchIndex;
-        }
+    std::vector<IndexType> localMatchingPartner(localN, -1);
+
+    // number of new local nodes
+    IndexType newLocalN = localN - matching.size();
+
+    //sort the matching according to its first element
+    std::sort(matching.begin(), matching.end());
+
+    //get new global indices by computing a prefix sum over the preserved nodes
+    DenseVector<IndexType> preserved(distPtr, 1);
+    {
+		scai::hmemo::WriteAccess<IndexType> localPreserved(preserved.getLocalValues());
+
+		for (IndexType i = 0; i < matching.size(); i++) {
+			assert(matching[i].first != matching[i].second);
+			assert(matching[i].first < localN);
+			assert(matching[i].second < localN);
+			assert(matching[i].first >= 0);
+			assert(matching[i].second >= 0);
+			localMatchingPartner[matching[i].first] = matching[i].second;
+			localMatchingPartner[matching[i].second] = matching[i].first;
+			if (matching[i].first < matching[i].second) {
+				localPreserved[matching[i].second] = 0;
+			} else if (matching[i].second < matching[i].first) {
+				localPreserved[matching[i].first] = 0;
+			}
+		}
     }
-*/
-/*  
-for(int i=0; i<localMapping.size(); i++){
-    PRINT(*comm << "__ "<< i << "-"<< localMapping[i]);
-}    
-*/
+
+    //fill gaps in index list. This might be expensive.
+	scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(globalN, comm));
+    preserved.redistribute(blockDist);
+    fineToCoarse = computeGlobalPrefixSum(preserved, -1);
+    const IndexType newGlobalN = fineToCoarse.max().Scalar::getValue<IndexType>() + 1;
+    fineToCoarse.redistribute(distPtr);
+
+    //set new indices for contracted nodes
+    {
+		scai::hmemo::WriteAccess<IndexType> wFineToCoarse(fineToCoarse.getLocalValues());
+		assert(wFineToCoarse.size() == localN);
+		IndexType nonMatched = 0;
+
+		for (IndexType i = 0; i < localN; i++) {
+			if (localMatchingPartner[i] < 0) {
+				localMatchingPartner[i] = i;
+				nonMatched++;
+			}
+
+			if (localMatchingPartner[i] < i) {
+				wFineToCoarse[i] = wFineToCoarse[localMatchingPartner[i]];
+			}
+		}
+
+	    for (IndexType i = 0; i < localN; i++) {
+	    	//assert(distPtr->isLocal(wFineToCoarse[i]));
+	    	//assert(distPtr->global2local(wFineToCoarse[i]) < newLocalN);
+	    	assert(localMatchingPartner[i] < localN);
+	    }
+	    assert(nonMatched == localN - matching.size()*2);
+    }
+    assert(fineToCoarse.max().Scalar::getValue<IndexType>() + 1 == newGlobalN);
+    assert(newGlobalN <= globalN);
+    assert(newGlobalN == comm->sum(newLocalN));
+
+    //build halo of new global indices
+    Halo halo = buildNeighborHalo(adjM);
+    scai::utilskernel::LArray<IndexType> haloData;
+    comm->updateHalo(haloData, fineToCoarse.getLocalValues(), halo);
+    
+    scai::hmemo::ReadAccess<IndexType> localFineToCoarse(fineToCoarse.getLocalValues());
+
     //create new coarsened CSR matrix
     scai::hmemo::HArray<IndexType> newIA;
     scai::hmemo::HArray<IndexType> newJA;
@@ -2817,7 +2800,7 @@ for(int i=0; i<localMapping.size(); i++){
     
     // this is larger, need to resize afterwards
     IndexType nnzValues = values.size() - matching.size();
-    
+
     {
         SCAI_REGION("coarsening.getCSRMatrix");
         // this is larger, need to resize afterwards
@@ -2825,136 +2808,98 @@ for(int i=0; i<localMapping.size(); i++){
         scai::hmemo::WriteOnlyAccess<IndexType> newJAWrite( newJA, nnzValues);
         scai::hmemo::WriteOnlyAccess<ValueType> newValuesWrite( newValues, nnzValues);
         newIAWrite[0] = 0;
-        
-        IndexType nnzCounter = 0;           // count non-zero elements
-        IndexType matchIndex = 0;           // current edge in the matching
-        IndexType newRowCounter = 0;        // count new number of rows
-    
-        // used for the second edge of each pair to check if it has been matched
-        // and thus, we do not need  to do anything
-        std::vector<bool> isMatched(localN,false);
+        IndexType iaIndex = 1;
+        IndexType jaIndex = 0;
         
         //for all rows before the coarsening
-        for(IndexType i=0; i<ia.size()-1; i++){
-            if( isMatched[i] ){     // must skip this node cause it will be contracted
-                continue;
-            }
+        for(IndexType i=0; i<localN; i++){
+            IndexType matchingPartner = localMatchingPartner[i];
+            //duplicate code is evil. Maybe use a lambda instead?
+            if (matchingPartner >= i) {
+            	std::map<IndexType, ValueType> outgoingEdges;
 
-            std::pair<IndexType,IndexType> currEdge= matching[matchIndex];
-            // if this node is not in the matching just copy its neigbours
-            // NOT DOING THAT: but with the new value using the localMapping
-            // keep the old indices and make a pass afterwards to fix them
-            if(i<currEdge.first){
-                IndexType numNgbrs = ia[i+1]-ia[i];
-                for(IndexType j=0; j<numNgbrs; j++){
-                    // the old neigbours [ NO: mapped in their new indices after coarsening]
-                    IndexType ngbrInd= ia[i]+j;
-                    //newJAWrite[nnzCounter] = localMapping[ ja[ngbrInd] ];
-                    newJAWrite[nnzCounter] = ja[ngbrInd];
-                    newValuesWrite[nnzCounter]= values[ngbrInd];
-                    ++nnzCounter;
-                }                
-                newIAWrite[newRowCounter+1]= newIAWrite[newRowCounter] + numNgbrs;
-                ++newRowCounter;
-                SCAI_ASSERT( newRowCounter < newLocalN +1 ,  __FILE__<<", "<< __LINE__<< ": new number of rows more than  expected." )
-            }else{  // this edge -i- is matched, for the first time
-                    // nodes to be contracted  are currEdge.first and currEdge.second
-                    // must add rows currEdge.first and currEdge.second
-                SCAI_ASSERT(currEdge.first+1< ia.size(), currEdge.first+1 <<" < "<< ia.size() );
-                SCAI_ASSERT(currEdge.second+1< ia.size(), currEdge.second+1 <<" < "<< ia.size() );
-                IndexType firstNumNgbrs = ia[currEdge.first+ 1] - ia[currEdge.first];
-                IndexType secondNumNgbrs = ia[currEdge.second+ 1] - ia[currEdge.second];
-                IndexType firstStartNgbrs = ia[currEdge.first];
-                IndexType secondStartNgbrs = ia[currEdge.second];
-                IndexType firstRelatIndex=0;    // 0< firstRelatIndex< firstNumNgbrs
-                IndexType secondRelatIndex=0;   // 0< secondRelatIndex< secondNumNgbrs
-                IndexType numCommonNeighbours=0;
-//PRINT(*comm << ": first: "<< currEdge.first << ", globalInd:="<< distPtr->local2global(currEdge.first) << " , numNgrs="<< firstNumNgbrs<< " || second: " << currEdge.second <<", globalInd:="<< distPtr->local2global(currEdge.second) << " , numNgrs="<< secondNumNgbrs);  
-                while(firstRelatIndex<firstNumNgbrs or secondRelatIndex<secondNumNgbrs){
-                    // the indices for the neigbour of each edge
-                    IndexType ngbrOfFirst , ngbrOfSecond;
-                    
-                    // if the neighbours of first are done, give a high value
-                    if(firstRelatIndex >= firstNumNgbrs){
-                        ngbrOfFirst = globalN+1;
-                    }else{
-                        ngbrOfFirst = ja[ firstStartNgbrs + firstRelatIndex ];
-                    }
-                    // if the neighbours of second are done, give a high value
-                    if(secondRelatIndex >= secondNumNgbrs){
-                        ngbrOfSecond = globalN+1;
-                    }else{
-                        ngbrOfSecond = ja[secondStartNgbrs + secondRelatIndex];   //global index
-                    }
-  //PRINT(*comm << ": firstNgbr= "<< ngbrOfFirst << " , secondNgbr= "<< ngbrOfSecond << " , nnzCounter= "<< nnzCounter);                  
-                    // do not copy each other as neighbours / skip the matched edge
-                    // ngbrOf... is the global index, we need local2global because the matching returns local indices
-                    
-                    if(ngbrOfFirst == distPtr->local2global(currEdge.second) ){       // without localMapping
-                    //if(ngbrOfFirst == currEdge.second ){                                // with localMapping
-                        ++firstRelatIndex;  // do nothing and go to the next neighbour
-                        continue;
-                    }
-                    if(ngbrOfSecond== distPtr->local2global(currEdge.first) ){        // without localMapping
-                    //if(ngbrOfSecond== currEdge.first ){                                 // with localMapping
-                        ++secondRelatIndex; // same for the other node
-                        continue;   
-                    }
-                    
-                    SCAI_ASSERT( firstRelatIndex <= firstNumNgbrs, *comm << " : "<< firstRelatIndex<< " <= " << firstNumNgbrs <<" >> first: "<< currEdge.first <<" - second: "<< currEdge.second);
-                    SCAI_ASSERT( secondRelatIndex <= secondNumNgbrs, *comm << " : "<< secondRelatIndex << " <=, "<< secondNumNgbrs <<" >> first: "<< currEdge.first <<" - second: "<< currEdge.second);
-                    // write neighbours in increasing order
-                    if(ngbrOfFirst < ngbrOfSecond){
-                        newJAWrite[nnzCounter] = ngbrOfFirst;
-                        newValuesWrite[nnzCounter] = values[ firstStartNgbrs + firstRelatIndex ];
-                        ++nnzCounter;
-                        ++firstRelatIndex;
-                    }else if(ngbrOfFirst > ngbrOfSecond){
-                        newJAWrite[nnzCounter] = ngbrOfSecond;
-                        newValuesWrite[nnzCounter]= values[ secondStartNgbrs + secondRelatIndex ];
-                        ++nnzCounter;
-                        ++secondRelatIndex;
-                    }else { //ngbrOfFirst == ngbrOfSecond , they share a common neighbour
-                        newJAWrite[nnzCounter] = ngbrOfFirst;
-                        // now add the values of the edge
-                        newValuesWrite[nnzCounter] = values[ firstStartNgbrs + firstRelatIndex ] + values[ secondStartNgbrs + secondRelatIndex ];
-                        ++nnzCounter;
-                        ++firstRelatIndex;
-                        ++secondRelatIndex;
-                        ++numCommonNeighbours;
-                    }
-                }
-                SCAI_ASSERT_EQUAL_ERROR( firstRelatIndex , firstNumNgbrs);
-                SCAI_ASSERT_EQUAL_ERROR( secondRelatIndex , secondNumNgbrs);
-                
-                // the new node's number of neighbours (-2 for the contracted edge)
-                newIAWrite[newRowCounter+1]= newIAWrite[newRowCounter] + firstNumNgbrs + secondNumNgbrs -2 -numCommonNeighbours;
-                ++newRowCounter;
-                //get the next edge of the matching
-                ++matchIndex;
-                
-                SCAI_ASSERT( newRowCounter <= newLocalN +1 , *comm << " : "<<newRowCounter << " < " << newLocalN +1 << ": new number of rows not as expected." )
-                //mark the other node as matched
-                assert(currEdge.second < isMatched.size() );
-                isMatched[currEdge.second] = true;
+            	//add edges for this node
+            	for (IndexType j = ia[i]; j < ia[i+1]; j++) {
+            		IndexType oldNeighbor = ja[j];
+            		IndexType newGlobalNeighbor;
+            		IndexType localID = distPtr->global2local(oldNeighbor);
+            		if (localID == matchingPartner) {
+            			continue;//no self loops!
+            		}
+            		if (localID != nIndex) {
+            			newGlobalNeighbor = localFineToCoarse[localID];
+            		} else {
+            			IndexType haloID = halo.global2halo(oldNeighbor);
+            			assert(haloID != nIndex);
+            			newGlobalNeighbor = haloData[haloID];
+            		}
+            		//make sure entry exists
+            		if (outgoingEdges.count(newGlobalNeighbor) == 0) {
+            			outgoingEdges[newGlobalNeighbor] = 0;
+            		}
+            		outgoingEdges[newGlobalNeighbor] += values[j];
+            	}
+
+            	//add edges for matching partner
+				if (matchingPartner > i) {
+					for (IndexType j = ia[matchingPartner]; j < ia[matchingPartner+1]; j++) {
+						IndexType oldNeighbor = ja[j];
+						IndexType localID = distPtr->global2local(oldNeighbor);
+						IndexType newGlobalNeighbor;
+						if (localID == i) {
+							continue;//no self loops!
+						}
+						if (localID != nIndex) {
+							newGlobalNeighbor = localFineToCoarse[localID];
+						} else {
+							IndexType haloID = halo.global2halo(oldNeighbor);
+							assert(haloID != nIndex);
+							newGlobalNeighbor = haloData[haloID];
+						}
+						//make sure entry exists
+						if (outgoingEdges.count(newGlobalNeighbor) == 0) {
+							outgoingEdges[newGlobalNeighbor] = 0;
+						}
+						outgoingEdges[newGlobalNeighbor] += values[j];
+					}
+				}
+
+				//write new matrix entries. Since entries in std::map are sorted by their keys, we can just iterate over them
+				for (std::pair<IndexType, ValueType> entry : outgoingEdges) {
+					assert(jaIndex < newJAWrite.size());
+					newJAWrite[jaIndex] = entry.first;
+					newValuesWrite[jaIndex] = entry.second;
+					jaIndex++;
+				}
+				assert(iaIndex < newIAWrite.size());
+				newIAWrite[iaIndex] = jaIndex;
+				iaIndex++;
             }
-            //PRINT(*comm<< "<> "<< i <<": matchIndex= "<< matchIndex<< ", newRowCounter= "<< newRowCounter << ", nnzCounter= " << nnzCounter );   
-        } //for(IndexType i=0; i<ia.size(); i++)
-           
-PRINT("matchIndex= "<< matchIndex<< ", newRowCounter= "<< newRowCounter << ", nnzCounter= " << nnzCounter );        
+        }
         
-        SCAI_ASSERT_EQUAL_ERROR(newRowCounter, newLocalN);
-        SCAI_ASSERT_EQUAL_ERROR(matchIndex, matching.size());
-        SCAI_ASSERT( nnzCounter <= newJA.size(), *comm <<" : "<< nnzCounter <<" < "<< newJA.size() << ": new number of non-zero elements not as expected." );
-        
-        newJA.resize(nnzCounter);
-        newValues.resize(nnzCounter);
-    }//read/write block
+        newJA.resize(jaIndex);
+        newValues.resize(jaIndex);
+        nnzValues = jaIndex;
+    }
     
-    // the coarsening is done, need to evaluate new global indices according to the coarsening
-    // at this point edges are contracted but the new nodes still have edges to previous/old indices/nodes
-    
-    
+    //create distribution object for coarse graph
+    scai::utilskernel::LArray<IndexType> myGlobalIndices(fineToCoarse.getLocalValues());
+    scai::hmemo::WriteAccess<IndexType> wIndices(myGlobalIndices);
+    assert(wIndices.size() == localN);
+    std::sort(wIndices.get(), wIndices.get() + localN);
+    auto newEnd = std::unique(wIndices.get(), wIndices.get() + localN);
+    wIndices.resize(std::distance(wIndices.get(), newEnd));
+    assert(wIndices.size() == newLocalN);
+    wIndices.release();
+
+
+	const scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(newGlobalN, myGlobalIndices, comm));
+	const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(newGlobalN));
+
+    CSRStorage<ValueType> storage;
+    storage.setCSRDataSwap(newLocalN, newGlobalN, nnzValues, newIA, newJA, newValues, scai::hmemo::ContextPtr());
+    coarseGraph = CSRSparseMatrix<ValueType>(newDist, noDist);
+    coarseGraph.swapLocalStorage(storage);
  }
 
 
@@ -2995,10 +2940,10 @@ template std::vector< std::vector<int>>  ParcoRepart<int, double>::getGraphEdgeC
 
 template std::vector<DenseVector<int>> ParcoRepart<int, double>::getCommunicationPairs_local( CSRSparseMatrix<double> &adjM);
 
-template std::vector<std::pair<int,int>> ParcoRepart<int, double>::maxLocalMatching(scai::lama::CSRSparseMatrix<double>& graph);
+template std::vector<std::pair<int,int>> ParcoRepart<int, double>::maxLocalMatching(const scai::lama::CSRSparseMatrix<double>& graph);
 
-template void ParcoRepart<int, double>::coarsening(scai::lama::CSRSparseMatrix<double>& graph);
+template void ParcoRepart<int, double>::coarsen(const CSRSparseMatrix<double>& inputGraph, CSRSparseMatrix<double>& coarseGraph, DenseVector<int>& fineToCoarse, int iterations);
 
-template DenseVector<int> ParcoRepart<int, double>::computeGlobalPrefixSum(DenseVector<int> input);
+template DenseVector<int> ParcoRepart<int, double>::computeGlobalPrefixSum(DenseVector<int> input, int offset);
 
 }

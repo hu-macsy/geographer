@@ -1427,8 +1427,12 @@ TEST_F (ParcoRepartTest, testCoarseningGrid_2D) {
     //assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
 
     // coarsen the graph
-    ParcoRepart<IndexType, ValueType>::coarsening(graph);
+    CSRSparseMatrix<ValueType> coarseGraph;
+    DenseVector<IndexType> fineToCoarseMap;
+    ParcoRepart<IndexType, ValueType>::coarsen(graph, coarseGraph, fineToCoarseMap);
     
+    EXPECT_TRUE(coarseGraph.isConsistent());
+    EXPECT_TRUE(coarseGraph.checkSymmetry());
 }
 
 //------------------------------------------------------------------------------
