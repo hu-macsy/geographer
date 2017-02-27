@@ -210,6 +210,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		ValueType gain = settings.minGainForNextRound;
 		ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
 
+		/**
 		scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getPEGraph(input);
 
 		std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
@@ -220,8 +221,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		if (settings.useGeometricTieBreaking) {
 			distances = distancesFromBlockCenter(coordinates);
 		}
-
-		DenseVector<IndexType> nonWeights = DenseVector<IndexType>(0,1);
+*/
+		DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(input.getRowDistributionPtr(), 1);
 
 		if (comm->getRank() == 0) {
 			afterSFC = std::chrono::steady_clock::now();
@@ -229,6 +230,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			std::cout << "With SFC (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
 		}
 
+		multiLevelStep(input, result, uniformWeights, coordinates, settings);
+		/*
 		while (gain >= settings.minGainForNextRound) {
 			if (inputDist->isReplicated()) {
 				gain = replicatedMultiWayFM(input, result, k, epsilon);
@@ -263,6 +266,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 			numRefinementRounds++;
 		}
+		*/
 	} else {
 		std::cout << "Local refinement only implemented sequentially and for one block per process. Called with " << comm->getSize() << " processes and " << k << " blocks." << std::endl;
 	}
@@ -1199,12 +1203,16 @@ IndexType ITI::ParcoRepart<IndexType, ValueType>::getDegreeSum(const CSRSparseMa
 template<typename IndexType, typename ValueType>
 IndexType ITI::ParcoRepart<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part,
 		DenseVector<IndexType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, Settings settings) {
-	scai::dmemo::CommunicatorPtr comm = input.getDistributionPtr()->getCommunicatorPtr();
+
+	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
+	const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
 
 	if (settings.multiLevelRounds > 0) {
 		CSRSparseMatrix<ValueType> coarseGraph;
 		DenseVector<IndexType> fineToCoarseMap;
+		std::cout << "Beginning coarsening, still " << settings.multiLevelRounds << " levels to go." << std::endl;
 		ParcoRepart<IndexType, ValueType>::coarsen(input, coarseGraph, fineToCoarseMap);
+		std::cout << "Coarse graph has " << coarseGraph.getNumRows() << " nodes." << std::endl;
 
 		//project coordinates and partition
 		std::vector<DenseVector<ValueType> > coarseCoords(settings.dimensions);
@@ -1216,23 +1224,29 @@ IndexType ITI::ParcoRepart<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix
 
 		DenseVector<IndexType> coarseWeights = sumToCoarse(nodeWeights, fineToCoarseMap);
 
+		assert(coarseWeights.sum().Scalar::getValue<IndexType>() == nodeWeights.sum().Scalar::getValue<IndexType>());
+
 		Settings settingscopy(settings);
 		settingscopy.multiLevelRounds--;
 		multiLevelStep(coarseGraph, coarsePart, coarseWeights, coarseCoords, settingscopy);
 
 		scai::dmemo::DistributionPtr projectedFineDist = projectToFine(coarseGraph.getRowDistributionPtr(), fineToCoarseMap);
+		assert(projectedFineDist->getGlobalSize() == globalN);
 		part = DenseVector<IndexType>(projectedFineDist, comm->getRank());
+		std::cout << "Projected distribution back to coarse" << std::endl;
 
 		if (settings.useGeometricTieBreaking) {
 			for (IndexType dim = 0; dim < settings.dimensions; dim++) {
 				coordinates[dim].redistribute(projectedFineDist);
 			}
+			std::cout << "Redistributed coordinates" << std::endl;
 		}
 
-		nodeWeights.redistribute(projectedFineDist);
-	}
+		input.redistribute(projectedFineDist, input.getColDistributionPtr());
 
-	DenseVector<IndexType> weights(part.getDistributionPtr(), 1);
+		nodeWeights.redistribute(projectedFineDist);
+		std::cout << "Redistributed node weights" << std::endl;
+	}
 
 	scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getPEGraph(input);
 
@@ -1245,9 +1259,11 @@ IndexType ITI::ParcoRepart<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix
 		distances = distancesFromBlockCenter(coordinates);
 	}
 
+	IndexType numRefinementRounds = 0;
+
 	ValueType gain = settings.minGainForNextRound;
 	while (gain >= settings.minGainForNextRound) {
-		std::vector<IndexType> gainPerRound = distributedFMStep(input, part, nodesWithNonLocalNeighbors, weights, communicationScheme, coordinates, distances, settings);
+		std::vector<IndexType> gainPerRound = distributedFMStep(input, part, nodesWithNonLocalNeighbors, nodeWeights, communicationScheme, coordinates, distances, settings);
 		gain = 0;
 		for (IndexType roundGain : gainPerRound) gain += roundGain;
 
@@ -1263,6 +1279,12 @@ IndexType ITI::ParcoRepart<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix
 				}
 			}
 		}
+
+		ValueType cut = comm->getSize() == 1 ? computeCut(input, part) : comm->sum(localSumOutgoingEdges(input, true)) / 2;
+		if (comm->getRank() == 0) {
+			std::cout << "After " << numRefinementRounds + 1 << " refinement rounds, cut is " << cut << std::endl;
+		}
+		numRefinementRounds++;
 	}
 }
 
@@ -2158,7 +2180,7 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffus
 	//settings and constants
 	const IndexType magicNumberDiffusionSteps = settings.diffusionRounds;
 	const ValueType degreeEstimate = ValueType(haloStorage.getNumValues()) / matrixHalo.getHaloSize();
-	const ValueType magicNumberAlpha = 1/(degreeEstimate+1);
+
 	const ValueType magicNumberDiffusionLoad = 1;
 	const IndexType veryLocalN = borderRegionIDs.size();
 
@@ -2193,6 +2215,24 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffus
 		IndexType globalIndex = borderRegionIDs[i];
 		globalToVeryLocal[globalIndex] = i;
 	}
+
+	IndexType maxDegree = 0;
+	{
+		const scai::hmemo::ReadAccess<IndexType> localIa(input.getLocalStorage().getIA());
+		for (IndexType i = 0; i < firstBlockSize; i++) {
+			const IndexType localI = inputDist->global2local(borderRegionIDs[i]);
+			if (localIa[localI+1]-localIa[localI] > maxDegree) maxDegree = localIa[localI+1]-localIa[localI];
+		}
+	}
+	{
+		const scai::hmemo::ReadAccess<IndexType> localIa(haloStorage.getIA());
+		for (IndexType i = 0; i < localIa.size()-1; i++) {
+			if (localIa[i+1]-localIa[i] > maxDegree) maxDegree = localIa[i+1]-localIa[i];
+		}
+	}
+
+
+	const ValueType magicNumberAlpha = 1/(maxDegree+1);
 
 	//assert that all indices were unique
 	assert(globalToVeryLocal.size() == veryLocalN);
@@ -2734,7 +2774,7 @@ DenseVector<ValueType> ParcoRepart<IndexType, ValueType>::projectToCoarse(const 
 	std::vector<IndexType> numFineNodes(coarseLocalN, 0);
 	{
 		scai::hmemo::ReadAccess<ValueType> rInput(input.getLocalValues());
-		scai::hmemo::ReadAccess<ValueType> rFineToCoarse(fineToCoarse.getLocalValues());
+		scai::hmemo::ReadAccess<IndexType> rFineToCoarse(fineToCoarse.getLocalValues());
 		for (IndexType i = 0; i < fineLocalN; i++) {
 			const IndexType coarseTarget = coarseDist->global2local(rFineToCoarse[i]);
 			sum[coarseTarget] += rInput[i];
@@ -2742,7 +2782,7 @@ DenseVector<ValueType> ParcoRepart<IndexType, ValueType>::projectToCoarse(const 
 		}
 	}
 
-	DenseVector<ValueType> result(coarseDist);
+	DenseVector<ValueType> result(coarseDist, 0);
 	scai::hmemo::WriteAccess<ValueType> wResult(result.getLocalValues());
 	for (IndexType i = 0; i < coarseLocalN; i++) {
 		assert(numFineNodes[i] > 0);
@@ -2762,13 +2802,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::sumToCoarse(const Dens
 	IndexType coarseLocalN = coarseDist->getLocalSize();
 	assert(inputDist->getLocalSize() == fineLocalN);
 
-	DenseVector<ValueType> result(coarseDist);
-	scai::hmemo::WriteAccess<ValueType> wResult(result.getLocalValues());
+	DenseVector<IndexType> result(coarseDist, 0);
+	scai::hmemo::WriteAccess<IndexType> wResult(result.getLocalValues());
 	{
-		scai::hmemo::ReadAccess<ValueType> rInput(input.getLocalValues());
-		scai::hmemo::ReadAccess<ValueType> rFineToCoarse(fineToCoarse.getLocalValues());
+		scai::hmemo::ReadAccess<IndexType> rInput(input.getLocalValues());
+		scai::hmemo::ReadAccess<IndexType> rFineToCoarse(fineToCoarse.getLocalValues());
 		for (IndexType i = 0; i < fineLocalN; i++) {
 			const IndexType coarseTarget = coarseDist->global2local(rFineToCoarse[i]);
+			assert(coarseTarget < coarseLocalN);
 			wResult[coarseTarget] += rInput[i];
 		}
 	}
@@ -2816,34 +2857,45 @@ scai::dmemo::DistributionPtr ParcoRepart<IndexType, ValueType>::projectToFine(sc
 	std::vector<std::vector<IndexType> > sendIndices(comm->getSize());
 	{
 		scai::hmemo::ReadAccess<IndexType> rOwners(owners);
-		scai::hmemo::ReadAccess<IndexType> rFineToCoarse(fineToCoarse);
+		scai::hmemo::ReadAccess<IndexType> rFineToCoarse(fineToCoarse.getLocalValues());
 		for (IndexType i = 0; i < fineLocalN; i++) {
-			IndexType targetRank = rOwners(coarseDist->global2local(rFineToCoarse[i]));
+			IndexType targetRank = rOwners[coarseDist->global2local(rFineToCoarse[i])];
+			assert(targetRank < comm->getSize());
 			sendIndices[targetRank].push_back(fineDist->local2global(i));
 			quantities[targetRank]++;
 		}
 	}
 
-	std::vector<IndexType> flatIndexVector(fineLocalN);
+	std::vector<IndexType> flatIndexVector;
 	for (IndexType i = 0; i < sendIndices.size(); i++) {
 		std::copy(sendIndices[i].begin(), sendIndices[i].end(), std::back_inserter(flatIndexVector));
 	}
+
+	assert(flatIndexVector.size() == fineLocalN);
 
     scai::dmemo::CommunicationPlan sendPlan;
 
     sendPlan.allocate( quantities.data(), comm->getSize() );
 
+    assert(sendPlan.totalQuantity() == fineLocalN);
+
     scai::dmemo::CommunicationPlan recvPlan;
 
 	recvPlan.allocateTranspose( sendPlan, *comm );
 
-	scai::utilskernel::LArray<ValueType> newValues;
+	scai::utilskernel::LArray<IndexType> newValues;
 
 	IndexType newLocalSize = recvPlan.totalQuantity();
 
 	{
-		scai::hmemo::WriteOnlyAccess<ValueType> recvVals( newValues, newLocalSize );
+		scai::hmemo::WriteOnlyAccess<IndexType> recvVals( newValues, newLocalSize );
 		comm->exchangeByPlan( recvVals.get(), recvPlan, flatIndexVector.data(), sendPlan );
+	}
+	assert(comm->sum(newLocalSize) == fineDist->getGlobalSize());
+
+	{
+		scai::hmemo::WriteAccess<IndexType> wValues(newValues);
+		std::sort(wValues.get(), wValues.get()+newLocalSize);
 	}
 
 	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(fineDist->getGlobalSize(), newValues, comm));
