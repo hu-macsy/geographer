@@ -68,9 +68,10 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
     const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
     //const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-    for(IndexType i=0; i< ia.size(); i++){        // for all local nodes
+    for(IndexType i=0; i< ia.size()-1; i++){        // for all local nodes
     	for(IndexType j=ia[i]; j<ia[i+1]; j++){             // for all the edges of a node
             SCAI_REGION("FileIO.writeGraph.newVersion.writeInFile");
+            SCAI_ASSERT( j<= ja.size() , j << " must be < "<< ja.size() );
             fNew << ja[j]+1 << " ";
     	}
     	fNew << std::endl;

@@ -781,6 +781,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
 
 template<typename IndexType, typename ValueType>
 void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const int dimension, const int numberOfAreas, const int pointsPerArea, const ValueType maxVal) {
+    SCAI_REGION("MeshGenerator.createQuadMesh")
     /*
     auto randomPoint= [](Point<ValueType> min, Point<ValueType> max, std::default_random_engine gen ){
         int dim= min.getDimensions();
@@ -812,7 +813,7 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
     //std::mt19937 generator(rd());
     std::vector<std::normal_distribution<ValueType>> distForDim(dimension);
     for(int n=0; n<numberOfAreas; n++){
-
+        SCAI_REGION("MeshGenerator.createQuadMesh.addPointsInQuadtree")
         Point<ValueType> randPoint(dimension);
         
         for(int d=0; d<dimension; d++){
@@ -825,9 +826,7 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
         }
         randPoint.print();
         
-        IndexType numPoints = pointsPerArea;
-        
-        for(int i=0; i<numPoints; i++){
+        for(int i=0; i<pointsPerArea; i++){
             Point<ValueType> pInRange(dimension);
             for(int d=0; d< dimension; d++){
                 ValueType thisCoord = distForDim[d](generator)+ (ValueType) rand()/RAND_MAX;
@@ -875,7 +874,7 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
     }
     */
     
-    PRINT("Num of leaves= N = "<< quad.countLeaves() );
+    //PRINT("Num of leaves= N = "<< quad.countLeaves() );
     IndexType numLeaves= quad.countLeaves();
     IndexType treeSize = quad.indexSubtree(0);
     

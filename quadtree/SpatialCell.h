@@ -539,7 +539,7 @@ public:
          */
 	template<typename IndexType, typename ValueType>
 	scai::lama::CSRSparseMatrix<ValueType> getSubTreeAsGraph(std::vector< std::set<std::shared_ptr<SpatialCell>>>& graphNgbrsCells ,  std::vector<std::vector<ValueType>>& coords,  std::queue<std::shared_ptr<SpatialCell>> frontier = std::queue<std::shared_ptr<SpatialCell>>()) {
-            SCAI_REGION("getSubTreeAsGraph");
+            SCAI_REGION("StatialCell.getSubTreeAsGraph");
             unsigned int treeSize= graphNgbrsCells.size();
             
             // graphNeighbours[i]: the indices of the neighbours of node i in the final graph, not of the tree
@@ -560,7 +560,7 @@ public:
             //PRINT("root ID: " << frontier.front()->getID() << ", and treeSize= "<< treeSize);
 
             while( !frontier.empty() ){
-                SCAI_REGION("getSubTreeAsGraph.inFrontier");
+                SCAI_REGION("StatialCell.getSubTreeAsGraph.inFrontier");
                 std::shared_ptr<SpatialCell> thisNode = frontier.front();
                                    
                 // if not indexed
@@ -667,7 +667,7 @@ public:
                 }
             }
             index numLeaves = leafIndex;
-            PRINT(" numLeaves= " << leafIndex  << " ,  non-leaves= " << non_leaves );
+            //PRINT(" numLeaves= " << leafIndex  << " ,  non-leaves= " << non_leaves );
             // this assertion is not correct in the case where we get a forest
             SCAI_ASSERT( leafIndex == countLeaves(), leafIndex << " >< "<< countLeaves() );
             
@@ -694,7 +694,7 @@ public:
             scai::hmemo::HArray<ValueType> csrValues;
             
             {
-                SCAI_REGION("getSubTreeAsGraph.getCSRMatrix");
+                SCAI_REGION("StatialCell.getSubTreeAsGraph.getCSRMatrix");
                 scai::hmemo::WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
                 scai::hmemo::WriteOnlyAccess<IndexType> ja( csrJA, nnzValues);
                 scai::hmemo::WriteOnlyAccess<ValueType> values( csrValues, nnzValues);
@@ -780,6 +780,7 @@ public:
          * */
         
         bool isAdjacent(SpatialCell& other){
+            
             int dim = minCoords.getDimensions();
             if(dim!=3){
                 //std::cout<<"Dimension != 3: WARNING, It could work but not sure...."<< std::endl;
