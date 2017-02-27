@@ -115,6 +115,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			maxCoords[dim] = comm->max(maxCoords[dim]);
 		}
 	
+
 		ValueType maxExtent = 0;
 		for (IndexType dim = 0; dim < dimensions; dim++) {
 			if (maxCoords[dim] - minCoords[dim] > maxExtent) {
@@ -599,15 +600,15 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<Va
 					result += values[j];
 				} else {
 					result++;
-				}
+                                }
 			}
 		}
 	}
 
 	if (!inputDist->isReplicated()) {
-    //sum values over all processes
-    result = inputDist->getCommunicatorPtr()->sum(result);
-  }
+            //sum values over all processes
+            result = inputDist->getCommunicatorPtr()->sum(result);
+        }
 
   return result / 2; //counted each edge from both sides
 }
@@ -638,6 +639,7 @@ IndexType ParcoRepart<IndexType, ValueType>::localBlockSize(const DenseVector<In
 			result++;
 		}
 	}
+
 	return result;
 }
 

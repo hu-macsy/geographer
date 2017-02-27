@@ -543,7 +543,7 @@ public:
          */
 	template<typename IndexType, typename ValueType>
 	scai::lama::CSRSparseMatrix<ValueType> getSubTreeAsGraph(std::vector< std::set<std::shared_ptr<SpatialCell>>>& graphNgbrsCells ,  std::vector<std::vector<ValueType>>& coords,  std::queue<std::shared_ptr<SpatialCell>> frontier = std::queue<std::shared_ptr<SpatialCell>>()) {
-            SCAI_REGION("getSubTreeAsGraph");
+            SCAI_REGION("StatialCell.getSubTreeAsGraph");
             unsigned int treeSize= graphNgbrsCells.size();
             
             // graphNeighbours[i]: the indices of the neighbours of node i in the final graph, not of the tree
@@ -564,7 +564,7 @@ public:
             //PRINT("root ID: " << frontier.front()->getID() << ", and treeSize= "<< treeSize);
 
             while( !frontier.empty() ){
-                SCAI_REGION("getSubTreeAsGraph.inFrontier");
+                SCAI_REGION("StatialCell.getSubTreeAsGraph.inFrontier");
                 std::shared_ptr<SpatialCell> thisNode = frontier.front();
                                    
                 // if not indexed
@@ -671,11 +671,12 @@ public:
                 }
             }
             index numLeaves = leafIndex;
-            PRINT(" numLeaves= " << leafIndex  << " ,  non-leaves= " << non_leaves );
+            //PRINT(" numLeaves= " << leafIndex  << " ,  non-leaves= " << non_leaves );
             // this assertion is not correct in the case where we get a forest
-            //assert( leafIndex == countLeaves() );
+            //SCAI_ASSERT( leafIndex == countLeaves(), leafIndex << " >< "<< countLeaves() );
             
             //print graphNgbrsCells 
+            /*
             for(int i=0; i< graphNgbrsCells.size(); i++){
                 for(typename std::set<std::shared_ptr<SpatialCell>>::iterator graphNgb= graphNgbrsCells[i].begin(); graphNgb!=graphNgbrsCells[i].end(); graphNgb++){
                         // the neigbours of thisNode->graphNgb. this->ID must be in there somewhere
@@ -683,7 +684,7 @@ public:
                         //PRINT(i<< ": "<< graphNgb->get()->getID() );
                     }
             }
-            
+            */
             
             /* 
              * from the graphNgbrsCells vector set the CSR sparse matrix
@@ -698,7 +699,7 @@ public:
             scai::hmemo::HArray<ValueType> csrValues;
             
             {
-                SCAI_REGION("getSubTreeAsGraph.getCSRMatrix");
+                SCAI_REGION("StatialCell.getSubTreeAsGraph.getCSRMatrix");
                 scai::hmemo::WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
                 scai::hmemo::WriteOnlyAccess<IndexType> ja( csrJA, nnzValues);
                 scai::hmemo::WriteOnlyAccess<ValueType> values( csrValues, nnzValues);
@@ -706,6 +707,7 @@ public:
                 
                 // count non-zero elements
                 IndexType nnzCounter = 0; 
+                index leafIndex= -1;
                 
                 // since we do not have distribution traverse all rows
                 for(IndexType i=0; i<graphNgbrsCells.size(); i++){
@@ -714,12 +716,13 @@ public:
                     // we just do after the for: ia[i+1] = ia[i] + graphNgbrsCells[i].size() 
                     IndexType numRowElems= 0;
                     // the index of the leaves since -i- traverses also non-leaf nodes
-                    index leafIndex= -1;
-                    assert( i< leafIndexMapping.size() );
                     
-                    if(leafIndexMapping[i]==-1){
+                    assert( i< leafIndexMapping.size() );
+                    if(leafIndexMapping[i]==-1){    // is not a leaf
                         continue;
                     }else{
+                        // leaf indices are sequenrial
+                        SCAI_ASSERT_EQUAL_ERROR(leafIndex , leafIndexMapping[i]-1);
                         leafIndex = leafIndexMapping[i];
                     }
                     
@@ -732,7 +735,7 @@ public:
                         IndexType ngbGlobalInd = leafIndexMapping[ graphNgb->get()->getID() ];
                         //PRINT("from treeIndex: "<< graphNgb->get()->getID() ", to leafIndex= "<< ngbGlobalInd);
                         assert( ngbGlobalInd>= 0);
-                        assert( ngbGlobalInd< numLeaves);
+                        SCAI_ASSERT( ngbGlobalInd<= numLeaves, "Global indexing: " << ngbGlobalInd << " shoould be less () at this point) than the number of leaves: "<< numLeaves );
                         assert( nnzCounter< ja.size() );
                         SCAI_ASSERT( nnzCounter < nnzValues, __FILE__<<" ,"<<__LINE__<< ": nnzValues not calculated properly")                   
                         ja[nnzCounter] = ngbGlobalInd;
@@ -740,7 +743,7 @@ public:
                         ++nnzCounter;
                         ++numRowElems;
                     }
-                    assert(leafIndex+1< ia.size() );
+                    SCAI_ASSERT(leafIndex < ia.size(), "Leaf index: "<<leafIndex << " , ia.size: "<< ia.size()  );
                     ia[leafIndex+1] = ia[leafIndex] + numRowElems;
                     SCAI_ASSERT(numRowElems == graphNgbrsCells[i].size(),  __FILE__<<" ,"<<__LINE__<<"something is wrong");
                 }
@@ -782,6 +785,7 @@ public:
          * */
         
         bool isAdjacent(SpatialCell& other){
+            
             int dim = minCoords.getDimensions();
             if(dim!=3){
                 //std::cout<<"Dimension != 3: WARNING, It could work but not sure...."<< std::endl;

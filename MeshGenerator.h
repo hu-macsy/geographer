@@ -28,7 +28,16 @@
 #include <fstream>
 #include <iterator>
 #include <tuple>    
+#include <random>
 
+#include "quadtree/Point.h"
+#include "quadtree/SpatialTree.h"
+#include "quadtree/SpatialCell.h"
+#include "quadtree/QuadTreeCartesianEuclid.h" 
+ 
+typedef double ValueType;
+typedef int IndexType;
+            
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
@@ -75,6 +84,10 @@ namespace ITI {
 
                 static void createRandomStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
                 
+                /*Creates points in a cube of side maxCoord in dimensions and adds them in a quad tree.
+                 * Adds more points in specific areas at random. 
+                 */
+                static void createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords,const int dimensions, const int numberOfAreas, const int pointsPerArea, const ValueType maxCoord);
                     
                 /* Creates random points in the cube for the given dimension, points in [0,maxCoord]^dim.
                  */

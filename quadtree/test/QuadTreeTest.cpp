@@ -262,12 +262,11 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
         PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
         
 }
-
-
+    
 
 TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
 
-        count n = 500;
+        count n = 1500;
 
 	vector<Point<double> > positions(n);
 	vector<index> content(n);
@@ -311,7 +310,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
         */
         
         // checkSymmetry is really expensive for big graphs, used only for small instances
-	graph.checkSymmetry();
+	//graph.checkSymmetry();
 	graph.isConsistent();
 
 	EXPECT_EQ( graph.getNumRows(), N);
@@ -338,7 +337,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
             std::cout<< "\t Num of nodes"<< std::endl;
             for(int i=0; i<degreeCount.size(); i++){
                 if(  degreeCount[i] !=0 ){
-                    std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
+                    //std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
                     numEdges += i*degreeCount[i];
                     maxDegree = i;
                 }
