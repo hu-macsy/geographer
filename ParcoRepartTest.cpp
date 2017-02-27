@@ -1377,13 +1377,13 @@ TEST_F (ParcoRepartTest, testGetMatchingGrid_2D) {
             }
     }
     
-    { // print
+    /*{ // print
         std::cout<<"matched edges for "<< *comm << " (local indices) :" << std::endl;
         for(int i=0; i<matching.size(); i++){
             //std::cout<< i<< ":global  ("<< dist->local2global(matching[0][i])<< ":" << dist->local2global(matching[1][i]) << ") # ";
             std::cout<< i<< ": ("<< matching[i].first << ":" << matching[i].second << ") # ";
         }
-    }
+    }*/
 
 }
 
@@ -1433,6 +1433,14 @@ TEST_F (ParcoRepartTest, testCoarseningGrid_2D) {
     
     EXPECT_TRUE(coarseGraph.isConsistent());
     EXPECT_TRUE(coarseGraph.checkSymmetry());
+    DenseVector<IndexType> sortedMap(fineToCoarseMap);
+    sortedMap.sort(true);
+    scai::hmemo::ReadAccess<IndexType> localSortedValues(sortedMap.getLocalValues());
+    for (IndexType i = 1; i < localSortedValues.size(); i++) {
+        EXPECT_LE(localSortedValues[i-1], localSortedValues[i]);
+        EXPECT_TRUE(localSortedValues[i-1] == localSortedValues[i] || localSortedValues[i-1] == localSortedValues[i]-1);
+        EXPECT_LE(localSortedValues[i], coarseGraph.getNumRows());
+    }
 }
 
 //------------------------------------------------------------------------------

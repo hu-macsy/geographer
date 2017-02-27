@@ -2640,7 +2640,7 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
 			// mark nodes are matched
 			matched[localNode]= true;
 			matched[localNgbr]= true;
-			PRINT(*comm << ", contracting nodes (local indices): "<< localNode <<" - "<< localNgbr );
+			//PRINT(*comm << ", contracting nodes (local indices): "<< localNode <<" - "<< localNgbr );
         }
     }
     
