@@ -188,6 +188,10 @@ namespace ITI {
 
 			static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& graph);
 
+			static DenseVector<ValueType> projectToCoarse(const DenseVector<ValueType>& input, const DenseVector<IndexType>& fineToCoarse);
+
+			template<typename T>
+			static DenseVector<T> projectToFine(const DenseVector<T>& input, const DenseVector<IndexType>& fineToCoarse);
 
 			template<typename T>
 			static DenseVector<T> computeGlobalPrefixSum(DenseVector<T> input, T offset = 0);

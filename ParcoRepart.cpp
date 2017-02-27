@@ -242,7 +242,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 					IndexType i = 0;
 					while (i < gainPerRound.size()) {
 						if (gainPerRound[i] == 0) {
-							//remove this color from future rounds. This is not terrible efficient, since it causes multiple copies, but all vectors are small and this method isn't called too often.
+							//remove this color from future rounds. This is not terribly efficient, since it causes multiple copies, but all vectors are small and this method isn't called too often.
 							communicationScheme.erase(communicationScheme.begin()+i);
 							gainPerRound.erase(gainPerRound.begin()+i);
 						} else {
@@ -2621,6 +2621,7 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
         	if (localNeighbor != nIndex && localNeighbor != localNode && !matched[localNeighbor]) {
         		//neighbor is local and unmatched, possible partner
         		if (bestTarget < 0 || values[j] > values[bestTarget]) {
+        			//either we haven't found any target yet, or the current one is better
         			bestTarget = j;
         		}
         	}
@@ -2637,7 +2638,7 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
 
 			matching.push_back( std::pair<IndexType,IndexType> (localNode, localNgbr) );
 
-			// mark nodes are matched
+			// mark nodes as matched
 			matched[localNode]= true;
 			matched[localNgbr]= true;
 			//PRINT(*comm << ", contracting nodes (local indices): "<< localNode <<" - "<< localNgbr );
@@ -2647,6 +2648,91 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
     assert(ia[ia.size()-1] >= totalNbrs);
     
     return matching;
+}
+
+template<typename IndexType, typename ValueType>
+DenseVector<ValueType> ParcoRepart<IndexType, ValueType>::projectToCoarse(const DenseVector<ValueType>& input, const DenseVector<IndexType>& fineToCoarse) {
+	const scai::dmemo::DistributionPtr inputDist = input.getDistributionPtr();
+	const IndexType fineLocalN = fineToCoarse.getDistributionPtr()->getLocalSize();
+	assert(inputDist->getLocalSize() == fineLocalN);
+
+	const IndexType newGlobalN = fineToCoarse.max().Scalar::getValue<IndexType>() +1;
+
+	//get set of coarse local indices, without repetitions
+	scai::utilskernel::LArray<IndexType> myCoarseGlobalIndices(fineToCoarse.getLocalValues());
+	scai::hmemo::WriteAccess<IndexType> wIndices(myCoarseGlobalIndices);
+	assert(wIndices.size() == fineLocalN);
+	std::sort(wIndices.get(), wIndices.get() + fineLocalN);
+	auto newEnd = std::unique(wIndices.get(), wIndices.get() + fineLocalN);
+	wIndices.resize(std::distance(wIndices.get(), newEnd));
+	IndexType coarseLocalN = wIndices.size();
+	wIndices.release();
+
+	//get local part of fineToCoarse map, translated to local indices
+	std::vector<IndexType> localFineToCoarse(fineLocalN);
+	{
+		scai::hmemo::ReadAccess<IndexType> rFineToCoarse(fineToCoarse.getLocalValues());
+		IndexType coarseIndex = 0;
+		for (IndexType i = 0; i < fineLocalN; i++) {
+			localFineToCoarse[i] = std::lower_bound(wIndices.get(), wIndices.get()+coarseLocalN, rFineToCoarse[i]);
+			assert(localFineToCoarse[i] < coarseLocalN);
+		}
+	}
+
+	//add values in preparation for interpolation
+	std::vector<ValueType> sum(coarseLocalN, 0);
+	std::vector<ValueType> numFineNodes(coarseLocalN, 0);
+	{
+		scai::hmemo::ReadAccess<ValueType> rInput(input.getLocalValues());
+		for (IndexType i = 0; i < fineLocalN; i++) {
+			sum[localFineToCoarse[i]] += rInput[i];
+			numFineNodes[localFineToCoarse[i]] += rInput[i];
+		}
+	}
+
+	const scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(newGlobalN, myCoarseGlobalIndices, inputDist->getCommunicatorPtr()));
+
+	DenseVector<ValueType> result(newDist);
+	scai::hmemo::WriteAccess<ValueType> wResult(result.getLocalValues());
+	for (IndexType i = 0; i < coarseLocalN; i++) {
+		assert(numFineNodes[i] > 0);
+		wResult[i] = sum[i] / numFineNodes[i];
+	}
+	wResult.release();
+	return result;
+}
+
+template<typename IndexType, typename ValueType>
+template<typename T>
+DenseVector<T> ParcoRepart<IndexType, ValueType>::projectToFine(const DenseVector<T>& input, const DenseVector<IndexType>& fineToCoarse) {
+	DenseVector<T> result(fineToCoarse.getDistributionPtr());
+	const IndexType fineLocalN = fineToCoarse.getDistributionPtr()->getLocalSize();
+
+	//get set of coarse local indices, without repetitions
+	scai::utilskernel::LArray<IndexType> myCoarseGlobalIndices(fineToCoarse.getLocalValues());
+	scai::hmemo::WriteAccess<IndexType> wIndices(myCoarseGlobalIndices);
+	assert(wIndices.size() == fineLocalN);
+	std::sort(wIndices.get(), wIndices.get() + fineLocalN);
+	auto newEnd = std::unique(wIndices.get(), wIndices.get() + fineLocalN);
+	wIndices.resize(std::distance(wIndices.get(), newEnd));
+	IndexType coarseLocalN = wIndices.size();
+	assert(coarseLocalN == input.getDistributionPtr()->getLocalSize());
+	wIndices.release();
+
+	//fill result
+	{
+		scai::hmemo::WriteAccess<ValueType> wResult(result.getLocalValues());
+		scai::hmemo::ReadAccess<T> rInput(input.getLocalValues());
+		scai::hmemo::ReadAccess<IndexType> rFineToCoarse(fineToCoarse.getLocalValues());
+
+		IndexType coarseIndex = 0;
+		for (IndexType i = 0; i < fineLocalN; i++) {
+			IndexType coarseIndex = std::lower_bound(wIndices.get(), wIndices.get()+coarseLocalN, rFineToCoarse[i]);
+			assert(coarseIndex < coarseLocalN);
+			result[i] = rInput[coarseIndex];
+		}
+	}
+	return result;
 }
 
 //---------------------------------------------------------------------------------------
