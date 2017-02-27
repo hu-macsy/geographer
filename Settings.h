@@ -12,7 +12,7 @@ struct Settings{
     IndexType sfcResolution = 0;
     IndexType numberOfRestarts = 0;
     IndexType diffusionRounds = 20;
-    IndexType multiLevelRounds = 5;
+    IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
     bool useDiffusionTieBreaking = false;
     bool useGeometricTieBreaking = false;

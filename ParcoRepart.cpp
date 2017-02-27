@@ -2232,7 +2232,7 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffus
 	}
 
 
-	const ValueType magicNumberAlpha = 1/(maxDegree+1);
+	const ValueType magicNumberAlpha = 1.0/(maxDegree+1);
 
 	//assert that all indices were unique
 	assert(globalToVeryLocal.size() == veryLocalN);
