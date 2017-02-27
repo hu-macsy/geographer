@@ -2689,7 +2689,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 
 template<typename IndexType, typename ValueType>
 std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& adjM){
-    
+	SCAI_REGION("ParcoRepart.maxLocalMatching");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
     
@@ -2761,6 +2761,7 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
 
 template<typename IndexType, typename ValueType>
 DenseVector<ValueType> ParcoRepart<IndexType, ValueType>::projectToCoarse(const DenseVector<ValueType>& input, const DenseVector<IndexType>& fineToCoarse) {
+	SCAI_REGION("ParcoRepart.projectToCoarse.interpolate");
 	const scai::dmemo::DistributionPtr inputDist = input.getDistributionPtr();
 
 	scai::dmemo::DistributionPtr fineDist = fineToCoarse.getDistributionPtr();
@@ -2794,6 +2795,7 @@ DenseVector<ValueType> ParcoRepart<IndexType, ValueType>::projectToCoarse(const 
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::sumToCoarse(const DenseVector<IndexType>& input, const DenseVector<IndexType>& fineToCoarse) {
+	SCAI_REGION("ParcoRepart.sumToCoarse");
 	const scai::dmemo::DistributionPtr inputDist = input.getDistributionPtr();
 
 	scai::dmemo::DistributionPtr fineDist = fineToCoarse.getDistributionPtr();
@@ -2820,6 +2822,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::sumToCoarse(const Dens
 
 template<typename IndexType, typename ValueType>
 scai::dmemo::DistributionPtr ParcoRepart<IndexType, ValueType>::projectToCoarse(const DenseVector<IndexType>& fineToCoarse) {
+	SCAI_REGION("ParcoRepart.projectToCoarse.distribution");
 	const IndexType newGlobalN = fineToCoarse.max().Scalar::getValue<IndexType>() +1;
 	scai::dmemo::DistributionPtr fineDist = fineToCoarse.getDistributionPtr();
 	const IndexType fineLocalN = fineDist->getLocalSize();
@@ -2840,6 +2843,7 @@ scai::dmemo::DistributionPtr ParcoRepart<IndexType, ValueType>::projectToCoarse(
 
 template<typename IndexType, typename ValueType>
 scai::dmemo::DistributionPtr ParcoRepart<IndexType, ValueType>::projectToFine(scai::dmemo::DistributionPtr dist, const DenseVector<IndexType>& fineToCoarse) {
+	SCAI_REGION("ParcoRepart.projectToFine");
 	scai::dmemo::DistributionPtr fineDist = fineToCoarse.getDistributionPtr();
 	const IndexType fineLocalN = fineDist->getLocalSize();
 	scai::dmemo::DistributionPtr coarseDist = projectToCoarse(fineToCoarse);
@@ -2907,6 +2911,7 @@ scai::dmemo::DistributionPtr ParcoRepart<IndexType, ValueType>::projectToFine(sc
 template<typename IndexType, typename ValueType>
 template<typename T>
 DenseVector<T> ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum(DenseVector<T> input, T globalOffset) {
+	SCAI_REGION("ParcoRepart.computeGlobalPrefixSum");
 	scai::dmemo::CommunicatorPtr comm = input.getDistributionPtr()->getCommunicatorPtr();
 
 	const IndexType p = comm->getSize();
@@ -2955,7 +2960,7 @@ DenseVector<T> ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum(DenseVe
 
 template<typename IndexType, typename ValueType>
 void ParcoRepart<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations) {
-
+	SCAI_REGION("ParcoRepart.coarsen");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
     
@@ -3055,7 +3060,7 @@ void ParcoRepart<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>
     IndexType nnzValues = values.size() - matching.size();
 
     {
-        SCAI_REGION("coarsening.getCSRMatrix");
+        SCAI_REGION("ParcoRepart.coarsen.getCSRMatrix");
         // this is larger, need to resize afterwards
         scai::hmemo::WriteOnlyAccess<IndexType> newIAWrite( newIA, newLocalN +1 );
         scai::hmemo::WriteOnlyAccess<IndexType> newJAWrite( newJA, nnzValues);
