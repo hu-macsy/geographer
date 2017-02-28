@@ -2750,7 +2750,7 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
 			// So, actually, globalNgbr is also local....
 			assert( distPtr->isLocal(globalNgbr));
 			IndexType localNgbr = distPtr->global2local(globalNgbr);
-
+                        //TODO: search neighbors for the heaviest edge
 			matching.push_back( std::pair<IndexType,IndexType> (localNode, localNgbr) );
 
 			// mark nodes as matched
