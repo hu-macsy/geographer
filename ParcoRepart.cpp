@@ -1203,16 +1203,21 @@ IndexType ITI::ParcoRepart<IndexType, ValueType>::getDegreeSum(const CSRSparseMa
 template<typename IndexType, typename ValueType>
 IndexType ITI::ParcoRepart<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part,
 		DenseVector<IndexType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, Settings settings) {
-
+	SCAI_REGION( "ParcoRepart.multiLevelStep" );
 	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
 	const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
 
 	if (settings.multiLevelRounds > 0) {
+		SCAI_REGION( "ParcoRepart.multiLevelStep.recursiveCall" )
 		CSRSparseMatrix<ValueType> coarseGraph;
 		DenseVector<IndexType> fineToCoarseMap;
-		std::cout << "Beginning coarsening, still " << settings.multiLevelRounds << " levels to go." << std::endl;
+		if (comm->getRank() == 0) {
+			std::cout << "Beginning coarsening, still " << settings.multiLevelRounds << " levels to go." << std::endl;
+		}
 		ParcoRepart<IndexType, ValueType>::coarsen(input, coarseGraph, fineToCoarseMap);
-		std::cout << "Coarse graph has " << coarseGraph.getNumRows() << " nodes." << std::endl;
+		if (comm->getRank() == 0) {
+			std::cout << "Coarse graph has " << coarseGraph.getNumRows() << " nodes." << std::endl;
+		}
 
 		//project coordinates and partition
 		std::vector<DenseVector<ValueType> > coarseCoords(settings.dimensions);
@@ -1233,58 +1238,57 @@ IndexType ITI::ParcoRepart<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix
 		scai::dmemo::DistributionPtr projectedFineDist = projectToFine(coarseGraph.getRowDistributionPtr(), fineToCoarseMap);
 		assert(projectedFineDist->getGlobalSize() == globalN);
 		part = DenseVector<IndexType>(projectedFineDist, comm->getRank());
-		std::cout << "Projected distribution back to coarse" << std::endl;
 
 		if (settings.useGeometricTieBreaking) {
 			for (IndexType dim = 0; dim < settings.dimensions; dim++) {
 				coordinates[dim].redistribute(projectedFineDist);
 			}
-			std::cout << "Redistributed coordinates" << std::endl;
 		}
 
 		input.redistribute(projectedFineDist, input.getColDistributionPtr());
 
 		nodeWeights.redistribute(projectedFineDist);
-		std::cout << "Redistributed node weights" << std::endl;
 	}
 
-	scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getPEGraph(input);
+	if (settings.multiLevelRounds % settings.coarseningStepsBetweenRefinement == 0) {
+		scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getPEGraph(input);
 
-	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
+		std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
 
-	std::vector<IndexType> nodesWithNonLocalNeighbors = getNodesWithNonLocalNeighbors(input);
+		std::vector<IndexType> nodesWithNonLocalNeighbors = getNodesWithNonLocalNeighbors(input);
 
-	std::vector<ValueType> distances;
-	if (settings.useGeometricTieBreaking) {
-		distances = distancesFromBlockCenter(coordinates);
-	}
+		std::vector<ValueType> distances;
+		if (settings.useGeometricTieBreaking) {
+			distances = distancesFromBlockCenter(coordinates);
+		}
 
-	IndexType numRefinementRounds = 0;
+		IndexType numRefinementRounds = 0;
 
-	ValueType gain = settings.minGainForNextRound;
-	while (gain >= settings.minGainForNextRound) {
-		std::vector<IndexType> gainPerRound = distributedFMStep(input, part, nodesWithNonLocalNeighbors, nodeWeights, communicationScheme, coordinates, distances, settings);
-		gain = 0;
-		for (IndexType roundGain : gainPerRound) gain += roundGain;
+		ValueType gain = settings.minGainForNextRound;
+		while (gain >= settings.minGainForNextRound) {
+			std::vector<IndexType> gainPerRound = distributedFMStep(input, part, nodesWithNonLocalNeighbors, nodeWeights, communicationScheme, coordinates, distances, settings);
+			gain = 0;
+			for (IndexType roundGain : gainPerRound) gain += roundGain;
 
-		if (settings.skipNoGainColors) {
-			IndexType i = 0;
-			while (i < gainPerRound.size()) {
-				if (gainPerRound[i] == 0) {
-					//remove this color from future rounds. This is not terribly efficient, since it causes multiple copies, but all vectors are small and this method isn't called too often.
-					communicationScheme.erase(communicationScheme.begin()+i);
-					gainPerRound.erase(gainPerRound.begin()+i);
-				} else {
-					i++;
+			if (settings.skipNoGainColors) {
+				IndexType i = 0;
+				while (i < gainPerRound.size()) {
+					if (gainPerRound[i] == 0) {
+						//remove this color from future rounds. This is not terribly efficient, since it causes multiple copies, but all vectors are small and this method isn't called too often.
+						communicationScheme.erase(communicationScheme.begin()+i);
+						gainPerRound.erase(gainPerRound.begin()+i);
+					} else {
+						i++;
+					}
 				}
 			}
-		}
 
-		ValueType cut = comm->getSize() == 1 ? computeCut(input, part) : comm->sum(localSumOutgoingEdges(input, true)) / 2;
-		if (comm->getRank() == 0) {
-			std::cout << "After " << numRefinementRounds + 1 << " refinement rounds, cut is " << cut << std::endl;
+			ValueType cut = comm->getSize() == 1 ? computeCut(input, part) : comm->sum(localSumOutgoingEdges(input, true)) / 2;
+			if (comm->getRank() == 0) {
+				std::cout << "After " << numRefinementRounds + 1 << " refinement rounds, cut is " << cut << std::endl;
+			}
+			numRefinementRounds++;
 		}
-		numRefinementRounds++;
 	}
 }
 
@@ -2925,9 +2929,13 @@ DenseVector<T> ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum(DenseVe
     //get local prefix sum
     scai::hmemo::ReadAccess<T> localValues(input.getLocalValues());
     std::vector<T> localPrefixSum(localN);
+    assert(localN == localValues.size());
     std::partial_sum(localValues.get(), localValues.get()+localN, localPrefixSum.begin());
 
-    T localSum[1] = {localPrefixSum[localN-1]};
+    T localSum[1] = {0};
+    if (localN > 0) {
+        localSum[0] = localPrefixSum[localN-1];
+    }
 
     //communicate local sums
     T allOffsets[p];
