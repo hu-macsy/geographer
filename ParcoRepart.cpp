@@ -115,6 +115,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			maxCoords[dim] = comm->max(maxCoords[dim]);
 		}
 	
+
 		ValueType maxExtent = 0;
 		for (IndexType dim = 0; dim < dimensions; dim++) {
 			if (maxCoords[dim] - minCoords[dim] > maxExtent) {
@@ -604,15 +605,15 @@ ValueType ParcoRepart<IndexType, ValueType>::computeCut(const CSRSparseMatrix<Va
 					result += values[j];
 				} else {
 					result++;
-				}
+                                }
 			}
 		}
 	}
 
 	if (!inputDist->isReplicated()) {
-    //sum values over all processes
-    result = inputDist->getCommunicatorPtr()->sum(result);
-  }
+            //sum values over all processes
+            result = inputDist->getCommunicatorPtr()->sum(result);
+        }
 
   return result / 2; //counted each edge from both sides
 }
@@ -643,6 +644,7 @@ IndexType ParcoRepart<IndexType, ValueType>::localBlockSize(const DenseVector<In
 			result++;
 		}
 	}
+
 	return result;
 }
 
@@ -1182,7 +1184,7 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::ParcoRepart<Index
 
 	assert(interfaceNodes.size() <= localN);
 	assert(roundMarkers.size() == depth);
-	return std::make_pair(std::move(interfaceNodes), std::move(roundMarkers));
+	return {interfaceNodes, roundMarkers};
 }
 
 template<typename IndexType, typename ValueType>
@@ -2957,6 +2959,7 @@ DenseVector<T> ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum(DenseVe
     return result;
 }
 
+//-------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 void ParcoRepart<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations) {
@@ -3010,7 +3013,7 @@ void ParcoRepart<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>
     }
 
     //fill gaps in index list. This might be expensive.
-	scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(globalN, comm));
+    scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(globalN, comm));
     preserved.redistribute(blockDist);
     fineToCoarse = computeGlobalPrefixSum(preserved, -1);
     const IndexType newGlobalN = fineToCoarse.max().Scalar::getValue<IndexType>() + 1;

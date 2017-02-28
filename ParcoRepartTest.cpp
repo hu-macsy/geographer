@@ -530,6 +530,7 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 	const IndexType k = comm->getSize();
 
 	scai::lama::CSRSparseMatrix<ValueType>a(n,n);
+        // WARNING: an error in the next line when run with p=7
 	scai::lama::MatrixCreator::buildPoisson(a, 3, 19, dimX,dimY,dimZ);
 
 	scai::dmemo::DistributionPtr dist = a.getRowDistributionPtr();
@@ -647,7 +648,7 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 				if (i == 0) {
 					EXPECT_TRUE(directNeighbor);
 				}
-			}
+			}		
 		}
 	}
 }

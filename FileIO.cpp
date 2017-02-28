@@ -43,9 +43,6 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     //PRINT(*comm << " In writeInFileMetisFormat");
 
-    std::ofstream f;
-    std::string oldFile = filename + "OLD";
-    f.open(oldFile);
     IndexType cols= adjM.getNumColumns() , rows= adjM.getNumRows();
     IndexType i, j;
 
@@ -68,9 +65,10 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
     const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
     //const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-    for(IndexType i=0; i< ia.size(); i++){        // for all local nodes
+    for(IndexType i=0; i< ia.size()-1; i++){        // for all local nodes
     	for(IndexType j=ia[i]; j<ia[i+1]; j++){             // for all the edges of a node
             SCAI_REGION("FileIO.writeGraph.newVersion.writeInFile");
+            SCAI_ASSERT( j<= ja.size() , j << " must be < "<< ja.size() );
             fNew << ja[j]+1 << " ";
     	}
     	fNew << std::endl;
@@ -128,7 +126,7 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
     assert(coords[0].size() == numPoints);
     for(i=0; i<numPoints; i++){
         for(j=0; j<dimension; j++)
-            f<< coords[j].getValue(i).Scalar::getValue<ValueType>() << " ";
+            f<< std::setprecision(15)<< coords[j].getValue(i).Scalar::getValue<ValueType>() << " ";
         f<< std::endl;
     }
 
@@ -171,6 +169,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     IndexType beginLocalRange, endLocalRange;
     scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
     const IndexType localN = endLocalRange - beginLocalRange;
+
     assert(localN >= 0);
     assert(localN <= globalN);
 
@@ -190,6 +189,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     //now read in local edges
     for (IndexType i = 0; i < localN; i++) {
     	bool read = std::getline(file, line);
+if(read==false) PRINT(*comm << ": "<<line);        
     	assert(read);//if we have read past the end of the file, the node count was incorrect
         std::stringstream ss( line );
         std::string item;
@@ -198,7 +198,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         while (std::getline(ss, item, ' ')) {
         	IndexType neighbor = std::stoi(item)-1;//-1 because of METIS format
         	if (neighbor >= globalN || neighbor < 0) {
-        		throw std::runtime_error("Found illegal neighbor " + std::to_string(neighbor) + " in line " + std::to_string(i+beginLocalRange));
+        		throw std::runtime_error("Found illegal neighbor " + std::to_string(neighbor) + " in line " + std::to_string(i+beginLocalRange) + " of file" + filename + " for PE " + std::to_string( comm->getRank()) );
         	}
         	//std::cout << "Converted " << item << " to " << neighbor << std::endl;
         	neighbors.push_back(neighbor);
