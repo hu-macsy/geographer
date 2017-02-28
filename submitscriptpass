@@ -1,0 +1,2 @@
+#!/bin/sh
+SCAI_TRACE=time:PREFIX=$JMS_stdout mpirun ./Katanomi "$@"
