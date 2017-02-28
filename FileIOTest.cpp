@@ -72,8 +72,8 @@ TEST_F(FileIOTest, testWriteMetis_Dist_3D){
  * Occasionally throws error, probably because own process tries to read the file while some other is still writing in it.
  */
 TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
-    std::string path = "meshes/bigbubbles/";
-    std::string file = "bigbubbles-00010.graph";
+    std::string path = "./";
+    std::string file = "Grid8x8";
     std::string filename= path + file;
     CSRSparseMatrix<ValueType> Graph;
     IndexType N;    //number of points
