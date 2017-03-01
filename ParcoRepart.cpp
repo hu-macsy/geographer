@@ -140,6 +140,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		// trying the new version of getHilbertIndex
                 
 		scai::lama::DenseVector<ValueType> hilbertIndices(inputDist);
+PRINT(*comm << ": initial local size "<<hilbertIndices.getLocalValues().size());                
+                
 		// get local part of hilbert indices
 		scai::utilskernel::LArray<ValueType>& hilbertIndicesLocal = hilbertIndices.getLocalValues();
 
@@ -165,7 +167,16 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			}
 		}
 		
-		
+		IndexType res=4, squares =std::pow(2,res) ;
+                std::vector<IndexType> density( squares , 0);
+                for(int i=0; i<localN; i++){
+                    int square = int(hilbertIndicesLocal[i]*squares);
+                    assert(square < squares);
+                    ++density[square];
+                }
+                for(int i=0; i<squares; i++){
+                    std::cout<< i << ": "<< density[i] << std::endl;
+                }
 		/**
 		* now sort the global indices by where they are on the space-filling curve.
 		*/
@@ -173,6 +184,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         {
 			SCAI_REGION( "ParcoRepart.partitionGraph.initialPartition.sorting" )
 			hilbertIndices.sort(permutation, true);
+PRINT(*comm << ": hilbertIndex size after sorting "<<hilbertIndices.getLocalValues().size());              
         }
 
 		/**
@@ -183,15 +195,16 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 			scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(n, comm));
 			permutation.redistribute(blockDist);
+PRINT(*comm << ": permutation size after redistribution "<<permutation.getLocalValues().size());                        
 			scai::hmemo::WriteAccess<IndexType> wPermutation( permutation.getLocalValues() );
 			std::sort(wPermutation.get(), wPermutation.get()+wPermutation.size());
 			wPermutation.release();
 
 			scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(n, permutation.getLocalValues(), comm));
-
+PRINT(*comm << input.getLocalNumRows() );
 			input.redistribute(newDistribution, input.getColDistributionPtr());
 			result = DenseVector<IndexType>(newDistribution, comm->getRank());
-
+PRINT(*comm << input.getLocalNumRows() );
 		} else {
 			scai::lama::DenseVector<IndexType> inversePermutation;
 			DenseVector<IndexType> tmpPerm = permutation;
@@ -1152,7 +1165,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 		const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
 		const scai::dmemo::DistributionPtr commDist = communicationScheme[round].getDistributionPtr();
-
+PRINT(*commDist);
 		const IndexType localN = inputDist->getLocalSize();
 
 		if (!communicationScheme[round].getDistributionPtr()->isLocal(comm->getRank())) {
@@ -1982,10 +1995,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const 
 	scai::dmemo::Halo partHalo = buildPartHalo(adjM, part);
 	scai::utilskernel::LArray<IndexType> haloData;
 	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
-
+int numOfNonLocal=0;
+int maxNonLocal=0;
     for(IndexType i=0; i<localN; i++){    // for all local nodes
     	IndexType thisBlock = localPart[i];
     	for(IndexType j=ia[i]; j<ia[i+1]; j++){                   // for all the edges of a node
+numOfNonLocal=0;            
     		IndexType neighbor = ja[j];
     		IndexType neighborBlock;
 			if (dist->isLocal(neighbor)) {
@@ -1996,10 +2011,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const 
 			assert( neighborBlock < max +1 );
 			if (thisBlock != neighborBlock) {
 				localBorder[i] = 1;
-				break;
+				//break;
+                                {//to be removed
+                                    ++numOfNonLocal;
+                                }
 			}
     	}
+if(numOfNonLocal>maxNonLocal) maxNonLocal = numOfNonLocal;    	
     }
+PRINT(maxNonLocal);
    
     //border.setValues(localBorder);
     assert(border.getDistributionPtr()->getLocalSize() == localN);

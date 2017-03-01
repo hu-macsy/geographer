@@ -138,9 +138,9 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     IndexType dim= 2, k= 8, i;
     ValueType epsilon= 0.1;
 
-    //std::string path = "./meshes/my_meshes";s
-    std::string path = "";
-    std::string file= "Grid8x8";
+    std::string path = "./meshes/slowrot/";
+    //std::string path = "";
+    std::string file= "slowrot-00000.graph";
     std::string grFile= path +file, coordFile= path +file +".xyz";  //graph file and coordinates file
     std::fstream f(grFile);
     IndexType nodes, edges;
@@ -153,14 +153,14 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     //
 
     //read the adjacency matrix from a file
-    std::cout<<"reading adjacency matrix from file: "<< grFile<<" for k="<< k<< std::endl;
+    //std::cout<<"reading adjacency matrix from file: "<< grFile<<" for k="<< k<< std::endl;
     scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, nodes) );
     scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( nodes ));
 
     SCAI_REGION_START("testPartitionFromFile_local_2D.readGraphFromFile");
         graph = FileIO<IndexType, ValueType>::readGraph( grFile );
         graph.redistribute( distPtr , noDistPtr);
-        std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
+        //std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
     SCAI_REGION_END("testPartitionFromFile_local_2D.readGraphFromFile");
 
     // N is the number of nodes
@@ -168,7 +168,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     EXPECT_EQ(nodes,N);
 
     //read the coordiantes from a file
-    std::cout<<"reading coordinates from file: "<< coordFile<< std::endl;
+    //std::cout<<"reading coordinates from file: "<< coordFile<< std::endl;
 
     SCAI_REGION_START("testPartitionFromFile_local_2D.readFromFile2Coords_2D");
     std::vector<DenseVector<ValueType>> coords2D = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dim);

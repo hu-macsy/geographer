@@ -595,7 +595,8 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 //----------------------------------------------------------
 
 TEST_F (ParcoRepartTest, testBorders_Distributed) {
-    std::string file = "Grid16x16";
+    //std::string file = "Grid16x16";
+    std::string file = "meshes/slowrot/slowrot-00000.graph";
     std::ifstream f(file);
     IndexType dimensions= 2, k=4;
     IndexType N, edges;
@@ -1334,15 +1335,7 @@ TEST_F (ParcoRepartTest, testCoarseningGrid_2D) {
     //assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
 
     // coarsen the graph
-    scai::lama::CSRSparseMatrix<ValueType> coarsendGraph = ParcoRepart<IndexType, ValueType>::coarsening(graph);
-    
-    // edge weights must be the same
-    EXPECT_EQ(graph.l1Norm() , coarsendGraph.l1Norm() );
-    
-    coarsendGraph.checkSymmetry();
-    coarsendGraph.isConsistent();
-    
-    
+    ParcoRepart<IndexType, ValueType>::coarsening(graph);
     
 }
 
