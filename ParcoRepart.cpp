@@ -28,6 +28,8 @@
 #include "ParcoRepart.h"
 #include "HilbertCurve.h"
 
+#include "FileIO.h"
+
 #include "quadtree/QuadTreeCartesianEuclid.h"
 
 namespace ITI {
@@ -166,7 +168,7 @@ PRINT(*comm << ": initial local size "<<hilbertIndices.getLocalValues().size());
 				hilbertIndicesLocal[i] = globalHilbertIndex;
 			}
 		}
-		
+//============		
 		IndexType res=4, squares =std::pow(2,res) ;
                 std::vector<IndexType> density( squares , 0);
                 for(int i=0; i<localN; i++){
@@ -174,9 +176,18 @@ PRINT(*comm << ": initial local size "<<hilbertIndices.getLocalValues().size());
                     assert(square < squares);
                     ++density[square];
                 }
+
+                std::vector<IndexType> sumDensity( squares , 0);
                 for(int i=0; i<squares; i++){
-                    std::cout<< i << ": "<< density[i] << std::endl;
+                    sumDensity[i] = comm->sum(density[i]);
                 }
+                if(comm->getRank()==0){
+                    for(int i=0; i<squares; i++){
+                        std::cout<<*comm <<": "<< i << ", "<< sumDensity[i] << std::endl;
+                    }
+                }
+
+//^^^^^^^^^^^^^^^^^^^                
 		/**
 		* now sort the global indices by where they are on the space-filling curve.
 		*/
@@ -184,6 +195,10 @@ PRINT(*comm << ": initial local size "<<hilbertIndices.getLocalValues().size());
         {
 			SCAI_REGION( "ParcoRepart.partitionGraph.initialPartition.sorting" )
 			hilbertIndices.sort(permutation, true);
+scai::hmemo::WriteAccess<ValueType> wHilbIndex( hilbertIndices.getLocalValues() );  
+ValueType* maxElem =  std::max_element(wHilbIndex.get(),wHilbIndex.get()+wHilbIndex.size());
+ValueType* minElem =  std::min_element(wHilbIndex.get(),wHilbIndex.get()+wHilbIndex.size());
+PRINT(*comm << ": min hilbIndex= "<< *minElem << "  and max= "<< *maxElem);
 PRINT(*comm << ": hilbertIndex size after sorting "<<hilbertIndices.getLocalValues().size());              
         }
 
@@ -201,10 +216,17 @@ PRINT(*comm << ": permutation size after redistribution "<<permutation.getLocalV
 			wPermutation.release();
 
 			scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(n, permutation.getLocalValues(), comm));
-PRINT(*comm << input.getLocalNumRows() );
+
 			input.redistribute(newDistribution, input.getColDistributionPtr());
 			result = DenseVector<IndexType>(newDistribution, comm->getRank());
-PRINT(*comm << input.getLocalNumRows() );
+                        
+                        if (settings.useGeometricTieBreaking) {
+                            for (IndexType dim = 0; dim < dimensions; dim++) {
+				coordinates[dim].redistribute(newDistribution);
+                            }
+ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, n, "debugRepart");
+			}
+//PRINT(*comm << input.getLocalNumRows() );
 		} else {
 			scai::lama::DenseVector<IndexType> inversePermutation;
 			DenseVector<IndexType> tmpPerm = permutation;
@@ -263,6 +285,15 @@ PRINT(*comm << input.getLocalNumRows() );
 	} else {
 		std::cout << "Local refinement only implemented sequentially and for one block per process. Called with " << comm->getSize() << " processes and " << k << " blocks." << std::endl;
 	}
+//=================
+/*
+scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(n, result.getLocalValues(), comm));
+for (IndexType dim = 0; dim < dimensions; dim++) {
+    coordinates[dim].redistribute(newDistribution);
+}
+ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, n, "debugResult");
+*/
+//^^^^^^^^^^^^^^^^^
 	return result;
 }
 
@@ -1165,7 +1196,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep(CSRSparseMat
 		const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 		const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
 		const scai::dmemo::DistributionPtr commDist = communicationScheme[round].getDistributionPtr();
-PRINT(*commDist);
+//PRINT(*commDist);
 		const IndexType localN = inputDist->getLocalSize();
 
 		if (!communicationScheme[round].getDistributionPtr()->isLocal(comm->getRank())) {
@@ -1831,7 +1862,7 @@ IndexType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalCut(const CSRSparse
 	}
 	return cut;
 }
-
+/*
 template<typename IndexType, typename ValueType>
 ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
 		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
@@ -1865,7 +1896,7 @@ ValueType ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffusion(const CSR
 
 	return oldCut - newCut;
 }
-
+*/
 template<typename IndexType, typename ValueType>
 std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
 		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,

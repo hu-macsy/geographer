@@ -197,6 +197,31 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
 
 }
 
+TEST_F(FileIOTest, testWriteCoordsDistributed){
+
+    //std::string path = "./meshes/slowrot/";
+    std::string path = "";
+    std::string file= "Grid8x8";
+    std::string grFile= path +file , coordFile= path +file +".xyz";  //graph file and coordinates file
+    std::fstream f(grFile);
+    IndexType nodes, edges;
+    f>> nodes>> edges;
+    f.close();
+    
+    IndexType dim=2;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, nodes) );
+    //scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( nodes ));
+
+    // every PE reads its own part of the coordinates based on a block distribution
+    std::vector<DenseVector<ValueType>> coords2D = FileIO<IndexType, ValueType>::readCoords( coordFile, nodes, dim);
+    EXPECT_TRUE(coords2D[0].getDistributionPtr()->isEqual(*distPtr));
+    
+    FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords2D, nodes, "writeCoordsDist");
+}
+
+
 TEST_F(FileIOTest, testReadQuadTree){
 	std::string filename = "cells.dat";
 

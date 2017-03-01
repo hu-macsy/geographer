@@ -61,10 +61,13 @@ int main(int argc, char** argv) {
 				("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
 				("borderDepth", value<int>(&settings.borderDepth)->default_value(settings.borderDepth), "Tuning parameter: Depth of border region used in each refinement step")
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
-				("sfcRecursionSteps", value<int>(&settings.sfcResolution)->default_value(settings.sfcResolution), "Tuning parameter: Recursion Level of space filling curve. A value of 0 causes the recursion level to be derived from the graph size.")
+				//("sfcRecursionSteps", value<int>(&settings.sfcResolution)->default_value(settings.sfcResolution), "Tuning parameter: Recursion Level of space filling curve. A value of 0 causes the recursion level to be derived from the graph size.")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
 				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
-				("numberOfRestarts", value<int>(&settings.numberOfRestarts)->default_value(settings.numberOfRestarts), "Tuning parameter: Restart local FM with different seeds and keep best.")
+				("useDiffusionTieBreaking", value<bool>(&settings.useDiffusionTieBreaking)->default_value(settings.useDiffusionTieBreaking), "Tuning Parameter: Use diffusion to break ties in Fiduccia-Mattheyes algorithm")
+				("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
+				("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
+				("multiLevelRounds", value<int>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
 				;
 
 	variables_map vm;
@@ -212,17 +215,32 @@ int main(int argc, char** argv) {
     }
 
     if( comm->getRank() ==0){
-        if(settings.dimensions==2){
+          settings.print(std::cout);
+        /*
+         * if(settings.dimensions==2){
             settings.print2D(std::cout);
         }else{
             settings.print3D(std::cout);
         }
+        */
     }
     
     std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
     
     scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, settings );
-    
+    assert( partition.size() == N);
+    assert( coordinates[0].size() == N);
+//=================
+PRINT(*comm<< ": "<< partition.getLocalValues().size());
+PRINT(*comm<< ": "<< coordinates[0].getLocalValues().size());
+//scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(N, partition/*.getLocalValues()*/, comm));
+for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+    assert( coordinates[dim].size() == N);
+    coordinates[dim].redistribute(partition.getDistributionPtr());
+}
+ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, "debugResult");
+
+//^^^^^^^^^^^^^^^^^    
     std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
     
     std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
