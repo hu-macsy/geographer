@@ -215,11 +215,14 @@ int main(int argc, char** argv) {
     }
 
     if( comm->getRank() ==0){
-        if(settings.dimensions==2){
+          settings.print(std::cout);
+        /*
+         * if(settings.dimensions==2){
             settings.print2D(std::cout);
         }else{
             settings.print3D(std::cout);
         }
+        */
     }
     
     std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
