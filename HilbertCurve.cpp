@@ -218,7 +218,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const*
 	}
 	unsigned long long divisor = size_t(1) << size_t(3*int(recursionDepth));
         double ret = double(integerIndex) / double(divisor);
-        SCAI_ASSERT(ret<1, ret << " , divisor= "<< divisor << " , integerIndex=" << integerIndex <<" , recursionDepth= " << recursionDepth << ", sizeof(uns_ll)="<< sizeof(unsigned long long));
+        SCAI_ASSERT(ret<1, ret << " , divisor= "<< divisor << " , integerIndex=" << integerIndex <<" , recursionDepth= " << recursionDepth << ", sizeof(unsigned long long)="<< sizeof(unsigned long long));
         return ret;
 
 }

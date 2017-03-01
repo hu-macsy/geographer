@@ -9,7 +9,7 @@ struct Settings{
     IndexType borderDepth = 4;
     IndexType stopAfterNoGainRounds = 0;
     IndexType minGainForNextRound = 1;
-    IndexType sfcResolution = 21;
+    IndexType sfcResolution = 17;
     IndexType numberOfRestarts = 0;
     IndexType diffusionRounds = 20;
     IndexType multiLevelRounds = 0;

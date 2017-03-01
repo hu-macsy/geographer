@@ -228,7 +228,19 @@ int main(int argc, char** argv) {
     std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
     
     scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, settings );
-    
+    assert( partition.size() == N);
+    assert( coordinates[0].size() == N);
+//=================
+PRINT(*comm<< ": "<< partition.getLocalValues().size());
+PRINT(*comm<< ": "<< coordinates[0].getLocalValues().size());
+//scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(N, partition/*.getLocalValues()*/, comm));
+for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+    assert( coordinates[dim].size() == N);
+    coordinates[dim].redistribute(partition.getDistributionPtr());
+}
+ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, "debugResult");
+
+//^^^^^^^^^^^^^^^^^    
     std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
     
     std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();

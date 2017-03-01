@@ -160,6 +160,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			}
 		}
 		
+		
 		/**
 		* now sort the global indices by where they are on the space-filling curve.
 		*/
@@ -623,7 +624,7 @@ ValueType ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(const CSRSpar
 	SCAI_REGION( "ParcoRepart.localSumOutgoingEdges" )
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-	const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+        const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
 	IndexType sumOutgoingEdgeWeights = 0;
 	for (IndexType j = 0; j < ja.size(); j++) {
@@ -2341,6 +2342,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const 
     	}
     }
    
+    //border.setValues(localBorder);
     assert(border.getDistributionPtr()->getLocalSize() == localN);
     return border;
 }
@@ -2519,7 +2521,6 @@ scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getBlo
     
     // TODO: memory costly for big k
     IndexType size= k*k;
-    
     // get, on each processor, the edges of the blocks that are local
     std::vector< std::vector<IndexType> > blockEdges = ParcoRepart<int, double>::getLocalBlockGraphEdges( adjM, part);
     assert(blockEdges[0].size() == blockEdges[1].size());

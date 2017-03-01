@@ -43,6 +43,9 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     //PRINT(*comm << " In writeInFileMetisFormat");
 
+    std::ofstream f;
+    std::string oldFile = filename + "OLD";
+    f.open(oldFile);
     IndexType cols= adjM.getNumColumns() , rows= adjM.getNumRows();
     IndexType i, j;
 
@@ -133,6 +136,38 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
 }
 
 //-------------------------------------------------------------------------------------------------
+/*Given the vector of the coordinates and their dimension, writes them in file "filename".
+ */
+template<typename IndexType, typename ValueType>
+void FileIO<IndexType, ValueType>::writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename){
+    SCAI_REGION( "FileIO.writeCoordsDistributed" )
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr distPtr = coords[0].getDistributionPtr();
+    
+    std::string thisPEFilename = filename + std::to_string(comm->getRank());
+    std::ofstream f(thisPEFilename);
+    if(f.fail())
+        throw std::runtime_error("File "+ thisPEFilename+ " failed.");
+
+    IndexType i, j;
+    IndexType dimension= coords.size();
+
+    assert(coords.size() == dimension );
+    assert(coords[0].size() == numPoints);
+    
+    IndexType localN = distPtr->getLocalSize();
+    
+    scai::hmemo::ReadAccess<ValueType> coordAccess0( coords[0].getLocalValues() );
+    scai::hmemo::ReadAccess<ValueType> coordAccess1( coords[1].getLocalValues() );
+    
+    for(i=0; i<localN; i++){
+        f<< std::setprecision(15)<< coordAccess0[i] << " " << coordAccess1[i] << std::endl;
+    }
+    
+}
+
+//-------------------------------------------------------------------------------------------------
 /*File "filename" contains a graph in the METIS format. The function reads that graph and transforms
  * it to the adjacency matrix as a CSRSparseMatrix.
  */
@@ -189,7 +224,6 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     //now read in local edges
     for (IndexType i = 0; i < localN; i++) {
     	bool read = std::getline(file, line);
-if(read==false) PRINT(*comm << ": "<<line);        
     	assert(read);//if we have read past the end of the file, the node count was incorrect
         std::stringstream ss( line );
         std::string item;
@@ -477,6 +511,7 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
     		std::vector<ValueType> coords = elems.first;
     		std::cout << "Warning: " << std::string("Node at " + std::to_string(coords[0]) + ", " + std::to_string(coords[1]) + ", " + std::to_string(coords[2]) + " inconsistent.");
     	}
+    	assert(elems.second->isConsistent());
     	assert(pendingEdges.count(elems.first) == 0);//list of pending edges was erased when node was handled, new edges should not be added to pending list
     }
 
@@ -514,6 +549,7 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 template void FileIO<int, double>::writeGraph (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
+template void FileIO<int, double>::writeCoordsDistributed_2D (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
 template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::string filename);
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension);
 template std::vector<std::set<std::shared_ptr<SpatialCell> > >  FileIO<int, double>::readQuadTree( std::string filename );

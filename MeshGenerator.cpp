@@ -660,11 +660,11 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
     }
     
     scai::hmemo::ReadAccess<IndexType> readRcvSize( recvSize);
-    
+    /*
     for(IndexType ii=0; ii<recvSize.size(); ii++){
         PRINT(*comm<<"| "<< readRcvSize[ii]);
     }
-
+    */
     
     
     for(IndexType round=1; round<comm->getSize(); round++){

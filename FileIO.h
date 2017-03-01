@@ -45,6 +45,7 @@ public:
 	*/
 	static void writeCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
 
+        static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
 	/** Reads a graph from filename in METIS format and returns the adjacency matrix.
 	 * @param[in] filename The file to read from. In a METIS format.
 	 * @param[out] matrix The adjacency matrix of the graph.

@@ -34,42 +34,6 @@ class ParcoRepartTest : public ::testing::Test {
 };
 
 
-TEST_F(ParcoRepartTest, testPartitionBalanceLocal) {
-  IndexType nroot = 8;
-  IndexType n = nroot * nroot * nroot;
-  IndexType k = 8;
-  IndexType dimensions = 3;
-  const ValueType epsilon = 0.05;
-
-  scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
-  
-  scai::lama::CSRSparseMatrix<ValueType>a(noDistPointer, noDistPointer);
-  std::vector<ValueType> maxCoord(dimensions, nroot);
-  std::vector<IndexType> numPoints(dimensions, nroot);
-
-  std::vector<DenseVector<ValueType>> coordinates(dimensions);
-  for(IndexType i=0; i<dimensions; i++){
-	  coordinates[i].allocate(noDistPointer);
-	  coordinates[i] = static_cast<ValueType>( 0 );
-  }
-  
-  MeshGenerator<IndexType, ValueType>::createStructured3DMesh(a, coordinates, maxCoord, numPoints);
-
-  struct Settings Settings;
-  Settings.numBlocks= k;
-  Settings.epsilon = epsilon;
-  
-  scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, Settings);
-  
-  EXPECT_EQ(n, partition.size());
-  EXPECT_EQ(0, partition.min().getValue<IndexType>());
-  EXPECT_EQ(k-1, partition.max().getValue<IndexType>());
-  EXPECT_TRUE(partition.getDistribution().isReplicated());//for now
-  
-  ParcoRepart<IndexType, ValueType> repart;
-  EXPECT_LE(repart.computeImbalance(partition, k), epsilon);
-}
-
 TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   IndexType nroot = 49;
   IndexType n = nroot * nroot * nroot;
@@ -648,7 +612,7 @@ TEST_F(ParcoRepartTest, testGetInterfaceNodesDistributed) {
 				if (i == 0) {
 					EXPECT_TRUE(directNeighbor);
 				}
-			}		
+			}
 		}
 	}
 }
@@ -1378,14 +1342,15 @@ TEST_F (ParcoRepartTest, testGetMatchingGrid_2D) {
             }
     }
     
-    /*{ // print
+    /*
+    { // print
         std::cout<<"matched edges for "<< *comm << " (local indices) :" << std::endl;
         for(int i=0; i<matching.size(); i++){
             //std::cout<< i<< ":global  ("<< dist->local2global(matching[0][i])<< ":" << dist->local2global(matching[1][i]) << ") # ";
             std::cout<< i<< ": ("<< matching[i].first << ":" << matching[i].second << ") # ";
         }
-    }*/
-
+    }
+    */
 }
 
 
