@@ -42,42 +42,142 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
     SCAI_REGION( "FileIO.writeGraph" )
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     //PRINT(*comm << " In writeInFileMetisFormat");
+    
+    IndexType globalN=0;
+    IndexType root =0;
+    IndexType rank = comm->getRank();
+    IndexType size = comm->getSize();
+    scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
+        
+    if( comm->getRank()==root){
+        globalN = distPtr->getGlobalSize();
+    }
+    //scai::hmemo::HArray<IndexType> globalIA(globalN);
+    //scai::hmemo::HArray<IndexType> globalJA(globalN);
+    
+    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+    scai::hmemo::HArray<IndexType> localIA_HA = localStorage.getIA();
 
-    std::ofstream f;
-    std::string oldFile = filename + "OLD";
-    f.open(oldFile);
+    // copy HArray to ValueType[] for the gather
+    // copy and gather IA array
+    // not copy first element of ia array since it is always 0, only first PE writes the initial 0    
+    IndexType localIAsize;
+    IndexType startIndex;
+    if(rank == 0){
+        localIAsize = localIA_HA.size();
+        startIndex = 0;
+    }else{
+        localIAsize = localIA_HA.size()-1;
+        startIndex = 1;
+    }
+
+    scai::common::scoped_array<ValueType> localIA_ar( new ValueType[localIAsize]);
+    {
+        const scai::hmemo::ReadAccess<IndexType> readIA(localIA_HA);
+        for(IndexType i=startIndex; i<localIA_HA.size(); i++){
+            localIA_ar[i-startIndex] = readIA[i];
+//PRINT(*comm <<": "<< i-startIndex << " $ " << localIA_ar[i-startIndex]);
+        }
+    } //readIA.release();
+    
+    scai::common::scoped_array<ValueType> tmpGlobalIA( new ValueType[globalN + size] );
+    //scai::common::scoped_array<ValueType> globalIA( new ValueType[globalN+1] );
+    std::vector<ValueType> globalIA;
+         
+    for( int i=0; i<globalN+size; i++){
+        tmpGlobalIA[i]= -1;         // trash to clear up later
+    }
+    comm->gather(tmpGlobalIA.get(), localIAsize, root, localIA_ar.get());
+ /*for(int i=0; i<globalN + size; i++){
+    std::cout<<i <<":" <<tmpGlobalIA[i] <<"  ,  ";
+}  */     
+    // indices are not correct since every PE stores local indices in IA and there are
+    // trash since gather expects same size of data from every partner (here takes as localSize
+    // the local size of rank0). Copy to the correct form.
+    IndexType trashCnt= 0;
+    if(rank==root){
+        IndexType prefix = 0;
+        for(IndexType i=0; i<globalN+size; i++){
+            if(tmpGlobalIA[i]!= -1){
+                globalIA.push_back(tmpGlobalIA[i]+ prefix);
+            }else{ //trash
+                ++trashCnt;
+            }
+            if((i+1<globalN+size) and tmpGlobalIA[i+1]<tmpGlobalIA[i]){ 
+                prefix = globalIA.back();
+                //PRINT(i<<" :: " <<prefix);            
+            }
+        }      
+        SCAI_ASSERT(trashCnt == comm->getSize()-1 , "Array from gather not in correct form");
+    }else if(comm->getSize()==1){ //no distribution/communication
+        globalIA.assign(localIA_ar.get(), localIA_ar.get()+ localIAsize);
+    }
+
+for(int i=0; i<globalIA.size(); i++){
+    std::cout<<i <<":" <<globalIA[i] <<"  ,  ";
+}
+  
+
+    //copy and gather JA array
+    scai::hmemo::HArray<IndexType> localJA_HA = localStorage.getJA();
+    scai::common::scoped_array<ValueType> localJA_ar( new ValueType[localJA_HA.size()]);
+    {
+        const scai::hmemo::ReadAccess<IndexType> readJA(localJA_HA);
+        for(IndexType i=0; i<localJA_HA.size(); i++){
+            localJA_ar[i] = readJA[i];
+        }
+    } //readJA.release();
+PRINT(*comm << ": " << localJA_HA.size() );       
+    IndexType globalJAsize = adjM.getNumValues();
+PRINT(globalJAsize);    
+    scai::common::scoped_array<ValueType> globalJA( new ValueType[globalJAsize] );
+    for( int i=0; i<globalJAsize; i++){
+        globalJA[i]= -1;         // trash to clear up later
+    }
+    //
+    // size should be the same for all PEs ...
+    comm->gather(globalJA.get(), 60/*localJA_HA.size()*/, root, localJA_ar.get());
+    //
+for(int i=0; i<globalN; i++){
+    std::cout<< globalJA[i] <<" , ";
+}
+
+
+    // assertion on root
+    if( rank==root){
+        SCAI_ASSERT(globalIA.size()== globalN+1, *comm<< ": Global size "<< globalIA.size() << " is incorrect, should be " << globalN+1);
+    }
     IndexType cols= adjM.getNumColumns() , rows= adjM.getNumRows();
-    IndexType i, j;
-
-    SCAI_REGION_START( "FileIO.writeGraph.newVersion" )
-    // new version
-    std::ofstream fNew;
-    std::string newFile = filename;// + "NEW";
-    fNew.open(newFile);
-
+    
     //assert( true == adjM.checkSymmetry() ); // this can be expensive
     assert(((int) adjM.getNumValues())%2==0); // even number of edges
     assert(cols==rows);
 
-    // first line is number of nodes and edges
-    fNew << cols <<" "<< adjM.getNumValues()/2 << std::endl;
-    //std::cout << cols <<" "<< adjM.getNumValues()/2 << std::endl;
+    std::cout << cols <<" "<< adjM.getNumValues()/2 << std::endl;
 
-    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-    const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-    const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-    //const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
+    
+    if(comm->getRank()==root){
+        SCAI_REGION("FileIO.writeGraph.newVersion.writeInFile");
+        std::ofstream fNew;
+        std::string newFile = filename;
+        fNew.open(newFile);
 
-    for(IndexType i=0; i< ia.size()-1; i++){        // for all local nodes
-    	for(IndexType j=ia[i]; j<ia[i+1]; j++){             // for all the edges of a node
-            SCAI_REGION("FileIO.writeGraph.newVersion.writeInFile");
-            SCAI_ASSERT( j<= ja.size() , j << " must be < "<< ja.size() );
-            fNew << ja[j]+1 << " ";
-    	}
-    	fNew << std::endl;
+        //const scai::hmemo::ReadAccess<IndexType> ia(globalIA);
+        //scai::common::scoped_array<ValueType> ia = globalIA;
+        //const scai::hmemo::ReadAccess<IndexType> ja(globalJA);
+        // first line is number of nodes and edges
+        fNew << cols <<" "<< adjM.getNumValues()/2 << std::endl;
+
+        // globlaIA.size() = globalN+1
+        for(IndexType i=0; i< globalN; i++){        // for all local nodes
+            for(IndexType j=globalIA[i]; j<globalIA[i+1]; j++){             // for all the edges of a node
+                SCAI_ASSERT( globalJA[j]<= globalN , globalJA[j] << " must be < "<< globalN );
+                fNew << globalJA[j]+1 << " ";
+            }
+            fNew << std::endl;
+        }
+        fNew.close();
     }
-    fNew.close();
-    SCAI_REGION_END( "FileIO.writeGraph.newVersion" )
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -186,14 +286,6 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
 	file >> globalN >> globalM;
 
-	if (globalN < 0) {
-		throw std::runtime_error("Invalid node count: " + std::to_string(globalN));
-	}
-
-	if (globalM < 0) {
-		throw std::runtime_error("Invalid edge count: " + std::to_string(globalM));
-	}
-
 	const ValueType avgDegree = ValueType(2*globalM) / globalN;
 
 	//get distribution and local range
@@ -204,9 +296,6 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     IndexType beginLocalRange, endLocalRange;
     scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
     const IndexType localN = endLocalRange - beginLocalRange;
-
-    assert(localN >= 0);
-    assert(localN <= globalN);
 
     //scroll to begin of local range. Neighbors of node i are in line i+1
     std::string line;
@@ -232,7 +321,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         while (std::getline(ss, item, ' ')) {
         	IndexType neighbor = std::stoi(item)-1;//-1 because of METIS format
         	if (neighbor >= globalN || neighbor < 0) {
-        		throw std::runtime_error("Found illegal neighbor " + std::to_string(neighbor) + " in line " + std::to_string(i+beginLocalRange) + " of file" + filename + " for PE " + std::to_string( comm->getRank()) );
+        		throw std::runtime_error("Found illegal neighbor " + std::to_string(neighbor) + " in line " + std::to_string(i+beginLocalRange));
         	}
         	//std::cout << "Converted " << item << " to " << neighbor << std::endl;
         	neighbors.push_back(neighbor);
@@ -355,7 +444,6 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
     IndexType duplicateNeighbors = 0;
 
     std::string line;
-    IndexType nodeID = 0;
     while (std::getline(file, line)) {
     	std::vector<ValueType> values;
     	std::stringstream ss( line );
@@ -406,8 +494,6 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 
 		//create own cell and add to node map
 		std::shared_ptr<QuadNodeCartesianEuclid> quadNodePointer(new QuadNodeCartesianEuclid(minCoords, maxCoords));
-		quadNodePointer->setID(nodeID);
-		nodeID++;
 		assert(nodeMap.count(ownCoords) == 0);
 		nodeMap[ownCoords] = quadNodePointer;
 		assert(confirmedEdges.count(ownCoords) == 0);
@@ -427,8 +513,6 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 		if (parentCoords[0] != -1 && nodeMap.count(parentCoords) == 0) {
 			std::tie(minCoords, maxCoords) = getBoundingCoords(parentCoords, level+1);
 			std::shared_ptr<QuadNodeCartesianEuclid> parentPointer(new QuadNodeCartesianEuclid(minCoords, maxCoords));
-			parentPointer->setID(nodeID);
-			nodeID++;
 			nodeMap[parentCoords] = parentPointer;
 			assert(confirmedEdges.count(parentCoords) == 0);
 			confirmedEdges[parentCoords] = {};
@@ -509,7 +593,7 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
     	bool consistent = elems.second->isConsistent();
     	if (!consistent) {
     		std::vector<ValueType> coords = elems.first;
-    		std::cout << "Warning: " << std::string("Node at " + std::to_string(coords[0]) + ", " + std::to_string(coords[1]) + ", " + std::to_string(coords[2]) + " inconsistent.");
+    		throw std::runtime_error("Node at " + std::to_string(coords[0]) + ", " + std::to_string(coords[1]) + ", " + std::to_string(coords[2]) + " inconsistent.");
     	}
     	assert(elems.second->isConsistent());
     	assert(pendingEdges.count(elems.first) == 0);//list of pending edges was erased when node was handled, new edges should not be added to pending list

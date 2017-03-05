@@ -16,6 +16,7 @@
 #include <memory>
 #include <cstdlib>
 #include <numeric>
+#include <chrono>
 
 #include "MeshGenerator.h"
 #include "FileIO.h"
@@ -1327,8 +1328,9 @@ TEST_F (ParcoRepartTest, testGetMatchingGrid_2D) {
     //check distributions
     //assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
 
-    //std::vector<std::vector<IndexType>> matching = ParcoRepart<IndexType, ValueType>::maxLocalMatching( graph );
-    std::vector<std::pair<IndexType,IndexType>> matching = ParcoRepart<IndexType, ValueType>::maxLocalMatching( graph );
+    DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+
+    std::vector<std::pair<IndexType,IndexType>> matching = ParcoRepart<IndexType, ValueType>::maxLocalMatching( graph, uniformWeights );
     //assert( matching[0].size() == matching[1].size() );
     
     // check matching to see if a node appears twice somewhere
@@ -1357,7 +1359,8 @@ TEST_F (ParcoRepartTest, testGetMatchingGrid_2D) {
 //------------------------------------------------------------------------------
 
 TEST_F (ParcoRepartTest, testCoarseningGrid_2D) {
-     std::string file = "Grid8x8";
+    //std::string file = "Grid8x8";
+    std::string file = "meshes/slowrot/slowrot-00010.graph";
     std::ifstream f(file);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;
@@ -1395,10 +1398,11 @@ TEST_F (ParcoRepartTest, testCoarseningGrid_2D) {
     // coarsen the graph
     CSRSparseMatrix<ValueType> coarseGraph;
     DenseVector<IndexType> fineToCoarseMap;
-    ParcoRepart<IndexType, ValueType>::coarsen(graph, coarseGraph, fineToCoarseMap);
-    
+    DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+
+    ParcoRepart<IndexType, ValueType>::coarsen(graph, uniformWeights, coarseGraph, fineToCoarseMap);
     EXPECT_TRUE(coarseGraph.isConsistent());
-    EXPECT_TRUE(coarseGraph.checkSymmetry());
+//    EXPECT_TRUE(coarseGraph.checkSymmetry());
     DenseVector<IndexType> sortedMap(fineToCoarseMap);
     sortedMap.sort(true);
     scai::hmemo::ReadAccess<IndexType> localSortedValues(sortedMap.getLocalValues());
@@ -1407,6 +1411,54 @@ TEST_F (ParcoRepartTest, testCoarseningGrid_2D) {
         EXPECT_TRUE(localSortedValues[i-1] == localSortedValues[i] || localSortedValues[i-1] == localSortedValues[i]-1);
         EXPECT_LE(localSortedValues[i], coarseGraph.getNumRows());
     }
+}
+
+//------------------------------------------------------------------------------
+
+TEST_F (ParcoRepartTest, testCommSum) {
+    
+    IndexType res= 6;
+    IndexType dim= 3;
+    // in total we have (2^d)^res = side^res
+    IndexType side = std::pow(2, dim);
+    IndexType numCubes = std::pow( side, res);
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, numCubes) );  
+    /*
+    scai::lama::DenseVector<IndexType> density( dist );    
+    scai::hmemo::HArray<IndexType> localDensity = density.getLocalValues();
+    scai::hmemo::WriteOnlyAccess<IndexType> wLocal( localDensity );
+    IndexType localN = localDensity.size();
+    */
+    std::vector<IndexType> localDensity(numCubes);
+    for(IndexType i=0; i<numCubes; i++){
+        localDensity[i] = comm->getRank();
+    }
+    //wLocal.release();
+    
+    std::chrono::time_point<std::chrono::steady_clock> start= std::chrono::steady_clock::now();
+    
+    std::vector<IndexType> sumDensity(numCubes, 0 );
+    for(IndexType i=0; i<numCubes; i++){
+        sumDensity[i] = comm->sum(localDensity[i]);
+    }
+    
+    IndexType size = comm->getSize();
+    IndexType expectedSum = size*(size-1)/2;
+        
+    std::chrono::duration<double> elapsedSeconds = std::chrono::steady_clock::now()-start;
+    
+    if(comm->getRank() == 0){
+        PRINT("array size= "<< numCubes << " , num of PEs: "<< comm->getSize() << " , time for communication: " << elapsedSeconds.count() );
+    }
+    
+    //check validity
+    for(IndexType i=0; i<numCubes; i++){
+        EXPECT_EQ( sumDensity[i], expectedSum);
+    }
+    
+    
 }
 
 //------------------------------------------------------------------------------

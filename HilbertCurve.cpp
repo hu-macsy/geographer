@@ -105,7 +105,9 @@ DenseVector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(
 	DenseVector<ValueType>  p(2,0), ret(2,0);
 	ValueType r;
 	IndexType q;
-
+        if(index>1){
+            throw std::runtime_error("Index: " + std::to_string(index) +" for hilbert curve must be >0 and <1");
+        }
 	if(level==0)
 		return ret;
 	else{

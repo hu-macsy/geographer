@@ -81,6 +81,27 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
 
 //-------------------------------------------------------------------------------------------------
 
+TEST_F(HilbertCurveTest, testInverseHilbertIndex_Local_2D) {
+  const IndexType dimensions = 2;
+  const IndexType recursionDepth = 7;
+  
+  ValueType divisor=16;
+  for(int i=0; i<divisor; i++){
+    DenseVector<ValueType> point = HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point( double(i)/divisor, recursionDepth);
+    
+    assert(point.size()==2);
+    ValueType x = point.getLocalValues()[0];
+    ValueType y = point.getLocalValues()[1];
+    PRINT(i << ": 1D index= \t"<< double(i)/divisor << " >> \t( "<< x <<" , "<< y << " )");
+    assert(x<=1);
+    assert(x>=0);
+    assert(y<=1);
+    assert(y>=0);
+  }
+    
+}    
+//-------------------------------------------------------------------------------------------------
+
 /* Read from file and test hilbert indices.
  * */
 TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {

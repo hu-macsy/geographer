@@ -28,10 +28,26 @@
 #include "ParcoRepart.h"
 #include "HilbertCurve.h"
 
+#include "FileIO.h"
+
 #include "quadtree/QuadTreeCartesianEuclid.h"
 
 namespace ITI {
 
+template<typename IndexType, typename ValueType>
+void writeHeatLike_local(DenseVector<ValueType> input, IndexType dim, const std::string filename){
+    std::ofstream f(filename);
+    if(f.fail())
+        throw std::runtime_error("File "+ filename+ " failed.");
+    
+    for(IndexType i=0; i<input.size(); i++){
+        for(IndexType d=0; d<dim; d++){
+            f<< i*dim +d<< " ";
+        }
+    }
+
+}    
+    
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings)
 {
@@ -135,6 +151,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		// trying the new version of getHilbertIndex
                 
 		scai::lama::DenseVector<ValueType> hilbertIndices(inputDist);
+PRINT(*comm << ": initial local size "<<hilbertIndices.getLocalValues().size());                
+                
 		// get local part of hilbert indices
 		scai::utilskernel::LArray<ValueType>& hilbertIndicesLocal = hilbertIndices.getLocalValues();
 
@@ -159,7 +177,41 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				hilbertIndicesLocal[i] = globalHilbertIndex;
 			}
 		}
-		
+//============	
+		// care: res must be even
+		IndexType res=4, numSquares =std::pow(2,res) ;
+                std::vector<IndexType> density( numSquares , 0);
+                for(int i=0; i<localN; i++){
+                    int square = int(hilbertIndicesLocal[i]*numSquares);
+                    assert(square < numSquares);
+                    ++density[square];
+                }
+
+                std::vector<IndexType> sumDensity( numSquares , 0);
+                for(int i=0; i<numSquares; i++){
+                    sumDensity[i] = comm->sum(density[i]);
+                }
+                if(comm->getRank()==0){
+                    for(int i=0; i<numSquares; i++){
+                        std::cout<<*comm <<": "<< i << ", "<< sumDensity[i] << std::endl;
+                    }
+                }
+                
+                // from a 1D DenseVector get a 2D array
+                // edge side = 2^(res/2), 
+                IndexType squareSide = std::pow(2, res/2);
+                std::vector<std::vector<IndexType>> heatmap(squareSide, std::vector<IndexType> (squareSide));
+                for(IndexType d1=0; d1<numSquares; d1++){         
+                        DenseVector<ValueType> twoDimPoint = HilbertCurve<IndexType,ValueType>::Hilbert2DIndex2Point( ValueType( d1)/numSquares, res+1);
+                        SCAI_ASSERT(twoDimPoint.size()==2, "Wrong point dimension");
+                        ValueType x = twoDimPoint.getLocalValues()[0];
+                        ValueType y = twoDimPoint.getLocalValues()[1];
+                        SCAI_ASSERT(x <squareSide, "Too big index");
+                        SCAI_ASSERT(y<squareSide, "Too big index");
+                        heatmap[x][y] = sumDensity[d1];
+if(comm->getRank()==0)PRINT(ValueType( d1)/numSquares << " >> "<< x << " - " << y << " as indices: "<< int( x*squareSide) << " - "<< int(y*squareSide));                                                     
+                }
+//^^^^^^^^^^^^^^^^^^^                
 		
 		/**
 		* now sort the global indices by where they are on the space-filling curve.
@@ -168,6 +220,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         {
 			SCAI_REGION( "ParcoRepart.partitionGraph.initialPartition.sorting" )
 			hilbertIndices.sort(permutation, true);
+scai::hmemo::WriteAccess<ValueType> wHilbIndex( hilbertIndices.getLocalValues() );  
+ValueType* maxElem =  std::max_element(wHilbIndex.get(),wHilbIndex.get()+wHilbIndex.size());
+ValueType* minElem =  std::min_element(wHilbIndex.get(),wHilbIndex.get()+wHilbIndex.size());
+PRINT(*comm << ": min hilbIndex= "<< *minElem << "  and max= "<< *maxElem);
+PRINT(*comm << ": hilbertIndex size after sorting "<<hilbertIndices.getLocalValues().size());              
         }
 
 		/**
@@ -178,6 +235,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 			scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(n, comm));
 			permutation.redistribute(blockDist);
+PRINT(*comm << ": permutation size after redistribution "<<permutation.getLocalValues().size());                        
 			scai::hmemo::WriteAccess<IndexType> wPermutation( permutation.getLocalValues() );
 			std::sort(wPermutation.get(), wPermutation.get()+wPermutation.size());
 			wPermutation.release();
@@ -191,6 +249,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				for (IndexType dim = 0; dim < dimensions; dim++) {
 					coordinates[dim].redistribute(newDistribution);
 				}
+ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, n, "debugRepart");
 			}
 
 		} else {
@@ -799,7 +858,21 @@ std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::distancesFromBloc
 		assert(localValues.size() == localN);
 		geometricCenter[dim] = localValues.sum() / localN;
 	}
-
+//===========
+/*
+std::fstream fs;
+fs.open("hugetric-00_centers", std::fstream::app);
+scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();	
+std::cout<< __LINE__<< " , "<< *comm<< ": geom center= ";
+fs<< *comm << " center= ";
+for(int d=0; d<dimensions; d++){
+    fs<< geometricCenter[d]<< ", ";
+    std::cout <<  geometricCenter[d]<< ", ";
+}
+std::cout << "\b\b" << std::endl;
+fs<< "\b\b"<< std::endl;
+*/
+// ^^^^^^^^^^^^^^^^^^^
 	std::vector<ValueType> result(localN);
 	for (IndexType i = 0; i < localN; i++) {
 		ValueType distanceSquared = 0;
@@ -1217,7 +1290,7 @@ IndexType ITI::ParcoRepart<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix
 		if (comm->getRank() == 0) {
 			std::cout << "Beginning coarsening, still " << settings.multiLevelRounds << " levels to go." << std::endl;
 		}
-		ParcoRepart<IndexType, ValueType>::coarsen(input, coarseGraph, fineToCoarseMap);
+		ParcoRepart<IndexType, ValueType>::coarsen(input, nodeWeights, coarseGraph, fineToCoarseMap);
 		if (comm->getRank() == 0) {
 			std::cout << "Coarse graph has " << coarseGraph.getNumRows() << " nodes." << std::endl;
 		}
@@ -1596,6 +1669,8 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 			/**
 			 * execute FM locally
 			 */
+                        //IndexType gain = twoWayLocalDiffusion(input, haloMatrix, graphHalo, borderRegionIDs,                                                              secondRoundMarkers, assignedToSecondBlock, maxBlockSizes,  blockSizes, settings);
+                        
 			IndexType gain = twoWayLocalFM(input, haloMatrix, graphHalo, borderRegionIDs, borderNodeWeights, secondRoundMarkers, assignedToSecondBlock, maxBlockSizes, blockSizes, tieBreakingKeys, settings);
 
 			{
@@ -1712,8 +1787,10 @@ std::vector<IndexType> ITI::ParcoRepart<IndexType, ValueType>::distributedFMStep
 						comm->updateHalo( haloData, localCoords, graphHalo );
 						redistributeFromHalo<ValueType>(coordinates[dim], newDistribution, graphHalo, haloData);
 					}
-
-					distances = distancesFromBlockCenter(coordinates);
+//==================
+// not update
+distances = distancesFromBlockCenter(coordinates);
+//^^^^^^^^^^^^^^^^^^
 				}
 			}
 		}
@@ -2695,7 +2772,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& adjM){
+std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& adjM, const DenseVector<IndexType> &nodeWeights){
 	SCAI_REGION("ParcoRepart.maxLocalMatching");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -2723,6 +2800,10 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
     // keep track of which nodes are already matched
     std::vector<bool> matched(localN, false);
     
+    // get local part of node weights
+    scai::utilskernel::LArray<IndexType> localNodeWeights = nodeWeights.getLocalValues();
+    scai::hmemo::ReadAccess<IndexType> rLocalNodeWeights( localNodeWeights );
+    
     // localNode is the local index of a node
     for(IndexType localNode=0; localNode<localN; localNode++){
         // if the node is already matched go to the next one;
@@ -2731,14 +2812,19 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
         }
         
         IndexType bestTarget = -1;
+        ValueType maxEdgeRating = -1;
         const IndexType endCols = ia[localNode+1];
         for (IndexType j = ia[localNode]; j < endCols; j++) {
         	IndexType localNeighbor = distPtr->global2local(ja[j]);
         	if (localNeighbor != nIndex && localNeighbor != localNode && !matched[localNeighbor]) {
         		//neighbor is local and unmatched, possible partner
-        		if (bestTarget < 0 || values[j] > values[bestTarget]) {
+        		//if (bestTarget < 0 || values[j] > values[bestTarget]) {
+                        ValueType thisEdgeRating = values[j]*values[j]/(rLocalNodeWeights[localNode]*rLocalNodeWeights[localNeighbor]);
+//PRINT(thisEdgeRating);                        
+                        if (bestTarget < 0 || values[j] > maxEdgeRating) {
         			//either we haven't found any target yet, or the current one is better
         			bestTarget = j;
+                                maxEdgeRating = thisEdgeRating;
         		}
         	}
         }
@@ -2762,7 +2848,26 @@ std::vector<std::pair<IndexType,IndexType>> ParcoRepart<IndexType, ValueType>::m
     }
     
     assert(ia[ia.size()-1] >= totalNbrs);
-    
+// check if a matching is maximal  
+/*    
+// for all nodes
+for(IndexType localNode=0; localNode<localN; localNode++){
+    if(matched[localNode]){
+        continue;
+    }    
+    // for all edges of localNode
+    const IndexType endCols = ia[localNode+1];
+    for (IndexType j = ia[localNode]; j < endCols; j++) {    
+        IndexType localNeighbor = distPtr->global2local(ja[j]);
+        // if localNode and localNeighbor are not matched then matching in not maximal
+        if(localNeighbor != nIndex && matched[localNeighbor]==false){
+            PRINT(*comm << ": Unmatched edge: (" <<localNode << ", " << localNeighbor << ") , matching not maximal." );
+        }
+    }
+}
+*/ 
+IndexType numMatched = std::accumulate(matched.begin(), matched.end(), 0);    
+PRINT(*comm << ": input size= "<< localN << ",  size of matching= "<< matching.size() << " , numMatched= " << numMatched );
     return matching;
 }
 
@@ -2971,7 +3076,7 @@ DenseVector<T> ParcoRepart<IndexType, ValueType>::computeGlobalPrefixSum(DenseVe
 //-------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-void ParcoRepart<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations) {
+void ParcoRepart<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, DenseVector<IndexType> &nodeWeights, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations) {
 	SCAI_REGION("ParcoRepart.coarsen");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -2990,8 +3095,8 @@ void ParcoRepart<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>
     assert(ia.size()-1 == localN );
      
     //get a matching, the returned indices are from 0 to localN
-    std::vector<std::pair<IndexType,IndexType>> matching = ParcoRepart<IndexType, ValueType>::maxLocalMatching( adjM );
-    
+    std::vector<std::pair<IndexType,IndexType>> matching = ParcoRepart<IndexType, ValueType>::maxLocalMatching( adjM , nodeWeights );
+  
     std::vector<IndexType> localMatchingPartner(localN, -1);
 
     // number of new local nodes
@@ -3210,9 +3315,9 @@ template std::vector< std::vector<int>>  ParcoRepart<int, double>::getGraphEdgeC
 
 template std::vector<DenseVector<int>> ParcoRepart<int, double>::getCommunicationPairs_local( CSRSparseMatrix<double> &adjM);
 
-template std::vector<std::pair<int,int>> ParcoRepart<int, double>::maxLocalMatching(const scai::lama::CSRSparseMatrix<double>& graph);
+template std::vector<std::pair<int,int>> ParcoRepart<int, double>::maxLocalMatching(const scai::lama::CSRSparseMatrix<double>& graph, const DenseVector<int> &nodeWeights);
 
-template void ParcoRepart<int, double>::coarsen(const CSRSparseMatrix<double>& inputGraph, CSRSparseMatrix<double>& coarseGraph, DenseVector<int>& fineToCoarse, int iterations);
+template void ParcoRepart<int, double>::coarsen(const CSRSparseMatrix<double>& inputGraph, DenseVector<int> &nodeWeights, CSRSparseMatrix<double>& coarseGraph, DenseVector<int>& fineToCoarse, int iterations);
 
 template DenseVector<int> ParcoRepart<int, double>::computeGlobalPrefixSum(DenseVector<int> input, int offset);
 

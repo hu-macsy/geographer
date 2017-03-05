@@ -153,22 +153,22 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     //
 
     //read the adjacency matrix from a file
-    std::cout<<"reading adjacency matrix from file: "<< grFile<<" for k="<< k<< std::endl;
+    //std::cout<<"reading adjacency matrix from file: "<< grFile<<" for k="<< k<< std::endl;
     scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, nodes) );
     scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( nodes ));
 
     SCAI_REGION_START("testPartitionFromFile_local_2D.readGraphFromFile");
         graph = FileIO<IndexType, ValueType>::readGraph( grFile );
         graph.redistribute( distPtr , noDistPtr);
-        std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
+        //std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
     SCAI_REGION_END("testPartitionFromFile_local_2D.readGraphFromFile");
 
     // N is the number of nodes
     IndexType N= graph.getNumColumns();
     EXPECT_EQ(nodes,N);
 
-    //read the coordinates from a file
-    std::cout<<"reading coordinates from file: "<< coordFile<< std::endl;
+    //read the coordiantes from a file
+    //std::cout<<"reading coordinates from file: "<< coordFile<< std::endl;
 
     SCAI_REGION_START("testPartitionFromFile_local_2D.readFromFile2Coords_2D");
     std::vector<DenseVector<ValueType>> coords2D = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dim);
@@ -177,6 +177,13 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
 
     EXPECT_EQ(coords2D.size(), dim);
     EXPECT_EQ(coords2D[0].size(), N);
+
+    // print
+    /*
+    for(IndexType i=0; i<N; i++){
+        std::cout<< i<< ": "<< *comm<< " - " <<coords2D[0].getLocalValues()[i] << " , " << coords2D[1].getLocalValues()[i] << std::endl;
+    }
+    */
 
     SCAI_REGION_START("testPartitionFromFile_local_2D.partition");
 
@@ -216,14 +223,10 @@ TEST_F(FileIOTest, testWriteCoordsDistributed){
 
 
 TEST_F(FileIOTest, testReadQuadTree){
-	std::string filename = "octree_timestep_0.dat";
+	std::string filename = "cells.dat";
 
 	std::vector<std::set<std::shared_ptr<SpatialCell> > > edgeList = FileIO<IndexType, ValueType>::readQuadTree(filename);
-	IndexType m = 0;
-	for (std::set<std::shared_ptr<SpatialCell> > edgeSet : edgeList) {
-		m += edgeSet.size();
-	}
-
+	IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
 	std::cout << "Read Quadtree with " << edgeList.size() << " nodes and " << m << " edges." << std::endl;
 }
 
