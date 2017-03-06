@@ -91,6 +91,7 @@ TEST_F(ParcoRepartTest, testImbalance) {
   scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
 
   //generate random partition
+  srand(time(NULL));
   scai::lama::DenseVector<IndexType> part(dist);
   for (IndexType i = 0; i < n; i++) {
     IndexType blockId = rand() % k;

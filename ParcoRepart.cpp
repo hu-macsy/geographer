@@ -209,7 +209,7 @@ PRINT(*comm << ": initial local size "<<hilbertIndices.getLocalValues().size());
                         SCAI_ASSERT(x <squareSide, "Too big index");
                         SCAI_ASSERT(y<squareSide, "Too big index");
                         heatmap[x][y] = sumDensity[d1];
-if(comm->getRank()==0)PRINT(ValueType( d1)/numSquares << " >> "<< x << " - " << y << " as indices: "<< int( x*squareSide) << " - "<< int(y*squareSide));                                                     
+//if(comm->getRank()==0)PRINT(ValueType( d1)/numSquares << " >> "<< x << " - " << y << " as indices: "<< int( x*squareSide) << " - "<< int(y*squareSide));                                                     
                 }
 //^^^^^^^^^^^^^^^^^^^                
 		
@@ -223,7 +223,7 @@ if(comm->getRank()==0)PRINT(ValueType( d1)/numSquares << " >> "<< x << " - " << 
 scai::hmemo::WriteAccess<ValueType> wHilbIndex( hilbertIndices.getLocalValues() );  
 ValueType* maxElem =  std::max_element(wHilbIndex.get(),wHilbIndex.get()+wHilbIndex.size());
 ValueType* minElem =  std::min_element(wHilbIndex.get(),wHilbIndex.get()+wHilbIndex.size());
-PRINT(*comm << ": min hilbIndex= "<< *minElem << "  and max= "<< *maxElem);
+//PRINT(*comm << ": min hilbIndex= "<< *minElem << "  and max= "<< *maxElem);
 PRINT(*comm << ": hilbertIndex size after sorting "<<hilbertIndices.getLocalValues().size());              
         }
 
@@ -235,7 +235,7 @@ PRINT(*comm << ": hilbertIndex size after sorting "<<hilbertIndices.getLocalValu
 
 			scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(n, comm));
 			permutation.redistribute(blockDist);
-PRINT(*comm << ": permutation size after redistribution "<<permutation.getLocalValues().size());                        
+//PRINT(*comm << ": permutation size after redistribution "<<permutation.getLocalValues().size());                        
 			scai::hmemo::WriteAccess<IndexType> wPermutation( permutation.getLocalValues() );
 			std::sort(wPermutation.get(), wPermutation.get()+wPermutation.size());
 			wPermutation.release();
@@ -1302,15 +1302,16 @@ IndexType ITI::ParcoRepart<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix
 		}
 
 		DenseVector<IndexType> coarsePart = DenseVector<IndexType>(coarseGraph.getRowDistributionPtr(), comm->getRank());
-
+PRINT("nodeWeights.size= "<< nodeWeights.size() );
 		DenseVector<IndexType> coarseWeights = sumToCoarse(nodeWeights, fineToCoarseMap);
-
+PRINT("coarseWeights.size= "<< coarseWeights.size());
 		assert(coarseWeights.sum().Scalar::getValue<IndexType>() == nodeWeights.sum().Scalar::getValue<IndexType>());
 
 		Settings settingscopy(settings);
 		settingscopy.multiLevelRounds--;
 		multiLevelStep(coarseGraph, coarsePart, coarseWeights, coarseCoords, settingscopy);
-
+                
+                // uncoarsening/refinement step
 		scai::dmemo::DistributionPtr projectedFineDist = projectToFine(coarseGraph.getRowDistributionPtr(), fineToCoarseMap);
 		assert(projectedFineDist->getGlobalSize() == globalN);
 		part = DenseVector<IndexType>(projectedFineDist, comm->getRank());
@@ -1325,7 +1326,8 @@ IndexType ITI::ParcoRepart<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix
 
 		nodeWeights.redistribute(projectedFineDist);
 	}
-
+    
+        //local refinement while uncoarsening
 	if (settings.multiLevelRounds % settings.coarseningStepsBetweenRefinement == 0) {
 		scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getPEGraph(input);
 
