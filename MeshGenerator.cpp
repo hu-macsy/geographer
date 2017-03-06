@@ -21,82 +21,6 @@ using std::istringstream;
 
 namespace ITI{
 
-template<typename IndexType, typename ValueType>
-void MeshGenerator<IndexType, ValueType>::createRandom3DMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const int numberOfPoints, const ValueType maxCoord) {
-    SCAI_REGION( "MeshGenerator.createRandom3DMesh" )
-
-    int n = numberOfPoints;
-    int i, j;
-    
-    coords = MeshGenerator::randomPoints(n, 3, maxCoord);
- 
-    srand(time(NULL));    
-    int bottom= 4, top= 8;
-    Scalar dist;
-    common::scoped_array<ValueType> adjArray( new ValueType[ n*n ]);
-    //initialize matrix with zeros
-    for(i=0; i<n; i++)
-        for(j=0; j<n; j++)
-            adjArray[i*n+j]=0;
-        
-    for(i=0; i<n; i++){
-        int k= ((int) rand()%(top-bottom) + bottom);
-        std::list<ValueType> kNNdist(k,maxCoord*1.7);       //max distance* sqrt(3)
-        std::list<IndexType> kNNindex(k,0);
-        typename std::list<ValueType>::iterator liVal;
-        typename std::list<IndexType>::iterator liIndex = kNNindex.begin();
-  
-        for(j=0; j<n; j++){
-            if(i==j) continue;
-            DenseVector<ValueType> p1(3,0), p2(3,0);
-            p1.setValue(0, coords[0].getValue(i));
-            p1.setValue(1, coords[1].getValue(i));
-            p1.setValue(2, coords[2].getValue(i));
-            
-            p2.setValue(0, coords[0].getValue(j));
-            p2.setValue(1, coords[1].getValue(j));
-            p2.setValue(2, coords[2].getValue(j));
-            
-            dist = MeshGenerator<IndexType, ValueType>::dist3D(p1 ,p2);
-
-            liIndex= kNNindex.begin();
-            for(liVal=kNNdist.begin(); liVal!=kNNdist.end(); ++liVal){
-                if(dist.getValue<ValueType>()< (*liVal)*(*liVal) ){
-                    kNNindex.insert(liIndex, j);
-                    kNNdist.insert(liVal , dist.getValue<ValueType>());
-                    kNNindex.pop_back();
-                    kNNdist.pop_back();
-                    break;
-                }
-                if(liIndex!=kNNindex.end()) ++liIndex;
-                else break;
-            }
-        }    
-        kNNindex.sort();
-        liIndex= kNNindex.begin();
-
-        for(IndexType col=0; col<n; col++){
-            if(col== *liIndex){
-                //undirected graph, symmetric adjacency matrix
-                adjArray[i*n +col] = 1;
-                adjArray[col*n +i] = 1;
-                if(liIndex!=kNNindex.end()) ++liIndex;
-                else  break;
-            }
-        }   
-    }
-    
-    //brute force zero in the diagonal
-    //TODO: should not be needed but sometimes ones appear in the diagonal
-    for(i=0; i<n; i++) 
-        adjArray[i*n +i]=0;
-    
-    //TODO: NoDistribution should be "BLOCK"?
-    //dmemo::DistributionPtr rep( new dmemo::NoDistribution( n ));
-    adjM.setRawDenseData( n, n, adjArray.get() );
-    assert(adjM.checkSymmetry() );
- 
-}
 //-------------------------------------------------------------------------------------------------
 // coords.size()= 3 , coords[i].size()= N
 // here, N= numPoints[0]*numPoints[1]*numPoints[2]
@@ -974,13 +898,21 @@ std::tuple<IndexType, IndexType, IndexType> MeshGenerator<IndexType, ValueType>:
 }
 
 //-------------------------------------------------------------------------------------------------
-template void MeshGenerator<int, double>::createRandom3DMesh(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, const int numberOfPoints,const double maxCoord);
+
 template void MeshGenerator<int, double>::createStructured3DMesh(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
+
 template void MeshGenerator<int, double>::createStructured3DMesh_dist(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
+
 template void MeshGenerator<int, double>::createRandomStructured3DMesh_dist(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
+
 template void MeshGenerator<int, double>::createQuadMesh( CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords,const int dimensions, const int numberOfPoints,  const int pointsPerArea, const double maxCoord);
+
 template std::vector<DenseVector<double>> MeshGenerator<int, double>::randomPoints(int numberOfPoints, int dimensions, double maxCoord);
+
 template Scalar MeshGenerator<int, double>::dist3D(DenseVector<double> p1, DenseVector<double> p2);
+
 template double MeshGenerator<int, double>::dist3DSquared(std::tuple<int, int, int> p1, std::tuple<int, int, int> p2);
+
 template std::tuple<IndexType, IndexType, IndexType> MeshGenerator<int, double>::index2_3DPoint(int index,  std::vector<int> numPoints);
+
 } //namespace ITI
