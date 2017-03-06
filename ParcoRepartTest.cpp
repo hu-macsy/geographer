@@ -23,6 +23,8 @@
 #include "ParcoRepart.h"
 #include "gtest/gtest.h"
 
+#include "AuxiliaryFunctions.h"
+
 typedef double ValueType;
 typedef int IndexType;
 
@@ -1461,7 +1463,55 @@ TEST_F (ParcoRepartTest, testCommSum) {
     
     
 }
+//-------------------------------------------------------------------------
 
+TEST_F(ParcoRepartTest, testMYPartitionBalanceDistributed) {
+  IndexType nroot = 49;
+  IndexType n = nroot * nroot * nroot;
+  IndexType dimensions = 3;
+  
+  scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+  IndexType k = comm->getSize();
+
+  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+  scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+  
+  scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
+  std::vector<ValueType> maxCoord(dimensions, nroot);
+  std::vector<IndexType> numPoints(dimensions, nroot);
+
+  std::vector<DenseVector<ValueType>> coordinates(dimensions);
+  for(IndexType i=0; i<dimensions; i++){ 
+	  coordinates[i].allocate(dist);
+	  coordinates[i] = static_cast<ValueType>( 0 );
+  }
+  
+  MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(a, coordinates, maxCoord, numPoints);
+
+  const ValueType epsilon = 0.05;
+  
+  struct Settings Settings;
+  Settings.numBlocks= k;
+  Settings.epsilon = epsilon;
+  
+  scai::lama::DenseVector<IndexType> partition = aux::MYpartitionGraph(a, coordinates, Settings);
+
+  EXPECT_GE(k-1, partition.getLocalValues().max() );
+  EXPECT_EQ(n, partition.size());
+  EXPECT_EQ(0, partition.min().getValue<ValueType>());
+  EXPECT_EQ(k-1, partition.max().getValue<ValueType>());
+  EXPECT_EQ(a.getRowDistribution(), partition.getDistribution());
+
+  ParcoRepart<IndexType, ValueType> repart;
+  EXPECT_LE(repart.computeImbalance(partition, k), epsilon);
+
+  const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(a, partition, true);
+
+  if (comm->getRank() == 0) {
+	  std::cout << "Commit " << version << ": Partitioned graph with " << n << " nodes into " << k << " blocks with a total cut of " << cut << std::endl;
+  }
+}
 //------------------------------------------------------------------------------
 
 /**

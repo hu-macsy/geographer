@@ -34,19 +34,6 @@
 
 namespace ITI {
 
-template<typename IndexType, typename ValueType>
-void writeHeatLike_local(DenseVector<ValueType> input, IndexType dim, const std::string filename){
-    std::ofstream f(filename);
-    if(f.fail())
-        throw std::runtime_error("File "+ filename+ " failed.");
-    
-    for(IndexType i=0; i<input.size(); i++){
-        for(IndexType d=0; d<dim; d++){
-            f<< i*dim +d<< " ";
-        }
-    }
-
-}    
     
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings)
