@@ -1,10 +1,14 @@
 CC=g++
 
 SRCS=$(wildcard *.cpp)
-OBJ_GOOGLETEST= test_main.o ParcoRepartTest.o ParcoRepart.o HilbertCurve.o HilbertCurveTest.o MeshGenerator.o FileIO.o FileIOTest.o PrioQueueForInts.o quadtree/test/QuadTreeTest.o
-OBJ_TEST_MAIN= mainTest.o ParcoRepart.o HilbertCurve.o MeshGenerator.o FileIO.o PrioQueueForInts.o
+OBJ_GOOGLETEST= test_main.o ParcoRepartTest.o ParcoRepart.o MultiLevelTest.o MultiLevel.o LocalRefinementTest.o LocalRefinement.o HilbertCurve.o HilbertCurveTest.o MeshGenerator.o FileIO.o FileIOTest.o PrioQueueForInts.o quadtree/test/QuadTreeTest.o
+OBJ_TEST_MAIN= mainTest.o ParcoRepart.o MultiLevel.o LocalRefinement.o HilbertCurve.o MeshGenerator.o FileIO.o PrioQueueForInts.o
+OBJ_GRAPH_GEN=  ParcoRepart.o HilbertCurve.o MeshGenerator.o FileIO.o graphGeneratorFromQuad.o
+
 EXECUTABLE_GOOGLETEST=KatanomiTest
 EXECUTABLE_MAIN=Katanomi
+EXECUTABLE_GRAPH_GEN= graphGen
+
 GIT_COMMIT=$(shell git rev-parse --short HEAD)
 SCAI_INCLUDE=
 SCAI_LIB=
@@ -23,9 +27,12 @@ tests: $(OBJ_GOOGLETEST)
 main: $(OBJ_TEST_MAIN)
 	$(CC) $(CCFLAGS) $(OBJ_TEST_MAIN) -o $(EXECUTABLE_MAIN) $(LFLAGS)
 	
+graphGen: $(OBJ_GRAPH_GEN)
+	$(CC) $(CCFLAGS) $(OBJ_GRAPH_GEN) -o $(EXECUTABLE_GRAPH_GEN) $(LFLAGS)
+		
 .PHONY: clean
 clean:
-	rm -f $(EXECUTABLE_MAIN) $(EXECUTABLE_GOOGLETEST) $(OBJ_GOOGLETEST) $(OBJ_TEST_MAIN)
+	rm -f $(EXECUTABLE_MAIN) $(EXECUTABLE_GOOGLETEST) $(EXECUTABLE_GRAPH_GEN) $(OBJ_GOOGLETEST) $(OBJ_TEST_MAIN) $(OBJ_GRAPH_GEN)
 
 %.o: %.cpp
 	$(CC) $(CCFLAGS) -c -o $@ $<

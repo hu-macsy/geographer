@@ -41,11 +41,6 @@ typedef int IndexType;
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
-//----------------------------------------
-//  for parameter input from command line
-extern int my_argc;
-extern char** my_argv;
-//----------------------------------------
 using namespace scai;
 using namespace scai::lama;
 
@@ -54,16 +49,6 @@ namespace ITI {
 	template <typename IndexType, typename ValueType>
 	class MeshGenerator{
             public:
-                /** Creates a random 3D mesh. Adjacency matrix stored in adjM and coordinates of the points in coords.
-                 *  Needs O(numberOfPoints^2) time!! Every nodes adds an edge with some of its closest neighbours.
-                 *  The time consuming part is to calculate the distance between all nodes.
-                 * 
-                 * @param[out] adjM The adjecency matrix of the graph to be created.
-                 * @param[in] coords The 3D coordinates vector.
-                 * @param[in] numberOfPoints The number of points.
-                 * @param[in] maxCoord The maximum value a coordinate can have
-                 */
-                static void createRandom3DMesh( scai::lama::CSRSparseMatrix<ValueType> &adjM,  std::vector<DenseVector<ValueType>> &coords, const int numberOfPoints, const ValueType maxCoord);
                 
                 static void createOctaTreeMesh( scai::lama::CSRSparseMatrix<ValueType> &adjM,  std::vector<DenseVector<ValueType>> &coords, const int numberOfPoints, const ValueType maxCoord);
 
