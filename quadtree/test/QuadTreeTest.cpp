@@ -269,7 +269,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
 
 TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
 
-        count n = 1500;
+        count n = 500;
 
 	vector<Point<double> > positions(n);
 	vector<index> content(n);
@@ -312,10 +312,12 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
         }
         */
         
-        // checkSymmetry is really expensive for big graphs, used only for small instances
-	//graph.checkSymmetry();
+        // checkSymmetry is really expensive for big graphs, use only for small instances
+	graph.checkSymmetry();
 	graph.isConsistent();
-
+        
+        EXPECT_EQ(coords[0].size(), N);
+            
 	EXPECT_EQ( graph.getNumRows(), N);
 	EXPECT_EQ( graph.getNumColumns(), N);
         {
@@ -373,6 +375,10 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
             }
             coordsDV[d].redistribute(dist);
         }
+        
+        EXPECT_EQ(coordsDV[0].getLocalValues().size() , graph.getLocalNumRows() );
+        
+        
         const ValueType epsilon = 0.05;        
         struct Settings Settings;
         Settings.numBlocks= k;
