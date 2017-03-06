@@ -71,7 +71,9 @@ TEST_F (MultiLevelTest, testCoarseningGrid_2D) {
     // coarsen the graph
     CSRSparseMatrix<ValueType> coarseGraph;
     DenseVector<IndexType> fineToCoarseMap;
-    MultiLevel<IndexType, ValueType>::coarsen(graph, coarseGraph, fineToCoarseMap);
+    DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+
+    MultiLevel<IndexType, ValueType>::coarsen(graph, uniformWeights, coarseGraph, fineToCoarseMap);
     
     EXPECT_TRUE(coarseGraph.isConsistent());
     EXPECT_TRUE(coarseGraph.checkSymmetry());
@@ -118,12 +120,11 @@ TEST_F (MultiLevelTest, testGetMatchingGrid_2D) {
     Settings.numBlocks= k;
     Settings.epsilon = 0.2;
 
-    
     //check distributions
     //assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
+    DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
 
-    //std::vector<std::vector<IndexType>> matching = MultiLevel<IndexType, ValueType>::maxLocalMatching( graph );
-    std::vector<std::pair<IndexType,IndexType>> matching = MultiLevel<IndexType, ValueType>::maxLocalMatching( graph );
+    std::vector<std::pair<IndexType,IndexType>> matching = MultiLevel<IndexType, ValueType>::maxLocalMatching( graph, uniformWeights );
     //assert( matching[0].size() == matching[1].size() );
     
     // check matching to see if a node appears twice somewhere

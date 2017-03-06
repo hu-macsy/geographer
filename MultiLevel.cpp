@@ -19,7 +19,7 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 		if (comm->getRank() == 0) {
 			std::cout << "Beginning coarsening, still " << settings.multiLevelRounds << " levels to go." << std::endl;
 		}
-		MultiLevel<IndexType, ValueType>::coarsen(input, coarseGraph, fineToCoarseMap);
+		MultiLevel<IndexType, ValueType>::coarsen(input,nodeWeights, coarseGraph, fineToCoarseMap);
 		if (comm->getRank() == 0) {
 			std::cout << "Coarse graph has " << coarseGraph.getNumRows() << " nodes." << std::endl;
 		}
@@ -99,7 +99,7 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 //--------------------------------------------------------------------------------------- 
  
 template<typename IndexType, typename ValueType>
-void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations) {
+void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, DenseVector<IndexType> &nodeWeights,  CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations) {
 	SCAI_REGION("MultiLevel.coarsen");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -118,7 +118,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     assert(ia.size()-1 == localN );
      
     //get a matching, the returned indices are from 0 to localN
-    std::vector<std::pair<IndexType,IndexType>> matching = MultiLevel<IndexType, ValueType>::maxLocalMatching( adjM );
+    std::vector<std::pair<IndexType,IndexType>> matching = MultiLevel<IndexType, ValueType>::maxLocalMatching( adjM, nodeWeights );
     
     std::vector<IndexType> localMatchingPartner(localN, -1);
 
@@ -507,7 +507,7 @@ DenseVector<IndexType> MultiLevel<IndexType, ValueType>::sumToCoarse(const Dense
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& adjM){
+std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& adjM, const DenseVector<IndexType> &nodeWeights){
 	SCAI_REGION("MultiLevel.maxLocalMatching");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -533,6 +533,10 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
     
     // keep track of which nodes are already matched
     std::vector<bool> matched(localN, false);
+
+    // get local part of node weights
+    scai::utilskernel::LArray<IndexType> localNodeWeights = nodeWeights.getLocalValues();
+    scai::hmemo::ReadAccess<IndexType> rLocalNodeWeights( localNodeWeights );
     
     // localNode is the local index of a node
     for(IndexType localNode=0; localNode<localN; localNode++){
@@ -542,14 +546,17 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
         }
         
         IndexType bestTarget = -1;
+	ValueType maxEdgeRating = -1;
         const IndexType endCols = ia[localNode+1];
         for (IndexType j = ia[localNode]; j < endCols; j++) {
         	IndexType localNeighbor = distPtr->global2local(ja[j]);
         	if (localNeighbor != nIndex && localNeighbor != localNode && !matched[localNeighbor]) {
         		//neighbor is local and unmatched, possible partner
-        		if (bestTarget < 0 || values[j] > values[bestTarget]) {
+			ValueType thisEdgeRating = values[j]*values[j]/(rLocalNodeWeights[localNode]*rLocalNodeWeights[localNeighbor]);
+        		if (bestTarget < 0 ||  thisEdgeRating > maxEdgeRating) {
         			//either we haven't found any target yet, or the current one is better
         			bestTarget = j;
+				maxEdgeRating = thisEdgeRating;
         		}
         	}
         }
@@ -581,9 +588,9 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
 
 template int MultiLevel<int, double>::multiLevelStep(CSRSparseMatrix<double> &input, DenseVector<int> &part, DenseVector<int> &nodeWeights, std::vector<DenseVector<double>> &coordinates, Settings settings);
 
-template std::vector<std::pair<int,int>> MultiLevel<int, double>::maxLocalMatching(const scai::lama::CSRSparseMatrix<double>& graph);
+template std::vector<std::pair<int,int>> MultiLevel<int, double>::maxLocalMatching(const scai::lama::CSRSparseMatrix<double>& graph, const DenseVector<int> &nodeWeights);
 
-template void MultiLevel<int, double>::coarsen(const CSRSparseMatrix<double>& inputGraph, CSRSparseMatrix<double>& coarseGraph, DenseVector<int>& fineToCoarse, int iterations);
+template void MultiLevel<int, double>::coarsen(const CSRSparseMatrix<double>& inputGraph, DenseVector<int> &nodeWeights, CSRSparseMatrix<double>& coarseGraph, DenseVector<int>& fineToCoarse, int iterations);
 
 template DenseVector<int> MultiLevel<int, double>::computeGlobalPrefixSum(DenseVector<int> input, int offset);
 
