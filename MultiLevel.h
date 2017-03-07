@@ -20,6 +20,7 @@
 #include "LocalRefinement.h"
 #include "Settings.h"
 
+
 using namespace scai::lama;     // for CSRSparseMatrix and DenseVector
 
 namespace ITI{
@@ -30,7 +31,7 @@ namespace ITI{
         			
         static IndexType multiLevelStep(scai::lama::CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<IndexType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
         
-        static void coarsen(const CSRSparseMatrix<ValueType>& inputGraph, DenseVector<IndexType> &nodeWeights, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations = 1);
+        static void coarsen(const CSRSparseMatrix<ValueType>& inputGraph, const DenseVector<IndexType> &nodeWeights, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations = 1);
         
         static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& graph, const DenseVector<IndexType> &nodeWeights);
         

@@ -11,7 +11,11 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
         SCAI_REGION( "MultiLevel.multiLevelStep" );
 	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
 	const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
-
+        
+        if(coordinates.size() != settings.dimensions){
+            throw std::runtime_error("Dimensions do not agree: vectos.size()= " + std::to_string(coordinates.size())  + " != settings.dimensions= " + std::to_string(settings.dimensions) );
+        }
+        
 	if (settings.multiLevelRounds > 0) {
 		SCAI_REGION( "MultiLevel.multiLevelStep.recursiveCall" )
 		CSRSparseMatrix<ValueType> coarseGraph;
@@ -33,13 +37,15 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 		DenseVector<IndexType> coarsePart = DenseVector<IndexType>(coarseGraph.getRowDistributionPtr(), comm->getRank());
 
 		DenseVector<IndexType> coarseWeights = sumToCoarse(nodeWeights, fineToCoarseMap);
-
+//PRINT(nodeWeights.size() << " == " << fineToCoarseMap.size() << " @ "<< coarseWeights.size() << " == "<< fineToCoarseMap.max() );
 		assert(coarseWeights.sum().Scalar::getValue<IndexType>() == nodeWeights.sum().Scalar::getValue<IndexType>());
 
 		Settings settingscopy(settings);
 		settingscopy.multiLevelRounds--;
+                // recursive call 
 		multiLevelStep(coarseGraph, coarsePart, coarseWeights, coarseCoords, settingscopy);
 
+                // uncoarsening/refinement
 		scai::dmemo::DistributionPtr projectedFineDist = projectToFine(coarseGraph.getRowDistributionPtr(), fineToCoarseMap);
 		assert(projectedFineDist->getGlobalSize() == globalN);
 		part = DenseVector<IndexType>(projectedFineDist, comm->getRank());
@@ -54,8 +60,10 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 
 		nodeWeights.redistribute(projectedFineDist);
 	}
-
+        
+        // do local refinement
 	if (settings.multiLevelRounds % settings.coarseningStepsBetweenRefinement == 0) {
+                SCAI_REGION( "MultiLevel.multiLevelStep.localRefinement" )
 		scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getPEGraph(input);
 
 		std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
@@ -90,7 +98,7 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 
 			ValueType cut = comm->getSize() == 1 ? ParcoRepart<IndexType, ValueType>::computeCut(input, part) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;
 			if (comm->getRank() == 0) {
-				std::cout << "After " << numRefinementRounds + 1 << " refinement rounds, cut is " << cut << std::endl;
+				std::cout << "Multilevel round= "<< settings.multiLevelRounds <<": After " << numRefinementRounds + 1 << " refinement rounds, cut is " << cut << std::endl;
 			}
 			numRefinementRounds++;
 		}
@@ -99,7 +107,7 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 //--------------------------------------------------------------------------------------- 
  
 template<typename IndexType, typename ValueType>
-void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, DenseVector<IndexType> &nodeWeights,  CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations) {
+void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, const DenseVector<IndexType> &nodeWeights,  CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations) {
 	SCAI_REGION("MultiLevel.coarsen");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -447,7 +455,7 @@ template<typename IndexType, typename ValueType>
 DenseVector<ValueType> MultiLevel<IndexType, ValueType>::projectToCoarse(const DenseVector<ValueType>& input, const DenseVector<IndexType>& fineToCoarse) {
 	SCAI_REGION("MultiLevel.projectToCoarse.interpolate");
 	const scai::dmemo::DistributionPtr inputDist = input.getDistributionPtr();
-
+        
 	scai::dmemo::DistributionPtr fineDist = fineToCoarse.getDistributionPtr();
 	const IndexType fineLocalN = fineDist->getLocalSize();
 	scai::dmemo::DistributionPtr coarseDist = projectToCoarse(fineToCoarse);
@@ -590,7 +598,7 @@ template int MultiLevel<int, double>::multiLevelStep(CSRSparseMatrix<double> &in
 
 template std::vector<std::pair<int,int>> MultiLevel<int, double>::maxLocalMatching(const scai::lama::CSRSparseMatrix<double>& graph, const DenseVector<int> &nodeWeights);
 
-template void MultiLevel<int, double>::coarsen(const CSRSparseMatrix<double>& inputGraph, DenseVector<int> &nodeWeights, CSRSparseMatrix<double>& coarseGraph, DenseVector<int>& fineToCoarse, int iterations);
+template void MultiLevel<int, double>::coarsen(const CSRSparseMatrix<double>& inputGraph, const DenseVector<int> &nodeWeights, CSRSparseMatrix<double>& coarseGraph, DenseVector<int>& fineToCoarse, int iterations);
 
 template DenseVector<int> MultiLevel<int, double>::computeGlobalPrefixSum(DenseVector<int> input, int offset);
 

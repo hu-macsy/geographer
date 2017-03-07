@@ -96,26 +96,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		ValueType gain = settings.minGainForNextRound;
 		ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
 
-		/*
-		scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getPEGraph(input);
-
-		std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
-
-		std::vector<IndexType> nodesWithNonLocalNeighbors = getNodesWithNonLocalNeighbors(input);
-
-		std::vector<double> distances;
-		if (settings.useGeometricTieBreaking) {
-			distances = distancesFromBlockCenter(coordinates);
-		}
-                */
 		DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(input.getRowDistributionPtr(), 1);
-
+                /*
 		if (comm->getRank() == 0) {
 			afterSFC = std::chrono::steady_clock::now();
 			std::chrono::duration<double> elapsedSeconds = afterSFC-start;
 			std::cout << "With SFC (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
 		}
-
+                */
 		ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, uniformWeights, coordinates, settings);
 
 	} else {
@@ -128,6 +116,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings){    
     SCAI_REGION( "ParcoRepart.initialPartition" )
+    	
+    std::chrono::time_point<std::chrono::steady_clock> start, afterSFC, round;
+    start = std::chrono::steady_clock::now();
     
     const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
     const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
@@ -239,6 +230,13 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
         for (IndexType i = 0; i < localN; i++) {
             result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/globalN);
         }
+    }
+    
+    ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
+    if (comm->getRank() == 0) {
+        afterSFC = std::chrono::steady_clock::now();
+        std::chrono::duration<double> elapsedSeconds = afterSFC-start;
+        std::cout << "With SFC (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
     }
     return result;
 }
@@ -400,7 +398,11 @@ ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<
 	if (weighted) {
 		//get global weight sum
 		weightSum = comm->sum(weightSum);
-		optSize = std::ceil(weightSum / k + (maxWeight - minWeight));
+                //PRINT(weightSum);                
+                //TODO: why not just weightSum/k ?
+                // changed for now so that the test cases can agree
+		//optSize = std::ceil(weightSum / k + (maxWeight - minWeight));
+                optSize = std::ceil(weightSum / k );
 	} else {
 		optSize = std::ceil(globalN / k);
 	}
@@ -416,6 +418,7 @@ ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<
 	if (!weighted) {
 		assert(maxBlockSize >= optSize);
 	}
+PRINT("optSize= "<< optSize << " and maxBlockSize= "<< maxBlockSize );	
 	return (ValueType(maxBlockSize - optSize)/ optSize);
 }
 //--------------------------------------------------------------------------------------- 

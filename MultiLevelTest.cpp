@@ -22,6 +22,8 @@
 #include "MultiLevel.h"
 #include "gtest/gtest.h"
 
+#include "AuxiliaryFunctions.h"
+
 typedef double ValueType;
 typedef int IndexType;
 
@@ -204,7 +206,81 @@ TEST_F (MultiLevelTest, testComputeGlobalPrefixSum) {
 }
 //--------------------------------------------------------------------------------------- 
 
+TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 
-
-
+    const IndexType N = 500;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( N ));
+    const IndexType k = comm->getSize();
+    
+    scai::lama::CSRSparseMatrix<ValueType> graph;
+    
+    // create random graph
+    scai::common::scoped_array<ValueType> adjArray( new ValueType[ N*N ] );
+    
+    //initialize matrix with zeros
+    for(int i=0; i<N; i++)
+        for(int j=0; j<N; j++)
+            adjArray[i*N+j]=0;
+        
+    srand(time(NULL));
+    IndexType numEdges = int (1.12*N);
+    for(IndexType i=0; i<numEdges; i++){
+        // a random position in the matrix
+        IndexType x = rand()%N;
+        IndexType y = rand()%N;
+        adjArray[ x+y*N ]= 1;
+        adjArray[ x*N+y ]= 1;
+    }
+    graph.setRawDenseData( N, N, adjArray.get() );
+    EXPECT_TRUE( graph.isConsistent() );
+    EXPECT_TRUE( graph.checkSymmetry() );
+    ValueType beforel1Norm = graph.l1Norm().Scalar::getValue<ValueType>();
+    IndexType beforeNumValues = graph.getNumValues();
+    graph.redistribute( distPtr , noDistPtr);
+    
+    // node weights = 1
+    DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+    //ValueType beforeSumWeigths = uniformWeights.l1Norm().Scalar::getValue<ValueType>();
+    IndexType beforeSumWeigths = N;
+    //uniformWeights.redistribute( distPtr );
+    
+    //coordinates at random and redistribute
+    std::vector<DenseVector<ValueType>> coords(2);
+    for(IndexType i=0; i<2; i++){ 
+	coords[i].allocate(N);
+	coords[i] = static_cast<ValueType>( 0 );
+        // set random coordinates
+        for(IndexType j=0; j<N; j++){
+            coords[i].setValue(j, rand()%10);
+        }
+        coords[i].redistribute( distPtr );
+    }
+    
+    //random partition
+    DenseVector<IndexType> partition( N , 0);
+    for(IndexType i=0; i<N; i++){
+        partition.setValue(i, rand()%k );
+    }
+    partition.redistribute( distPtr );
+    
+    struct Settings Settings;
+    Settings.numBlocks= k;
+    Settings.epsilon = 0.2;
+    Settings.multiLevelRounds= 10;
+    Settings.coarseningStepsBetweenRefinement = 3;
+    Settings.useGeometricTieBreaking = true;
+    Settings.dimensions= 2;
+    
+    //ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, Settings);
+    ITI::aux::multiLevelStep(graph, partition, uniformWeights, coords, Settings);
+    
+    EXPECT_EQ( graph.l1Norm() , beforel1Norm);
+    EXPECT_EQ( graph.getNumValues() , beforeNumValues);
+    EXPECT_EQ( uniformWeights.l1Norm() , beforeSumWeigths );
+    
+}
+//---------------------------------------------------------------------------------------
 } // namespace ITI

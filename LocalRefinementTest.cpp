@@ -88,7 +88,6 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesLocal) {
 */
 //--------------------------------------------------------------------------------------- 
  
-
 TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType k = comm->getSize();
@@ -127,7 +126,18 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 		IndexType globalID = inputDist->local2global(i);
 		part.setValue(globalID, blockId);
 	}
-
+	//test initial partion for imbalance
+	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+        ValueType initialImbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k, uniformWeights);
+        
+        // If initial partition is highly imbalanced local refinement cannot fix it.
+        // TODO: should the final partion be balances no matter how imbalanced is the initial one???
+        // set as epsilon the initial imbalance
+        
+        if(initialImbalance > epsilon){
+            PRINT("Warning, initial random partition too imbalanced: "<< initialImbalance);
+        }
+        
 	//redistribute according to partition
 	scai::utilskernel::LArray<IndexType> owners(n);
 	for (IndexType i = 0; i < n; i++) {
@@ -147,8 +157,9 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 
 	Settings settings;
 	settings.numBlocks= k;
-	settings.epsilon = epsilon;
-
+	//settings.epsilon = initialImbalance;
+        settings.epsilon = epsilon;
+        
 	//get block graph
 	scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, part, settings.numBlocks);
 
@@ -157,9 +168,14 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 
 	//get random node weights
 	DenseVector<IndexType> weights;
-	weights.setRandom(graph.getRowDistributionPtr(), 1);
+        // setRandom creates too big numbers and weights.sum() < 0 because (probably) sum does not fit in int
+	//weights.setRandom(graph.getRowDistributionPtr(), 1);
+        weights.setSequence(1, 1, graph.getRowDistributionPtr() );
+        IndexType totalWeight = n*(n+1)/2;
 	IndexType minNodeWeight = weights.min().Scalar::getValue<IndexType>();
 	IndexType maxNodeWeight = weights.max().Scalar::getValue<IndexType>();
+
+        EXPECT_EQ(weights.sum(), totalWeight );
 	if (comm->getRank() == 0) {
 		std::cout << "Max node weight: " << maxNodeWeight << std::endl;
 		std::cout << "Min node weight: " << minNodeWeight << std::endl;
@@ -187,7 +203,10 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 
 	//check for balance
 	ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k, weights);
-	EXPECT_LE(imbalance, epsilon);
+        // TODO: I do not know, both assertion fail from time to time...
+        // at least return a solution less imbalanced than the initial one
+	//EXPECT_LE(imbalance, initialImbalance);
+        EXPECT_LE(imbalance, settings.epsilon);
 }
 //--------------------------------------------------------------------------------------- 
  
@@ -237,7 +256,8 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 	}
 
 	//std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::computeCommunicationPairings(a, part, mapping);
-	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local(a);
+        scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( a, part, k);
+	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
 	std::vector<IndexType> localBorder = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(a);
 
 	IndexType thisBlock = comm->getRank();
