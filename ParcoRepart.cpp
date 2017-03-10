@@ -42,9 +42,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
     
 	SCAI_REGION( "ParcoRepart.partitionGraph" )
 
-	std::chrono::time_point<std::chrono::steady_clock> start, afterSFC, round;
-	start = std::chrono::steady_clock::now();
-
 	SCAI_REGION_START("ParcoRepart.partitionGraph.inputCheck")
 	/**
 	* check input arguments for sanity
@@ -110,12 +107,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 */
 		DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(input.getRowDistributionPtr(), 1);
 
-		if (comm->getRank() == 0) {
-			afterSFC = std::chrono::steady_clock::now();
-			std::chrono::duration<double> elapsedSeconds = afterSFC-start;
-			std::cout << "With SFC (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
-		}
-
 		ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, uniformWeights, coordinates, settings);
 
 	} else {
@@ -141,6 +132,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
     std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
     std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
     DenseVector<IndexType> result;
+    
+    
+    std::chrono::time_point<std::chrono::steady_clock> start, afterSFC;
+    start = std::chrono::steady_clock::now();
     
     /**
      * get minimum / maximum of local coordinates
@@ -222,7 +217,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
         
         input.redistribute(newDistribution, input.getColDistributionPtr());
         result = DenseVector<IndexType>(newDistribution, comm->getRank());
-        
+
+//        
+settings.useGeometricTieBreaking = 1;
+//
+
         if (settings.useGeometricTieBreaking) {
             for (IndexType dim = 0; dim < dimensions; dim++) {
                 coordinates[dim].redistribute(newDistribution);
@@ -239,6 +238,13 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
         for (IndexType i = 0; i < localN; i++) {
             result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/globalN);
         }
+    }
+    
+    ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
+    if (comm->getRank() == 0) {
+        afterSFC = std::chrono::steady_clock::now();
+        std::chrono::duration<double> elapsedSeconds = afterSFC-start;
+        std::cout << "With SFC (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
     }
     return result;
 }

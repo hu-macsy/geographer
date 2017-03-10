@@ -35,6 +35,40 @@ class ParcoRepartTest : public ::testing::Test {
 };
 
 
+TEST_F(ParcoRepartTest, testInitialPartition){
+    //std::string file = "Grid16x16";
+    std::string file = "meshes/bigbubbles/bigbubbles-00010.graph";
+    //std::string file = "meshes/bigtrace/bigtrace-00000.graph";
+    std::ifstream f(file);
+    IndexType dimensions= 2;
+    IndexType N, edges;
+    f >> N >> edges; 
+    
+    PRINT("nodes= "<< N);
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    // for now local refinement requires k = P
+    IndexType k = comm->getSize();
+    //
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+    graph.redistribute(dist, noDistPointer);
+    
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
+    
+    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
+    EXPECT_EQ(edges, (graph.getNumValues())/2 );   
+    
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+      
+    DenseVector<IndexType> hilbertInitialPartition = ParcoRepart<IndexType, ValueType>::initialPartition(graph, coords, settings);
+    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords, N, "hilbertPartition");
+}
+
+
 TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   IndexType nroot = 49;
   IndexType n = nroot * nroot * nroot;
