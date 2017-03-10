@@ -28,7 +28,12 @@
 #include "ParcoRepart.h"
 #include "HilbertCurve.h"
 #include "MultiLevel.h"
-//#include "LocalRefinement.h"
+
+#include "AuxiliaryFunctions.h"
+
+// for the new initial partition
+#include "../morton_curve/include/morton2d.h"
+#include "../morton_curve/include/morton3d.h"
 
 #include "quadtree/QuadTreeCartesianEuclid.h"
 
@@ -87,7 +92,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	SCAI_REGION_END("ParcoRepart.partitionGraph.inputCheck")
 	
         // get an initial partition
-        
         DenseVector<IndexType> result= ParcoRepart<IndexType, ValueType>::initialPartition(input, coordinates, settings);
 
 	IndexType numRefinementRounds = 0;
@@ -239,6 +243,388 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
         std::cout << "With SFC (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
     }
     return result;
+}
+//--------------------------------------------------------------------------------------- 
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings){    
+    SCAI_REGION( "ParcoRepart.pixelPartition" )
+    	
+    std::chrono::time_point<std::chrono::steady_clock> start, afterSFC, round;
+    start = std::chrono::steady_clock::now();
+    
+    const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
+    const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
+    
+    IndexType k = settings.numBlocks;
+    const IndexType dimensions = coordinates.size();
+    const IndexType localN = inputDist->getLocalSize();
+    const IndexType globalN = inputDist->getGlobalSize();
+    
+    std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
+    std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
+    DenseVector<IndexType> result(inputDist, 0);
+    
+    //TODO: probably minimum is not needed
+    //TODO: if we know maximum from the input we could saave that although is not too costly
+    
+    /**
+     * get minimum / maximum of local coordinates
+     */
+    for (IndexType dim = 0; dim < dimensions; dim++) {
+        //get local parts of coordinates
+        scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
+        for (IndexType i = 0; i < localN; i++) {
+            ValueType coord = localPartOfCoords[i];
+            if (coord < minCoords[dim]) minCoords[dim] = coord;
+            if (coord > maxCoords[dim]) maxCoords[dim] = coord;
+        }
+    }
+    
+    /**
+     * communicate to get global min / max
+     */
+    for (IndexType dim = 0; dim < dimensions; dim++) {
+        minCoords[dim] = comm->min(minCoords[dim]);
+        maxCoords[dim] = comm->max(maxCoords[dim]);
+    }
+   
+    // measure density with rounding
+    // have to handle 2D and 3D cases seperately
+    const unsigned int detailLvl = 3;
+    const unsigned long sideLen = std::pow(2,detailLvl);
+    const unsigned long cubeSize = std::pow(sideLen, dimensions);
+    
+    //TODO: generalise this to arbitrary dimensions, do not handle 2D and 3D differently
+    // a 2D or 3D arrays as a one dimensional vector
+    // [i][j] is in position: i*sideLen + j
+    // [i][j][k] is in: i*sideLen*sideLen + j*sideLen + k
+    
+    std::vector<IndexType> density( cubeSize ,0);
+    
+    std::cout<< "detailLvl= " << detailLvl <<", sideLen= " << sideLen << ", " << "density.size= " << density.size() << std::endl;
+    
+    if(dimensions==2){
+        SCAI_REGION( "ParcoRepart.pixelPartition.localDensity" )
+        scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
+        scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
+            
+        IndexType scaledX, scaledY;
+        //the +1 is needed
+        IndexType maxX = maxCoords[0]+1;
+        IndexType maxY = maxCoords[1]+1;
+        
+        for(IndexType i=0; i<localN; i++){
+            scaledX = coordAccess0[i]/maxX * sideLen;
+            scaledY = coordAccess1[i]/maxY * sideLen;
+            IndexType densInd = scaledX*sideLen + scaledY;
+//PRINT(densInd << " # " << coordAccess0[i] << " _ " << coordAccess1[i] );            
+            SCAI_ASSERT( densInd < density.size(), "Index too big: "<< std::to_string(densInd) );
+            ++density[densInd];
+        }
+    }else if(dimensions==3){
+        SCAI_REGION( "ParcoRepart.pixelPartition.localDensity" )
+        scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
+        scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
+        scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[2].getLocalValues() );
+        
+        IndexType scaledX, scaledY, scaledZ;
+        
+        IndexType maxX = maxCoords[0]+1;
+        IndexType maxY = maxCoords[1]+1;
+        IndexType maxZ = maxCoords[2]+1;
+        
+        for(IndexType i=0; i<localN; i++){
+            scaledX = coordAccess0[i]/maxX * sideLen;
+            scaledY = coordAccess1[i]/maxY * sideLen;
+            scaledZ = coordAccess2[i]/maxZ * sideLen;
+            IndexType densInd = scaledX*sideLen*sideLen + scaledY*sideLen + scaledZ;
+            
+            SCAI_ASSERT( densInd < density.size(), "Index too big: "<< std::to_string(densInd) );
+            ++density[densInd];        
+        }
+    }else{
+        throw std::runtime_error("Available only for 2D and 3D. Data given have dimension:" + std::to_string(dimensions) );
+    }
+
+    // sum density from all PEs
+    std::vector<IndexType> sumDensity( density.size() , 0);
+    for(int i=0; i<density.size(); i++){
+        SCAI_REGION( "ParcoRepart.pixelPartition.sumDensity" )
+        sumDensity[i] = comm->sum(density[i]);
+    }
+    if(comm->getRank()==0){
+        ITI::aux::writeHeatLike_local_2D(sumDensity, sideLen, dimensions, "heat.plt");
+    }
+    
+    if(comm->getRank()==0){
+        for(int i=0; i<density.size(); i++){
+            std::cout<<*comm <<": "<< i << ", "<< sumDensity[i] << std::endl;
+        }
+    }
+    
+    //using the summed denisty get an intial pixeled partition
+    
+    std::vector<IndexType> pixeledPartition( density.size() , -1);
+
+    IndexType maxBlockSize = globalN/k * 1.05; // allowing some imbalance
+if(comm->getRank()==0) PRINT("max allowed block size: " << maxBlockSize );         
+
+    //for all the blocks
+    for(IndexType block=0; block<k; block++){
+           
+        // start from the densest pixel
+        IndexType maxDensityPixel = std::distance( sumDensity.begin(), std::max_element(sumDensity.begin(), sumDensity.end()) );
+        SCAI_ASSERT(maxDensityPixel < sumDensity.size(), "Too big index: " + std::to_string(maxDensityPixel));
+        SCAI_ASSERT(maxDensityPixel >= 0, "Negative index: " + std::to_string(maxDensityPixel));
+PRINT(*comm<< " +++ "<< block);        
+        //TODO: change to more appropriate data type
+        // insert all the neighbouring pixels
+        //std::vector<IndexType> border; 
+        std::vector<std::pair<IndexType, ValueType>> border; 
+        std::vector<IndexType> neighbours = ParcoRepart<IndexType, ValueType>::neighbourPixels( maxDensityPixel, sideLen, dimensions);
+        //border.reserve( neighbours.size() );
+        //border.insert( border.end(), neighbours.begin(), neighbours.end());
+        // insert in border if not already picked
+        for(IndexType j=0; j<neighbours.size(); j++){
+            // make sure this neighbour does not belong to another block
+            if(sumDensity[ neighbours[j]] != -1 ){
+                std::pair<IndexType, ValueType> toInsert;
+                toInsert.first = neighbours[j];
+                SCAI_ASSERT(neighbours[j] < sumDensity.size(), "Too big index: " + std::to_string(neighbours[j]));
+                SCAI_ASSERT(neighbours[j] >= 0, "Negative index: " + std::to_string(neighbours[j]));
+                // value to pick a border node
+                toInsert.second = std::pow(sumDensity[neighbours[j]], 0.5) + std::pow(sumDensity[maxDensityPixel], 0.5);
+                border.push_back(toInsert);
+            }
+        }
+        //IndexType thisBlockSize = *std::max_element(sumDensity.begin(), sumDensity.end() );
+        IndexType thisBlockSize = sumDensity[maxDensityPixel];
+        
+        pixeledPartition[maxDensityPixel] = block;
+        
+        // set this pixel to 0 so it is not picked again
+        sumDensity[maxDensityPixel] = -1;
+        
+if(comm->getRank()==0) PRINT("block= "<< block << ", first pixel= "<< maxDensityPixel << " , size= "<< thisBlockSize);
+
+
+        while(border.size() !=0 ){      // there are still pixels to check
+            
+            //TODO: different data type to avoid that
+            // sort border by the value in increasing order 
+            std::sort( border.begin(), border.end(),
+                       [](std::pair<IndexType, ValueType> &left, std::pair<IndexType, ValueType> &right){
+                           return left.second < right.second; });
+             
+            std::pair<IndexType, ValueType> bestPixel;
+            IndexType bestIndex=-1;
+            do{
+                bestPixel = border.back();                
+                border.pop_back();
+                bestIndex = bestPixel.first;
+                
+            }while( sumDensity[ bestIndex] +thisBlockSize > maxBlockSize and border.size()>0); // this pixel is too big
+PRINT0("\t bestIndex: " << bestIndex << " >> "<< int (bestIndex/sideLen) <<" ," << bestIndex%sideLen << " with value: "<< bestPixel.second);             
+            // picked last pixel in border but is too big
+            if(sumDensity[ bestIndex] +thisBlockSize > maxBlockSize ){
+                break;
+            }
+            
+            if(sumDensity[ bestIndex ] == -1){   //this pixel is already picked- this should not happen
+                throw std::runtime_error( std::string(__FILE__) +", " + std::to_string(__LINE__) + ", Wrong pixel choice");
+            }
+            
+            // this pixel now belongs in this block
+            SCAI_ASSERT(bestIndex < sumDensity.size(), "Wrong pixel index: " + std::to_string(bestIndex));
+            pixeledPartition[ bestIndex ] = block;
+            thisBlockSize += sumDensity[ bestIndex ];
+
+
+            //get the neighbours of the new pixel
+            std::vector<IndexType> neighbours = ParcoRepart<IndexType, ValueType>::neighbourPixels( bestIndex, sideLen, dimensions);
+            
+            //insert neighbour in border or update value if already there
+            for(IndexType j=0; j<neighbours.size(); j++){
+
+                SCAI_ASSERT(neighbours[j] < sumDensity.size(), "Too big index: " + std::to_string(neighbours[j]));
+                SCAI_ASSERT(neighbours[j] >= 0, "Negative index: " + std::to_string(neighbours[j]));
+                
+                if( sumDensity[ neighbours[j]] == -1){ // this pixel is already picked by a block (maybe this)
+                    continue;
+                }else{
+                    bool inBorder = false;
+                    for(IndexType l=0; l<border.size(); l++){                        
+                        if( border[l].first == neighbours[j]){ // its already in border, update value
+if(comm->getRank()==0){
+    PRINT("pixel: "<< neighbours[j]/sideLen << ", "<< neighbours[j]%sideLen  << " already in border");    
+    PRINT("value before: "<< border[l].second );
+}
+                            border[l].second = 2*border[l].second + std::pow(sumDensity[neighbours[j]], 0.5) + std::pow(sumDensity[bestIndex], 0.5);
+PRINT0("updated value: "<< border[l].second );
+                            inBorder= true;
+                        }
+                    }
+                    if(!inBorder){
+                        std::pair<IndexType, ValueType> toInsert;
+                        toInsert.first = neighbours[j];
+                        toInsert.second = std::pow(sumDensity[neighbours[j]], 0.5) + std::pow(sumDensity[bestIndex], 0.5);
+                        border.push_back(toInsert);
+if(comm->getRank()==0) PRINT("insert in border pixel: "<< neighbours[j]/sideLen <<", "<<neighbours[j]%sideLen << " with value: "<< toInsert.second ) ;
+                    }
+                }
+            }
+            
+            sumDensity[ bestIndex ] = -1;
+if(comm->getRank()==0) PRINT("border.size= "<< border.size() << " and blockSize= "<< thisBlockSize);
+        }
+if(comm->getRank()==0) PRINT("final blockSize for block "<< block << ": "<< thisBlockSize);
+
+        IndexType leftOvers = std::accumulate( sumDensity.begin(), sumDensity.end(), 0);
+if(comm->getRank()==0)  PRINT("left over nodes= "<< leftOvers );     
+        // re start for this block
+        if(thisBlockSize < maxBlockSize/2 and leftOvers>0){
+            /*
+            IndexType maxDensityPixel = std::distance( sumDensity.begin(), std::max_element(sumDensity.begin(), sumDensity.end()) );
+            std::pair<IndexType, ValueType> toInsert;
+            toInsert.first = maxDensityPixel;
+            toInsert.second = sumDensity[maxDensityPixel];
+            */
+PRINT0("restarting for block: " << block );             
+            block--;
+        }
+    
+    } // for(IndexType block=0; block<k; block++)
+
+if(comm->getRank()==0) {
+    for(int sideX=0; sideX<sideLen; sideX++){
+        for(int sideY=0; sideY<sideLen; sideY++){
+            std::cout<< pixeledPartition[sideX*sideLen+ sideY] << ", ";
+        }
+        std::cout << std::endl;
+    }
+}
+std::cout << std::endl;
+
+
+    for(int pp=0; pp<pixeledPartition.size(); pp++){
+        // assign all orphan pixels to last block
+        if(pixeledPartition[pp] == -1){
+            pixeledPartition[pp] = k-1;        
+        }
+    }   
+    // here all pixels should have a partition 
+    
+    // set your local part of the partition/result
+    //scai::utilskernel::LArray<IndexType>& localPart = result.getLocalValues();
+    scai::hmemo::WriteOnlyAccess<IndexType> wLocalPart ( result.getLocalValues() );
+    
+    if(dimensions==2){
+        SCAI_REGION( "ParcoRepart.pixelPartition.localDensity" )
+        scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
+        scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
+        
+        IndexType scaledX, scaledY;
+        //the +1 is needed
+        IndexType maxX = maxCoords[0]+1;
+        IndexType maxY = maxCoords[1]+1;
+std::vector<IndexType> partSize(k,0);        
+        for(IndexType i=0; i<localN; i++){
+            scaledX = coordAccess0[i]/maxX * sideLen;
+            scaledY = coordAccess1[i]/maxY * sideLen;
+            IndexType densInd = scaledX*sideLen + scaledY;
+            //PRINT(densInd << " # " << coordAccess0[i] << " _ " << coordAccess1[i] );            
+            SCAI_ASSERT( densInd < density.size(), "Index too big: "<< std::to_string(densInd) );
+
+            wLocalPart[i] = pixeledPartition[densInd];
+            SCAI_ASSERT(wLocalPart[i] < k, " Wrong block number: " + std::to_string(wLocalPart[i] ) );
+++partSize[wLocalPart[i]];            
+        }
+/*        
+for(int p=0; p<k; p++){        
+    PRINT( *comm<<", "<< p <<": "<< partSize[p]); 
+}
+*/
+    }else if(dimensions==3){
+        SCAI_REGION( "ParcoRepart.pixelPartition.localDensity" )
+        scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
+        scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
+        scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[2].getLocalValues() );
+        
+        IndexType scaledX, scaledY, scaledZ;
+        
+        IndexType maxX = maxCoords[0]+1;
+        IndexType maxY = maxCoords[1]+1;
+        IndexType maxZ = maxCoords[2]+1;
+        
+        for(IndexType i=0; i<localN; i++){
+            scaledX = coordAccess0[i]/maxX * sideLen;
+            scaledY = coordAccess1[i]/maxY * sideLen;
+            scaledZ = coordAccess2[i]/maxZ * sideLen;
+            IndexType densInd = scaledX*sideLen*sideLen + scaledY*sideLen + scaledZ;
+            
+            SCAI_ASSERT( densInd < density.size(), "Index too big: "<< std::to_string(densInd) );
+            wLocalPart[i] = pixeledPartition[densInd];  
+            SCAI_ASSERT(wLocalPart[i] < k, " Wrong block number: " + std::to_string(wLocalPart[i] ) );
+        }
+    }else{
+        throw std::runtime_error("Available only for 2D and 3D. Data given have dimension:" + std::to_string(dimensions) );
+    }
+    wLocalPart.release();
+    
+    //get new distribution
+    /* must gather in one PE and create partition by owners
+     
+    scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, localPart, comm));
+    input.redistribute(newDistribution, input.getColDistributionPtr());
+    result.redistribute(newDistribution);
+    */
+ if (comm->getRank() == 0) { 
+    int r  =rand()%(localN/2);
+    std::cout<< r <<": ";
+    for(int kk=r; kk<r+20; kk++){
+        std::cout<< result.getLocalValues()[kk] << ", ";
+    }
+    std::cout<< std::endl;
+}     
+    //TODO: should change this
+    //replicate in every PE to make the new distribution
+    scai::dmemo::DistributionPtr noDist (new scai::dmemo::NoDistribution( globalN ));
+    result.redistribute(noDist);
+    
+if (comm->getRank() == 0) { 
+    int r  =rand()%(globalN/2);
+    std::cout<< r <<": ";
+    for(int kk=r; kk<r+20; kk++){
+        std::cout<< result.getLocalValues()[kk] << ", ";
+    }
+    std::cout<< std::endl;
+}    
+
+PRINT0(result.max() << " # " << result.min() );
+    scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution( result.getLocalValues(), comm));
+    result.redistribute( newDist);
+
+    // redistibute coordinates
+    for (IndexType dim = 0; dim < dimensions; dim++) {
+        coordinates[dim].redistribute( newDist );
+    }
+    // check coordinates size
+    for (IndexType dim = 0; dim < dimensions; dim++) {
+        assert( coordinates[dim].size() == globalN);
+    }
+    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, globalN, "pixeledPartition");
+
+    ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
+    if (comm->getRank() == 0) {
+        afterSFC = std::chrono::steady_clock::now();
+        std::chrono::duration<double> elapsedSeconds = afterSFC-start;
+        std::cout << "With pixel (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
+    }
+    
+    return result;
+    //return pixeledPartition;
 }
 //--------------------------------------------------------------------------------------- 
 
@@ -930,7 +1316,7 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
 
     // use boost::Graph and boost::edge_coloring()
     typedef adjacency_list<vecS, vecS, undirectedS, no_property, size_t, no_property> Graph;
-    typedef std::pair<std::size_t, std::size_t> Pair;
+    //typedef std::pair<std::size_t, std::size_t> Pair;
     Graph G(N);
     
     // retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge
@@ -1009,9 +1395,66 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 }
 //---------------------------------------------------------------------------------------
 
+/* A 2D or 3D matrix given as a 1D array of size sideLen^dimesion
+ * */
+template<typename IndexType, typename ValueType>
+std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const IndexType thisPixel, const IndexType sideLen, const IndexType dimension){
+    SCAI_REGION("ParcoRepart.neighbourPixels");
+   
+    SCAI_ASSERT(thisPixel>=0, "Negative pixel value: " << std::to_string(thisPixel));
+    SCAI_ASSERT(sideLen> 0, "Negative or zero side length: " << std::to_string(sideLen));
+    SCAI_ASSERT(sideLen> 0, "Negative or zero dimension: " << std::to_string(dimension));
+    
+    IndexType totalSize = std::pow(sideLen ,dimension);    
+    SCAI_ASSERT( thisPixel < totalSize , "Wrong side length or dimension, sideLen=" + std::to_string(sideLen)+ " and dimension= " + std::to_string(dimension) );
+    
+    std::vector<IndexType> result;
+    
+    //calculate the index of the neighbouring pixels
+    for(IndexType i=0; i<dimension; i++){
+        for( int j :{-1, 1} ){
+            // possible neighbour
+            IndexType ngbrIndex = thisPixel + j*std::pow(sideLen,i );
+            // index is within bounds
+            if( ngbrIndex < 0 or ngbrIndex >=totalSize){
+                continue;
+            }
+            if(dimension==2){
+                IndexType xCoord = thisPixel/sideLen;
+                IndexType yCoord = thisPixel%sideLen;
+                if( ngbrIndex/sideLen == xCoord or ngbrIndex%sideLen == yCoord){
+                    result.push_back(ngbrIndex);
+                }
+            }else if(dimension==3){
+                IndexType planeSize= sideLen*sideLen;
+                IndexType xCoord = thisPixel/planeSize;
+                IndexType yCoord = (thisPixel%planeSize) /  sideLen;
+                IndexType zCoord = (thisPixel%planeSize) % sideLen;
+                IndexType ngbrX = ngbrIndex/planeSize;
+                IndexType ngbrY = (ngbrIndex%planeSize)/sideLen;
+                IndexType ngbrZ = (ngbrIndex%planeSize)%sideLen;
+                if( ngbrX == xCoord and  ngbrY == yCoord ){
+                    result.push_back(ngbrIndex);
+                }else if(ngbrX == xCoord and  ngbrZ == zCoord){
+                    result.push_back(ngbrIndex);
+                }else if(ngbrY == yCoord and  ngbrZ == zCoord){
+                    result.push_back(ngbrIndex);
+                }
+            }else{
+                throw std::runtime_error("Implemented only for 2D and 3D. Dimension given: " + std::to_string(dimension) );
+            }
+        }
+    }
+    return result;
+}
+
+//---------------------------------------------------------------------------------------
+
 //to force instantiation
 
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings);
+
+template DenseVector<int> ParcoRepart<int, double>::pixelPartition(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, Settings settings);
 
 template double ParcoRepart<int, double>::computeCut(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, bool ignoreWeights);
 
@@ -1038,5 +1481,7 @@ template scai::lama::CSRSparseMatrix<double> ParcoRepart<int, double>::getBlockG
 template std::vector< std::vector<int>>  ParcoRepart<int, double>::getGraphEdgeColoring_local( CSRSparseMatrix<double> &adjM, int& colors);
 
 template std::vector<DenseVector<int>> ParcoRepart<int, double>::getCommunicationPairs_local( CSRSparseMatrix<double> &adjM);
+
+template std::vector<int> ParcoRepart<int, double>::neighbourPixels(const int thisPixel, const int sideLen, const int dimension);
 
 }

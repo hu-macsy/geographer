@@ -85,7 +85,7 @@ namespace ITI {
                 static ValueType dist3DSquared(std::tuple<IndexType, IndexType, IndexType> p1, std::tuple<IndexType, IndexType, IndexType> p2);
                 
                 /*  Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
-                 *  of the index in 3D. The return value is not the coordiantes of the point!
+                 *  of the index in 3D. The return value is not the coordinates of the point!
                  */
                 static std::tuple<IndexType, IndexType, IndexType> index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints);
         };//class MeshGenerator

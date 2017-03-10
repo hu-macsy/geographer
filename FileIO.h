@@ -29,14 +29,14 @@ public:
 	 *  Not distributed.
 	 *
 	 * @param[in] adjM The graph's adjacency matrix.
-	 * @param[in] filename The file's name to write to/
+	 * @param[in] filename The file's name to write to
 	 */
 	static void writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
 
 	/** Given an adjacency matrix and a filename writes the local part of matrix in the file using the METIS format.
 	 *  Every proccesor adds his rank in the end of the file name.
 	 * @param[in] adjM The graph's adjacency matrix.
-	 * @param[in] filename The file's name to write to/
+	 * @param[in] filename The file's name to write to
 	 */
 	static void writeGraphDistributed (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
 
@@ -46,6 +46,7 @@ public:
 	static void writeCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
 
         static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
+        
 	/** Reads a graph from filename in METIS format and returns the adjacency matrix.
 	 * @param[in] filename The file to read from. In a METIS format.
 	 * @param[out] matrix The adjacency matrix of the graph.

@@ -30,10 +30,14 @@ namespace ITI {
         static std::vector<IndexType> distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
         
         static std::vector<IndexType> distributedFMStep(
-            CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, 
+            CSRSparseMatrix<ValueType> &input, 
+            DenseVector<IndexType> &part, 
             std::vector<IndexType>& nodesWithNonLocalNeighbors,
-            DenseVector<IndexType> &nodeWeights, const std::vector<DenseVector<IndexType>>& communicationScheme, std::vector<DenseVector<ValueType>> &coordinates,
-            std::vector<ValueType> &distances, Settings settings
+            DenseVector<IndexType> &nodeWeights, 
+            const std::vector<DenseVector<IndexType>>& communicationScheme, 
+            std::vector<DenseVector<ValueType>> &coordinates,
+            std::vector<ValueType> &distances, 
+            Settings settings
         );
 
         /**
@@ -70,8 +74,10 @@ namespace ITI {
             const std::vector<IndexType>& nodeWeights, 
             std::pair<IndexType, IndexType> secondRoundMarkers,
             std::vector<bool>& assignedToSecondBlock,
-            const std::pair<IndexType, IndexType> blockCapacities,
-            std::pair<IndexType, IndexType>& blockSizes,
+            const std::pair<IndexType, 
+            IndexType> blockCapacities,
+            std::pair<IndexType, 
+            IndexType>& blockSizes,
             std::vector<ValueType> tieBreakingKeys,
             Settings settings
         );

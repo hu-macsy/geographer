@@ -24,6 +24,7 @@ using scai::dmemo::Halo;
 #define STR_VALUE(arg)      STRINGIZER(arg)
 #define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
+#define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
 const std::string version = BUILD_COMMIT_STRING;
 
@@ -46,7 +47,12 @@ namespace ITI {
                          * Get an initial partition using the hilbert curve.
                          */
                         static DenseVector<IndexType> initialPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
-                            
+                        
+                        /*
+                         * Get an initial partition using the morton curve and measuring density per square.
+                         */
+                        static DenseVector<IndexType> pixelPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+                                                        
                         /**
 			 * This method takes a (possibly distributed) partition and computes its global cut.
 			 *
@@ -164,5 +170,7 @@ namespace ITI {
 			static ValueType localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input, const bool weighted);
 
 			static IndexType getDegreeSum(const CSRSparseMatrix<ValueType> &input, const std::vector<IndexType> &nodes);
+                        
+                        static std::vector<IndexType> neighbourPixels(const IndexType thisPixel,const IndexType sideLen, const IndexType dimensions);
 	};
 }

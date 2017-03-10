@@ -34,6 +34,47 @@ class ParcoRepartTest : public ::testing::Test {
 
 };
 
+TEST_F(ParcoRepartTest, testInitialPartition){
+    //std::string file = "Grid16x16";
+    std::string file = "meshes/bigbubbles/bigbubbles-00010.graph";
+    //std::string file = "meshes/bigtrace/bigtrace-00000.graph";
+    std::ifstream f(file);
+    IndexType dimensions= 2;
+    IndexType N, edges;
+    f >> N >> edges; 
+    
+    PRINT("nodes= "<< N);
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    // for now local refinement requires k = P
+    IndexType k = comm->getSize();
+    //
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+    graph.redistribute(dist, noDistPointer);
+    
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
+    
+    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
+    EXPECT_EQ(edges, (graph.getNumValues())/2 );   
+    
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+      
+    DenseVector<IndexType> hilbertInitialPartition = ParcoRepart<IndexType, ValueType>::initialPartition(graph, coords, settings);
+    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords, N, "hilbertPartition");
+
+    comm->synchronize();
+
+    //DenseVector<IndexType> pixelInitialPartition = ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coords, settings);
+    
+    //gather all in one PE
+    //scai::dmemo::DistributionPtr noDist (new scai::dmemo::NoDistribution( globalN ));
+    
+}
+//--------------------------------------------------------------------------------------- 
 
 TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   IndexType nroot = 49;
@@ -1030,7 +1071,34 @@ TEST_F(ParcoRepartTest, testMYPartitionBalanceDistributed) {
 	  std::cout << "Commit " << version << ": Partitioned graph with " << n << " nodes into " << k << " blocks with a total cut of " << cut << std::endl;
   }
 }
+//------------------------------------------------------------------------------
 
+TEST_F(ParcoRepartTest, testPixelNeighbours){
+    
+    srand(time(NULL));
+    
+    for(IndexType dimension:{2,3}){
+        IndexType numEdges = 0;
+        IndexType sideLen = rand()%30 +10;
+        IndexType totalSize = std::pow(sideLen ,dimension);
+        std::cout<< "dim= "<< dimension << " and sideLen= "<< sideLen << std::endl;    
+        
+        for(IndexType thisPixel=0; thisPixel<totalSize; thisPixel++){
+            std::vector<IndexType> pixelNgbrs = ParcoRepart<IndexType, ValueType>::neighbourPixels( thisPixel, sideLen, dimension);
+            numEdges += pixelNgbrs.size();
+            SCAI_ASSERT(pixelNgbrs.size() <= 2*dimension , "Wrong number of neighbours");
+            SCAI_ASSERT(pixelNgbrs.size() >= dimension , "Wrong number of neighbours");
+            /*
+            std::cout<<" neighbours of pixel " << thisPixel  <<std::endl;
+            for(int i=0; i<pixelNgbrs.size(); i++){
+                std::cout<< pixelNgbrs[i] << " ,";
+            }
+            std::cout<< std::endl;
+            */
+        }
+        SCAI_ASSERT_EQUAL_ERROR(numEdges/2,  dimension*( std::pow(sideLen,dimension)- std::pow(sideLen, dimension-1)) );
+    }
+}       
 //------------------------------------------------------------------------------
 
 /**
