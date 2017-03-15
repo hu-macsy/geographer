@@ -31,9 +31,9 @@ TEST_F(QuadTreeTest, testGetGraphFromForestRandom_2D){
     // every forest[i] is a pointer to the root of a tree
     std::vector<std::shared_ptr<SpatialCell>> forest;
     
-    IndexType n= 2;
-    vector<Point<double> > positions(n);
-    vector<index> content(n);
+    IndexType n= 20;
+    //vector<Point<double> > positions(n);
+    //vector<index> content(n);
 
     Point<double> min(0.0, 0.0);
     Point<double> max(1.0, 1.0);
@@ -82,7 +82,7 @@ TEST_F(QuadTreeTest, testGetGraphFromForestRandom_2D){
     graph.checkSymmetry();
     graph.isConsistent();
 }
-
+//-------------------------------------------------------------------------------------------------
 
 
 TEST_F(QuadTreeTest, testGetGraphFromForestByHand_2D){
@@ -265,7 +265,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
         PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
         
 }
-    
+//-------------------------------------------------------------------------------------------------    
 
 TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
 
@@ -376,14 +376,18 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
             coordsDV[d].redistribute(dist);
         }
         
-        EXPECT_EQ(coordsDV[0].getLocalValues().size() , graph.getLocalNumRows() );
-        
+        EXPECT_EQ(coordsDV[0].getLocalValues().size() , graph.getLocalNumRows() ); 
         
         const ValueType epsilon = 0.05;        
         struct Settings Settings;
         Settings.numBlocks= k;
         Settings.epsilon = epsilon;
-  
+        Settings.dimensions = 3;
+        
+        EXPECT_EQ(coords[0].size(), N);
+	EXPECT_EQ( graph.getNumRows(), N);
+	EXPECT_EQ( graph.getNumColumns(), N);
+        
         scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordsDV, Settings);
 
         ParcoRepart<IndexType, ValueType> repart;

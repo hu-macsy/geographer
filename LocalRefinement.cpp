@@ -4,12 +4,16 @@
 
 namespace ITI{
 
-    
+    /*
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<DenseVector<ValueType>> &coordinates, Settings settings) {
-	/**
-	 * This is a wrapper function to allow calls without precomputing a communication schedule..
-	 */
+std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFMStep(
+    CSRSparseMatrix<ValueType> &input,
+    DenseVector<IndexType> &part,
+    std::vector<DenseVector<ValueType>> &coordinates,
+    Settings settings) {
+	//
+        //  This is a wrapper function to allow calls without precomputing a communication schedule..
+        //
 
 	std::vector<IndexType> nodesWithNonLocalNeighbors = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(input);
 
@@ -29,11 +33,13 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 	//call distributed FM-step
 	return distributedFMStep(input, part, nodesWithNonLocalNeighbors, uniformWeights, communicationScheme, coordinates, distances, settings);
 }
+*/
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFMStep(
-    CSRSparseMatrix<ValueType>& input, DenseVector<IndexType>& part,
+    CSRSparseMatrix<ValueType>& input, 
+    DenseVector<IndexType>& part,
     std::vector<IndexType>& nodesWithNonLocalNeighbors,
     DenseVector<IndexType> &nodeWeights, 
     const std::vector<DenseVector<IndexType>>& communicationScheme, 
@@ -41,38 +47,40 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     std::vector<ValueType> &distances, 
     Settings settings) {
     
-	SCAI_REGION( "LocalRefinement.distributedFMStep" )
-	const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
-	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
-
-	if (part.getDistributionPtr()->getLocalSize() != input.getRowDistributionPtr()->getLocalSize()) {
-		throw std::runtime_error("Distributions of input matrix and partitions must be equal, for now.");
-	}
-
-	if (!input.getColDistributionPtr()->isReplicated()) {
-		throw std::runtime_error("Column distribution needs to be replicated.");
-	}
-
-	if (settings.useGeometricTieBreaking) {
-		for (IndexType dim = 0; dim < coordinates.size(); dim++) {
-			if (coordinates[dim].getDistributionPtr()->getLocalSize() != input.getRowDistributionPtr()->getLocalSize()) {
-				throw std::runtime_error("Coordinate distribution must be equal to matrix distribution");
-			}
-		}
-		assert(distances.size() == input.getRowDistributionPtr()->getLocalSize());
-	}
-
-	if (settings.epsilon < 0) {
-		throw std::runtime_error("Epsilon must be >= 0, not " + std::to_string(settings.epsilon));
-	}
-
+    SCAI_REGION( "LocalRefinement.distributedFMStep" )
+    const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
+    scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
+    
+    if (part.getDistributionPtr()->getLocalSize() != input.getRowDistributionPtr()->getLocalSize()) {
+        throw std::runtime_error("Distributions of input matrix and partitions must be equal, for now.");
+    }
+    
+    if (!input.getColDistributionPtr()->isReplicated()) {
+        throw std::runtime_error("Column distribution needs to be replicated.");
+    }
+    
+    if (settings.useGeometricTieBreaking) {
+        for (IndexType dim = 0; dim < coordinates.size(); dim++) {
+            if (coordinates[dim].getDistributionPtr()->getLocalSize() != input.getRowDistributionPtr()->getLocalSize()) {
+                throw std::runtime_error("Coordinate distribution must be equal to matrix distribution");
+            }
+        }
+        assert(distances.size() == input.getRowDistributionPtr()->getLocalSize());
+    }
+    
+    if (settings.epsilon < 0) {
+        throw std::runtime_error("Epsilon must be >= 0, not " + std::to_string(settings.epsilon));
+    }
+    
     if (settings.numBlocks != comm->getSize()) {
     	throw std::runtime_error("Called with " + std::to_string(comm->getSize()) + " processors, but " + std::to_string(settings.numBlocks) + " blocks.");
     }
 
     //block sizes TODO: adapt for weighted case
-    const IndexType optSize = ceil(double(globalN) / settings.numBlocks);
+    const IndexType optSize_old = ceil(double(globalN) / settings.numBlocks);
+const IndexType optSize = std::ceil( nodeWeights.sum().Scalar::getValue<IndexType>() / settings.numBlocks);
     const IndexType maxAllowableBlockSize = optSize*(1+settings.epsilon);
+//PRINT(optSize << " , allowed maxBlockSize "<< maxAllowableBlockSize );
 
     //for now, we are assuming equal numbers of blocks and processes
     const IndexType localBlockID = comm->getRank();
@@ -86,7 +94,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     IndexType gainSum = 0;
     std::vector<IndexType> gainPerRound(communicationScheme.size(), 0);
 
-	//copy into usable data structure with iterators
+    //copy into usable data structure with iterators
     //TODO: we only need those if redistribution happens.
     //Maybe hold off on creating the vector until then? On the other hand, the savings would be in those processes that are faster anyway and probably have to wait.
 	std::vector<IndexType> myGlobalIndices(input.getRowDistributionPtr()->getLocalSize());
@@ -192,6 +200,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 					 * These processes don't share a border and thus have no communication to do with each other. How did they end up in a communication scheme?
 					 * We could skip the loop entirely.
 					 */
+                                        PRINT("PEs " << comm->getRank() << " and "<< partner << " do not share a borer nontheless they communicate for color " << color << ". Something is wrong");
 				}
 			}
 
@@ -955,9 +964,9 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 		SCAI_REGION( "LocalRefinement.redistributeFromHalo.sourceSizes" )
 		scai::hmemo::ReadAccess<IndexType> sourceIA(localStorage.getIA());
 		scai::hmemo::WriteOnlyAccess<IndexType> wSourceSizes( sourceSizes, sourceNumRows );
-	    scai::sparsekernel::OpenMPCSRUtils::offsets2sizes( wSourceSizes.get(), sourceIA.get(), sourceNumRows );
-	    //allocate
-	    scai::hmemo::WriteOnlyAccess<IndexType> wTargetIA( targetIA, targetNumRows + 1 );
+                scai::sparsekernel::OpenMPCSRUtils::offsets2sizes( wSourceSizes.get(), sourceIA.get(), sourceNumRows );
+                //allocate
+                scai::hmemo::WriteOnlyAccess<IndexType> wTargetIA( targetIA, targetNumRows + 1 );
 	}
 
 	scai::hmemo::HArray<IndexType> haloSizes;
@@ -977,7 +986,7 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 		SCAI_REGION( "LocalRefinement.redistributeFromHalo.targetIA" )
 		scai::hmemo::ReadAccess<IndexType> rSourceSizes(sourceSizes);
 		scai::hmemo::ReadAccess<IndexType> rHaloSizes(haloSizes);
-	    scai::hmemo::WriteAccess<IndexType> wTargetIA( targetIA );
+                scai::hmemo::WriteAccess<IndexType> wTargetIA( targetIA );
 
 		for (IndexType i = 0; i < targetNumRows; i++) {
 			IndexType newGlobalIndex = newDist->local2global(i);
@@ -1011,9 +1020,12 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 
 	for (IndexType i = 0; i < targetNumRows; i++) {
 		assert(rTargetIA[i] <= rTargetIA[i+1]);
-		assert(rTargetIA[i] < numValues);
+                assert(rTargetIA[i] <= numValues);
+                //WARNING: the assertion was as below (added '=') but it failed when the last row was empty
+                // and rTargetIA[i] = rTargetIA[i+1]
+		//assert(rTargetIA[i] < numValues);
 	}
-
+        rTargetIA.release();
 	{
 		SCAI_REGION( "LocalRefinement.redistributeFromHalo.copy" )
 		//copying JA array from local matrix and halo
@@ -1024,7 +1036,6 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 		scai::dmemo::Redistributor::copyV( targetValues, targetIA, LArray<IndexType>(numLocalIndices, localTargetIndices.data()), localStorage.getValues(), localStorage.getIA(), LArray<IndexType>(numLocalIndices, localSourceIndices.data()) );
 		scai::dmemo::Redistributor::copyV( targetValues, targetIA, LArray<IndexType>(additionalLocalNodes.size(), additionalLocalNodes.data()), haloStorage.getValues(), haloStorage.getIA(), LArray<IndexType>(numHaloIndices, localHaloIndices.data()) );
 	}
-	rTargetIA.release();
 
 	{
 		SCAI_REGION( "LocalRefinement.redistributeFromHalo.setCSRData" )
@@ -1113,6 +1124,7 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 			if (!inputDist->isLocal(ja[j])) {
 				hasNonLocal = true;
 				if (foreignNodes.count(ja[j])> 0) {
+//PRINT("local node: "<< node <<" , foreignNgbr= "<< ja[j] );                                    
 					interfaceNodes.push_back(node);
 					break;
 				}
@@ -1213,7 +1225,17 @@ IndexType ITI::LocalRefinement<IndexType, ValueType>::getDegreeSum(const CSRSpar
 
 //---------------------------------------------------------------------------------------
 
-template std::vector<int> LocalRefinement<int, double>::distributedFMStep(CSRSparseMatrix<double> &input, DenseVector<int> &part, std::vector<DenseVector<double>> &coordinates, Settings settings);
+//template std::vector<int> LocalRefinement<int, double>::distributedFMStep(CSRSparseMatrix<double> &input, DenseVector<int> &part, std::vector<DenseVector<double>> &coordinates, Settings settings);
+
+template std::vector<int> ITI::LocalRefinement<int, double>::distributedFMStep(
+    CSRSparseMatrix<double>& input, 
+    DenseVector<int>& part,
+    std::vector<int>& nodesWithNonLocalNeighbors,
+    DenseVector<int> &nodeWeights, 
+    const std::vector<DenseVector<int>>& communicationScheme, 
+    std::vector<DenseVector<double>> &coordinates, 
+    std::vector<double> &distances, 
+    Settings settings);
 
 template std::pair<std::vector<int>, std::vector<int>> ITI::LocalRefinement<int, double>::getInterfaceNodes(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, const std::vector<int>& nodesWithNonLocalNeighbors, int otherBlock, int depth);
 

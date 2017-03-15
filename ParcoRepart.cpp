@@ -42,6 +42,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
     
 	SCAI_REGION( "ParcoRepart.partitionGraph" )
 
+	std::chrono::time_point<std::chrono::steady_clock> start, afterSFC, round;
+	start = std::chrono::steady_clock::now();
+
 	SCAI_REGION_START("ParcoRepart.partitionGraph.inputCheck")
 	/**
 	* check input arguments for sanity
@@ -84,7 +87,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	SCAI_REGION_END("ParcoRepart.partitionGraph.inputCheck")
 	
         // get an initial partition
-        
         DenseVector<IndexType> result= ParcoRepart<IndexType, ValueType>::initialPartition(input, coordinates, settings);
 
 	IndexType numRefinementRounds = 0;
@@ -106,7 +108,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		}
                 */
 		DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(input.getRowDistributionPtr(), 1);
-
 		ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, uniformWeights, coordinates, settings);
 
 	} else {
@@ -119,6 +120,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings){    
     SCAI_REGION( "ParcoRepart.initialPartition" )
+    	
+    std::chrono::time_point<std::chrono::steady_clock> start, afterSFC;
+    start = std::chrono::steady_clock::now();
     
     const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
     const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
@@ -133,9 +137,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
     std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
     DenseVector<IndexType> result;
     
-    
-    std::chrono::time_point<std::chrono::steady_clock> start, afterSFC;
-    start = std::chrono::steady_clock::now();
+    if( ! inputDist->isEqual(*coordDist) ){
+        throw std::runtime_error("Matrix and coordianted should have then same distribution");
+    }
     
     /**
      * get minimum / maximum of local coordinates
@@ -217,11 +221,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
         
         input.redistribute(newDistribution, input.getColDistributionPtr());
         result = DenseVector<IndexType>(newDistribution, comm->getRank());
-
-//        
-settings.useGeometricTieBreaking = 1;
-//
-
+        
         if (settings.useGeometricTieBreaking) {
             for (IndexType dim = 0; dim < dimensions; dim++) {
                 coordinates[dim].redistribute(newDistribution);
@@ -933,7 +933,7 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
 
     // use boost::Graph and boost::edge_coloring()
     typedef adjacency_list<vecS, vecS, undirectedS, no_property, size_t, no_property> Graph;
-    typedef std::pair<std::size_t, std::size_t> Pair;
+    //typedef std::pair<std::size_t, std::size_t> Pair;
     Graph G(N);
     
     // retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge
@@ -1012,6 +1012,88 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 }
 //---------------------------------------------------------------------------------------
 
+/* A 2D or 3D matrix given as a 1D array of size sideLen^dimesion
+ * */
+template<typename IndexType, typename ValueType>
+std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const IndexType thisPixel, const IndexType sideLen, const IndexType dimension){
+    SCAI_REGION("ParcoRepart.neighbourPixels");
+   
+    SCAI_ASSERT(thisPixel>=0, "Negative pixel value: " << std::to_string(thisPixel));
+    SCAI_ASSERT(sideLen> 0, "Negative or zero side length: " << std::to_string(sideLen));
+    SCAI_ASSERT(sideLen> 0, "Negative or zero dimension: " << std::to_string(dimension));
+    
+    IndexType totalSize = std::pow(sideLen ,dimension);    
+    SCAI_ASSERT( thisPixel < totalSize , "Wrong side length or dimension, sideLen=" + std::to_string(sideLen)+ " and dimension= " + std::to_string(dimension) );
+    
+    std::vector<IndexType> result;
+    
+    //calculate the index of the neighbouring pixels
+    for(IndexType i=0; i<dimension; i++){
+        for( int j :{-1, 1} ){
+            // possible neighbour
+            IndexType ngbrIndex = thisPixel + j*std::pow(sideLen,i );
+            // index is within bounds
+            if( ngbrIndex < 0 or ngbrIndex >=totalSize){
+                continue;
+            }
+            if(dimension==2){
+                IndexType xCoord = thisPixel/sideLen;
+                IndexType yCoord = thisPixel%sideLen;
+                if( ngbrIndex/sideLen == xCoord or ngbrIndex%sideLen == yCoord){
+                    result.push_back(ngbrIndex);
+                }
+            }else if(dimension==3){
+                IndexType planeSize= sideLen*sideLen;
+                IndexType xCoord = thisPixel/planeSize;
+                IndexType yCoord = (thisPixel%planeSize) /  sideLen;
+                IndexType zCoord = (thisPixel%planeSize) % sideLen;
+                IndexType ngbrX = ngbrIndex/planeSize;
+                IndexType ngbrY = (ngbrIndex%planeSize)/sideLen;
+                IndexType ngbrZ = (ngbrIndex%planeSize)%sideLen;
+                if( ngbrX == xCoord and  ngbrY == yCoord ){
+                    result.push_back(ngbrIndex);
+                }else if(ngbrX == xCoord and  ngbrZ == zCoord){
+                    result.push_back(ngbrIndex);
+                }else if(ngbrY == yCoord and  ngbrZ == zCoord){
+                    result.push_back(ngbrIndex);
+                }
+            }else{
+                throw std::runtime_error("Implemented only for 2D and 3D. Dimension given: " + std::to_string(dimension) );
+            }
+        }
+    }
+    return result;
+}
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+scai::lama::DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType> adjM){
+    SCAI_REGION("ParcoRepart.getDegreeVector");
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
+    const IndexType localN = distPtr->getLocalSize();
+    
+    scai::lama::DenseVector<IndexType> degreeVector(distPtr);
+    scai::utilskernel::LArray<IndexType>& localDegreeVector = degreeVector.getLocalValues();
+    
+    const scai::lama::CSRStorage<ValueType> localAdjM = adjM.getLocalStorage();
+    {
+        const scai::hmemo::ReadAccess<IndexType> readIA ( localAdjM.getIA() );
+        scai::hmemo::WriteOnlyAccess<IndexType> writeVector( localDegreeVector, localDegreeVector.size()) ;
+        
+        SCAI_ASSERT_EQ_ERROR(readIA.size(), localDegreeVector.size()+1, "Probably wrong distribution");
+        
+        for(IndexType i=0; i<readIA.size()-1; i++){
+            writeVector[i] = readIA[i+1] - readIA[i];
+        }
+    }
+    
+    return degreeVector;
+}
+
+//---------------------------------------------------------------------------------------
+
 //to force instantiation
 
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings);
@@ -1041,5 +1123,9 @@ template scai::lama::CSRSparseMatrix<double> ParcoRepart<int, double>::getBlockG
 template std::vector< std::vector<int>>  ParcoRepart<int, double>::getGraphEdgeColoring_local( CSRSparseMatrix<double> &adjM, int& colors);
 
 template std::vector<DenseVector<int>> ParcoRepart<int, double>::getCommunicationPairs_local( CSRSparseMatrix<double> &adjM);
+
+template std::vector<int> ParcoRepart<int, double>::neighbourPixels(const int thisPixel, const int sideLen, const int dimension);
+
+template scai::lama::DenseVector<int> ParcoRepart<int, double>::getDegreeVector( const scai::lama::CSRSparseMatrix<double> adjM);
 
 }

@@ -22,6 +22,8 @@
 #include "MultiLevel.h"
 #include "gtest/gtest.h"
 
+#include "AuxiliaryFunctions.h"
+
 typedef double ValueType;
 typedef int IndexType;
 
@@ -204,7 +206,161 @@ TEST_F (MultiLevelTest, testComputeGlobalPrefixSum) {
 }
 //--------------------------------------------------------------------------------------- 
 
+TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 
+    const IndexType N = 500;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( N ));
+    const IndexType k = comm->getSize();
+    
+    scai::lama::CSRSparseMatrix<ValueType> graph;
+    
+    // create random graph
+    scai::common::scoped_array<ValueType> adjArray( new ValueType[ N*N ] );
+    
+    //initialize matrix with zeros
+    for(int i=0; i<N; i++)
+        for(int j=0; j<N; j++)
+            adjArray[i*N+j]=0;
+        
+    srand(time(NULL));
+    IndexType numEdges = int (1.12*N);
+    for(IndexType i=0; i<numEdges; i++){
+        // a random position in the matrix
+        IndexType x = rand()%N;
+        IndexType y = rand()%N;
+        adjArray[ x+y*N ]= 1;
+        adjArray[ x*N+y ]= 1;
+    }
+    graph.setRawDenseData( N, N, adjArray.get() );
+    EXPECT_TRUE( graph.isConsistent() );
+    EXPECT_TRUE( graph.checkSymmetry() );
+    ValueType beforel1Norm = graph.l1Norm().Scalar::getValue<ValueType>();
+    IndexType beforeNumValues = graph.getNumValues();
+    graph.redistribute( distPtr , noDistPtr);
+    
+    // node weights = 1
+    DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+    //ValueType beforeSumWeigths = uniformWeights.l1Norm().Scalar::getValue<ValueType>();
+    IndexType beforeSumWeigths = N;
+    //uniformWeights.redistribute( distPtr );
+    
+    //coordinates at random and redistribute
+    std::vector<DenseVector<ValueType>> coords(2);
+    for(IndexType i=0; i<2; i++){ 
+	coords[i].allocate(N);
+	coords[i] = static_cast<ValueType>( 0 );
+        // set random coordinates
+        for(IndexType j=0; j<N; j++){
+            coords[i].setValue(j, rand()%10);
+        }
+        coords[i].redistribute( distPtr );
+    }
+    
+    //random partition
+    DenseVector<IndexType> partition( N , 0);
+    for(IndexType i=0; i<N; i++){
+        partition.setValue(i, rand()%k );
+    }
+    partition.redistribute( distPtr );
+    
+    struct Settings Settings;
+    Settings.numBlocks= k;
+    Settings.epsilon = 0.2;
+    Settings.multiLevelRounds= 6;
+    Settings.coarseningStepsBetweenRefinement = 3;
+    Settings.useGeometricTieBreaking = true;
+    Settings.dimensions= 2;
+    
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, Settings);
+    
+    EXPECT_EQ( graph.l1Norm() , beforel1Norm);
+    EXPECT_EQ( graph.getNumValues() , beforeNumValues);
+    // l1Norm not supported for IndexType
+    EXPECT_EQ( static_cast <DenseVector<ValueType>> (uniformWeights).l1Norm() , beforeSumWeigths );
+    
+}
+//--------------------------------------------------------------------------------------- 
 
+TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
+    //std::string file = "Grid16x16";
+    std::string file = "meshes/slowrot/slowrot-00009.graph";
+    //std::string file = "graphFromQuad2D/graphFromQuad2D_10";
+    std::ifstream f(file);
+    IndexType dimensions= 2, k=8;
+    IndexType N, edges;
+    f >> N >> edges; 
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    // for now local refinement requires k = P
+    k = comm->getSize();
+    //
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    //distrubute graph
+    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
+        
+
+    //read the array locally and messed the distribution. Left as a remainder.
+    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
+    EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
+    
+    //distribution should be the same
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
+    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
+    
+    struct Settings Settings;
+    Settings.numBlocks= k;
+    Settings.epsilon = 0.2;
+
+    //check distributions
+    //assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
+
+    // coarsen the graph
+    for(IndexType i=2; i<7; i++){
+        std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
+        
+        Settings.pixeledDetailLevel = i;
+        IndexType sideLen = std::pow(2, Settings.pixeledDetailLevel);
+        IndexType pixeledGraphSize =  std::pow( sideLen, dimensions);
+        IndexType pixeledGraphAdjecencyMatrixSize = pixeledGraphSize*pixeledGraphSize;
+        
+                
+        PRINT0("detail level="<< Settings.pixeledDetailLevel << " ,pixeledGraphSize= "<< pixeledGraphSize << " , pixeledGraphAdjecencyMatrixSize= " << pixeledGraphAdjecencyMatrixSize );
+        if( pixeledGraphSize > N ){
+            std::cout<< " size of pixeledGraph (number of pixels)= "<< pixeledGraphSize << "  > input grap " << N <<" .Hmm, not really a coarsening... Breaking..." << std::endl;
+            break;
+        }
+        
+        DenseVector<IndexType> pixelWeights;
+        
+        scai::lama::CSRSparseMatrix<ValueType> pixelGraph = MultiLevel<IndexType, ValueType>::pixeledCoarsen(graph, coords, pixelWeights, Settings);
+        
+        std::chrono::duration<double> elapsedSeconds = std::chrono::steady_clock::now() - start;
+        double maxElapsedTime = comm->max( elapsedSeconds.count() );
+        
+        if(comm->getRank()==0 ){
+            std::cout<< "detail level= "<< i << " , max time: "<< maxElapsedTime << std::endl;
+        }
+        
+        EXPECT_TRUE(pixelGraph.isConsistent());
+        if(pixeledGraphSize < 5000){
+            EXPECT_TRUE(pixelGraph.checkSymmetry());
+        }
+        SCAI_ASSERT_EQ_ERROR( pixelWeights.sum().Scalar::getValue<ValueType>() , N , "should ne equal");
+        EXPECT_LE( pixelGraph.l1Norm().Scalar::getValue<ValueType>()  , edges);
+        
+        IndexType nnzValues= 2*dimensions*(std::pow(sideLen, dimensions) - std::pow(sideLen, dimensions-1) );
+        
+        EXPECT_EQ( nnzValues , pixelGraph.getNumValues() );
+        EXPECT_GE( pixelGraph.l1Norm().Scalar::getValue<ValueType>(), 1 );
+    }
+}
+
+//---------------------------------------------------------------------------------------
 
 } // namespace ITI

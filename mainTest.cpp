@@ -226,8 +226,8 @@ int main(int argc, char** argv) {
     
 // the code below writes the output coordinates in one file per processor for visualiation purposes.
 //=================
-PRINT(*comm<< ": "<< partition.getLocalValues().size());
-PRINT(*comm<< ": "<< coordinates[0].getLocalValues().size());
+//PRINT(*comm<< ": "<< partition.getLocalValues().size());
+//PRINT(*comm<< ": "<< coordinates[0].getLocalValues().size());
 //scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(N, partition/*.getLocalValues()*/, comm));
 for (IndexType dim = 0; dim < settings.dimensions; dim++) {
     assert( coordinates[dim].size() == N);

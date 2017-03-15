@@ -71,10 +71,11 @@ TEST_F(FileIOTest, testWriteMetis_Dist_3D){
  *
  * Occasionally throws error, probably because own process tries to read the file while some other is still writing in it.
  */
-/*
+
 TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
-    std::string path = "./";
-    std::string file = "Grid8x8";
+    std::string path = "meshes/slowrot/";
+    //std::string file = "Grid8x8";
+    std::string file = "slowrot-00000.graph";
     std::string filename= path + file;
     CSRSparseMatrix<ValueType> Graph;
     IndexType N;    //number of points
@@ -108,7 +109,9 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
     CSRSparseMatrix<ValueType> Graph2 = FileIO<IndexType, ValueType>::readGraph( fileTo );
 
     // check that the two graphs are identical
-    std::cout<< "Output written in file: "<< fileTo<< std::endl;
+    if(comm->getRank()==0 ){
+        std::cout<< "Output written in file: "<< fileTo<< std::endl;
+    }
     EXPECT_EQ(Graph.getNumValues(), Graph2.getNumValues() );
     EXPECT_EQ(Graph.l2Norm(), Graph2.l2Norm() );
     EXPECT_EQ(Graph2.getNumValues(), Graph2.l1Norm() );
@@ -130,7 +133,7 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
         }
     }
 }
-*/
+
 //-----------------------------------------------------------------
 // read a graph from a file in METIS format and its coordinates in 2D and partition that graph
 // usually, graph file: "file.graph", coordinates file: "file.graph.xy" or .xyz
@@ -197,6 +200,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     SCAI_REGION_END("testPartitionFromFile_local_2D.partition");
 
 }
+//-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testWriteCoordsDistributed){
 
@@ -221,8 +225,9 @@ TEST_F(FileIOTest, testWriteCoordsDistributed){
     
     FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords2D, nodes, "writeCoordsDist");
 }
-
-
+//-------------------------------------------------------------------------------------------------
+/*
+ // no cells.dat file
 TEST_F(FileIOTest, testReadQuadTree){
 	std::string filename = "cells.dat";
 
@@ -230,6 +235,6 @@ TEST_F(FileIOTest, testReadQuadTree){
 	IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
 	std::cout << "Read Quadtree with " << edgeList.size() << " nodes and " << m << " edges." << std::endl;
 }
-
+*/
 
 } /* namespace ITI */
