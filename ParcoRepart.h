@@ -172,5 +172,12 @@ namespace ITI {
 			static IndexType getDegreeSum(const CSRSparseMatrix<ValueType> &input, const std::vector<IndexType> &nodes);
                         
                         static std::vector<IndexType> neighbourPixels(const IndexType thisPixel,const IndexType sideLen, const IndexType dimensions);
+                        
+                        /** Returns the degree of every node of the graph.
+                         * @param[in] adjM The NxN adjacency matrix of the input graph.
+                         * @return A distributed DenseVector of size N with the degree of every node. The DenseVector
+                         * has the same distribution as the the rows of adjM.
+                         */
+                        static scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType> adjM);
 	};
 }

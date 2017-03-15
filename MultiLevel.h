@@ -49,7 +49,18 @@ namespace ITI{
         template<typename T>
         static DenseVector<T> computeGlobalPrefixSum(DenseVector<T> input, T offset = 0);
         
-    
+        /**
+         * Creates a coarsened graph using geometric information. Rounds avery point according to settings.pixeledDetailLevel creating a grid of size 2^detailLevel x 2^detailLevel (for 2D). Every coarse node/pixel of the
+         * grid has weight equal the number of points it contains and the edge between two coarse nodes/pixels is the
+         * number of edgees of the input graph that their endpoints belinf to different pixels.
+         * 
+         * @param[in] adjM The adjacency matrix of the input graph
+         * @param[in] coordinates The coordinates of the input points.
+         * @param[out] nodeWeights The weights for the coarse nodes/pixels of the returned graph.
+         * @param[in] settings Descibe different setting for the coarsening. Here we need settings.pixeledDetailLevel.
+         * @return The adjacency matric of the coarsened/pixeled graph. This has side length 2^detailLevel and the whole size is dimension^sideLength.
+         */
+        static scai::lama::CSRSparseMatrix<ValueType> pixeledCoarsen (const CSRSparseMatrix<ValueType>& adjM, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<IndexType> &nodeWeights, Settings settings);
     
     }; // class MultiLevel
 } // namespace ITI

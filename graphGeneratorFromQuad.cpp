@@ -32,12 +32,12 @@ typedef int IndexType;
 
 int main(int argc, char** argv){
 
-    IndexType maxNumberOfAreas= 21;
-    const IndexType pointsPerArea= 200000;
-    const IndexType dimension = 2;
+    IndexType maxNumberOfAreas= 10;
+    const IndexType pointsPerArea= 20000;
+    const IndexType dimension = 3;
     const ValueType maxCoord = 100;
 
-    for(int numberOfAreas=20; numberOfAreas<maxNumberOfAreas; numberOfAreas+=2){
+    for(int numberOfAreas=5; numberOfAreas<maxNumberOfAreas; numberOfAreas+=2){
         std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
         scai::lama::CSRSparseMatrix<ValueType> graph;
@@ -52,12 +52,12 @@ int main(int argc, char** argv){
         // count the degree    
         const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
         const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-        IndexType upBound= 40;
+        IndexType upBound= 30*dimension;
         std::vector<IndexType> degreeCount( upBound, 0 );
         
         for(IndexType i=0; i<ia.size()-1; i++){
             IndexType nodeDegree = ia[i+1] -ia[i];
-            assert(nodeDegree < degreeCount.size()-1);
+            SCAI_ASSERT(nodeDegree < degreeCount.size()-1, "Node with too high degree: " << nodeDegree);
             ++degreeCount[nodeDegree];
         }
         
@@ -75,7 +75,7 @@ int main(int argc, char** argv){
         ValueType averageDegree = ValueType( numEdges)/ia.size();
         PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
             
-        std::string outFile = "./graphFromQuad2D/graphFromQuad2D_"+std::to_string(numberOfAreas);
+        std::string outFile = "./graphFromQuad3D/graphFromQuad3D_"+std::to_string(numberOfAreas);
         ITI::FileIO<IndexType, ValueType>::writeGraph( graph, outFile);
         
         std::string outCoords = outFile + ".xyz";
