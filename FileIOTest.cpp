@@ -194,6 +194,8 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
         struct Settings Settings;
         Settings.numBlocks= k;
         Settings.epsilon = epsilon;
+        Settings.dimensions = 2;
+        
         //partition the graph
         scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D, Settings );
         EXPECT_EQ(partition.size(), N);

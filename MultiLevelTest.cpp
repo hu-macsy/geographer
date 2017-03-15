@@ -16,13 +16,12 @@
 #include <memory>
 #include <cstdlib>
 #include <numeric>
+#include <chrono>
 
 #include "MeshGenerator.h"
 #include "FileIO.h"
 #include "MultiLevel.h"
 #include "gtest/gtest.h"
-
-#include "AuxiliaryFunctions.h"
 
 typedef double ValueType;
 typedef int IndexType;
