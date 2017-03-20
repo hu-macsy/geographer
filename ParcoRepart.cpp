@@ -1126,7 +1126,7 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getLocalB
     }
     SCAI_REGION_START("ParcoRepart.getLocalBlockGraphEdges.gatherNonLocal")
         //gather all non-local indexes
-        gatheredPart.gather(part, nonLocalDV , scai::utilskernel::binary::COPY );
+        gatheredPart.gather(part, nonLocalDV , scai::common::binary::COPY );
     SCAI_REGION_END("ParcoRepart.getLocalBlockGraphEdges.gatherNonLocal")
     
     assert( gatheredPart.size() == nonLocalInd.size() );
