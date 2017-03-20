@@ -36,7 +36,9 @@ class ParcoRepartTest : public ::testing::Test {
 
 TEST_F(ParcoRepartTest, testInitialPartition){
     //std::string file = "Grid16x16";
-    std::string file = "meshes/bigbubbles/bigbubbles-00010.graph";
+    std::string path = "meshes/bigbubbles/";
+    std::string fileName = "bigbubbles-00010.graph";
+    std::string file = path + fileName;
     //std::string file = "meshes/hugebubbles/hugebubbles-00010.graph";
     std::ifstream f(file);
     IndexType dimensions= 2;
@@ -62,16 +64,20 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     struct Settings settings;
     settings.numBlocks= k;
     settings.epsilon = 0.2;
-      
+    settings.pixeledDetailLevel =4;
     settings.useGeometricTieBreaking = 1;
     
-    for( int i=4; i<6; i++){
+    for( int i=2; i<6; i++){
         settings.pixeledDetailLevel = i;
         DenseVector<IndexType> pixelInitialPartition = ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coords, settings);
+        
+        EXPECT_GE(k-1, pixelInitialPartition.getLocalValues().max() );
+        EXPECT_EQ(N, pixelInitialPartition.size());
+        EXPECT_EQ(0, pixelInitialPartition.min().getValue<ValueType>());
+        EXPECT_EQ(k-1, pixelInitialPartition.max().getValue<ValueType>());
+        EXPECT_EQ(graph.getRowDistribution(), pixelInitialPartition.getDistribution());
     }
-
-    //comm->synchronize();
-
+    
     // after the first partitioning cordinates are redistributed 
     // redistribution needed because sort works only for block distribution
     coords[0].redistribute(dist);
@@ -82,8 +88,11 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     DenseVector<IndexType> hilbertInitialPartition = ParcoRepart<IndexType, ValueType>::initialPartition(graph, coords, settings);
     ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords, N, "hilbertPartition");
     
-    //gather all in one PE
-    //scai::dmemo::DistributionPtr noDist (new scai::dmemo::NoDistribution( globalN ));
+    EXPECT_GE(k-1, hilbertInitialPartition.getLocalValues().max() );
+    EXPECT_EQ(N, hilbertInitialPartition.size());
+    EXPECT_EQ(0, hilbertInitialPartition.min().getValue<ValueType>());
+    EXPECT_EQ(k-1, hilbertInitialPartition.max().getValue<ValueType>());
+    EXPECT_EQ(graph.getRowDistribution(), hilbertInitialPartition.getDistribution());
     
 }
 //--------------------------------------------------------------------------------------- 
@@ -448,7 +457,8 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     struct Settings settings;
     settings.numBlocks= k;
     settings.epsilon = 0.2;
-  
+    settings.dimensions = dimensions;
+    
     // get partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
     ASSERT_EQ(N, partition.size());
@@ -1063,52 +1073,6 @@ TEST_F(ParcoRepartTest, testPixelNeighbours){
     }
 }       
 //------------------------------------------------------------------------------
-
-TEST_F(ParcoRepartTest, testSpectralPartition){
- std::string file = "Grid8x8";
-    std::ifstream f(file);
-    IndexType dimensions= 2, k=16;
-    IndexType N, edges;
-    f >> N >> edges; 
-    
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    // for now local refinement requires k = P
-    k = comm->getSize();
-    //
-    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
-    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
-    const IndexType localN = dist->getLocalSize();
-    
-    //distrubute graph
-    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
-        
-
-    //read the array locally and messed the distribution. Left as a remainder.
-    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
-    EXPECT_EQ( edges, (graph.getNumValues())/2 );
-    
-    //reading coordinates
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
-    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
-    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
-    
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
-    
-    scai::lama::DenseVector<IndexType> degreeVector = ParcoRepart<IndexType, ValueType>::getDegreeVector( graph);
-    
-    for(int i=0; i<localN; i++){
-        PRINT(*comm << ": " << degreeVector.getLocalValues()[i]);
-    }
-
-}
-//------------------------------------------------------------------------------
-
-
-
-
 
 /**
 * TODO: test for correct error handling in case of inconsistent distributions

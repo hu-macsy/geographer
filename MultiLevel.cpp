@@ -652,8 +652,6 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
     std::vector<IndexType> density( cubeSize ,0);
 
     // initialize pixelGraph
-    scai::lama::CSRStorage<ValueType> pixelStorage;
-    pixelStorage.allocate( cubeSize, cubeSize);
     scai::hmemo::HArray<IndexType> pixelIA;
     scai::hmemo::HArray<IndexType> pixelJA;
     scai::hmemo::HArray<ValueType> pixelValues;
@@ -799,7 +797,7 @@ for(int la=0; la<nnzValues; la++){
             scaledY = coordAccess1[i]/maxY * sideLen;
             scaledZ = coordAccess2[i]/maxZ * sideLen;
             IndexType thisPixel = scaledX*sideLen*sideLen + scaledY*sideLen + scaledZ;
-            SCAI_ASSERT( thisPixel < density.size(), "Index too big: "<< std::to_string(thisPixel) );
+            SCAI_ASSERT( thisPixel < density.size(), "Index too big: "<< thisPixel );
             
             ++density[thisPixel];        
             
@@ -876,7 +874,7 @@ for(int la=0; la<nnzValues; la++){
     
     comm->sumArray( pixelValues);
 
-    
+    scai::lama::CSRStorage<ValueType> pixelStorage;
     pixelStorage.setCSRData( cubeSize, cubeSize, nnzValues, pixelIA, pixelJA, pixelValues);
     
 
