@@ -77,22 +77,8 @@ TEST_F(SpectralPartitionTest, testSpectralPartition){
     scai::lama::DenseVector<IndexType> degreeVector = SpectralPartition<IndexType, ValueType>::getDegreeVector( graph);
     SCAI_ASSERT_EQ_ERROR( degreeVector.sum() , 2*edges , "Wrong degree vector sum.");
     
-    /*
-    for(int i=0; i<localN; i++){
-        PRINT(*comm << ": " << degreeVector.getLocalValues()[i]);
-    }
-    */
-    
     scai::lama::CSRSparseMatrix<ValueType> laplacian = SpectralPartition<IndexType, ValueType>::getLaplacian( graph );
     
-    /*
-    for(int i=0; i<laplacian.getLocalNumRows(); i++){
-        for(int j=0; j<laplacian.getLocalNumColumns(); j++){
-            std::cout << "("<<i << ","<< j << ")-"<< laplacian.getLocalStorage().getValue(i,j) <<"  ";
-        }
-        std::cout<< std::endl;
-    }
-    */
     if(laplacian.getNumRows() < 4000 ){
         EXPECT_TRUE( laplacian.checkSymmetry() );
     }
@@ -120,8 +106,7 @@ TEST_F(SpectralPartitionTest, testSpectralPartition){
             sum += readLaplVal[i];
         }
     }
-    // PRINT (sum);
-    // sums the absolute values, make our own sum?
+
     EXPECT_EQ( sum , 0 );
 
 }
@@ -171,8 +156,7 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
     //
     // From down here everything is local/replicated in every PE
     //
-    
-    
+
     scai::solver::CG cgSolver( "CGTestSolver" );
     scai::lama::NormPtr norm = scai::lama::NormPtr ( new scai::lama::L2Norm ( ) );
     scai::solver::CriterionPtr criterion ( new scai::solver::ResidualThreshold ( norm, 1E-8, scai::solver::ResidualThreshold::Absolute ) );
@@ -184,14 +168,7 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
     //Solve laplacian * solution = rhs
     cgSolver.solve ( solution, rhs );
     
-    /*
-    if( comm->getRank()==0 ){
-        for(int i=0; i<solution.size(); i++){
-            std::cout<< solution.getLocalValues()[i] << " _ ";
-        }
-        std::cout << std::endl;
-    }
-    */
+
     using Eigen::MatrixXd;
     using namespace Eigen;
     
@@ -246,25 +223,13 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
         
         graph.redistribute(newDistribution, graph.getColDistributionPtr());
         partition = DenseVector<IndexType>(newDistribution, comm->getRank());
-        /*
-        if (settings.useGeometricTieBreaking) {
-            for (IndexType dim = 0; dim < dimensions; dim++) {
-                coordinates[dim].redistribute(newDistribution);
-            }
-        }
-        */
     }
     
     ValueType cut = comm->getSize() == 1 ? ParcoRepart<IndexType, ValueType>::computeCut(graph, partition) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(graph, false)) / 2;
     
     PRINT0( "cut= " << cut);
     PRINT(*comm <<", "<< partition.getLocalValues().size() );
-    
-    /*
-    for(int i=0; i<partition.getLocalValues().size(); i++){
-        PRINT(*comm <<", "<< partition.getDistributionPtr()->local2global(i) << ": "<< partition.getLocalValues()[i] );
-    }
-    */
+
     aux::print2DGrid( graph, partition );
 }
 //------------------------------------------------------------------------------

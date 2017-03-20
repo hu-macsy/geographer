@@ -78,38 +78,6 @@ scai::lama::CSRSparseMatrix<ValueType> SpectralPartition<IndexType, ValueType>::
         scai::hmemo::WriteOnlyAccess<IndexType> wLaplacianJA( laplacianJA , laplacianNnzValues );
         scai::hmemo::WriteOnlyAccess<ValueType> wLaplacianValues( laplacianValues, laplacianNnzValues );
         
-   /*     
-        IndexType localInd = 0;
-        IndexType globalIndex = distPtr->local2Global( localInd );
-        //IndexType laplacianOffset = 0;
-        IndexType laplacianIndex = 0;
-        
-        for(IndexType j=0; j<ja.size(); j++){
-            SCAI_ASSERT( ja[j]==globalIndex, "Diagonal no empty, no self loops allowed.");
-            laplacianIndex = j + localInd;
-            if( ja[j]<globalIndex ){
-                wLaplacianJA[laplacianIndex] = ja[j];
-                wLaplacianValues[laplacianIndex] = -1*values[j];    //opposite value
-            }else{      //add diagonal element
-                wLaplacianJA[laplacianIndex] = globalIndex;
-                assert( localInd < localocalDegree.size() );
-                wLaplacianValues[laplacianIndex] = rLocalDegree[ localInd ];
-                ++localInd;
-                // can we write ++globalindex; ? Probably
-                if( localInd >localN){      //for the last local element
-                    globalIndex = globalN;
-                }else{
-                    globalIndex = distPtr->local2Global( localInd );
-                }
-            }
-            if( j+1<ja.size() and j+1> ia[localInd+1] ){  //changed row
-                globalIndex = distPtr->local2Global( localInd );    // or just ++ ?
-            }
-            
-        }
-   */     
-
-        
         IndexType nnzCounter = 0;
         for(IndexType i=0; i<localN; i++){
             const IndexType beginCols = ia[i];
@@ -133,8 +101,7 @@ scai::lama::CSRSparseMatrix<ValueType> SpectralPartition<IndexType, ValueType>::
             // out of while, must insert diagonal element
             wLaplacianJA[nnzCounter] = globalI;
             assert( i < rLocalDegree.size() );
-            wLaplacianValues[nnzCounter] = rLocalDegree[i];
-//PRINT(*comm << ": "<< i << " _ "<< nnzCounter << " >> "<< wLaplacianJA[nnzCounter] << ", "<< wLaplacianValues[nnzCounter] );        
+            wLaplacianValues[nnzCounter] = rLocalDegree[i];      
             ++nnzCounter;
             // copy the rest of the row
             while( j<endCols){
@@ -161,11 +128,6 @@ scai::lama::CSRSparseMatrix<ValueType> SpectralPartition<IndexType, ValueType>::
         scai::hmemo::ReadAccess<ValueType> rLaplacianValues( laplacianValues );
         
         SCAI_ASSERT_EQ_ERROR(rLaplacianIA[ rLaplacianIA.size()-1] , laplacianJA.size(), "Wrong sizes." );
-        /*
-        for(int i=0; i<laplacianJA.size(); i++){
-            PRINT(*comm <<" = " <<rLaplacianValues[i]);
-        }
-        */
     }
     
     scai::lama::CSRStorage<ValueType> resultStorage( localN, globalN, laplacianNnzValues, laplacianIA, laplacianJA, laplacianValues);
@@ -215,11 +177,7 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
     }else{
         PRINT0("Laplacian already replicated, no need to redistribute.");
     }
-    
-    //
-    // From down here a big part (until ^^^) is local/replicated in every PE
-    //
-    
+        
     // get the second eigenvector of the laplacian (local, not distributed)
     //TODO: if local, change to std::vector
     DenseVector<ValueType> eigenVec (numPixels, -1);
@@ -246,14 +204,7 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
             eigenVec.setValue( i, secondEigenVector[i]);
         }
     }
-    //redistribute the eigenVec
-    //eigenVec.redistribute( inputDist );
-    
-    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ redistributing the eigen vector
-    
-    // we could sort locally, no need to redistribute
-    // doing it like this to mimic real case senario
-    
+
     // sort
     //TODO: if local, change to std::vector
     scai::lama::DenseVector<IndexType> permutation;
@@ -354,31 +305,6 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
             wLocalPart[i] = rPixelPart[ thisPixel ];
         }
     }
-    /*
-    DenseVector<IndexType>  result;
-    
-    if (!inputDist->isReplicated() && comm->getSize() == k) {
-        SCAI_REGION( "SpectralPartition.getPartition.redistribute" )
-        
-        //scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(globalN, comm));
-        //permutation.redistribute(blockDist);
-        //scai::hmemo::WriteAccess<IndexType> wPermutation( permutation.getLocalValues() );
-        //std::sort(wPermutation.get(), wPermutation.get()+wPermutation.size());
-        //wPermutation.release();
-        
-        scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, permutation.getLocalValues(), comm));
-        
-        adjM.redistribute( newDistribution, adjM.getColDistributionPtr());
-        result = DenseVector<IndexType>(newDistribution, comm->getRank());
-        
-        if (settings.useGeometricTieBreaking) {
-            for (IndexType dim = 0; dim < dimensions; dim++) {
-                coordinates[dim].redistribute(newDistribution);
-            }
-        }
-        
-    }
-    */
     
     //
     // redistribute based on the new partition
