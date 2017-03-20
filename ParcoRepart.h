@@ -38,7 +38,7 @@ namespace ITI {
 	 		*
 	 		* @param[in] input Adjacency matrix of the input graph
 	 		* @param[in] coordinates Node positions
-		 		*
+                        *
 	 		* @return Distributed DenseVector	, at position i is the block node i is assigned to
 	 		*/
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings Settings);
@@ -173,10 +173,8 @@ namespace ITI {
                         
                         static std::vector<IndexType> neighbourPixels(const IndexType thisPixel,const IndexType sideLen, const IndexType dimensions);
                         
-                        /** Returns the degree of every node of the graph.
-                         * @param[in] adjM The NxN adjacency matrix of the input graph.
-                         * @return A distributed DenseVector of size N with the degree of every node. The DenseVector
-                         * has the same distribution as the the rows of adjM.
+                        /**Returns a vector of size N (if adjM is of size NxN) with the degree for every node of
+                         * the inout graph.
                          */
                         static scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType> adjM);
 	};

@@ -61,14 +61,20 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     struct Settings settings;
     settings.numBlocks= k;
     settings.epsilon = 0.2;
-      
+    settings.pixeledDetailLevel =4;
     settings.useGeometricTieBreaking = 1;
-    /*
-    for( int i=4; i<6; i++){
+    
+    for( int i=2; i<6; i++){
         settings.pixeledDetailLevel = i;
         DenseVector<IndexType> pixelInitialPartition = ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coords, settings);
+        
+        EXPECT_GE(k-1, pixelInitialPartition.getLocalValues().max() );
+        EXPECT_EQ(N, pixelInitialPartition.size());
+        EXPECT_EQ(0, pixelInitialPartition.min().getValue<ValueType>());
+        EXPECT_EQ(k-1, pixelInitialPartition.max().getValue<ValueType>());
+        EXPECT_EQ(graph.getRowDistribution(), pixelInitialPartition.getDistribution());
     }
-    */
+    
     // after the first partitioning cordinates are redistributed 
     // redistribution needed because sort works only for block distribution
     coords[0].redistribute(dist);
@@ -77,11 +83,13 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     
     
     DenseVector<IndexType> hilbertInitialPartition = ParcoRepart<IndexType, ValueType>::initialPartition(graph, coords, settings);
-    if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords, N, "hilbertPartition");
-    }else{
-        std::cout<<"No write in file for 3D coordinates." << std::endl;
-    }
+    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords, N, "hilbertPartition");
+    
+    EXPECT_GE(k-1, hilbertInitialPartition.getLocalValues().max() );
+    EXPECT_EQ(N, hilbertInitialPartition.size());
+    EXPECT_EQ(0, hilbertInitialPartition.min().getValue<ValueType>());
+    EXPECT_EQ(k-1, hilbertInitialPartition.max().getValue<ValueType>());
+    EXPECT_EQ(graph.getRowDistribution(), hilbertInitialPartition.getDistribution());
     
 }
 //--------------------------------------------------------------------------------------- 
@@ -447,6 +455,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
+    
     // get partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
     ASSERT_EQ(N, partition.size());

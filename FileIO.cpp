@@ -155,7 +155,7 @@ void FileIO<IndexType, ValueType>::writeCoordsDistributed_2D (const std::vector<
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr distPtr = coords[0].getDistributionPtr();
     
-    std::string thisPEFilename = filename + std::to_string(comm->getRank());
+    std::string thisPEFilename = filename +'_'+ std::to_string(comm->getRank()) + ".xyz";
     std::ofstream f(thisPEFilename);
     if(f.fail())
         throw std::runtime_error("File "+ thisPEFilename+ " failed.");

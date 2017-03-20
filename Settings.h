@@ -20,6 +20,7 @@ struct Settings{
     bool gainOverBalance = false;
     bool skipNoGainColors = false;
     double epsilon = 0.05;
+    std::string fileName = "-";
     
     void print(std::ostream& out){
         IndexType numPoints = numX* numY* numZ;
@@ -36,15 +37,5 @@ struct Settings{
         out<< "skipNoGainColors: "<< skipNoGainColors << std::endl;
         out<< "pixeledDetailLevel: "<< pixeledDetailLevel << std::endl;
     }
-/*    
-    void print3D(std::ostream& out){
-        IndexType numPoints = numX* numY* numZ;
-        
-        out<< "Settings: number of points= " << numPoints<< ", dimensions= "<< dimensions << ", borderDepth= "\
-        << borderDepth << ", stopAfterNoGainRounds= "<< stopAfterNoGainRounds <<\
-        ", minGainForNextRound= " << minGainForNextRound << ", sfcResolution= "<<\
-        sfcResolution << ", epsilon= "<< epsilon << ", numBlocks= " << numBlocks << std::endl;
-    }
-*/
 };
 
