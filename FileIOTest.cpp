@@ -71,9 +71,11 @@ TEST_F(FileIOTest, testWriteMetis_Dist_3D){
  *
  * Occasionally throws error, probably because own process tries to read the file while some other is still writing in it.
  */
+
 TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
-    std::string path = "meshes/bigbubbles/";
-    std::string file = "bigbubbles-00010.graph";
+    std::string path = "meshes/slowrot/";
+    //std::string file = "Grid8x8";
+    std::string file = "slowrot-00000.graph";
     std::string filename= path + file;
     CSRSparseMatrix<ValueType> Graph;
     IndexType N;    //number of points
@@ -107,7 +109,9 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
     CSRSparseMatrix<ValueType> Graph2 = FileIO<IndexType, ValueType>::readGraph( fileTo );
 
     // check that the two graphs are identical
-    std::cout<< "Output written in file: "<< fileTo<< std::endl;
+    if(comm->getRank()==0 ){
+        std::cout<< "Output written in file: "<< fileTo<< std::endl;
+    }
     EXPECT_EQ(Graph.getNumValues(), Graph2.getNumValues() );
     EXPECT_EQ(Graph.l2Norm(), Graph2.l2Norm() );
     EXPECT_EQ(Graph2.getNumValues(), Graph2.l1Norm() );
@@ -138,9 +142,9 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     IndexType dim= 2, k= 8, i;
     ValueType epsilon= 0.1;
 
-    //std::string path = "./meshes/my_meshes";s
-    std::string path = "";
-    std::string file= "Grid8x8";
+    std::string path = "./meshes/slowrot/";
+    //std::string path = "";
+    std::string file= "slowrot-00000.graph";
     std::string grFile= path +file, coordFile= path +file +".xyz";  //graph file and coordinates file
     std::fstream f(grFile);
     IndexType nodes, edges;
@@ -153,22 +157,22 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     //
 
     //read the adjacency matrix from a file
-    std::cout<<"reading adjacency matrix from file: "<< grFile<<" for k="<< k<< std::endl;
+    //std::cout<<"reading adjacency matrix from file: "<< grFile<<" for k="<< k<< std::endl;
     scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, nodes) );
     scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( nodes ));
 
     SCAI_REGION_START("testPartitionFromFile_local_2D.readGraphFromFile");
         graph = FileIO<IndexType, ValueType>::readGraph( grFile );
         graph.redistribute( distPtr , noDistPtr);
-        std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
+        //std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
     SCAI_REGION_END("testPartitionFromFile_local_2D.readGraphFromFile");
 
     // N is the number of nodes
     IndexType N= graph.getNumColumns();
     EXPECT_EQ(nodes,N);
 
-    //read the coordinates from a file
-    std::cout<<"reading coordinates from file: "<< coordFile<< std::endl;
+    //read the coordiantes from a file
+    //std::cout<<"reading coordinates from file: "<< coordFile<< std::endl;
 
     SCAI_REGION_START("testPartitionFromFile_local_2D.readFromFile2Coords_2D");
     std::vector<DenseVector<ValueType>> coords2D = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dim);
@@ -178,28 +182,61 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     EXPECT_EQ(coords2D.size(), dim);
     EXPECT_EQ(coords2D[0].size(), N);
 
+    // print
+    /*
+    for(IndexType i=0; i<N; i++){
+        std::cout<< i<< ": "<< *comm<< " - " <<coords2D[0].getLocalValues()[i] << " , " << coords2D[1].getLocalValues()[i] << std::endl;
+    }
+    */
+
     SCAI_REGION_START("testPartitionFromFile_local_2D.partition");
 
         struct Settings Settings;
         Settings.numBlocks= k;
         Settings.epsilon = epsilon;
+        Settings.dimensions = 2;
+        
         //partition the graph
         scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D, Settings );
         EXPECT_EQ(partition.size(), N);
     SCAI_REGION_END("testPartitionFromFile_local_2D.partition");
-}
 
+}
+//-------------------------------------------------------------------------------------------------
+
+TEST_F(FileIOTest, testWriteCoordsDistributed){
+
+    //std::string path = "./meshes/slowrot/";
+    std::string path = "";
+    std::string file= "Grid8x8";
+    std::string grFile= path +file , coordFile= path +file +".xyz";  //graph file and coordinates file
+    std::fstream f(grFile);
+    IndexType nodes, edges;
+    f>> nodes>> edges;
+    f.close();
+    
+    IndexType dim=2;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, nodes) );
+    //scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( nodes ));
+
+    // every PE reads its own part of the coordinates based on a block distribution
+    std::vector<DenseVector<ValueType>> coords2D = FileIO<IndexType, ValueType>::readCoords( coordFile, nodes, dim);
+    EXPECT_TRUE(coords2D[0].getDistributionPtr()->isEqual(*distPtr));
+    
+    FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords2D, nodes, "writeCoordsDist");
+}
+//-------------------------------------------------------------------------------------------------
+/*
+ // no cells.dat file
 TEST_F(FileIOTest, testReadQuadTree){
-	std::string filename = "octree_timestep_0.dat";
+	std::string filename = "cells.dat";
 
 	std::vector<std::set<std::shared_ptr<SpatialCell> > > edgeList = FileIO<IndexType, ValueType>::readQuadTree(filename);
-	IndexType m = 0;
-	for (std::set<std::shared_ptr<SpatialCell> > edgeSet : edgeList) {
-		m += edgeSet.size();
-	}
-
+	IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
 	std::cout << "Read Quadtree with " << edgeList.size() << " nodes and " << m << " edges." << std::endl;
 }
-
+*/
 
 } /* namespace ITI */

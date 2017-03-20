@@ -73,7 +73,8 @@ public:
 
 	T operator[](const index i) const;
 	T at(const index i) const;
-
+        
+        void print() const;
 	/**
 	 * Default point to string conversion.
 	 */
@@ -270,6 +271,15 @@ inline std::string Point<T>::genericToString(
 	}
 	out << end;
 	return out.str();
+}
+//---------------------------------
+template<class T>
+inline void Point<T>::print() const{
+    std::cout<< "(";
+    for(int i=0; i<this->data.size(); i++){
+        std::cout<< std::setprecision(15)<< this->data[i] << ", ";
+    }
+    std::cout<<"\b\b)"<< std::endl;
 }
 
 } /* namespace ITI */

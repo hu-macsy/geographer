@@ -23,6 +23,8 @@ using scai::dmemo::Halo;
 #define STRINGIZER(arg)     #arg
 #define STR_VALUE(arg)      STRINGIZER(arg)
 #define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
+#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
+#define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
 const std::string version = BUILD_COMMIT_STRING;
 
@@ -36,11 +38,28 @@ namespace ITI {
 	 		*
 	 		* @param[in] input Adjacency matrix of the input graph
 	 		* @param[in] coordinates Node positions
-		 		*
+                        *
 	 		* @return Distributed DenseVector	, at position i is the block node i is assigned to
 	 		*/
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings Settings);
 
+                        /*
+                         * Get an initial partition using the hilbert curve.
+                         */
+                        static DenseVector<IndexType> initialPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+                        
+                        /*
+                         * Get an initial partition using the morton curve and measuring density per square.
+                         */
+                        static DenseVector<IndexType> pixelPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+                                                        
+                        /**
+			 * This method takes a (possibly distributed) partition and computes its global cut.
+			 *
+                         * @param[in] input The adjacency matrix of the graph.
+			 * @param[in] part The partition vector for the input graph.
+			 * @param[in] weighted If edges are weighted or not.
+			 */
 			static ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool weighted = false);
 
 			/**
@@ -53,20 +72,6 @@ namespace ITI {
 			static ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<IndexType> &nodeWeights = {});
 
 			/**
-			* Performs local refinement of a given partition
-			*
-	 		* @param[in] input Adjacency matrix of the input graph
-			* @param[in,out] part Partition which is to be refined
-	 		* @param[in] k Number of desired blocks. Must be the same as in the previous partition.
-	 		* @param[in] epsilon Tolerance of block size
-			*
-			* @return The difference in cut weight between this partition and the previous one
-			*/
-			static ValueType replicatedMultiWayFM(const CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, IndexType k, ValueType epsilon, bool unweighted = true);
-
-			static std::vector<DenseVector<IndexType>> computeCommunicationPairings(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const DenseVector<IndexType> &blocksToPEs);
-
-			/**
 			 * Computes a list of global IDs of nodes which are adjacent to nodes local on this processor, but are themselves not local.
 			 */
 			static std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
@@ -74,44 +79,11 @@ namespace ITI {
 			static std::vector<ValueType> distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates);
 
 			/**
-			 * redistributes a matrix from a local halo object without communication. It that is impossible, throw an error.
-			 */
-			static void redistributeFromHalo(CSRSparseMatrix<ValueType>& matrix, scai::dmemo::DistributionPtr newDistribution, Halo& halo, CSRStorage<ValueType>& haloMatrix);
-
-			template<typename T>
-			static void redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, Halo& halo, scai::utilskernel::LArray<T>& haloData);
-
-			/**
 			 * Builds a halo containing all non-local neighbors.
 			 */
 			static scai::dmemo::Halo buildNeighborHalo(const CSRSparseMatrix<ValueType> &input);
 
-			/**
-			 * Computes the border region within one block, adjacent to another block
-			 * @param[in] input Adjacency matrix of the input graph
-			 * @param[in] part Partition vector
-			 * @param[in] otherBlock block to which the border region should be adjacent
-			 * @param[in] depth Width of the border region, measured in hops
-			 */
-			static std::pair<std::vector<IndexType>, std::vector<IndexType>> getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType otherBlock, IndexType depth);
-
-			static IndexType multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<IndexType> &nodeWeights,
-					std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
-
-			static std::vector<IndexType> distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
-
-			static std::vector<IndexType> distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<IndexType>& nodesWithNonLocalNeighbors,
-					DenseVector<IndexType> &nodeWeights, const std::vector<DenseVector<IndexType>>& communicationScheme, std::vector<DenseVector<ValueType>> &coordinates,
-					std::vector<ValueType> &distances, Settings settings);
-
-			/**
-			 * Iterates over the local part of the adjacency matrix and counts local edges.
-			 * If an inconsistency in the graph is detected, it tries to find the inconsistent edge and throw a runtime error.
-			 * Not guaranteed to find inconsistencies. Iterates once over the edge list.
-			 */
-			static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
-
-			/**
+                        /**
 			 * Returns true if the node identified with globalID has a neighbor that is not local on this process.
 			 * Since this method acquires reading locks on the CSR structure, it might be expensive to call often
 			 */
@@ -124,7 +96,12 @@ namespace ITI {
 			 */
 			static std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
 
-			//------------------------------------------------------------------------
+			/**
+			 * Iterates over the local part of the adjacency matrix and counts local edges.
+			 * If an inconsistency in the graph is detected, it tries to find the inconsistent edge and throw a runtime error.
+			 * Not guaranteed to find inconsistencies. Iterates once over the edge list.
+			 */
+			static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
 
 			/** Get the borders nodes of each block.
 			*/
@@ -186,46 +163,19 @@ namespace ITI {
 			 */
 			static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM);
 
-
-			static void coarsen(const CSRSparseMatrix<ValueType>& inputGraph, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations = 1);
-
-			static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& graph);
-
-			static DenseVector<ValueType> projectToCoarse(const DenseVector<ValueType>& input, const DenseVector<IndexType>& fineToCoarse);
-
-			static DenseVector<IndexType> sumToCoarse(const DenseVector<IndexType>& input, const DenseVector<IndexType>& fineToCoarse);
-
-			static scai::dmemo::DistributionPtr projectToCoarse(const DenseVector<IndexType>& fineToCoarse);
-
-			static scai::dmemo::DistributionPtr projectToFine(scai::dmemo::DistributionPtr, const DenseVector<IndexType>& fineToCoarse);
-
-			template<typename T>
-			static DenseVector<T> projectToFine(const DenseVector<T>& input, const DenseVector<IndexType>& fineToCoarse);
-
-			template<typename T>
-			static DenseVector<T> computeGlobalPrefixSum(DenseVector<T> input, T offset = 0);
-
-		private:
-			static ValueType twoWayLocalFM(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-				const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<IndexType>& nodeWeights, std::pair<IndexType, IndexType> secondRoundMarkers,
-				std::vector<bool>& assignedToSecondBlock, const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes,
-				std::vector<ValueType> tieBreakingKeys, Settings settings);
-
-			static IndexType twoWayLocalCut(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage, const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, const std::vector<bool>& assignedToSecondBlock);
-
-			static ValueType twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-				const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
-				std::vector<bool>& assignedToSecondBlock, const std::pair<IndexType, IndexType> blockCapacities, std::pair<IndexType, IndexType>& blockSizes,
-				Settings settings);
-
-			static std::vector<ValueType> twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-				const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
-				const std::vector<bool>& assignedToSecondBlock, Settings settings);
-
+		//private:
+			
 			static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
 
 			static ValueType localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input, const bool weighted);
 
 			static IndexType getDegreeSum(const CSRSparseMatrix<ValueType> &input, const std::vector<IndexType> &nodes);
+                        
+                        static std::vector<IndexType> neighbourPixels(const IndexType thisPixel,const IndexType sideLen, const IndexType dimensions);
+                        
+                        /**Returns a vector of size N (if adjM is of size NxN) with the degree for every node of
+                         * the inout graph.
+                         */
+                        static scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType> adjM);
 	};
 }

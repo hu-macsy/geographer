@@ -105,7 +105,9 @@ DenseVector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(
 	DenseVector<ValueType>  p(2,0), ret(2,0);
 	ValueType r;
 	IndexType q;
-
+        if(index>1){
+            throw std::runtime_error("Index: " + std::to_string(index) +" for hilbert curve must be >0 and <1");
+        }
 	if(level==0)
 		return ret;
 	else{
@@ -218,7 +220,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const*
 	}
 	unsigned long long divisor = size_t(1) << size_t(3*int(recursionDepth));
         double ret = double(integerIndex) / double(divisor);
-        SCAI_ASSERT(ret<1, ret << " , divisor= "<< divisor << " , integerIndex=" << integerIndex <<" , recursionDepth= " << recursionDepth << ", sizeof(uns_ll)="<< sizeof(unsigned long long));
+        SCAI_ASSERT(ret<1, ret << " , divisor= "<< divisor << " , integerIndex=" << integerIndex <<" , recursionDepth= " << recursionDepth << ", sizeof(unsigned long long)="<< sizeof(unsigned long long));
         return ret;
 
 }
