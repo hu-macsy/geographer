@@ -24,12 +24,12 @@
 #include <tuple>
 #include <chrono>
 
+ #include <eigen3/Eigen/Dense>
+
 #include "PrioQueue.h"
 #include "ParcoRepart.h"
 #include "HilbertCurve.h"
 #include "MultiLevel.h"
-
-#include "../Eigen/Dense"
 
 namespace ITI {
 

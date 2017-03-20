@@ -1,4 +1,6 @@
 
+#include <unordered_set>
+
 #include "LocalRefinement.h"
 
 

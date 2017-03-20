@@ -18,7 +18,7 @@
 #include <scai/solver/criteria/ResidualThreshold.hpp>
 #include <scai/solver/criteria/IterationCount.hpp>
 
-#include "../Eigen/Dense"
+#include <eigen3/Eigen/Dense>
 
 #include <algorithm>
 #include <memory>
