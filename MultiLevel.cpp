@@ -311,7 +311,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
  
 template<typename IndexType, typename ValueType>
 template<typename T>
-DenseVector<T> MultiLevel<IndexType, ValueType>::computeGlobalPrefixSum(DenseVector<T> input, T globalOffset) {
+DenseVector<T> MultiLevel<IndexType, ValueType>::computeGlobalPrefixSum(const DenseVector<T> &input, T globalOffset) {
 	SCAI_REGION("MultiLevel.computeGlobalPrefixSum");
 	scai::dmemo::CommunicatorPtr comm = input.getDistributionPtr()->getCommunicatorPtr();
 
@@ -894,7 +894,7 @@ template std::vector<std::pair<int,int>> MultiLevel<int, double>::maxLocalMatchi
 
 template void MultiLevel<int, double>::coarsen(const CSRSparseMatrix<double>& inputGraph, const DenseVector<int> &nodeWeights, CSRSparseMatrix<double>& coarseGraph, DenseVector<int>& fineToCoarse, int iterations);
 
-template DenseVector<int> MultiLevel<int, double>::computeGlobalPrefixSum(DenseVector<int> input, int offset);
+template DenseVector<int> MultiLevel<int, double>::computeGlobalPrefixSum(const DenseVector<int> &input, int offset);
 
 template scai::lama::CSRSparseMatrix<double> MultiLevel<int, double>::pixeledCoarsen (const CSRSparseMatrix<double>& adjM, std::vector<DenseVector<double>> &coordinates, DenseVector<int> &nodeWeights, Settings settings);
     

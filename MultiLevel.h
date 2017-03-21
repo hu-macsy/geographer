@@ -47,10 +47,10 @@ namespace ITI{
         static DenseVector<T> projectToFine(const DenseVector<T>& input, const DenseVector<IndexType>& fineToCoarse);
         
         template<typename T>
-        static DenseVector<T> computeGlobalPrefixSum(DenseVector<T> input, T offset = 0);
+        static DenseVector<T> computeGlobalPrefixSum(const DenseVector<T> &input, T offset = 0);
         
         /**
-         * Creates a coarsened graph using geometric information. Rounds avery point according to settings.pixeledDetailLevel creating a grid of size 2^detailLevel x 2^detailLevel (for 2D). Every coarse node/pixel of the
+         * Creates a coarsened graph using geometric information. Rounds every point according to settings.pixeledDetailLevel creating a grid of size 2^detailLevel x 2^detailLevel (for 2D). Every coarse node/pixel of the
          * grid has weight equal the number of points it contains and the edge between two coarse nodes/pixels is the
          * number of edgees of the input graph that their endpoints belinf to different pixels.
          * 
