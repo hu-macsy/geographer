@@ -503,7 +503,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_2D) {
 
 TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
 
-        count n = 1800;
+        count n = 100;
 
 	vector<Point<double> > positions(n);
 	vector<index> content(n);
@@ -535,7 +535,6 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         quad.addContent(i++, Point<double>({249, 945 }) );
         quad.addContent(i++, Point<double>({430, 845 }) );
         quad.addContent(i++, Point<double>({430, 825 }) );
-        //quad.addContent(i++, Point<double>({748, 345 }) );
         
 	PRINT("Num of leaves= N = "<< quad.countLeaves() );
 	index N= quad.countLeaves();
@@ -551,22 +550,6 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
 	scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>(graphNgbrsCells, coords);
         
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-        
-        /*
-        //print graph
-        if( comm->getRank()==0 ){
-            for(int i=0; i<graph.getNumRows(); i++){
-                std::cout << i <<": \t";
-                for(int j=0; j<graph.getNumColumns(); j++){
-                    if( graph.getValue(i,j).Scalar::getValue<ValueType>() != 0){
-                        std::cout<< j << ":"<< graph.getValue(i,j).Scalar::getValue<ValueType>() << " , ";
-                    }
-                }
-                std::cout << " coords: "<< coords[0][i] << " _ "<< coords[1][i];
-                std::cout<< std::endl;
-            }
-        }
-        */
         
         // checkSymmetry is really expensive for big graphs, use only for small instances
         if(N<3000){
@@ -597,7 +580,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
             
             IndexType numEdges = 0;
             IndexType maxDegree = 0;
-            std::cout<< "\t Num of nodes"<< std::endl;
+            //std::cout<< "\t Num of nodes"<< std::endl;
             for(int i=0; i<degreeCount.size(); i++){
                 if(  degreeCount[i] !=0 ){
                     //std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
@@ -634,6 +617,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         
         EXPECT_EQ(coordsDV[0].getLocalValues().size() , graph.getLocalNumRows() );
         
+        // write coords in files for visualization purposes
         std::string destPath = "./partResults/fromQuadTree/blocks_"+std::to_string(k)+"/";
         boost::filesystem::create_directories( destPath );  
         
@@ -649,8 +633,6 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         ValueType imbalance;
         IndexType bestPixelCut=0;
         
-        //scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordsDV, settings);
-                
         IndexType np = 3;
         scai::dmemo::DistributionPtr bestDist = dist;
         //std::vector<scai::lama::DenseVector<IndexType>> pixelPartition(np);
@@ -698,38 +680,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         if (comm->getRank() == 0) {
             std::cout << "Commit " << version << ": Partitioned graph with " << N << " nodes into " << k << " blocks with a total cut of " << cut << std::endl;
         }        
-        
 
-
-        /*
-        if (comm->getRank() == 2) {
-            scai::hmemo::ReadAccess<ValueType> coordAccess0( coordsDV[0].getLocalValues() );
-            scai::hmemo::ReadAccess<ValueType> coordAccess1( coordsDV[1].getLocalValues() );        
-            
-            const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
-            scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-            scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-            scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
-            
-            scai::dmemo::DistributionPtr coordDist = coordsDV[0].getDistributionPtr();
-            
-            // all local graph nodes
-            for (IndexType i = 0; i < ia.size()-1; i++) {
-		const IndexType beginCols = ia[i];
-		const IndexType endCols = ia[i+1];
-		assert(ja.size() >= endCols);
-
-                PRINT(coordDist->local2global(i) << ": this coords: "<< coordAccess0[i] << " , "<< coordAccess1[i] );
-                
-                // all edges of this node
-		for (IndexType j = beginCols; j < endCols; j++) {
-                    if( coordDist->isLocal(j) ){
-                        std::cout<< j <<"\t ngbr coords: " << coordAccess0[coordDist->global2local(j)] << " , " << coordAccess1[coordDist->global2local(j)] << std::endl;
-                    }
-                }
-            }
-        }
-        */
 }
 
 

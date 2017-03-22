@@ -593,7 +593,6 @@ public:
                         std::shared_ptr<SpatialCell> sibling = thisNode->children[s];
                         // if cells are adjacent add -it- to your graph neighbours list
                         if( child->isAdjacent( *sibling) ){        
-//PRINT("are adjacent, child: "<< child->getID() << " <> sibling: "<< sibling->getID() );
                             assert( child->getID() < graphNgbrsCells.size() );
                             assert( sibling->getID() < graphNgbrsCells.size() );
                             graphNgbrsCells[child->getID()].insert(sibling);
@@ -605,7 +604,6 @@ public:
                     // graphNgb is a neighbouring cell of this node as a shared_ptr
                     for(typename std::set<std::shared_ptr<SpatialCell>>::iterator graphNgb= graphNgbrsCells[thisNode->ID].begin(); graphNgb!=graphNgbrsCells[thisNode->getID()].end(); graphNgb++){
                         if( child->isAdjacent(*graphNgb->get()) ){        
-//PRINT("are adjacent, child: "<< child->getID() << " <> graphNgbr: "<< graphNgb->get()->getID() );
                             assert( child->getID() < graphNgbrsCells.size() );
                             assert( graphNgb->get()->getID() < graphNgbrsCells.size() );
                             graphNgbrsCells[child->getID()].insert(*graphNgb );
@@ -635,7 +633,6 @@ public:
                         typename std::set<std::shared_ptr<SpatialCell>>::iterator fnd= ngbSet.find(std::shared_ptr<SpatialCell>(thisNode) ) ;
 
                         if( fnd != ngbSet.end() ){
-                            //PRINT("Node ID: "<< thisNode->getID() << " WAS found in the set of node "<< graphNgb->get()->getID());
                             // erase the shared_ptr from the set
                             ngbSet.erase(fnd);
                         }else{
@@ -653,22 +650,17 @@ public:
                         assert(d<coordsTree.size());
                         assert(d< maxCoords.getDimensions());
                         ValueType thisCoord = thisNode->minCoords[d] + double(thisNode->maxCoords[d] - thisNode->minCoords[d])/ 2;
-                        //PRINT("max= "<< thisNode->maxCoords[d] <<", min= "<< thisNode->minCoords[d] << ", mean= "<< thisCoord);  
                         assert( thisNode->getID()< coordsTree[d].size() );
                         coordsTree[d][thisNode->getID()] = thisCoord;
-                        //coords[d].push_back(thisCoord);
-                    }
-                    
+                    }                    
                 }
-                
                 frontier.pop();
             } //for(unsigned int frontierI=0; frontierI<frontier.size(); frontierI++)
             
-
             /*
              * Before making the CSR sparse matrix must reindex because leaves do not have
              * sequencial indices.
-             *
+             * Also set the coordinates so they correspond only to leaves.
              * REMEMBER: graphNgbrsCells.size()== treeSize, not leafSize
              */
             
@@ -746,7 +738,6 @@ public:
                         // not -i- since it also includes non-leaf nodes, use leafIndex instead
                         assert( graphNgb->get()->getID() < leafIndexMapping.size() );
                         IndexType ngbGlobalInd = leafIndexMapping[ graphNgb->get()->getID() ];
-                        //PRINT("from treeIndex: "<< graphNgb->get()->getID() ", to leafIndex= "<< ngbGlobalInd);
                         assert( ngbGlobalInd>= 0);
                         SCAI_ASSERT( ngbGlobalInd<= numLeaves, "Global indexing: " << ngbGlobalInd << " shoould be less () at this point) than the number of leaves: "<< numLeaves );
                         assert( nnzCounter< ja.size() );
