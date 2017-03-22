@@ -279,7 +279,7 @@ inline void Point<T>::print() const{
     for(int i=0; i<this->data.size(); i++){
         std::cout<< std::setprecision(15)<< this->data[i] << ", ";
     }
-    std::cout<<"\b\b)"<< std::endl;
+    std::cout<<"\b\b)";//<< std::endl;
 }
 
 } /* namespace ITI */

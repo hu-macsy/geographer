@@ -492,7 +492,7 @@ public:
 		for (int i = 0; i < this->children.size(); i++) {
 			result = this->children[i]->indexSubtree(result);
 		}
-		this->ID = result;
+                this->ID = result;
 		return result+1;
 	}
 
@@ -538,16 +538,24 @@ public:
 	
 //-------------------------------------------------------------------------------------------
     
-	/* Returns the sub tree starting from this node as the adjacency list/matrix of a graph.
+	/** Returns the sub tree starting from this node as the adjacency list/matrix of a graph.
          * Whenever I use "graph" I mean in the final graph, not the tree.
+         * 
+         * @param[in] graphNgbrsCells Keeps pointers to neighbours of every node in the graph.
+         *  graphNgbrsPtrs[i]= a set with pointers to the neighbours of -i- in the CSR matrix/graph.
+         *  graphNgbrsPtrs.size() == size of the forest or tre = all nodes on every tree, the global sum of nodes
+         * @param[out] coords The coordinates of the output graph.
+         * @param[in] frontier Used in the case we have a forest and is initialised inside SpatialTree.h while called
+         *  in SpatialTree::getGraphFromForest(...).
          */
+        //TODO: graphNgbrsCells, is initialised only in case of forest. If we have a tree is empty. right???
 	template<typename IndexType, typename ValueType>
 	scai::lama::CSRSparseMatrix<ValueType> getSubTreeAsGraph(std::vector< std::set<std::shared_ptr<SpatialCell>>>& graphNgbrsCells ,  std::vector<std::vector<ValueType>>& coords,  std::queue<std::shared_ptr<SpatialCell>> frontier = std::queue<std::shared_ptr<SpatialCell>>()) {
             SCAI_REGION("StatialCell.getSubTreeAsGraph");
             unsigned int treeSize= graphNgbrsCells.size();
             
             // graphNeighbours[i]: the indices of the neighbours of node i in the final graph, not of the tree
-            std::vector<std::set<index>> graphNgbrsID(treeSize);
+            //std::vector<std::set<index>> graphNgbrsID(treeSize);
             
             const IndexType dimension = minCoords.getDimensions();
             
@@ -561,8 +569,10 @@ public:
                 frontier.push( this->shared_from_this() );
             }
 
-            //PRINT("root ID: " << frontier.front()->getID() << ", and treeSize= "<< treeSize);
-
+            // coordsTree[dim].size()== treeSize, initialize with dummy value -1, 
+            // might be a problem if you can have negative coords.            
+            std::vector<std::vector<ValueType>> coordsTree( dimension , std::vector<ValueType>( treeSize, -1));
+            
             while( !frontier.empty() ){
                 SCAI_REGION("StatialCell.getSubTreeAsGraph.inFrontier");
                 std::shared_ptr<SpatialCell> thisNode = frontier.front();
@@ -572,8 +582,8 @@ public:
                     PRINT("Got cell ID= -1.");
                     throw std::logic_error("Tree not indexed?");
                 }
-                // connect children in the graph
-                // for all children
+                
+                // for all children - connect children in the graph
                 for(unsigned int c=0; c<thisNode->children.size(); c++){
                     
                     std::shared_ptr<SpatialCell> child = thisNode->children[c];
@@ -582,7 +592,8 @@ public:
                     for(unsigned int s=c+1; s<thisNode->children.size(); s++){
                         std::shared_ptr<SpatialCell> sibling = thisNode->children[s];
                         // if cells are adjacent add -it- to your graph neighbours list
-                        if( child->isAdjacent( *sibling) ){                      
+                        if( child->isAdjacent( *sibling) ){        
+//PRINT("are adjacent, child: "<< child->getID() << " <> sibling: "<< sibling->getID() );
                             assert( child->getID() < graphNgbrsCells.size() );
                             assert( sibling->getID() < graphNgbrsCells.size() );
                             graphNgbrsCells[child->getID()].insert(sibling);
@@ -593,7 +604,8 @@ public:
                     // check this child with all the neighbours of father in the graph
                     // graphNgb is a neighbouring cell of this node as a shared_ptr
                     for(typename std::set<std::shared_ptr<SpatialCell>>::iterator graphNgb= graphNgbrsCells[thisNode->ID].begin(); graphNgb!=graphNgbrsCells[thisNode->getID()].end(); graphNgb++){
-                        if( child->isAdjacent(*graphNgb->get()) ){                          
+                        if( child->isAdjacent(*graphNgb->get()) ){        
+//PRINT("are adjacent, child: "<< child->getID() << " <> graphNgbr: "<< graphNgb->get()->getID() );
                             assert( child->getID() < graphNgbrsCells.size() );
                             assert( graphNgb->get()->getID() < graphNgbrsCells.size() );
                             graphNgbrsCells[child->getID()].insert(*graphNgb );
@@ -638,11 +650,13 @@ public:
                 else{ //thisNode is a leaf, then store its coords
                     //PRINT("Node "<< thisNode->getID() << " IS a leaf node"); 
                     for(int d=0; d<dimension; d++){
-                        assert(d<coords.size());
+                        assert(d<coordsTree.size());
                         assert(d< maxCoords.getDimensions());
                         ValueType thisCoord = thisNode->minCoords[d] + double(thisNode->maxCoords[d] - thisNode->minCoords[d])/ 2;
-                        //PRINT("max= "<< thisNode->maxCoords[d] <<", min= "<< thisNode->minCoords[d] << ", mean= "<< thisCoord);                        
-                        coords[d].push_back(thisCoord);
+                        //PRINT("max= "<< thisNode->maxCoords[d] <<", min= "<< thisNode->minCoords[d] << ", mean= "<< thisCoord);  
+                        assert( thisNode->getID()< coordsTree[d].size() );
+                        coordsTree[d][thisNode->getID()] = thisCoord;
+                        //coords[d].push_back(thisCoord);
                     }
                     
                 }
@@ -665,12 +679,19 @@ public:
                 //if a set has size 0 then it is not a leaf so set -1
                 if( graphNgbrsCells[i].size() != 0){
                     leafIndexMapping[i]= leafIndex++;
+                    for(int d=0; d<dimension; d++){
+                        coords[d].push_back( coordsTree[d][i] );
+                    }                
                 }else{
                     leafIndexMapping[i]= -1;
                     ++non_leaves;
                 }
             }
+    
             index numLeaves = leafIndex;
+            SCAI_ASSERT_EQ_ERROR(coords[0].size(), numLeaves, "Wrong leaf size." )
+            SCAI_ASSERT( numLeaves+ non_leaves == treeSize, "Wrong leaves or non-leaves count.");
+            
             // this assertion is not correct in the case where we get a forest
             //SCAI_ASSERT( leafIndex == countLeaves(), leafIndex << " >< "<< countLeaves() );
 
@@ -678,7 +699,11 @@ public:
              * from the graphNgbrsCells vector set the CSR sparse matrix
              */
 
-            IndexType nnzValues = getVSsize(graphNgbrsCells);
+            IndexType nnzValues= 0;
+            for(int i=0; i<graphNgbrsCells.size(); i++){
+                nnzValues += graphNgbrsCells[i].size();
+            }
+            
             IndexType N = numLeaves;
             
             //create the adjacency matrix

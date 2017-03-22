@@ -31,11 +31,7 @@
 
 #include "AuxiliaryFunctions.h"
 
-// for the new initial partition
-#include "../morton_curve/include/morton2d.h"
-#include "../morton_curve/include/morton3d.h"
-
-#include "quadtree/QuadTreeCartesianEuclid.h"
+//#include "quadtree/QuadTreeCartesianEuclid.h"
 
 namespace ITI {
 

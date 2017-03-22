@@ -13,12 +13,14 @@
 #include <scai/lama/matrix/all.hpp>
 
 #include "QuadTreeTest.h"
-//#include "../../MeshIO.h"
 #include "../../ParcoRepart.h"
+#include "../../FileIO.h"
 
 #include "../QuadTreeCartesianEuclid.h"
 #include "../QuadTreePolarEuclid.h"
 #include "../KDTreeEuclidean.h"
+
+#include <boost/filesystem.hpp>
 
 namespace ITI {
 
@@ -136,6 +138,7 @@ TEST_F(QuadTreeTest, testGetGraphFromForestByHand_2D){
     
 
     // graphNgbrsPtrs[i]= a set with pointers to the neighbours of -i- in the CSR matrix/graph
+    // graphNgbrsPtrs.size() == size of the forest , all nodes on every tree
     std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsPtrs( globIndexing );
     //WARNING: this kind of edges must be symmetric
     
@@ -494,6 +497,239 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_2D) {
         
     PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);   
 
+}
+
+
+
+TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
+
+        count n = 1800;
+
+	vector<Point<double> > positions(n);
+	vector<index> content(n);
+
+        Point<double> min(0.0, 0.0);
+        Point<double> max(1000.0, 1000.0);
+        index capacity = 1;
+        
+	QuadTreeCartesianEuclid quad(min, max, true, capacity);
+        index i=0;
+        srand(time(NULL));
+  
+        for (i = 0; i < n; i++) {
+		Point<double> pos = Point<double>({ max[0]*(double(rand()) / RAND_MAX), max[1]*(double(rand()) / RAND_MAX) });
+		positions[i] = pos;
+		content[i] = i;
+		quad.addContent(i, pos);                
+	}
+
+        // 2D points
+        quad.addContent(i++, Point<double>({818, 170 }) );
+        quad.addContent(i++, Point<double>({985, 476 }) );
+        quad.addContent(i++, Point<double>({128, 174 }) );
+        quad.addContent(i++, Point<double>({771, 11 }) );
+        quad.addContent(i++, Point<double>({614, 458 }) );
+        quad.addContent(i++, Point<double>({10, 91 }) );
+        quad.addContent(i++, Point<double>({740, 930 }) );
+        quad.addContent(i++, Point<double>({749, 945 }) );
+        quad.addContent(i++, Point<double>({249, 945 }) );
+        quad.addContent(i++, Point<double>({430, 845 }) );
+        quad.addContent(i++, Point<double>({430, 825 }) );
+        //quad.addContent(i++, Point<double>({748, 345 }) );
+        
+	PRINT("Num of leaves= N = "<< quad.countLeaves() );
+	index N= quad.countLeaves();
+        // index the tree
+        index treeSize = quad.indexSubtree(0);
+        
+        // A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
+        // of -i- in the output graph, not the quad tree.
+        std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells( treeSize );
+        int dimension = 2;
+        std::vector<std::vector<ValueType>> coords( dimension );
+        
+	scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>(graphNgbrsCells, coords);
+        
+        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        
+        /*
+        //print graph
+        if( comm->getRank()==0 ){
+            for(int i=0; i<graph.getNumRows(); i++){
+                std::cout << i <<": \t";
+                for(int j=0; j<graph.getNumColumns(); j++){
+                    if( graph.getValue(i,j).Scalar::getValue<ValueType>() != 0){
+                        std::cout<< j << ":"<< graph.getValue(i,j).Scalar::getValue<ValueType>() << " , ";
+                    }
+                }
+                std::cout << " coords: "<< coords[0][i] << " _ "<< coords[1][i];
+                std::cout<< std::endl;
+            }
+        }
+        */
+        
+        // checkSymmetry is really expensive for big graphs, use only for small instances
+        if(N<3000){
+            graph.checkSymmetry();
+        }
+	graph.isConsistent();
+        
+        EXPECT_EQ(coords[0].size(), N);
+            
+	EXPECT_EQ( graph.getNumRows(), N);
+	EXPECT_EQ( graph.getNumColumns(), N);
+        {
+            const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
+            const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+            const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+            
+            // 20 is too large upper bound. Should be around 24 for 3D and 8 (or 10) for 2D
+            //TODO: maybe 30 is not so large... find another way to do it or skip it entirely
+            IndexType upBound= 20;
+            std::vector<IndexType> degreeCount( upBound, 0 );
+            for(IndexType i=0; i<N; i++){
+                IndexType nodeDegree = ia[i+1] -ia[i];
+                if( nodeDegree > upBound){
+                    throw std::logic_error( "Node with large degree, degree= "+  std::to_string(nodeDegree) + " > current upper bound= " + std::to_string(upBound) );
+                }
+                ++degreeCount[nodeDegree];
+            }
+            
+            IndexType numEdges = 0;
+            IndexType maxDegree = 0;
+            std::cout<< "\t Num of nodes"<< std::endl;
+            for(int i=0; i<degreeCount.size(); i++){
+                if(  degreeCount[i] !=0 ){
+                    //std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
+                    numEdges += i*degreeCount[i];
+                    maxDegree = i;
+                }
+            }
+            EXPECT_EQ(numEdges, graph.getNumValues() );
+            
+            ValueType averageDegree = ValueType( numEdges)/N;
+        
+            //PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
+        }
+        
+        // communicate/distribute graph
+
+        IndexType k = comm->getSize();
+
+        scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+        scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
+        
+        graph.redistribute( dist, noDistPointer);
+        
+        //TODO: change coords data type to vector<double> ? or the way we copy to a DenseVector
+        std::vector<DenseVector<ValueType>> coordsDV(dimension);
+        
+        for(int d=0; d<dimension; d++){
+            coordsDV[d].allocate(coords[d].size() );
+            for(IndexType j=0; j<coords[d].size(); j++){
+                coordsDV[d].setValue(j , coords[d][j]);
+            }
+            coordsDV[d].redistribute(dist);
+        }
+        
+        EXPECT_EQ(coordsDV[0].getLocalValues().size() , graph.getLocalNumRows() );
+        
+        std::string destPath = "./partResults/fromQuadTree/blocks_"+std::to_string(k)+"/";
+        boost::filesystem::create_directories( destPath );  
+        
+        const ValueType epsilon = 0.05;        
+        struct Settings settings;
+        settings.numBlocks= k;
+        settings.epsilon = epsilon;
+        settings.dimensions = dimension;
+        settings.useGeometricTieBreaking = 1;
+        
+        ParcoRepart<IndexType, ValueType> repart;
+        ValueType cut , maxCut= N;
+        ValueType imbalance;
+        IndexType bestPixelCut=0;
+        
+        //scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordsDV, settings);
+                
+        IndexType np = 3;
+        scai::dmemo::DistributionPtr bestDist = dist;
+        //std::vector<scai::lama::DenseVector<IndexType>> pixelPartition(np);
+        scai::lama::DenseVector<IndexType> pixelPartition;
+        
+        for(int detail= 0; detail<np; detail++){           
+            settings.pixeledDetailLevel= detail + np;
+            pixelPartition = ITI::ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coordsDV, settings);
+            cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, pixelPartition, true);
+            if (cut<maxCut){
+                maxCut = cut;
+                bestPixelCut = detail;
+                bestDist = pixelPartition.getDistributionPtr();
+            }
+        }
+        // TODO: must save best distibution and redistribute with the best distribution
+        
+        settings.dimensions = bestPixelCut;
+        pixelPartition = ITI::ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coordsDV, settings);
+        bestDist = pixelPartition.getDistributionPtr();
+        for(int d=0; d<dimension; d++){
+            coordsDV[d].redistribute(bestDist);
+        }
+        if(dimension==2){
+            ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordsDV, N, destPath+"pixel");
+        }
+        
+        //redistribute
+        graph.redistribute( dist, noDistPointer);
+        for(int d=0; d<dimension; d++){
+            coordsDV[d].redistribute(dist);
+        }
+        
+        scai::lama::DenseVector<IndexType> hilbertPartition = ITI::ParcoRepart<IndexType, ValueType>::initialPartition(graph, coordsDV, settings);
+        if(dimension==2){
+            ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordsDV, N, destPath+"hilbert");
+        }
+        
+        cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, hilbertPartition, true);
+        imbalance = repart.computeImbalance(hilbertPartition, k);
+        
+        if( imbalance>epsilon ){
+            PRINT0("WARNING, imbalance: "<< imbalance <<" more than epislon: "<< epsilon);
+        }
+        if (comm->getRank() == 0) {
+            std::cout << "Commit " << version << ": Partitioned graph with " << N << " nodes into " << k << " blocks with a total cut of " << cut << std::endl;
+        }        
+        
+
+
+        /*
+        if (comm->getRank() == 2) {
+            scai::hmemo::ReadAccess<ValueType> coordAccess0( coordsDV[0].getLocalValues() );
+            scai::hmemo::ReadAccess<ValueType> coordAccess1( coordsDV[1].getLocalValues() );        
+            
+            const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
+            scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+            scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+            scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+            
+            scai::dmemo::DistributionPtr coordDist = coordsDV[0].getDistributionPtr();
+            
+            // all local graph nodes
+            for (IndexType i = 0; i < ia.size()-1; i++) {
+		const IndexType beginCols = ia[i];
+		const IndexType endCols = ia[i+1];
+		assert(ja.size() >= endCols);
+
+                PRINT(coordDist->local2global(i) << ": this coords: "<< coordAccess0[i] << " , "<< coordAccess1[i] );
+                
+                // all edges of this node
+		for (IndexType j = beginCols; j < endCols; j++) {
+                    if( coordDist->isLocal(j) ){
+                        std::cout<< j <<"\t ngbr coords: " << coordAccess0[coordDist->global2local(j)] << " , " << coordAccess1[coordDist->global2local(j)] << std::endl;
+                    }
+                }
+            }
+        }
+        */
 }
 
 
