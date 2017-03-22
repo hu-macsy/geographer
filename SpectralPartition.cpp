@@ -177,7 +177,6 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
     }else{
         PRINT0("Laplacian already replicated, no need to redistribute.");
     }
-        
     // get the second eigenvector of the laplacian (local, not distributed)
     //TODO: if local, change to std::vector
     DenseVector<ValueType> eigenVec (numPixels, -1);
@@ -204,7 +203,6 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
             eigenVec.setValue( i, secondEigenVector[i]);
         }
     }
-
     // sort
     //TODO: if local, change to std::vector
     scai::lama::DenseVector<IndexType> permutation;

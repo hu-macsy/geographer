@@ -293,10 +293,10 @@ TEST_F(MeshGeneratorTest, testMeshFromQuadTree){
     
     IndexType numEdges = 0;
     IndexType maxDegree = 0;
-    std::cout<< "\t Num of nodes"<< std::endl;
+    //std::cout<< "\t Num of nodes"<< std::endl;
     for(int i=0; i<degreeCount.size(); i++){
         if(  degreeCount[i] !=0 ){
-            std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
+            //std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
             numEdges += i*degreeCount[i];
             maxDegree = i;
         }

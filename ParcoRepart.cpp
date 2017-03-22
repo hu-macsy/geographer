@@ -28,9 +28,10 @@
 #include "ParcoRepart.h"
 #include "HilbertCurve.h"
 #include "MultiLevel.h"
-//#include "LocalRefinement.h"
 
-#include "quadtree/QuadTreeCartesianEuclid.h"
+#include "AuxiliaryFunctions.h"
+
+//#include "quadtree/QuadTreeCartesianEuclid.h"
 
 namespace ITI {
 
@@ -450,10 +451,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
                 //geomSpread = 1 + 1.0/detailLvl*( std::abs(sideLen/2.0 - neighbours[j]/sideLen)/(0.8*sideLen/2.0) + std::abs(sideLen/2.0 - neighbours[j]%sideLen)/(0.8*sideLen/2.0) );
                 IndexType ngbrX = neighbours[j]/sideLen;
                 IndexType ngbrY = neighbours[j]%sideLen;
- 
+
                 geomSpread= 1+ (std::pow(ngbrX-sideLen/2, 2) + std::pow(ngbrY-sideLen/2, 2))*(2/std::pow(sideLen,2));
                 geomSpread = geomSpread * geomSpread;// std::pow(geomSpread, 0.5);
- 
+
                 if( sumDensity[ neighbours[j]] == -1){ // this pixel is already picked by a block (maybe this)
                     continue;
                 }else{
@@ -487,7 +488,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
             thisBlockSize += sumDensity[pp];
         }
     }   
-    //PRINT0("##### final blockSize for block "<< k-1 << ": "<< thisBlockSize);
 
     // here all pixels should have a partition 
     
@@ -505,7 +505,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
         //the +1 is needed
         IndexType maxX = maxCoords[0]+1;
         IndexType maxY = maxCoords[1]+1;
-        
+     
         for(IndexType i=0; i<localN; i++){
             scaledX = coordAccess0[i]/maxX * sideLen;
             scaledY = coordAccess1[i]/maxY * sideLen;
@@ -566,7 +566,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
         assert( coordinates[dim].size() == globalN);
         assert( coordinates[dim].getLocalValues().size() == newDist->getLocalSize() );
     }
-    
+   
     ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
     ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(result, k);
     if (comm->getRank() == 0) {
@@ -1400,34 +1400,6 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const 
 }
 //---------------------------------------------------------------------------------------
 
-template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType> adjM){
-    SCAI_REGION("ParcoRepart.getDegreeVector");
-    
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-    const IndexType localN = distPtr->getLocalSize();
-    
-    scai::lama::DenseVector<IndexType> degreeVector(distPtr);
-    scai::utilskernel::LArray<IndexType>& localDegreeVector = degreeVector.getLocalValues();
-    
-    const scai::lama::CSRStorage<ValueType> localAdjM = adjM.getLocalStorage();
-    {
-        const scai::hmemo::ReadAccess<IndexType> readIA ( localAdjM.getIA() );
-        scai::hmemo::WriteOnlyAccess<IndexType> writeVector( localDegreeVector, localDegreeVector.size()) ;
-        
-        SCAI_ASSERT_EQ_ERROR(readIA.size(), localDegreeVector.size()+1, "Probably wrong distribution");
-        
-        for(IndexType i=0; i<readIA.size()-1; i++){
-            writeVector[i] = readIA[i+1] - readIA[i];
-        }
-    }
-    
-    return degreeVector;
-}
-
-//---------------------------------------------------------------------------------------
-
 //to force instantiation
 
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings);
@@ -1461,7 +1433,5 @@ template std::vector< std::vector<int>>  ParcoRepart<int, double>::getGraphEdgeC
 template std::vector<DenseVector<int>> ParcoRepart<int, double>::getCommunicationPairs_local( CSRSparseMatrix<double> &adjM);
 
 template std::vector<int> ParcoRepart<int, double>::neighbourPixels(const int thisPixel, const int sideLen, const int dimension);
-
-template scai::lama::DenseVector<int> ParcoRepart<int, double>::getDegreeVector( const scai::lama::CSRSparseMatrix<double> adjM);
 
 }

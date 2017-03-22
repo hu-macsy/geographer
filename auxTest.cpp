@@ -124,7 +124,7 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
 TEST_F (auxTest, testInitialPartitions){
 
     std::string path = "meshes/bigtrace/";
-    std::string fileName = "bigtrace-00021.graph";
+    std::string fileName = "bigtrace-00001.graph";
     std::string file = path + fileName;
     std::ifstream f(file);
     IndexType dimensions= 2;
@@ -162,6 +162,11 @@ TEST_F (auxTest, testInitialPartitions){
     settings.pixeledDetailLevel = 6;        // for a 16x16 coarsen graph in 2D, 16x16x16 in 3D
     settings.useGeometricTieBreaking =1;
     settings.fileName = fileName;
+    settings.useGeometricTieBreaking =1;
+    settings.multiLevelRounds = 6;
+    settings.minGainForNextRound= 10;
+    
+    DenseVector<IndexType> uniformWeights;
     
     ValueType cut;
     ValueType imbalance;
@@ -188,8 +193,17 @@ TEST_F (auxTest, testInitialPartitions){
     //cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
     cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, pixeledPartition);
     imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
-    logF<< "-- Pixeled partition " << std::endl;
+    logF<< "-- Initial Pixeled partition " << std::endl;
     logF<< "\tcut: " << cut << " , imbalance= "<< imbalance;
+    
+    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, settings);
+    if(dimensions==2){
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithPixel");
+    }
+    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, pixeledPartition);
+    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
+    logF<< "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
     logF  << std::endl  << std::endl; 
     
     //------------------------------------------- hilbert/sfc
@@ -210,10 +224,19 @@ TEST_F (auxTest, testInitialPartitions){
     }
     cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, hilbertPartition);
     imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
-    logF<< "-- Hilbert/sfc partition " << std::endl;
+    logF<< "-- Initial Hilbert/sfc partition " << std::endl;
     logF<< "\tcut: " << cut << " , imbalance= "<< imbalance;
-    logF  << std::endl  << std::endl;
-
+    
+    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, settings);
+    if(dimensions==2){
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithHilbert");
+    }
+    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, hilbertPartition);
+    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
+    logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
+    logF  << std::endl  << std::endl; 
+    
     //------------------------------------------- spectral
     
     // the partitioning may redistribute the input graph
@@ -223,6 +246,12 @@ TEST_F (auxTest, testInitialPartitions){
     }
     if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
     PRINT0("Get a spectral partition");
+    
+    if( settings.pixeledDetailLevel > 5){
+        settings.pixeledDetailLevel = 5;
+        PRINT0("changing detail level to 5 since it would be too slow otherwise" );
+    }
+    
     // get spectral partition
     scai::lama::DenseVector<IndexType> spectralPartition = SpectralPartition<IndexType, ValueType>::getPartition( graph, coordinates, settings);
     
@@ -232,12 +261,25 @@ TEST_F (auxTest, testInitialPartitions){
     }
     cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, spectralPartition);
     imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( spectralPartition, k);
-    logF<< "-- Spectral partition " << std::endl;
+    logF<< "-- Initial Spectral partition " << std::endl;
     logF<< "\tcut: " << cut << " , imbalance= "<< imbalance;
+    
+    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, spectralPartition, uniformWeights, coordinates, settings);
+    
+    if(dimensions==2){
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithSpectral");
+    }
+    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, spectralPartition);
+    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( spectralPartition, k);
+    logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
+    logF  << std::endl  << std::endl; 
+    
     
     if(comm->getRank()==0){
         std::cout<< "Output files written in " << destPath << std::endl;
     }
+    
 }
 
 }
