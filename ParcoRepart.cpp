@@ -130,7 +130,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
     DenseVector<IndexType> result;
     
     if( ! inputDist->isEqual(*coordDist) ){
-        throw std::runtime_error("Matrix and coordianted should have then same distribution");
+        throw std::runtime_error("Matrix and coordinates should have the same distribution");
     }
     
     /**
