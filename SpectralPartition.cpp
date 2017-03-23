@@ -78,38 +78,6 @@ scai::lama::CSRSparseMatrix<ValueType> SpectralPartition<IndexType, ValueType>::
         scai::hmemo::WriteOnlyAccess<IndexType> wLaplacianJA( laplacianJA , laplacianNnzValues );
         scai::hmemo::WriteOnlyAccess<ValueType> wLaplacianValues( laplacianValues, laplacianNnzValues );
         
-   /*     
-        IndexType localInd = 0;
-        IndexType globalIndex = distPtr->local2Global( localInd );
-        //IndexType laplacianOffset = 0;
-        IndexType laplacianIndex = 0;
-        
-        for(IndexType j=0; j<ja.size(); j++){
-            SCAI_ASSERT( ja[j]==globalIndex, "Diagonal no empty, no self loops allowed.");
-            laplacianIndex = j + localInd;
-            if( ja[j]<globalIndex ){
-                wLaplacianJA[laplacianIndex] = ja[j];
-                wLaplacianValues[laplacianIndex] = -1*values[j];    //opposite value
-            }else{      //add diagonal element
-                wLaplacianJA[laplacianIndex] = globalIndex;
-                assert( localInd < localocalDegree.size() );
-                wLaplacianValues[laplacianIndex] = rLocalDegree[ localInd ];
-                ++localInd;
-                // can we write ++globalindex; ? Probably
-                if( localInd >localN){      //for the last local element
-                    globalIndex = globalN;
-                }else{
-                    globalIndex = distPtr->local2Global( localInd );
-                }
-            }
-            if( j+1<ja.size() and j+1> ia[localInd+1] ){  //changed row
-                globalIndex = distPtr->local2Global( localInd );    // or just ++ ?
-            }
-            
-        }
-   */     
-
-        
         IndexType nnzCounter = 0;
         for(IndexType i=0; i<localN; i++){
             const IndexType beginCols = ia[i];
@@ -147,7 +115,7 @@ scai::lama::CSRSparseMatrix<ValueType> SpectralPartition<IndexType, ValueType>::
             
         }
         
-        //fix ia array , we add 1 element in every row
+        //fix ia array , we just added 1 element in every row, so...
         for(IndexType i=0; i<ia.size(); i++){
             wLaplacianIA[i] = ia[i] + i;
         }

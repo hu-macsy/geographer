@@ -85,22 +85,15 @@ TEST_F(SpectralPartitionTest, testSpectralPartition){
     
     scai::lama::CSRSparseMatrix<ValueType> laplacian = SpectralPartition<IndexType, ValueType>::getLaplacian( graph );
     
-    /*
-    for(int i=0; i<laplacian.getLocalNumRows(); i++){
-        for(int j=0; j<laplacian.getLocalNumColumns(); j++){
-            std::cout << "("<<i << ","<< j << ")-"<< laplacian.getLocalStorage().getValue(i,j) <<"  ";
-        }
-        std::cout<< std::endl;
-    }
-    */
     if(laplacian.getNumRows() < 4000 ){
         EXPECT_TRUE( laplacian.checkSymmetry() );
     }
     EXPECT_TRUE( laplacian.isConsistent() );
     
-    //DenseVector<ValueType> diagonal(dist);
-    //laplacian.getDiagonal( diagonal );
-    //PRINT( diagonal.sum() );
+    DenseVector<ValueType> x( graph.getColDistributionPtr(), 1 );
+    DenseVector<ValueType> y( graph * x );
+
+    SCAI_ASSERT_LT_ERROR( y.maxNorm(), Scalar( 1e-8 ), "not a Laplacian matrix" )
     
     ValueType diagonalSum=0;
     for( int r=0; r<laplacian.getNumRows(); r++){
@@ -171,8 +164,7 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
     //
     // From down here everything is local/replicated in every PE
     //
-    
-    
+     
     scai::solver::CG cgSolver( "CGTestSolver" );
     scai::lama::NormPtr norm = scai::lama::NormPtr ( new scai::lama::L2Norm ( ) );
     scai::solver::CriterionPtr criterion ( new scai::solver::ResidualThreshold ( norm, 1E-8, scai::solver::ResidualThreshold::Absolute ) );

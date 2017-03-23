@@ -36,8 +36,8 @@ class ParcoRepartTest : public ::testing::Test {
 
 TEST_F(ParcoRepartTest, testInitialPartition){
     //std::string file = "Grid16x16";
-    std::string path = "meshes/bigbubbles/";
-    std::string fileName = "bigbubbles-00010.graph";
+    std::string path = "meshes/bubbles/";
+    std::string fileName = "bubbles-00010.graph";
     std::string file = path + fileName;
     //std::string file = "meshes/hugebubbles/hugebubbles-00010.graph";
     std::ifstream f(file);
@@ -45,11 +45,11 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     IndexType N, edges;
     f >> N >> edges; 
     
-    PRINT("nodes= "<< N);
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     // for now local refinement requires k = P
     IndexType k = comm->getSize();
     //
+    PRINT0("nodes= "<< N);
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );

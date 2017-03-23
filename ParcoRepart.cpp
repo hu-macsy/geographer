@@ -548,17 +548,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     wLocalPart.release();
     
     //get new distribution
-    // must gather in one PE and create partition by owners
-
-    //TODO: should change this
-    //replicate in every PE to make the new distribution
-    scai::dmemo::DistributionPtr noDist (new scai::dmemo::NoDistribution( globalN ));
-    result.redistribute(noDist);
-    assert( result.getDistribution().isReplicated() );
-
-    scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution( result.getLocalValues(), comm));
+    scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
+    
+    //TODO: not sure if this is needed...
     result.redistribute( newDist);
-
     input.redistribute(newDist, input.getColDistributionPtr());
     
     // redistibute coordinates
@@ -1130,7 +1123,7 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getLocalB
     }
     SCAI_REGION_START("ParcoRepart.getLocalBlockGraphEdges.gatherNonLocal")
         //gather all non-local indexes
-        gatheredPart.gather(part, nonLocalDV , scai::utilskernel::binary::COPY );
+        gatheredPart.gather(part, nonLocalDV , scai::common::binary::COPY );
     SCAI_REGION_END("ParcoRepart.getLocalBlockGraphEdges.gatherNonLocal")
     
     assert( gatheredPart.size() == nonLocalInd.size() );
