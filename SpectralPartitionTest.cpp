@@ -106,7 +106,6 @@ TEST_F(SpectralPartitionTest, testSpectralPartition){
             sum += readLaplVal[i];
         }
     }
-
     EXPECT_EQ( sum , 0 );
 
 }
@@ -168,7 +167,6 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
     //Solve laplacian * solution = rhs
     cgSolver.solve ( solution, rhs );
     
-
     using Eigen::MatrixXd;
     using namespace Eigen;
     

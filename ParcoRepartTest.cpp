@@ -35,7 +35,7 @@ class ParcoRepartTest : public ::testing::Test {
 
 TEST_F(ParcoRepartTest, testInitialPartition){
     //std::string file = "Grid16x16";
-    std::string file = "meshes/bigbubbles/bigbubbles-00010.graph";
+    std::string file = "meshes/bubbles/bubbles-00010.graph";
     //std::string file = "meshes/hugebubbles/hugebubbles-00010.graph";
     std::ifstream f(file);
     IndexType dimensions= 2;
@@ -64,7 +64,7 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     settings.pixeledDetailLevel =4;
     settings.useGeometricTieBreaking = 1;
     
-    for( int i=2; i<6; i++){
+    for( int i=2; i<5; i++){
         settings.pixeledDetailLevel = i;
         DenseVector<IndexType> pixelInitialPartition = ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coords, settings);
         
@@ -1076,53 +1076,8 @@ TEST_F(ParcoRepartTest, testPixelNeighbours){
         SCAI_ASSERT_EQUAL_ERROR(numEdges/2,  dimension*( std::pow(sideLen,dimension)- std::pow(sideLen, dimension-1)) );
     }
 }       
+
 //------------------------------------------------------------------------------
-
-TEST_F(ParcoRepartTest, testSpectralPartition){
- std::string file = "Grid8x8";
-    std::ifstream f(file);
-    IndexType dimensions= 2, k=16;
-    IndexType N, edges;
-    f >> N >> edges; 
-    
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    // for now local refinement requires k = P
-    k = comm->getSize();
-    //
-    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
-    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
-    const IndexType localN = dist->getLocalSize();
-    
-    //distrubute graph
-    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
-        
-
-    //read the array locally and messed the distribution. Left as a remainder.
-    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
-    EXPECT_EQ( edges, (graph.getNumValues())/2 );
-    
-    //reading coordinates
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
-    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
-    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
-    
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
-    
-    scai::lama::DenseVector<IndexType> degreeVector = ParcoRepart<IndexType, ValueType>::getDegreeVector( graph);
-    SCAI_ASSERT_EQ_ERROR(degreeVector.sum(), 2*edges, "Wrong degree count.");
-    /*
-    for(int i=0; i<localN; i++){
-        PRINT(*comm << ": " << degreeVector.getLocalValues()[i]);
-    }
-    */
-
-}
-//------------------------------------------------------------------------------
-
-
 
 
 
