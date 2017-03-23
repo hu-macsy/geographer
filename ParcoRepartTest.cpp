@@ -35,7 +35,7 @@ class ParcoRepartTest : public ::testing::Test {
 };
 
 TEST_F(ParcoRepartTest, testInitialPartition){
-    //std::string file = "Grid16x16";
+    //std::string file = "Grid8x8";
     std::string path = "meshes/bubbles/";
     std::string fileName = "bubbles-00010.graph";
     std::string file = path + fileName;
@@ -67,7 +67,7 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     settings.pixeledDetailLevel =4;
     settings.useGeometricTieBreaking = 1;
     
-    for( int i=2; i<6; i++){
+    for( int i=2; i<3; i++){
         settings.pixeledDetailLevel = i;
         DenseVector<IndexType> pixelInitialPartition = ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coords, settings);
         

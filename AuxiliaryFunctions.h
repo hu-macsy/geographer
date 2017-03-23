@@ -41,6 +41,27 @@ static void writeHeatLike_local_2D(std::vector<IndexType> input,IndexType sideLe
 }    
 //------------------------------------------------------------------------------
 
+static void writeHeatLike_local_2D(scai::hmemo::HArray<IndexType> input,IndexType sideLen, IndexType dim, const std::string filename){
+    std::ofstream f(filename);
+    if(f.fail())
+        throw std::runtime_error("File "+ filename+ " failed.");
+    
+    f<< "$map2 << EOD" << std::endl;
+    scai::hmemo::ReadAccess<IndexType> rInput( input );
+    
+    for(IndexType i=0; i<sideLen; i++){
+        for(IndexType j=0; j<sideLen; j++){
+            f<< j << " " << i << " " << rInput[i*sideLen+j] << std::endl;
+        }
+        f<< std::endl;
+    }
+    rInput.release();
+    f<< "EOD"<< std::endl;
+    f<< "set title \"Pixeled partition for file " << filename << "\" " << std::endl;
+    f << "plot '$map2' using 2:1:3 with image" << std::endl;
+}    
+//------------------------------------------------------------------------------
+
 static void print2DGrid(scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama::DenseVector<IndexType>& partition  ){
     
     IndexType N= adjM.getNumRows();
