@@ -202,7 +202,7 @@ const IndexType optSize = std::ceil( nodeWeights.sum().Scalar::getValue<IndexTyp
 					 * These processes don't share a border and thus have no communication to do with each other. How did they end up in a communication scheme?
 					 * We could skip the loop entirely.
 					 */
-                                        PRINT("PEs " << comm->getRank() << " and "<< partner << " do not share a borer nontheless they communicate for color " << color << ". Something is wrong");
+                     //PRINT("PEs " << comm->getRank() << " and "<< partner << " do not share a border, nonetheless they communicate for color " << color << ". Something is wrong");
 				}
 			}
 
