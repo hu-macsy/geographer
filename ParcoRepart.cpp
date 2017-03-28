@@ -55,7 +55,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		throw std::runtime_error("Matrix has " + std::to_string(n) + " rows, but " + std::to_string(coordinates[0].size())
 		 + " coordinates are given.");
 	}
-        
+
 	if (n != input.getNumColumns()) {
 		throw std::runtime_error("Matrix must be quadratic.");
 	}
@@ -86,6 +86,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		throw std::runtime_error( "Distributions should be equal.");
 	}
 	SCAI_REGION_END("ParcoRepart.partitionGraph.inputCheck")
+	{
+		SCAI_REGION("ParcoRepart.synchronize")
+		comm->synchronize();
+	}
 	
         // get an initial partition
         DenseVector<IndexType> result= ParcoRepart<IndexType, ValueType>::initialPartition(input, coordinates, settings);
@@ -112,8 +116,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings){    
-    SCAI_REGION( "ParcoRepart.initialPartition" )
-    	
+    SCAI_REGION( "ParcoRepart.initialPartition" );
+
     std::chrono::time_point<std::chrono::steady_clock> start, afterSFC;
     start = std::chrono::steady_clock::now();
     
@@ -137,22 +141,25 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
     /**
      * get minimum / maximum of local coordinates
      */
-    for (IndexType dim = 0; dim < dimensions; dim++) {
-        //get local parts of coordinates
-        scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
-        for (IndexType i = 0; i < localN; i++) {
-            ValueType coord = localPartOfCoords[i];
-            if (coord < minCoords[dim]) minCoords[dim] = coord;
-            if (coord > maxCoords[dim]) maxCoords[dim] = coord;
-        }
-    }
-    
-    /**
-     * communicate to get global min / max
-     */
-    for (IndexType dim = 0; dim < dimensions; dim++) {
-        minCoords[dim] = comm->min(minCoords[dim]);
-        maxCoords[dim] = comm->max(maxCoords[dim]);
+    {
+		SCAI_REGION( "ParcoRepart.initialPartition.minMax" )
+		for (IndexType dim = 0; dim < dimensions; dim++) {
+			//get local parts of coordinates
+			scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
+			for (IndexType i = 0; i < localN; i++) {
+				ValueType coord = localPartOfCoords[i];
+				if (coord < minCoords[dim]) minCoords[dim] = coord;
+				if (coord > maxCoords[dim]) maxCoords[dim] = coord;
+			}
+		}
+
+		/**
+		 * communicate to get global min / max
+		 */
+		for (IndexType dim = 0; dim < dimensions; dim++) {
+			minCoords[dim] = comm->min(minCoords[dim]);
+			maxCoords[dim] = comm->max(maxCoords[dim]);
+		}
     }
     
     /**
