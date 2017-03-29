@@ -441,7 +441,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
         // set this pixel to -1 so it is not picked again
         localSumDens[maxDensityPixel] = -1;
         
-//PRINT0(border.size());
         while(border.size() !=0 ){      // there are still pixels to check
             
             //TODO: different data type to avoid that
@@ -468,7 +467,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
             // this pixel now belongs in this block
             SCAI_ASSERT(bestIndex < sumDensity.size(), "Wrong pixel index: " + std::to_string(bestIndex));
             pixeledPartition[ bestIndex ] = block;
-//PRINT0(bestIndex << " ++ "<< pixeledPartition[ bestIndex ] << " -- " << block);            
             thisBlockSize += localSumDens[ bestIndex ];
             --pixelsLeft;
             pointsLeft -= localSumDens[ bestIndex ];

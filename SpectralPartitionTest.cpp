@@ -90,9 +90,10 @@ TEST_F(SpectralPartitionTest, testSpectralPartition){
     }
     EXPECT_TRUE( laplacian.isConsistent() );
     
+    // check that x = (1, 1, ..., 1 ) is eigenvector with eigenvalue 0
+    EXPECT_TRUE( graph.getColDistributionPtr()->isEqual(laplacian.getColDistribution() ) );
     DenseVector<ValueType> x( graph.getColDistributionPtr(), 1 );
-    DenseVector<ValueType> y( graph * x );
-
+    DenseVector<ValueType> y( laplacian * x );
     SCAI_ASSERT_LT_ERROR( y.maxNorm(), Scalar( 1e-8 ), "not a Laplacian matrix" )
     
     ValueType diagonalSum=0;
@@ -102,7 +103,6 @@ TEST_F(SpectralPartitionTest, testSpectralPartition){
                 diagonalSum += laplacian.getValue( r, c).Scalar::getValue<ValueType>();
         }
     }
-    //PRINT( diagonalSum );
     EXPECT_EQ( diagonalSum , 2*edges);
     
     ValueType sum=0;
@@ -121,7 +121,7 @@ TEST_F(SpectralPartitionTest, testSpectralPartition){
 //------------------------------------------------------------------------------
 
 TEST_F(SpectralPartitionTest, testLamaSolver){
-    std::string file = "Grid32x32";
+    std::string file = "Grid8x8";
     std::ifstream f(file);
     IndexType dimensions= 2, k=16;
     IndexType N, edges;
@@ -173,7 +173,6 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
     scai::lama::DenseVector<ValueType> solution ( N, 1.0 );
     scai::lama::DenseVector<ValueType> rhs ( N, 0.0 );
     cgSolver.initialize ( laplacian );
-    //Solve laplacian * solution = rhs
     cgSolver.solve ( solution, rhs );
     
     /*
@@ -196,31 +195,42 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
   
     SelfAdjointEigenSolver<MatrixXd> eigensolver( eigenLapl );
     VectorXd secondEigenVector = eigensolver.eigenvectors().col(2) ;
-    
-    /*
-    if( comm->getRank()==0 ){
-        if (eigensolver.info() != Success){ //abort();
-            std::cout<< " eigensolver.info() != Success "<< std::endl;
-        }else{
-            std::cout << "The eigenvalues of A are:\n" << eigensolver.eigenvalues() << std::endl;
-            std::cout << "Here's the vector corresponding to the second smaller eigenvalue:\n" << secondEigenVector << std::endl  ;
-        }
-    }
-    */
+
     DenseVector<ValueType> eigenVec (N, -1);
     for(int i=0; i<secondEigenVector.size(); i++){
         eigenVec.setValue( i, secondEigenVector[i]);
     }
-    //
-    // redistribute and sort to silumate a real case scenario with a distributed eigenvector from start    
-    //
     
     //redistribute the eigenVec
     eigenVec.redistribute( dist );
     
+    DenseVector<ValueType> prod (graph*eigenVec);
+    DenseVector<ValueType> prod2 ( eigensolver.eigenvalues().col(1)*eigenVec);
+    
+    //SCAI_ASSERT_EQ_ERROR(prod, prod2, "A*v=lambda*v failed" );
+    
+    PRINT0("getting the LAMA fiedler vector");    
+    std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
+    scai::lama::DenseVector<ValueType> fiedler = SpectralPartition<IndexType, ValueType>::getFiedlerVector( graph );
+
+    SCAI_ASSERT_EQ_ERROR( eigenVec.size() , fiedler.size(), "Wrong vector sizes");
+    PRINT("l1 norm: Eigen= "<< eigenVec.l1Norm() << " , fiedler= "<< fiedler.l1Norm() );
+    PRINT("l2 norm: Eigen= "<< eigenVec.l2Norm() << " , fiedler= "<< fiedler.l2Norm() );
+    PRINT("max: Eigen= "<< eigenVec.max() << " , fiedler= "<< fiedler.max() );
+    PRINT("min: Eigen= "<< eigenVec.min() << " , fiedler= "<< fiedler.min() );
+    
+    PRINT0("got it! time: " << ( std::chrono::duration<double> (std::chrono::steady_clock::now() -start) ).count() );
+
+    EXPECT_TRUE( eigenVec.getDistributionPtr()->isEqual( fiedler.getDistribution() ) );
+    //EXPECT_TRUE( eigenVec.getDistributionPtr()->isEqual( fiedler.getRowDistribution() ) );
+    
     // sort
     scai::lama::DenseVector<IndexType> permutation;
     eigenVec.sort(permutation, true);
+    // sort
+    scai::lama::DenseVector<IndexType> permutation2;
+    fiedler.sort(permutation2, true);
+    
     
     IndexType globalN = N;
     DenseVector<IndexType>  partition;
@@ -250,7 +260,6 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
     ValueType cut = comm->getSize() == 1 ? ParcoRepart<IndexType, ValueType>::computeCut(graph, partition) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(graph, false)) / 2;
     
     PRINT0( "cut= " << cut);
-    PRINT(*comm <<", "<< partition.getLocalValues().size() );
     
     /*
     for(int i=0; i<partition.getLocalValues().size(); i++){
