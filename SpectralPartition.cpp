@@ -326,7 +326,7 @@ scai::lama::CSRSparseMatrix<ValueType> SpectralPartition<IndexType, ValueType>::
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getFiedlerVector(const scai::lama::CSRSparseMatrix<ValueType>& adjM ){
+scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getFiedlerVector(const scai::lama::CSRSparseMatrix<ValueType>& adjM, ValueType& eigenvalue ){
     
     IndexType globalN= adjM.getNumRows();
     SCAI_ASSERT_EQ_ERROR( globalN, adjM.getNumColumns(), "Matrix not square, numRows != numColumns");
@@ -359,8 +359,9 @@ scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getF
     t[0] = 0.0;
     scai::lama::DenseVector<ValueType> z(t);
     
-    IndexType kmax = 200;        // maximal number of iterations
+    IndexType kmax = 100;        // maximal number of iterations
     Scalar    eps  = 1e-7;       // accuracy for maxNorm
+    scai::lama::Scalar lambda = 0.0;   // the eigenvalue (?) TODO: make sure
     
     for(IndexType k=0; k<kmax; k++){
         // normalize t
@@ -371,7 +372,7 @@ scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getF
         y -= s.dotProduct( t ) * r;  
         y -= r.dotProduct( t ) * s;
         
-        scai::lama::Scalar lambda = t.dotProduct( y );
+        lambda = t.dotProduct( y );
         diff = y - lambda * t;
         Scalar diffNorm = diff.maxNorm();
         
@@ -410,13 +411,15 @@ scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getF
             rOld = rNew;
             rNorm = norm( res );
         }
-        
+      
         t = z;
     }
-    
+ 
     t[0] = 0.0;
     scai::lama::Scalar beta = u.dotProduct(t) / alpha;
     t = t- beta*u;
+    
+    eigenvalue = lambda.Scalar::getValue<ValueType>();
     
     return t;
 }
@@ -457,6 +460,6 @@ template scai::lama::CSRSparseMatrix<double> SpectralPartition<int, double>::get
 
 template scai::lama::DenseVector<int> SpectralPartition<int, double>::getPartition(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coordinates, Settings settings);
 
-template scai::lama::DenseVector<double> SpectralPartition<int, double>::getFiedlerVector(const scai::lama::CSRSparseMatrix<double>& adjM );
+template scai::lama::DenseVector<double> SpectralPartition<int, double>::getFiedlerVector(const scai::lama::CSRSparseMatrix<double>& adjM, double& eigenvalue );
 
 };

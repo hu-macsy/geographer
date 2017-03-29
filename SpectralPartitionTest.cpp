@@ -121,7 +121,8 @@ TEST_F(SpectralPartitionTest, testSpectralPartition){
 //------------------------------------------------------------------------------
 
 TEST_F(SpectralPartitionTest, testLamaSolver){
-    std::string file = "Grid8x8";
+    std::string file = "Grid16x16";
+    //std::string file = "meshes/trace/trace-00000.graph";
     std::ifstream f(file);
     IndexType dimensions= 2, k=16;
     IndexType N, edges;
@@ -158,31 +159,14 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
    
     scai::lama::CSRSparseMatrix<ValueType> laplacian = SpectralPartition<IndexType, ValueType>::getLaplacian( graph );    
     
-    // replicate the laplacian
+    // replicate the laplacian for Eigen
     laplacian.redistribute( noDistPointer, noDistPointer);
+    
     
     //
     // From down here everything is local/replicated in every PE
     //
-     
-    scai::solver::CG cgSolver( "CGTestSolver" );
-    scai::lama::NormPtr norm = scai::lama::NormPtr ( new scai::lama::L2Norm ( ) );
-    scai::solver::CriterionPtr criterion ( new scai::solver::ResidualThreshold ( norm, 1E-8, scai::solver::ResidualThreshold::Absolute ) );
-    cgSolver.setStoppingCriterion ( criterion );
     
-    scai::lama::DenseVector<ValueType> solution ( N, 1.0 );
-    scai::lama::DenseVector<ValueType> rhs ( N, 0.0 );
-    cgSolver.initialize ( laplacian );
-    cgSolver.solve ( solution, rhs );
-    
-    /*
-    if( comm->getRank()==0 ){
-        for(int i=0; i<solution.size(); i++){
-            std::cout<< solution.getLocalValues()[i] << " _ ";
-        }
-        std::cout << std::endl;
-    }
-    */
     using Eigen::MatrixXd;
     using namespace Eigen;
     
@@ -193,43 +177,75 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
         }
     }
   
-    SelfAdjointEigenSolver<MatrixXd> eigensolver( eigenLapl );
-    VectorXd secondEigenVector = eigensolver.eigenvectors().col(2) ;
+    SelfAdjointEigenSolver<MatrixXd> eigensolver( eigenLapl, Eigen::DecompositionOptions::ComputeEigenvectors);
+    VectorXd secondEigenVector = eigensolver.eigenvectors().col(1) ;
 
     DenseVector<ValueType> eigenVec (N, -1);
     for(int i=0; i<secondEigenVector.size(); i++){
         eigenVec.setValue( i, secondEigenVector[i]);
     }
-    
+    for(int i=0; i<5; i++){
+        PRINT0(i <<": "<< eigensolver.eigenvalues()[i]);
+    }
     //redistribute the eigenVec
     eigenVec.redistribute( dist );
     
     DenseVector<ValueType> prod (graph*eigenVec);
-    DenseVector<ValueType> prod2 ( eigensolver.eigenvalues().col(1)*eigenVec);
+    DenseVector<ValueType> prod2 ( eigensolver.eigenvalues()[1]*eigenVec);
     
     //SCAI_ASSERT_EQ_ERROR(prod, prod2, "A*v=lambda*v failed" );
+    for(int i=0; i<prod.getLocalValues().size(); i++){
+        //PRINT( prod.getLocalValues()[i] << " == "<< prod2.getLocalValues()[i]);
+        PRINT0(prod.getLocalValues()[i]/ prod2.getLocalValues()[i]);
+    }
+    
+    //^^^^^ Eigen part
     
     PRINT0("getting the LAMA fiedler vector");    
     std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
-    scai::lama::DenseVector<ValueType> fiedler = SpectralPartition<IndexType, ValueType>::getFiedlerVector( graph );
+    ValueType eigenvalue;
+    scai::lama::DenseVector<ValueType> fiedler = SpectralPartition<IndexType, ValueType>::getFiedlerVector( graph, eigenvalue );
 
-    SCAI_ASSERT_EQ_ERROR( eigenVec.size() , fiedler.size(), "Wrong vector sizes");
-    PRINT("l1 norm: Eigen= "<< eigenVec.l1Norm() << " , fiedler= "<< fiedler.l1Norm() );
-    PRINT("l2 norm: Eigen= "<< eigenVec.l2Norm() << " , fiedler= "<< fiedler.l2Norm() );
-    PRINT("max: Eigen= "<< eigenVec.max() << " , fiedler= "<< fiedler.max() );
-    PRINT("min: Eigen= "<< eigenVec.min() << " , fiedler= "<< fiedler.min() );
-    
     PRINT0("got it! time: " << ( std::chrono::duration<double> (std::chrono::steady_clock::now() -start) ).count() );
 
+    SCAI_ASSERT_EQ_ERROR( eigenVec.size() , fiedler.size(), "Wrong vector sizes");
+    PRINT0("eigenvalue should be similar: Eigen= "<< eigensolver.eigenvalues()[1] << " , fiedler= "<< eigenvalue);
+    
+    ValueType eigenl1Norm = eigenVec.l1Norm().Scalar::getValue<ValueType>();
+    ValueType fiedlerl1Norm = fiedler.l1Norm().Scalar::getValue<ValueType>();
+    PRINT0("l1 norm should be similar: Eigen= "<< eigenl1Norm << " , fiedler= "<< fiedlerl1Norm );
+    //PRINT("l2 norm: Eigen= "<< eigenVec.l2Norm() << " , fiedler= "<< fiedler.l2Norm() );
+    
+    ValueType eigenl2Norm = eigenVec.l2Norm().Scalar::getValue<ValueType>();
+    ValueType fiedlerl2Norm = fiedler.l2Norm().Scalar::getValue<ValueType>();
+    PRINT0("l2 norm should be similar: Eigen= "<< eigenl2Norm << " , fiedler= "<< fiedlerl2Norm );
+    
+    ValueType eigenMax = eigenVec.max().Scalar::getValue<ValueType>();
+    ValueType fiedlerMax = fiedler.max().Scalar::getValue<ValueType>();
+    PRINT0("max should be similar: Eigen= "<< eigenMax  << " , fiedler= "<< fiedlerMax );
+    
+    ValueType eigenMin = eigenVec.min().Scalar::getValue<ValueType>();
+    ValueType fiedlerMin = fiedler.min().Scalar::getValue<ValueType>();
+    PRINT0("min should be similar: Eigen= "<< eigenMin << " , fiedler= "<< fiedlerMin );
+    //SCAI_ASSERT_EQ_ERROR(eigenVec.l2Norm().Scalar::getValue<ValueType>(), fiedler.l2Norm().Scalar::getValue<ValueType>() ,"Should (? , not sure) be equal." );
     EXPECT_TRUE( eigenVec.getDistributionPtr()->isEqual( fiedler.getDistribution() ) );
-    //EXPECT_TRUE( eigenVec.getDistributionPtr()->isEqual( fiedler.getRowDistribution() ) );
+    EXPECT_TRUE( graph.getRowDistributionPtr()->isEqual( fiedler.getDistribution() ) );
+    
+    DenseVector<ValueType> prodF (graph*fiedler);
+    DenseVector<ValueType> prodF2 ( eigenvalue*fiedler);
+    
+    //SCAI_ASSERT_EQ_ERROR(prod, prod2, "A*v=lambda*v failed" );
+    for(int i=0; i<prodF.getLocalValues().size(); i++){
+        //PRINT( prod.getLocalValues()[i] << " == "<< prod2.getLocalValues()[i]);
+        PRINT(prodF.getLocalValues()[i]/ prodF2.getLocalValues()[i]);
+    }
     
     // sort
-    scai::lama::DenseVector<IndexType> permutation;
-    eigenVec.sort(permutation, true);
+    //scai::lama::DenseVector<IndexType> permutation;
+    //eigenVec.sort(permutation, true);
     // sort
-    scai::lama::DenseVector<IndexType> permutation2;
-    fiedler.sort(permutation2, true);
+    scai::lama::DenseVector<IndexType> permutation;
+    fiedler.sort(permutation, true);
     
     
     IndexType globalN = N;
@@ -248,24 +264,12 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
         
         graph.redistribute(newDistribution, graph.getColDistributionPtr());
         partition = DenseVector<IndexType>(newDistribution, comm->getRank());
-        /*
-        if (settings.useGeometricTieBreaking) {
-            for (IndexType dim = 0; dim < dimensions; dim++) {
-                coordinates[dim].redistribute(newDistribution);
-            }
-        }
-        */
     }
     
     ValueType cut = comm->getSize() == 1 ? ParcoRepart<IndexType, ValueType>::computeCut(graph, partition) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(graph, false)) / 2;
     
     PRINT0( "cut= " << cut);
     
-    /*
-    for(int i=0; i<partition.getLocalValues().size(); i++){
-        PRINT(*comm <<", "<< partition.getDistributionPtr()->local2global(i) << ": "<< partition.getLocalValues()[i] );
-    }
-    */
     aux::print2DGrid( graph, partition );
 }
 //------------------------------------------------------------------------------

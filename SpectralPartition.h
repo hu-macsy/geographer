@@ -61,9 +61,11 @@ namespace ITI {
              *         Householder deflation and inverse power iteration
              *         Jian-ping Wu, Jun-qiang Song, Wei-min Zhang 
              * @param[in] adjM The adjacency matrix of the input graph to get the Fiedler eigenvector.
+             * @param[out] eigenvalue The second smallest eigenvalue that corresponds to the fiedler vector.
              * @return The Fiedler eigenvector, aka the vector corresponding to the second smallest eigenvalue of adjM.
              */
-            static scai::lama::DenseVector<ValueType> getFiedlerVector(const scai::lama::CSRSparseMatrix<ValueType>& adjM );
+            static scai::lama::DenseVector<ValueType> getFiedlerVector(const scai::lama::CSRSparseMatrix<ValueType>& adjM,
+                ValueType& eigenvalue );
     };
     
 }
