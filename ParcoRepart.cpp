@@ -28,8 +28,9 @@
 #include "ParcoRepart.h"
 #include "HilbertCurve.h"
 #include "MultiLevel.h"
-
 #include "AuxiliaryFunctions.h"
+
+#include "sort/SchizoQS.hpp"
 
 //#include "quadtree/QuadTreeCartesianEuclid.h"
 
@@ -202,16 +203,27 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
     /**
      * now sort the global indices by where they are on the space-filling curve.
      */
-    scai::lama::DenseVector<IndexType> permutation;
+    scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(globalN, comm));
+    scai::lama::DenseVector<IndexType> permutation(blockDist);
     {
-        SCAI_REGION( "ParcoRepart.initialPartition.sorting" )
-        hilbertIndices.sort(permutation, true);
+        SCAI_REGION( "ParcoRepart.initialPartition.sorting" );
+        std::pair<ValueType, IndexType> localPairs[localN];
+        scai::hmemo::ReadAccess<ValueType> localIndices(hilbertIndices.getLocalValues());
+        for (IndexType i = 0; i < localN; i++) {
+        	localPairs[i] = {localIndices[i], inputDist->local2global(i)};
+        }
+        SchizoQS::sort<std::pair<ValueType, IndexType>>(localPairs, localN);
+
+        scai::hmemo::WriteAccess<IndexType> wPermutation(permutation.getLocalValues(), localN);
+
+        for (IndexType i = 0; i < localN; i++) {
+        	wPermutation[i] = localPairs[i].second;
+        }
     }
     
     if (!inputDist->isReplicated() && comm->getSize() == k) {
         SCAI_REGION( "ParcoRepart.initialPartition.redistribute" )
         
-        scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(globalN, comm));
         permutation.redistribute(blockDist);
         scai::hmemo::WriteAccess<IndexType> wPermutation( permutation.getLocalValues() );
         std::sort(wPermutation.get(), wPermutation.get()+wPermutation.size());
