@@ -203,40 +203,61 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
     /**
      * now sort the global indices by where they are on the space-filling curve.
      */
-    scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(globalN, comm));
-    scai::lama::DenseVector<IndexType> permutation(blockDist);
+    //scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(globalN, comm));
+    //scai::lama::DenseVector<IndexType> permutation(blockDist);
+    std::vector<IndexType> newLocalIndices;
     {
         SCAI_REGION( "ParcoRepart.initialPartition.sorting" );
 
-        sort_pair localPairs[localN];
         auto type = SortingDatatype<sort_pair>::getMPIDatatype();
         int typesize;
         MPI_Type_size(type, &typesize);
-
         assert(typesize == sizeof(sort_pair));
+
+        const IndexType maxLocalN = comm->max(localN);
+        sort_pair localPairs[maxLocalN];
+
+        //fill with local values
         scai::hmemo::ReadAccess<ValueType> localIndices(hilbertIndices.getLocalValues());
         for (IndexType i = 0; i < localN; i++) {
         	localPairs[i].value = localIndices[i];
         	localPairs[i].index = inputDist->local2global(i);
         }
-        SchizoQS::sort<sort_pair>(localPairs, localN);
 
-        scai::hmemo::WriteAccess<IndexType> wPermutation(permutation.getLocalValues(), localN);
-
-        for (IndexType i = 0; i < localN; i++) {
-        	wPermutation[i] = localPairs[i].index;
+        //fill up with dummy values to ensure equal size
+        for (IndexType i = localN; i < maxLocalN; i++) {
+        	localPairs[i].value = std::numeric_limits<decltype(sort_pair::value)>::max();
+        	localPairs[i].index = std::numeric_limits<decltype(sort_pair::index)>::max();
         }
+
+        //call distributed sort
+        SchizoQS::sort<sort_pair>(localPairs, maxLocalN);
+
+        //copy indices into array
+        newLocalIndices.resize(maxLocalN);
+        for (IndexType i = 0; i < maxLocalN; i++) {
+        	newLocalIndices[i] = localPairs[i].index;
+        }
+
+		//sort local indices for general distribution
+        std::sort(newLocalIndices.begin(), newLocalIndices.end());
+
+        //remove dummy values
+        auto startOfDummyValues = std::lower_bound(newLocalIndices.begin(), newLocalIndices.end(), std::numeric_limits<IndexType>::max());
+        newLocalIndices.resize(std::distance(newLocalIndices.begin(), startOfDummyValues));
+
+        assert(comm->sum(newLocalIndices.size()) == globalN);
+
+        //possible optimization: remove dummy values during first copy, then directly copy into HArray and sort with pointers. Would save one copy.
     }
     
-    if (!inputDist->isReplicated() && comm->getSize() == k) {
-        SCAI_REGION( "ParcoRepart.initialPartition.redistribute" )
-        
-        permutation.redistribute(blockDist);
-        scai::hmemo::WriteAccess<IndexType> wPermutation( permutation.getLocalValues() );
-        std::sort(wPermutation.get(), wPermutation.get()+wPermutation.size());
-        wPermutation.release();
-        
-        scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, permutation.getLocalValues(), comm));
+    {
+    	assert(!inputDist->isReplicated() && comm->getSize() == k);
+        SCAI_REGION( "ParcoRepart.initialPartition.redistribute" );
+
+        scai::utilskernel::LArray<IndexType> indexTransport(newLocalIndices.size(), newLocalIndices.data());
+        assert(comm->sum(indexTransport.size()) == globalN);
+        scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
         
         input.redistribute(newDistribution, input.getColDistributionPtr());
         result = DenseVector<IndexType>(newDistribution, comm->getRank());
@@ -247,16 +268,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
             }
         }
         
-    } else {
-        scai::lama::DenseVector<IndexType> inversePermutation;
-        DenseVector<IndexType> tmpPerm = permutation;
-        tmpPerm.sort( inversePermutation, true);
-        
-        result.allocate(inputDist);
-        
-        for (IndexType i = 0; i < localN; i++) {
-            result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/globalN);
-        }
     }
     
     ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
