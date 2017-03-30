@@ -209,21 +209,23 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
         SCAI_REGION( "ParcoRepart.initialPartition.sorting" );
 
         sort_pair localPairs[localN];
+        auto type = SortingDatatype<sort_pair>::getMPIDatatype();
+        int typesize;
+        MPI_Type_size(type, &typesize);
+
+        assert(typesize == sizeof(sort_pair));
         scai::hmemo::ReadAccess<ValueType> localIndices(hilbertIndices.getLocalValues());
         for (IndexType i = 0; i < localN; i++) {
         	localPairs[i].value = localIndices[i];
-		localPairs[i].index = inputDist->local2global(i);
+        	localPairs[i].index = inputDist->local2global(i);
         }
-		std::cout << "Prepared " << localN << " indices. Begin sorting." << std::endl;
         SchizoQS::sort<sort_pair>(localPairs, localN);
-		std::cout << "Completed sorting." << std::endl;
 
         scai::hmemo::WriteAccess<IndexType> wPermutation(permutation.getLocalValues(), localN);
 
         for (IndexType i = 0; i < localN; i++) {
         	wPermutation[i] = localPairs[i].index;
         }
-	std::cout << "Derived Permutation." << std::endl;
     }
     
     if (!inputDist->isReplicated() && comm->getSize() == k) {
