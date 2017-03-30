@@ -28,6 +28,7 @@
 #include "ParcoRepart.h"
 #include "HilbertCurve.h"
 #include "MultiLevel.h"
+#include "sort/SchizoQS.hpp"
 
 #include "AuxiliaryFunctions.h"
 
@@ -202,16 +203,32 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
     /**
      * now sort the global indices by where they are on the space-filling curve.
      */
-    scai::lama::DenseVector<IndexType> permutation;
+    scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(globalN, comm));
+    scai::lama::DenseVector<IndexType> permutation(blockDist);
     {
-        SCAI_REGION( "ParcoRepart.initialPartition.sorting" )
-        hilbertIndices.sort(permutation, true);
+        SCAI_REGION( "ParcoRepart.initialPartition.sorting" );
+
+        sort_pair localPairs[localN];
+        scai::hmemo::ReadAccess<ValueType> localIndices(hilbertIndices.getLocalValues());
+        for (IndexType i = 0; i < localN; i++) {
+        	localPairs[i].value = localIndices[i];
+		localPairs[i].index = inputDist->local2global(i);
+        }
+	std::cout << "Prepared " << localN << " indices. Begin sorting." << std::endl;
+        SchizoQS::sort<sort_pair>(localPairs, localN);
+	std::cout << "Completed sorting." << std::endl;
+
+        scai::hmemo::WriteAccess<IndexType> wPermutation(permutation.getLocalValues(), localN);
+
+        for (IndexType i = 0; i < localN; i++) {
+        	wPermutation[i] = localPairs[i].index;
+        }
+	std::cout << "Derived Permutation." << std::endl;
     }
     
     if (!inputDist->isReplicated() && comm->getSize() == k) {
         SCAI_REGION( "ParcoRepart.initialPartition.redistribute" )
         
-        scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(globalN, comm));
         permutation.redistribute(blockDist);
         scai::hmemo::WriteAccess<IndexType> wPermutation( permutation.getLocalValues() );
         std::sort(wPermutation.get(), wPermutation.get()+wPermutation.size());
