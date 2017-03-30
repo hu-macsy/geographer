@@ -114,15 +114,14 @@ TEST_F(SpectralPartitionTest, testSpectralPartition){
         }
     }
     // PRINT (sum);
-    // sums the absolute values, make our own sum?
     EXPECT_EQ( sum , 0 );
 
 }
 //------------------------------------------------------------------------------
 
 TEST_F(SpectralPartitionTest, testLamaSolver){
-    std::string file = "Grid16x16";
-    //std::string file = "meshes/trace/trace-00000.graph";
+    //std::string file = "Grid16x16";
+    std::string file = "meshes/trace/trace-00000.graph";
     std::ifstream f(file);
     IndexType dimensions= 2, k=16;
     IndexType N, edges;
@@ -184,16 +183,13 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
     for(int i=0; i<secondEigenVector.size(); i++){
         eigenVec.setValue( i, secondEigenVector[i]);
     }
-    for(int i=0; i<5; i++){
-        PRINT0(i <<": "<< eigensolver.eigenvalues()[i]);
-    }
     //redistribute the eigenVec
     eigenVec.redistribute( dist );
+    
     
     DenseVector<ValueType> prod (graph*eigenVec);
     DenseVector<ValueType> prod2 ( eigensolver.eigenvalues()[1]*eigenVec);
     
-    //SCAI_ASSERT_EQ_ERROR(prod, prod2, "A*v=lambda*v failed" );
     for(int i=0; i<prod.getLocalValues().size(); i++){
         //PRINT( prod.getLocalValues()[i] << " == "<< prod2.getLocalValues()[i]);
         PRINT0(prod.getLocalValues()[i]/ prod2.getLocalValues()[i]);
@@ -214,7 +210,6 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
     ValueType eigenl1Norm = eigenVec.l1Norm().Scalar::getValue<ValueType>();
     ValueType fiedlerl1Norm = fiedler.l1Norm().Scalar::getValue<ValueType>();
     PRINT0("l1 norm should be similar: Eigen= "<< eigenl1Norm << " , fiedler= "<< fiedlerl1Norm );
-    //PRINT("l2 norm: Eigen= "<< eigenVec.l2Norm() << " , fiedler= "<< fiedler.l2Norm() );
     
     ValueType eigenl2Norm = eigenVec.l2Norm().Scalar::getValue<ValueType>();
     ValueType fiedlerl2Norm = fiedler.l2Norm().Scalar::getValue<ValueType>();
@@ -227,23 +222,26 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
     ValueType eigenMin = eigenVec.min().Scalar::getValue<ValueType>();
     ValueType fiedlerMin = fiedler.min().Scalar::getValue<ValueType>();
     PRINT0("min should be similar: Eigen= "<< eigenMin << " , fiedler= "<< fiedlerMin );
-    //SCAI_ASSERT_EQ_ERROR(eigenVec.l2Norm().Scalar::getValue<ValueType>(), fiedler.l2Norm().Scalar::getValue<ValueType>() ,"Should (? , not sure) be equal." );
+
     EXPECT_TRUE( eigenVec.getDistributionPtr()->isEqual( fiedler.getDistribution() ) );
     EXPECT_TRUE( graph.getRowDistributionPtr()->isEqual( fiedler.getDistribution() ) );
     
+    // TODO: should it be A*v=l*v? this is not true either for the getFiedlerVector or the vector from Eigen
+    
+    // check if A*v=l*v
     DenseVector<ValueType> prodF (graph*fiedler);
     DenseVector<ValueType> prodF2 ( eigenvalue*fiedler);
     
-    //SCAI_ASSERT_EQ_ERROR(prod, prod2, "A*v=lambda*v failed" );
     for(int i=0; i<prodF.getLocalValues().size(); i++){
         //PRINT( prod.getLocalValues()[i] << " == "<< prod2.getLocalValues()[i]);
-        PRINT(prodF.getLocalValues()[i]/ prodF2.getLocalValues()[i]);
+        PRINT0(prodF.getLocalValues()[i]/ prodF2.getLocalValues()[i]);
     }
+    
     
     // sort
     //scai::lama::DenseVector<IndexType> permutation;
     //eigenVec.sort(permutation, true);
-    // sort
+
     scai::lama::DenseVector<IndexType> permutation;
     fiedler.sort(permutation, true);
     
@@ -275,7 +273,8 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
 //------------------------------------------------------------------------------
 
 TEST_F(SpectralPartitionTest, testGetPartition){
-    std::string file = "Grid32x32";
+    //std::string file = "Grid32x32";
+    std::string file ="meshes/trace/trace-00001.graph";
     std::ifstream f(file);
     IndexType dimensions= 2;
     IndexType N, edges;
@@ -303,20 +302,22 @@ TEST_F(SpectralPartitionTest, testGetPartition){
        
     PRINT0("Get a spectral partition");
     // get spectral partition
-    settings.pixeledDetailLevel = 5;    // for a 16x16 coarsen graph
+    settings.pixeledDetailLevel = 4;    //4  for a 16x16 coarsen graph
     scai::lama::DenseVector<IndexType> spectralPartition = SpectralPartition<IndexType, ValueType>::getPartition( graph, coordinates, settings);
     
     if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, "SpectralPartition_"+file);
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, "SpectralPartition_+trace01");
     }
-       
+    //aux::print2DGrid( graph, spectralPartition );
+    
+    
     EXPECT_GE(k-1, spectralPartition.getLocalValues().max() );
     EXPECT_EQ(N, spectralPartition.size());
     EXPECT_EQ(0, spectralPartition.min().getValue<ValueType>());
     EXPECT_EQ(k-1, spectralPartition.max().getValue<ValueType>());
     EXPECT_EQ(graph.getRowDistribution(), spectralPartition.getDistribution());
        
-    aux::print2DGrid( graph, spectralPartition );
+    
 }
 
 

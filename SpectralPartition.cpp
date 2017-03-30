@@ -49,6 +49,13 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
         PRINT0("Laplacian already replicated, no need to redistribute.");
     }
     
+    
+    // use the fiedler vector
+    ValueType eigenvalue;
+    scai::lama::DenseVector<ValueType> fiedler = SpectralPartition<IndexType, ValueType>::getFiedlerVector( pixelGraph, eigenvalue );
+    SCAI_ASSERT( fiedler.size() == numPixels, "Sizes do not agree.");
+    
+    
     //
     // From down here a big part (until ^^^) is local/replicated in every PE
     //
@@ -71,13 +78,38 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
     
         // solve and get the second eigenvector
         SelfAdjointEigenSolver<MatrixXd> eigensolver( eigenLapl );
-        VectorXd secondEigenVector = eigensolver.eigenvectors().col(2) ;
+        VectorXd secondEigenVector = eigensolver.eigenvectors().col(1) ;
         SCAI_ASSERT( secondEigenVector.size() == numPixels, "Sizes do not agree.");
         
         // copy to DenseVector
         for(int i=0; i<secondEigenVector.size(); i++){
             eigenVec.setValue( i, secondEigenVector[i]);
         }
+        for(int i=0; i<5; i++){
+            PRINT0( eigensolver.eigenvalues()[i] );
+        }
+            
+        SCAI_ASSERT_EQ_ERROR( eigenVec.size() , fiedler.size(), "Wrong vector sizes");
+        PRINT0("eigenvalue should be similar: Eigen= "<< eigensolver.eigenvalues()[1] << " , fiedler= "<< eigenvalue);
+        
+        ValueType eigenl1Norm = eigenVec.l1Norm().Scalar::getValue<ValueType>();
+        ValueType fiedlerl1Norm = fiedler.l1Norm().Scalar::getValue<ValueType>();
+        PRINT0("l1 norm should be similar: Eigen= "<< eigenl1Norm << " , fiedler= "<< fiedlerl1Norm );
+        
+        ValueType eigenl2Norm = eigenVec.l2Norm().Scalar::getValue<ValueType>();
+        ValueType fiedlerl2Norm = fiedler.l2Norm().Scalar::getValue<ValueType>();
+        PRINT0("l2 norm should be similar: Eigen= "<< eigenl2Norm << " , fiedler= "<< fiedlerl2Norm );
+        
+        ValueType eigenMax = eigenVec.max().Scalar::getValue<ValueType>();
+        ValueType fiedlerMax = fiedler.max().Scalar::getValue<ValueType>();
+        PRINT0("max should be similar: Eigen= "<< eigenMax  << " , fiedler= "<< fiedlerMax );
+        
+        ValueType eigenMin = eigenVec.min().Scalar::getValue<ValueType>();
+        ValueType fiedlerMin = fiedler.min().Scalar::getValue<ValueType>();
+        PRINT0("min should be similar: Eigen= "<< eigenMin << " , fiedler= "<< fiedlerMin );
+
+        SCAI_ASSERT( eigenVec.getDistributionPtr()->isEqual( fiedler.getDistribution() )== true,"distribution problem" );
+        SCAI_ASSERT( pixelGraph.getRowDistributionPtr()->isEqual( fiedler.getDistribution() )==true, "distribution problem" );
     }
     //redistribute the eigenVec
     //eigenVec.redistribute( inputDist );
@@ -85,14 +117,18 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
     // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ redistributing the eigen vector
     
     // we could sort locally, no need to redistribute
-    // doing it like this to mimic real case senario
+    // doing it like this to mimic real case senario where pixeledGraph is also distributed
     
+
     // sort
     //TODO: if local, change to std::vector
     scai::lama::DenseVector<IndexType> permutation;
-    eigenVec.sort(permutation, true);
+    //eigenVec.sort(permutation, true);
+    fiedler.sort(permutation, true);
+    // since pixelGraph is replicated so is the permutation
+    SCAI_ASSERT( true, permutation.getDistributionPtr()->isReplicated() );
     
-    // TODO: change to localPixelPartition( numPixels, k-1); so last part get the remaining pixels (if any)
+    // TODO: change to localPixelPartition( numPixels, k-1); so that the last part get the remaining pixels (if any)
     // get local partition of the pixeled graph
     DenseVector<IndexType> localPixelPartition( numPixels, -1);
     IndexType averageBlockSize = globalN/k +1;
@@ -108,7 +144,7 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
         scai::hmemo::ReadAccess<IndexType> rPixelWeights( pixelWeights.getLocalValues() );
         
         while( thisBlockSize < averageBlockSize){ 
-            SCAI_ASSERT( serialPixelInd<permutation.getLocalValues().size(), "Pixel index too big.");
+            SCAI_ASSERT( serialPixelInd<permutation.getLocalValues().size(), "Pixel index " << serialPixelInd << " too big.");
             IndexType pixel= permutation.getLocalValues()[ serialPixelInd ];
             SCAI_ASSERT( pixel<numPixels, "Wrong pixel value "<< pixel);
             wPixelPart[ pixel ] = block;
@@ -327,6 +363,7 @@ scai::lama::CSRSparseMatrix<ValueType> SpectralPartition<IndexType, ValueType>::
 
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getFiedlerVector(const scai::lama::CSRSparseMatrix<ValueType>& adjM, ValueType& eigenvalue ){
+    SCAI_REGION("SpectralPartition.getFiedlerVector");
     
     IndexType globalN= adjM.getNumRows();
     SCAI_ASSERT_EQ_ERROR( globalN, adjM.getNumColumns(), "Matrix not square, numRows != numColumns");
@@ -359,7 +396,7 @@ scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getF
     t[0] = 0.0;
     scai::lama::DenseVector<ValueType> z(t);
     
-    IndexType kmax = 100;        // maximal number of iterations
+    IndexType kmax = 50;        // maximal number of iterations
     Scalar    eps  = 1e-7;       // accuracy for maxNorm
     scai::lama::Scalar lambda = 0.0;   // the eigenvalue (?) TODO: make sure
     
@@ -413,6 +450,7 @@ scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getF
         }
       
         t = z;
+        PRINT(lambda.Scalar::getValue<ValueType>());
     }
  
     t[0] = 0.0;

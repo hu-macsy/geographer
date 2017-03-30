@@ -124,7 +124,7 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
 TEST_F (auxTest, testInitialPartitions){
 
     std::string path = "meshes/hugetric/";
-    std::string fileName = "hugetric-00005.graph";
+    std::string fileName = "hugetric-00006.graph";
     std::string file = path + fileName;
     std::ifstream f(file);
     IndexType dimensions= 2;
@@ -252,7 +252,7 @@ TEST_F (auxTest, testInitialPartitions){
         PRINT0("changing detail level to 5 since it would be too slow otherwise" );
     }
     
-    // get spectral partition
+    // get initial spectral partition
     scai::lama::DenseVector<IndexType> spectralPartition = SpectralPartition<IndexType, ValueType>::getPartition( graph, coordinates, settings);
     
     //aux::print2DGrid( graph, spectralPartition );
