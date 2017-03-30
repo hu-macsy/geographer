@@ -92,11 +92,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		comm->synchronize();
 	}
 	
-        // get an initial partition
-        DenseVector<IndexType> result= ParcoRepart<IndexType, ValueType>::initialPartition(input, coordinates, settings);
+	// get an initial partition
+	DenseVector<IndexType> result= ParcoRepart<IndexType, ValueType>::initialPartition(input, coordinates, settings);
 
-        //settings.pixeledDetailLevel = 3;
-        //DenseVector<IndexType> result= ParcoRepart<IndexType, ValueType>::pixelPartition(input, coordinates, settings);
+	//settings.pixeledDetailLevel = 3;
+	//DenseVector<IndexType> result= ParcoRepart<IndexType, ValueType>::pixelPartition(input, coordinates, settings);
 
 	IndexType numRefinementRounds = 0;
 
@@ -218,11 +218,17 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
         sort_pair localPairs[maxLocalN];
 
         //fill with local values
+        long indexSum = 0;//for sanity checks
         scai::hmemo::ReadAccess<ValueType> localIndices(hilbertIndices.getLocalValues());
         for (IndexType i = 0; i < localN; i++) {
         	localPairs[i].value = localIndices[i];
         	localPairs[i].index = inputDist->local2global(i);
+        	indexSum += localPairs[i].index;
         }
+
+        //create checksum
+        const long checkSum = comm->sum(indexSum);
+        assert(checkSum == (long(globalN)*(long(globalN)-1))/2);
 
         //fill up with dummy values to ensure equal size
         for (IndexType i = localN; i < maxLocalN; i++) {
@@ -234,19 +240,34 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
         SchizoQS::sort<sort_pair>(localPairs, maxLocalN);
 
         //copy indices into array
+        IndexType newLocalN = 0;
         newLocalIndices.resize(maxLocalN);
         for (IndexType i = 0; i < maxLocalN; i++) {
         	newLocalIndices[i] = localPairs[i].index;
+        	if (newLocalIndices[i] != std::numeric_limits<decltype(sort_pair::index)>::max()) newLocalN++;
         }
 
 		//sort local indices for general distribution
         std::sort(newLocalIndices.begin(), newLocalIndices.end());
 
         //remove dummy values
-        auto startOfDummyValues = std::lower_bound(newLocalIndices.begin(), newLocalIndices.end(), std::numeric_limits<IndexType>::max());
+        auto startOfDummyValues = std::lower_bound(newLocalIndices.begin(), newLocalIndices.end(), std::numeric_limits<decltype(sort_pair::index)>::max());
+        assert(std::all_of(startOfDummyValues, newLocalIndices.end(), [](IndexType index){return index == std::numeric_limits<decltype(sort_pair::index)>::max();}));
         newLocalIndices.resize(std::distance(newLocalIndices.begin(), startOfDummyValues));
 
-        assert(comm->sum(newLocalIndices.size()) == globalN);
+        //check size and sanity
+        assert(newLocalN == newLocalIndices.size());
+		assert( *std::max_element(newLocalIndices.begin(), newLocalIndices.end()) < globalN);
+		assert( comm->sum(newLocalIndices.size()) == globalN);
+
+        //check checksum
+        long indexSumAfter = 0;
+        for (IndexType i = 0; i < newLocalN; i++) {
+        	indexSumAfter += newLocalIndices[i];
+        }
+
+        const long newCheckSum = comm->sum(indexSumAfter);
+        SCAI_ASSERT( newCheckSum == checkSum, "Old checksum: " << checkSum << ", new checksum: " << newCheckSum );
 
         //possible optimization: remove dummy values during first copy, then directly copy into HArray and sort with pointers. Would save one copy.
     }
@@ -259,15 +280,18 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
         assert(comm->sum(indexTransport.size()) == globalN);
         scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
         
-        input.redistribute(newDistribution, input.getColDistributionPtr());
+        if (comm->getRank() == 0) std::cout << "Created distribution." << std::endl;
         result = DenseVector<IndexType>(newDistribution, comm->getRank());
+        if (comm->getRank() == 0) std::cout << "Created initial partition." << std::endl;
+        input.redistribute(newDistribution, input.getColDistributionPtr());
+        if (comm->getRank() == 0) std::cout << "Redistributed input matrix" << std::endl;
         
         if (settings.useGeometricTieBreaking) {
             for (IndexType dim = 0; dim < dimensions; dim++) {
                 coordinates[dim].redistribute(newDistribution);
             }
+            if (comm->getRank() == 0) std::cout << "Redistributed coordinates" << std::endl;
         }
-        
     }
     
     ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
