@@ -28,9 +28,9 @@
 #include "ParcoRepart.h"
 #include "HilbertCurve.h"
 #include "MultiLevel.h"
-#include "sort/SchizoQS.hpp"
-
 #include "AuxiliaryFunctions.h"
+
+#include "sort/SchizoQS.hpp"
 
 //#include "quadtree/QuadTreeCartesianEuclid.h"
 
@@ -214,9 +214,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
         	localPairs[i].value = localIndices[i];
 		localPairs[i].index = inputDist->local2global(i);
         }
-	std::cout << "Prepared " << localN << " indices. Begin sorting." << std::endl;
+		std::cout << "Prepared " << localN << " indices. Begin sorting." << std::endl;
         SchizoQS::sort<sort_pair>(localPairs, localN);
-	std::cout << "Completed sorting." << std::endl;
+		std::cout << "Completed sorting." << std::endl;
 
         scai::hmemo::WriteAccess<IndexType> wPermutation(permutation.getLocalValues(), localN);
 
