@@ -52,7 +52,7 @@ namespace ITI {
             const DenseVector<IndexType> &part, 
             const std::vector<IndexType>& nodesWithNonLocalNeighbors, 
             IndexType otherBlock, 
-            IndexType depth
+            IndexType minNodes
         );
         
         /**

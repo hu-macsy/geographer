@@ -277,7 +277,7 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 
 			std::vector<IndexType> interfaceNodes;
 			std::vector<IndexType> roundMarkers;
-			std::tie(interfaceNodes, roundMarkers) = LocalRefinement<IndexType, ValueType>::getInterfaceNodes(a, part, localBorder, otherBlock, 2);
+			std::tie(interfaceNodes, roundMarkers) = LocalRefinement<IndexType, ValueType>::getInterfaceNodes(a, part, localBorder, otherBlock, 10);
 			IndexType lastRoundMarker = roundMarkers[roundMarkers.size()-1];
 
 			//last round marker can only be zero if set is empty
