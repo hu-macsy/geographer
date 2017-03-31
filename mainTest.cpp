@@ -205,7 +205,8 @@ int main(int argc, char** argv) {
     	return 0;
     }
     
-    // time needed to get the input
+    // time needed to get the input. Synchronize first to make sure that all processes are finished.
+    comm->synchronize();
     std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
 
     assert(N > 0);
@@ -224,6 +225,8 @@ int main(int argc, char** argv) {
     assert( partition.size() == N);
     assert( coordinates[0].size() == N);
     
+    std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
+
 // the code below writes the output coordinates in one file per processor for visualiation purposes.
 //=================
 //PRINT(*comm<< ": "<< partition.getLocalValues().size());
@@ -235,8 +238,7 @@ for (IndexType dim = 0; dim < settings.dimensions; dim++) {
 }
 ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, "debugResult");
 
-//^^^^^^^^^^^^^^^^^    
-    std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
+//^^^^^^^^^^^^^^^^^
     
     std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
@@ -244,7 +246,6 @@ ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, "d
     ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partition, comm->getSize() );
     
     std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
-    
     
     // Reporting output to std::cout
     ValueType inputT = ValueType ( comm->max(inputTime.count() ));
