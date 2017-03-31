@@ -21,6 +21,7 @@
 #include "FileIO.h"
 #include "ParcoRepart.h"
 #include "gtest/gtest.h"
+#include "AuxiliaryFunctions.h"
 
 typedef double ValueType;
 typedef int IndexType;
@@ -34,19 +35,22 @@ class ParcoRepartTest : public ::testing::Test {
 };
 
 TEST_F(ParcoRepartTest, testInitialPartition){
-    //std::string file = "Grid16x16";
-    std::string file = "meshes/bubbles/bubbles-00010.graph";
+    //std::string file = "Grid8x8";
+    std::string path = "meshes/bubbles/";
+    std::string fileName = "bubbles-00010.graph";
+    std::string file = path + fileName;
     //std::string file = "meshes/hugebubbles/hugebubbles-00010.graph";
     std::ifstream f(file);
     IndexType dimensions= 2;
     IndexType N, edges;
     f >> N >> edges; 
     
-    PRINT("nodes= "<< N);
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     // for now local refinement requires k = P
     IndexType k = comm->getSize();
     //
+    PRINT0("nodes= "<< N);
+
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
@@ -64,7 +68,7 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     settings.pixeledDetailLevel =4;
     settings.useGeometricTieBreaking = 1;
     
-    for( int i=2; i<5; i++){
+    for( int i=2; i<6; i++){
         settings.pixeledDetailLevel = i;
         DenseVector<IndexType> pixelInitialPartition = ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coords, settings);
         
@@ -120,11 +124,12 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
 
   const ValueType epsilon = 0.05;
   
-  struct Settings Settings;
-  Settings.numBlocks= k;
-  Settings.epsilon = epsilon;
-  
-  scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, Settings);
+  struct Settings settings;
+  settings.numBlocks= k;
+  settings.epsilon = epsilon;
+  settings.dimensions = dimensions;
+      
+  scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, settings);
 
   EXPECT_GE(k-1, partition.getLocalValues().max() );
   EXPECT_EQ(n, partition.size());
@@ -364,7 +369,7 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
         }
         a.setRawDenseData( n, n, adjArray.get() );
         
-        //PRINT("num of edges= " <<a.getNumValues()/2 );
+        PRINT("num of edges= " <<a.getNumValues()/2 );
         EXPECT_TRUE( a.isConsistent() );
         EXPECT_TRUE( a.checkSymmetry() );
         
@@ -460,6 +465,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
     ASSERT_EQ(N, partition.size());
   
+PRINT(*comm);
     //get the border nodes
     scai::lama::DenseVector<IndexType> border(dist, 0);
     border = ParcoRepart<IndexType,ValueType>::getBorderNodes( graph , partition);
@@ -543,13 +549,13 @@ TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
 
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
     
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
-    Settings.dimensions = dimensions;
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+    settings.dimensions = dimensions;
     
     scai::lama::DenseVector<IndexType> partition(dist, -1);
-    partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, Settings);
+    partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
 
     //get the PE graph
     scai::lama::CSRSparseMatrix<ValueType> PEgraph =  ParcoRepart<IndexType, ValueType>::getPEGraph( graph); 
@@ -599,13 +605,13 @@ TEST_F (ParcoRepartTest, testPEGraphBlockGraph_k_equal_p_Distributed) {
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
     
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
-    Settings.dimensions = dimensions;
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+    settings.dimensions = dimensions;
     
     scai::lama::DenseVector<IndexType> partition(dist, -1);
-    partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, Settings);
+    partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
 
     //get the PE graph
     scai::lama::CSRSparseMatrix<ValueType> PEgraph =  ParcoRepart<IndexType, ValueType>::getPEGraph( graph); 
@@ -676,13 +682,13 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_2D) {
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
     
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
-    Settings.dimensions = dimensions;
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+    settings.dimensions = dimensions;
     
     // get partition
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, Settings );
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings );
     
     //check distributions
     assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );    
@@ -727,12 +733,12 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_3D) {
     coords[1].redistribute(dist);
     coords[2].redistribute(dist);
     
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
-    Settings.dimensions = dimensions;
-    
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, Settings);
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+    settings.dimensions = dimensions;
+        
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
     
     //check distributions
     assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
@@ -781,12 +787,12 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
     
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
-    Settings.dimensions = dimensions;
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+    settings.dimensions = dimensions;
     
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, Settings);
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
     
     //check distributions
     assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
@@ -837,12 +843,12 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
     // create the adjacency matrix and the coordinates
     MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
     
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
-    Settings.dimensions = 3;
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+    settings.dimensions = 3;
     
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(adjM, coords, Settings);
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(adjM, coords, settings);
     
     //check distributions
     assert( partition.getDistribution().isEqual( adjM.getRowDistribution()) );
@@ -909,13 +915,13 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
     
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
-    Settings.dimensions = dimensions;
-    
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+    settings.dimensions = dimensions;
+        
     //get the partition
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, Settings);
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
     
     //check distributions
     assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
@@ -1058,7 +1064,7 @@ TEST_F(ParcoRepartTest, testPixelNeighbours){
         IndexType numEdges = 0;
         IndexType sideLen = rand()%30 +10;
         IndexType totalSize = std::pow(sideLen ,dimension);
-        std::cout<< "dim= "<< dimension << " and sideLen= "<< sideLen << std::endl;    
+        //std::cout<< "dim= "<< dimension << " and sideLen= "<< sideLen << std::endl;    
         
         for(IndexType thisPixel=0; thisPixel<totalSize; thisPixel++){
             std::vector<IndexType> pixelNgbrs = ParcoRepart<IndexType, ValueType>::neighbourPixels( thisPixel, sideLen, dimension);
@@ -1076,10 +1082,7 @@ TEST_F(ParcoRepartTest, testPixelNeighbours){
         SCAI_ASSERT_EQUAL_ERROR(numEdges/2,  dimension*( std::pow(sideLen,dimension)- std::pow(sideLen, dimension-1)) );
     }
 }       
-
 //------------------------------------------------------------------------------
-
-
 
 /**
 * TODO: test for correct error handling in case of inconsistent distributions

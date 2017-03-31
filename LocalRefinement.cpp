@@ -80,9 +80,9 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
     //block sizes TODO: adapt for weighted case
     const IndexType optSize_old = ceil(double(globalN) / settings.numBlocks);
-const IndexType optSize = std::ceil( nodeWeights.sum().Scalar::getValue<IndexType>() / settings.numBlocks);
+    const IndexType optSize = std::ceil( nodeWeights.sum().Scalar::getValue<IndexType>() / settings.numBlocks);
     const IndexType maxAllowableBlockSize = optSize*(1+settings.epsilon);
-//PRINT(optSize << " , allowed maxBlockSize "<< maxAllowableBlockSize );
+
 
     //for now, we are assuming equal numbers of blocks and processes
     const IndexType localBlockID = comm->getRank();
@@ -106,11 +106,11 @@ const IndexType optSize = std::ceil( nodeWeights.sum().Scalar::getValue<IndexTyp
 			myGlobalIndices[j] = inputDist->local2global(j);
 		}
 	}
-
+PRINT(*comm);
 	//main loop, one iteration for each color of the graph coloring
 	for (IndexType color = 0; color < communicationScheme.size(); color++) {
 		SCAI_REGION( "LocalRefinement.distributedFMStep.loop" )
-
+PRINT(color);
 		const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 		const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
 		const scai::dmemo::DistributionPtr commDist = communicationScheme[color].getDistributionPtr();
@@ -155,10 +155,10 @@ const IndexType optSize = std::ceil( nodeWeights.sum().Scalar::getValue<IndexTyp
 		scai::dmemo::Halo graphHalo;
 		CSRStorage<ValueType> haloMatrix;
 		scai::utilskernel::LArray<IndexType> nodeWeightHaloData;
-
+PRINT(*comm);
 		if (partner != comm->getRank()) {
 			//processor is active this round
-
+PRINT(*comm << " , partner= "<< partner);
 			/**
 			 * get indices of border nodes with breadth-first search
 			 */
@@ -179,7 +179,7 @@ const IndexType optSize = std::ceil( nodeWeights.sum().Scalar::getValue<IndexTyp
 			if (blockSize != localN) {
 				throw std::runtime_error(std::to_string(localN) + " local nodes, but only " + std::to_string(blockSize) + " of them belong to block " + std::to_string(localBlockID) + ".");
 			}
-
+PRINT(*comm);
 			IndexType swapField[5];
 			swapField[0] = interfaceNodes.size();
 			swapField[1] = secondRoundMarker;
@@ -445,7 +445,9 @@ const IndexType optSize = std::ceil( nodeWeights.sum().Scalar::getValue<IndexTyp
 				}
 			}
 		}
+PRINT(*comm);		
 	}
+PRINT(*comm);	
 	comm->synchronize();
 	for (IndexType color = 0; color < gainPerRound.size(); color++) {
 		gainPerRound[color] = comm->sum(gainPerRound[color]) / 2;

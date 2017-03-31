@@ -315,7 +315,8 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
     std::vector<DenseVector<ValueType> > result(dimension);
 
     for (IndexType i = 0; i < dimension; i++) {
-    	result[i] = DenseVector<ValueType>(dist, coords[i]);
+    	//result[i] = DenseVector<ValueType>(coords[i], dist);
+        result[i] = DenseVector<ValueType>(dist, coords[i] );
     }
 
     return result;
