@@ -368,7 +368,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
         //comm->sumImpl( sumDensity, density, cubeSize, scai::common::scalar::ScalarType::INT );
     }
     
-    // use the summed density as a ense vector
+    //TODO; is that needed. we just can overwrite density array
+    // use the summed density as a Dense vector
     scai::lama::DenseVector<IndexType> sumDensity( density );
     
     if(comm->getRank()==0){
