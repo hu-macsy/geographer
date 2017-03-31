@@ -1192,7 +1192,7 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 	}
 
 	assert(interfaceNodes.size() <= localN);
-	assert(interfaceNodes.size() >= minBorderNodes);
+	assert(interfaceNodes.size() >= minBorderNodes || interfaceNodes.size() == localN);
 	return {interfaceNodes, roundMarkers};
 }
 //---------------------------------------------------------------------------------------
