@@ -364,22 +364,17 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
     // radius^3 is the number of possible neighbours, here keep their indices as an array
     std::vector<IndexType> neighbourGlobalIndices;
 
-    PRINT(*comm << " , boxRadius= "<< boxRadius<< " , and num of possible neighbours ="<< pow(2*boxRadius+1, 3) );
+    //PRINT(*comm << " , boxRadius= "<< boxRadius<< " , and num of possible neighbours ="<< pow(2*boxRadius+1, 3) );
     
     for(IndexType x=-boxRadius; x<=boxRadius; x++){
         for(IndexType y=-boxRadius; y<=boxRadius; y++){
                 for(IndexType z=-boxRadius; z<=boxRadius; z++){
-// changed the code above so we find neighbours only with greater indices    
-//    for(IndexType x=0; x<=boxRadius; x++){
-//        for(IndexType y=0; y<=boxRadius; y++){
-//            for(IndexType z=0; z<=boxRadius; z++){
-                // calculate the global index of a possible neighbour and insert it to the vector
                 IndexType globalNeighbourIndex= x*planeSize + y*numZ + z;
                 neighbourGlobalIndices.push_back( globalNeighbourIndex );
             }
         }
     }
-    PRINT(*comm<<", num of neighbours inserted= "<< neighbourGlobalIndices.size() );
+    //PRINT(*comm<<", num of neighbours inserted= "<< neighbourGlobalIndices.size() );
 
     // an upper bound to how many neighbours a vertex can have, 
     // at most as many neighbours as we have
@@ -516,7 +511,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
             }
         }
     } // for(IndexType i=0; i<localSize; i++)
-    PRINT(*comm << ",  num of non-local ngbs= " << nonLocalNodeInd.size() );   
+    //PRINT(*comm << ",  num of non-local ngbs= " << nonLocalNodeInd.size() );   
     
 
     /* 
@@ -683,8 +678,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
             ia[i+1] = ia[i] + numRowElems;
             //PRINT(numRowElems << " should be == "<< localNgbs[i].size() );
             SCAI_ASSERT(numRowElems == localNgbs[i].size(),  __FILE__<<" ,"<<__LINE__<<"something is wrong");
-            //ia[i+1] = ia[i] +static_cast<IndexType>(numRowElems);
-        } //for(IndexType i=0; i<localSize; i++)
+        }
         ja.resize(nnzCounter);
         values.resize(nnzCounter);
         //PRINT("nnz afterwards= " << nnzCounter << " should be == "<< nnzValues);
@@ -706,17 +700,6 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
 template<typename IndexType, typename ValueType>
 void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const int dimension, const int numberOfAreas, const int pointsPerArea, const ValueType maxVal) {
     SCAI_REGION("MeshGenerator.createQuadMesh")
-    /*
-    auto randomPoint= [](Point<ValueType> min, Point<ValueType> max, std::default_random_engine gen ){
-        int dim= min.getDimensions();
-        Point<ValueType> retP(dim);
-        for(int d=0; d<dim; d++){
-            std::uniform_real_distribution<ValueType> dist(min[d], max[d]);
-            retP[d] = dist(gen);
-        }
-        return retP;
-    };
-    */
         
     srand(time(NULL));
 
@@ -748,7 +731,7 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
             ValueType deviation = (ValueType) rand()/RAND_MAX + 0.4;
             distForDim[d] = std::normal_distribution<ValueType> (randPoint[d], deviation);
         }
-        randPoint.print();
+        //randPoint.print();
         
         for(int i=0; i<pointsPerArea; i++){
             Point<ValueType> pInRange(dimension);

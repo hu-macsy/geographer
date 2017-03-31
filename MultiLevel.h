@@ -50,9 +50,14 @@ namespace ITI{
         static DenseVector<T> computeGlobalPrefixSum(DenseVector<T> input, T offset = 0);
         
         /**
-         * Creates a coarsened graph using geometric information. Rounds avery point according to settings.pixeledDetailLevel creating a grid of size 2^detailLevel x 2^detailLevel (for 2D). Every coarse node/pixel of the
+         * Creates a coarsened graph using geometric information. Rounds avery point according to settings.pixeledDetailLevel
+         * creating a grid of size 2^detailLevel x 2^detailLevel (for 2D). Every coarse node/pixel of the
          * grid has weight equal the number of points it contains and the edge between two coarse nodes/pixels is the
-         * number of edgees of the input graph that their endpoints belinf to different pixels.
+         * number of edges of the input graph that their endpoints belinf to different pixels.
+         * 
+         * WARNING: can happen that pixels are empty, this would create isolated vertices in hte pixeled graph 
+         *          which is not so good for spectral partitioning. To avoid that, we add every edge in the isolated
+         *          vertices with a small weight of 0.001. This might cause other problems though, so have it in mind.
          * 
          * @param[in] adjM The adjacency matrix of the input graph
          * @param[in] coordinates The coordinates of the input points.

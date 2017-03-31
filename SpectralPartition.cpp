@@ -48,68 +48,21 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
     }else{
         PRINT0("Laplacian already replicated, no need to redistribute.");
     }
-    
-    
-    
-    //
-    // From down here a big part (until ^^^) is local/replicated in every PE
-    //
-    
-    // use the fiedler vector
-    ValueType eigenvalue;
+
+    // the fiedler vector corresponding to second smallest eigenvalue
     scai::lama::DenseVector<ValueType> fiedler;
-    //or the Eigen ibrary
-    DenseVector<ValueType> eigenVec (numPixels, -1);
-        
+    ValueType fiedlerEigenvalue;
+
     scai::lama::DenseVector<IndexType> permutation;
     
-    if(false){
-        // get the second eigenvector of the laplacian (local, not distributed)
-        //TODO: if local, change to std::vector
-        using Eigen::MatrixXd;
-        using namespace Eigen;
-        
-        // copy to an eigen::matrix
-        MatrixXd eigenLapl( numPixels, numPixels);
-        assert(numPixels == laplacian.getNumRows());
-        for( int r=0; r<laplacian.getNumRows(); r++){
-            for( int c=0; c<laplacian.getNumColumns(); c++){
-                eigenLapl(c,r) = laplacian.getValue( r, c).Scalar::getValue<ValueType>();
-            }
-        }
-    
-        // solve and get the second eigenvector
-        SelfAdjointEigenSolver<MatrixXd> eigensolver( eigenLapl );
-        VectorXd secondEigenVector = eigensolver.eigenvectors().col(1) ;
-        SCAI_ASSERT( secondEigenVector.size() == numPixels, "Sizes do not agree.");
-        
-        // copy to DenseVector
-        for(int i=0; i<secondEigenVector.size(); i++){
-            eigenVec.setValue( i, secondEigenVector[i]);
-        }
-        for(int i=0; i<5; i++){
-            PRINT0( eigensolver.eigenvalues()[i] );
-        }
-        eigenVec.sort(permutation, true);
-    }else{
-        fiedler= SpectralPartition<IndexType, ValueType>::getFiedlerVector( pixelGraph, eigenvalue );
+    {
+        SCAI_REGION( "SpectralPartition.getPartition.getFiedlerVectorAndSort" )
+        fiedler= SpectralPartition<IndexType, ValueType>::getFiedlerVector( pixelGraph, fiedlerEigenvalue );
         SCAI_ASSERT( fiedler.size() == numPixels, "Sizes do not agree.");
         fiedler.sort(permutation, true);
     }
     
-    
-    //redistribute the eigenVec
-    //eigenVec.redistribute( inputDist );
-    
-    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ redistributing the eigen vector
-    
-    // we could sort locally, no need to redistribute
-    // doing it like this to mimic real case senario where pixeledGraph is also distributed
-    
-
-    // sort
-    //TODO: if local/replicated, change to std::vector
-    
+    //TODO(?): a distributed version
     // since pixelGraph is replicated so is the permutation
     SCAI_ASSERT( true, permutation.getDistributionPtr()->isReplicated() );
     
@@ -306,9 +259,9 @@ scai::lama::CSRSparseMatrix<ValueType> SpectralPartition<IndexType, ValueType>::
             wLaplacianJA[nnzCounter] = globalI;
             assert( i < rLocalDegree.size() );
             wLaplacianValues[nnzCounter] = rLocalDegree[i];
-            diagonalIndex = nnzCounter;
-//PRINT(*comm << ": "<< i << " _ "<< nnzCounter << " >> "<< wLaplacianJA[nnzCounter] << ", "<< wLaplacianValues[nnzCounter] );        
+            diagonalIndex = nnzCounter;       
             ++nnzCounter;
+            
             // copy the rest of the row
             while( j<endCols){
                 wLaplacianJA[nnzCounter] = ja[j];          // same indices
@@ -335,11 +288,6 @@ scai::lama::CSRSparseMatrix<ValueType> SpectralPartition<IndexType, ValueType>::
         scai::hmemo::ReadAccess<ValueType> rLaplacianValues( laplacianValues );
         
         SCAI_ASSERT_EQ_ERROR(rLaplacianIA[ rLaplacianIA.size()-1] , laplacianJA.size(), "Wrong sizes." );
-        /*
-        for(int i=0; i<laplacianJA.size(); i++){
-            PRINT(*comm <<" = " <<rLaplacianValues[i]);
-        }
-        */
     }
     
     scai::lama::CSRStorage<ValueType> resultStorage( localN, globalN, laplacianNnzValues, laplacianIA, laplacianJA, laplacianValues);
@@ -441,7 +389,6 @@ scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getF
         }
       
         t = z;
-        //PRINT(lambda.Scalar::getValue<ValueType>());
     }
  
     t[0] = 0.0;

@@ -61,7 +61,7 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
             adjArray[i*N+j]=0;
         
     srand(time(NULL));
-    IndexType numEdges = int (2*N);
+    IndexType numEdges = int (3*N);
     for(IndexType i=0; i<numEdges; i++){
         // a random position in the matrix
         IndexType x = rand()%N;
@@ -123,9 +123,9 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
 
 TEST_F (auxTest, testInitialPartitions){
 
-    std::string path = "meshes/hugetric/";
-    std::string fileName = "hugetric-00006.graph";
-    //std::string fileName = "bubbles-00010.graph";
+    std::string path = "meshes/bubbles/";
+    //std::string fileName = "hugetric-00006.graph";
+    std::string fileName = "bubbles-00010.graph";
     std::string file = path + fileName;
     std::ifstream f(file);
     IndexType dimensions= 2;
@@ -247,12 +247,7 @@ TEST_F (auxTest, testInitialPartitions){
     }
     if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
     PRINT0("Get a spectral partition");
-    /*
-    if( settings.pixeledDetailLevel > 5){
-        settings.pixeledDetailLevel = 5;
-        PRINT0("changing detail level to 5 since it would be too slow otherwise" );
-    }
-    */
+
     // get initial spectral partition
     scai::lama::DenseVector<IndexType> spectralPartition = SpectralPartition<IndexType, ValueType>::getPartition( graph, coordinates, settings);
     

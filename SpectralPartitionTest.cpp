@@ -45,14 +45,15 @@ TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
     // for now local refinement requires k = P
     IndexType k = comm->getSize();
     //
-    IndexType N =80;
+    IndexType N =60;
     //CSRSparseMatrix<ValueType> graph(N, N);
     scai::lama::SparseAssemblyStorage<ValueType> graphSt(N, N);
     
     srand(time(NULL));
     
+    //TODO: this (rarely) can give disconnected graph
     // random graph with weighted edges
-    for(IndexType i=0; i<5*N; i++){
+    for(IndexType i=0; i<4*N; i++){
         IndexType row = rand()%(N);
         IndexType col;
         if(row==0) continue;
@@ -114,7 +115,7 @@ TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
         eigenEigenvalue = eigensolver.eigenvalues()[1];
         
         for(int i=0; i<eigensolver.eigenvalues().size(); i++){
-            if(i<10) PRINT0(eigensolver.eigenvalues()[i]);
+            //if(i<10) PRINT0(eigensolver.eigenvalues()[i]);
             if(i>0){ // first eigenvalue can be negative due to approximation
                 SCAI_ASSERT( eigensolver.eigenvalues()[i] > 0 , "Eigenvalue not positive: "<< eigensolver.eigenvalues()[i] << " for index "<< i);
             }
@@ -128,9 +129,9 @@ TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
         std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
         fiedler = SpectralPartition<IndexType, ValueType>::getFiedlerVector( graph, fiedlerEigenvalue );
         PRINT0("time to get fiedler vector: " << ( std::chrono::duration<double> (std::chrono::steady_clock::now() -start) ).count() );
-        PRINT0(fiedlerEigenvalue);
         SCAI_ASSERT( fiedlerEigenvalue >0, "fiedler eigenvalue negative: "<< fiedlerEigenvalue);
            
+        /* //TODO: this test does not work
         // check if A*v=l*v
         DenseVector<ValueType> prod (graph*eigenVec);
         //DenseVector<ValueType> prod2 ( fiedlerEigenvalue*fiedler);
@@ -138,9 +139,10 @@ TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
         
         SCAI_ASSERT( true, graph.getRowDistributionPtr()->isEqual( fiedler.getDistribution()) );
         for(int i=0; i<prod.getLocalValues().size(); i++){
-            //PRINT0( fiedler.getLocalValues()[i]<< " _ "<< prod.getLocalValues()[i] << " == "<< prod2.getLocalValues()[i]);
+            // should be 1 or at least the same. I think.... TODO: find it out
             PRINT0(prod.getLocalValues()[i]/ prod2.getLocalValues()[i]);
-        }   
+        } 
+        */
     }
     //-------------------------------------------
     ValueType eigenMax = eigenVec.max().Scalar::getValue<ValueType>();
@@ -172,18 +174,15 @@ TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
     
     EXPECT_LE( m - eigenMin/fiedlerMin, 1);
     fiedler.redistribute(noDistPtr);
-    //PRINT0( (fiedler-=eigenVec).l2Norm()  );
-    //PRINT0("Should be equal to "<< std::abs(eigenl2Norm - fiedlerl2Norm) );
+    
     scai::lama::DenseVector<ValueType> tmp(fiedler* m);
-    //SCAI_ASSERT_EQ_ERROR(eigenVec.size() , tmp.size() , "Must be true that: eigen=r*fiedler for r= " << m);
+    SCAI_ASSERT_EQ_ERROR(eigenVec.size() , tmp.size() , "Must be true that: eigen=m*fiedler for m= " << m);
     for(int i=0; i< eigenVec.size(); i++){
-        //SCAI_ASSERT( eigenVec.getValue(i).Scalar::getValue<ValueType>()== tmp.getValue(i).Scalar::getValue<ValueType>(), "values do not agree in position "<< i);
-        //EXPECT_EQ( eigenVec.getValue(i).Scalar::getValue<ValueType>(), tmp.getValue(i).Scalar::getValue<ValueType>() );
-        if( eigenVec.getValue(i).Scalar::getValue<ValueType>() != tmp.getValue(i).Scalar::getValue<ValueType>() ){
-            //PRINT0(i<< ": "<< eigenVec.getValue(i).Scalar::getValue<ValueType>() << " # " << tmp.getValue(i).Scalar::getValue<ValueType>());
-            PRINT0(eigenVec.getValue(i).Scalar::getValue<ValueType>() / tmp.getValue(i).Scalar::getValue<ValueType>() );
+        if(tmp.getValue(i).Scalar::getValue<ValueType>() != 0){
+            SCAI_ASSERT(std::abs(eigenVec.getValue(i).Scalar::getValue<ValueType>() / tmp.getValue(i).Scalar::getValue<ValueType>()) -1< 0.01 , "maybe wrong values in position " << i << " , must be <0.01 while it is: " << std::abs(eigenVec.getValue(i).Scalar::getValue<ValueType>() / tmp.getValue(i).Scalar::getValue<ValueType>()) );
+        }else{
+            SCAI_ASSERT(std::abs(eigenVec.getValue(i).Scalar::getValue<ValueType>()) < 0.01 , "maybe wrong values in position " << i << " , must be <0.01 while it is: " << std::abs(eigenVec.getValue(i).Scalar::getValue<ValueType>()) );
         }
-        //SCAI_ASSERT(std::abs(eigenVec.getValue(i).Scalar::getValue<ValueType>() / tmp.getValue(i).Scalar::getValue<ValueType>()) -1< 0.01 , "maybe wrong values in position " << i <<": "<<);
     }
     
 }
@@ -269,8 +268,8 @@ TEST_F(SpectralPartitionTest, testSpectralPartition){
 //------------------------------------------------------------------------------
 
 TEST_F(SpectralPartitionTest, testLamaSolver){
-    //std::string file = "Grid16x16";
-    std::string file = "meshes/trace/trace-00001.graph";
+    std::string file = "Grid16x16";
+    //std::string file = "meshes/trace/trace-00001.graph";
     std::ifstream f(file);
     IndexType dimensions= 2, k=16;
     IndexType N, edges;
@@ -339,11 +338,6 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
     DenseVector<ValueType> prod (graph*eigenVec);
     DenseVector<ValueType> prod2 ( eigensolver.eigenvalues()[1]*eigenVec);
     
-    for(int i=0; i<prod.getLocalValues().size(); i++){
-        //PRINT( prod.getLocalValues()[i] << " == "<< prod2.getLocalValues()[i]);
-        //PRINT0(prod.getLocalValues()[i]/ prod2.getLocalValues()[i]);
-    }
-    
     //^^^^^ Eigen part
     
     PRINT0("getting the LAMA fiedler vector");    
@@ -380,12 +374,6 @@ TEST_F(SpectralPartitionTest, testLamaSolver){
     // check if A*v=l*v
     DenseVector<ValueType> prodF (graph*fiedler);
     DenseVector<ValueType> prodF2 ( eigenvalue*fiedler);
-    
-    for(int i=0; i<prodF.getLocalValues().size(); i++){
-        //PRINT( prod.getLocalValues()[i] << " == "<< prod2.getLocalValues()[i]);
-        //PRINT0(prodF.getLocalValues()[i]/ prodF2.getLocalValues()[i]);
-    }
-    
     
     // sort
     scai::lama::DenseVector<IndexType> permutation;
@@ -494,7 +482,7 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    settings.pixeledDetailLevel = 5;    //4  for a 16x16 coarsen graph
+    settings.pixeledDetailLevel = 4;    //4  for a 16x16 coarsen graph
 
     // get a pixeled-coarsen graph , this is replicated in every PE
     scai::lama::DenseVector<IndexType> pixelWeights;
@@ -504,11 +492,11 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     int emptyPixels=0;
     for(int i=0; i<pixelWeights.size(); i++){
         if(pixelWeights[i]==0){
-            PRINT0(i);
+            //PRINT0(i);
             ++emptyPixels;
         }
     }
-    PRINT("emptyPixels= " << emptyPixels);
+    PRINT0("emptyPixels= " << emptyPixels);
     IndexType numPixels = pixelGraph.getNumRows();
     SCAI_ASSERT( numPixels == pixelGraph.getNumColumns(), "Wrong pixeled graph.");
     SCAI_ASSERT( pixelGraph.isConsistent() == 1 , "Pixeled graph not consistent.");
@@ -556,9 +544,6 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
         for(int i=0; i<secondEigenVector.size(); i++){
             eigenVec.setValue( i, secondEigenVector[i]);
         }
-        for(int i=0; i<emptyPixels+10; i++){
-            PRINT0(i<<": "<< eigensolver.eigenvalues()[i] );
-        }
             
         DenseVector<ValueType> prod ( pixelGraph*eigenVec);
         DenseVector<ValueType> prod2 ( eigensolver.eigenvalues()[1]*eigenVec);
@@ -597,13 +582,13 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     EXPECT_TRUE( pixelGraph.getRowDistributionPtr()->isEqual( fiedler.getDistribution() ) );
     
     
-    // check if A*v=l*v
+    // check 
     DenseVector<ValueType> prodF (pixelGraph*fiedler);
     DenseVector<ValueType> prodF2 ( eigenvalue*fiedler);
     PRINT0("fiedler eigenvalue= "<< eigenvalue);
     for(int i=0; i<prodF.getLocalValues().size(); i++){
-        //PRINT0( fiedler.getLocalValues()[i]<< " _ "<< prodF.getLocalValues()[i] << " == "<< prodF2.getLocalValues()[i]);
-        if(i<30) PRINT0(prodF.getLocalValues()[i]/ prodF2.getLocalValues()[i] << " / "<< prod.getLocalValues()[i]/ prod2.getLocalValues()[i]);
+        //if(i<30) PRINT0(prodF.getLocalValues()[i]/ prodF2.getLocalValues()[i] << " / "<< prod.getLocalValues()[i]/ prod2.getLocalValues()[i]);
+        EXPECT_LE( std::abs(prodF.getLocalValues()[i]/ prodF2.getLocalValues()[i] - prod.getLocalValues()[i]/ prod2.getLocalValues()[i]), 1 );
     }    
     
     // sort
@@ -612,7 +597,7 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     fiedler.sort(permutationF, true);
     
     for(int i=0; i<fiedler.size(); i++){
-        if( i<20 or i>fiedler.size()-20){
+        if( i<10 or i>fiedler.size()-10){
             PRINT0(i<<": "<< permutation.getValue(i) << " + " << permutationF.getValue(i));
         }
     }

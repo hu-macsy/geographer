@@ -583,7 +583,6 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
 			// mark nodes as matched
 			matched[localNode]= true;
 			matched[localNgbr]= true;
-			//PRINT(*comm << ", contracting nodes (local indices): "<< localNode <<" - "<< localNgbr );
         }
     }
     
@@ -649,7 +648,6 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
     // [i][j] is in position: i*sideLen + j
     // [i][j][k] is in: i*sideLen*sideLen + j*sideLen + k
     
-    //std::vector<IndexType> density( cubeSize ,0);
     scai::hmemo::HArray<IndexType> density( cubeSize, 0);
 
     // initialize pixelGraph
@@ -657,6 +655,8 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
     scai::hmemo::HArray<IndexType> pixelJA;
     scai::hmemo::HArray<ValueType> pixelValues;
     
+    // here we assume that all edges exist in the pixeled graph. That might not be true. After we add the edges that
+    // do exist, we add all mising edges with a small weight.
     IndexType nnzValues= 2*dimensions*(std::pow(sideLen, dimensions) - std::pow(sideLen, dimensions-1) );
     {
         scai::hmemo::WriteOnlyAccess<IndexType> wPixelIA( pixelIA, cubeSize+1 );
@@ -679,21 +679,10 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
             }
         }
 
-    SCAI_ASSERT( nnzCounter == wPixelValues.size() , "Wrong values size for CSR matrix: " << wPixelValues.size() );
-    SCAI_ASSERT( nnzCounter == wPixelJA.size() , "Wrong ja size for CSR matrix: " << wPixelJA.size());
-    SCAI_ASSERT( wPixelIA[cubeSize] == nnzCounter, "Wrong ia for CSR matrix." );
-/*
-for(int la=0; la<nnzValues; la++){
-    PRINT0(wPixelJA[la] << " ## " << wPixelValues[la] );
-    if(la<cubeSize+1)
-        PRINT0("__" << wPixelIA[la] );
-}    
-  */  
+        SCAI_ASSERT( nnzCounter == wPixelValues.size() , "Wrong values size for CSR matrix: " << wPixelValues.size() );
+        SCAI_ASSERT( nnzCounter == wPixelJA.size() , "Wrong ja size for CSR matrix: " << wPixelJA.size());
+        SCAI_ASSERT( wPixelIA[cubeSize] == nnzCounter, "Wrong ia for CSR matrix." );
     }
-
-    //pixelStorage.setCSRData( cubeSize, cubeSize, nnzValues, pixelIA, pixelJA, pixelValues);
-    
-    
     
     // get halo for the non-local coordinates
     scai::dmemo::Halo coordHalo = ParcoRepart<IndexType, ValueType>::buildNeighborHalo(adjM);
@@ -725,7 +714,6 @@ for(int la=0; la<nnzValues; la++){
             IndexType thisPixel = scaledX*sideLen + scaledY;      
             SCAI_ASSERT( thisPixel < wDensity.size(), "Index too big: "<< std::to_string(thisPixel) );
             
-            //++density[thisPixel];
             ++wDensity[thisPixel];
             
             scai::hmemo::WriteAccess<IndexType> wPixelIA( pixelIA );
@@ -756,12 +744,11 @@ for(int la=0; la<nnzValues; la++){
 
                 if( ngbrPixelIndex != thisPixel ){ // neighbor not in the same pixel, find the correct pixel
                     const IndexType pixelBeginCols = wPixelIA[thisPixel];
-                    const IndexType pixelEndCols = wPixelIA[thisPixel+1];
-//PRINT0(thisPixel << " ++ " << ngbrPixelIndex );                    
+                    const IndexType pixelEndCols = wPixelIA[thisPixel+1];           
                     bool ngbrNotFound = true;
+                    
                     for(IndexType p= pixelBeginCols; p<pixelEndCols; p++){
                         IndexType thisPixelOtherNeighbor = wPixelJA[p];
-//PRINT0("thisPixel= " << thisPixel << ", ngrbPixel= "<<ngbrPixelIndex << ", otherNgbr= "<< thisPixelOtherNeighbor );   
                         if( thisPixelOtherNeighbor == ngbrPixelIndex ){   // add in edge weights
                             SCAI_ASSERT(ngbrPixelIndex < cubeSize, "Index too big." << ngbrPixelIndex );
                             ++wPixelValues[ p ];
@@ -801,8 +788,7 @@ for(int la=0; la<nnzValues; la++){
             scaledZ = coordAccess2[i]/maxZ * sideLen;
             IndexType thisPixel = scaledX*sideLen*sideLen + scaledY*sideLen + scaledZ;
             SCAI_ASSERT( thisPixel < wDensity.size(), "Index too big: "<< thisPixel );
-            
-            //++density[thisPixel];        
+             
             ++wDensity[thisPixel];
             
             // check the neighbours to fix the pixeledEdge weights
@@ -818,7 +804,6 @@ for(int la=0; la<nnzValues; la++){
                 IndexType neighbor = ja[j];
                 
                 // find the neighbor's pixel
-                //std::vector<IndexType> ngbrCoords(dimensions);
                 IndexType ngbrX, ngbrY, ngbrZ;
                 if( coordDist->isLocal(neighbor) ){
                     ngbrX = coordAccess0[ coordDist->global2local(neighbor) ];
@@ -837,6 +822,7 @@ for(int la=0; la<nnzValues; la++){
                     const IndexType pixelBeginCols = wPixelIA[thisPixel];
                     const IndexType pixelEndCols = wPixelIA[thisPixel+1];
                     bool ngbrNotFound = true;
+                    
                     for(IndexType p= pixelBeginCols; p<pixelEndCols; p++){
                         IndexType thisPixelOtherNeighbor = wPixelJA[p];
                         if( thisPixelOtherNeighbor == ngbrPixelIndex ){   // add in edge weights
@@ -858,13 +844,6 @@ for(int la=0; la<nnzValues; la++){
         throw std::runtime_error("Available only for 2D and 3D. Data given have dimension:" + std::to_string(dimensions) );
     } 
     
-for(int i=0; i<pixelValues.size(); i++){    
-    scai::hmemo::WriteAccess<ValueType> wPixelValues( pixelValues );    
-    if(wPixelValues[i]==0){
-        //PRINT0("pixelValues["<< i<< "]= 0");
-        wPixelValues[i]=0.1;
-    }
-}
     //PRINT(notCountedPixelEdges);
     IndexType sumMissingEdges = comm->sum(notCountedPixelEdges);
     
@@ -877,22 +856,31 @@ for(int i=0; i<pixelValues.size(); i++){
     {
         SCAI_REGION( "Multilevel.pixeledCoarsen.sumDensity" )
         comm->sumArray( density );
-        //comm->sumImpl( sumDensity, density, cubeSize, scai::common::scalar::ScalarType::INT );
     }
 
     scai::hmemo::WriteAccess<IndexType> wDensity(density);
     for(int i=0; i<density.size(); i++){
-        SCAI_REGION( "MultiLevel.pixeledCoarsen.sumDensity" )
-        //nodeWeights.getLocalValues()[i] = comm->sum(density[i]);
         nodeWeights.getLocalValues()[i] = wDensity[i];
     }   
     wDensity.release();
     
-    // sum the edge weights
-    //comm->sumArray ( pixelStorage.getValues() );
+    {
+        SCAI_REGION( "Multilevel.pixeledCoarsen.sumValues" )
+        // sum the values from all PEs
+        comm->sumArray( pixelValues);
+    }
     
-    comm->sumArray( pixelValues);
-
+    // add a lightweight edge to isolated pixels. Hope this does not affect the spectral partition 
+    // or any other usage.
+    //PRINT(*comm << ": " << nnzValues);
+    for(int i=0; i<pixelValues.size(); i++){    
+        scai::hmemo::WriteAccess<ValueType> wPixelValues( pixelValues );    
+        if(wPixelValues[i]==0){
+            //PRINT(*comm<< ": " << i );
+            wPixelValues[i]=0.01;
+        }
+    }
+    
     scai::lama::CSRStorage<ValueType> pixelStorage;
     pixelStorage.setCSRData( cubeSize, cubeSize, nnzValues, pixelIA, pixelJA, pixelValues);
     
