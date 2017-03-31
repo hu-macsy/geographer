@@ -128,6 +128,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   settings.numBlocks= k;
   settings.epsilon = epsilon;
   settings.dimensions = dimensions;
+  settings.minGainForNextRound = 4;
       
   scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, settings);
 
@@ -465,7 +466,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
     ASSERT_EQ(N, partition.size());
   
-PRINT(*comm);
+
     //get the border nodes
     scai::lama::DenseVector<IndexType> border(dist, 0);
     border = ParcoRepart<IndexType,ValueType>::getBorderNodes( graph , partition);
@@ -737,9 +738,10 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_3D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-        
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
+    settings.minBorderNodes =1;
     
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
+
     //check distributions
     assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
     // the next assertion fails in "this version" (commit a2fc03ab73f3af420123c491fbf9afb84be4a0c4) because partition 

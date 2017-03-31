@@ -106,11 +106,11 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			myGlobalIndices[j] = inputDist->local2global(j);
 		}
 	}
-PRINT(*comm);
+
 	//main loop, one iteration for each color of the graph coloring
 	for (IndexType color = 0; color < communicationScheme.size(); color++) {
 		SCAI_REGION( "LocalRefinement.distributedFMStep.loop" )
-PRINT(color);
+
 		const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 		const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
 		const scai::dmemo::DistributionPtr commDist = communicationScheme[color].getDistributionPtr();
@@ -155,17 +155,18 @@ PRINT(color);
 		scai::dmemo::Halo graphHalo;
 		CSRStorage<ValueType> haloMatrix;
 		scai::utilskernel::LArray<IndexType> nodeWeightHaloData;
-PRINT(*comm);
+
 		if (partner != comm->getRank()) {
 			//processor is active this round
-PRINT(*comm << " , partner= "<< partner);
+                    
 			/**
 			 * get indices of border nodes with breadth-first search
 			 */
 			std::vector<IndexType> interfaceNodes;
 			std::vector<IndexType> roundMarkers;
-			std::tie(interfaceNodes, roundMarkers)= getInterfaceNodes(input, part, nodesWithNonLocalNeighbors, partner, settings.minBorderNodes);
-			const IndexType lastRoundMarker = roundMarkers[roundMarkers.size()-1];
+                        std::tie(interfaceNodes, roundMarkers)= getInterfaceNodes(input, part, nodesWithNonLocalNeighbors, partner, settings.minBorderNodes);
+
+                        const IndexType lastRoundMarker = roundMarkers[roundMarkers.size()-1];
 			const IndexType secondRoundMarker = roundMarkers[1];
 
 			/**
@@ -179,7 +180,7 @@ PRINT(*comm << " , partner= "<< partner);
 			if (blockSize != localN) {
 				throw std::runtime_error(std::to_string(localN) + " local nodes, but only " + std::to_string(blockSize) + " of them belong to block " + std::to_string(localBlockID) + ".");
 			}
-PRINT(*comm);
+
 			IndexType swapField[5];
 			swapField[0] = interfaceNodes.size();
 			swapField[1] = secondRoundMarker;
@@ -445,9 +446,8 @@ PRINT(*comm);
 				}
 			}
 		}
-PRINT(*comm);		
 	}
-PRINT(*comm);	
+
 	comm->synchronize();
 	for (IndexType color = 0; color < gainPerRound.size(); color++) {
 		gainPerRound[color] = comm->sum(gainPerRound[color]) / 2;
@@ -1127,8 +1127,7 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 		for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
 			if (!inputDist->isLocal(ja[j])) {
 				hasNonLocal = true;
-				if (foreignNodes.count(ja[j])> 0) {
-//PRINT("local node: "<< node <<" , foreignNgbr= "<< ja[j] );                                    
+				if (foreignNodes.count(ja[j])> 0) {                              
 					interfaceNodes.push_back(node);
 					break;
 				}
@@ -1171,7 +1170,6 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 			while (!bfsQueue.empty()) {
 				IndexType nextNode = bfsQueue.front();
 				bfsQueue.pop();
-
 				const IndexType localI = inputDist->global2local(nextNode);
 				assert(localI != nIndex);
 				assert(touched[localI]);

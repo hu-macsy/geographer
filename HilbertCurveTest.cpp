@@ -397,7 +397,7 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
 //
 //Creates random coordinates for n points in 3D and test the new.
 //
-TEST_F(HilbertCurveTest, testNewVersionRandom_Distributed_3D) {
+TEST_F(HilbertCurveTest, testRandom_Distributed_3D) {
   const IndexType dimensions = 3;
   const IndexType N = 200000;
   const IndexType recursionDepth = 19;

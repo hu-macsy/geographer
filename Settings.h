@@ -6,7 +6,7 @@ struct Settings{
     IndexType numY = 32;
     IndexType numZ = 32;
     IndexType numBlocks = 2;
-    IndexType minBorderNodes = 1000;
+    IndexType minBorderNodes = 1;
     IndexType stopAfterNoGainRounds = 0;
     IndexType minGainForNextRound = 1;
     IndexType sfcResolution = 17;

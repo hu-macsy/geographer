@@ -43,7 +43,7 @@ class auxTest : public ::testing::Test {
 
 TEST_F (auxTest, testMultiLevelStep_dist) {
 
-    const IndexType N = 60;
+    const IndexType N = 120;
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -61,7 +61,7 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
             adjArray[i*N+j]=0;
         
     srand(time(NULL));
-    IndexType numEdges = int (3*N);
+    IndexType numEdges = int (4*N);
     for(IndexType i=0; i<numEdges; i++){
         // a random position in the matrix
         IndexType x = rand()%N;

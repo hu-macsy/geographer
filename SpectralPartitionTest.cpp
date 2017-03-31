@@ -93,6 +93,7 @@ TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
     DenseVector<ValueType> eigenVec (N, -1);
             
     {   // get eigenvalues with Eigen, all but the first (mybe) must be >0
+        PRINT0("Getting the eigenvector with Eigen");
         using Eigen::MatrixXd;
         using namespace Eigen;
         
@@ -602,9 +603,10 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     eigenVec.sort(permutation, true);
     fiedler.sort(permutationF, true);
     
+    PRINT0("The permutation should be almost the same or the inverse: ");
     for(int i=0; i<fiedler.size(); i++){
         if( i<10 or i>fiedler.size()-10){
-            PRINT0(i<<": "<< permutation.getValue(i) << " + " << permutationF.getValue(i));
+            PRINT0(i<<": "<< permutation.getValue(i).Scalar::getValue<ValueType>() << " + " << permutationF.getValue(i).Scalar::getValue<ValueType>() );
         }
     }
     

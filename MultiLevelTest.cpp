@@ -348,7 +348,7 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
         }
         
         EXPECT_TRUE(pixelGraph.isConsistent());
-        if(pixeledGraphSize < 5000){
+        if(pixeledGraphSize < 4000){
             EXPECT_TRUE(pixelGraph.checkSymmetry());
         }
         SCAI_ASSERT_EQ_ERROR( pixelWeights.sum().Scalar::getValue<ValueType>() , N , "should ne equal");
