@@ -211,17 +211,17 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
         sort_pair localPairs[maxLocalN];
 
         //fill with local values
-        //long indexSum = 0;//for sanity checks
+        long indexSum = 0;//for sanity checks
         scai::hmemo::ReadAccess<ValueType> localIndices(hilbertIndices.getLocalValues());
         for (IndexType i = 0; i < localN; i++) {
         	localPairs[i].value = localIndices[i];
         	localPairs[i].index = inputDist->local2global(i);
-        	//indexSum += localPairs[i].index;
+        	indexSum += localPairs[i].index;
         }
 
         //create checksum
-        //const long checkSum = comm->sum(indexSum);
-        //assert(checkSum == (long(globalN)*(long(globalN)-1))/2);
+        const long checkSum = comm->sum(indexSum);
+        assert(checkSum == (long(globalN)*(long(globalN)-1))/2);
 
         //fill up with dummy values to ensure equal size
         for (IndexType i = localN; i < maxLocalN; i++) {
@@ -233,11 +233,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
         SchizoQS::sort<sort_pair>(localPairs, maxLocalN);
 
         //copy indices into array
-        //IndexType newLocalN = 0;
+        IndexType newLocalN = 0;
         newLocalIndices.resize(maxLocalN);
         for (IndexType i = 0; i < maxLocalN; i++) {
         	newLocalIndices[i] = localPairs[i].index;
-        	//if (newLocalIndices[i] != std::numeric_limits<decltype(sort_pair::index)>::max()) newLocalN++;
+        	if (newLocalIndices[i] != std::numeric_limits<decltype(sort_pair::index)>::max()) newLocalN++;
         }
 
 		//sort local indices for general distribution
@@ -245,22 +245,22 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
 
         //remove dummy values
         auto startOfDummyValues = std::lower_bound(newLocalIndices.begin(), newLocalIndices.end(), std::numeric_limits<decltype(sort_pair::index)>::max());
-        //assert(std::all_of(startOfDummyValues, newLocalIndices.end(), [](IndexType index){return index == std::numeric_limits<decltype(sort_pair::index)>::max();}));
+        assert(std::all_of(startOfDummyValues, newLocalIndices.end(), [](IndexType index){return index == std::numeric_limits<decltype(sort_pair::index)>::max();}));
         newLocalIndices.resize(std::distance(newLocalIndices.begin(), startOfDummyValues));
 
         //check size and sanity
-        //assert(newLocalN == newLocalIndices.size());
-		//assert( *std::max_element(newLocalIndices.begin(), newLocalIndices.end()) < globalN);
-		//assert( comm->sum(newLocalIndices.size()) == globalN);
+        assert(newLocalN == newLocalIndices.size());
+		assert( *std::max_element(newLocalIndices.begin(), newLocalIndices.end()) < globalN);
+		assert( comm->sum(newLocalIndices.size()) == globalN);
 
         //check checksum
-        //long indexSumAfter = 0;
-        //for (IndexType i = 0; i < newLocalN; i++) {
-        //	indexSumAfter += newLocalIndices[i];
-        /}
+        long indexSumAfter = 0;
+        for (IndexType i = 0; i < newLocalN; i++) {
+        	indexSumAfter += newLocalIndices[i];
+        }
 
-        //const long newCheckSum = comm->sum(indexSumAfter);
-        //SCAI_ASSERT( newCheckSum == checkSum, "Old checksum: " << checkSum << ", new checksum: " << newCheckSum );
+        const long newCheckSum = comm->sum(indexSumAfter);
+        SCAI_ASSERT( newCheckSum == checkSum, "Old checksum: " << checkSum << ", new checksum: " << newCheckSum );
 
         //possible optimization: remove dummy values during first copy, then directly copy into HArray and sort with pointers. Would save one copy.
     }
