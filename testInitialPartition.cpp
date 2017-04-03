@@ -227,9 +227,6 @@ int main(int argc, char** argv) {
     	settings.numBlocks = comm->getSize();
     }
 
-    if( comm->getRank() ==0){
-          settings.print(std::cout);
-    }
     
     //----------
     
@@ -242,6 +239,8 @@ int main(int argc, char** argv) {
     ValueType imbalance;
     
     settings.pixeledDetailLevel = 4;
+    settings.minGainForNextRound = 10;
+    settings.minBorderNodes = 10;
     
     std::string destPath = "./partResults/testInitial/blocks_"+std::to_string(settings.numBlocks)+"/";
     std::string logFile = destPath + "results"+graphFile+".log";

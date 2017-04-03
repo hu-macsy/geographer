@@ -257,6 +257,7 @@ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings){    
     SCAI_REGION( "ParcoRepart.pixelPartition" )
     	
+    SCAI_REGION_START("ParcoRepart.pixelPartition.initialise")
     std::chrono::time_point<std::chrono::steady_clock> start, round;
     start = std::chrono::steady_clock::now();
     
@@ -312,6 +313,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     scai::hmemo::HArray<IndexType> density( cubeSize, 0);
     scai::hmemo::WriteAccess<IndexType> wDensity(density);
     //std::cout<< "detailLvl= " << detailLvl <<", sideLen= " << sideLen << ", " << "density.size= " << density.size() << std::endl;
+    SCAI_REGION_END("ParcoRepart.pixelPartition.initialise")
     
     if(dimensions==2){
         SCAI_REGION( "ParcoRepart.pixelPartition.localDensity" )
@@ -382,6 +384,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     
     //for all the blocks
     for(IndexType block=0; block<k; block++){
+        SCAI_REGION( "ParcoRepart.pixelPartition.localPixelGrowing")
            
         ValueType averagePointsPerPixel = ValueType(pointsLeft)/pixelsLeft;
         ValueType spreadFactor;
@@ -531,7 +534,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     scai::hmemo::WriteOnlyAccess<IndexType> wLocalPart ( result.getLocalValues() );
     
     if(dimensions==2){
-        SCAI_REGION( "ParcoRepart.pixelPartition.localDensity" )
+        SCAI_REGION( "ParcoRepart.pixelPartition.setLocalPartition" )
         scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
         scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
         
@@ -551,7 +554,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
             SCAI_ASSERT(wLocalPart[i] < k, " Wrong block number: " + std::to_string(wLocalPart[i] ) );
         }
     }else if(dimensions==3){
-        SCAI_REGION( "ParcoRepart.pixelPartition.localDensity" )
+        SCAI_REGION( "ParcoRepart.pixelPartition.setLocalPartition" )
         scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
         scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
         scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[2].getLocalValues() );
@@ -577,11 +580,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     }
     wLocalPart.release();
     
+    SCAI_REGION_START("ParcoRepart.pixelPartition.newDistribution")
     //get new distribution
     scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
+    SCAI_REGION_END("ParcoRepart.pixelPartition.newDistribution")
     
+    SCAI_REGION_START("ParcoRepart.pixelPartition.finalRedistribute")
     //TODO: not sure if this is needed...
-    result.redistribute( newDist);
+    //result.redistribute( newDist);
 
     input.redistribute(newDist, input.getColDistributionPtr());
     
@@ -602,6 +608,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
         std::cout << "\033[1;35mWith pixel detail level= "<< detailLvl<<" (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
         std::cout<< "and imbalance= " << imbalance << "\033[0m"<< std::endl;
     }
+    SCAI_REGION_END("ParcoRepart.pixelPartition.finalRedistribute")
     
     return result;
 }
