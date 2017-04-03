@@ -587,7 +587,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     
     SCAI_REGION_START("ParcoRepart.pixelPartition.finalRedistribute")
     //TODO: not sure if this is needed...
-    //result.redistribute( newDist);
+    result.redistribute( newDist);
 
     input.redistribute(newDist, input.getColDistributionPtr());
     

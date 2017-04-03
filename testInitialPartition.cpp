@@ -241,12 +241,15 @@ int main(int argc, char** argv) {
     settings.pixeledDetailLevel = 4;
     settings.minGainForNextRound = 10;
     settings.minBorderNodes = 10;
+    settings.useGeometricTieBreaking = 1;
     
     std::string destPath = "./partResults/testInitial/blocks_"+std::to_string(settings.numBlocks)+"/";
-    std::string logFile = destPath + "results"+graphFile+".log";
+    boost::filesystem::create_directories( destPath );   
+    
+    std::size_t found= graphFile.std::string::find_last_of("/");
+    std::string logFile = destPath + "results_" + graphFile.substr(found+1)+ ".log";
     std::ofstream logF(logFile);
     std::ifstream f(graphFile);
-    boost::filesystem::create_directories( destPath );   
     
     logF<< "Results for file " << graphFile << std::endl;
     logF<< "node= "<< N << " , edges= "<< edges << std::endl<< std::endl;
@@ -401,8 +404,9 @@ int main(int argc, char** argv) {
     }
     
     
+    logF.close();
     if(comm->getRank()==0){
-        std::cout<< "Output files written in " << destPath << std::endl;
+        std::cout<< "Output files written in " << destPath << " in file "<< logFile <<std::endl;
     }
     /*
     if (comm->getRank() == 0) {
