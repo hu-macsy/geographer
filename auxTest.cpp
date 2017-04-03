@@ -102,7 +102,7 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
     Settings.useGeometricTieBreaking = true;
     Settings.dimensions= 2;
     
-    DenseVector<IndexType> partition= ParcoRepart<IndexType, ValueType>::initialPartition(graph, coords, Settings);
+    DenseVector<IndexType> partition= ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coords, Settings);
     //partition.redistribute( distPtr );
     
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, Settings);
@@ -166,6 +166,7 @@ TEST_F (auxTest, testInitialPartitions){
     settings.useGeometricTieBreaking =1;
     settings.multiLevelRounds = 6;
     settings.minGainForNextRound= 10;
+    settings.minBorderNodes = 1;
     
     DenseVector<IndexType> uniformWeights;
     
@@ -217,7 +218,7 @@ TEST_F (auxTest, testInitialPartitions){
     if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
     PRINT0( "Get a hilbert/sfc partition");
     // get a hilbertPartition
-    scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::initialPartition( graph, coordinates, settings);
+    scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition( graph, coordinates, settings);
     
     //aux::print2DGrid( graph, hilbertPartition );
     if(dimensions==2){

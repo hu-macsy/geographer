@@ -14,6 +14,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
 
 #include <memory>
 #include <cstdlib>
@@ -23,6 +24,9 @@
 #include "FileIO.h"
 #include "ParcoRepart.h"
 #include "Settings.h"
+#include "MultiLevel.h"
+#include "LocalRefinement.h"
+#include "SpectralPartition.h"
 
 typedef double ValueType;
 typedef int IndexType;
@@ -98,6 +102,7 @@ int main(int argc, char** argv) {
 	}
 
     IndexType N = -1; 		// total number of points
+    IndexType edges= -1;        // number of edges
 
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
@@ -117,8 +122,10 @@ int main(int argc, char** argv) {
         std::cout<< "commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :" generate") << std::endl;
 	}
 
+    std::string graphFile;
+	
     if (vm.count("graphFile")) {
-    	std::string graphFile = vm["graphFile"].as<std::string>();
+    	graphFile = vm["graphFile"].as<std::string>();
     	std::string coordFile;
     	if (vm.count("coordFile")) {
     		coordFile = vm["coordFile"].as<std::string>();
@@ -132,7 +139,7 @@ int main(int argc, char** argv) {
             throw std::runtime_error("File "+ graphFile + " failed.");
         }
         
-        f >> N;				// first line must have total number of nodes and edges
+        f >> N >> edges;			// first line must have total number of nodes and edges
         
         // for 2D we do not know the size of every dimension
         settings.numX = N;
@@ -160,7 +167,9 @@ int main(int argc, char** argv) {
         	std::cout << "Read coordinates." << std::endl;
         }
 
-    } else if(vm.count("generate")){
+    }
+    /*
+     else if(vm.count("generate")){
     	if (settings.dimensions == 2) {
     		settings.numZ = 1;
     	}
@@ -202,8 +211,10 @@ int main(int argc, char** argv) {
 	}
 
 
-    } else{
-    	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile or --generate" << std::endl;
+    }
+    */
+    else{
+    	std::cout << "Only input file as input. Call again with --graphFile" << std::endl;
     	return 0;
     }
     
@@ -220,39 +231,181 @@ int main(int argc, char** argv) {
           settings.print(std::cout);
     }
     
-    std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
+    //----------
     
-    scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, settings );
-    assert( partition.size() == N);
+    scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
+    scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
+    
+    DenseVector<IndexType> uniformWeights;
+    
+    ValueType cut;
+    ValueType imbalance;
+    
+    settings.pixeledDetailLevel = 4;
+    
+    std::string destPath = "./partResults/testInitial/blocks_"+std::to_string(settings.numBlocks)+"/";
+    std::string logFile = destPath + "results"+graphFile+".log";
+    std::ofstream logF(logFile);
+    std::ifstream f(graphFile);
+    boost::filesystem::create_directories( destPath );   
+    
+    logF<< "Results for file " << graphFile << std::endl;
+    logF<< "node= "<< N << " , edges= "<< edges << std::endl<< std::endl;
+    settings.print( logF );
+    if( comm->getRank()==0)    settings.print( std::cout );
+    logF<< std::endl<< std::endl << "Only initial partition, no MultiLevel or LocalRefinement"<< std::endl << std::endl;
+
+    IndexType dimensions = settings.dimensions;
+    IndexType k = settings.numBlocks;
+    
+    std::chrono::time_point<std::chrono::system_clock> beforeInitialTime;
+    std::chrono::duration<double> partitionTime;
+    std::chrono::duration<double> finalPartitionTime;
+    
+    using namespace ITI;
+    
+    //------------------------------------------- hilbert/sfc
+    
+    // the partitioning may redistribute the input graph
+    graph.redistribute( rowDistPtr, noDistPtr);
+    for(int d=0; d<dimensions; d++){
+        coordinates[d].redistribute( rowDistPtr );
+    }    
+    if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
+    
+    beforeInitialTime =  std::chrono::system_clock::now();
+    PRINT0( "Get a hilbert/sfc partition");
+    // get a hilbertPartition
+    scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition( graph, coordinates, settings);
+    
+    partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
+    
+    assert( hilbertPartition.size() == N);
     assert( coordinates[0].size() == N);
     
-// the code below writes the output coordinates in one file per processor for visualiation purposes.
-//=================
-//PRINT(*comm<< ": "<< partition.getLocalValues().size());
-//PRINT(*comm<< ": "<< coordinates[0].getLocalValues().size());
-//scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(N, partition/*.getLocalValues()*/, comm));
-for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-    assert( coordinates[dim].size() == N);
-    coordinates[dim].redistribute(partition.getDistributionPtr());
-}
-ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, "debugResult");
+    //aux::print2DGrid( graph, hilbertPartition );
+    //if(dimensions==2){
+    //    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"hilbertPart");
+    //}
+    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, hilbertPartition);
+    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
+    if(comm->getRank()==0){
+        logF<< "-- Initial Hilbert/sfc partition time: " << partitionTime.count() <<  std::endl;
+        logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
+    }
+    
+    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, settings);
+    
+    finalPartitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
+    
+    //if(dimensions==2){
+    //   ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithHilbert");
+    //}
+    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, hilbertPartition);
+    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
+    if(comm->getRank()==0){
+        logF<< "   After multilevel, total time: " << finalPartitionTime.count() << std::endl;
+        logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
+        logF  << std::endl  << std::endl; 
+    }
+    
+    //------------------------------------------- pixeled
+  
+    // the partitioning may redistribute the input graph
+    graph.redistribute(rowDistPtr, noDistPtr);
+    for(int d=0; d<dimensions; d++){
+        coordinates[d].redistribute( rowDistPtr );
+    }    
+    if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
+    
+    beforeInitialTime =  std::chrono::system_clock::now();
+    PRINT0( "Get a pixeled partition");
+    // get a hilbertPartition
+    scai::lama::DenseVector<IndexType> pixeledPartition = ParcoRepart<IndexType, ValueType>::pixelPartition( graph, coordinates, settings);
+    
+    partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
+    
+    assert( pixeledPartition.size() == N);
+    assert( coordinates[0].size() == N);
+    
+    //aux::print2DGrid( graph, hilbertPartition );
+    //if(dimensions==2){
+    //    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"hilbertPart");
+    //}
+    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, pixeledPartition);
+    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
+    if(comm->getRank()==0){
+        logF<< "-- Initial pixel partition time: " << partitionTime.count() <<  std::endl;
+        logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
+    }
+    
+    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, settings);
+    
+    finalPartitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
+    
+    //if(dimensions==2){
+    //   ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithHilbert");
+    //}
+    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, pixeledPartition);
+    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
+    if(comm->getRank()==0){
+        logF<< "   After multilevel, total time: " << finalPartitionTime.count() << std::endl;
+        logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
+        logF  << std::endl  << std::endl; 
+    }
+ 
+    //------------------------------------------- spectral
+    
+    // the partitioning may redistribute the input graph
+    graph.redistribute(rowDistPtr, noDistPtr);
+    for(int d=0; d<dimensions; d++){
+        coordinates[d].redistribute( rowDistPtr );
+    }
+    if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
+    PRINT0("Get a spectral partition");
 
-//^^^^^^^^^^^^^^^^^    
-    std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
+    beforeInitialTime =  std::chrono::system_clock::now();
+    // get initial spectral partition
+    scai::lama::DenseVector<IndexType> spectralPartition = SpectralPartition<IndexType, ValueType>::getPartition( graph, coordinates, settings);
+      
+    partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
     
-    std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
+    assert( spectralPartition.size() == N);
+    assert( coordinates[0].size() == N);
+    //aux::print2DGrid( graph, spectralPartition );
+    //if(dimensions==2){
+    //    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"spectralPart");
+    //}
+    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, spectralPartition);
+    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( spectralPartition, k);
+    if(comm->getRank()==0){
+        logF<< "-- Initial Spectral partition " << std::endl;
+        logF<< "\tcut: " << cut << " , imbalance= "<< imbalance;
+    }
     
-    ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true); 
-    ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partition, comm->getSize() );
+    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, spectralPartition, uniformWeights, coordinates, settings);
     
-    std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
+    finalPartitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
+    
+    //if(dimensions==2){
+    //    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithSpectral");
+    //}
+    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, spectralPartition);
+    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( spectralPartition, k);
+    if(comm->getRank()==0){
+        logF<< "   After multilevel, total time: " << finalPartitionTime.count() << std::endl;
+        logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
+        logF  << std::endl  << std::endl; 
+    }
     
     
-    // Reporting output to std::cout
-    ValueType inputT = ValueType ( comm->max(inputTime.count() ));
-    ValueType partT = ValueType (comm->max(partitionTime.count()));
-    ValueType repT = ValueType (comm->max(reportTime.count()));
-        
+    if(comm->getRank()==0){
+        std::cout<< "Output files written in " << destPath << std::endl;
+    }
+    /*
     if (comm->getRank() == 0) {
         std::cout<< "commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
         std::cout<< " nodes:"<< N<< " dimensions:"<< settings.dimensions <<" k:" << settings.numBlocks;
@@ -263,4 +416,5 @@ ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, "d
         std::cout<< "Cut is: "<< cut<< " and imbalance: "<< imbalance << std::endl;
         std::cout<<"inputTime:" << inputT << " partitionTime:" << partT <<" reportTime:"<< repT << std::endl;
     }
+    */
 }

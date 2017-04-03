@@ -28,7 +28,7 @@
 #include "ParcoRepart.h"
 #include "HilbertCurve.h"
 #include "MultiLevel.h"
-
+#include "SpectralPartition.h"
 #include "AuxiliaryFunctions.h"
 
 //#include "quadtree/QuadTreeCartesianEuclid.h"
@@ -88,7 +88,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	SCAI_REGION_END("ParcoRepart.partitionGraph.inputCheck")
 	
         // get an initial partition
-        DenseVector<IndexType> result= ParcoRepart<IndexType, ValueType>::initialPartition(input, coordinates, settings);
+        DenseVector<IndexType> result;
+        
+        if( settings.initialPartition==0 ){ //sfc
+            result= ParcoRepart<IndexType, ValueType>::hilbertPartition(input, coordinates, settings);
+        }else if( settings.initialPartition==1 ){ // pixel
+            result = ParcoRepart<IndexType, ValueType>::pixelPartition(input, coordinates, settings);
+        }else{ // spectral
+            result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
+        }
 
         //settings.pixeledDetailLevel = 3;
         //DenseVector<IndexType> result= ParcoRepart<IndexType, ValueType>::pixelPartition(input, coordinates, settings);
@@ -111,8 +119,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 //--------------------------------------------------------------------------------------- 
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings){    
-    SCAI_REGION( "ParcoRepart.initialPartition" )
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings){    
+    SCAI_REGION( "ParcoRepart.hilbertPartition" )
     	
     std::chrono::time_point<std::chrono::steady_clock> start, afterSFC;
     start = std::chrono::steady_clock::now();
@@ -170,7 +178,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
     scai::utilskernel::LArray<ValueType>& hilbertIndicesLocal = hilbertIndices.getLocalValues();
     
     {
-        SCAI_REGION("ParcoRepart.initialPartition.spaceFillingCurve")
+        SCAI_REGION("ParcoRepart.hilbertPartition.spaceFillingCurve")
         // get read access to the local part of the coordinates
         // TODO: should be coordAccess[dimension] but I don't know how ... maybe HArray::acquireReadAccess? (harry)
         scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
@@ -197,12 +205,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
      */
     scai::lama::DenseVector<IndexType> permutation;
     {
-        SCAI_REGION( "ParcoRepart.initialPartition.sorting" )
+        SCAI_REGION( "ParcoRepart.hilbertPartition.sorting" )
         hilbertIndices.sort(permutation, true);
     }
     
     if (!inputDist->isReplicated() && comm->getSize() == k) {
-        SCAI_REGION( "ParcoRepart.initialPartition.redistribute" )
+        SCAI_REGION( "ParcoRepart.hilbertPartition.redistribute" )
         
         scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(globalN, comm));
         permutation.redistribute(blockDist);

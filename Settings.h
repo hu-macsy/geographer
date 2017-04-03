@@ -15,6 +15,7 @@ struct Settings{
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
     IndexType pixeledDetailLevel = 3;
+    IndexType initialPartition = 0;
     bool useDiffusionTieBreaking = false;
     bool useGeometricTieBreaking = false;
     bool gainOverBalance = false;
@@ -36,6 +37,15 @@ struct Settings{
         out<< "gainOverBalance: " << gainOverBalance << std::endl;
         out<< "skipNoGainColors: "<< skipNoGainColors << std::endl;
         out<< "pixeledDetailLevel: "<< pixeledDetailLevel << std::endl;
+        if( initialPartition==0){
+            out<< "initial partition: hilbert curve" << std::endl;
+        }else if( initialPartition==1 ){
+            out<< "initial partition: pixels" << std::endl;
+        }else if( initialPartition==2 ){
+            out<< "initial partition: spectral " << std::endl;
+        }else{
+            out<< "initial partition undefined" << std::endl;
+        }
     }
 };
 
