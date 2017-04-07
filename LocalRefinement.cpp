@@ -1162,7 +1162,7 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 		assert(bfsQueue.size() == interfaceNodes.size());
 		bool dummyRound = true;
 
-		while (interfaceNodes.size() < minBorderNodes || dummyRound) {
+		while (interfaceNodes.size() < minBorderNodes || dummyRound ) {
 			//if the target number is reached, complete this round and then stop
 			if (interfaceNodes.size() >= minBorderNodes) dummyRound = false;
 			roundMarkers.push_back(interfaceNodes.size());

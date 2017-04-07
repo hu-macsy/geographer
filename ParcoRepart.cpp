@@ -87,6 +87,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	}
 	SCAI_REGION_END("ParcoRepart.partitionGraph.inputCheck")
 	
+        SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition")
         // get an initial partition
         DenseVector<IndexType> result;
         
@@ -97,12 +98,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         }else{ // spectral
             result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
         }
-
-        //settings.pixeledDetailLevel = 3;
-        //DenseVector<IndexType> result= ParcoRepart<IndexType, ValueType>::pixelPartition(input, coordinates, settings);
-
+        SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
+        
 	IndexType numRefinementRounds = 0;
 
+        SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
 	if (comm->getSize() == 1 || comm->getSize() == k) {
 		ValueType gain = settings.minGainForNextRound;
 		ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
@@ -114,6 +114,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	} else {
 		std::cout << "Local refinement only implemented sequentially and for one block per process. Called with " << comm->getSize() << " processes and " << k << " blocks." << std::endl;
 	}
+	SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
 	return result;
 }
 //--------------------------------------------------------------------------------------- 
@@ -372,7 +373,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
         ITI::aux::writeHeatLike_local_2D(density, sideLen, dimensions, "heat_"+settings.fileName+".plt");
     }
   
-    //using the summed density get an intial pixeled partition
+    //using the summed density get an initial pixeled partition
     
     std::vector<IndexType> pixeledPartition( density.size() , -1);
     
