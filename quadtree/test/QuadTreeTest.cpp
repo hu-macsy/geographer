@@ -670,7 +670,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
             coordsDV[d].redistribute(dist);
         }
         
-        scai::lama::DenseVector<IndexType> hilbertPartition = ITI::ParcoRepart<IndexType, ValueType>::initialPartition(graph, coordsDV, settings);
+        scai::lama::DenseVector<IndexType> hilbertPartition = ITI::ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coordsDV, settings);
         if(dimension==2){
             ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordsDV, N, destPath+"hilbert");
         }

@@ -40,7 +40,7 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 
 		assert(coarseWeights.sum().Scalar::getValue<IndexType>() == nodeWeights.sum().Scalar::getValue<IndexType>());
 
-		Settings settingscopy(settings);
+                Settings settingscopy(settings);
 		settingscopy.multiLevelRounds--;
                 // recursive call 
 		multiLevelStep(coarseGraph, coarsePart, coarseWeights, coarseCoords, settingscopy);
@@ -60,7 +60,7 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 
 		nodeWeights.redistribute(projectedFineDist);
 	}
-  
+ 
         // do local refinement
 	if (settings.multiLevelRounds % settings.coarseningStepsBetweenRefinement == 0) {
                 SCAI_REGION( "MultiLevel.multiLevelStep.localRefinement" )
