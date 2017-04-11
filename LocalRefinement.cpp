@@ -80,9 +80,9 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
     //block sizes TODO: adapt for weighted case
     const IndexType optSize_old = ceil(double(globalN) / settings.numBlocks);
-const IndexType optSize = std::ceil( nodeWeights.sum().Scalar::getValue<IndexType>() / settings.numBlocks);
+    const IndexType optSize = std::ceil( nodeWeights.sum().Scalar::getValue<IndexType>() / settings.numBlocks);
     const IndexType maxAllowableBlockSize = optSize*(1+settings.epsilon);
-//PRINT(optSize << " , allowed maxBlockSize "<< maxAllowableBlockSize );
+
 
     //for now, we are assuming equal numbers of blocks and processes
     const IndexType localBlockID = comm->getRank();
@@ -158,14 +158,15 @@ const IndexType optSize = std::ceil( nodeWeights.sum().Scalar::getValue<IndexTyp
 
 		if (partner != comm->getRank()) {
 			//processor is active this round
-
+                    
 			/**
 			 * get indices of border nodes with breadth-first search
 			 */
 			std::vector<IndexType> interfaceNodes;
 			std::vector<IndexType> roundMarkers;
-			std::tie(interfaceNodes, roundMarkers)= getInterfaceNodes(input, part, nodesWithNonLocalNeighbors, partner, settings.borderDepth+1);
-			const IndexType lastRoundMarker = roundMarkers[roundMarkers.size()-1];
+                        std::tie(interfaceNodes, roundMarkers)= getInterfaceNodes(input, part, nodesWithNonLocalNeighbors, partner, settings.minBorderNodes);
+
+                        const IndexType lastRoundMarker = roundMarkers[roundMarkers.size()-1];
 			const IndexType secondRoundMarker = roundMarkers[1];
 
 			/**
@@ -446,6 +447,7 @@ const IndexType optSize = std::ceil( nodeWeights.sum().Scalar::getValue<IndexTyp
 			}
 		}
 	}
+
 	comm->synchronize();
 	for (IndexType color = 0; color < gainPerRound.size(); color++) {
 		gainPerRound[color] = comm->sum(gainPerRound[color]) / 2;
@@ -1048,7 +1050,7 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<IndexType, ValueType>::getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType otherBlock, IndexType depth) {
+std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<IndexType, ValueType>::getInterfaceNodes(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const std::vector<IndexType>& nodesWithNonLocalNeighbors, IndexType otherBlock, IndexType minBorderNodes) {
 
 	SCAI_REGION( "LocalRefinement.getInterfaceNodes" )
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
@@ -1071,8 +1073,8 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 		throw std::runtime_error("Block IDs must be different.");
 	}
 
-	if (depth <= 0) {
-		throw std::runtime_error("Depth must be positive");
+	if (minBorderNodes <= 0) {
+		throw std::runtime_error("Minimum number of nodes must be positive");
 	}
 
 	scai::hmemo::HArray<IndexType> localData = part.getLocalValues();
@@ -1125,8 +1127,7 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 		for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
 			if (!inputDist->isLocal(ja[j])) {
 				hasNonLocal = true;
-				if (foreignNodes.count(ja[j])> 0) {
-//PRINT("local node: "<< node <<" , foreignNgbr= "<< ja[j] );                                    
+				if (foreignNodes.count(ja[j])> 0) {                              
 					interfaceNodes.push_back(node);
 					break;
 				}
@@ -1147,7 +1148,7 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 	/**
 	 * now gather buffer zone with breadth-first search
 	 */
-	if (depth > 1) {
+	{
 		SCAI_REGION( "LocalRefinement.getInterfaceNodes.breadthFirstSearch" )
 		std::vector<bool> touched(localN, false);
 
@@ -1159,14 +1160,16 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 			touched[localID] = true;
 		}
 		assert(bfsQueue.size() == interfaceNodes.size());
+		bool dummyRound = true;
 
-		for (IndexType round = 1; round < depth; round++) {
+		while (interfaceNodes.size() < minBorderNodes || dummyRound) {
+			//if the target number is reached, complete this round and then stop
+			if (interfaceNodes.size() >= minBorderNodes) dummyRound = false;
 			roundMarkers.push_back(interfaceNodes.size());
 			std::queue<IndexType> nextQueue;
 			while (!bfsQueue.empty()) {
 				IndexType nextNode = bfsQueue.front();
 				bfsQueue.pop();
-
 				const IndexType localI = inputDist->global2local(nextNode);
 				assert(localI != nIndex);
 				assert(touched[localI]);
@@ -1189,7 +1192,7 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 	}
 
 	assert(interfaceNodes.size() <= localN);
-	assert(roundMarkers.size() == depth);
+	assert(interfaceNodes.size() >= minBorderNodes || interfaceNodes.size() == localN);
 	return {interfaceNodes, roundMarkers};
 }
 //---------------------------------------------------------------------------------------

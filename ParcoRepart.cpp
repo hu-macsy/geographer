@@ -307,8 +307,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     // [i][j] is in position: i*sideLen + j
     // [i][j][k] is in: i*sideLen*sideLen + j*sideLen + k
     
-    std::vector<IndexType> density( cubeSize ,0);
-    
+    //std::vector<IndexType> density( cubeSize ,0);
+    scai::hmemo::HArray<IndexType> density( cubeSize, 0);
+    scai::hmemo::WriteAccess<IndexType> wDensity(density);
     //std::cout<< "detailLvl= " << detailLvl <<", sideLen= " << sideLen << ", " << "density.size= " << density.size() << std::endl;
     
     if(dimensions==2){
@@ -325,8 +326,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
             scaledX = coordAccess0[i]/maxX * sideLen;
             scaledY = coordAccess1[i]/maxY * sideLen;
             IndexType pixelInd = scaledX*sideLen + scaledY;      
-            SCAI_ASSERT( pixelInd < density.size(), "Index too big: "<< std::to_string(pixelInd) );
-            ++density[pixelInd];
+            SCAI_ASSERT( pixelInd < wDensity.size(), "Index too big: "<< std::to_string(pixelInd) );
+            ++wDensity[pixelInd];
         }
     }else if(dimensions==3){
         SCAI_REGION( "ParcoRepart.pixelPartition.localDensity" )
@@ -346,20 +347,28 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
             scaledZ = coordAccess2[i]/maxZ * sideLen;
             IndexType pixelInd = scaledX*sideLen*sideLen + scaledY*sideLen + scaledZ;
             
-            SCAI_ASSERT( pixelInd < density.size(), "Index too big: "<< std::to_string(pixelInd) );
-            ++density[pixelInd];        
+            SCAI_ASSERT( pixelInd < wDensity.size(), "Index too big: "<< std::to_string(pixelInd) );  
+            ++wDensity[pixelInd];
         }
     }else{
         throw std::runtime_error("Available only for 2D and 3D. Data given have dimension:" + std::to_string(dimensions) );
     }
+    wDensity.release();
 
-    // sum density from all PEs
-    std::vector<IndexType> sumDensity( density.size() , 0);
-    for(int i=0; i<density.size(); i++){
+    // sum density from all PEs 
+    {
         SCAI_REGION( "ParcoRepart.pixelPartition.sumDensity" )
-        sumDensity[i] = comm->sum(density[i]);
+        comm->sumArray( density );
     }
     
+    //TODO; is that needed. we just can overwrite density array
+    // use the summed density as a Dense vector
+    scai::lama::DenseVector<IndexType> sumDensity( density );
+    
+    if(comm->getRank()==0){
+        ITI::aux::writeHeatLike_local_2D(density, sideLen, dimensions, "heat_"+settings.fileName+".plt");
+    }
+  
     //using the summed density get an intial pixeled partition
     
     std::vector<IndexType> pixeledPartition( density.size() , -1);
@@ -378,10 +387,25 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
         ValueType geomSpread;
         
         // start from the densest pixel
-        IndexType maxDensityPixel = std::distance( sumDensity.begin(), std::max_element(sumDensity.begin(), sumDensity.end()) );
+        //IndexType maxDensityPixel = std::distance( sumDensity.begin(), std::max_element(sumDensity.begin(), sumDensity.end()) );
+        
+        //TODO: sumDensity is local/not distributed. No need for that, just to avoid getValue.
+        scai::hmemo::WriteAccess<IndexType> localSumDens( sumDensity.getLocalValues() );
+        
+        //TODO: bad way to do that. linear time for every block. maybe sort or use a priority queue
+        IndexType maxDensityPixel=-1;
+        IndexType maxDensity=-1;
+        for(IndexType ii=0; ii<sumDensity.size(); ii++){
+            if(localSumDens[ii]>maxDensity){
+                maxDensityPixel = ii;
+                maxDensity= localSumDens[ii];
+            }
+        }
+
+        if(maxDensityPixel<0) break;
         SCAI_ASSERT(maxDensityPixel < sumDensity.size(), "Too big index: " + std::to_string(maxDensityPixel));
         SCAI_ASSERT(maxDensityPixel >= 0, "Negative index: " + std::to_string(maxDensityPixel));
-        spreadFactor = averagePointsPerPixel/sumDensity[ maxDensityPixel ];
+        spreadFactor = averagePointsPerPixel/localSumDens[ maxDensityPixel ];
 
         //TODO: change to more appropriate data type
         // insert all the neighbouring pixels
@@ -391,7 +415,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
         // insert in border if not already picked
         for(IndexType j=0; j<neighbours.size(); j++){
             // make sure this neighbour does not belong to another block
-            if(sumDensity[ neighbours[j]] != -1 ){
+            if(localSumDens[ neighbours[j]] != -1 ){
                 std::pair<IndexType, ValueType> toInsert;
                 toInsert.first = neighbours[j];
                 SCAI_ASSERT(neighbours[j] < sumDensity.size(), "Too big index: " + std::to_string(neighbours[j]));
@@ -399,16 +423,16 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
                 geomSpread = 1 + 1/detailLvl*( std::abs(sideLen/2 - neighbours[j]/sideLen)/(0.8*sideLen/2) + std::abs(sideLen/2 - neighbours[j]%sideLen)/(0.8*sideLen/2) );
                 //PRINT0( geomSpread );            
                 // value to pick a border node
-                toInsert.second = geomSpread * ( spreadFactor*(std::pow(sumDensity[neighbours[j]], 0.5)) + std::pow(sumDensity[maxDensityPixel], 0.5) );
+                toInsert.second = geomSpread * ( spreadFactor*(std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[maxDensityPixel], 0.5) );
                 border.push_back(toInsert);
             }
         }
-        thisBlockSize = sumDensity[maxDensityPixel];
+        thisBlockSize = localSumDens[maxDensityPixel];
         
         pixeledPartition[maxDensityPixel] = block;
         
         // set this pixel to -1 so it is not picked again
-        sumDensity[maxDensityPixel] = -1;
+        localSumDens[maxDensityPixel] = -1;
         
 
         while(border.size() !=0 ){      // there are still pixels to check
@@ -416,7 +440,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
             //TODO: different data type to avoid that
             // sort border by the value in increasing order 
             std::sort( border.begin(), border.end(),
-                       [](const std::pair<IndexType, ValueType> &left, const std::pair<IndexType, ValueType> &right){
+                       [](std::pair<IndexType, ValueType> &left, std::pair<IndexType, ValueType> &right){
                            return left.second < right.second; });
              
             std::pair<IndexType, ValueType> bestPixel;
@@ -426,25 +450,25 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
                 border.pop_back();
                 bestIndex = bestPixel.first;
                 
-            }while( sumDensity[ bestIndex] +thisBlockSize > maxBlockSize and border.size()>0); // this pixel is too big
-             
+            }while( localSumDens[ bestIndex] +thisBlockSize > maxBlockSize and border.size()>0); // this pixel is too big
+            
             // picked last pixel in border but is too big
-            if(sumDensity[ bestIndex] +thisBlockSize > maxBlockSize ){
+            if(localSumDens[ bestIndex] +thisBlockSize > maxBlockSize ){
                 break;
             }
-            SCAI_ASSERT(sumDensity[ bestIndex ] != -1, "Wrong pixel choice.");
+            SCAI_ASSERT(localSumDens[ bestIndex ] != -1, "Wrong pixel choice.");
             
             // this pixel now belongs in this block
             SCAI_ASSERT(bestIndex < sumDensity.size(), "Wrong pixel index: " + std::to_string(bestIndex));
             pixeledPartition[ bestIndex ] = block;
-            thisBlockSize += sumDensity[ bestIndex ];
+            thisBlockSize += localSumDens[ bestIndex ];
             --pixelsLeft;
-            pointsLeft -= sumDensity[ bestIndex ];
+            pointsLeft -= localSumDens[ bestIndex ];
             
             //averagePointsPerPixel = ValueType(pointsLeft)/pixelsLeft;
-            //spreadFactor = sumDensity[ bestIndex ]/averagePointsPerPixel;
-            //spreadFactor = (k-block)*averagePointsPerPixel/sumDensity[ bestIndex ];
-            spreadFactor = averagePointsPerPixel/sumDensity[ bestIndex ];
+            //spreadFactor = localSumDens[ bestIndex ]/averagePointsPerPixel;
+            //spreadFactor = (k-block)*averagePointsPerPixel/localSumDens[ bestIndex ];
+            spreadFactor = averagePointsPerPixel/localSumDens[ bestIndex ];
 
             //get the neighbours of the new pixel
             std::vector<IndexType> neighbours = ParcoRepart<IndexType, ValueType>::neighbourPixels( bestIndex, sideLen, dimensions);
@@ -462,39 +486,41 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
                 geomSpread= 1+ (std::pow(ngbrX-sideLen/2, 2) + std::pow(ngbrY-sideLen/2, 2))*(2/std::pow(sideLen,2));
                 geomSpread = geomSpread * geomSpread;// std::pow(geomSpread, 0.5);
 
-                if( sumDensity[ neighbours[j]] == -1){ // this pixel is already picked by a block (maybe this)
+                if( localSumDens[ neighbours[j]] == -1){ // this pixel is already picked by a block (maybe this)
                     continue;
                 }else{
                     bool inBorder = false;
                     for(IndexType l=0; l<border.size(); l++){                        
                         if( border[l].first == neighbours[j]){ // its already in border, update value
-                            border[l].second = 1.3*border[l].second + geomSpread * (spreadFactor*(std::pow(sumDensity[neighbours[j]], 0.5)) + std::pow(sumDensity[bestIndex], 0.5) );
+                            border[l].second = 1.3*border[l].second + geomSpread * (spreadFactor*(std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5) );
                             inBorder= true;
                         }
                     }
                     if(!inBorder){
                         std::pair<IndexType, ValueType> toInsert;
                         toInsert.first = neighbours[j];
-                        //toInsert.second = geomSpread * (spreadFactor* (std::pow(sumDensity[neighbours[j]], 0.5)) + std::pow(sumDensity[bestIndex], 0.5));
-                        toInsert.second = geomSpread * (spreadFactor* (std::pow(sumDensity[neighbours[j]], 0.5)) + std::pow(sumDensity[bestIndex], 0.5));
-                        //toInsert.second = geomSpread * (spreadFactor* (std::pow(sumDensity[neighbours[j]], 0.5)) + std::pow(sumDensity[bestIndex], 0.5))/(std::pow( std::abs( sumDensity[bestIndex] - sumDensity[neighbours[j]]),0.5));
+                        //toInsert.second = geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5));
+                        toInsert.second = geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5));
+                        //toInsert.second = geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5))/(std::pow( std::abs( localSumDens[bestIndex] - localSumDens[neighbours[j]]),0.5));
                         border.push_back(toInsert);
                     }
                 }
             }
             
-            sumDensity[ bestIndex ] = -1;
+            localSumDens[ bestIndex ] = -1;
         }
         //PRINT0("##### final blockSize for block "<< block << ": "<< thisBlockSize);      
     } // for(IndexType block=0; block<k; block++)
     
     // assign all orphan pixels to last block
-    for(int pp=0; pp<pixeledPartition.size(); pp++){        
+    for(int pp=0; pp<pixeledPartition.size(); pp++){  
+        scai::hmemo::ReadAccess<IndexType> localSumDens( sumDensity.getLocalValues() );
         if(pixeledPartition[pp] == -1){
             pixeledPartition[pp] = k-1;     
-            thisBlockSize += sumDensity[pp];
+            thisBlockSize += localSumDens[pp];
         }
     }   
+    //PRINT0("##### final blockSize for block "<< k-1 << ": "<< thisBlockSize);
 
     // here all pixels should have a partition 
     
@@ -551,15 +577,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     wLocalPart.release();
     
     //get new distribution
-    // must gather in one PE and create partition by owners
-
-    //TODO: should change this
-    //replicate in every PE to make the new distribution
-    scai::dmemo::DistributionPtr noDist (new scai::dmemo::NoDistribution( globalN ));
-    result.redistribute(noDist);
-    assert( result.getDistribution().isReplicated() );
-
-    scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution( result.getLocalValues(), comm));
+    scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
+    
+    //TODO: not sure if this is needed...
     result.redistribute( newDist);
 
     input.redistribute(newDist, input.getColDistributionPtr());

@@ -207,7 +207,7 @@ TEST_F (MultiLevelTest, testComputeGlobalPrefixSum) {
 
 TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 
-    const IndexType N = 500;
+    const IndexType N = 300;
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -225,7 +225,7 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
             adjArray[i*N+j]=0;
         
     srand(time(NULL));
-    IndexType numEdges = int (1.12*N);
+    IndexType numEdges = int (3*N);
     for(IndexType i=0; i<numEdges; i++){
         // a random position in the matrix
         IndexType x = rand()%N;
@@ -272,6 +272,7 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     Settings.coarseningStepsBetweenRefinement = 3;
     Settings.useGeometricTieBreaking = true;
     Settings.dimensions= 2;
+    Settings.minGainForNextRound =3;
     
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, Settings);
     
@@ -347,7 +348,7 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
         }
         
         EXPECT_TRUE(pixelGraph.isConsistent());
-        if(pixeledGraphSize < 5000){
+        if(pixeledGraphSize < 4000){
             EXPECT_TRUE(pixelGraph.checkSymmetry());
         }
         SCAI_ASSERT_EQ_ERROR( pixelWeights.sum().Scalar::getValue<ValueType>() , N , "should ne equal");

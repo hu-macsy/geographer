@@ -77,11 +77,12 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_3D) {
     std::vector<IndexType> numPoints= { 40, 40, 40};
     std::vector<ValueType> maxCoord= {441, 711, 1160};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
-    std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
+    
+    PRINT0("Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N );
     
     std::vector<DenseVector<ValueType>> coords(3);
     for(IndexType i=0; i<3; i++){ 
@@ -149,7 +150,7 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_3D) {
     EXPECT_EQ( comm->sum(cntEdges) , 4*(numX+numY+numZ)-24);
     EXPECT_EQ( comm->sum(cntSides) , 2*( (numX-2)*(numY-2)+ (numX-2)*(numZ-2)+ (numY-2)*(numZ-2) )  );
     
-    PRINT(", corner nodes= "<< cntCorners << " , edge nodes= "<< cntEdges<< " , side nodes= "<< cntSides);
+    //PRINT(comm << ", corner nodes= "<< cntCorners << " , edge nodes= "<< cntEdges<< " , side nodes= "<< cntSides);
     
     {
     SCAI_REGION("testCreateStructuredMesh_Distributed_3D.check_coords_2")
@@ -177,12 +178,13 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
     std::vector<IndexType> numPoints= { 140, 24, 190};
     std::vector<ValueType> maxCoord= {441, 711, 1160};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
-    std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
-    
+
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
-        
+    
+    PRINT0("Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N );
+            
     scai::lama::CSRSparseMatrix<ValueType> adjM;
     adjM =  scai::lama::CSRSparseMatrix<ValueType>( dist, noDistPointer);
         
@@ -239,12 +241,13 @@ TEST_F(MeshGeneratorTest, testWriteMetis_Dist_3D){
     std::vector<IndexType> numPoints= { 10, 10, 10};
     std::vector<ValueType> maxCoord= { 10, 20, 30};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
-    std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
-    
+
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
     
+    PRINT0("Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N );
+        
     std::vector<DenseVector<ValueType>> coords(3);
     for(IndexType i=0; i<3; i++){ 
 	  coords[i].allocate(dist);
@@ -262,12 +265,14 @@ TEST_F(MeshGeneratorTest, testWriteMetis_Dist_3D){
 }
 
 //-----------------------------------------------------------------
-TEST_F(MeshGeneratorTest, testMeshFromQuadTree){
+TEST_F(MeshGeneratorTest, testMeshFromQuadTree_local){
 
     const IndexType numberOfAreas= 4;
     const IndexType pointsPerArea= 100000;
     const IndexType dimension = 2;
     const ValueType maxCoord = 100;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
     scai::lama::CSRSparseMatrix<ValueType> graph;
     std::vector<DenseVector<ValueType>> coords( dimension );
@@ -303,14 +308,15 @@ TEST_F(MeshGeneratorTest, testMeshFromQuadTree){
     }
     
     ValueType averageDegree = ValueType( numEdges)/ia.size();
-    PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
+    PRINT0("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
         
+    if(comm->getRank()==0){
+        std::string outFile = "quadTreeGraph2D_11";
+        ITI::FileIO<IndexType, ValueType>::writeGraph( graph, outFile);
         
-    std::string outFile = "quadTreeGraph2D_11";
-    ITI::FileIO<IndexType, ValueType>::writeGraph( graph, outFile);
-    
-    std::string outCoords = outFile + ".xyz";
-    ITI::FileIO<IndexType, ValueType>::writeCoords(coords, coords[0].size(), outCoords);
+        std::string outCoords = outFile + ".xyz";
+        ITI::FileIO<IndexType, ValueType>::writeCoords(coords, coords[0].size(), outCoords);
+    }
     
 }
 //-----------------------------------------------------------------
@@ -322,12 +328,14 @@ TEST_F(MeshGeneratorTest, testSimpleMeshFromQuadTree_2D){
     const IndexType pointsPerArea= 10*dimension;
     const ValueType maxCoord = 100;
 
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    
     scai::lama::CSRSparseMatrix<ValueType> graph;
     std::vector<DenseVector<ValueType>> coords( dimension );
     
     ITI::MeshGenerator<IndexType, ValueType>::createQuadMesh( graph, coords, dimension, numberOfAreas, pointsPerArea, maxCoord); 
     
-    PRINT("edges: "<< graph.getNumValues() << " , nodes: " << coords[0].size() );    
+    PRINT0("edges: "<< graph.getNumValues() << " , nodes: " << coords[0].size() );    
     graph.isConsistent();
     //graph.checkSymmetry();
     assert( coords[0].size() == graph.getNumRows());
@@ -346,25 +354,25 @@ TEST_F(MeshGeneratorTest, testSimpleMeshFromQuadTree_2D){
     
     IndexType numEdges = 0;
     IndexType maxDegree = 0;
-    std::cout<< "\t Num of nodes"<< std::endl;
+    //std::cout<< "\t Num of nodes"<< std::endl;
     for(int i=0; i<degreeCount.size(); i++){
         if(  degreeCount[i] !=0 ){
-            std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
+            //std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
             numEdges += i*degreeCount[i];
             maxDegree = i;
         }
     }
     
     ValueType averageDegree = ValueType( numEdges)/ia.size();
-    PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
+    PRINT0("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
         
+    if(comm->getRank()==0){
+        std::string outFile = "lalal";
+        ITI::FileIO<IndexType, ValueType>::writeGraph( graph, outFile);
         
-    std::string outFile = "lalal";
-    ITI::FileIO<IndexType, ValueType>::writeGraph( graph, outFile);
-    
-    std::string outCoords = outFile + ".xyz";
-    ITI::FileIO<IndexType, ValueType>::writeCoords(coords, coords[0].size(), outCoords);
-    
+        std::string outCoords = outFile + ".xyz";
+        ITI::FileIO<IndexType, ValueType>::writeCoords(coords, coords[0].size(), outCoords);
+    }
 }
 //-----------------------------------------------------------------
 

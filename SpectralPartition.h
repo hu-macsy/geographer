@@ -48,10 +48,24 @@ namespace ITI {
             static scai::lama::CSRSparseMatrix<ValueType> getLaplacian( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
             
             /** Returns a spectral partition of the input graph
-             * @param[in] adjM The input adjacency matrix of the graph to partition.
+             * @param[in] adjM The adjacency matrix of the input graph to partition.
              * @param[in] coordinates Node positions
              */
             static scai::lama::DenseVector<IndexType> getPartition(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+            
+            /**Main program to determine the Fiedler vector for a Laplacian matrix
+             * 
+             *  Method: Inverse power method incorporated with Householder deflation
+             *
+             *  Paper: An efficient and accurate method to compute the Fiedler vector based on 
+             *         Householder deflation and inverse power iteration
+             *         Jian-ping Wu, Jun-qiang Song, Wei-min Zhang 
+             * @param[in] adjM The adjacency matrix of the input graph to get the Fiedler eigenvector.
+             * @param[out] eigenvalue The second smallest eigenvalue that corresponds to the fiedler vector.
+             * @return The Fiedler eigenvector, aka the vector corresponding to the second smallest eigenvalue of adjM.
+             */
+            static scai::lama::DenseVector<ValueType> getFiedlerVector(const scai::lama::CSRSparseMatrix<ValueType>& adjM,
+                ValueType& eigenvalue );
     };
     
 }
