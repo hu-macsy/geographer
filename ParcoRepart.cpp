@@ -440,7 +440,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
             //TODO: different data type to avoid that
             // sort border by the value in increasing order 
             std::sort( border.begin(), border.end(),
-                       [](std::pair<IndexType, ValueType> &left, std::pair<IndexType, ValueType> &right){
+                       [](const std::pair<IndexType, ValueType> &left, const std::pair<IndexType, ValueType> &right){
                            return left.second < right.second; });
              
             std::pair<IndexType, ValueType> bestPixel;
