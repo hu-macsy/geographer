@@ -123,9 +123,10 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
 
 TEST_F (auxTest, testInitialPartitions){
 
-    std::string path = "meshes/bigtric/";
-    std::string fileName = "bigtric-00016.graph";
-    //std::string fileName = "bigtrace-00021.graph";
+    std::string path = "meshes/bigtrace/";
+    //std::string fileName = "bigtric-00016.graph";
+    std::string fileName = "bigtrace-00021.graph";
+    //std::string fileName = "slowrot-00014.graph";
     std::string file = path + fileName;
     std::ifstream f(file);
     IndexType dimensions= 2;
@@ -160,13 +161,13 @@ TEST_F (auxTest, testInitialPartitions){
     settings.numBlocks= k;
     settings.epsilon = 0.1;
     settings.dimensions = dimensions;
-    settings.pixeledDetailLevel =6;        //4 for a 16x16 coarsen graph in 2D, 16x16x16 in 3D
+    settings.pixeledDetailLevel = 8;        //4 for a 16x16 coarsen graph in 2D, 16x16x16 in 3D
     settings.useGeometricTieBreaking =1;
     settings.fileName = fileName;
     settings.useGeometricTieBreaking =1;
-    settings.multiLevelRounds = 9;
+    settings.multiLevelRounds = 6;
     settings.minGainForNextRound= 10;
-    // 5% of (approximetely) the nodes of the coarsest graph
+    // 5% of (approximetely, if at every round you get a 60% reduction in nodes) the nodes of the coarsest graph
     settings.minBorderNodes = N*std::pow(0.6, settings.multiLevelRounds)/k * 0.05;
     settings.coarseningStepsBetweenRefinement =2;
     
@@ -253,6 +254,7 @@ TEST_F (auxTest, testInitialPartitions){
         std::cout << "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
         std::cout  << std::endl  << std::endl; 
     }
+   
     //------------------------------------------- spectral
 /*
     settings.minGainForNextRound = 5;
@@ -296,6 +298,33 @@ TEST_F (auxTest, testInitialPartitions){
         std::cout<< "Output files written in " << destPath << std::endl;
     }
 
+}
+
+
+TEST_F (auxTest, testPixelDistance) {
+    
+    IndexType sideLen = 139;
+    
+    //for pixel=18 and an 8x8 grid max dist is with pixel 63 and is equal to 10
+    ValueType maxl2Dist = aux::pixell2Distance2D(0,sideLen*sideLen-1, sideLen);
+    std::cout<< maxl2Dist << std::endl;
+    for(int i=0; i<sideLen*sideLen; i++){
+        //std::cout << "dist1(" << 0<< ", "<< i << ")= "<< aux::pixelDistance2D( 0, i, sideLen) << std::endl;
+        EXPECT_LE(aux::pixelDistance2D( 0, i, sideLen), sideLen+sideLen-2);
+        EXPECT_LE(aux::pixell2Distance2D( 0, i, sideLen), maxl2Dist);
+    }
+    
+    srand(time(NULL));
+    IndexType pixel= rand()/(sideLen*(sideLen-2)) +2*sideLen;
+    
+    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel, sideLen), 0);
+    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel+1, sideLen), 1);
+    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel+sideLen, sideLen), 1);
+    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel-sideLen, sideLen), 1);
+    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel+sideLen-3, sideLen), 4);
+    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel-sideLen-2, sideLen), 3);
+    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel-2*sideLen+3, sideLen), 5);
+    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel-2*sideLen-3, sideLen), 5);
 }
 
 }

@@ -388,8 +388,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
         SCAI_REGION( "ParcoRepart.pixelPartition.localPixelGrowing")
            
         ValueType averagePointsPerPixel = ValueType(pointsLeft)/pixelsLeft;
+        // a factor to force the block to spread more
         ValueType spreadFactor;
+        // make a block spread towards the borders (and corners) of our input space 
         ValueType geomSpread;
+        // to measure the distance from the first, center pixel
+        ValueType pixelDistance;
         
         // start from the densest pixel
         //IndexType maxDensityPixel = std::distance( sumDensity.begin(), std::max_element(sumDensity.begin(), sumDensity.end()) );
@@ -407,7 +411,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
             }
         }
 
-        if(maxDensityPixel<0) break;
+        if(maxDensityPixel<0){
+            PRINT0("Max density pixel id = -1. Should not happen(?) or pixels are finished. For block "<< block<< " and k= " << k);
+            break;
+        }
+        
         SCAI_ASSERT(maxDensityPixel < sumDensity.size(), "Too big index: " + std::to_string(maxDensityPixel));
         SCAI_ASSERT(maxDensityPixel >= 0, "Negative index: " + std::to_string(maxDensityPixel));
         spreadFactor = averagePointsPerPixel/localSumDens[ maxDensityPixel ];
@@ -428,7 +436,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
                 geomSpread = 1 + 1/detailLvl*( std::abs(sideLen/2 - neighbours[j]/sideLen)/(0.8*sideLen/2) + std::abs(sideLen/2 - neighbours[j]%sideLen)/(0.8*sideLen/2) );
                 //PRINT0( geomSpread );            
                 // value to pick a border node
-                toInsert.second = geomSpread * ( spreadFactor*(std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[maxDensityPixel], 0.5) );
+                pixelDistance = aux::pixell2Distance2D( maxDensityPixel, neighbours[j], sideLen);
+                toInsert.second = (1/pixelDistance)* geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[maxDensityPixel], 0.5) );
                 border.push_back(toInsert);
             }
         }
@@ -489,15 +498,21 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
                 IndexType ngbrY = neighbours[j]%sideLen;
 
                 geomSpread= 1+ (std::pow(ngbrX-sideLen/2, 2) + std::pow(ngbrY-sideLen/2, 2))*(2/std::pow(sideLen,2));
-                geomSpread = geomSpread * geomSpread;// std::pow(geomSpread, 0.5);
-
+                //geomSpread = geomSpread * geomSpread;// std::pow(geomSpread, 0.5);
+                //
+                geomSpread = 1;
+                //
+                
                 if( localSumDens[ neighbours[j]] == -1){ // this pixel is already picked by a block (maybe this)
                     continue;
                 }else{
                     bool inBorder = false;
+                    
                     for(IndexType l=0; l<border.size(); l++){                        
                         if( border[l].first == neighbours[j]){ // its already in border, update value
-                            border[l].second = 1.3*border[l].second + geomSpread * (spreadFactor*(std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5) );
+                            //border[l].second = 1.3*border[l].second + geomSpread * (spreadFactor*(std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5) );
+                            pixelDistance = aux::pixell2Distance2D( maxDensityPixel, neighbours[j], sideLen);    
+                            border[l].second += geomSpread*  (1/(pixelDistance*pixelDistance))* ( spreadFactor *std::pow(localSumDens[neighbours[j]], 0.5) + std::pow(localSumDens[bestIndex], 0.5) );
                             inBorder= true;
                         }
                     }
@@ -505,7 +520,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
                         std::pair<IndexType, ValueType> toInsert;
                         toInsert.first = neighbours[j];
                         //toInsert.second = geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5));
-                        toInsert.second = geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5));
+                        pixelDistance = aux::pixell2Distance2D( maxDensityPixel, neighbours[j], sideLen);    
+                        //toInsert.second = (1/(pixelDistance*pixelDistance))* geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5));
+                        toInsert.second = geomSpread*  (1/(pixelDistance*pixelDistance))* ( spreadFactor *(std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5) );
                         //toInsert.second = geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5))/(std::pow( std::abs( localSumDens[bestIndex] - localSumDens[neighbours[j]]),0.5));
                         border.push_back(toInsert);
                     }

@@ -105,6 +105,42 @@ static void print2DGrid(scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama
 
 }
 //------------------------------------------------------------------------------
-   
+
+/*  From pixel (int) coords, either in 2S or 3D, to a 1D index. 
+ * Only for cubes, where every side has the same length, maxLen;
+ */
+//static IndexType pixel2Index(IndexType pixel1, IndexType maxLen, IndexType dimension){
+//}
+ 
+ /** The l1 distance of two pixels in 2D if their given as a 1D distance.
+  * @param[in] pixel1 The index of the first pixel.
+  * @param[in] pixel1 The index of the second pixel.
+  * @param[in] sideLen The length of the side of the cube.
+  * 
+  * @return The l1 distance of the pixels.
+  */
+static IndexType pixelDistance2D(IndexType pixel1, IndexType pixel2, IndexType sideLen){
+     
+     IndexType col1 = pixel1/sideLen;
+     IndexType col2 = pixel2/sideLen;
+     
+     IndexType row1 = pixel1%sideLen;
+     IndexType row2 = pixel2%sideLen;
+     
+     return std::abs(col1-col2) + std::abs(row1-row2);;
+}
+
+static ValueType pixell2Distance2D(IndexType pixel1, IndexType pixel2, IndexType sideLen){
+     
+     IndexType col1 = pixel1/sideLen;
+     IndexType col2 = pixel2/sideLen;
+     
+     IndexType row1 = pixel1%sideLen;
+     IndexType row2 = pixel2%sideLen;
+     
+     return std::pow( ValueType (std::pow(std::abs(col1-col2),2) + std::pow(std::abs(row1-row2),2)) , 0.5);
+}
+ 
+ 
 }; //class aux
 }// namespace ITI
