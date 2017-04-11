@@ -45,7 +45,14 @@ public:
 	*/
 	static void writeCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
 
-        static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
+    static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
+
+    /**
+	 * Writes a partition to file.
+	 * @param[in] part
+	 * @param[in] filename The file's name to write to
+	 */
+	static void writePartition(const DenseVector<IndexType> &part, const std::string filename);
         
 	/** Reads a graph from filename in METIS format and returns the adjacency matrix.
 	 * @param[in] filename The file to read from. In a METIS format.
@@ -59,9 +66,16 @@ public:
 	static std::vector<DenseVector<ValueType>> readCoords ( std::string filename, IndexType numberOfCoords, IndexType dimension);
 
 	/**
+	 * Reads a partition from file.
+	 */
+	static DenseVector<IndexType> readPartition(const std::string filename);
+
+	/**
 	 * Reads a quadtree as specified in the format of Michael Selzer
 	 */
 	static std::vector<std::set<std::shared_ptr<SpatialCell> > > readQuadTree( std::string filename );
+
+
 
 private:
 	static std::pair<std::vector<ValueType>, std::vector<ValueType>> getBoundingCoords(std::vector<ValueType> centralCoords, IndexType level);
