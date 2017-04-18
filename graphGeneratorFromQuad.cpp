@@ -57,7 +57,7 @@ int main(int argc, char** argv){
         
         for(IndexType i=0; i<ia.size()-1; i++){
             IndexType nodeDegree = ia[i+1] -ia[i];
-            SCAI_ASSERT(nodeDegree < degreeCount.size()-1, "Node with too high degree: " << nodeDegree);
+            SCAI_ASSERT(nodeDegree < degreeCount.size()-1, "Local node " << i << " has degree " << nodeDegree << ", which is too high.");
             ++degreeCount[nodeDegree];
         }
         
