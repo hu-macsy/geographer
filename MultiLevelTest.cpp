@@ -230,6 +230,8 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
         // a random position in the matrix
         IndexType x = rand()%N;
         IndexType y = rand()%N;
+        ASSERT_LT(x+y*N, N*N);
+        ASSERT_LT(x*N+y, N*N);
         adjArray[ x+y*N ]= 1;
         adjArray[ x*N+y ]= 1;
     }
@@ -238,13 +240,21 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     EXPECT_TRUE( graph.checkSymmetry() );
     ValueType beforel1Norm = graph.l1Norm().Scalar::getValue<ValueType>();
     IndexType beforeNumValues = graph.getNumValues();
-    graph.redistribute( distPtr , noDistPtr);
     
+    //random partition
+	DenseVector<IndexType> partition( N , 0);
+	for(IndexType i=0; i<N; i++){
+		partition.setValue(i, rand()%k );
+	}
+	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(partition.getLocalValues(), comm));
+	partition.redistribute( newDist );
+
+    graph.redistribute( newDist , noDistPtr);
+
     // node weights = 1
     DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
     //ValueType beforeSumWeigths = uniformWeights.l1Norm().Scalar::getValue<ValueType>();
-    IndexType beforeSumWeigths = N;
-    //uniformWeights.redistribute( distPtr );
+    IndexType beforeSumWeights = N;
     
     //coordinates at random and redistribute
     std::vector<DenseVector<ValueType>> coords(2);
@@ -255,16 +265,9 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
         for(IndexType j=0; j<N; j++){
             coords[i].setValue(j, rand()%10);
         }
-        coords[i].redistribute( distPtr );
+        coords[i].redistribute( newDist );
     }
-    
-    //random partition
-    DenseVector<IndexType> partition( N , 0);
-    for(IndexType i=0; i<N; i++){
-        partition.setValue(i, rand()%k );
-    }
-    partition.redistribute( distPtr );
-    
+
     struct Settings Settings;
     Settings.numBlocks= k;
     Settings.epsilon = 0.2;
@@ -279,7 +282,7 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     EXPECT_EQ( graph.l1Norm() , beforel1Norm);
     EXPECT_EQ( graph.getNumValues() , beforeNumValues);
     // l1Norm not supported for IndexType
-    EXPECT_EQ( static_cast <DenseVector<ValueType>> (uniformWeights).l1Norm() , beforeSumWeigths );
+    EXPECT_EQ( static_cast <DenseVector<ValueType>> (uniformWeights).l1Norm() , beforeSumWeights );
     
 }
 //--------------------------------------------------------------------------------------- 

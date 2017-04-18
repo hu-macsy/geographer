@@ -79,7 +79,7 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
     // node weights = 1
     DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
     //ValueType beforeSumWeigths = uniformWeights.l1Norm().Scalar::getValue<ValueType>();
-    IndexType beforeSumWeigths = N;
+    IndexType beforeSumWeights = N;
     //uniformWeights.redistribute( distPtr );
     
     //coordinates at random and redistribute
@@ -116,7 +116,7 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
         newWeights.setValue(i, uniformWeights.getValue(i) );
     }
     //PRINT(newWeights.l1Norm() );
-    EXPECT_EQ( newWeights.l1Norm() , beforeSumWeigths );
+    EXPECT_EQ( newWeights.l1Norm() , beforeSumWeights );
     
 }
 //-------------------------------------------------------------------------

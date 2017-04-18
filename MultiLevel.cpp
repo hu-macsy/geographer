@@ -8,13 +8,29 @@ namespace ITI{
 template<typename IndexType, typename ValueType>
 IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<IndexType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, Settings settings) {
 	
-        SCAI_REGION( "MultiLevel.multiLevelStep" );
+   SCAI_REGION( "MultiLevel.multiLevelStep" );
 	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
 	const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
-        
-        if(coordinates.size() != settings.dimensions){
-            throw std::runtime_error("Dimensions do not agree: vectos.size()= " + std::to_string(coordinates.size())  + " != settings.dimensions= " + std::to_string(settings.dimensions) );
-        }
+
+	if(coordinates.size() != settings.dimensions){
+		throw std::runtime_error("Dimensions do not agree: vector.size()= " + std::to_string(coordinates.size())  + " != settings.dimensions= " + std::to_string(settings.dimensions) );
+	}
+
+	if (!input.getRowDistributionPtr()->isReplicated()) {
+		//check whether distributions agree
+		const scai::dmemo::Distribution &inputDist = input.getRowDistribution();
+		SCAI_ASSERT(  part.getDistributionPtr()->getLocalSize() == inputDist.getLocalSize(), "distribution mismatch" );
+		SCAI_ASSERT(  nodeWeights.getDistributionPtr()->getLocalSize() == inputDist.getLocalSize(), "distribution mismatch" );
+		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+			SCAI_ASSERT(  coordinates[dim].getDistributionPtr()->getLocalSize() == inputDist.getLocalSize(), "distribution mismatch" );
+		}
+
+		//check whether partition agrees with distribution
+		scai::hmemo::ReadAccess<IndexType> rLocal(part.getLocalValues());
+		for (IndexType i = 0; i < inputDist.getLocalSize(); i++) {
+			SCAI_ASSERT(rLocal[i] == comm->getRank(), "distribution/partition mismatch");
+		}
+	}
         
 	if (settings.multiLevelRounds > 0) {
 		SCAI_REGION( "MultiLevel.multiLevelStep.recursiveCall" )
@@ -63,7 +79,7 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
   
         // do local refinement
 	if (settings.multiLevelRounds % settings.coarseningStepsBetweenRefinement == 0) {
-                SCAI_REGION( "MultiLevel.multiLevelStep.localRefinement" )
+		SCAI_REGION( "MultiLevel.multiLevelStep.localRefinement" )
 		scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getPEGraph(input);
 
 		std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
@@ -76,9 +92,10 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 		}
 
 		IndexType numRefinementRounds = 0;
+		IndexType oldCut = 0;
 
-		ValueType gain = settings.minGainForNextRound;
-		while (gain >= settings.minGainForNextRound) {
+		ValueType gain = 0;
+		while (numRefinementRounds == 0 || gain >= settings.minGainForNextRound) {
 			std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(input, part, nodesWithNonLocalNeighbors, nodeWeights, communicationScheme, coordinates, distances, settings);
 			gain = 0;
 			for (IndexType roundGain : gainPerRound) gain += roundGain;
@@ -97,9 +114,14 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 			}
 
 			ValueType cut = comm->getSize() == 1 ? ParcoRepart<IndexType, ValueType>::computeCut(input, part) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;
+			if (numRefinementRounds > 0) {
+				SCAI_ASSERT(gain == oldCut - cut, "Old cut is " << oldCut << ", new cut is " << cut << ", but gain is " << gain);
+				assert(gain >= 0);
+			}
 			if (comm->getRank() == 0) {
 				std::cout << "Multilevel round= "<< settings.multiLevelRounds <<": After " << numRefinementRounds + 1 << " refinement rounds, cut is " << cut << std::endl;
 			}
+			oldCut = cut;
 			numRefinementRounds++;
 		}
 	}
