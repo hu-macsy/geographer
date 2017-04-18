@@ -6,38 +6,6 @@
 
 namespace ITI{
 
-    /*
-template<typename IndexType, typename ValueType>
-std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFMStep(
-    CSRSparseMatrix<ValueType> &input,
-    DenseVector<IndexType> &part,
-    std::vector<DenseVector<ValueType>> &coordinates,
-    Settings settings) {
-	//
-        //  This is a wrapper function to allow calls without precomputing a communication schedule..
-        //
-
-	std::vector<IndexType> nodesWithNonLocalNeighbors = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(input);
-
-	//get block graph
-	scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( input, part, settings.numBlocks);
-
-	//color block graph and get a communication schedule
-	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
-
-	//get uniform node weights
-	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(input.getRowDistributionPtr(), 1);
-	//DenseVector<IndexType> nonWeights = DenseVector<IndexType>(0, 1);
-
-	//get distances
-	std::vector<double> distances = ParcoRepart<IndexType, ValueType>::distancesFromBlockCenter(coordinates);
-
-	//call distributed FM-step
-	return distributedFMStep(input, part, nodesWithNonLocalNeighbors, uniformWeights, communicationScheme, coordinates, distances, settings);
-}
-*/
-//---------------------------------------------------------------------------------------
-
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFMStep(
     CSRSparseMatrix<ValueType>& input, 
