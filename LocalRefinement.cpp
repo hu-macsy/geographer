@@ -78,11 +78,9 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     	throw std::runtime_error("Called with " + std::to_string(comm->getSize()) + " processors, but " + std::to_string(settings.numBlocks) + " blocks.");
     }
 
-    //block sizes TODO: adapt for weighted case
     const IndexType optSize_old = ceil(double(globalN) / settings.numBlocks);
     const IndexType optSize = std::ceil( nodeWeights.sum().Scalar::getValue<IndexType>() / settings.numBlocks);
     const IndexType maxAllowableBlockSize = optSize*(1+settings.epsilon);
-
 
     //for now, we are assuming equal numbers of blocks and processes
     const IndexType localBlockID = comm->getRank();
@@ -164,9 +162,9 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			 */
 			std::vector<IndexType> interfaceNodes;
 			std::vector<IndexType> roundMarkers;
-                        std::tie(interfaceNodes, roundMarkers)= getInterfaceNodes(input, part, nodesWithNonLocalNeighbors, partner, settings.minBorderNodes);
+			std::tie(interfaceNodes, roundMarkers)= getInterfaceNodes(input, part, nodesWithNonLocalNeighbors, partner, settings.minBorderNodes);
 
-                        const IndexType lastRoundMarker = roundMarkers[roundMarkers.size()-1];
+			const IndexType lastRoundMarker = roundMarkers[roundMarkers.size()-1];
 			const IndexType secondRoundMarker = roundMarkers[1];
 
 			/**
@@ -1160,11 +1158,11 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 			touched[localID] = true;
 		}
 		assert(bfsQueue.size() == interfaceNodes.size());
-		bool dummyRound = true;
+		bool active = true;
 
-		while (interfaceNodes.size() < minBorderNodes || dummyRound) {
+		while (active) {
 			//if the target number is reached, complete this round and then stop
-			if (interfaceNodes.size() >= minBorderNodes) dummyRound = false;
+			if (interfaceNodes.size() >= minBorderNodes || interfaceNodes.size() == roundMarkers.back()) active = false;
 			roundMarkers.push_back(interfaceNodes.size());
 			std::queue<IndexType> nextQueue;
 			while (!bfsQueue.empty()) {
@@ -1192,7 +1190,7 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 	}
 
 	assert(interfaceNodes.size() <= localN);
-	assert(interfaceNodes.size() >= minBorderNodes || interfaceNodes.size() == localN);
+	assert(interfaceNodes.size() >= minBorderNodes || interfaceNodes.size() == localN || roundMarkers[roundMarkers.size()-2] == roundMarkers.back());
 	return {interfaceNodes, roundMarkers};
 }
 //---------------------------------------------------------------------------------------

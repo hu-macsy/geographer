@@ -114,6 +114,7 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 			}
 
 			ValueType cut = comm->getSize() == 1 ? ParcoRepart<IndexType, ValueType>::computeCut(input, part) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;
+			SCAI_ASSERT(comm->sum(cut) == comm->getSize()*cut, "Cut sum inconsistency.");
 			if (numRefinementRounds > 0) {
 				SCAI_ASSERT(gain == oldCut - cut, "Old cut is " << oldCut << ", new cut is " << cut << ", but gain is " << gain);
 				assert(gain >= 0);
