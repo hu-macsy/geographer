@@ -349,30 +349,34 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
 
 	//fill random matrix
 	//scai::lama::CSRSparseMatrix<ValueType>a(n,n);
-        scai::lama::CSRSparseMatrix<ValueType> a;
+	scai::lama::CSRSparseMatrix<ValueType> a;
 	//scai::lama::MatrixCreator::fillRandom(a, 0.001);  // not symmetric
         
-        scai::common::scoped_array<ValueType> adjArray( new ValueType[ n*n ] );
-        //initialize matrix with zeros
-        for(int i=0; i<n; i++)
-            for(int j=0; j<n; j++)
-                adjArray[i*n+j]=0;
-        
-        srand(time(NULL));
-        IndexType numEdges = int (1.12*n);
-        for(IndexType i=0; i<numEdges; i++){
-            // a random position in the matrix
-            IndexType x = rand()%n;
-            IndexType y = rand()%n;
-            adjArray[ x+y*n ]= 1;
-            adjArray[ x*n+y ]= 1;
-        }
-        a.setRawDenseData( n, n, adjArray.get() );
-        
-        PRINT("num of edges= " <<a.getNumValues()/2 );
-        EXPECT_TRUE( a.isConsistent() );
-        EXPECT_TRUE( a.checkSymmetry() );
-        
+	scai::common::scoped_array<ValueType> adjArray( new ValueType[ n*n ] );
+	//initialize matrix with zeros
+	for(int i=0; i<n; i++)
+		for(int j=0; j<n; j++)
+			adjArray[i*n+j]=0;
+
+	//broadcast seed value from root to ensure equal pseudorandom numbers.
+	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+	comm->bcast( seed, 1, 0 );
+	srand(seed[0]);
+
+	IndexType numEdges = int (1.12*n);
+	for(IndexType i=0; i<numEdges; i++){
+		// a random position in the matrix
+		IndexType x = rand()%n;
+		IndexType y = rand()%n;
+		adjArray[ x+y*n ]= 1;
+		adjArray[ x*n+y ]= 1;
+	}
+	a.setRawDenseData( n, n, adjArray.get() );
+
+	PRINT("num of edges= " <<a.getNumValues()/2 );
+	EXPECT_TRUE( a.isConsistent() );
+	EXPECT_TRUE( a.checkSymmetry() );
+
 	//generate random partition
 	scai::lama::DenseVector<IndexType> part(n, 0);
 	for (IndexType i = 0; i < n; i++) {
@@ -381,13 +385,13 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
 	}
 
 	scai::lama::CSRSparseMatrix<ValueType> blockGraph =  ParcoRepart<IndexType, ValueType>::getBlockGraph( a, part, k);
-        EXPECT_TRUE( blockGraph.isConsistent() );
-        EXPECT_TRUE( blockGraph.checkSymmetry() );
+	EXPECT_TRUE( blockGraph.isConsistent() );
+	EXPECT_TRUE( blockGraph.checkSymmetry() );
 	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local(blockGraph);
 
-        IndexType rounds = scheme.size();
-        //PRINT("num edges of the blockGraph= "<< blockGraph.getNumValues()/2 );
-        //PRINT("#rounds= "<< rounds );
+	IndexType rounds = scheme.size();
+	//PRINT("num edges of the blockGraph= "<< blockGraph.getNumValues()/2 );
+	//PRINT("#rounds= "<< rounds );
 
 	std::vector<std::vector<bool> > communicated(p);
 	for (IndexType i = 0; i < p; i++) {
@@ -417,20 +421,20 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
 		}
 	}
 
-	//completeness. For now checking all pairs. TODO: update to only check edges
-        {
-            const CSRStorage<ValueType>& localStorage = blockGraph.getLocalStorage();
-            scai::hmemo::ReadAccess<IndexType> ia( localStorage.getIA() );
-            scai::hmemo::ReadAccess<IndexType> ja( localStorage.getJA() );
-            EXPECT_EQ(ia.size() , k+1);
-            
-            for(IndexType i=0; i<k; i++){
-                const IndexType endCols = ia[i+1];   
-                for (IndexType j = ia[i]; j < endCols; j++) {
-                    EXPECT_TRUE(communicated[i][ja[j]]) << i << " and " << ja[j] << " did not communicate";
-                }
-            }
-        }
+	//completeness.
+	{
+		const CSRStorage<ValueType>& localStorage = blockGraph.getLocalStorage();
+		scai::hmemo::ReadAccess<IndexType> ia( localStorage.getIA() );
+		scai::hmemo::ReadAccess<IndexType> ja( localStorage.getJA() );
+		EXPECT_EQ(ia.size() , k+1);
+
+		for(IndexType i=0; i<k; i++){
+			const IndexType endCols = ia[i+1];
+			for (IndexType j = ia[i]; j < endCols; j++) {
+				EXPECT_TRUE(communicated[i][ja[j]]) << i << " and " << ja[j] << " did not communicate";
+			}
+		}
+}
 }
 //--------------------------------------------------------------------------------------- 
 

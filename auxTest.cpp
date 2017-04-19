@@ -61,7 +61,11 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
         for(int j=0; j<N; j++)
             adjArray[i*N+j]=0;
         
-    srand(time(NULL));
+	//broadcast seed value from root to ensure equal pseudorandom numbers.
+	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+	comm->bcast( seed, 1, 0 );
+	srand(seed[0]);
+
     IndexType numEdges = int (4*N);
     for(IndexType i=0; i<numEdges; i++){
         // a random position in the matrix

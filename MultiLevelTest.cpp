@@ -224,7 +224,11 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
         for(int j=0; j<N; j++)
             adjArray[i*N+j]=0;
         
-    srand(time(NULL));
+	//broadcast seed value from root to ensure equal pseudorandom numbers.
+	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+	comm->bcast( seed, 1, 0 );
+	srand(seed[0]);
+
     IndexType numEdges = int (3*N);
     for(IndexType i=0; i<numEdges; i++){
         // a random position in the matrix
@@ -259,8 +263,8 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     //coordinates at random and redistribute
     std::vector<DenseVector<ValueType>> coords(2);
     for(IndexType i=0; i<2; i++){ 
-	coords[i].allocate(N);
-	coords[i] = static_cast<ValueType>( 0 );
+        coords[i].allocate(N);
+        coords[i] = static_cast<ValueType>( 0 );
         // set random coordinates
         for(IndexType j=0; j<N; j++){
             coords[i].setValue(j, rand()%10);
