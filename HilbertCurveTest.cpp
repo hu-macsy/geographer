@@ -237,13 +237,16 @@ TEST_F(HilbertCurveTest, testHilbertIndexRandom_Distributed_3D) {
       coordinates[i] = static_cast<ValueType>( 0 );
   }
 
-  srand(time(NULL));
+  //broadcast seed value from root to ensure equal pseudorandom numbers.
+  ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+  comm->bcast( seed, 1, 0 );
+  srand(seed[0]);
+
   ValueType r;
-  
   for(int i=0; i<N; i++){      
     for(int j=0; j<dimensions; j++){
-        r= ((double) rand()/RAND_MAX);
-	coordinates[j].setValue( i, r);	
+      r= double(rand()/RAND_MAX);
+	  coordinates[j].setValue( i, r);
     }
   }
 
@@ -416,9 +419,10 @@ TEST_F(HilbertCurveTest, testRandom_Distributed_3D) {
   // create own part of coordinates 
   for(IndexType i=0; i<dimensions; i++){
     SCAI_REGION("testNewVsOldVersionRandom_Distributed_3D.create_coords");
+    scai::hmemo::WriteOnlyAccess<ValueType> wCoords(coordinates[i].getLocalValues());
     for(IndexType j=0; j<coordinates[i].getLocalValues().size(); j++){ 
       r= ((double) rand()/RAND_MAX * 100);
-      coordinates[i].getLocalValues()[j] = r;
+      wCoords[j] = r;
     }
   }
   

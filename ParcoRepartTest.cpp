@@ -358,10 +358,7 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
 		for(int j=0; j<n; j++)
 			adjArray[i*n+j]=0;
 
-	//broadcast seed value from root to ensure equal pseudorandom numbers.
-	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
-	comm->bcast( seed, 1, 0 );
-	srand(seed[0]);
+	srand(time(NULL));
 
 	IndexType numEdges = int (1.12*n);
 	for(IndexType i=0; i<numEdges; i++){
