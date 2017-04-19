@@ -104,6 +104,7 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
     
     DenseVector<IndexType> partition= ParcoRepart<IndexType, ValueType>::initialPartition(graph, coords, Settings);
     //partition.redistribute( distPtr );
+    uniformWeights.redistribute(partition.getDistributionPtr());
     
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, Settings);
     //ITI::aux::multiLevelStep(graph, partition, uniformWeights, coords, Settings);

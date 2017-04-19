@@ -12,17 +12,17 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
 	const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
 
-	if(coordinates.size() != settings.dimensions){
+	if (coordinates.size() != settings.dimensions){
 		throw std::runtime_error("Dimensions do not agree: vector.size()= " + std::to_string(coordinates.size())  + " != settings.dimensions= " + std::to_string(settings.dimensions) );
 	}
 
 	if (!input.getRowDistributionPtr()->isReplicated()) {
 		//check whether distributions agree
 		const scai::dmemo::Distribution &inputDist = input.getRowDistribution();
-		SCAI_ASSERT(  part.getDistributionPtr()->getLocalSize() == inputDist.getLocalSize(), "distribution mismatch" );
-		SCAI_ASSERT(  nodeWeights.getDistributionPtr()->getLocalSize() == inputDist.getLocalSize(), "distribution mismatch" );
+		SCAI_ASSERT(  part.getDistributionPtr()->isEqual(inputDist), "distribution mismatch" );
+		SCAI_ASSERT(  nodeWeights.getDistributionPtr()->isEqual(inputDist), "distribution mismatch" );
 		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-			SCAI_ASSERT(  coordinates[dim].getDistributionPtr()->getLocalSize() == inputDist.getLocalSize(), "distribution mismatch" );
+			SCAI_ASSERT(  coordinates[dim].getDistributionPtr()->isEqual(inputDist), "distribution mismatch" );
 		}
 
 		//check whether partition agrees with distribution
@@ -58,10 +58,10 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 
 		Settings settingscopy(settings);
 		settingscopy.multiLevelRounds--;
-                // recursive call 
+		// recursive call
 		multiLevelStep(coarseGraph, coarsePart, coarseWeights, coarseCoords, settingscopy);
 
-                // uncoarsening/refinement
+		// uncoarsening/refinement
 		scai::dmemo::DistributionPtr projectedFineDist = projectToFine(coarseGraph.getRowDistributionPtr(), fineToCoarseMap);
 		assert(projectedFineDist->getGlobalSize() == globalN);
 		part = DenseVector<IndexType>(projectedFineDist, comm->getRank());
@@ -120,7 +120,7 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 				assert(gain >= 0);
 			}
 			if (comm->getRank() == 0) {
-				std::cout << "Multilevel round= "<< settings.multiLevelRounds <<": After " << numRefinementRounds + 1 << " refinement rounds, cut is " << cut << std::endl;
+				std::cout << "Multilevel round "<< settings.multiLevelRounds <<": After " << numRefinementRounds + 1 << " refinement rounds, cut is " << cut << std::endl;
 			}
 			oldCut = cut;
 			numRefinementRounds++;

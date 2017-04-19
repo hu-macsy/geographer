@@ -17,3 +17,8 @@ local/
 *.graph
 *.graph.xyz
 *.csv
+SpectralPartition_Grid32x32_*.xyz
+writeCoordsDist_*.xyz
+hilbertPartition_*.xyz
+SpectralPartition_+trace01_*.xyz
+octree_timestep_*.dat
