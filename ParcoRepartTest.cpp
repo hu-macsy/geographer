@@ -116,8 +116,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
 
   std::vector<DenseVector<ValueType>> coordinates(dimensions);
   for(IndexType i=0; i<dimensions; i++){ 
-	  coordinates[i].allocate(dist);
-	  coordinates[i] = static_cast<ValueType>( 0 );
+	  coordinates[i] = DenseVector<ValueType>(dist, 0);
   }
   
   MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(a, coordinates, maxCoord, numPoints);

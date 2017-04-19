@@ -103,7 +103,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		ValueType gain = settings.minGainForNextRound;
 		ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
 
-		DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(input.getRowDistributionPtr(), 1);
+		DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(result.getDistributionPtr(), 1);
 
 		ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, uniformWeights, coordinates, settings);
 
@@ -173,11 +173,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
      */
     
     scai::lama::DenseVector<ValueType> hilbertIndices(inputDist);
-    // get local part of hilbert indices
-    scai::utilskernel::LArray<ValueType>& hilbertIndicesLocal = hilbertIndices.getLocalValues();
     
     {
-        SCAI_REGION("ParcoRepart.initialPartition.spaceFillingCurve")
+        SCAI_REGION("ParcoRepart.initialPartition.spaceFillingCurve");
+        // get local part of hilbert indices
+        scai::hmemo::WriteOnlyAccess<ValueType> hilbertIndicesLocal(hilbertIndices.getLocalValues());
+        assert(hilbertIndicesLocal.size() == localN);
         // get read access to the local part of the coordinates
         // TODO: should be coordAccess[dimension] but I don't know how ... maybe HArray::acquireReadAccess? (harry)
         scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
@@ -233,10 +234,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(CSRSp
         DenseVector<IndexType> tmpPerm = permutation;
         tmpPerm.sort( inversePermutation, true);
         
-        result.allocate(inputDist);
+        scai::hmemo::WriteOnlyAccess<IndexType> wResult(result.getLocalValues(), localN);
         
         for (IndexType i = 0; i < localN; i++) {
-            result.getLocalValues()[i] = int( inversePermutation.getLocalValues()[i] *k/globalN);
+        	wResult[i] = static_cast<IndexType>(inversePermutation.getLocalValues()[i] *k/globalN);
         }
     }
     

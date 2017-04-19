@@ -21,8 +21,10 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 		const scai::dmemo::Distribution &inputDist = input.getRowDistribution();
 		SCAI_ASSERT(  part.getDistributionPtr()->isEqual(inputDist), "distribution mismatch" );
 		SCAI_ASSERT(  nodeWeights.getDistributionPtr()->isEqual(inputDist), "distribution mismatch" );
-		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-			SCAI_ASSERT(  coordinates[dim].getDistributionPtr()->isEqual(inputDist), "distribution mismatch" );
+		if (settings.useGeometricTieBreaking) {
+			for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+				SCAI_ASSERT(  coordinates[dim].getDistributionPtr()->isEqual(inputDist), "distribution mismatch in dimension " << dim );
+			}
 		}
 
 		//check whether partition agrees with distribution
