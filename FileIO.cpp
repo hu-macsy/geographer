@@ -281,7 +281,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
     scai::utilskernel::LArray<ValueType> values(ja.size(), 1);//unweighted edges
     assert(ja.size() == ia[localN]);
-    assert(comm->sum(localN) == globalN);
+    SCAI_ASSERT(comm->sum(localN) == globalN, "Sum " << comm->sum(localN) << " should be " << globalN);
 
     if (comm->sum(ja.size()) != 2*globalM) {
     	throw std::runtime_error("Expected " + std::to_string(2*globalM) + " edges, got " + std::to_string(comm->sum(ja.size())));
@@ -289,7 +289,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
     //assign matrix
     scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, ja.size(), scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
-    		scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()), values);
+	scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()), values);
 
     return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
 }

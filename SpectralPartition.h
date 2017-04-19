@@ -24,7 +24,7 @@
 #include <tuple>
 #include <chrono>
 
- #include <eigen3/Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 
 #include "PrioQueue.h"
 #include "ParcoRepart.h"

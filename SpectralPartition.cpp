@@ -91,7 +91,7 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
             
             if(serialPixelInd >= numPixels){
                 if(block != k-1){
-                    PRINT("Pixels finished but still have blocks that will be empty." << std::endl << "This should not happen. Exiting...");
+                    PRINT("Pixels finished but still have blocks that will be empty: current block is "<< block << " and k= "<< k << std::endl << "This should not happen. Exiting...");
                     return DenseVector<IndexType>(inputDist, -1);
                 }
                 break;

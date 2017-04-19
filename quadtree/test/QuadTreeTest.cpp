@@ -272,36 +272,41 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
 
 TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
 
-        count n = 500;
+	count n = 500;
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	vector<Point<double> > positions(n);
 	vector<index> content(n);
 
-        Point<double> min(0.0, 0.0, 0.0);
-        Point<double> max(1.0, 1.0, 1.0);
-        index capacity = 1;
+	Point<double> min(0.0, 0.0, 0.0);
+	Point<double> max(1.0, 1.0, 1.0);
+	index capacity = 1;
         
 	QuadTreeCartesianEuclid quad(min, max, true, capacity);
-        index i=0;
-        srand(time(NULL));
+	index i=0;
+
+	//broadcast seed value from root to ensure equal pseudorandom numbers.
+	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+	comm->bcast( seed, 1, 0 );
+	srand(seed[0]);
     
-        for (i = 0; i < n; i++) {
+	for (i = 0; i < n; i++) {
 		Point<double> pos = Point<double>({double(rand()) / RAND_MAX, double(rand()) / RAND_MAX, double(rand()) / RAND_MAX});
 		positions[i] = pos;
 		content[i] = i;
 		quad.addContent(i, pos);
 	}
 	
-	PRINT("Num of leaves= N = "<< quad.countLeaves() );
-	index N= quad.countLeaves();
-        // index the tree
-        index treeSize = quad.indexSubtree(0);
+	PRINT("Num of leaves = N = "<< quad.countLeaves() );
+	index N = quad.countLeaves();
+	// index the tree
+	index treeSize = quad.indexSubtree(0);
         
-        // A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
-        // of -i- in the output graph, not the quad tree.
-        std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells( treeSize );
-        int dimension = 3;
-        std::vector<std::vector<ValueType>> coords( dimension );
+	// A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
+	// of -i- in the output graph, not the quad tree.
+	std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells( treeSize );
+	int dimension = 3;
+	std::vector<std::vector<ValueType>> coords( dimension );
         
 	scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>(graphNgbrsCells, coords);
         /*
@@ -319,7 +324,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
 	graph.checkSymmetry();
 	graph.isConsistent();
         
-        EXPECT_EQ(coords[0].size(), N);
+	EXPECT_EQ(coords[0].size(), N);
             
 	EXPECT_EQ( graph.getNumRows(), N);
 	EXPECT_EQ( graph.getNumColumns(), N);
@@ -359,8 +364,6 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
         
         // communicate/distribute graph
     
-        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-
         IndexType k = comm->getSize();
 
         scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -670,7 +673,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
             coordsDV[d].redistribute(dist);
         }
         
-        scai::lama::DenseVector<IndexType> hilbertPartition = ITI::ParcoRepart<IndexType, ValueType>::initialPartition(graph, coordsDV, settings);
+        scai::lama::DenseVector<IndexType> hilbertPartition = ITI::ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coordsDV, settings);
         if(dimension==2){
             ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordsDV, N, destPath+"hilbert");
         }
