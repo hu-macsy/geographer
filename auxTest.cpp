@@ -43,12 +43,13 @@ class auxTest : public ::testing::Test {
 
 TEST_F (auxTest, testMultiLevelStep_dist) {
 
-    const IndexType N = 60;
+    const IndexType N = 120;
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( N ));
     const IndexType k = comm->getSize();
+    const IndexType localN = distPtr->getLocalSize();
     
     scai::lama::CSRSparseMatrix<ValueType> graph;
     
@@ -60,8 +61,12 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
         for(int j=0; j<N; j++)
             adjArray[i*N+j]=0;
         
-    srand(time(NULL));
-    IndexType numEdges = int (1.12*N);
+	//broadcast seed value from root to ensure equal pseudorandom numbers.
+	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+	comm->bcast( seed, 1, 0 );
+	srand(seed[0]);
+
+    IndexType numEdges = int (4*N);
     for(IndexType i=0; i<numEdges; i++){
         // a random position in the matrix
         IndexType x = rand()%N;
@@ -76,36 +81,33 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
     IndexType beforeNumValues = graph.getNumValues();
     graph.redistribute( distPtr , noDistPtr);
     
-    // node weights = 1
-    DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
     //ValueType beforeSumWeigths = uniformWeights.l1Norm().Scalar::getValue<ValueType>();
-    IndexType beforeSumWeigths = N;
-    //uniformWeights.redistribute( distPtr );
+    IndexType beforeSumWeights = N;
+
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+    settings.multiLevelRounds= 3;
+    settings.coarseningStepsBetweenRefinement = 3;
+    settings.useGeometricTieBreaking = true;
+    settings.dimensions= 2;
     
     //coordinates at random and redistribute
-    std::vector<DenseVector<ValueType>> coords(2);
-    for(IndexType i=0; i<2; i++){ 
-	coords[i].allocate(N);
-	coords[i] = static_cast<ValueType>( 0 );
+    std::vector<DenseVector<ValueType>> coords(settings.dimensions);
+    for(IndexType i=0; i<settings.dimensions; i++){
+    	coords[i] = DenseVector<ValueType>(distPtr, 0);
         // set random coordinates
-        for(IndexType j=0; j<N; j++){
-            coords[i].setValue(j, rand()%10);
+    	scai::hmemo::WriteOnlyAccess<ValueType> wCoords(coords[i].getLocalValues());
+        for(IndexType j=0; j<localN; j++){
+            wCoords[i] = rand()%k;
         }
-        coords[i].redistribute( distPtr );
     }
     
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
-    Settings.multiLevelRounds= 3;
-    Settings.coarseningStepsBetweenRefinement = 3;
-    Settings.useGeometricTieBreaking = true;
-    Settings.dimensions= 2;
+    DenseVector<IndexType> partition= ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coords, settings);
+    // node weights = 1
+    DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(partition.getDistributionPtr(), 1);
     
-    DenseVector<IndexType> partition= ParcoRepart<IndexType, ValueType>::initialPartition(graph, coords, Settings);
-    //partition.redistribute( distPtr );
-    
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, Settings);
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, settings);
     //ITI::aux::multiLevelStep(graph, partition, uniformWeights, coords, Settings);
     
     EXPECT_EQ( graph.l1Norm() , beforel1Norm);
@@ -116,7 +118,7 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
         newWeights.setValue(i, uniformWeights.getValue(i) );
     }
     //PRINT(newWeights.l1Norm() );
-    EXPECT_EQ( newWeights.l1Norm() , beforeSumWeigths );
+    EXPECT_EQ( newWeights.l1Norm() , beforeSumWeights );
     
 }
 //-------------------------------------------------------------------------
@@ -124,7 +126,9 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
 TEST_F (auxTest, testInitialPartitions){
 
     std::string path = "meshes/bigtrace/";
-    std::string fileName = "bigtrace-00001.graph";
+    //std::string fileName = "bigtric-00016.graph";
+    std::string fileName = "bigtrace-00021.graph";
+    //std::string fileName = "slowrot-00014.graph";
     std::string file = path + fileName;
     std::ifstream f(file);
     IndexType dimensions= 2;
@@ -159,25 +163,31 @@ TEST_F (auxTest, testInitialPartitions){
     settings.numBlocks= k;
     settings.epsilon = 0.1;
     settings.dimensions = dimensions;
-    settings.pixeledDetailLevel = 6;        // for a 16x16 coarsen graph in 2D, 16x16x16 in 3D
+    settings.pixeledDetailLevel = 8;        //4 for a 16x16 coarsen graph in 2D, 16x16x16 in 3D
     settings.useGeometricTieBreaking =1;
     settings.fileName = fileName;
     settings.useGeometricTieBreaking =1;
     settings.multiLevelRounds = 6;
     settings.minGainForNextRound= 10;
+    // 5% of (approximetely, if at every round you get a 60% reduction in nodes) the nodes of the coarsest graph
+    settings.minBorderNodes = N*std::pow(0.6, settings.multiLevelRounds)/k * 0.05;
+    settings.coarseningStepsBetweenRefinement =2;
     
     DenseVector<IndexType> uniformWeights;
     
     ValueType cut;
     ValueType imbalance;
     
-    std::string logFile = destPath + "resutls.log";
+    std::string logFile = destPath + "results.log";
     std::ofstream logF(logFile);
-    logF<< "Results for file " << fileName << std::endl;
-    logF<< "node= "<< N << " , edges= "<< edges << " , blocks= "<< k<< std::endl<< std::endl;
-    settings.print( logF );
-    if( comm->getRank()==0)    settings.print( std::cout );
-    logF<< std::endl<< std::endl << "Only initial partition, no MultiLevel or LocalRefinement"<< std::endl << std::endl;
+    
+    if( comm->getRank()==0){
+        logF<< "Results for file " << fileName << std::endl;
+        logF<< "node= "<< N << " , edges= "<< edges << " , blocks= "<< k<< std::endl<< std::endl;
+        settings.print( logF );
+        settings.print( std::cout );
+    }
+    //logF<< std::endl<< std::endl << "Only initial partition, no MultiLevel or LocalRefinement"<< std::endl << std::endl;
     
     //------------------------------------------- pixeled
     
@@ -193,9 +203,10 @@ TEST_F (auxTest, testInitialPartitions){
     //cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
     cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, pixeledPartition);
     imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
-    logF<< "-- Initial Pixeled partition " << std::endl;
-    logF<< "\tcut: " << cut << " , imbalance= "<< imbalance;
-    
+    if(comm->getRank()==0){
+        logF<< "-- Initial Pixeled partition " << std::endl;
+        logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
+    }
     uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, settings);
     if(dimensions==2){
@@ -203,8 +214,12 @@ TEST_F (auxTest, testInitialPartitions){
     }
     cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, pixeledPartition);
     imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
-    logF<< "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
-    logF  << std::endl  << std::endl; 
+    if(comm->getRank()==0){
+        logF<< "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
+        logF  << std::endl  << std::endl; 
+        std::cout << "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
+        std::cout  << std::endl  << std::endl; 
+    }
     
     //------------------------------------------- hilbert/sfc
     
@@ -216,7 +231,7 @@ TEST_F (auxTest, testInitialPartitions){
     if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
     PRINT0( "Get a hilbert/sfc partition");
     // get a hilbertPartition
-    scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::initialPartition( graph, coordinates, settings);
+    scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition( graph, coordinates, settings);
     
     //aux::print2DGrid( graph, hilbertPartition );
     if(dimensions==2){
@@ -224,9 +239,10 @@ TEST_F (auxTest, testInitialPartitions){
     }
     cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, hilbertPartition);
     imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
-    logF<< "-- Initial Hilbert/sfc partition " << std::endl;
-    logF<< "\tcut: " << cut << " , imbalance= "<< imbalance;
-    
+    if(comm->getRank()==0){
+        logF<< "-- Initial Hilbert/sfc partition " << std::endl;
+        logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
+    }
     uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, settings);
     if(dimensions==2){
@@ -234,10 +250,16 @@ TEST_F (auxTest, testInitialPartitions){
     }
     cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, hilbertPartition);
     imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
-    logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
-    logF  << std::endl  << std::endl; 
-    
+    if(comm->getRank()==0){
+        logF<< "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
+        logF  << std::endl  << std::endl; 
+        std::cout << "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
+        std::cout  << std::endl  << std::endl; 
+    }
+   
     //------------------------------------------- spectral
+/*
+    settings.minGainForNextRound = 5;
     
     // the partitioning may redistribute the input graph
     graph.redistribute(dist, noDistPointer);
@@ -246,13 +268,8 @@ TEST_F (auxTest, testInitialPartitions){
     }
     if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
     PRINT0("Get a spectral partition");
-    
-    if( settings.pixeledDetailLevel > 5){
-        settings.pixeledDetailLevel = 5;
-        PRINT0("changing detail level to 5 since it would be too slow otherwise" );
-    }
-    
-    // get spectral partition
+
+    // get initial spectral partition
     scai::lama::DenseVector<IndexType> spectralPartition = SpectralPartition<IndexType, ValueType>::getPartition( graph, coordinates, settings);
     
     //aux::print2DGrid( graph, spectralPartition );
@@ -262,7 +279,7 @@ TEST_F (auxTest, testInitialPartitions){
     cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, spectralPartition);
     imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( spectralPartition, k);
     logF<< "-- Initial Spectral partition " << std::endl;
-    logF<< "\tcut: " << cut << " , imbalance= "<< imbalance;
+    logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
     
     uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, spectralPartition, uniformWeights, coordinates, settings);
@@ -272,14 +289,44 @@ TEST_F (auxTest, testInitialPartitions){
     }
     cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, spectralPartition);
     imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( spectralPartition, k);
-    logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
-    logF  << std::endl  << std::endl; 
-    
-    
+    if(comm->getRank()==0){
+        logF<< "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
+        logF  << std::endl  << std::endl; 
+        std::cout << "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
+        std::cout  << std::endl  << std::endl; 
+    }
+*/    
     if(comm->getRank()==0){
         std::cout<< "Output files written in " << destPath << std::endl;
     }
+
+}
+
+
+TEST_F (auxTest, testPixelDistance) {
     
+    IndexType sideLen = 139;
+    
+    //for pixel=18 and an 8x8 grid max dist is with pixel 63 and is equal to 10
+    ValueType maxl2Dist = aux::pixell2Distance2D(0,sideLen*sideLen-1, sideLen);
+    std::cout<< maxl2Dist << std::endl;
+    for(int i=0; i<sideLen*sideLen; i++){
+        //std::cout << "dist1(" << 0<< ", "<< i << ")= "<< aux::pixelDistance2D( 0, i, sideLen) << std::endl;
+        EXPECT_LE(aux::pixelDistance2D( 0, i, sideLen), sideLen+sideLen-2);
+        EXPECT_LE(aux::pixell2Distance2D( 0, i, sideLen), maxl2Dist);
+    }
+    
+    srand(time(NULL));
+    IndexType pixel= rand()/(sideLen*(sideLen-2)) +2*sideLen;
+    
+    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel, sideLen), 0);
+    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel+1, sideLen), 1);
+    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel+sideLen, sideLen), 1);
+    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel-sideLen, sideLen), 1);
+    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel+sideLen-3, sideLen), 4);
+    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel-sideLen-2, sideLen), 3);
+    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel-2*sideLen+3, sideLen), 5);
+    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel-2*sideLen-3, sideLen), 5);
 }
 
 }

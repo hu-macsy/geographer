@@ -177,6 +177,38 @@ void FileIO<IndexType, ValueType>::writeCoordsDistributed_2D (const std::vector<
     
 }
 
+template<typename IndexType, typename ValueType>
+void FileIO<IndexType, ValueType>::writePartition(const DenseVector<IndexType> &part, const std::string filename) {
+	SCAI_REGION( "FileIO.writePartition" );
+
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	scai::dmemo::DistributionPtr dist = part.getDistributionPtr();
+	scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( part.size() ));
+
+	/**
+	 * If the input partition is replicated, we can write it directly from the root processor.
+	 * If it is not, we need to create a replicated copy.
+	 */
+	DenseVector<IndexType> maybeCopy;
+	DenseVector<IndexType> &targetReference = dist->isReplicated() ? part : maybeCopy;
+	if (!dist->isReplicated()) {
+		maybeCopy = DenseVector<IndexType>(part, noDist);
+	}
+	assert(maybeCopy.getDistributionPtr()->isReplicated());
+	assert(maybeCopy.size() == part.size());
+
+	if (comm->getRank() == 0) {
+		std::ofstream filehandle(filename);
+		if (filehandle.fail()) {
+			throw std::runtime_error("Could not write to file " + filename);
+		}
+		scai::hmemo::ReadAccess<IndexType> access(maybeCopy);
+		for (IndexType i = 0; i < access.size(); i++) {
+			filehandle << access[i] << std::endl;
+		}
+	}
+}
+
 //-------------------------------------------------------------------------------------------------
 /*File "filename" contains a graph in the METIS format. The function reads that graph and transforms
  * it to the adjacency matrix as a CSRSparseMatrix.
@@ -249,7 +281,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
     scai::utilskernel::LArray<ValueType> values(ja.size(), 1);//unweighted edges
     assert(ja.size() == ia[localN]);
-    assert(comm->sum(localN) == globalN);
+    SCAI_ASSERT(comm->sum(localN) == globalN, "Sum " << comm->sum(localN) << " should be " << globalN);
 
     if (comm->sum(ja.size()) != 2*globalM) {
     	throw std::runtime_error("Expected " + std::to_string(2*globalM) + " edges, got " + std::to_string(comm->sum(ja.size())));
@@ -257,7 +289,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
     //assign matrix
     scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, ja.size(), scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
-    		scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()), values);
+	scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()), values);
 
     return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
 }
@@ -315,10 +347,29 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
     std::vector<DenseVector<ValueType> > result(dimension);
 
     for (IndexType i = 0; i < dimension; i++) {
-    	result[i] = DenseVector<ValueType>(dist, coords[i]);
+    	//result[i] = DenseVector<ValueType>(coords[i], dist);
+        result[i] = DenseVector<ValueType>(dist, coords[i] );
     }
 
     return result;
+}
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::string filename) {
+	std::ifstream file(filename);
+
+	if(file.fail())
+		throw std::runtime_error("File "+ filename+ " failed.");
+
+	std::vector<IndexType> part;
+	std::string line;
+	while (std::getline(file, line)) {
+		part.push_back(std::stoi(line));
+	}
+
+	DenseVector<IndexType> result(part.size(), part.data());
+
+	return result;
 }
 
 template<typename IndexType, typename ValueType>

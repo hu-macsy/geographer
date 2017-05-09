@@ -41,6 +41,27 @@ static void writeHeatLike_local_2D(std::vector<IndexType> input,IndexType sideLe
 }    
 //------------------------------------------------------------------------------
 
+static void writeHeatLike_local_2D(scai::hmemo::HArray<IndexType> input,IndexType sideLen, IndexType dim, const std::string filename){
+    std::ofstream f(filename);
+    if(f.fail())
+        throw std::runtime_error("File "+ filename+ " failed.");
+    
+    f<< "$map2 << EOD" << std::endl;
+    scai::hmemo::ReadAccess<IndexType> rInput( input );
+    
+    for(IndexType i=0; i<sideLen; i++){
+        for(IndexType j=0; j<sideLen; j++){
+            f<< j << " " << i << " " << rInput[i*sideLen+j] << std::endl;
+        }
+        f<< std::endl;
+    }
+    rInput.release();
+    f<< "EOD"<< std::endl;
+    f<< "set title \"Pixeled partition for file " << filename << "\" " << std::endl;
+    f << "plot '$map2' using 2:1:3 with image" << std::endl;
+}    
+//------------------------------------------------------------------------------
+
 static void print2DGrid(scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama::DenseVector<IndexType>& partition  ){
     
     IndexType N= adjM.getNumRows();
@@ -84,6 +105,42 @@ static void print2DGrid(scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama
 
 }
 //------------------------------------------------------------------------------
-   
+
+/*  From pixel (int) coords, either in 2S or 3D, to a 1D index. 
+ * Only for cubes, where every side has the same length, maxLen;
+ */
+//static IndexType pixel2Index(IndexType pixel1, IndexType maxLen, IndexType dimension){
+//}
+ 
+ /** The l1 distance of two pixels in 2D if their given as a 1D distance.
+  * @param[in] pixel1 The index of the first pixel.
+  * @param[in] pixel1 The index of the second pixel.
+  * @param[in] sideLen The length of the side of the cube.
+  * 
+  * @return The l1 distance of the pixels.
+  */
+static IndexType pixelDistance2D(IndexType pixel1, IndexType pixel2, IndexType sideLen){
+     
+     IndexType col1 = pixel1/sideLen;
+     IndexType col2 = pixel2/sideLen;
+     
+     IndexType row1 = pixel1%sideLen;
+     IndexType row2 = pixel2%sideLen;
+     
+     return std::abs(col1-col2) + std::abs(row1-row2);;
+}
+
+static ValueType pixell2Distance2D(IndexType pixel1, IndexType pixel2, IndexType sideLen){
+     
+     IndexType col1 = pixel1/sideLen;
+     IndexType col2 = pixel2/sideLen;
+     
+     IndexType row1 = pixel1%sideLen;
+     IndexType row2 = pixel2%sideLen;
+     
+     return std::pow( ValueType (std::pow(std::abs(col1-col2),2) + std::pow(std::abs(row1-row2),2)) , 0.5);
+}
+ 
+ 
 }; //class aux
 }// namespace ITI

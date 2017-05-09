@@ -207,7 +207,7 @@ TEST_F (MultiLevelTest, testComputeGlobalPrefixSum) {
 
 TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 
-    const IndexType N = 500;
+    const IndexType N = 300;
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -224,12 +224,18 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
         for(int j=0; j<N; j++)
             adjArray[i*N+j]=0;
         
-    srand(time(NULL));
-    IndexType numEdges = int (1.12*N);
+	//broadcast seed value from root to ensure equal pseudorandom numbers.
+	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+	comm->bcast( seed, 1, 0 );
+	srand(seed[0]);
+
+    IndexType numEdges = int (3*N);
     for(IndexType i=0; i<numEdges; i++){
         // a random position in the matrix
         IndexType x = rand()%N;
         IndexType y = rand()%N;
+        ASSERT_LT(x+y*N, N*N);
+        ASSERT_LT(x*N+y, N*N);
         adjArray[ x+y*N ]= 1;
         adjArray[ x*N+y ]= 1;
     }
@@ -238,33 +244,34 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     EXPECT_TRUE( graph.checkSymmetry() );
     ValueType beforel1Norm = graph.l1Norm().Scalar::getValue<ValueType>();
     IndexType beforeNumValues = graph.getNumValues();
-    graph.redistribute( distPtr , noDistPtr);
     
+    //random partition
+	DenseVector<IndexType> partition( N , 0);
+	for(IndexType i=0; i<N; i++){
+		partition.setValue(i, rand()%k );
+	}
+	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(partition.getLocalValues(), comm));
+	partition.redistribute( newDist );
+
+    graph.redistribute( newDist , noDistPtr);
+
     // node weights = 1
     DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
     //ValueType beforeSumWeigths = uniformWeights.l1Norm().Scalar::getValue<ValueType>();
-    IndexType beforeSumWeigths = N;
-    //uniformWeights.redistribute( distPtr );
+    IndexType beforeSumWeights = N;
     
     //coordinates at random and redistribute
     std::vector<DenseVector<ValueType>> coords(2);
     for(IndexType i=0; i<2; i++){ 
-	coords[i].allocate(N);
-	coords[i] = static_cast<ValueType>( 0 );
+        coords[i].allocate(N);
+        coords[i] = static_cast<ValueType>( 0 );
         // set random coordinates
         for(IndexType j=0; j<N; j++){
             coords[i].setValue(j, rand()%10);
         }
-        coords[i].redistribute( distPtr );
+        coords[i].redistribute( newDist );
     }
-    
-    //random partition
-    DenseVector<IndexType> partition( N , 0);
-    for(IndexType i=0; i<N; i++){
-        partition.setValue(i, rand()%k );
-    }
-    partition.redistribute( distPtr );
-    
+
     struct Settings Settings;
     Settings.numBlocks= k;
     Settings.epsilon = 0.2;
@@ -272,13 +279,14 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     Settings.coarseningStepsBetweenRefinement = 3;
     Settings.useGeometricTieBreaking = true;
     Settings.dimensions= 2;
+    Settings.minGainForNextRound =3;
     
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, Settings);
     
     EXPECT_EQ( graph.l1Norm() , beforel1Norm);
     EXPECT_EQ( graph.getNumValues() , beforeNumValues);
     // l1Norm not supported for IndexType
-    EXPECT_EQ( static_cast <DenseVector<ValueType>> (uniformWeights).l1Norm() , beforeSumWeigths );
+    EXPECT_EQ( static_cast <DenseVector<ValueType>> (uniformWeights).l1Norm() , beforeSumWeights );
     
 }
 //--------------------------------------------------------------------------------------- 
@@ -347,7 +355,7 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
         }
         
         EXPECT_TRUE(pixelGraph.isConsistent());
-        if(pixeledGraphSize < 5000){
+        if(pixeledGraphSize < 4000){
             EXPECT_TRUE(pixelGraph.checkSymmetry());
         }
         SCAI_ASSERT_EQ_ERROR( pixelWeights.sum().Scalar::getValue<ValueType>() , N , "should ne equal");
