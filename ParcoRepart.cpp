@@ -816,7 +816,6 @@ ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<
 	if (!weighted) {
 		assert(maxBlockSize >= optSize);
 	}
-PRINT0("optSize= "<< optSize << " and maxBlockSize= "<< maxBlockSize );	
 	return (ValueType(maxBlockSize - optSize)/ optSize);
 }
 //--------------------------------------------------------------------------------------- 
