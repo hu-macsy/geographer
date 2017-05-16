@@ -229,7 +229,7 @@ int main(int argc, char** argv) {
     
     std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
     
-    // the code below writes the output coordinates in one file per processor for visualiation purposes.
+    // the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================
     if (settings.writeDebugCoordinates) {
 		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
