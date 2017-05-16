@@ -40,7 +40,7 @@ IndexType RecursiveBisection<IndexType, ValueType>::getLocalExtent(scai::lama::D
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<ValueType> RecursiveBisection<IndexType, ValueType>::partition1D(scai::lama::DenseVector<ValueType>& nodeWeights, IndexType k1, IndexType dimensionToPartition, IndexType sideLen, Settings settings){
+std::vector<ValueType> RecursiveBisection<IndexType, ValueType>::partition1D(scai::lama::DenseVector<ValueType>& nodeWeights, IndexType k1, IndexType dimensionToPartition, IndexType sideLen, Settings settings){
     
     const IndexType dimension = settings.dimensions;
     SCAI_ASSERT(dimensionToPartition < dimension, "Dimension to partition is wrong, must be less than "<< dimension << " but it is " << dimensionToPartition );
@@ -70,6 +70,9 @@ scai::lama::DenseVector<ValueType> RecursiveBisection<IndexType, ValueType>::par
     // the vector -projectionSum- is replicated to every PE
     comm->sumArray( projectionSum.getLocalValues() );
     
+    ValueType totalWeight = projectionSum.sum().scai::lama::Scalar::getValue<ValueType>();
+    ValueType averageWeight = totalWeight/k1;
+    
 PRINT0(averageWeight);
 if(comm->getRank() ==0){
     for(int i=0; i<sideLen; i++){
@@ -78,10 +81,7 @@ if(comm->getRank() ==0){
     std::cout << std::endl;
 }
     
-    ValueType totalWeight = projectionSum.sum().scai::lama::Scalar::getValue<ValueType>();
-    ValueType averageWeight = totalWeight/k1;
-    
-    scai::lama::DenseVector<ValueType> partHyperplanes(k1-1,-9);
+    std::vector<ValueType> partHyperplanes(k1-1,-9);
     IndexType part=1;
     scai::utilskernel::LArray<ValueType> projectionSum_local = projectionSum.getLocalValues();
     ValueType thisPartWeight = 0;
@@ -91,8 +91,8 @@ if(comm->getRank() ==0){
     for(int i=0; i<sideLen;i++){
         thisPartWeight += projectionSum_local[i];
         if( thisPartWeight > part*averageWeight){
-            SCAI_ASSERT(part-1 < partHyperplanes.getLocalValues().size(), "index: "<< part-1 << " too big, must be < "<<partHyperplanes.getLocalValues().size() )
-            partHyperplanes.getLocalValues()[part-1]= i-1;
+            SCAI_ASSERT(part-1 < partHyperplanes.size(), "index: "<< part-1 << " too big, must be < "<< partHyperplanes.size() )
+            partHyperplanes[part-1]= i-1;
             ++part;
             thisPartWeight =0;
         }
@@ -157,7 +157,7 @@ template void RecursiveBisection<int, double>::getPartition(scai::lama::DenseVec
 
 template scai::dmemo::CommunicatorPtr RecursiveBisection<int, double>::bisection(scai::lama::DenseVector<int>& nodeWeights, int k, scai::dmemo::CommunicatorPtr comm, Settings settings);
 
-template scai::lama::DenseVector<double> RecursiveBisection<int, double>::partition1D(scai::lama::DenseVector<double>& nodeWeights, int k1, int dimensionToPartition, int sideLen, Settings settings);
+template std::vector<double> RecursiveBisection<int, double>::partition1D(scai::lama::DenseVector<double>& nodeWeights, int k1, int dimensionToPartition, int sideLen, Settings settings);
 
 template int RecursiveBisection<int, double>::getLocalExtent(scai::lama::DenseVector<int>& nodeWeights, int dim, int totalDims);
 

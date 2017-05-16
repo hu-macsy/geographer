@@ -56,28 +56,34 @@ TEST_F(RecursiveBisectionTest, testPrefixSum){
             localPart[i] = i;
         }
     }
-    IndexType k1= std::pow(comm->getSize(), 0.5);
+    IndexType k1= 3;// std::pow(comm->getSize(), 0.5);
     IndexType dimensionToPartition = 0;
     Settings settings;
     settings.dimensions = dim;
     
-    scai::lama::DenseVector<ValueType> part1D = RecursiveBisection<IndexType, ValueType>::partition1D( nodeWeights, k1, dimensionToPartition, sideLen, settings);
+    // the 1D partition
+    std::vector<ValueType> part1D = RecursiveBisection<IndexType, ValueType>::partition1D( nodeWeights, k1, dimensionToPartition, sideLen, settings);
     
-    if(comm->getRank() ==0){
-        for(int i=0; i<part1D.getLocalValues().size(); i++){
-            std::cout<< *comm <<": "<< part1D.getLocalValues()[i] << std::endl;
+    //tests
+        
+    //if(comm->getRank() ==0){
+        for(int i=0; i<part1D.size(); i++){
+            std::cout<< *comm <<": "<< part1D[i] << std::endl;
         }
-    }
+    //}
+    
+    //SCAI_ASSERT( !std::is_sorted(part1D.begin(), part1D.end()) , "part1D is not sorted" )
+    
     
     // TODO: add proper tests
-    /*
+    
     std::vector<ValueType> part1DWeights(k1,0);
     for(int h=0; h<part1D.size(); h++){
         for(int i=0; i<localN; i++){
             
         }
     }
-    */
+    
 }
 //---------------------------------------------------------------------------------------
 
