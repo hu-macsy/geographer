@@ -254,7 +254,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
     //now read in local edges
     for (IndexType i = 0; i < localN; i++) {
-    	bool read = std::getline(file, line);
+    	bool read = std::getline(file, line).good();
     	assert(read);//if we have read past the end of the file, the node count was incorrect
         std::stringstream ss( line );
         std::string item;
@@ -328,7 +328,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 
     //read local range
     for (IndexType i = 0; i < localN; i++) {
-		bool read = std::getline(file, line);
+		bool read = std::getline(file, line).good();
 		assert(read);//if we have read past the end of the file, the node count was incorrect
 		std::stringstream ss( line );
 		std::string item;
