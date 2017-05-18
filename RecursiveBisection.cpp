@@ -40,6 +40,69 @@ IndexType RecursiveBisection<IndexType, ValueType>::getLocalExtent(scai::lama::D
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
+std::vector<ValueType> RecursiveBisection<IndexType, ValueType>::partition1D(scai::lama::DenseVector<ValueType>& nodeWeights, IndexType k1, IndexType dimensionToPartition, IndexType sideLen, Settings settings){
+    
+    const IndexType dimension = settings.dimensions;
+    SCAI_ASSERT(dimensionToPartition < dimension, "Dimension to partition is wrong, must be less than "<< dimension << " but it is " << dimensionToPartition );
+    //SCAI_ASSERT(maxPoint.size() == dimension);
+    
+    const scai::dmemo::DistributionPtr dist = nodeWeights.getDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+     
+    const IndexType globalN = nodeWeights.getDistributionPtr()->getGlobalSize();
+    const IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
+
+    // assuming a square grid 
+    scai::lama::DenseVector<ValueType> projectionSum(sideLen,0);
+        
+    {
+        scai::hmemo::ReadAccess<ValueType> localWeights(nodeWeights.getLocalValues());   
+        scai::hmemo::WriteAccess<ValueType> localSum(projectionSum.getLocalValues());
+        
+        for(int i=0; i<localN; i++){
+            IndexType globalIndex = dist->local2global(i);
+            std::vector<IndexType> coords = indexToCoords( globalIndex, sideLen, dimension);
+            localSum[ coords[dimensionToPartition] ] += localWeights[i];
+        }
+    }
+    
+    // the global sum of the weights projection in the given dimension
+    // the vector -projectionSum- is replicated to every PE
+    comm->sumArray( projectionSum.getLocalValues() );
+    
+    ValueType totalWeight = projectionSum.sum().scai::lama::Scalar::getValue<ValueType>();
+    ValueType averageWeight = totalWeight/k1;
+    
+PRINT0(averageWeight);
+if(comm->getRank() ==0){
+    for(int i=0; i<sideLen; i++){
+        std::cout<< projectionSum.getLocalValues()[i] << " , ";
+    }
+    std::cout << std::endl;
+}
+    
+    std::vector<ValueType> partHyperplanes(k1-1,-9);
+    IndexType part=1;
+    scai::utilskernel::LArray<ValueType> projectionSum_local = projectionSum.getLocalValues();
+    ValueType thisPartWeight = 0;
+    
+    // TODO: pick the most balanced of the two choices; add parameter epsilon
+    // if the weight of this part get more than the average return the previous index as hyperplane
+    for(int i=0; i<sideLen;i++){
+        thisPartWeight += projectionSum_local[i];
+        if( thisPartWeight > part*averageWeight){
+            SCAI_ASSERT(part-1 < partHyperplanes.size(), "index: "<< part-1 << " too big, must be < "<< partHyperplanes.size() )
+            partHyperplanes[part-1]= i-1;
+            ++part;
+            thisPartWeight =0;
+        }
+    }
+     
+    return partHyperplanes;
+}
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
 std::vector<IndexType> RecursiveBisection<IndexType, ValueType>::indexToCoords(IndexType ind, IndexType sideLen, IndexType dim){
     
     if(dim==2){
@@ -93,6 +156,8 @@ std::vector<IndexType> RecursiveBisection<IndexType, ValueType>::indexTo3D(Index
 template void RecursiveBisection<int, double>::getPartition(scai::lama::DenseVector<int>& nodeWeights, int k,  scai::dmemo::CommunicatorPtr comm, Settings settings);
 
 template scai::dmemo::CommunicatorPtr RecursiveBisection<int, double>::bisection(scai::lama::DenseVector<int>& nodeWeights, int k, scai::dmemo::CommunicatorPtr comm, Settings settings);
+
+template std::vector<double> RecursiveBisection<int, double>::partition1D(scai::lama::DenseVector<double>& nodeWeights, int k1, int dimensionToPartition, int sideLen, Settings settings);
 
 template int RecursiveBisection<int, double>::getLocalExtent(scai::lama::DenseVector<int>& nodeWeights, int dim, int totalDims);
 

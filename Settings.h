@@ -20,6 +20,7 @@ struct Settings{
     bool useGeometricTieBreaking = false;
     bool gainOverBalance = false;
     bool skipNoGainColors = false;
+    bool writeDebugCoordinates = false;
     double epsilon = 0.05;
     std::string fileName = "-";
     

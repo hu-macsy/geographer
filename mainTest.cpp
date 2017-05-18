@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
 				("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
 				("minBorderNodes", value<int>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
-				("sfcResolution", value<int>(&settings.sfcResolution)->default_value(settings.sfcResolution), "Tuning parameter: Recursion Level of space filling curve. A value of 0 causes the recursion level to be derived from the graph size.")
+				//("sfcRecursionSteps", value<int>(&settings.sfcResolution)->default_value(settings.sfcResolution), "Tuning parameter: Recursion Level of space filling curve. A value of 0 causes the recursion level to be derived from the graph size.")
 				("initialPartition", value<int>(&settings.initialPartition)->default_value(settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition")
 				("pixeledDetailLevel", value<int>(&settings.pixeledDetailLevel)->default_value(settings.pixeledDetailLevel), "The resolution for the pixeled partition or the spectral")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
@@ -69,6 +69,7 @@ int main(int argc, char** argv) {
 				("useDiffusionTieBreaking", value<bool>(&settings.useDiffusionTieBreaking)->default_value(settings.useDiffusionTieBreaking), "Tuning Parameter: Use diffusion to break ties in Fiduccia-Mattheyes algorithm")
 				("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
 				("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
+				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 				("multiLevelRounds", value<int>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
 				;
 
@@ -229,18 +230,15 @@ int main(int argc, char** argv) {
     
     std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
     
-    // the code below writes the output coordinates in one file per processor for visualiation purposes.
+    // the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================
-    //PRINT(*comm<< ": "<< partition.getLocalValues().size());
-    //PRINT(*comm<< ": "<< coordinates[0].getLocalValues().size());
-    //scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(N, partition/*.getLocalValues()*/, comm));
-    for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-        assert( coordinates[dim].size() == N);
-        coordinates[dim].redistribute(partition.getDistributionPtr());
+    if (settings.writeDebugCoordinates) {
+		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+			assert( coordinates[dim].size() == N);
+			coordinates[dim].redistribute(partition.getDistributionPtr());
+		}
+		ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, "debugResult");
     }
-    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, "debugResult");
-
-    //^^^^^^^^^^^^^^^^^    
     
     std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     

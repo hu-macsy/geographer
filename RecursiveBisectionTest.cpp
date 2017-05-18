@@ -36,6 +36,57 @@ class RecursiveBisectionTest : public ::testing::Test {
 
 };
 
+
+TEST_F(RecursiveBisectionTest, testPrefixSum){
+ 
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    IndexType sideLen= comm->getSize()*2;
+    int dim = 2;
+    IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
+    scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
+    IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
+    
+    //create local (random) weights
+    {
+        scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
+        srand(time(NULL));
+        for(int i=0; i<localN; i++){
+            //localPart[i] = rand()%10+2;
+            localPart[i] = i;
+        }
+    }
+    IndexType k1= 3;// std::pow(comm->getSize(), 0.5);
+    IndexType dimensionToPartition = 0;
+    Settings settings;
+    settings.dimensions = dim;
+    
+    // the 1D partition
+    std::vector<ValueType> part1D = RecursiveBisection<IndexType, ValueType>::partition1D( nodeWeights, k1, dimensionToPartition, sideLen, settings);
+    
+    //tests
+        
+    //if(comm->getRank() ==0){
+        for(int i=0; i<part1D.size(); i++){
+            std::cout<< *comm <<": "<< part1D[i] << std::endl;
+        }
+    //}
+    
+    //SCAI_ASSERT( !std::is_sorted(part1D.begin(), part1D.end()) , "part1D is not sorted" )
+    
+    
+    // TODO: add proper tests
+    
+    std::vector<ValueType> part1DWeights(k1,0);
+    for(int h=0; h<part1D.size(); h++){
+        for(int i=0; i<localN; i++){
+            
+        }
+    }
+    
+}
+//---------------------------------------------------------------------------------------
+
 TEST_F(RecursiveBisectionTest, testIndexTo){
     
     IndexType sideLen=4;
