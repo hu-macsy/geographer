@@ -37,10 +37,10 @@ class MultiSectionTest : public ::testing::Test {
 };
 
 
-TEST_F(MultiSectionTest, testPrefixSum){
+TEST_F(MultiSectionTest, test1DPartition){
  
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    IndexType sideLen= comm->getSize()*2;
+    IndexType sideLen= 10;
     IndexType dim = 2;
     IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -53,18 +53,22 @@ TEST_F(MultiSectionTest, testPrefixSum){
         srand(time(NULL));
         for(int i=0; i<localN; i++){
             //localPart[i] = rand()%10+2;
-            localPart[i] = i;
+            localPart[i] = 1;
         }
     }
-    IndexType k1= 3;// std::pow(comm->getSize(), 0.5);
+    IndexType k1= 5;
     IndexType dimensionToPartition = 0;
     Settings settings;
     settings.dimensions = dim;
     
-    // the 1D partition
-    std::vector<ValueType> part1D = MultiSection<IndexType, ValueType>::partition1D( nodeWeights, k1, dimensionToPartition, sideLen, settings);
+    std::pair<std::vector<ValueType>,std::vector<ValueType>> bBox;
+    bBox.first = {0,0};
+    bBox.second = {(ValueType) sideLen, (ValueType) sideLen};
     
-    //tests
+    // the 1D partition
+    std::vector<ValueType> part1D = MultiSection<IndexType, ValueType>::partition1D( nodeWeights, bBox, k1, dimensionToPartition, sideLen, settings);
+    
+    //assertions
         
     //if(comm->getRank() ==0){
         for(int i=0; i<part1D.size(); i++){
@@ -72,7 +76,7 @@ TEST_F(MultiSectionTest, testPrefixSum){
         }
     //}
     
-    //SCAI_ASSERT( !std::is_sorted(part1D.begin(), part1D.end()) , "part1D is not sorted" )
+    SCAI_ASSERT( !std::is_sorted(part1D.end(), part1D.begin()) , "part1D is not sorted" )
     
     
     // TODO: add proper tests
@@ -122,8 +126,8 @@ TEST_F(MultiSectionTest, test1DProjection){
     SCAI_ASSERT( projLength==projection.size(), "Length of projection is not correct");
     
     for(int i=0; i<projection.size(); i++){
-        //this only works when dim=2
-        PRINT0("proj["<< i<< "]= "<< projection[i]);
+        //this only works when dim=2 and nodeWeights=1
+        //PRINT0("proj["<< i<< "]= "<< projection[i]);
         SCAI_ASSERT( projection[i]== bBox.second[1-dim2proj]-bBox.first[1-dim2proj], "projection["<<i<<"]= "<< projection[i] << " should be equal to "<< bBox.second[1-dim2proj]-bBox.first[1-dim2proj] );
     }
 }
