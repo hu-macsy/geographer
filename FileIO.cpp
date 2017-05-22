@@ -631,8 +631,10 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
 	}
 
 	scai::lama::CSRSparseMatrix<ValueType> matrix = SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsCells, rootVector, vCoords);
+
 	for (IndexType d = 0; d < dimension; d++) {
-		coords[d] = DenseVector<ValueType>(nodesInForest, vCoords[d].data());
+		assert(vCoords[d].size() == numLeaves);
+		coords[d] = DenseVector<ValueType>(vCoords[d].size(), vCoords[d].data());
 	}
     return matrix;
 }
