@@ -570,7 +570,7 @@ public:
             
             const IndexType dimension = minCoords.getDimensions();
             
-            assert(coords.size() != 0);
+            assert(coords.size() == dimension);
             
             // not recursive, keep a frontier of the nodes to be checked
             // start with this and add every child
@@ -585,12 +585,12 @@ public:
             std::vector<std::vector<ValueType>> coordsTree( dimension , std::vector<ValueType>( treeSize, -1));
             
             while( !frontier.empty() ){
-                SCAI_REGION("StatialCell.getSubTreeAsGraph.inFrontier");
+                SCAI_REGION("SpatialCell.getSubTreeAsGraph.inFrontier");
                 std::shared_ptr<const SpatialCell> thisNode = frontier.front();
                                    
                 // if not indexed
                 if(thisNode->getID() == -1){
-                    PRINT("Got cell ID= -1.");
+                    PRINT("Got cell ID = -1.");
                     throw std::logic_error("Tree not indexed?");
                 }
                 
@@ -613,12 +613,12 @@ public:
                     
                     // check this child with all the neighbours of father in the graph
                     // graphNgb is a neighbouring cell of this node as a shared_ptr
-                    for(typename std::set<std::shared_ptr<const SpatialCell>>::iterator graphNgb= graphNgbrsCells[thisNode->ID].begin(); graphNgb!=graphNgbrsCells[thisNode->getID()].end(); graphNgb++){
-                        if( child->isAdjacent(*graphNgb->get()) ){        
+                    for(std::shared_ptr<const SpatialCell> graphNgb : graphNgbrsCells[thisNode->ID]) {
+                        if( child->isAdjacent(*graphNgb) ){
                             assert( child->getID() < graphNgbrsCells.size() );
-                            assert( graphNgb->get()->getID() < graphNgbrsCells.size() );
-                            graphNgbrsCells[child->getID()].insert(*graphNgb );
-                            graphNgbrsCells[graphNgb->get()->getID()].insert(child);
+                            assert( graphNgb->getID() < graphNgbrsCells.size() );
+                            graphNgbrsCells[child->getID()].insert(graphNgb );
+                            graphNgbrsCells[graphNgb->getID()].insert(child);
                         } 
                     }
 
@@ -648,7 +648,7 @@ public:
                             ngbSet.erase(fnd);
                         }else{
                             // in principle this must never occur.
-                            // TODO: shange the warning to an assertion or error 
+                            // TODO: change the warning to an assertion or error
                             PRINT("\n WARNING:\nNode ID: "<< thisNode->getID() << " was NOT found in the set of node "<< graphNgb->get()->getID());
                         }
                     }
@@ -715,7 +715,7 @@ public:
             scai::hmemo::HArray<ValueType> csrValues;
             
             {
-                SCAI_REGION("StatialCell.getSubTreeAsGraph.getCSRMatrix");
+                SCAI_REGION("SpatialCell.getSubTreeAsGraph.getCSRMatrix");
                 scai::hmemo::WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
                 scai::hmemo::WriteOnlyAccess<IndexType> ja( csrJA, nnzValues);
                 scai::hmemo::WriteOnlyAccess<ValueType> values( csrValues, nnzValues);
@@ -743,12 +743,12 @@ public:
                     }
                     
                     // graphNgb is a neighbouring cell of this node as a shared_ptr
-                    for(typename std::set<std::shared_ptr<const SpatialCell>>::iterator graphNgb= graphNgbrsCells[i].begin(); graphNgb!=graphNgbrsCells[i].end(); graphNgb++){
+                    for(std::shared_ptr<const SpatialCell> graphNgb : graphNgbrsCells[i]){
                         // all nodes must be leaves                
-                        assert( graphNgb->get()->isLeaf );
+                        assert( graphNgb->isLeaf );
                         // not -i- since it also includes non-leaf nodes, use leafIndex instead
-                        assert( graphNgb->get()->getID() < leafIndexMapping.size() );
-                        IndexType ngbGlobalInd = leafIndexMapping[ graphNgb->get()->getID() ];
+                        assert( graphNgb->getID() < leafIndexMapping.size() );
+                        IndexType ngbGlobalInd = leafIndexMapping[ graphNgb->getID() ];
                         assert( ngbGlobalInd>= 0);
                         SCAI_ASSERT( ngbGlobalInd<= numLeaves, "Global indexing: " << ngbGlobalInd << " shoould be less () at this point) than the number of leaves: "<< numLeaves );
                         assert( nnzCounter< ja.size() );
@@ -800,7 +800,6 @@ public:
          * */
         
         bool isAdjacent(const SpatialCell& other) const {
-            
             int dim = minCoords.getDimensions();
             if(dim!=3){
                 //std::cout<<"Dimension != 3: WARNING, It could work but not sure...."<< std::endl;
