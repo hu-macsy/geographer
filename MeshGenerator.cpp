@@ -701,7 +701,11 @@ template<typename IndexType, typename ValueType>
 void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const int dimension, const int numberOfAreas, const int pointsPerArea, const ValueType maxVal) {
     SCAI_REGION("MeshGenerator.createQuadMesh")
         
-    srand(time(NULL));
+	//broadcast seed value from root to ensure equal pseudorandom numbers.
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+	comm->bcast( seed, 1, 0 );
+	srand(seed[0]);
 
     Point<ValueType> minCoord(dimension);
     Point<ValueType> maxCoord(dimension);
@@ -731,7 +735,6 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
             ValueType deviation = (ValueType) rand()/RAND_MAX + 0.4;
             distForDim[d] = std::normal_distribution<ValueType> (randPoint[d], deviation);
         }
-        //randPoint.print();
         
         for(int i=0; i<pointsPerArea; i++){
             Point<ValueType> pInRange(dimension);
@@ -745,7 +748,6 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
                 assert(thisCoord < maxCoord[d]);
                 pInRange[d] = thisCoord; 
             }
-            //pInRange.print();
             quad.addContent(0,pInRange);
         }
     }
@@ -762,25 +764,6 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
         quad.addContent(0, p);
     }   
     
-
-    //TODO: add points not at random, to cover holes
-    /*
-    int numGridPointsPerDim= 10;
-    int numGridPoints= std::pow(numGridPointsPerDim, dimension);    
-    std::vector<Point<ValueType>> gridPoints(numGridPoints, Point<ValueType>(dimension));
-    for(int d=0; d<dimension; d++){
-        ValueType offset = double (maxCoord[d]-minCoord[d])/ numGridPointsPerDim;
-        for(int plane=0; plane<numGridPointsPerDim; plane++){
-            int planeSize = std::pow(numGridPointsPerDim, dimension-1);
-            for(int p=0; p<planeSize; p++){
-                ValueType noise = (ValueType) rand()/RAND_MAX;
-                assert(p*plane < gridPoints.size() );
-                gridPoints[p*plane][d]=  offset*( ValueType(plane) ) + noise;
-    PRINT(noise << " _ " << gridPoints[p][d] );
-            }
-        }
-    }
-    */
     quad.indexSubtree(0);
     graphFromQuadtree(adjM, coords, quad);
 }    
@@ -803,11 +786,7 @@ void MeshGenerator<IndexType, ValueType>::graphFromQuadtree(CSRSparseMatrix<Valu
 	// copy from vector to DenseVector
 	for(int d=0; d<dimension; d++){
 		SCAI_REGION("MeshGenerator.createQuadMesh.copyToDenseVector")
-		coords[d].allocate(n);
-		for(unsigned int i=0; i<n; i++){
-			ValueType thisCoord = coordsV[d][i];
-			coords[d].setValue(i, thisCoord);
-		}
+		coords[d] = DenseVector<ValueType>(n, coordsV[d].data());
 	}
 }
 
