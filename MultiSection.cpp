@@ -8,16 +8,8 @@
 
 namespace ITI {
 
-/*    
-     pick dimension in which to first partition
-     first bBox= {(0,0,0,...), (max,max,max,...)}
-    
-     get first 1D partition in the choosen dimension
-    
-     form bounding boxes and get further partitions for the other dimensions
-*/
 template<typename IndexType, typename ValueType>
-void MultiSection<IndexType, ValueType>::getPartition(scai::lama::DenseVector<ValueType>& nodeWeights, IndexType sideLen, Settings settings) {
+std::queue<rectangle> MultiSection<IndexType, ValueType>::getPartition( const scai::lama::DenseVector<ValueType>& nodeWeights, const IndexType sideLen, Settings settings) {
     SCAI_REGION("MultiSection.getPartition");
 	
     const IndexType k = settings.numBlocks;    
@@ -28,7 +20,7 @@ void MultiSection<IndexType, ValueType>::getPartition(scai::lama::DenseVector<Va
     const IndexType localN = inputDist->getLocalSize();
     const IndexType globalN = inputDist->getGlobalSize();
     
-    // for all dimensions i: first[i]<second[i] 
+    // for all dimensions i: bBox.bottom[i]<bBox.top[i]
     struct rectangle bBox;
     
     // at first the bounding box is the whole space
@@ -37,43 +29,91 @@ void MultiSection<IndexType, ValueType>::getPartition(scai::lama::DenseVector<Va
         bBox.top.push_back(sideLen);
     }
     
-    std::vector<rectangle> allRectangles;
-    allRectangles.push_back(bBox);
-        
-    //TODO: this maybe costly...
-    // calculate the projections for every dimension
-    // after we have the projections in every dimension we must choose the first dimension to partition
+    std::queue<rectangle> allRectangles;
+    allRectangles.push(bBox);
+
+    //TODO: find dim integers for multisection
+    // if k=2 then it is a bisection
+    //
+    IndexType k1 = 2;
+    //
     
-    std::vector<std::vector<ValueType>> projectionsVector(dim);
-    ValueType minExtent = LONG_MAX;
-    IndexType chosenDim=0;
-    
-    for(int r=0; r<allRectangles.size(); r++){
+    while( allRectangles.size() < k){
+        SCAI_REGION("MultiSection.getPartition.forAllRectangles");
         struct rectangle thisRectangle;
+        if( !allRectangles.empty() ){
+            thisRectangle = allRectangles.front();
+            allRectangles.pop();
+        }else{
+            throw std::runtime_error("allRectangles is empty, this should not ahve happend.");
+        }
+
+        ValueType maxExtent = 0;
+        ValueType minDifference = LONG_MAX;
+        std::vector<ValueType> chosenProjection, thisProjection;
+        // chosenDim: the dimension with the smallest extent is choosen
+        IndexType chosenDim = -1;
+        
+        /*Two way to find in with dimension to project:
+         * 1) just pick the dimension of the bounding box that has the largest extent: only one projection
+         * 2) project in every dimension and pick the one in which the difference between the maximum and minimum value is the smallest: d projections
+         * 3) TODO: maybe we can change (2) and calculate the variance of the projection and pick the one with the biggest
+         * */
+        
         for(int d=0; d<dim; d++){
-            projectionsVector[d] = MultiSection<IndexType, ValueType>::projection( nodeWeights, thisRectangle, d, sideLen, settings);
-            // extent = max - min
-            ValueType extent = std::max_element( projectionsVector[d].begin(), projectionsVector[d].end() ) - std::min_element( projectionsVector[d].begin(), projectionsVector[d].end() );
-            // chosenDim: the dimension with the smallest extent is choosen
-            if(extent< minExtent){
-                minExtent = extent;
-                chosenDim = d;
+            if(settings.useExtent){
+                ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
+                if( extent>maxExtent ){
+                    maxExtent = extent;
+                    chosenDim= d;
+                }
+                // this way we take only the projection to the dimension with the largest extent.
+                chosenProjection = MultiSection<IndexType, ValueType>::projection( nodeWeights, thisRectangle, d, sideLen, settings);
+            }else{          //use variance
+                thisProjection = MultiSection<IndexType, ValueType>::projection( nodeWeights, thisRectangle, d, sideLen, settings);
+                // variance = max - min
+                ValueType difference = std::max_element( thisProjection.begin(), thisProjection.end() ) - std::min_element( thisProjection.begin(), thisProjection.end() );
+                if( difference< minDifference){
+                    minDifference = difference;
+                    chosenDim = d;
+                    chosenProjection = thisProjection;
+                }
             }
         }
-        
+      
         //perform 1D partitioning for the chosen dimension
-        std::vector<ValueType> projection = MultiSection<IndexType, ValueType>::projection( nodeWeights, bBox, chosenDim, sideLen, settings);
         std::vector<ValueType> part1D, weightPerPart;
-        std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1D( projection, k, settings);
+        std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1D( chosenProjection, k1, settings);
+
+        // create the new rectangles and add them to the queue
+        struct rectangle newRect;
+        newRect.bottom = thisRectangle.bottom;
+        newRect.top = thisRectangle.top;
         
+        //first rectangle
+        newRect.top[chosenDim] = thisRectangle.bottom[chosenDim]+part1D[0];
+        allRectangles.push(newRect);
+
+        for(int h=0; h<part1D.size()-1; h++ ){
+            //change only the chosen dimension
+            newRect.bottom[chosenDim] = thisRectangle.bottom[chosenDim]+part1D[h];
+            newRect.top[chosenDim] = thisRectangle.bottom[chosenDim]+part1D[h+1];
+            allRectangles.push(newRect);
+        }
+        
+        //last rectangle
+        newRect.bottom[chosenDim] = thisRectangle.bottom[chosenDim]+part1D.back();
+        newRect.top = thisRectangle.top;
+        allRectangles.push(newRect);
     }
     
+    return allRectangles;
 }
 //---------------------------------------------------------------------------------------
 
 
 template<typename IndexType, typename ValueType>
-std::vector<ValueType> MultiSection<IndexType, ValueType>::projection(scai::lama::DenseVector<ValueType>& nodeWeights, struct rectangle& bBox, IndexType dimensionToProject, IndexType sideLen, Settings settings){
+std::vector<ValueType> MultiSection<IndexType, ValueType>::projection(const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const IndexType dimensionToProject, const IndexType sideLen, Settings settings){
     SCAI_REGION("MultiSection.projection");
     
     const IndexType dimension = settings.dimensions;
@@ -81,9 +121,11 @@ std::vector<ValueType> MultiSection<IndexType, ValueType>::projection(scai::lama
     // for all dimensions i: bottomCorner[i]<topCorner[i] 
     std::vector<ValueType> bottomCorner = bBox.bottom, topCorner = bBox.top;
     SCAI_ASSERT( bottomCorner.size()==topCorner.size(), "Dimensions of bBox corners do not agree");
-    SCAI_ASSERT( bottomCorner.size()==dimension, "bounding box dimension, "<< topCorner.size() << " do not agree with settings.dimension= "<< dimension);
+    SCAI_ASSERT( bottomCorner.size()==dimension, "Bounding box dimension, "<< topCorner.size() << " do not agree with settings.dimension= "<< dimension);
+    
     for(int i=0; i<dimension; i++){
-        SCAI_ASSERT(bottomCorner[i]< topCorner[i], "bounding box corners are wrong: bottom coord= "<< bottomCorner[i] << " and top coord= "<< topCorner[i] << " for dimension "<< i );
+        SCAI_ASSERT(bottomCorner[i]< topCorner[i], "Bounding box corners are wrong: bottom coord= "<< bottomCorner[i] << " and top coord= "<< topCorner[i] << " for dimension "<< i );
+        SCAI_ASSERT( topCorner[i]<=sideLen, "The bounding box is out of the grid bounds. Top corner in dimension   "<< i << " is " << topCorner[i] << " while the grid's side is "<< sideLen);
     }
     
     const IndexType dim2proj = dimensionToProject; // shorter name
@@ -92,12 +134,12 @@ std::vector<ValueType> MultiSection<IndexType, ValueType>::projection(scai::lama
         throw std::runtime_error("function: projection, line:" +std::to_string(__LINE__) +", the length of the projection is " +std::to_string(projLength) + " and is not correct");
     }
     
-    std::vector<ValueType> projection(projLength, 0);
-    
     const scai::dmemo::DistributionPtr inputDist = nodeWeights.getDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
     const IndexType localN = inputDist->getLocalSize();
     const IndexType globalN = nodeWeights.size();
+    
+    std::vector<ValueType> projection(projLength, 0);
     
     // calculate projection for local coordinates
     {
@@ -129,7 +171,7 @@ std::vector<ValueType> MultiSection<IndexType, ValueType>::projection(scai::lama
 //---------------------------------------------------------------------------------------
 // Checks if given index is in the bounding box bBox.
 template<typename IndexType, typename ValueType>
-bool MultiSection<IndexType, ValueType>::inBBox( std::vector<IndexType>& coords, struct rectangle& bBox, IndexType sideLen){
+bool MultiSection<IndexType, ValueType>::inBBox( const std::vector<IndexType>& coords, const struct rectangle& bBox, const IndexType sideLen){
     SCAI_REGION("MultiSection.inBBox");
     
     IndexType dimension = bBox.top.size();
@@ -146,7 +188,7 @@ bool MultiSection<IndexType, ValueType>::inBBox( std::vector<IndexType>& coords,
     
     for(int i=0; i<dimension; i++){
         SCAI_ASSERT( coords[i]<sideLen, "Coordinate "<< coords[i] << " for dimension "<< i <<" is too big, bigget than the side of the whole grid: "<< sideLen);
-        // TODO: ensure if it should be coords[i]>=top[i] or coords[i]>top[i
+        // TODO: ensure if it should be coords[i]>=top[i] or coords[i]>top[i]
         if(coords[i]>=top[i] or coords[i]<bottom[i]){
             ret = false;
             break;
@@ -158,14 +200,13 @@ bool MultiSection<IndexType, ValueType>::inBBox( std::vector<IndexType>& coords,
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::pair<std::vector<ValueType>,std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1D( std::vector<ValueType>& projection,  IndexType k, Settings settings){
+std::pair<std::vector<ValueType>,std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1D( const std::vector<ValueType>& projection, const IndexType k, Settings settings){
     SCAI_REGION("MultiSection.partition1D");
     
     const IndexType dimension = settings.dimensions;
     
     ValueType totalWeight = std::accumulate(projection.begin(), projection.end(), 0);
     ValueType averageWeight = totalWeight/k;
-//PRINT("totalWeight = "<< totalWeight << " , averageWeight = "<< averageWeight);
 
     std::vector<ValueType> partHyperplanes(k-1,-9);
     std::vector<ValueType> weightPerPart(k,-9);
@@ -180,8 +221,7 @@ std::pair<std::vector<ValueType>,std::vector<ValueType>> MultiSection<IndexType,
     // greedy 1D partition (a 2-approx solution?)
     for(int i=0; i<projection.size(); i++){
         thisPartWeight += projection[i];
-        if( thisPartWeight > averageWeight*(1+epsilon)){
-//PRINT(i<<": " << part << " _ " << thisPartWeight);
+        if( thisPartWeight > averageWeight /* *(1+epsilon)*/){
             SCAI_ASSERT(part < partHyperplanes.size(), "index: "<< part << " too big, must be < "<< partHyperplanes.size() )
             // choose between keeping the projection[i] in the sum, having something more than the average
             // or do not add projection[i] and get something below average
@@ -212,8 +252,48 @@ std::pair<std::vector<ValueType>,std::vector<ValueType>> MultiSection<IndexType,
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> MultiSection<IndexType, ValueType>::indexToCoords(IndexType ind, IndexType sideLen, IndexType dim){
+ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const IndexType sideLen, Settings settings){
+    SCAI_REGION("MultiSection.getRectangleWeight");
+    
+    const scai::dmemo::DistributionPtr inputDist = nodeWeights.getDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
+    const IndexType localN = inputDist->getLocalSize();
+    
+    const IndexType dimension = bBox.top.size();
+    ValueType localWeight=0;
+    
+    {
+        SCAI_REGION("MultiSection.getRectangleWeight.localWeight");
+        scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights.getLocalValues() );
+        
+        for(int i=0; i<localN; i++){
+            const IndexType globalIndex = inputDist->local2global(i);
+            std::vector<IndexType> coords = indexToCoords(globalIndex, sideLen, dimension); // check the global index
+            if( inBBox(coords, bBox, sideLen) ){ 
+                localWeight += localWeights[i];
+            }
+        }
+    }
+    
+    // sum all local weights
+    return comm->sum(localWeight);
+}
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<IndexType> MultiSection<IndexType, ValueType>::indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dim){
     SCAI_REGION("MultiSection.indexToCoords");
+    
+    IndexType gridSize= std::pow(sideLen, dim);
+    
+    if( ind>gridSize){
+        PRINT("Index "<< ind <<" too big, should be < gridSize= "<< gridSize);
+        throw std::runtime_error("Wrong index");
+    }
+    
+    if(ind<0){
+        throw std::runtime_error("Wrong index" + std::to_string(ind) + " should be positive or zero.");
+    }
     
     if(dim==2){
         return  MultiSection<IndexType, ValueType>::indexTo2D( ind, sideLen);
@@ -228,14 +308,7 @@ std::vector<IndexType> MultiSection<IndexType, ValueType>::indexToCoords(IndexTy
 
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> MultiSection<IndexType, ValueType>::indexTo2D(IndexType ind, IndexType sideLen){
-    
-    IndexType gridSize= sideLen*sideLen;
-    
-    if( ind>gridSize){
-        PRINT("Index "<< ind <<" too big, should be < gridSize= "<< gridSize);
-        throw std::runtime_error("Wrong index");
-    }
-    
+
     IndexType x = ind/sideLen;
     IndexType y = ind%sideLen;
     
@@ -245,13 +318,6 @@ std::vector<IndexType> MultiSection<IndexType, ValueType>::indexTo2D(IndexType i
 
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> MultiSection<IndexType, ValueType>::indexTo3D(IndexType ind, IndexType sideLen){
-    
-    IndexType gridSize= sideLen*sideLen*sideLen;
-    
-    if( ind>gridSize){
-        PRINT("Index "<< ind <<" too big, should be < gridSize= "<< gridSize);
-        throw std::runtime_error("Wrong index");
-    }
     
     IndexType planeSize= sideLen*sideLen; // a YxZ plane
     
@@ -263,15 +329,17 @@ std::vector<IndexType> MultiSection<IndexType, ValueType>::indexTo3D(IndexType i
 }
 //---------------------------------------------------------------------------------------
 
-template void MultiSection<int, double>::getPartition(scai::lama::DenseVector<double>& nodeWeights, IndexType sideLen, Settings settings);
+template std::queue<rectangle> MultiSection<int, double>::getPartition( const scai::lama::DenseVector<double>& nodeWeights, const IndexType sideLen, Settings settings);
 
-template std::vector<double> MultiSection<int, double>::projection( scai::lama::DenseVector<double>& nodeWeights, struct rectangle& bBox, int dimensionToProject, int sideLen, Settings settings);
+template std::vector<double> MultiSection<int, double>::projection( const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const int dimensionToProject, const int sideLen, Settings settings);
 
-template bool MultiSection<int, double>::inBBox( std::vector<int>& coords, struct rectangle& bBox, int sideLen);
+template bool MultiSection<int, double>::inBBox( const std::vector<int>& coords, const struct rectangle& bBox, const int sideLen);
     
-template  std::pair<std::vector<double>,std::vector<double>> MultiSection<int, double>::partition1D( std::vector<double>& array, int k, Settings settings);
+template  std::pair<std::vector<double>,std::vector<double>> MultiSection<int, double>::partition1D( const std::vector<double>& array, const int k, Settings settings);
 
-template std::vector<int> MultiSection<int, double>::indexToCoords(int ind, int sideLen, int dim);
+template double MultiSection<int, double>::getRectangleWeight( const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const int sideLen, Settings settings);
+
+template std::vector<int> MultiSection<int, double>::indexToCoords( const int ind, const int sideLen, const int dim);
 
 
 };

@@ -36,6 +36,142 @@ class MultiSectionTest : public ::testing::Test {
 
 };
 
+TEST_F(MultiSectionTest, testGetPartition){
+ 
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    IndexType sideLen= 100;
+    IndexType dim = 2;
+    IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
+    scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
+    IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();  
+    
+    //create local (random) weights
+    {
+        scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
+        srand(time(NULL));
+        for(int i=0; i<localN; i++){
+            //localPart[i] = rand()%10*comm->getRank()+2;
+            localPart[i] = 1;
+        }
+    }
+    
+    Settings settings;
+    settings.dimensions = dim;
+    settings.numBlocks = 6;
+    
+    std::queue<rectangle> rectangles= MultiSection<IndexType, ValueType>::getPartition( nodeWeights, sideLen, settings);
+    
+    // assertions - prints
+    
+    SCAI_ASSERT( rectangles.size()==settings.numBlocks , "Returned number of rectangles is wrong. Should be "<< settings.numBlocks<< " but it is "<< rectangles.size() );
+    
+    ValueType totalWeight = 0;
+    ValueType minWeight = LONG_MAX, maxWeight = 0;
+    
+    for(int r=0; r<settings.numBlocks; r++){
+        struct rectangle thisRectangle = rectangles.front();
+        rectangles.pop();
+        if( comm->getRank()==0 ){
+            thisRectangle.print();
+        }
+        
+        //this only works when dim=2 and nodeWeights=1
+        ValueType thisArea = (thisRectangle.top[0]-thisRectangle.bottom[0])*(thisRectangle.top[1]-thisRectangle.bottom[1]);
+        ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( nodeWeights, thisRectangle, sideLen, settings);
+        SCAI_ASSERT( thisArea==thisWeight , "This rectangle's area= "<< thisArea << " and should be equal to its weight that is= "<< thisWeight);
+        
+        if( thisWeight<minWeight ){
+            minWeight = thisWeight;
+        }
+        if( thisWeight>maxWeight ){
+            maxWeight = thisWeight;
+        }
+        
+        totalWeight += thisWeight;
+    }
+    
+    PRINT0( "minWeight= "<< minWeight << " , maxWeight= "<< maxWeight );
+    
+    //all points are covered by a rectangle
+    SCAI_ASSERT( totalWeight==N , "total weight= "<< totalWeight << " and should be equal the number of points= "<< N);
+    
+}
+//---------------------------------------------------------------------------------------
+
+TEST_F(MultiSectionTest, testCompareExtentDiff){
+ 
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    IndexType sideLen= 30;
+    IndexType dim = 3;
+    IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
+    scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
+    IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();  
+    
+    //create local random weights
+    {
+        scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
+        srand(time(NULL));
+        for(int i=0; i<localN; i++){
+            localPart[i] = rand()%10*comm->getRank()+2;
+        }
+    }
+    
+    Settings settings;
+    settings.dimensions = dim;
+    settings.numBlocks = std::pow(2, 4);
+    settings.useExtent = true;
+    
+    std::queue<rectangle> rectanglesExtent = MultiSection<IndexType, ValueType>::getPartition( nodeWeights, sideLen, settings);
+    
+    // get a second partition using the minimum max-min difference
+    settings.useExtent = false;
+    
+    std::queue<rectangle> rectanglesDiff = MultiSection<IndexType, ValueType>::getPartition( nodeWeights, sideLen, settings);
+    
+    
+    // assertions - prints
+    
+    SCAI_ASSERT( rectanglesExtent.size()==settings.numBlocks , "Returned number of rectangles is wrong. Should be "<< settings.numBlocks<< " but it is "<< rectanglesExtent.size() );
+    
+    ValueType minWeightExt = LONG_MAX, maxWeightExt = 0;
+    ValueType minWeightDiff = LONG_MAX, maxWeightDiff = 0;
+    ValueType totalWeight = 0;
+    
+    for(int r=0; r<settings.numBlocks; r++){
+        struct rectangle thisRectangleExt = rectanglesExtent.front();
+        struct rectangle thisRectangleDiff = rectanglesDiff.front();
+        rectanglesExtent.pop();
+        rectanglesDiff.pop();
+        
+        ValueType thisWeightExt = MultiSection<IndexType, ValueType>::getRectangleWeight( nodeWeights, thisRectangleExt, sideLen, settings);
+        
+        ValueType thisWeightDiff = MultiSection<IndexType, ValueType>::getRectangleWeight( nodeWeights, thisRectangleDiff, sideLen, settings);
+        
+        if( thisWeightExt<minWeightExt ){
+            minWeightExt = thisWeightExt;
+        }
+        if( thisWeightExt>maxWeightExt ){
+            maxWeightExt = thisWeightExt;
+        }
+        if( thisWeightDiff<minWeightDiff ){
+            minWeightDiff = thisWeightDiff;
+        }
+        if( thisWeightDiff>maxWeightDiff ){
+            maxWeightDiff = thisWeightDiff;
+        }
+        totalWeight += thisWeightExt;
+    }
+    
+    ValueType averageWeight = totalWeight/settings.numBlocks;
+    
+    PRINT0("averagr weight= "<< averageWeight );
+    PRINT0( "useExtent: minWeight= "<< minWeightExt << " , maxWeight= "<< maxWeightExt << ", max/min= "<< maxWeightExt/minWeightExt );
+    PRINT0( "  useDiff: minWeight= "<< minWeightDiff << " , maxWeight= "<< maxWeightDiff << ", max/min= "<< maxWeightDiff/minWeightDiff );
+        
+}
+//---------------------------------------------------------------------------------------
 
 TEST_F(MultiSectionTest, test1DPartition){
  
@@ -61,7 +197,7 @@ TEST_F(MultiSectionTest, test1DPartition){
     Settings settings;
     settings.dimensions = dim;
     
-    MultiSection<IndexType,ValueType>::rectangle bBox;
+    rectangle bBox;
     bBox.bottom = {0,0};
     bBox.top = {(ValueType) sideLen, (ValueType) sideLen};
     
@@ -105,8 +241,6 @@ TEST_F(MultiSectionTest, test1DPartition){
     }
     
     
-    
-    
     // TODO: add proper tests
     
     std::vector<ValueType> part1DWeights(k1,0);
@@ -140,7 +274,8 @@ TEST_F(MultiSectionTest, test1DProjection){
     }
     
     IndexType dim2proj = 0;
-    MultiSection<IndexType,ValueType>::rectangle bBox;
+    //MultiSection<IndexType,ValueType>::rectangle bBox;
+    rectangle bBox;
     // for all dimensions i: first[i]<second[i] 
     bBox.bottom = {1,1};
     bBox.top = {7,7};
@@ -172,7 +307,8 @@ TEST_F(MultiSectionTest, testInbBox){
     IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
     
     // for all dimensions i: first[i]<second[i] 
-    MultiSection<IndexType,ValueType>::rectangle bBox;
+    //MultiSection<IndexType,ValueType>::rectangle bBox;
+    rectangle bBox;
     bBox.bottom = {2,3,1};
     bBox.top = {6,8,6};
     
