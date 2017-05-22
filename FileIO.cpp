@@ -387,7 +387,7 @@ std::pair<std::vector<ValueType>, std::vector<ValueType>> FileIO<IndexType, Valu
 }
 
 template<typename IndexType, typename ValueType>
-std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueType>::readQuadTree( std::string filename ) {
+std::set<std::shared_ptr<SpatialCell> > FileIO<IndexType, ValueType>::readQuadTree( std::string filename ) {
 	SCAI_REGION( "FileIO.readQuadTree" );
 
 	const IndexType dimension = 3;
@@ -396,11 +396,12 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
     std::ifstream file(filename);
 
     if(file.fail())
-            throw std::runtime_error("File "+ filename+ " failed.");
+            throw std::runtime_error("Reading file "+ filename+ " failed.");
 
     std::map<std::vector<ValueType>, std::shared_ptr<SpatialCell>> nodeMap;
     std::map<std::vector<ValueType>, std::set<std::vector<ValueType>>> pendingEdges;
     std::map<std::vector<ValueType>, std::set<std::vector<ValueType>>> confirmedEdges;
+    std::set<std::shared_ptr<SpatialCell> > roots;
 
     IndexType duplicateNeighbors = 0;
 
@@ -477,6 +478,7 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 			nodeMap[parentCoords] = parentPointer;
 			assert(confirmedEdges.count(parentCoords) == 0);
 			confirmedEdges[parentCoords] = {};
+			roots.insert(parentPointer);
 
 			//check for pending edges of parent
 			if (pendingEdges.count(parentCoords) > 0) {
@@ -489,7 +491,11 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 				pendingEdges.erase(parentCoords);
 			}
 		}
-		assert(nodeMap.count(parentCoords));
+		if (parentCoords[0] != -1) {
+			roots.erase(quadNodePointer);
+		}
+
+		assert(nodeMap.count(parentCoords));//Why does this assert work? Why can't it happen that the parentCoords are -1?
 		nodeMap[parentCoords]->addChild(quadNodePointer);
 		assert(nodeMap[parentCoords]->height() > 1);
 
@@ -549,14 +555,23 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
     	assert(nodeMap.count(pendingSets.first) == 0);
     }
 
+    IndexType nodesInForest = 0;
+    for (auto root : roots) {
+    	nodesInForest += root->countNodes();
+    }
+
+    std::cout << "Found " << roots.size() << " roots with " << nodesInForest << " nodes hanging from them." << std::endl;
+
+    assert(nodesInForest == nodeMap.size());
+
     //check whether all nodes have either no or the full amount of children
     for (std::pair<std::vector<ValueType>, std::shared_ptr<SpatialCell>> elems : nodeMap) {
     	bool consistent = elems.second->isConsistent();
     	if (!consistent) {
     		std::vector<ValueType> coords = elems.first;
-    		throw std::runtime_error("Node at " + std::to_string(coords[0]) + ", " + std::to_string(coords[1]) + ", " + std::to_string(coords[2]) + " inconsistent.");
+    		//throw std::runtime_error("Node at " + std::to_string(coords[0]) + ", " + std::to_string(coords[1]) + ", " + std::to_string(coords[2]) + " inconsistent.");
     	}
-    	assert(elems.second->isConsistent());
+    	//assert(elems.second->isConsistent());
     	assert(pendingEdges.count(elems.first) == 0);//list of pending edges was erased when node was handled, new edges should not be added to pending list
     }
 
@@ -588,7 +603,11 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
     }
     assert(nodeMap.size() == i++);
     std::cout << "Read " << totalEdges << " confirmed edges, among them " << leafEdges << " edges between " << numLeaves << " leaves." << std::endl;
-    return result;
+    IndexType offset = 0;
+    for (auto root : roots) {
+    	offset = root->indexSubtree(offset);
+    }
+    return roots;
 }
 
 template void FileIO<int, double>::writeGraph (const CSRSparseMatrix<double> &adjM, const std::string filename);
@@ -597,7 +616,7 @@ template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<do
 template void FileIO<int, double>::writeCoordsDistributed_2D (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
 template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::string filename);
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension);
-template std::vector<std::set<std::shared_ptr<SpatialCell> > >  FileIO<int, double>::readQuadTree( std::string filename );
+template std::set<std::shared_ptr<SpatialCell> >  FileIO<int, double>::readQuadTree( std::string filename );
 
 
 } /* namespace ITI */

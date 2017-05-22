@@ -73,11 +73,14 @@ public:
 	/**
 	 * Reads a quadtree as specified in the format of Michael Selzer
 	 */
-	static std::vector<std::set<std::shared_ptr<SpatialCell> > > readQuadTree( std::string filename );
+	static std::set<std::shared_ptr<SpatialCell> > readQuadTree( std::string filename );
 
 
 
 private:
+	/**
+	 * given the central coordinates of a cell and its level, compute the bounding corners
+	 */
 	static std::pair<std::vector<ValueType>, std::vector<ValueType>> getBoundingCoords(std::vector<ValueType> centralCoords, IndexType level);
 };
 

@@ -21,12 +21,16 @@
 
 #include <scai/utilskernel/LArray.hpp>
 
-#include "ParcoRepart.h"
+#include <memory>
+
 #include "gtest/gtest.h"
+
+#include "ParcoRepart.h"
 #include "HilbertCurve.h"
 #include "FileIO.h"
 #include "MeshGenerator.h"
 #include "Settings.h"
+#include "quadtree/SpatialTree.h"
 
 typedef double ValueType;
 typedef int IndexType;
@@ -230,11 +234,24 @@ TEST_F(FileIOTest, testWriteCoordsDistributed){
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadQuadTree){
-	std::string filename = "cells.dat";
+	std::string filename = "octree_timestep_10.dat";
 
-	std::vector<std::set<std::shared_ptr<SpatialCell> > > edgeList = FileIO<IndexType, ValueType>::readQuadTree(filename);
-	IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
-	std::cout << "Read Quadtree with " << edgeList.size() << " nodes and " << m << " edges." << std::endl;
+	std::set<std::shared_ptr<SpatialCell> > roots = FileIO<IndexType, ValueType>::readQuadTree(filename);
+	std::vector<std::shared_ptr<const SpatialCell> > rootVector(roots.begin(), roots.end());
+    IndexType nodesInForest = 0;
+    for (auto root : roots) {
+    	nodesInForest += root->countNodes();
+    }
+
+	std::vector<std::vector<ValueType>> coords(rootVector[0]->getDimensions());
+	std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsCells(nodesInForest);
+	for (auto root : roots) {
+		graphNgbrsCells[root->getID()].insert(root);
+	}
+	scai::lama::CSRSparseMatrix<ValueType> matrix = SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsCells, rootVector, coords);
+
+	//IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
+	//std::cout << "Read Quadtree with " << edgeList.size() << " nodes and " << m << " edges." << std::endl;
 }
 
 
