@@ -14,33 +14,49 @@
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 #define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
-
+        
 
 namespace ITI {
 
-    template <typename IndexType, typename ValueType>
-    class MultiSection{
-    public:
-        
-        /* A d-dimensional rectangle represented by two points: the bottom and the top corner.
+            /* A d-dimensional rectangle represented by two points: the bottom and the top corner.
          * For all i: 0<i<d, it must be bottom[i]<top[i]
          * */
         struct rectangle{
             //IndexType dimension;
             // for all i: 0<i<dimension, bottom[i]<top[i]
-            std::vector<ValueType> bottom;
-            std::vector<ValueType> top;
+            std::vector<double> bottom;
+            std::vector<double> top;
+            
+            void print(){
+                std::cout<< "rectangle bottom: ";
+                for(int i=0; i<bottom.size(); i++){
+                    std::cout<< bottom[i] << ", ";
+                }
+                std::cout<< std::endl;
+                
+                std::cout<< "             top: ";
+                for(int i=0; i<top.size(); i++){
+                    std::cout<< top[i] << ", ";
+                }
+                std::cout<< std::endl;
+            }
         };
         
-        static void getPartition(scai::lama::DenseVector<ValueType>& nodeWeights, IndexType sideLen, Settings settings);
+    template <typename IndexType, typename ValueType>
+    class MultiSection{
+    public:
+
+        /** Get a partition of a uniform grid of side length sideLen into settings.numBlocks blocks.
+         */
+        static std::queue<struct rectangle> getPartition( const scai::lama::DenseVector<ValueType>& nodeWeights, const IndexType sideLen, Settings settings);
         
         /** Calculates the projection of all points in the bounding box (bBox) in the given dimension. Every PE
          *  creates an array of appropriate length, calculates the projection for its local coords and then
-         *  calls a all2all sum routine. We assume a uniform grid so the exact coordianates can be refered just
+         *  calls a all2all sum routine. We assume a uniform grid so the exact coordinates can be infered just
          *  by the index of the -nodeWeights- vector.
          * 
-         * @param[in] nodeWeights The weigh of each point.
-         * @param[in] bBox The bounding box/rectangle in which we wish to calculate the projection.
+         * @param[in] nodeWeights The weights for each point.
+         * @param[in] bBox The bounding box/rectangle in which we wish to calculate the projection. For all dimensions, bBox.bottom[i]< bBox.top[i].
          * @param[in] dimensiontoProject The dimension in which we wish to project the weights. Should be more or equal to 0 and less than d (where d are the total dimensions).
          * @param[in] sideLen The length of the side of the whole uniform, square grid.
          * @param[in] setting A settigns struct passing various arguments.
@@ -48,7 +64,7 @@ namespace ITI {
 
          * Example: bBox={(5,10),(8,15)} and dimensionToProject=0 (=x). Then the return vector has size |8-5|=3. return[0] is the sum of the coordinates in the bBox which have their 0-coordinate equal to 5, return[1] fot he points with 0-coordinate equal to 3 etc. If dimensionToProject=1 then return vector has size |10-15|=5.
          */
-        static std::vector<ValueType> projection( scai::lama::DenseVector<ValueType>& nodeWeights, struct rectangle& bBox, IndexType dimensionToProject, IndexType sideLen, Settings settings);
+        static std::vector<ValueType> projection( const scai::lama::DenseVector<ValueType>& nodeWeights, const struct rectangle& bBox, const IndexType dimensionToProject, const IndexType sideLen, Settings settings);
         
         /** Partitions the given vector into k parts of roughly equal weights.
          *
@@ -62,7 +78,7 @@ namespace ITI {
          * return.first = [ 1, 5]. Implies the partition: 0, 1 | 2, 3, 4, 5 | 6, 7, 8
          * return.second=[ 17, 15, 14]
          */
-        static std::pair<std::vector<ValueType>,std::vector<ValueType>> partition1D( std::vector<ValueType>& array, IndexType k, Settings settings);   
+        static std::pair<std::vector<ValueType>,std::vector<ValueType>> partition1D( const std::vector<ValueType>& array, const IndexType k, Settings settings);   
         
         /**Checks if the given index is in the given bounding box. Index corresponds to a uniform matrix given
          * as a 1D array/vector. 
@@ -72,8 +88,19 @@ namespace ITI {
          * @param[in] sideLen The length of the side of the whole uniform, square grid.
          * 
          */
-        static bool inBBox( std::vector<IndexType>& coords, struct rectangle& bBox, IndexType sideLen);
-        /** Functions to transform a 1D index to 2D or 3D given the side length of the cubical grid.
+        static bool inBBox( const std::vector<IndexType>& coords, const struct rectangle& bBox, const IndexType sideLen);
+        
+        /** Calculates the wwight of the rentangle.
+         * 
+         * @param[in] nodeWeights The weights for each point.
+         * @param[in] bBox The bounding box/rectangle in which we wish to calculate the projection. For all dimensions, bBox.bottom[i]< bBox.top[i]
+         * @param[in] sideLen The length of the side of the whole uniform, square grid.
+         *
+         * @return The weight of the given rectangle.
+         */
+        static ValueType getRectangleWeight( const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const IndexType sideLen, Settings settings);
+        
+        /** Function to transform a 1D index to 2D or 3D given the side length of the cubical grid.
          * For example, in a 4x4 grid, indexTo2D(1)=(0,1), indexTo2D(4)=(1,0) and indexTo2D(13)=(3,1)
          * 
          * @param[in] ind The index to transform.
@@ -81,7 +108,7 @@ namespace ITI {
          * @param[in] dimensions The dimension of the cube/grid (either 2 or 3).
          * @return A vector containing the index for every dimension. The size of the vector is equal to dimensions.
          */
-        static std::vector<IndexType> indexToCoords(IndexType ind, IndexType sideLen, IndexType dimensions);
+        static std::vector<IndexType> indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dimensions);
         
     private:
 
