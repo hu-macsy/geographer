@@ -781,33 +781,36 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
         }
     }
     */
-    
-    //PRINT("Num of leaves= N = "<< quad.countLeaves() );
-    IndexType numLeaves= quad.countLeaves();
-    IndexType treeSize = quad.indexSubtree(0);
-    
-    // the quad tree is created. extract is as a CSR matrix
-    // graphNgbrsCells is just empty now
-    std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells( treeSize );
-    std::vector<std::vector<ValueType>> coordsV( dimension );
-        
-    adjM= quad.getTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coordsV );
-    assert(adjM.getNumRows() == coordsV[0].size());
-    
-    // copy from vector to DenseVector
-    for(int d=0; d<dimension; d++){
-        SCAI_REGION("MeshGenerator.createQuadMesh.copyToDenseVector")
-        coords[d].allocate(coordsV[d].size());
-        for(unsigned int i=0; i<coordsV[d].size(); i++){
-            ValueType thisCoord = coordsV[d][i];
-            coords[d].setValue(i, thisCoord);
-            assert(thisCoord>= minCoord[d]);
-            assert(thisCoord<= maxCoord[d]);
-        }
-    }
-    
-    
+    quad.indexSubtree(0);
+    graphFromQuadtree(adjM, coords, quad);
 }    
+
+template<typename IndexType, typename ValueType>
+void MeshGenerator<IndexType, ValueType>::graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid &quad) {
+	const IndexType numLeaves= quad.countLeaves();
+	const IndexType treeSize = quad.countNodes();
+	const IndexType dimension = quad.getDimensions();
+
+	// the quad tree is created. extract is as a CSR matrix
+	// graphNgbrsCells is just empty now
+	std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsCells( treeSize );
+	std::vector<std::vector<ValueType>> coordsV( dimension );
+
+	adjM= quad.getTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coordsV );
+	const IndexType n = adjM.getNumRows();
+	assert(n == coordsV[0].size());
+
+	// copy from vector to DenseVector
+	for(int d=0; d<dimension; d++){
+		SCAI_REGION("MeshGenerator.createQuadMesh.copyToDenseVector")
+		coords[d].allocate(n);
+		for(unsigned int i=0; i<n; i++){
+			ValueType thisCoord = coordsV[d][i];
+			coords[d].setValue(i, thisCoord);
+		}
+	}
+}
+
 //----------------------------------------------------------------------------------------------
 /* Creates random points in the cube [0,maxCoord] in the given dimensions.
  */
