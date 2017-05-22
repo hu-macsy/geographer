@@ -37,10 +37,10 @@ class MultiSectionTest : public ::testing::Test {
 };
 
 
-TEST_F(MultiSectionTest, testPrefixSum){
+TEST_F(MultiSectionTest, test1DPartition){
  
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    IndexType sideLen= comm->getSize()*2;
+    IndexType sideLen= 10;
     IndexType dim = 2;
     IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -52,27 +52,59 @@ TEST_F(MultiSectionTest, testPrefixSum){
         scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
         srand(time(NULL));
         for(int i=0; i<localN; i++){
-            //localPart[i] = rand()%10+2;
-            localPart[i] = i;
+            localPart[i] = rand()%10*comm->getRank()+2;
+            //localPart[i] = 1;
         }
     }
-    IndexType k1= 3;// std::pow(comm->getSize(), 0.5);
+    IndexType k1= 5;
     IndexType dimensionToPartition = 0;
     Settings settings;
     settings.dimensions = dim;
     
-    // the 1D partition
-    std::vector<ValueType> part1D = MultiSection<IndexType, ValueType>::partition1D( nodeWeights, k1, dimensionToPartition, sideLen, settings);
+    MultiSection<IndexType,ValueType>::rectangle bBox;
+    bBox.bottom = {0,0};
+    bBox.top = {(ValueType) sideLen, (ValueType) sideLen};
     
-    //tests
-        
-    //if(comm->getRank() ==0){
+    // the 1D partition
+    
+    // get the projection in one dimension
+    std::vector<ValueType> projection = MultiSection<IndexType, ValueType>::projection( nodeWeights, bBox, dimensionToPartition, sideLen, settings);
+    std::vector<ValueType> part1D, weightPerPart;
+    std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1D( projection,  k1, settings);
+    
+    //assertions - checks - prints
+    
+    SCAI_ASSERT( !std::is_sorted(part1D.end(), part1D.begin()) , "part1D is not sorted" );
+    
+    ValueType minWeight=LONG_MAX, maxWeight=0;
+    for(int i=0; i<weightPerPart.size(); i++){
+        if( weightPerPart[i]<minWeight ){
+            minWeight = weightPerPart[i];
+        }
+        if( weightPerPart[i]>maxWeight ){
+            maxWeight = weightPerPart[i];
+        }
+    }
+    
+    //ValueType maxWeightDiff = maxWeight - minWeight;
+    ValueType maxOverMin = maxWeight/minWeight;
+    PRINT0("max weight part / min weight part = "<< maxOverMin);
+    
+    ValueType totalWeight = std::accumulate(weightPerPart.begin(), weightPerPart.end(), 0);
+    ValueType averageWeight = totalWeight/k1;
+    PRINT0("max weight / average =" << maxWeight/averageWeight<< " , min / average =" << minWeight/averageWeight);
+   
+    for(int i=0; i<weightPerPart.size(); i++){
+        PRINT0("part "<< i <<" weight: "<< weightPerPart[i]);
+    }    
+   
+    if(comm->getRank() ==0){
         for(int i=0; i<part1D.size(); i++){
             std::cout<< *comm <<": "<< part1D[i] << std::endl;
         }
-    //}
+    }
     
-    //SCAI_ASSERT( !std::is_sorted(part1D.begin(), part1D.end()) , "part1D is not sorted" )
+    
     
     
     // TODO: add proper tests
@@ -108,23 +140,23 @@ TEST_F(MultiSectionTest, test1DProjection){
     }
     
     IndexType dim2proj = 0;
-    std::pair<std::vector<ValueType>, std::vector<ValueType>> bBox;
+    MultiSection<IndexType,ValueType>::rectangle bBox;
     // for all dimensions i: first[i]<second[i] 
-    bBox.first = {1,1};
-    bBox.second = {7,7};
+    bBox.bottom = {1,1};
+    bBox.top = {7,7};
     Settings settings;
     settings.dimensions = dim;
     
-    std::vector<ValueType> projection = MultiSection<IndexType, ValueType>::projection1D( nodeWeights, bBox, dim2proj, sideLen, settings);
+    std::vector<ValueType> projection = MultiSection<IndexType, ValueType>::projection( nodeWeights, bBox, dim2proj, sideLen, settings);
     
     //assertions
-    const IndexType projLength = bBox.second[dim2proj]-bBox.first[dim2proj];
+    const IndexType projLength = bBox.top[dim2proj]-bBox.bottom[dim2proj];
     SCAI_ASSERT( projLength==projection.size(), "Length of projection is not correct");
     
     for(int i=0; i<projection.size(); i++){
-        //this only works when dim=2
-        PRINT0("proj["<< i<< "]= "<< projection[i]);
-        SCAI_ASSERT( projection[i]== bBox.second[1-dim2proj]-bBox.first[1-dim2proj], "projection["<<i<<"]= "<< projection[i] << " should be equal to "<< bBox.second[1-dim2proj]-bBox.first[1-dim2proj] );
+        //this only works when dim=2 and nodeWeights=1
+        //PRINT0("proj["<< i<< "]= "<< projection[i]);
+        SCAI_ASSERT( projection[i]== bBox.top[1-dim2proj]-bBox.bottom[1-dim2proj], "projection["<<i<<"]= "<< projection[i] << " should be equal to "<< bBox.top[1-dim2proj]-bBox.bottom[1-dim2proj] );
     }
 }
 //---------------------------------------------------------------------------------------
@@ -140,14 +172,14 @@ TEST_F(MultiSectionTest, testInbBox){
     IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
     
     // for all dimensions i: first[i]<second[i] 
-    std::pair<std::vector<ValueType>, std::vector<ValueType>> bBox;
-    bBox.first = {2,3,1};
-    bBox.second = {6,8,6};
+    MultiSection<IndexType,ValueType>::rectangle bBox;
+    bBox.bottom = {2,3,1};
+    bBox.top = {6,8,6};
     
     //bBox area = number of points in the box
     IndexType bBoxArea = 1;
     for(int i=0; i<dim; i++){
-        bBoxArea *= (bBox.second[i]-bBox.first[i]);
+        bBoxArea *= (bBox.top[i]-bBox.bottom[i]);
     }
     
     IndexType numPoints=0;
