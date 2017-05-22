@@ -387,7 +387,7 @@ std::pair<std::vector<ValueType>, std::vector<ValueType>> FileIO<IndexType, Valu
 }
 
 template<typename IndexType, typename ValueType>
-std::set<std::shared_ptr<SpatialCell> > FileIO<IndexType, ValueType>::readQuadTree( std::string filename ) {
+CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::string filename, std::vector<DenseVector<ValueType>> &coords ) {
 	SCAI_REGION( "FileIO.readQuadTree" );
 
 	const IndexType dimension = 3;
@@ -491,6 +491,7 @@ std::set<std::shared_ptr<SpatialCell> > FileIO<IndexType, ValueType>::readQuadTr
 				pendingEdges.erase(parentCoords);
 			}
 		}
+
 		if (parentCoords[0] != -1) {
 			roots.erase(quadNodePointer);
 		}
@@ -603,11 +604,37 @@ std::set<std::shared_ptr<SpatialCell> > FileIO<IndexType, ValueType>::readQuadTr
     }
     assert(nodeMap.size() == i++);
     std::cout << "Read " << totalEdges << " confirmed edges, among them " << leafEdges << " edges between " << numLeaves << " leaves." << std::endl;
+
+    /**
+     * now convert into CSRSparseMatrix
+     */
+
     IndexType offset = 0;
-    for (auto root : roots) {
-    	offset = root->indexSubtree(offset);
-    }
-    return roots;
+	for (auto root : roots) {
+		offset = root->indexSubtree(offset);
+	}
+
+    std::vector<std::shared_ptr<const SpatialCell> > rootVector(roots.begin(), roots.end());
+
+	coords.clear();
+	coords.resize(dimension);
+
+	std::vector<std::vector<ValueType> > vCoords(dimension);
+	std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsCells(nodesInForest);
+
+	for (auto outgoing : confirmedEdges) {
+		std::set<std::shared_ptr<const SpatialCell>> edgeSet;
+		for (std::vector<ValueType> edgeTarget : outgoing.second) {
+			edgeSet.insert(nodeMap[edgeTarget]);
+		}
+		graphNgbrsCells[nodeMap[outgoing.first]->getID()] = edgeSet;
+	}
+
+	scai::lama::CSRSparseMatrix<ValueType> matrix = SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsCells, rootVector, vCoords);
+	for (IndexType d = 0; d < dimension; d++) {
+		coords[d] = DenseVector<ValueType>(nodesInForest, vCoords[d].data());
+	}
+    return matrix;
 }
 
 template void FileIO<int, double>::writeGraph (const CSRSparseMatrix<double> &adjM, const std::string filename);
@@ -616,7 +643,7 @@ template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<do
 template void FileIO<int, double>::writeCoordsDistributed_2D (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
 template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::string filename);
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension);
-template std::set<std::shared_ptr<SpatialCell> >  FileIO<int, double>::readQuadTree( std::string filename );
+template CSRSparseMatrix<double>  FileIO<int, double>::readQuadTree( std::string filename, std::vector<DenseVector<double>> &coords );
 
 
 } /* namespace ITI */

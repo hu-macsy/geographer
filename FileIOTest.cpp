@@ -234,22 +234,12 @@ TEST_F(FileIOTest, testWriteCoordsDistributed){
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadQuadTree){
-	std::string filename = "octree_timestep_10.dat";
+	std::string filename = "cells.dat";
 
-	std::set<std::shared_ptr<SpatialCell> > roots = FileIO<IndexType, ValueType>::readQuadTree(filename);
-	std::vector<std::shared_ptr<const SpatialCell> > rootVector(roots.begin(), roots.end());
-    IndexType nodesInForest = 0;
-    for (auto root : roots) {
-    	nodesInForest += root->countNodes();
-    }
+	scai::lama::CSRSparseMatrix<ValueType> matrix = FileIO<IndexType, ValueType>::readQuadTree(filename);
 
-	std::vector<std::vector<ValueType>> coords(rootVector[0]->getDimensions());
-	std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsCells(nodesInForest);
-	for (auto root : roots) {
-		graphNgbrsCells[root->getID()].insert(root);
-	}
-	scai::lama::CSRSparseMatrix<ValueType> matrix = SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsCells, rootVector, coords);
-
+	std::cout << "Matrix has " << matrix.getNumRows() << " rows and " << matrix.getNumValues() << " values " << std::endl;
+	EXPECT_TRUE(matrix.isConsistent());
 	//IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
 	//std::cout << "Read Quadtree with " << edgeList.size() << " nodes and " << m << " edges." << std::endl;
 }

@@ -94,7 +94,7 @@ public:
 	template<typename IndexType, typename ValueType>
 	scai::lama::CSRSparseMatrix<ValueType>  getTreeAsGraph( std::vector< std::set<std::shared_ptr<const SpatialCell>>>& graphNgbrsCells, std::vector<std::vector<ValueType>>& coords ) const {
 		if (!root->isIndexed()) {
-			throw std::runtime_error("Call indexSubtree fist.");
+			throw std::runtime_error("Call indexSubtree first.");
 		}
 		return root->getSubTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coords );
 	}

@@ -73,7 +73,15 @@ public:
 	/**
 	 * Reads a quadtree as specified in the format of Michael Selzer
 	 */
-	static std::set<std::shared_ptr<SpatialCell> > readQuadTree( std::string filename );
+	static CSRSparseMatrix<ValueType> readQuadTree( std::string filename, std::vector<DenseVector<ValueType>> &coords);
+
+	/**
+	 * Reads a quadtree as specified in the format of Michael Selzer
+	 */
+	static CSRSparseMatrix<ValueType> readQuadTree( std::string filename) {
+		std::vector<DenseVector<ValueType>> coords;
+		return readQuadTree(filename, coords);
+	}
 
 
 
