@@ -797,17 +797,17 @@ template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType>> MeshGenerator<IndexType, ValueType>::randomPoints(int numberOfPoints, int dimensions, ValueType maxCoord){
     SCAI_REGION( "MeshGenerator.randomPoints" )
     int n = numberOfPoints;
-    int i, j;
+    int d, j;
     std::vector<DenseVector<ValueType>> ret(dimensions);
-    for (i=0; i<dimensions; i++)
-        ret[i] = DenseVector<ValueType>(dimensions, 0);
+    for (d=0; d<dimensions; d++)
+        ret[d] = DenseVector<ValueType>(n, 0);
     
     srand(time(NULL));
-    ValueType r;
-    for(i=0; i<n; i++){
-        for(j=0; j<dimensions; j++){
-            r= ((ValueType) rand()/RAND_MAX) * maxCoord;
-            ret[i].setValue(j, r);
+
+    for(d=0; d<dimensions; d++){
+        for(j=0; j<n; j++){
+        	ValueType r = ((ValueType) rand()/RAND_MAX) * maxCoord;
+            ret[d].setValue(j, r);
         }
     }
     return ret;
