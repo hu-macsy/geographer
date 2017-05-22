@@ -228,8 +228,7 @@ TEST_F(FileIOTest, testWriteCoordsDistributed){
     FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords2D, nodes, "writeCoordsDist");
 }
 //-------------------------------------------------------------------------------------------------
-/*
- // no cells.dat file
+
 TEST_F(FileIOTest, testReadQuadTree){
 	std::string filename = "cells.dat";
 
@@ -237,6 +236,6 @@ TEST_F(FileIOTest, testReadQuadTree){
 	IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
 	std::cout << "Read Quadtree with " << edgeList.size() << " nodes and " << m << " edges." << std::endl;
 }
-*/
+
 
 } /* namespace ITI */

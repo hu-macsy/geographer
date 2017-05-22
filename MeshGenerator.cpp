@@ -766,7 +766,7 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
     
     quad.indexSubtree(0);
     graphFromQuadtree(adjM, coords, quad);
-}    
+}
 
 template<typename IndexType, typename ValueType>
 void MeshGenerator<IndexType, ValueType>::graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid &quad) {
@@ -774,12 +774,12 @@ void MeshGenerator<IndexType, ValueType>::graphFromQuadtree(CSRSparseMatrix<Valu
 	const IndexType treeSize = quad.countNodes();
 	const IndexType dimension = quad.getDimensions();
 
-	// the quad tree is created. extract is as a CSR matrix
+	// the quad tree is created. extract it as a CSR matrix
 	// graphNgbrsCells is just empty now
 	std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsCells( treeSize );
 	std::vector<std::vector<ValueType>> coordsV( dimension );
 
-	adjM= quad.getTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coordsV );
+	adjM = quad.getTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coordsV );
 	const IndexType n = adjM.getNumRows();
 	assert(n == coordsV[0].size());
 
