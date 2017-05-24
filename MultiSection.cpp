@@ -32,7 +32,6 @@ std::priority_queue< rectangle, std::vector<rectangle>, rectangle> MultiSection<
     // TODO: try to avoid that, probably not needed
     ValueType totalWeight = nodeWeights.sum().scai::lama::Scalar::getValue<ValueType>();
     ValueType averageWeight = totalWeight/k;
-//PRINT0( "totalWeight =" << totalWeight << ", averageWeight= " << averageWeight);
 
     bBox.weight = totalWeight;
 
@@ -56,10 +55,7 @@ std::priority_queue< rectangle, std::vector<rectangle>, rectangle> MultiSection<
         }else{
             throw std::runtime_error("allRectangles is empty, this should not have happend.");
         }
-/*
-if(comm->getRank()==0) { thisRectangle.print();}
-PRINT0("thisRectangle.weight= " << thisRectangle.weight);            
-*/
+
         ValueType maxExtent = 0;
         ValueType minDifference = LONG_MAX;
         std::vector<ValueType> chosenProjection, thisProjection;
@@ -97,21 +93,11 @@ PRINT0("thisRectangle.weight= " << thisRectangle.weight);
                 }
             }
         }
-//PRINT0(allRectangles.size());             
+
         //perform 1D partitioning for the chosen dimension
         std::vector<ValueType> part1D, weightPerPart;
         std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1D( chosenProjection, k1, settings);
 
-/*        
-PRINT0("chosenDim= "<<  chosenDim);
-for(int gg=0; gg<weightPerPart.size(); gg++){
-    PRINT0(weightPerPart[gg]);
-    if( gg<part1D.size()){
-        PRINT0(part1D[gg]);
-    }
-}
-PRINT0("-----");
-*/
         SCAI_REGION_START("MultiSection.getPartition.createRectanglesAndPush");
         // create the new rectangles and add them to the queue
 ValueType dbg_rectW=0;
@@ -124,7 +110,7 @@ ValueType dbg_rectW=0;
         newRect.weight = weightPerPart[0];
         allRectangles.push( newRect );        
 dbg_rectW += newRect.weight;
-//if(comm->getRank()==0) { newRect.print();}
+
 
         for(int h=0; h<part1D.size()-1; h++ ){
             //change only the chosen dimension

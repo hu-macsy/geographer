@@ -379,8 +379,7 @@ TEST_F(MultiSectionTest, testInbBox){
     scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
     IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
     
-    // for all dimensions i: first[i]<second[i] 
-    //MultiSection<IndexType,ValueType>::rectangle bBox;
+    // for all dimensions i: bottom[i]<top[i] 
     rectangle bBox;
     bBox.bottom = {2,3,1};
     bBox.top = {6,8,6};
