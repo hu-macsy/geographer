@@ -152,6 +152,8 @@ SCAI_ASSERT( dbg_rectW==thisRectangle.weight, "Rectangle weight not correct");
 }
 //---------------------------------------------------------------------------------------
 
+//TODO: Now it works only for k1=2 => bisection, handle k not a power of 2.
+//TODO: Find numbers k1,k2,...,kd such that k1*k2*...*kd=k to perform multisection
 
 template<typename IndexType, typename ValueType>
 std::vector<ValueType> MultiSection<IndexType, ValueType>::projection(const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const IndexType dimensionToProject, const IndexType sideLen, Settings settings){
