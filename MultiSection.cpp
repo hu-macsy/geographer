@@ -9,7 +9,7 @@
 namespace ITI {
 
 template<typename IndexType, typename ValueType>
-std::queue<rectangle> MultiSection<IndexType, ValueType>::getPartition( const scai::lama::DenseVector<ValueType>& nodeWeights, const IndexType sideLen, Settings settings) {
+std::priority_queue< rectangle, std::vector<rectangle>, rectangle> MultiSection<IndexType, ValueType>::getPartition( const scai::lama::DenseVector<ValueType>& nodeWeights, const IndexType sideLen, Settings settings) {
     SCAI_REGION("MultiSection.getPartition");
 	
     const IndexType k = settings.numBlocks;    
@@ -28,10 +28,18 @@ std::queue<rectangle> MultiSection<IndexType, ValueType>::getPartition( const sc
         bBox.bottom.push_back(0);
         bBox.top.push_back(sideLen);
     }
-    
-    std::queue<rectangle> allRectangles;
-    allRectangles.push(bBox);
 
+    // TODO: try to avoid that, probably not needed
+    ValueType totalWeight = nodeWeights.sum().scai::lama::Scalar::getValue<ValueType>();
+    ValueType averageWeight = totalWeight/k;
+//PRINT0( "totalWeight =" << totalWeight << ", averageWeight= " << averageWeight);
+
+    bBox.weight = totalWeight;
+
+    std::priority_queue< rectangle, std::vector<rectangle>, rectangle> allRectangles ;
+
+    allRectangles.push(bBox);
+    
     //TODO: find dim integers for multisection
     // if k=2 then it is a bisection
     //
@@ -40,14 +48,18 @@ std::queue<rectangle> MultiSection<IndexType, ValueType>::getPartition( const sc
     
     while( allRectangles.size() < k){
         SCAI_REGION("MultiSection.getPartition.forAllRectangles");
-        struct rectangle thisRectangle;
+        
+        struct rectangle thisRectangle;          
         if( !allRectangles.empty() ){
-            thisRectangle = allRectangles.front();
+            thisRectangle = allRectangles.top();
             allRectangles.pop();
         }else{
-            throw std::runtime_error("allRectangles is empty, this should not ahve happend.");
+            throw std::runtime_error("allRectangles is empty, this should not have happend.");
         }
-
+/*
+if(comm->getRank()==0) { thisRectangle.print();}
+PRINT0("thisRectangle.weight= " << thisRectangle.weight);            
+*/
         ValueType maxExtent = 0;
         ValueType minDifference = LONG_MAX;
         std::vector<ValueType> chosenProjection, thisProjection;
@@ -59,17 +71,22 @@ std::queue<rectangle> MultiSection<IndexType, ValueType>::getPartition( const sc
          * 2) project in every dimension and pick the one in which the difference between the maximum and minimum value is the smallest: d projections
          * 3) TODO: maybe we can change (2) and calculate the variance of the projection and pick the one with the biggest
          * */
-        
+             
+        //TODO: since this is done locally, we can also get the 1D partition in every dimension and choose the best one
+        //      maybe not the fastest way but probably would give better quality
         for(int d=0; d<dim; d++){
             if(settings.useExtent){
+                SCAI_REGION("MultiSection.getPartition.useExtent");
                 ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
                 if( extent>maxExtent ){
                     maxExtent = extent;
                     chosenDim= d;
+                
+                    // this way we take only the projection to the dimension with the largest extent.
+                    chosenProjection = MultiSection<IndexType, ValueType>::projection( nodeWeights, thisRectangle, d, sideLen, settings);
                 }
-                // this way we take only the projection to the dimension with the largest extent.
-                chosenProjection = MultiSection<IndexType, ValueType>::projection( nodeWeights, thisRectangle, d, sideLen, settings);
-            }else{          //use variance
+            }else{          //use difference
+                SCAI_REGION("MultiSection.getPartition.useDiff");
                 thisProjection = MultiSection<IndexType, ValueType>::projection( nodeWeights, thisRectangle, d, sideLen, settings);
                 // variance = max - min
                 ValueType difference = std::max_element( thisProjection.begin(), thisProjection.end() ) - std::min_element( thisProjection.begin(), thisProjection.end() );
@@ -80,31 +97,55 @@ std::queue<rectangle> MultiSection<IndexType, ValueType>::getPartition( const sc
                 }
             }
         }
-      
+//PRINT0(allRectangles.size());             
         //perform 1D partitioning for the chosen dimension
         std::vector<ValueType> part1D, weightPerPart;
         std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1D( chosenProjection, k1, settings);
 
+/*        
+PRINT0("chosenDim= "<<  chosenDim);
+for(int gg=0; gg<weightPerPart.size(); gg++){
+    PRINT0(weightPerPart[gg]);
+    if( gg<part1D.size()){
+        PRINT0(part1D[gg]);
+    }
+}
+PRINT0("-----");
+*/
+        SCAI_REGION_START("MultiSection.getPartition.createRectanglesAndPush");
         // create the new rectangles and add them to the queue
+ValueType dbg_rectW=0;
         struct rectangle newRect;
         newRect.bottom = thisRectangle.bottom;
         newRect.top = thisRectangle.top;
         
         //first rectangle
-        newRect.top[chosenDim] = thisRectangle.bottom[chosenDim]+part1D[0];
-        allRectangles.push(newRect);
+        newRect.top[chosenDim] = thisRectangle.bottom[chosenDim]+part1D[0]+1;
+        newRect.weight = weightPerPart[0];
+        allRectangles.push( newRect );        
+dbg_rectW += newRect.weight;
+//if(comm->getRank()==0) { newRect.print();}
 
         for(int h=0; h<part1D.size()-1; h++ ){
             //change only the chosen dimension
             newRect.bottom[chosenDim] = thisRectangle.bottom[chosenDim]+part1D[h];
-            newRect.top[chosenDim] = thisRectangle.bottom[chosenDim]+part1D[h+1];
-            allRectangles.push(newRect);
+            newRect.top[chosenDim] = thisRectangle.bottom[chosenDim]+part1D[h+1]+1;
+            newRect.weight = weightPerPart[h];
+            allRectangles.push( newRect );
+dbg_rectW += newRect.weight;                
         }
         
         //last rectangle
-        newRect.bottom[chosenDim] = thisRectangle.bottom[chosenDim]+part1D.back();
+        newRect.bottom[chosenDim] = thisRectangle.bottom[chosenDim]+part1D.back()+1;
         newRect.top = thisRectangle.top;
-        allRectangles.push(newRect);
+        newRect.weight = weightPerPart.back();
+        allRectangles.push( newRect );
+dbg_rectW += newRect.weight;        
+
+//TODO: only for debuging, remove variable dbg_rectW
+SCAI_ASSERT( dbg_rectW==thisRectangle.weight, "Rectangle weight not correct"); 
+        SCAI_REGION_END("MultiSection.getPartition.createRectanglesAndPush");
+
     }
     
     return allRectangles;
@@ -329,7 +370,7 @@ std::vector<IndexType> MultiSection<IndexType, ValueType>::indexTo3D(IndexType i
 }
 //---------------------------------------------------------------------------------------
 
-template std::queue<rectangle> MultiSection<int, double>::getPartition( const scai::lama::DenseVector<double>& nodeWeights, const IndexType sideLen, Settings settings);
+template std::priority_queue< rectangle, std::vector<rectangle>, rectangle> MultiSection<int, double>::getPartition( const scai::lama::DenseVector<double>& nodeWeights, const IndexType sideLen, Settings settings);
 
 template std::vector<double> MultiSection<int, double>::projection( const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const int dimensionToProject, const int sideLen, Settings settings);
 
