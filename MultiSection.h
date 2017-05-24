@@ -22,7 +22,9 @@ namespace ITI {
          * For all i: 0<i<d, it must be bottom[i]<top[i]
          * */
         struct rectangle{
-            //IndexType dimension;
+            
+            double weight;
+            
             // for all i: 0<i<dimension, bottom[i]<top[i]
             std::vector<double> bottom;
             std::vector<double> top;
@@ -40,6 +42,14 @@ namespace ITI {
                 }
                 std::cout<< std::endl;
             }
+            /*
+            static bool heavier(rectangle& a, rectangle& b){
+                return a.weight > b.weight;
+            }
+            */
+            bool operator()(rectangle& a, rectangle& b){
+                return a.weight < b.weight;
+            }
         };
         
     template <typename IndexType, typename ValueType>
@@ -48,7 +58,7 @@ namespace ITI {
 
         /** Get a partition of a uniform grid of side length sideLen into settings.numBlocks blocks.
          */
-        static std::queue<struct rectangle> getPartition( const scai::lama::DenseVector<ValueType>& nodeWeights, const IndexType sideLen, Settings settings);
+        static std::priority_queue< rectangle, std::vector<rectangle>, rectangle> getPartition( const scai::lama::DenseVector<ValueType>& nodeWeights, const IndexType sideLen, Settings settings);
         
         /** Calculates the projection of all points in the bounding box (bBox) in the given dimension. Every PE
          *  creates an array of appropriate length, calculates the projection for its local coords and then
