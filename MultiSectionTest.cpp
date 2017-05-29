@@ -21,7 +21,6 @@
 
 #include "MeshGenerator.h"
 #include "FileIO.h"
-//#include "ParcoRepart.h"
 #include "AuxiliaryFunctions.h"
 #include "MultiSection.h"
 
@@ -46,7 +45,7 @@ TEST_F(MultiSectionTest, testGetPartition){
     scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
     IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();  
     
-    //create local (random) weights
+    //create weights locally
     {
         scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
         srand(time(NULL));
@@ -66,6 +65,7 @@ TEST_F(MultiSectionTest, testGetPartition){
     SCAI_ASSERT( rectangles.size()==settings.numBlocks , "Returned number of rectangles is wrong. Should be "<< settings.numBlocks<< " but it is "<< rectangles.size() );
     
     ValueType totalWeight = 0;
+    IndexType totalVolume = 0;
     ValueType minWeight = LONG_MAX, maxWeight = 0;
     
     for(int r=0; r<settings.numBlocks; r++){
@@ -80,6 +80,7 @@ TEST_F(MultiSectionTest, testGetPartition){
         for(int d=0; d<dim; d++){
             thisVolume = thisVolume * (thisRectangle.top[d]-thisRectangle.bottom[d]);
         }
+        totalVolume += thisVolume;
         ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( nodeWeights, thisRectangle, sideLen, settings);
         SCAI_ASSERT( thisWeight==thisRectangle.weight, "wrong weight calculation");
         SCAI_ASSERT( thisVolume==thisWeight , "This rectangle's area= "<< thisVolume << " and should be equal to its weight that is= "<< thisWeight);
@@ -98,6 +99,8 @@ TEST_F(MultiSectionTest, testGetPartition){
     
     //all points are covered by a rectangle
     SCAI_ASSERT( totalWeight==N , "total weight= "<< totalWeight << " and should be equal the number of points= "<< N);
+    // this works even when weights are not 1
+    SCAI_ASSERT( totalVolume==N , "total weight= "<< totalVolume << " and should be equal the number of points= "<< N);
     
 }
 //---------------------------------------------------------------------------------------
@@ -213,7 +216,7 @@ TEST_F(MultiSectionTest, test1DPartition){
     bBox.bottom = {0,0};
     bBox.top = {(ValueType) sideLen, (ValueType) sideLen};
     
-    // the 1D partition
+    // the 1D partition for all dimensions
     
     for( int dimensionToPartition=0; dimensionToPartition<dim; dimensionToPartition++){
         // get the projection in one dimension
@@ -236,6 +239,7 @@ TEST_F(MultiSectionTest, test1DPartition){
         SCAI_ASSERT( part1D.size()==k1-1, "part1D.size()= "<< part1D.size() << " and is should be = " << k1 -1);
         SCAI_ASSERT( weightPerPart.size()==k1, "weightPerPart.size()= "<< weightPerPart.size() << " and is should be = " << k1 );
         
+        // calculate min and max weights
         ValueType minWeight=LONG_MAX, maxWeight=0;
         for(int i=0; i<weightPerPart.size(); i++){
             if( weightPerPart[i]<minWeight ){
@@ -270,6 +274,130 @@ TEST_F(MultiSectionTest, test1DPartition){
         
         // TODO: add more tests
     }
+}
+//---------------------------------------------------------------------------------------
+
+TEST_F(MultiSectionTest, testRectTree){
+    
+    rectangle initialRect;
+    initialRect.bottom = { 0, 0};
+    initialRect.top = { 100, 100};
+    
+    std::shared_ptr<rectCell<IndexType,ValueType>> root( new rectCell<IndexType,ValueType>(initialRect) );
+    //root = new rectCell<ValueType,IndexType>(initialRect) ;
+    //rectCell<ValueType,IndexType> r(initialRect);
+    
+    rectangle r1;
+    r1.bottom = { 0,0};
+    r1.top = { 50, 50};
+    root->insert( r1 );
+    
+    rectangle r2;
+    r2.bottom = { 70, 90};
+    r2.top = {100, 100};
+    root->insert( r2 );
+    
+    rectangle r3;
+    r3.bottom = {10,20};
+    r3.top = {20, 40};
+    root->insert( r3 );
+    
+    rectangle r4;
+    r4.bottom = {10, 70};
+    r4.top = {40, 80};
+    root->insert( r4 );
+    
+    rectangle r5;
+    r5.bottom = {12, 20};
+    r5.top = {18, 40};
+    root->insert( r5 );
+    
+    rectangle r6;
+    r6.bottom = {30, 10};
+    r6.top = {40, 35};
+    root->insert( r6 );
+    
+    /*              root
+     *             / |  \
+     *           r1  r2  r4
+     *          / \
+     *         r3  r6
+     *          |  
+     *         r5   
+     */
+    
+    //checks
+    SCAI_ASSERT( root->getSubtreeSize()==7, "Wrong subtree size.");
+    SCAI_ASSERT( root->getLeafSize()==4, "Wrong number of leaves.");
+    
+    std::vector<std::vector<ValueType>> points = {  
+                                                    {60.0, 31},     // in r0
+                                                    { 3.4, 8.5},    // in r1
+                                                    {75.0, 91.0},   // in r2
+                                                    {10.2, 20},     // in r1 and r3
+                                                    {12.0, 71.5},   // in r4                                                    
+                                                    {15.0, 30},     // in r1, r3 and r5
+                                                    {33.1, 33.1}    // in r1, r3 and r6 
+                                                };
+                                                    
+    std::shared_ptr<rectCell<IndexType,ValueType>> retRect; 
+    
+    for(int p=0; p<points.size(); p++){
+        retRect = root->contains( points[p] );
+        if( retRect!=NULL){
+            PRINT("point ("<< points[p][0]<<", "<< points[p][1] <<") found in rectangle:");
+            retRect->getRect().print();
+        }else{
+            PRINT("point ("<< points[p][0]<<", "<< points[p][1] <<") was not found in any rectangle.");
+        }
+    }
+    
+    std::vector<ValueType> point(2); 
+    
+    //random points
+    srand(time(NULL));
+    for(int r=0; r<10; r++){
+        point[0] = rand()%100;
+        point[1] = rand()%100;
+        
+        retRect = root->contains( point );
+        if( retRect!=NULL){
+            PRINT("point ("<< point[0]<<", "<< point[1] <<") found in rectangle:");
+            retRect->getRect().print();
+        }else{
+            PRINT("point ("<< point[0]<<", "<< point[1] <<") was not found in any rectangle.");
+        }
+    }
+    
+    //all the points
+    int numOfPointsIn_r2 =0;
+    int numOfPointsIn_r4 =0;
+    int numOfPointsIn_r6 =0;
+    for( int x=0; x<100; x++){
+        for(int y=0; y<100; y++){
+            point[0]=x;
+            point[1]=y;
+            
+            retRect = root->contains( point );
+            
+            if(retRect->getRect()==r2){
+                numOfPointsIn_r2++;
+            }
+            if(retRect->getRect()==r4){
+                numOfPointsIn_r4++;
+            }
+            if(retRect->getRect()==r6){
+                numOfPointsIn_r6++;
+            }
+        }
+    }
+    int r2Vol, r4Vol, r6Vol;
+    r2Vol = (r2.top[0]-r2.bottom[0])*(r2.top[1]-r2.bottom[1]);
+    r4Vol = (r4.top[0]-r4.bottom[0])*(r4.top[1]-r4.bottom[1]);
+    r6Vol = (r6.top[0]-r6.bottom[0])*(r6.top[1]-r6.bottom[1]);
+    SCAI_ASSERT( numOfPointsIn_r2==r2Vol, "Wrong number of points in rectangle r2.");
+    SCAI_ASSERT( numOfPointsIn_r4==r4Vol, "Wrong number of points in rectangle r4.");
+    SCAI_ASSERT( numOfPointsIn_r6==r6Vol, "Wrong number of points in rectangle r6.");
 }
 //---------------------------------------------------------------------------------------
 
