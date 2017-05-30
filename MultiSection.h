@@ -206,6 +206,7 @@ namespace ITI {
         }
         
         IndexType getSubtreeSize(){
+            SCAI_REGION("rectCell.getSubtreeSize");
             IndexType ret = 1;
             for(int c=0; c<children.size(); c++){
                 ret += children[c]->getSubtreeSize();
@@ -213,21 +214,111 @@ namespace ITI {
             return ret;
         }
         
-        IndexType getLeafSize(){
+        IndexType getNumLeaves(){
+            SCAI_REGION("rectCell.getNumLeaves");
             IndexType ret = 0;
             if( isLeaf ){
                 ret= 1;
             }else{
                 for(int c=0; c<children.size(); c++){
-                    ret += children[c]->getLeafSize();
+                    ret += children[c]->getNumLeaves();
                 }
             }
             return ret;
         }
+                
         
-        rectangle getRect(){
-            return myRect;
+        /** Returns a vector of size getNumLeaves() with pointers to all the leaf nodes
+         *  The traversal, and thus the order leaves appear in the returned vector, is done in a DFS way.
+         */
+        std::vector<std::shared_ptr<rectCell>> getAllLeaves(){
+            SCAI_REGION("rectCell.getAllLeaves");
+            // well... in case there is only one node
+            //SCAI_ASSERT( !isLeaf, "Node should not be a leaf.");
+
+            if( isLeaf ){
+                std::vector<std::shared_ptr<rectCell>> ret(1);
+                ret[0] = std::make_shared<rectCell>(*this);
+                return ret;
+            }
+            IndexType leafIndex = this->indexLeaves(0);
+            SCAI_ASSERT( leafIndex==this->getNumLeaves(), "Wrong leaf indexing");
+
+            // we use a frontier queue and it looks like a BFS, but we insert the leaves 
+            // in leaves[child->leafID] and leafID is computed in a DFS way
+            std::vector<std::shared_ptr<rectCell>> leaves( leafIndex );
+            std::queue<std::shared_ptr<rectCell>> frontier;
+                        
+            for(int c=0; c<children.size(); c++){
+                if( !children[c]->isLeaf ){
+                    frontier.push( children[c] );
+                }else{
+                    std::shared_ptr<rectCell> child = this->children[c];
+                    leaves[child->leafID] = child;
+                }
+            }
+               
+            while( !frontier.empty() ){
+                std::shared_ptr<rectCell> thisNode = frontier.front();
+                
+                for(int c=0; c<thisNode->children.size(); c++){
+                    std::shared_ptr<rectCell> child = this->children[c];
+                    if( !child->isLeaf ){
+                        frontier.push( child );
+                    }else{
+                        leaves[child->leafID] = child;
+                    }
+                }
+                
+                frontier.pop();
+            }
+            /*
+            for(int c=0; c<children.size(); c++){
+                if( !children[c]->isLeaf ){
+                    std::shared_ptr<rectCell>  tmp;// (new rectCell( rect ) );
+                    tmp = children[c];
+                    ret.push_back( tmp );
+                }else{
+                    std::vector<std::shared_ptr<rectCell>> childLeaves = children[c].getAllLeaves();
+                    if( ret.size()<childLeaves.size() ){
+                        childLeaves.insert( childLeaves.end(), std::make_move_iterator(ret.begin()), std::make_move_iterator(ret.emd()) );
+                    }else{
+                        ret.insert( ret.end(), std::make_move_iterator(childLeaves.begin()), std::make_move_iterator(childLeaves.end()) );
+                    }
+                }
+            }
+            */
+PRINT("");                      
+            return  leaves;
         }
+        
+        /** Indexes only the leaf nodes of the tree in a DFS way.
+         * */
+        IndexType indexLeaves(IndexType currentIndex){
+            SCAI_REGION("rectCell.indexLeaves");
+            IndexType ret = currentIndex;
+            for(int c=0; c<this->children.size(); c++){
+                ret = children[c]->indexLeaves( ret );
+            }
+            if( this->isLeaf ){
+                this->leafID = ret;
+                ret = currentIndex+1;
+            }else{ //do not index if this is not a leaf
+                this->leafID= -1;
+            }
+            
+            return ret;
+        }
+        
+        /* // Indexes only the leaf nodes of the tree in a BFS way.
+         
+        IndexType BFSIndexLeaves(IndexType currentIndex){
+            IndexType ret = currentIndex;
+           
+            return ret;
+        }
+        */
+        
         
         /*
         bool areChildrenOverlapping(){
@@ -240,12 +331,21 @@ namespace ITI {
             return ret;
         }
         */
+        
+        rectangle getRect(){
+            return myRect;
+        }
+        
+        IndexType getLeafID(){
+            return leafID;
+        }
+        
     protected:
         rectangle myRect;
         std::vector<std::shared_ptr<rectCell>> children;
         ValueType weight;
         bool isLeaf;
-        
+        IndexType leafID = -1;   // id value only for leaf nodes
     };
         
         
@@ -258,8 +358,14 @@ namespace ITI {
     public:
 
         /** Get a partition of a uniform grid of side length sideLen into settings.numBlocks blocks.
+         * 
+         * @param[in] nodeWeights The weights for each point.
+         * @param[in] sideLen The length of the side of the whole uniform, square grid.
+         * @param[in] setting A settigns struct passing various arguments.
+         * 
+         * @return A vector of pointers to all the leaves/rectangles of the tree. return.size() = settings.numBlocks.
          */
-        static std::priority_queue< rectangle, std::vector<rectangle>, rectangle> getPartition( const scai::lama::DenseVector<ValueType>& nodeWeights, const IndexType sideLen, Settings settings);
+        static std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> getPartition( const scai::lama::DenseVector<ValueType>& nodeWeights, const IndexType sideLen, Settings settings);
         
         /** Calculates the projection of all points in the bounding box (bBox) in the given dimension. Every PE
          *  creates an array of appropriate length, calculates the projection for its local coords and then
@@ -267,27 +373,16 @@ namespace ITI {
          *  by the index of the -nodeWeights- vector.
          * 
          * @param[in] nodeWeights The weights for each point.
-         * @param[in] bBox The bounding box/rectangle in which we wish to calculate the projection. For all dimensions, bBox.bottom[i]< bBox.top[i].
-         * @param[in] dimensiontoProject The dimension in which we wish to project the weights. Should be more or equal to 0 and less than d (where d are the total dimensions).
+         * @param[in] treeRoot The root of the tree that contains all current rectangles for which we get the projections. We only calculate the projections for the leaf nodes.
+         * @param[in] dimensiontoProject A vector of size treeRoot.getNumLeaves(). dimensionsToProject[i]= the dimension in which we wish to project the weights for rectangle/leaf i. Should be more or equal to 0 and less than d (where d are the total dimensions).
          * @param[in] sideLen The length of the side of the whole uniform, square grid.
          * @param[in] setting A settigns struct passing various arguments.
          * @return Return an vector where in each position is the sum of the weights of the corespondig coordianate (not the same).
 
          * Example: bBox={(5,10),(8,15)} and dimensionToProject=0 (=x). Then the return vector has size |8-5|=3. return[0] is the sum of the coordinates in the bBox which have their 0-coordinate equal to 5, return[1] fot he points with 0-coordinate equal to 3 etc. If dimensionToProject=1 then return vector has size |10-15|=5.
          */
-        static std::vector<ValueType> projection( const scai::lama::DenseVector<ValueType>& nodeWeights, const struct rectangle& bBox, const IndexType dimensionToProject, const IndexType sideLen, Settings settings);
-        
-        /** Calculates the projection for a vector of rectangles.
-         * @param[in] nodeWeights The weights for each point.
-         * @param[in] bBoxes The bounding boxes for all the rectangles. bBoxes.size()= k
-         * @param[in] dimensiontoProject The dimension in which we wish to project the weights for every rectangle. Should be more or equal to 0 and less than d (where d are the total dimensions). dimensionsToProject.size()= k.
-         * @param[in] sideLen The length of the side of the whole uniform, square grid.
-         * @param[in] setting A settigns struct passing various arguments.
-         * 
-         * @return A vector of size k that holds the projection of every rectangle in the given dimension. return.size()= k and return[i].size() depends on the size of the rectangle i.
-         */
-        static std::vector<std::vector<ValueType>> allProjection( const scai::lama::DenseVector<ValueType>& nodeWeights, const std::vector<struct rectangle>& bBoxes, const std::vector<IndexType> dimensionsToProject, const IndexType sideLen, Settings settings);
-        
+        static std::vector<std::vector<ValueType>> projection( const scai::lama::DenseVector<ValueType>& nodeWeights, const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot, const std::vector<IndexType>& dimensionToProject, const IndexType sideLen, Settings settings );
+                
         /** Partitions the given vector into k parts of roughly equal weights.
          *
          * @param[in] array The 1 dimensional array of positive numbers to be partitioned.

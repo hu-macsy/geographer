@@ -496,8 +496,8 @@ public:
 		for (int i = 0; i < this->children.size(); i++) {
 			result = this->children[i]->indexSubtree(result);
 		}
-        this->ID = result;
-        indexed = true;
+                this->ID = result;
+                indexed = true;
 		return result+1;
 	}
 
