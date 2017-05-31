@@ -10,8 +10,7 @@ namespace ITI {
     
 //TODO: Now it works only for k1=2 => bisection, handle k not a power of 2.
 //TODO: Find numbers k1,k2,...,kd such that k1*k2*...*kd=k to perform multisection
-//TODO: Rectangles are always non-intersecting => calculate all the projections at once
-//TODO(?):  Enforce initial partition and keep track which PEs need to communicate for each projection
+//TODO(?): Enforce initial partition and keep track which PEs need to communicate for each projection
 //TODO(?): Add an optimal algorithm for 1D partition
 //TODO(kind of): Keep in mind semi-strucutured grids
     
@@ -39,7 +38,6 @@ std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> MultiSection<IndexTy
     // TODO: try to avoid that, probably not needed
     ValueType totalWeight = nodeWeights.sum().scai::lama::Scalar::getValue<ValueType>();
     ValueType averageWeight = totalWeight/k;
-//PRINT0( "totalWeight =" << totalWeight << ", averageWeight= " << averageWeight);
 
     bBox.weight = totalWeight;
 
@@ -56,7 +54,7 @@ std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> MultiSection<IndexTy
 
     while( numLeaves < k){
         SCAI_REGION("MultiSection.getPartition.forAllRectangles");
-PRINT0(numLeaves);         
+
         ValueType maxExtent = 0;
         //std::vector<ValueType> minDifference ( numLeaves, LONG_MAX );        
 
@@ -81,12 +79,12 @@ PRINT0(numLeaves);
         
         // choose the dimension to project for all leaves/rectangles
         if( settings.useExtent ){
+            SCAI_REGION("MultiSection.getPartition.forAllRectangles.useExtent");
             // for all leaves/rectangles
             for( int l=0; l<allLeaves.size(); l++){
                 struct rectangle thisRectangle = allLeaves[l]->getRect();
                 maxExtent = 0;
                 for(int d=0; d<dim; d++){
-                    SCAI_REGION("MultiSection.getPartition.useExtent");
                     ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
                     if( extent>maxExtent ){
                         maxExtent = extent;
@@ -101,20 +99,6 @@ PRINT0(numLeaves);
         std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projection( nodeWeights, root, chosenDim, sideLen, settings);
                 
         SCAI_ASSERT( projections.size()==numLeaves, "Wrong number of projections"); 
-                /*
-            }else{          //use difference
-                SCAI_REGION("MultiSection.getPartition.useDiff");
-                thisProjection = MultiSection<IndexType, ValueType>::projection( nodeWeights, thisRectangle, d, sideLen, settings);
-                // variance = max - min
-                ValueType difference = std::max_element( thisProjection.begin(), thisProjection.end() ) - std::min_element( thisProjection.begin(), thisProjection.end() );
-                if( difference< minDifference){
-                    minDifference = difference;
-                    chosenDim = d;
-                    chosenProjection = thisProjection;
-                }
-            }
-            */
-        
         
         for(int l=0; l<numLeaves; l++){        
             SCAI_REGION("MultiSection.getPartition.createRectanglesAndPush");
@@ -125,16 +109,7 @@ PRINT0(numLeaves);
 
             //TODO: make sure that projections[l] and allLeaves[l] refer to the same rectangle
             struct rectangle thisRectangle = allLeaves[l]->getRect();
-    /*        
-    PRINT0("chosenDim= "<<  chosenDim);
-    for(int gg=0; gg<weightPerPart.size(); gg++){
-        PRINT0(weightPerPart[gg]);
-        if( gg<part1D.size()){
-            PRINT0(part1D[gg]);
-        }
-    }
-    PRINT0("-----");
-    */
+
             IndexType thisChosenDim = chosenDim[l];
             
             // create the new rectangles and add them to the queue
@@ -148,7 +123,6 @@ ValueType dbg_rectW=0;
             newRect.weight = weightPerPart[0];
             root->insert( newRect );     
 dbg_rectW += newRect.weight;
-//if(comm->getRank()==0) { newRect.print();}
 
             for(int h=0; h<part1D.size()-1; h++ ){
                 //change only the chosen dimension
@@ -212,11 +186,9 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
         if(projLength<1){
             throw std::runtime_error("function: projection, line:" +std::to_string(__LINE__) +", the length of the projection is " +std::to_string(projLength) + " and is not correct");
         }
-//PRINT0(l<<" ++ "<< projLength );   
-        //projections[l].reserve(projLength);
         projections[l].assign( projLength, 0 );
     }
-    
+              
     // calculate projection for local coordinates
     {
         SCAI_REGION("MultiSection.projection.localProjection");
@@ -229,7 +201,16 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
             std::vector<ValueType> coordsVal( coords.begin(), coords.end() );
             
             // a pointer to the cell that contains point i
+            SCAI_REGION_START("MultiSection.projection.localProjection.contains");
             std::shared_ptr<rectCell<IndexType,ValueType>> thisRectCell = treeRoot->contains( coordsVal );
+            SCAI_REGION_END("MultiSection.projection.localProjection.contains");
+            
+            //TODO: in the partition this should not happen. But it may happen in a more general case
+            // if this point is not contained in any rectangle
+            if( thisRectCell==NULL ){
+                continue;
+            }
+            
             IndexType thisLeafID = thisRectCell->getLeafID();
             SCAI_ASSERT( thisLeafID!=-1, "leafID for containing rectCell must be >0");
             SCAI_ASSERT( thisLeafID<projections.size(), "Index too big.");
@@ -239,21 +220,18 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
             IndexType relativeIndex = coords[dim2proj]-thisRectCell->getRect().bottom[dim2proj];
 
             SCAI_ASSERT( relativeIndex<projections[ thisLeafID ].capacity(), "Wrong relative index: "<< relativeIndex << " should be < "<< projections[ thisLeafID ].capacity() );
-//PRINT0(thisLeafID << " , "<< relativeIndex << " _ " <<localWeights[i] );   
+
             projections[ thisLeafID ][relativeIndex] += localWeights[i];
         }
     }
     // here, the projection of the local points has been calculated
-
     
     // must sum all local projections from all PEs
     std::vector<std::vector<ValueType>> globalProj(numLeaves);
     for(int i=0; i<numLeaves; i++){
         SCAI_REGION("MultiSection.projection.sumImpl");
-PRINT0(projections[i].size() << " +__+ " << projections[i].capacity() );
         globalProj[i].assign( projections[i].size() ,0 );
         comm->sumImpl( globalProj[i].data(), projections[i].data(), projections[i].size(), scai::common::TypeTraits<ValueType>::stype);
-PRINT0( globalProj[i].size()) ;
     }
     
     return globalProj;
@@ -273,7 +251,6 @@ std::pair<std::vector<ValueType>, std::vector<ValueType>> MultiSection<IndexType
     if(projection.size()==0){
         throw std::runtime_error( "In MultiSection::partition1D, input projection vector is empty");
     }
-//for(int i : projection)      PRINT( projection[i] );
 
     std::vector<ValueType> partHyperplanes(k-1,-9);
     std::vector<ValueType> weightPerPart(k,-9);

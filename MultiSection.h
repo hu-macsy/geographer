@@ -43,11 +43,7 @@ namespace ITI {
             }
             std::cout<< std::endl;
         }
-        /*
-         *     static bool heavier(rectangle& a, rectangle& b){
-         *         return a.weight > b.weight;
-    }
-    */
+        
         /** Checks if this rectangle resides entirelly in the given rectangle: 
          * for all dimensions i< d:  
          * this.bottom[i]> outer.bottom[i] and this.top[i]< outer.top[i]
@@ -171,20 +167,22 @@ namespace ITI {
             
             // point should be inside this rectangle
             for(int d=0; d<dim; d++){
-                SCAI_ASSERT( point[d]<myRect.top[d], "Point is out of bounds");
-                SCAI_ASSERT( point[d]>=myRect.bottom[d], "Point is out of bounds");
-                //TODO: or just return NULL
+                //TODO: just return NULL or insert assertion to ensure point is within bounds?
+                if(point[d]>=myRect.top[d] or  point[d]<myRect.bottom[d]){
+                    return NULL;
+                }
             }
             
             std::shared_ptr<rectCell> ret;
             // only leaf nodes must be returned as owners of points
-            //TODO: maybe not... when leaf rectangles do not cover the whole space.
+            //TODO: maybe not... when the leaf rectangles do not cover the whole space.
             if( !this->isLeaf ){
                 bool foundOwnerChild = false;
                 for(int c=0; c<this->children.size(); c++){
                     if( children[c]->myRect.owns( point ) ){                    
                         foundOwnerChild = true;
                         ret = children[c]->contains( point );
+                        break;  // if one node is found no need to search the rest of the children
                     }
                 }
                
@@ -233,8 +231,6 @@ namespace ITI {
          */
         std::vector<std::shared_ptr<rectCell>> getAllLeaves(){
             SCAI_REGION("rectCell.getAllLeaves");
-            // well... in case there is only one node
-            //SCAI_ASSERT( !isLeaf, "Node should not be a leaf.");
 
             if( isLeaf ){
                 std::vector<std::shared_ptr<rectCell>> ret(1);
@@ -260,9 +256,9 @@ namespace ITI {
                
             while( !frontier.empty() ){
                 std::shared_ptr<rectCell> thisNode = frontier.front();
-                
+
                 for(int c=0; c<thisNode->children.size(); c++){
-                    std::shared_ptr<rectCell> child = this->children[c];
+                    std::shared_ptr<rectCell> child = thisNode->children[c];
                     if( !child->isLeaf ){
                         frontier.push( child );
                     }else{
@@ -272,23 +268,6 @@ namespace ITI {
                 
                 frontier.pop();
             }
-            /*
-            for(int c=0; c<children.size(); c++){
-                if( !children[c]->isLeaf ){
-                    std::shared_ptr<rectCell>  tmp;// (new rectCell( rect ) );
-                    tmp = children[c];
-                    ret.push_back( tmp );
-                }else{
-                    std::vector<std::shared_ptr<rectCell>> childLeaves = children[c].getAllLeaves();
-                    if( ret.size()<childLeaves.size() ){
-                        childLeaves.insert( childLeaves.end(), std::make_move_iterator(ret.begin()), std::make_move_iterator(ret.emd()) );
-                    }else{
-                        ret.insert( ret.end(), std::make_move_iterator(childLeaves.begin()), std::make_move_iterator(childLeaves.end()) );
-                    }
-                }
-            }
-            */
-PRINT("");                      
             return  leaves;
         }
         
@@ -309,29 +288,7 @@ PRINT("");
             
             return ret;
         }
-        
-        /* // Indexes only the leaf nodes of the tree in a BFS way.
-         
-        IndexType BFSIndexLeaves(IndexType currentIndex){
-            IndexType ret = currentIndex;
-           
-            return ret;
-        }
-        */
-        
-        
-        /*
-        bool areChildrenOverlapping(){
-            bool ret = false;
-            for(int c=0; c<children.size(); c++){
-                 for(int c2=0; c<children.size(); c++){
-                     }
-                 }
-            }
-            return ret;
-        }
-        */
-        
+                
         rectangle getRect(){
             return myRect;
         }

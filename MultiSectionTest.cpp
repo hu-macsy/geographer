@@ -51,15 +51,23 @@ TEST_F(MultiSectionTest, testGetPartition){
         srand(time(NULL));
         for(int i=0; i<localN; i++){
             localPart[i] = 1;
+            //localPart[i] = rand()%7*comm->getRank()+2;
         }
     }
-PRINT0("");    
+
     Settings settings;
     settings.dimensions = dim;
-    settings.numBlocks = 16;
+    settings.numBlocks = 64;
+    
+    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
     std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> rectangles= MultiSection<IndexType, ValueType>::getPartition( nodeWeights, sideLen, settings);
     
+    std::chrono::duration<double> partitionTime = std::chrono::system_clock::now() - startTime;
+    
+    if (comm->getRank() == 0) {
+        std::cout<< "Time to partition: "<< partitionTime.count() << std::endl;
+    }
     // assertions - prints
     
     SCAI_ASSERT( rectangles.size()==settings.numBlocks , "Returned number of rectangles is wrong. Should be "<< settings.numBlocks<< " but it is "<< rectangles.size() );
@@ -70,16 +78,18 @@ PRINT0("");
     
     for(int r=0; r<settings.numBlocks; r++){
         struct rectangle thisRectangle = rectangles[r]->getRect();
-        if( comm->getRank()==0 ){
+        
+        if( comm->getRank()==0 and settings.numBlocks<20){
             thisRectangle.print();
         }
         
-        //this only works when dim=2 and nodeWeights=1
+        // the sum of all the volumes must be equal the volume of the grid: sideLen^dim
         ValueType thisVolume = 1;
         for(int d=0; d<dim; d++){
             thisVolume = thisVolume * (thisRectangle.top[d]-thisRectangle.bottom[d]);
         }
         totalVolume += thisVolume;
+        
         ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( nodeWeights, thisRectangle, sideLen, settings);
         SCAI_ASSERT( thisWeight==thisRectangle.weight, "wrong weight calculation");
         SCAI_ASSERT( thisVolume==thisWeight , "This rectangle's area= "<< thisVolume << " and should be equal to its weight that is= "<< thisWeight);
@@ -92,95 +102,39 @@ PRINT0("");
         }
         
         totalWeight += thisWeight;
+        
+        // check if this rectangle overlaps with some other rectangle
+        for(int r2=0; r2<settings.numBlocks; r2++){
+            if( r2==r) continue; // do not self-check
+            
+            struct rectangle otherRectangle = rectangles[r2]->getRect();
+            bool overlap = true;
+            for(int d=0; d<dim; d++){
+                if( thisRectangle.bottom[d]>=otherRectangle.top[d] or thisRectangle.top[d]<=otherRectangle.bottom[d] ){
+                    // if they do not overlap in dimension then they cannot overlap 
+                    overlap = false;
+                    break;
+                }
+            }
+            
+            if( comm->getRank()==0 and overlap ){
+                //PRINT0("Found overlapping rectangles:");
+                thisRectangle.print();
+                otherRectangle.print();
+                throw std::runtime_error("The rectangles above overlap.");
+            }
+        }
     }
     PRINT0( "averageWeight= "<< N/settings.numBlocks );
     PRINT0( "minWeight= "<< minWeight << " , maxWeight= "<< maxWeight );
     
     //all points are covered by a rectangle
-    SCAI_ASSERT( totalWeight==N , "total weight= "<< totalWeight << " and should be equal the number of points= "<< N);
+    ValueType sumWeight = nodeWeights.sum().Scalar::getValue<ValueType>();
+    SCAI_ASSERT( totalWeight==sumWeight , "sum of all rectangles weight= "<< totalWeight << " and should be equal the sum of weights= "<< sumWeight);
     // this works even when weights are not 1
-    SCAI_ASSERT( totalVolume==N , "total weight= "<< totalVolume << " and should be equal the number of points= "<< N);
+    SCAI_ASSERT( totalVolume==N , "total volume= "<< totalVolume << " and should be equal the number of points= "<< N);
     
 }
-//---------------------------------------------------------------------------------------
-/*
-TEST_F(MultiSectionTest, testCompareExtentDiff){
- 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    IndexType sideLen= 50;
-    IndexType dim = 3;
-    IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
-    scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-    scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
-    IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();  
-    
-    //create local random weights
-    {
-        scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
-        srand(time(NULL));
-        for(int i=0; i<localN; i++){
-            localPart[i] = rand()%7*comm->getRank()+2;
-        }
-    }
-    
-    Settings settings;
-    settings.dimensions = dim;
-    settings.numBlocks = std::pow(2, 4);
-    settings.useExtent = true;
-
-    std::priority_queue< rectangle, std::vector<rectangle>, rectangle> rectanglesExtent = MultiSection<IndexType, ValueType>::getPartition( nodeWeights, sideLen, settings);
-    
-    // get a second partition using the minimum max-min difference
-    settings.useExtent = false;
-    
-    std::priority_queue< rectangle, std::vector<rectangle>, rectangle> rectanglesDiff = MultiSection<IndexType, ValueType>::getPartition( nodeWeights, sideLen, settings);
-    
-    
-    // assertions - prints
-    SCAI_ASSERT( rectanglesExtent.size()==rectanglesDiff.size() , "Returned number of rectangles is wrong.");
-    SCAI_ASSERT( rectanglesExtent.size()==settings.numBlocks , "Returned number of rectangles is wrong. Should be "<< settings.numBlocks<< " but it is "<< rectanglesExtent.size() );
-    
-    ValueType minWeightExt = LONG_MAX, maxWeightExt = 0;
-    ValueType minWeightDiff = LONG_MAX, maxWeightDiff = 0;
-    ValueType totalWeight = 0;
-    ValueType topRectWeight = rectanglesDiff.top().weight;
-    
-    for(int r=0; r<settings.numBlocks; r++){
-        struct rectangle thisRectangleExt = rectanglesExtent.top();
-        struct rectangle thisRectangleDiff = rectanglesDiff.top();
-        rectanglesExtent.pop();
-        rectanglesDiff.pop();
-        
-        ValueType thisWeightExt = MultiSection<IndexType, ValueType>::getRectangleWeight( nodeWeights, thisRectangleExt, sideLen, settings);
-        
-        ValueType thisWeightDiff = MultiSection<IndexType, ValueType>::getRectangleWeight( nodeWeights, thisRectangleDiff, sideLen, settings);
-        
-        if( thisWeightExt<minWeightExt ){
-            minWeightExt = thisWeightExt;
-        }
-        if( thisWeightExt>maxWeightExt ){
-            maxWeightExt = thisWeightExt;
-        }
-        if( thisWeightDiff<minWeightDiff ){
-            minWeightDiff = thisWeightDiff;
-        }
-        if( thisWeightDiff>maxWeightDiff ){
-            maxWeightDiff = thisWeightDiff;
-        }
-        totalWeight += thisWeightExt;
-        PRINT0("weight of block "<< r << ": with extent= "<< thisWeightExt << " , with diff= "<< thisWeightDiff);
-    }
-    
-    SCAI_ASSERT( maxWeightDiff==topRectWeight, "Wrong maximum weights, maxWeightDiff= "<< maxWeightDiff << " and rectanglesDiff.top().weight= " << topRectWeight );
-    
-    ValueType averageWeight = totalWeight/settings.numBlocks;
-    
-    PRINT0("average weight= "<< averageWeight );
-    PRINT0( "useExtent: minWeight= "<< minWeightExt << " , maxWeight= "<< maxWeightExt << ", max/min= "<< maxWeightExt/minWeightExt );
-    PRINT0( "  useDiff: minWeight= "<< minWeightDiff << " , maxWeight= "<< maxWeightDiff << ", max/min= "<< maxWeightDiff/minWeightDiff );
-        
-}
-*/
 //---------------------------------------------------------------------------------------
 
 TEST_F(MultiSectionTest, test1DPartition){
@@ -208,20 +162,20 @@ TEST_F(MultiSectionTest, test1DPartition){
     origTotalWeight = comm->sum(origTotalWeight);
     
     IndexType k1= 5;
-    //IndexType dimensionToPartition = 0;
+    
     Settings settings;
     settings.dimensions = dim;
     
     rectangle bBox;
     bBox.bottom = {0,0};
-    bBox.top = {(ValueType) sideLen, (ValueType) sideLen};
+    bBox.top = { (ValueType) sideLen, (ValueType) sideLen};
     // create the root of the tree that contains the whole grid
     std::shared_ptr<rectCell<IndexType,ValueType>> root( new rectCell<IndexType,ValueType>(bBox) );
 
     // the 1D partition for all dimensions
     for( int dimensionToPartition=0; dimensionToPartition<dim; dimensionToPartition++){
-
         std::vector<IndexType> dim2proj = {dimensionToPartition};
+        
         // get the projection in one dimension
         std::vector<std::vector<ValueType>> projection = MultiSection<IndexType, ValueType>::projection( nodeWeights, root, dim2proj, sideLen, settings);
 
@@ -270,12 +224,13 @@ TEST_F(MultiSectionTest, test1DPartition){
             for(int i=0; i<weightPerPart.size(); i++){
                 PRINT0("part "<< i <<" weight: "<< weightPerPart[i]);
             }    
-        
+            /*
             if(comm->getRank() ==0){
                 for(int i=0; i<part1D.size(); i++){
                     std::cout<< *comm <<": "<< part1D[i] << std::endl;
                 }
             }
+            */
         }
         // TODO: add more tests
     }
@@ -289,9 +244,7 @@ TEST_F(MultiSectionTest, testRectTree){
     initialRect.top = { 100, 100};
     
     std::shared_ptr<rectCell<IndexType,ValueType>> root( new rectCell<IndexType,ValueType>(initialRect) );
-    //root = new rectCell<ValueType,IndexType>(initialRect) ;
-    //rectCell<ValueType,IndexType> r(initialRect);
-    
+
     rectangle r1;
     r1.bottom = { 0,0};
     r1.top = { 50, 50};
@@ -350,11 +303,10 @@ TEST_F(MultiSectionTest, testRectTree){
     
     for(int p=0; p<points.size(); p++){
         retRect = root->contains( points[p] );
+
         if( retRect!=NULL){
-            PRINT("point ("<< points[p][0]<<", "<< points[p][1] <<") found in rectangle:");
-            retRect->getRect().print();
-        }else{
-            PRINT("point ("<< points[p][0]<<", "<< points[p][1] <<") was not found in any rectangle.");
+            SCAI_ASSERT( retRect->getRect().bottom[0]<=points[p][0] and retRect->getRect().top[0]>=points[p][0] , "Wrong rectangle");
+            SCAI_ASSERT( retRect->getRect().bottom[1]<=points[p][1] and retRect->getRect().top[1]>=points[p][1] , "Wrong rectangle");
         }
     }
     
@@ -368,11 +320,17 @@ TEST_F(MultiSectionTest, testRectTree){
         
         retRect = root->contains( point );
         if( retRect!=NULL){
+            SCAI_ASSERT( retRect->getRect().bottom[0]<=point[0] and retRect->getRect().top[0]>=point[0] , "Wrong rectangle");
+            SCAI_ASSERT( retRect->getRect().bottom[1]<=point[1] and retRect->getRect().top[1]>=point[1] , "Wrong rectangle");
+        }
+        /*
+        if( retRect!=NULL){
             PRINT("point ("<< point[0]<<", "<< point[1] <<") found in rectangle:");
             retRect->getRect().print();
         }else{
             PRINT("point ("<< point[0]<<", "<< point[1] <<") was not found in any rectangle.");
         }
+        */
     }
     
     //all the points
@@ -425,7 +383,7 @@ TEST_F(MultiSectionTest, testGetRectangleWeight){
     
     Settings settings;
     
-    rectangle bBox;
+    rectangle bBox;        // the sub-rectangles of the initial grid
     
     bBox.bottom = {0, 0};       //  1, 2
     bBox.top = {2, 2};          //  5, 6
@@ -452,7 +410,7 @@ TEST_F(MultiSectionTest, testGetRectangleWeight){
 TEST_F(MultiSectionTest, test1DProjection){
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    IndexType sideLen = 11;
+    IndexType sideLen = 10;
     IndexType dim = 3;
     IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -469,12 +427,12 @@ TEST_F(MultiSectionTest, test1DProjection){
     }
     
     // test projection in all dimensions
-    /*
+    
     for(int d=0; d<dim; d++){
         rectangle bBox;
         // for all dimensions i: bottom[i]<top[i] 
-        bBox.bottom = {1, 3, 2};
-        bBox.top =    {7, 10, 9};
+        bBox.bottom = {1, 1, 2};
+        bBox.top =    {8, 10, 9};
         // create the root of the tree that contains the whole grid
         std::shared_ptr<rectCell<IndexType,ValueType>> root( new rectCell<IndexType,ValueType>(bBox) );
         
@@ -485,9 +443,10 @@ TEST_F(MultiSectionTest, test1DProjection){
         
         Settings settings;
         settings.dimensions = dim;
-        std::vector<IndexType> dim2proj = {dim2proj};
+        std::vector<IndexType> dim2proj = {d};
         
-        std::vector<std::vector<ValueType>> projection = MultiSection<IndexType, ValueType>::projection( nodeWeights, root, dim2proj, sideLen, settings);
+        std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projection( nodeWeights, root, dim2proj, sideLen, settings);
+        std::vector<ValueType> projection = projections[0];
         
         //assertions
         const IndexType projLength = bBox.top[dim2proj[0]]-bBox.bottom[dim2proj[0]];
@@ -499,11 +458,10 @@ TEST_F(MultiSectionTest, test1DProjection){
         ValueType bBoxSlice = bBoxVolume/(bBox.top[dim2proj[0]]-bBox.bottom[dim2proj[0]]);
         for(int i=0; i<projection.size(); i++){
             //this only works when dim=2 and nodeWeights=1
-            //PRINT0("proj["<< i<< "]= "<< projection[i]);
-            SCAI_ASSERT( projection[i]==bBoxSlice , "projection["<<i<<"]= "<< projection[i] << " should be equal to "<< bBoxSlice );
+            SCAI_ASSERT( projection[i]==bBoxSlice , "projection["<< i<<"]= "<< projection[i] << " should be equal to "<< bBoxSlice );
         }
     }
-    */
+    
 }
 //---------------------------------------------------------------------------------------
 
@@ -518,7 +476,6 @@ TEST_F(MultiSectionTest, testInbBox){
     IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
     
     // for all dimensions i: first[i]<second[i] 
-    //MultiSection<IndexType,ValueType>::rectangle bBox;
     rectangle bBox;
     bBox.bottom = {2,3,1};
     bBox.top = {6,8,6};
