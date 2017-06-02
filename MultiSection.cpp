@@ -49,12 +49,32 @@ std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> MultiSection<IndexTy
     //
     IndexType k1 = 2;
     //
+    
+    // from k get d numbers such that their product equals k
+    // TODO: now k must be number such that k^(1/d) is an integer, drop this condition, generalize
+    const ValueType sqrtK = std::pow( k,  1.0/dim );
+
+    if( !std::floor(sqrtK)==sqrtK ){
+        PRINT0("Input k= "<< k << " and sqrt(k)= "<< sqrtK );
+        throw std::logic_error("Number of blocks not a square number");
+    }
+    
+    // sqrtK is not correct, it is -1 but not sure if always
+    IndexType intSqrtK = sqrtK;
+    
+    if( std::pow( intSqrtK+1, dim ) == k){
+        intSqrtK++;
+    }
+    SCAI_ASSERT( std::pow( intSqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow(k, 1/d)= " << intSqrtK);
+    
+    // number of cuts for each dimensions
+    std::vector<IndexType> numCuts( dim, intSqrtK );
 
     IndexType numLeaves = root->getNumLeaves();
 
-    while( numLeaves < k){
+    for(typename std::vector<IndexType>::iterator thisDimCuts=numCuts.begin(); thisDimCuts!=numCuts.end(); ++thisDimCuts ){
         SCAI_REGION("MultiSection.getPartition.forAllRectangles");
-
+PRINT0(*thisDimCuts);
         ValueType maxExtent = 0;
         //std::vector<ValueType> minDifference ( numLeaves, LONG_MAX );        
 
@@ -99,14 +119,16 @@ std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> MultiSection<IndexTy
         std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projection( nodeWeights, root, chosenDim, sideLen, settings);
                 
         SCAI_ASSERT( projections.size()==numLeaves, "Wrong number of projections"); 
-        
+PRINT0(numLeaves);        
         for(int l=0; l<numLeaves; l++){        
             SCAI_REGION("MultiSection.getPartition.createRectanglesAndPush");
             //perform 1D partitioning for the chosen dimension
             std::vector<ValueType> part1D, weightPerPart;
             std::vector<ValueType> thisProjection = projections[l];
-            std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1D( thisProjection, k1, settings);
-
+            std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1D( thisProjection, *thisDimCuts, settings);
+            // TODO: possibly expensive assertion
+            SCAI_ASSERT( std::accumulate(thisProjection.begin(), thisProjection.end(), 0)==std::accumulate( weightPerPart.begin(), weightPerPart.end(), 0), "Weights are wrong." )
+            
             //TODO: make sure that projections[l] and allLeaves[l] refer to the same rectangle
             struct rectangle thisRectangle = allLeaves[l]->getRect();
 
@@ -126,9 +148,9 @@ dbg_rectW += newRect.weight;
 
             for(int h=0; h<part1D.size()-1; h++ ){
                 //change only the chosen dimension
-                newRect.bottom[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h];
+                newRect.bottom[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h]+1;
                 newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h+1]+1;
-                newRect.weight = weightPerPart[h];
+                newRect.weight = weightPerPart[h+1];
                 root->insert( newRect );
 dbg_rectW += newRect.weight;                
             }
@@ -142,7 +164,8 @@ dbg_rectW += newRect.weight;
         
 
 //TODO: only for debuging, remove variable dbg_rectW
-SCAI_ASSERT( dbg_rectW==thisRectangle.weight, "Rectangle weight not correct"); 
+SCAI_ASSERT( dbg_rectW==thisRectangle.weight, "Rectangle weights not correct. dbg_rectW= " << dbg_rectW << " , this.weight= "<< thisRectangle.weight);
+
         }
         numLeaves = root->getNumLeaves();
     }
