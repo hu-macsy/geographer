@@ -17,6 +17,7 @@ int main(int argc, char* argv[]) {
 		string coordname = graphname + ".xyz";
 		std::vector<scai::lama::DenseVector<double>> coordinates;
 		scai::lama::CSRSparseMatrix<double> graph;
+
 		try {
 			graph = ITI::FileIO<int,double>::readQuadTree(filename, coordinates);
 			std::cout << "Read file " << filename << std::endl;

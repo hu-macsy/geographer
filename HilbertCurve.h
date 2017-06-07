@@ -25,10 +25,10 @@ namespace ITI {
 	template <typename IndexType, typename ValueType>
 	class HilbertCurve {
 		public:
-                        /* Wrapper function that calls either the 2D or 3D hilbert curve depending on dimensions.
-                         * */
-                        static ValueType getHilbertIndex(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
-                        
+			/* Wrapper function that calls either the 2D or 3D hilbert curve depending on dimensions.
+			* */
+			static ValueType getHilbertIndex(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+
 			/**
 			* Accepts a point and calculates where along the hilbert curve it lies.
 			*

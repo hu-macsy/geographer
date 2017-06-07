@@ -317,7 +317,6 @@ TEST_F(MeshGeneratorTest, testMeshFromQuadTree_local){
         std::string outCoords = outFile + ".xyz";
         ITI::FileIO<IndexType, ValueType>::writeCoords(coords, outCoords);
     }
-    
 }
 //-----------------------------------------------------------------
 

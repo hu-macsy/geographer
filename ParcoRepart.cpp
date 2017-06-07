@@ -31,8 +31,6 @@
 #include "SpectralPartition.h"
 #include "AuxiliaryFunctions.h"
 
-//#include "quadtree/QuadTreeCartesianEuclid.h"
-
 namespace ITI {
 
 template<typename IndexType, typename ValueType>
@@ -713,7 +711,7 @@ ValueType ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(const CSRSpar
 	SCAI_REGION( "ParcoRepart.localSumOutgoingEdges" )
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-        const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+    const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
 	IndexType sumOutgoingEdgeWeights = 0;
 	for (IndexType j = 0; j < ja.size(); j++) {
