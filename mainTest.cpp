@@ -136,20 +136,7 @@ int main(int argc, char** argv) {
     	} else {
     		coordFile = graphFile + ".xyz";
     	}
-    
-        std::fstream f(graphFile);
 
-        if(f.fail()){
-            throw std::runtime_error("File "+ graphFile + " failed.");
-        }
-        
-        f >> N;				// first line must have total number of nodes and edges
-        
-        // for 2D we do not know the size of every dimension
-        settings.numX = N;
-        settings.numY = 1;
-        settings.numZ = 1;
-        
         if (comm->getRank() == 0)
         {
             std::cout<< "Reading from file \""<< graphFile << "\" for the graph and \"" << coordFile << "\" for coordinates"<< std::endl;
@@ -157,9 +144,15 @@ int main(int argc, char** argv) {
 
         // read the adjacency matrix and the coordinates from a file
         graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+        N = graph.getNumRows();
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
         assert(graph.getColDistribution().isEqual(*noDistPtr));
+
+        // for 2D we do not know the size of every dimension
+		settings.numX = N;
+		settings.numY = 1;
+		settings.numZ = 1;
 
         if (comm->getRank() == 0) {
         	std::cout<< "Read " << N << " points." << std::endl;
