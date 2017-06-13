@@ -6,8 +6,11 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <fstream>
 #include <chrono>
 #include <numeric>
+
+#include <scai/dmemo/BlockDistribution.hpp>
 
 #include "FileIO.h"
 #include "ParcoRepart.h"
