@@ -141,25 +141,29 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			 */
 
 			SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.prepareSets" )
-			//swap size of border region and total block size. Block size is only needed as sanity check, could be removed in optimized version
+			//swap size of border region and total block size.
 			IndexType blockSize = localBlockSize(part, localBlockID);
 			if (blockSize != localN) {
 				throw std::runtime_error(std::to_string(localN) + " local nodes, but only " + std::to_string(blockSize) + " of them belong to block " + std::to_string(localBlockID) + ".");
 			}
 
-			IndexType swapField[5];
+			const IndexType blockWeightSum = nodeWeights.getLocalValues().sum();
+
+			IndexType swapField[6];
 			swapField[0] = interfaceNodes.size();
 			swapField[1] = secondRoundMarker;
 			swapField[2] = lastRoundMarker;
 			swapField[3] = blockSize;
-			swapField[4] = getDegreeSum(input, interfaceNodes);
-			comm->swap(swapField, 5, partner);
+			swapField[4] = blockWeightSum;
+			swapField[5] = getDegreeSum(input, interfaceNodes);
+			comm->swap(swapField, 6, partner);
 			//want to isolate raw array accesses as much as possible, define named variables and only use these from now
 			const IndexType otherSize = swapField[0];
 			const IndexType otherSecondRoundMarker = swapField[1];
 			const IndexType otherLastRoundMarker = swapField[2];
 			const IndexType otherBlockSize = swapField[3];
-			const IndexType otherDegreeSum = swapField[4];
+			const IndexType otherBlockWeightSum = swapField[4];
+			const IndexType otherDegreeSum = swapField[5];
 
 			if (interfaceNodes.size() == 0) {
 				if (otherSize != 0) {
@@ -261,7 +265,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			}
 
 			//block sizes and capacities
-			std::pair<IndexType, IndexType> blockSizes = {blockSize, otherBlockSize};
+			std::pair<IndexType, IndexType> blockSizes = {blockWeightSum, otherBlockWeightSum};
 			std::pair<IndexType, IndexType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
 
 			//second round markers
