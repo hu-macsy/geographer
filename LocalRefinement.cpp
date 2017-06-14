@@ -880,16 +880,10 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(DenseVecto
 		scai::hmemo::ReadAccess<T> rHaloData(haloData);
 
 		scai::hmemo::WriteOnlyAccess<T> wNewLocalValues(newLocalValues, newLocalN);
-		scai::hmemo::HArray<IndexType> oldIndices;
-		oldDist->getOwnedIndexes(oldIndices);
-		scai::hmemo::ReadAccess<IndexType> oldAcc(oldIndices);
-		IndexType oldLocalI = 0;
-
 		for (IndexType i = 0; i < newLocalN; i++) {
 			const IndexType globalI = newDist->local2global(i);
-			while(oldAcc[oldLocalI] < globalI) oldLocalI++;
-
-			if (oldAcc[oldLocalI] == globalI) {
+			const IndexType oldLocalI = oldDist->global2local(globalI);
+			if (oldLocalI != nIndex) {
 				wNewLocalValues[i] = rOldLocalValues[oldLocalI];
 			} else {
 				const IndexType localI = halo.global2halo(globalI);
@@ -961,6 +955,7 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 
 		scai::hmemo::HArray<IndexType> oldIndices;
 		oldDist->getOwnedIndexes(oldIndices);
+
 		scai::hmemo::ReadAccess<IndexType> oldAcc(oldIndices);
 
 		IndexType oldLocalIndex = 0;
