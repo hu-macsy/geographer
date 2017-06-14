@@ -2,10 +2,11 @@ SCAI_LIB="/home/kit/iti/cq6340/WAVE/scai_lama/install/lib/"
 BOOST_LIB="/home/kit/iti/cq6340/boost_1_61_0/stage/lib"
 JOB_DIR="/home/hpc/pr87si/di36sop/WAVE/ParcoRepart/Implementation"
 
-def createMOABSubmitFile(filename, commandString, walltime, processors, memory):   
+def createMOABSubmitFile(filename, commandString, walltime, processors, memory):
+    classString = "singlenode" if processors <= 16 else "multinode"
     with open(filename, 'w') as f:
         f.write("#!/bin/bash"+"\n")
-        f.write("#MSUB -q multinode"+"\n")
+        f.write("#MSUB -q "+classString+"\n")
         f.write("#MSUB -l nodes="+str(max(1,int(processors/16)))+":ppn=16"+"\n")
         f.write("#MSUB -l walltime="+walltime+"\n")
         f.write("#MSUB -l pmem="+memory+"\n")
