@@ -172,16 +172,15 @@ namespace ITI {
                     return NULL;
                 }
             }
-            
+            //TODO: remove variable ret or not?
             std::shared_ptr<rectCell> ret;
-            // only leaf nodes must be returned as owners of points
-            //TODO: maybe not... when the leaf rectangles do not cover the whole space.
             if( !this->isLeaf ){
                 bool foundOwnerChild = false;
                 for(int c=0; c<this->children.size(); c++){
                     if( children[c]->myRect.owns( point ) ){                    
                         foundOwnerChild = true;
-                        ret = children[c]->contains( point );
+                        //ret = children[c]->contains( point );
+                        return children[c]->contains( point );
                         break;  // if one node is found no need to search the rest of the children
                     }
                 }
@@ -193,12 +192,14 @@ namespace ITI {
                     if( myRect.owns( point ) ){
                         ret = std::make_shared<rectCell>(*this);
                     }else{
-                        ret = NULL;
+                        //ret = NULL;
+                        return NULL;
                     }
                 }
             }else{
                 SCAI_ASSERT( this->myRect.owns(point), "Should not happen")    
-                ret = std::make_shared<rectCell>(*this);
+                //ret = std::make_shared<rectCell>(*this);
+                return  std::make_shared<rectCell>(*this);
             }
             return ret;
         }

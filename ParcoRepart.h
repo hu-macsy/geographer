@@ -39,7 +39,7 @@ namespace ITI {
 	 		* @param[in] input Adjacency matrix of the input graph
 	 		* @param[in] coordinates Node positions
                         *
-	 		* @return Distributed DenseVector	, at position i is the block node i is assigned to
+	 		* @return Distributed DenseVector, at position i is the block in which node i is assigned to
 	 		*/
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings Settings);
 
@@ -49,7 +49,7 @@ namespace ITI {
                         static DenseVector<IndexType> hilbertPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
                         
                         /*
-                         * Get an initial partition using the morton curve and measuring density per square.
+                         * Get an initial partition by measuring the density per pixel.
                          */
                         static DenseVector<IndexType> pixelPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
                                                         

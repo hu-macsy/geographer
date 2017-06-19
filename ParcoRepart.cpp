@@ -373,7 +373,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
         comm->sumArray( density );
     }
     
-    //TODO; is that needed. we just can overwrite density array
+    //TODO: is that needed? we just can overwrite density array.
     // use the summed density as a Dense vector
     scai::lama::DenseVector<IndexType> sumDensity( density );
     
@@ -383,7 +383,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
   
     //using the summed density get an initial pixeled partition
     
-    std::vector<IndexType> pixeledPartition( density.size() , -1);
+    std::vector<IndexType> pixeledPartition( sumDensity.size() , -1);
     
     IndexType pointsLeft= globalN;
     IndexType pixelsLeft= cubeSize;

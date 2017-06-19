@@ -8,7 +8,7 @@
 
 namespace ITI {
     
-//TODO: Now it works only for k1=2 => bisection, handle k not a power of 2.
+//TODO: Now it works only for k=x^(1/dim) for int x. Handle the general case.
 //TODO: Find numbers k1,k2,...,kd such that k1*k2*...*kd=k to perform multisection
 //TODO(?): Enforce initial partition and keep track which PEs need to communicate for each projection
 //TODO(?): Add an optimal algorithm for 1D partition
@@ -218,10 +218,12 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
         scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights.getLocalValues() );
         
         for(int i=0; i<localN; i++){
+            SCAI_REGION_START("MultiSection.projection.localProjection.indexAndCopyCoords");
             const IndexType globalIndex = inputDist->local2global(i);
             std::vector<IndexType> coords = indexToCoords(globalIndex, sideLen, dimension); // check the global index
             //TODO: avoid the conversion to vector<double>
             std::vector<ValueType> coordsVal( coords.begin(), coords.end() );
+            SCAI_REGION_END("MultiSection.projection.localProjection.indexAndCopyCoords");
             
             // a pointer to the cell that contains point i
             SCAI_REGION_START("MultiSection.projection.localProjection.contains");
@@ -250,6 +252,8 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
     // here, the projection of the local points has been calculated
     
     // must sum all local projections from all PEs
+    //TODO: sum using one call to comm->sum()
+    // data of vector of vectors are not stored continuously. Maybe copy to a large vector and then add
     std::vector<std::vector<ValueType>> globalProj(numLeaves);
     for(int i=0; i<numLeaves; i++){
         SCAI_REGION("MultiSection.projection.sumImpl");
@@ -315,6 +319,14 @@ std::pair<std::vector<ValueType>, std::vector<ValueType>> MultiSection<IndexType
     weightPerPart[part] = totalWeight;
   
     return std::make_pair(partHyperplanes, weightPerPart);
+}
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+scai::lama::DenseVector<ValueType> convert2Uniform(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings Settings){
+    SCAI_REGION("MultiSection.convert2Uniform");
+    
+    
 }
 //---------------------------------------------------------------------------------------
 
@@ -407,7 +419,7 @@ std::vector<IndexType> MultiSection<IndexType, ValueType>::indexToCoords(const I
 
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> MultiSection<IndexType, ValueType>::indexTo2D(IndexType ind, IndexType sideLen){
-
+    SCAI_REGION("MultiSection.indexTo2D");
     IndexType x = ind/sideLen;
     IndexType y = ind%sideLen;
     
@@ -417,7 +429,7 @@ std::vector<IndexType> MultiSection<IndexType, ValueType>::indexTo2D(IndexType i
 
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> MultiSection<IndexType, ValueType>::indexTo3D(IndexType ind, IndexType sideLen){
-    
+    SCAI_REGION("MultiSection.indexTo3D");
     IndexType planeSize= sideLen*sideLen; // a YxZ plane
     
     IndexType x = ind/planeSize;
