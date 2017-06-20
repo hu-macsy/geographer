@@ -340,7 +340,20 @@ namespace ITI {
          * Example: bBox={(5,10),(8,15)} and dimensionToProject=0 (=x). Then the return vector has size |8-5|=3. return[0] is the sum of the coordinates in the bBox which have their 0-coordinate equal to 5, return[1] fot he points with 0-coordinate equal to 3 etc. If dimensionToProject=1 then return vector has size |10-15|=5.
          */
         static std::vector<std::vector<ValueType>> projection( const scai::lama::DenseVector<ValueType>& nodeWeights, const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot, const std::vector<IndexType>& dimensionToProject, const IndexType sideLen, Settings settings );
+        
+        static std::vector<std::vector<ValueType>> projectionNonUniform( 
+            const std::vector<std::vector<ValueType>> &coordinates,
+            const scai::lama::DenseVector<ValueType>& nodeWeights,
+            const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
+            const std::vector<IndexType>& dimensionToProject,
+            Settings settings);
                 
+        static std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> getPartitionNonUniform( 
+            const scai::lama::CSRSparseMatrix<ValueType> &input,
+            const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+            const scai::lama::DenseVector<ValueType>& nodeWeights,
+            Settings settings);
+        
         /** Partitions the given vector into k parts of roughly equal weights.
          *
          * @param[in] array The 1 dimensional array of positive numbers to be partitioned.
@@ -354,6 +367,11 @@ namespace ITI {
          * return.second=[ 17, 15, 14]
          */
         static std::pair<std::vector<ValueType>,std::vector<ValueType>> partition1D( const std::vector<ValueType>& array, const IndexType k, Settings settings);   
+        
+        /**Converts a graph with coordinates to a uniform grid. The space is divided is cubes and the weight of the cube is the
+         * sum of the weights of all the points inside the cube.
+         */
+        static scai::lama::DenseVector<ValueType> convert2Uniform(scai::lama::CSRSparseMatrix<ValueType> &input, std::vector<scai::lama::DenseVector<ValueType>> &coordinates, struct Settings Settings);
         
         /**Checks if the given index is in the given bounding box. Index corresponds to a uniform matrix given
          * as a 1D array/vector. 

@@ -314,6 +314,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     const IndexType cubeSize = std::pow(sideLen, dimensions);
     
     //TODO: generalise this to arbitrary dimensions, do not handle 2D and 3D differently
+    //TODO: by a  for(int d=0; d<dimension; d++){ ... }
     // a 2D or 3D arrays as a one dimensional vector
     // [i][j] is in position: i*sideLen + j
     // [i][j][k] is in: i*sideLen*sideLen + j*sideLen + k

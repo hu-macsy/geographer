@@ -465,6 +465,46 @@ TEST_F(MultiSectionTest, test1DProjection){
 }
 //---------------------------------------------------------------------------------------
 
+TEST_F(MultiSectionTest, testConvert2Uniform){
+
+    const IndexType N = 265400;
+    const IndexType dimensions = 3;
+    const IndexType k = std::pow( 5, dimensions);
+    const std::vector<IndexType> maxCoord= {700, 800, 900};
+    
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr("BLOCK", comm, N) );
+    const scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
+    const IndexType localN = dist->getLocalSize();
+    
+    scai::lama::CSRSparseMatrix<ValueType> adjM(dist, noDistPointer);
+  
+    std::vector<DenseVector<ValueType>> coordinates(dimensions);
+    for(IndexType i=0; i<dimensions; i++){
+	  coordinates[i].allocate(dist);
+	  coordinates[i] = static_cast<ValueType>( 0 );
+    }
+    
+    //set random coordinates in your local part
+    {
+        srand(time(NULL));
+        for(int d=0; d<dimensions; d++){
+            scai::hmemo::WriteAccess<ValueType> coordWrite( coordinates[d].getLocalValues() );
+            for(IndexType i=0; i<localN; i++){
+                coordWrite[i] = rand()%maxCoord[d];
+            }
+        }
+    }
+    
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+    settings.dimensions = dimensions;
+    
+    scai::lama::DenseVector<ValueType> uniformGrid = MultiSection<IndexType, ValueType>::convert2Uniform( adjM, coordinates, settings);
+}
+//---------------------------------------------------------------------------------------
+
 TEST_F(MultiSectionTest, testInbBox){
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
