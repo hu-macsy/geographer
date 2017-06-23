@@ -141,7 +141,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
     
     std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
     std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
-    DenseVector<IndexType> result;
     
     if( ! inputDist->isEqual(*coordDist) ){
         throw std::runtime_error("Matrix and coordinates should have the same distribution");
@@ -212,6 +211,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
     /**
      * now sort the global indices by where they are on the space-filling curve.
      */
+    DenseVector<IndexType> result;
     scai::lama::DenseVector<IndexType> permutation;
     {
         SCAI_REGION( "ParcoRepart.hilbertPartition.sorting" )
@@ -281,7 +281,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     
     std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
     std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
-    DenseVector<IndexType> result(inputDist, 0);
     
     //TODO: probably minimum is not needed
     //TODO: if we know maximum from the input we could save that although is not too costly
@@ -558,6 +557,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     //=========
     
     // set your local part of the partition/result
+    DenseVector<IndexType> result(inputDist, 0);
     scai::hmemo::WriteOnlyAccess<IndexType> wLocalPart ( result.getLocalValues() );
     
     if(dimensions==2){
