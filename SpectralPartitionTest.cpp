@@ -51,7 +51,7 @@ TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
     
     //TODO: this (rarely) can give disconnected graph
     // random graph with weighted edges
-    for(IndexType i=0; i<4*N; i++){
+    for(IndexType i=0; i<5*N; i++){
         IndexType row = rand()%(N);
         IndexType col;
         if(row==0) continue;
@@ -90,7 +90,7 @@ TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
     ValueType eigenEigenvalue = -9;
     DenseVector<ValueType> eigenVec (N, -1);
             
-    {   // get eigenvalues with Eigen, all but the first (mybe) must be >0
+    {   // get eigenvalues with Eigen, all but the first (maybe) must be >0
         PRINT0("Getting the eigenvector with Eigen");
         using Eigen::MatrixXd;
         using namespace Eigen;
@@ -143,7 +143,7 @@ TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
         } 
         */
     }
-    //-------------------------------------------
+    
     ValueType eigenMax = eigenVec.max().Scalar::getValue<ValueType>();
     ValueType fiedlerMax = fiedler.max().Scalar::getValue<ValueType>();
     ValueType m = eigenMax/fiedlerMax;
@@ -178,7 +178,7 @@ TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
     SCAI_ASSERT_EQ_ERROR(eigenVec.size() , tmp.size() , "Must be true that: eigen=m*fiedler for m= " << m);
     for(int i=0; i< eigenVec.size(); i++){
         if(tmp.getValue(i).Scalar::getValue<ValueType>() != 0){
-            SCAI_ASSERT(std::abs(eigenVec.getValue(i).Scalar::getValue<ValueType>() / tmp.getValue(i).Scalar::getValue<ValueType>()) -1< 0.01 , "maybe wrong values in position " << i << " , must be <0.01 while it is: " << std::abs(eigenVec.getValue(i).Scalar::getValue<ValueType>() / tmp.getValue(i).Scalar::getValue<ValueType>()) );
+            SCAI_ASSERT(std::abs(eigenVec.getValue(i).Scalar::getValue<ValueType>() / tmp.getValue(i).Scalar::getValue<ValueType>())-1 < 0.01 , "maybe wrong values in position " << i << " , must be <0.01 while it is: " << std::abs(eigenVec.getValue(i).Scalar::getValue<ValueType>() / tmp.getValue(i).Scalar::getValue<ValueType>()) << ". Maybe graph is disconnected." );
         }else{
             SCAI_ASSERT(std::abs(eigenVec.getValue(i).Scalar::getValue<ValueType>()) < 0.01 , "maybe wrong values in position " << i << " , must be <0.01 while it is: " << std::abs(eigenVec.getValue(i).Scalar::getValue<ValueType>()) );
         }

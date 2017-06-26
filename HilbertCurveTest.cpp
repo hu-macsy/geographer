@@ -226,11 +226,13 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_3D) {
 */
 TEST_F(HilbertCurveTest, testHilbertIndexRandom_Distributed_3D) {
   const IndexType dimensions = 3;
-  const IndexType N = 200;
+  const IndexType N = 10;
   const IndexType recursionDepth = 7;
   
   scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
   scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+  const IndexType localN = dist->getLocalSize();
+  
   std::vector<DenseVector<ValueType>> coordinates(dimensions);
   for(IndexType i=0; i<dimensions; i++){ 
       coordinates[i].allocate(dist);
@@ -243,10 +245,10 @@ TEST_F(HilbertCurveTest, testHilbertIndexRandom_Distributed_3D) {
   srand(seed[0]);
 
   ValueType r;
-  for(int i=0; i<N; i++){      
-    for(int j=0; j<dimensions; j++){
-      r= double(rand()/RAND_MAX);
-	  coordinates[j].setValue( i, r);
+  for(int i=0; i<localN; i++){      
+    for(int d=0; d<dimensions; d++){
+        r= double(rand())/RAND_MAX;
+        coordinates[d].getLocalValues()[i] = r;
     }
   }
 
@@ -274,12 +276,13 @@ TEST_F(HilbertCurveTest, testHilbertIndexRandom_Distributed_3D) {
   //the hilbert indices initiated with the dummy value 19
   DenseVector<ValueType> indices(dist, 19);
   DenseVector<IndexType> perm(dist, 19);
-
-  const IndexType localN = dist->getLocalSize();
     
   scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
   scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
   scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[2].getLocalValues() );
+  
+  SCAI_ASSERT(coordAccess0.size()==coordAccess1.size() and coordAccess0.size()==coordAccess2.size(), "Wrong size of coordinates");
+  
   
   ValueType point[3];
   

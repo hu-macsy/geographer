@@ -92,15 +92,17 @@ public:
 	}
         
 	template<typename IndexType, typename ValueType>
-	scai::lama::CSRSparseMatrix<ValueType>  getTreeAsGraph( std::vector< std::set<std::shared_ptr<const SpatialCell>>>& graphNgbrsCells, std::vector<std::vector<ValueType>>& coords ) const {
+	scai::lama::CSRSparseMatrix<ValueType>  getTreeAsGraph( std::vector< std::set<std::shared_ptr< const SpatialCell>>>& graphNgbrsCells, std::vector<std::vector<ValueType>>& coords ) const {
 		if (!root->isIndexed()) {
 			throw std::runtime_error("Call indexSubtree first.");
 		}
 		return root->getSubTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coords );
 	}
-        
+	
+    //TODO: removed -const- from ...shared_ptr< const SpatialCell>... not sure if needed or not
+    //TODO: re-added the const
     template<typename IndexType, typename ValueType>
-	static scai::lama::CSRSparseMatrix<ValueType>  getGraphFromForest( std::vector< std::set<std::shared_ptr<const SpatialCell>>>& graphNgbrsCells, const std::vector<std::shared_ptr<const SpatialCell>>& treePtrVector,  std::vector<std::vector<ValueType>>& coords){
+	static scai::lama::CSRSparseMatrix<ValueType>  getGraphFromForest( std::vector< std::set<std::shared_ptr< const SpatialCell>>>& graphNgbrsCells, const std::vector<std::shared_ptr< const SpatialCell>>& treePtrVector,  std::vector<std::vector<ValueType>>& coords){
             IndexType numTrees = treePtrVector.size();
             //  both vectors must have the same size = forestSize
             IndexType forestSize = treePtrVector[numTrees-1]->getID()+1;

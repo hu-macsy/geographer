@@ -470,10 +470,11 @@ public:
 	 * Leaf cells in the subtree hanging from this QuadNode
 	 */
 	count countLeaves() const {
-		count result = 1;
+		count result = 0;
 		for (index i = 0; i < children.size(); i++) {
 			result += children[i]->countLeaves();
 		}
+		if( this->isLeaf ) ++result;
 		return result;
 	}
 
@@ -552,14 +553,15 @@ public:
          * 
          * @param[in] graphNgbrsCells Keeps pointers to neighbours of every node in the graph.
          *  graphNgbrsPtrs[i]= a set with pointers to the neighbours of -i- in the CSR matrix/graph.
-         *  graphNgbrsPtrs.size() == size of the forest or tre = all nodes on every tree, the global sum of nodes
+         *  graphNgbrsPtrs.size() == size of the forest or tree = all nodes on every tree, the global sum of nodes
          * @param[out] coords The coordinates of the output graph.
          * @param[in] frontier Used in the case we have a forest and is initialised inside SpatialTree.h while called
          *  in SpatialTree::getGraphFromForest(...).
          */
         //TODO: graphNgbrsCells, is initialised only in case of forest. If we have a tree is empty. right???
 	template<typename IndexType, typename ValueType>
-	scai::lama::CSRSparseMatrix<ValueType> getSubTreeAsGraph(std::vector< std::set<std::shared_ptr<const SpatialCell>>>& graphNgbrsCells,
+	scai::lama::CSRSparseMatrix<ValueType> getSubTreeAsGraph(
+                        std::vector< std::set<std::shared_ptr<const SpatialCell>>>& graphNgbrsCells,
 			std::vector<std::vector<ValueType>>& coords,
 			std::queue<std::shared_ptr<const SpatialCell>> frontier = std::queue<std::shared_ptr<const SpatialCell>>()) const {
             SCAI_REGION("SpatialCell.getSubTreeAsGraph");
