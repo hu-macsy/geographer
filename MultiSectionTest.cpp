@@ -35,6 +35,89 @@ class MultiSectionTest : public ::testing::Test {
 
 };
 
+
+TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
+    
+    const IndexType dimensions = 2;
+    const IndexType k = std::pow( 4, dimensions);
+
+    std::string path = "meshes/trace/";
+    std::string fileName = "trace-00002.graph";
+    std::string file = path + fileName;
+    std::ifstream f(file);
+    IndexType N, edges;
+    f >> N >> edges; 
+    
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr("BLOCK", comm, N) );
+    const scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
+    const IndexType localN = dist->getLocalSize();
+    PRINT0("Number of vertices= " << N << " and k= "<< k );
+    
+    //
+    // get the adjacency matrix and the coordinates
+    //
+    scai::lama::CSRSparseMatrix<ValueType> adjM = FileIO<IndexType, ValueType>::readGraph(file );
+    adjM.redistribute(dist, noDistPointer);
+    
+    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    
+    EXPECT_TRUE(coordinates[0].getDistributionPtr()->isEqual(*dist));
+    EXPECT_EQ( adjM.getNumColumns(), adjM.getNumRows());
+    EXPECT_EQ( edges, (adjM.getNumValues())/2 );   
+    
+    //
+    //create weights locally
+    //
+    scai::lama::DenseVector<ValueType> nodeWeights( dist );
+    IndexType actualTotalWeight = 0;
+    {
+        scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
+        srand(time(NULL));
+        for(int i=0; i<localN; i++){
+            localPart[i] = 1;
+            //localPart[i] = rand()%7*comm->getRank()+2;
+            actualTotalWeight += localPart[i];         
+        }
+    }
+    actualTotalWeight =  comm->sum(actualTotalWeight);
+    
+    Settings settings;
+    settings.dimensions = dimensions;
+    settings.numBlocks = k;
+    
+    //
+    // get the partition
+    //
+    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
+    
+    scai::lama::DenseVector<IndexType> partition =  MultiSection<IndexType, ValueType>::getPartitionNonUniform( adjM, coordinates, nodeWeights, settings);
+    
+    std::chrono::duration<double> partitionTime = std::chrono::system_clock::now() - startTime;
+    
+    if (comm->getRank() == 0) {
+        std::cout<< "Time to partition: "<< partitionTime.count() << std::endl;
+    }
+    
+    //
+    // assertions - prints
+    //  
+
+    for(IndexType i=0; i<localN; i++){
+        SCAI_ASSERT( partition.getLocalValues()[i]!=-1 , "In PE " << *comm << " local point " << i << " has no partition." );
+        
+    }
+    
+    const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(adjM, partition, false);
+    PRINT0( "Cut = " << cut );
+    
+    const ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k);
+    PRINT0( "Imbalance = " << imbalance );
+    
+}
+//---------------------------------------------------------------------------------------
+
+
 TEST_F(MultiSectionTest, testGetRectangles){
  
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -579,7 +662,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
             }
         }
     }
-    SCAI_ASSERT( p==N, "Wrong number of coordinates created");
+    SCAI_ASSERT( p==N, "Wrong number of coordinates created.");
     
     coordinates[0].redistribute( dist );
     coordinates[1].redistribute( dist );
@@ -685,7 +768,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(MultiSectionTest, testGetPartitionNonUniformFile){
+TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
     
     const IndexType dimensions = 2;
     const IndexType k = std::pow( 4, dimensions);
@@ -731,39 +814,83 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFile){
     }
     actualTotalWeight =  comm->sum(actualTotalWeight);
 
-    // find min and max and copy local coordinates to a IndexType DenseVector
-    std::vector<ValueType> minCoords( dimensions , std::numeric_limits<ValueType>::max() );
-    std::vector<ValueType> maxCoords( dimensions , std::numeric_limits<ValueType>::lowest() );
-    std::vector<scai::lama::DenseVector<IndexType>> coordsIndex(dimensions);
+    //
+    // find min and max and scale local coordinates to a IndexType DenseVector
+    //
+    std::vector<ValueType> minCoords( dimensions, std::numeric_limits<ValueType>::max() );
+    std::vector<ValueType> maxCoords( dimensions, std::numeric_limits<ValueType>::lowest() );
+    std::vector<ValueType> scaledMin( dimensions, std::numeric_limits<ValueType>::max());
+    std::vector<ValueType> scaledMax( dimensions, std::numeric_limits<ValueType>::lowest());
     
-    {
+    std::vector<scai::lama::DenseVector<IndexType>> scaledCoords(dimensions);
+    // scale= N^(1/d): this way the scaled max is N^(1/d) and this is also the maximum size of the projection arrays
+    IndexType scale = std::pow( N, 1.0/dimensions);
+    
+    {   
         // gel local min/max
         for (IndexType d = 0; d < dimensions; d++) {
+            scaledCoords[d].allocate( dist );
+            scaledCoords[d] = static_cast<ValueType>( 0 );
             const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
-            coordsIndex[d].allocate( localN );
-            scai::hmemo::WriteAccess<IndexType> wCoordsIndex( coordsIndex[d].getLocalValues() );
             
             for (IndexType i = 0; i < localN; i++) {
-                IndexType coord = localPartOfCoords[i];
+                ValueType coord = localPartOfCoords[i];
                 if (coord < minCoords[d]) minCoords[d] = ValueType (coord);
                 if (coord > maxCoords[d]) maxCoords[d] = ValueType (coord);
-                wCoordsIndex[i] = coord;
+                //wCoordsIndex[i] = coord;
             }
         }
-        // gel global min/max
+        // get global min/max
         for (IndexType d = 0; d < dimensions; d++) {
             minCoords[d] = comm->min(minCoords[d]);
             maxCoords[d] = comm->max(maxCoords[d])+1;
+            scaledMin[d] = 0;
+            scaledMax[d] = scale;
+        }
+        
+        for (IndexType d = 0; d < dimensions; d++) {
+            //get local parts of coordinates
+            const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
+            scai::hmemo::WriteOnlyAccess<IndexType> wScaledCoord( scaledCoords[d].getLocalValues() );
+            
+            SCAI_ASSERT( localN==wScaledCoord.size() , "Wrong size of local part.");
+            
+            for (IndexType i = 0; i < localN; i++) {
+                ValueType normalizedCoord = (localPartOfCoords[i] - minCoords[d])/(maxCoords[d]-minCoords[d]);
+                IndexType scaledCoord =  normalizedCoord * scale; 
+                wScaledCoord[i] = scaledCoord;
+                
+                if (scaledCoord < scaledMin[d]) scaledMin[d] = scaledCoord;
+                if (scaledCoord > scaledMax[d]) scaledMax[d] = scaledCoord;
+            }
+            scaledMin[d] = comm->min( scaledMin[d] );
+            scaledMax[d] = comm->max( scaledMax[d] );
+PRINT0( minCoords[d] << " __ " << maxCoords[d] );    
+PRINT0( scaledMin[d] << " __ " << scaledMax[d] << " ++ " << scale);    
         }
     }
     
+    for (IndexType d=0; d<dimensions; d++) {
+        SCAI_ASSERT( scaledMax[d]<= std::pow(N, 1.0/dimensions), "Scaled maximum value "<< scaledMax[d] << " is too large. should be less than " << std::pow(N, 1.0/dimensions) );
+        if( scaledMin[d]!=0 ){
+            //TODO: it works even if scaledMin is not 0 but the projection arrays will start from 0 and the first 
+            //      elements will just always be 0.
+            PRINT(":");
+            throw std::logic_error("Minimum scaled value should be 0 but it is " + std::to_string(scaledMin[d]) );
+        }
+    }
+    SCAI_ASSERT( localN==scaledCoords[0].getLocalValues().size(), "Wrong size of scaled coordinates vector: localN= "<< localN << " and scaledCoords.size()= " << scaledCoords[0].getLocalValues().size() );
+    
+    //
+    // get tree of rectangles
+    //
     Settings settings;
     settings.dimensions = dimensions;
     settings.numBlocks = k;
     
     std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
-    std::shared_ptr<rectCell<IndexType,ValueType>> root = MultiSection<IndexType, ValueType>::getRectanglesNonUniform( adjM, coordsIndex , nodeWeights, minCoords, maxCoords, settings);
+    std::shared_ptr<rectCell<IndexType,ValueType>> root = MultiSection<IndexType, ValueType>::getRectanglesNonUniform( adjM, scaledCoords, nodeWeights, scaledMin, scaledMax, settings);
     
     std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> rectangles = root->getAllLeaves();
 
@@ -787,7 +914,7 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFile){
             thisRectangle.print();
         }
  
-        ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, thisRectangle, maxCoords, settings);
+        ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( scaledCoords, nodeWeights, thisRectangle, scaledMax, settings);
         SCAI_ASSERT( thisWeight==thisRectangle.weight, "wrong weight calculation: thisWeight= " << thisWeight << " , thisRectangle.weight= " << thisRectangle.weight);
         
         if( thisWeight<minWeight ){

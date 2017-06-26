@@ -182,7 +182,7 @@ namespace ITI {
          *  @return A pointer to the rectangle cell that contains the point.
          */
         std::shared_ptr<rectCell> contains( const std::vector<ValueType>& point){
-            SCAI_REGION("rectCell.contains");
+            SCAI_REGION("rectCell.containsVal");
             
             IndexType dim = point.size();
             SCAI_ASSERT( dim==myRect.top.size(), "Dimensions do not agree");
@@ -229,7 +229,7 @@ namespace ITI {
         /*Overloaded version for IndexType coordinates.
          */
         std::shared_ptr<rectCell> contains( const std::vector<IndexType>& point){
-            SCAI_REGION("rectCell.contains");
+            SCAI_REGION("rectCell.containsInd");
             
             IndexType dim = point.size();
             SCAI_ASSERT( point.size()==myRect.top.size(), "Dimensions do not agree: point.size()= " << point.size() << " and myRect.top.size()= " << myRect.top.size() );
@@ -488,9 +488,13 @@ namespace ITI {
          */
         static ValueType getRectangleWeight( const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const IndexType sideLen, Settings settings);
         
-        /* Overloaded version for the non-uniform grid that also takes as inout the coordinates.
+        /* Overloaded version for the non-uniform grid that also takes as input the coordinates.
          */
         static ValueType getRectangleWeight( const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
+        
+        /* Overloaded version for the non-uniform grid with IndexType coordinates.
+         */
+        static ValueType getRectangleWeight( const std::vector<scai::lama::DenseVector<IndexType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);        
         
         /** Function to transform a 1D index to 2D or 3D given the side length of the cubical grid.
          * For example, in a 4x4 grid, indexTo2D(1)=(0,1), indexTo2D(4)=(1,0) and indexTo2D(13)=(3,1)
