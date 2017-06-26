@@ -73,7 +73,7 @@ TEST_F(QuadTreeTest, testGetGraphFromForestRandom_2D){
     PRINT("num trees= " << numTrees << ", globIndex= " << globIndexing);       
     int dimension = 2;
     std::vector<std::vector<ValueType>> coords( dimension );
-    scai::lama::CSRSparseMatrix<ValueType> graph= SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsPtrs, forest, coords);
+    scai::lama::CSRSparseMatrix<ValueType> graph= SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsPtrs,  forest, coords);
 
     // checkSymmetry is really expensive for big graphs, used only for small instances
     graph.checkSymmetry();
@@ -112,19 +112,17 @@ TEST_F(QuadTreeTest, testGetGraphFromForestByHand_2D){
     quad3.addContent( i++, Point<double>({1.3, 1.2}) );
     quad3.addContent( i++, Point<double>({1.3, 1.8}) );
  
-    forest.push_back(quad0.getRoot());
-    forest.push_back(quad1.getRoot());
-    forest.push_back(quad2.getRoot());
-    forest.push_back(quad3.getRoot());
-    
-    // make more trees and pass them to the forest
-    // CARE though, indexing should be one for all trees, maybe a forestIndex() routine or just a for 
     IndexType globIndexing=0;
     globIndexing = quad0.indexSubtree(globIndexing);
     globIndexing = quad1.indexSubtree(globIndexing);
     globIndexing = quad2.indexSubtree(globIndexing);
     globIndexing = quad3.indexSubtree(globIndexing);
 
+    forest.push_back(quad0.getRoot());
+    forest.push_back(quad1.getRoot());
+    forest.push_back(quad2.getRoot());
+    forest.push_back(quad3.getRoot());
+    
     IndexType numTrees = forest.size();
     for(i=0; i<numTrees; i++){
         PRINT(i << ",forest root id= "<< forest[i]->getID());
@@ -211,7 +209,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
         
         // index the tree
         index treeSize = quad.indexSubtree(0);
-PRINT("N= " << N << " , treeSize= "<< treeSize );        
+        
         // A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
         // of -i- in the output graph, not the quad tree.
         std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsCells( treeSize );
@@ -225,8 +223,8 @@ PRINT("N= " << N << " , treeSize= "<< treeSize );
 	graph.isConsistent();
         
         //EXPECT_EQ( graph.getNumRows(), graph.getNumColumns() );
-	EXPECT_EQ( graph.getNumRows(), N);
-	EXPECT_EQ( graph.getNumColumns(), N);
+	ASSERT_EQ( graph.getNumRows(), N);
+	ASSERT_EQ( graph.getNumColumns(), N);
 
 	const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
 	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
@@ -297,6 +295,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
 	index N = quad.countLeaves();
 	// index the tree
 	index treeSize = quad.indexSubtree(0);
+	ASSERT_GT(treeSize, 0);
         
 	// A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
 	// of -i- in the output graph, not the quad tree.
@@ -320,10 +319,10 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
 	graph.checkSymmetry();
 	graph.isConsistent();
         
-	EXPECT_EQ(coords[0].size(), N);
+	ASSERT_EQ(coords[0].size(), N);
             
-	EXPECT_EQ( graph.getNumRows(), N);
-	EXPECT_EQ( graph.getNumColumns(), N);
+	ASSERT_EQ( graph.getNumRows(), N);
+	ASSERT_EQ( graph.getNumColumns(), N);
         {
             const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
             const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
@@ -458,8 +457,8 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_2D) {
     graph.checkSymmetry();
     graph.isConsistent();
     
-    EXPECT_EQ( graph.getNumRows(), N);
-    EXPECT_EQ( graph.getNumColumns(), N);
+    ASSERT_EQ( graph.getNumRows(), N);
+    ASSERT_EQ( graph.getNumColumns(), N);
     
     const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
@@ -564,10 +563,10 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
 	}
 	graph.isConsistent();
         
-	EXPECT_EQ(coords[0].size(), N);
+	ASSERT_EQ(coords[0].size(), N);
             
-	EXPECT_EQ( graph.getNumRows(), N);
-	EXPECT_EQ( graph.getNumColumns(), N);
+	ASSERT_EQ( graph.getNumRows(), N);
+	ASSERT_EQ( graph.getNumColumns(), N);
 	{
 		const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
 		const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());

@@ -315,9 +315,8 @@ TEST_F(MeshGeneratorTest, testMeshFromQuadTree_local){
         ITI::FileIO<IndexType, ValueType>::writeGraph( graph, outFile);
         
         std::string outCoords = outFile + ".xyz";
-        ITI::FileIO<IndexType, ValueType>::writeCoords(coords, coords[0].size(), outCoords);
+        ITI::FileIO<IndexType, ValueType>::writeCoords(coords, outCoords);
     }
-    
 }
 //-----------------------------------------------------------------
 
@@ -371,7 +370,7 @@ TEST_F(MeshGeneratorTest, testSimpleMeshFromQuadTree_2D){
         ITI::FileIO<IndexType, ValueType>::writeGraph( graph, outFile);
         
         std::string outCoords = outFile + ".xyz";
-        ITI::FileIO<IndexType, ValueType>::writeCoords(coords, coords[0].size(), outCoords);
+        ITI::FileIO<IndexType, ValueType>::writeCoords(coords, outCoords);
     }
 }
 //-----------------------------------------------------------------

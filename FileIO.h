@@ -43,7 +43,7 @@ public:
 	/** Given the vector of the coordinates and their dimension, writes them in file "filename".
 	 * Coordinates are given as a DenseVector of size dim*numPoints.
 	*/
-	static void writeCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
+	static void writeCoords (const std::vector<DenseVector<ValueType>> &coords, const std::string filename);
 
     static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
 

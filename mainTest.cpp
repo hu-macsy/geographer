@@ -52,6 +52,7 @@ int main(int argc, char** argv) {
 				("help", "display options")
 				("version", "show version")
 				("graphFile", value<std::string>(), "read graph from file")
+				("quadTreeFile", value<std::string>(), "read QuadTree from file")
 				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
@@ -88,8 +89,8 @@ int main(int argc, char** argv) {
 		return 0;
 	}
 
-	if (vm.count("generate") && vm.count("file")) {
-		std::cout << "Pick one of --file or --generate" << std::endl;
+	if (vm.count("generate") + vm.count("graphFile") + vm.count("quadTreeFile") != 1) {
+		std::cout << "Pick one of --graphFile, --quadTreeFile or --generate" << std::endl;
 		return 0;
 	}
 
@@ -115,7 +116,16 @@ int main(int argc, char** argv) {
     
     if (comm->getRank() == 0)
 	{
-        std::cout<< "commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :" generate") << std::endl;
+    	std::string inputstring;
+    	if (vm.count("graphFile")) {
+    		inputstring = vm["graphFile"].as<std::string>();
+    	} else if (vm.count("quadTreeFile")) {
+    		inputstring = vm["quadTreeFile"].as<std::string>();
+    	} else {
+    		inputstring = "generate";
+    	}
+
+        std::cout<< "commit:"<< version<< " input:"<< inputstring << std::endl;
 	}
 
     if (vm.count("graphFile")) {
@@ -126,20 +136,7 @@ int main(int argc, char** argv) {
     	} else {
     		coordFile = graphFile + ".xyz";
     	}
-    
-        std::fstream f(graphFile);
 
-        if(f.fail()){
-            throw std::runtime_error("File "+ graphFile + " failed.");
-        }
-        
-        f >> N;				// first line must have total number of nodes and edges
-        
-        // for 2D we do not know the size of every dimension
-        settings.numX = N;
-        settings.numY = 1;
-        settings.numZ = 1;
-        
         if (comm->getRank() == 0)
         {
             std::cout<< "Reading from file \""<< graphFile << "\" for the graph and \"" << coordFile << "\" for coordinates"<< std::endl;
@@ -147,9 +144,15 @@ int main(int argc, char** argv) {
 
         // read the adjacency matrix and the coordinates from a file
         graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+        N = graph.getNumRows();
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
         assert(graph.getColDistribution().isEqual(*noDistPtr));
+
+        // for 2D we do not know the size of every dimension
+		settings.numX = N;
+		settings.numY = 1;
+		settings.numZ = 1;
 
         if (comm->getRank() == 0) {
         	std::cout<< "Read " << N << " points." << std::endl;
@@ -200,11 +203,27 @@ int main(int argc, char** argv) {
             IndexType nodes= graph.getNumRows();
             IndexType edges= graph.getNumValues()/2;	
             std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
-	}
+        }
+	} else if (vm.count("quadTreeFile")) {
+		//if (comm->getRank() == 0) {
+			graph = ITI::FileIO<IndexType, ValueType>::readQuadTree(vm["quadTreeFile"].as<std::string>(), coordinates);
+			N = graph.getNumRows();
+		//}
 
+		//broadcast graph size from root to initialize distributions
+		//IndexType NTransport[1] = {static_cast<IndexType>(graph.getNumRows())};
+		//comm->bcast( NTransport, 1, 0 );
+		//N = NTransport[0];
+
+        scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+        scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
+        graph.redistribute(rowDistPtr, noDistPtr);
+        for (IndexType i = 0; i < settings.dimensions; i++) {
+        	coordinates[i].redistribute(rowDistPtr);
+        }
 
     } else{
-    	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile or --generate" << std::endl;
+    	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;
     	return 0;
     }
     
