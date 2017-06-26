@@ -305,15 +305,15 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				 * the difference in running times between the two local FM implementations.
 				 */
 				swapField[0] = gain;
-				swapField[1] = blockSizes.second;
+				swapField[1] = otherBlockWeightSum;
 				comm->swap(swapField, 2, partner);
 			}
 			const IndexType otherGain = swapField[0];
-			const IndexType otherSecondBlockSize = swapField[1];
+			const IndexType otherSecondBlockWeightSum = swapField[1];
 
-			if (otherSecondBlockSize > maxBlockSizes.first) {
+			if (otherSecondBlockWeightSum > maxBlockSizes.first) {
 				//If a block is too large after the refinement, it is only because it was too large to begin with.
-				assert(otherSecondBlockSize <= blockSize);
+				assert(otherSecondBlockWeightSum <= blockWeightSum);
 			}
 
 			if (otherGain <= 0 && gain <= 0) {
