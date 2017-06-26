@@ -224,8 +224,8 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
 	graph.isConsistent();
         
         //EXPECT_EQ( graph.getNumRows(), graph.getNumColumns() );
-	EXPECT_EQ( graph.getNumRows(), N);
-	EXPECT_EQ( graph.getNumColumns(), N);
+	ASSERT_EQ( graph.getNumRows(), N);
+	ASSERT_EQ( graph.getNumColumns(), N);
 
 	const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
 	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
@@ -296,6 +296,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
 	index N = quad.countLeaves();
 	// index the tree
 	index treeSize = quad.indexSubtree(0);
+	ASSERT_GT(treeSize, 0);
         
 	// A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
 	// of -i- in the output graph, not the quad tree.
@@ -319,10 +320,10 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
 	graph.checkSymmetry();
 	graph.isConsistent();
         
-	EXPECT_EQ(coords[0].size(), N);
+	ASSERT_EQ(coords[0].size(), N);
             
-	EXPECT_EQ( graph.getNumRows(), N);
-	EXPECT_EQ( graph.getNumColumns(), N);
+	ASSERT_EQ( graph.getNumRows(), N);
+	ASSERT_EQ( graph.getNumColumns(), N);
         {
             const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
             const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
@@ -457,8 +458,8 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_2D) {
     graph.checkSymmetry();
     graph.isConsistent();
     
-    EXPECT_EQ( graph.getNumRows(), N);
-    EXPECT_EQ( graph.getNumColumns(), N);
+    ASSERT_EQ( graph.getNumRows(), N);
+    ASSERT_EQ( graph.getNumColumns(), N);
     
     const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
@@ -563,10 +564,10 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
 	}
 	graph.isConsistent();
         
-	EXPECT_EQ(coords[0].size(), N);
+	ASSERT_EQ(coords[0].size(), N);
             
-	EXPECT_EQ( graph.getNumRows(), N);
-	EXPECT_EQ( graph.getNumColumns(), N);
+	ASSERT_EQ( graph.getNumRows(), N);
+	ASSERT_EQ( graph.getNumColumns(), N);
 	{
 		const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
 		const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
