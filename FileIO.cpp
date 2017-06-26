@@ -125,20 +125,20 @@ void FileIO<IndexType, ValueType>::writeGraphDistributed (const CSRSparseMatrix<
 /*Given the vector of the coordinates and their dimension, writes them in file "filename".
  */
 template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename){
+void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<ValueType>> &coords, const std::string filename){
     SCAI_REGION( "FileIO.writeCoords" )
 
     std::ofstream f(filename);
     if(f.fail())
         throw std::runtime_error("File "+ filename+ " failed.");
 
-    IndexType i, j;
     IndexType dimension= coords.size();
+    for (IndexType d = 1; d < dimension; d++) {
+    	assert(coords[d].size() == coords[0].size());
+    }
 
-    assert(coords.size() == dimension );
-    assert(coords[0].size() == numPoints);
-    for(i=0; i<numPoints; i++){
-        for(j=0; j<dimension; j++)
+    for(IndexType i=0; i<coords[0].size(); i++){
+        for(IndexType j=0; j<dimension; j++)
             f<< std::setprecision(15)<< coords[j].getValue(i).Scalar::getValue<ValueType>() << " ";
         f<< std::endl;
     }
@@ -631,15 +631,17 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
 	}
 
 	scai::lama::CSRSparseMatrix<ValueType> matrix = SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsCells, rootVector, vCoords);
+
 	for (IndexType d = 0; d < dimension; d++) {
-		coords[d] = DenseVector<ValueType>(nodesInForest, vCoords[d].data());
+		assert(vCoords[d].size() == numLeaves);
+		coords[d] = DenseVector<ValueType>(vCoords[d].size(), vCoords[d].data());
 	}
     return matrix;
 }
 
 template void FileIO<int, double>::writeGraph (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<double> &adjM, const std::string filename);
-template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
+template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, const std::string filename);
 template void FileIO<int, double>::writeCoordsDistributed_2D (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
 template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::string filename);
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension);

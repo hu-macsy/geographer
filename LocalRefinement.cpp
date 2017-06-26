@@ -141,25 +141,29 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			 */
 
 			SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.prepareSets" )
-			//swap size of border region and total block size. Block size is only needed as sanity check, could be removed in optimized version
+			//swap size of border region and total block size.
 			IndexType blockSize = localBlockSize(part, localBlockID);
 			if (blockSize != localN) {
 				throw std::runtime_error(std::to_string(localN) + " local nodes, but only " + std::to_string(blockSize) + " of them belong to block " + std::to_string(localBlockID) + ".");
 			}
 
-			IndexType swapField[5];
+			const IndexType blockWeightSum = nodeWeights.getLocalValues().sum();
+
+			IndexType swapField[6];
 			swapField[0] = interfaceNodes.size();
 			swapField[1] = secondRoundMarker;
 			swapField[2] = lastRoundMarker;
 			swapField[3] = blockSize;
-			swapField[4] = getDegreeSum(input, interfaceNodes);
-			comm->swap(swapField, 5, partner);
+			swapField[4] = blockWeightSum;
+			swapField[5] = getDegreeSum(input, interfaceNodes);
+			comm->swap(swapField, 6, partner);
 			//want to isolate raw array accesses as much as possible, define named variables and only use these from now
 			const IndexType otherSize = swapField[0];
 			const IndexType otherSecondRoundMarker = swapField[1];
 			const IndexType otherLastRoundMarker = swapField[2];
 			const IndexType otherBlockSize = swapField[3];
-			const IndexType otherDegreeSum = swapField[4];
+			const IndexType otherBlockWeightSum = swapField[4];
+			const IndexType otherDegreeSum = swapField[5];
 
 			if (interfaceNodes.size() == 0) {
 				if (otherSize != 0) {
@@ -248,8 +252,8 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				borderNodeWeights.resize(borderRegionSize);
 				for (IndexType i = 0; i < borderRegionSize; i++) {
 					const IndexType globalI = borderRegionIDs[i];
-					if (inputDist->isLocal(globalI)) {
-						const IndexType localI = inputDist->global2local(globalI);
+					const IndexType localI = inputDist->global2local(globalI);
+					if (localI != nIndex) {
 						borderNodeWeights[i] = localWeights[localI];
 					} else {
 						const IndexType localI = graphHalo.global2halo(globalI);
@@ -261,7 +265,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			}
 
 			//block sizes and capacities
-			std::pair<IndexType, IndexType> blockSizes = {blockSize, otherBlockSize};
+			std::pair<IndexType, IndexType> blockSizes = {blockWeightSum, otherBlockWeightSum};
 			std::pair<IndexType, IndexType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
 
 			//second round markers
@@ -301,15 +305,15 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				 * the difference in running times between the two local FM implementations.
 				 */
 				swapField[0] = gain;
-				swapField[1] = blockSizes.second;
+				swapField[1] = otherBlockWeightSum;
 				comm->swap(swapField, 2, partner);
 			}
 			const IndexType otherGain = swapField[0];
-			const IndexType otherSecondBlockSize = swapField[1];
+			const IndexType otherSecondBlockWeightSum = swapField[1];
 
-			if (otherSecondBlockSize > maxBlockSizes.first) {
+			if (otherSecondBlockWeightSum > maxBlockSizes.first) {
 				//If a block is too large after the refinement, it is only because it was too large to begin with.
-				assert(otherSecondBlockSize <= blockSize);
+				assert(otherSecondBlockWeightSum <= blockWeightSum);
 			}
 
 			if (otherGain <= 0 && gain <= 0) {
@@ -878,8 +882,9 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(DenseVecto
 		scai::hmemo::WriteOnlyAccess<T> wNewLocalValues(newLocalValues, newLocalN);
 		for (IndexType i = 0; i < newLocalN; i++) {
 			const IndexType globalI = newDist->local2global(i);
-			if (oldDist->isLocal(globalI)) {
-				wNewLocalValues[i] = rOldLocalValues[oldDist->global2local(globalI)];
+			const IndexType oldLocalI = oldDist->global2local(globalI);
+			if (oldLocalI != nIndex) {
+				wNewLocalValues[i] = rOldLocalValues[oldLocalI];
 			} else {
 				const IndexType localI = halo.global2halo(globalI);
 				assert(localI != nIndex);
@@ -908,7 +913,7 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 		throw std::runtime_error("Old Distribution has " + std::to_string(globalN) + " values, new distribution has " + std::to_string(newDist->getGlobalSize()));
 	}
 
-	scai::hmemo::HArray<IndexType> targetIA;
+	scai::hmemo::HArray<IndexType> targetIA(targetNumRows+1);
 	scai::hmemo::HArray<IndexType> targetJA;
 	scai::hmemo::HArray<ValueType> targetValues;
 
@@ -916,27 +921,12 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 
 	matrix.setDistributionPtr(newDist);
 
-	//check for equality
-	if (sourceNumRows == targetNumRows) {
-		SCAI_REGION( "LocalRefinement.redistributeFromHalo.equalityCheck" )
-		bool allLocal = true;
-		for (IndexType i = 0; i < targetNumRows; i++) {
-			if (!oldDist->isLocal(newDist->local2global(i))) allLocal = false;
-		}
-		if (allLocal) {
-			//nothing to redistribute and no communication to do either.
-			return;
-		}
-	}
-
 	scai::hmemo::HArray<IndexType> sourceSizes;
 	{
 		SCAI_REGION( "LocalRefinement.redistributeFromHalo.sourceSizes" )
 		scai::hmemo::ReadAccess<IndexType> sourceIA(localStorage.getIA());
 		scai::hmemo::WriteOnlyAccess<IndexType> wSourceSizes( sourceSizes, sourceNumRows );
-                scai::sparsekernel::OpenMPCSRUtils::offsets2sizes( wSourceSizes.get(), sourceIA.get(), sourceNumRows );
-                //allocate
-                scai::hmemo::WriteOnlyAccess<IndexType> wTargetIA( targetIA, targetNumRows + 1 );
+		scai::sparsekernel::OpenMPCSRUtils::offsets2sizes( wSourceSizes.get(), sourceIA.get(), sourceNumRows );
 	}
 
 	scai::hmemo::HArray<IndexType> haloSizes;
@@ -951,19 +941,31 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 	std::vector<IndexType> localSourceIndices;
 	std::vector<IndexType> localHaloIndices;
 	std::vector<IndexType> additionalLocalNodes;
+	localTargetIndices.reserve(std::min(targetNumRows, sourceNumRows));
+	localSourceIndices.reserve(std::min(targetNumRows, sourceNumRows));
+	localHaloIndices.reserve(std::min(targetNumRows, halo.getHaloSize()));
+	additionalLocalNodes.reserve(std::min(targetNumRows, halo.getHaloSize()));
 	IndexType numValues = 0;
 	{
 		SCAI_REGION( "LocalRefinement.redistributeFromHalo.targetIA" )
 		scai::hmemo::ReadAccess<IndexType> rSourceSizes(sourceSizes);
 		scai::hmemo::ReadAccess<IndexType> rHaloSizes(haloSizes);
-                scai::hmemo::WriteAccess<IndexType> wTargetIA( targetIA );
+		scai::hmemo::WriteAccess<IndexType> wTargetIA( targetIA );
+
+
+		scai::hmemo::HArray<IndexType> oldIndices;
+		oldDist->getOwnedIndexes(oldIndices);
+
+		scai::hmemo::ReadAccess<IndexType> oldAcc(oldIndices);
+
+		IndexType oldLocalIndex = 0;
 
 		for (IndexType i = 0; i < targetNumRows; i++) {
 			IndexType newGlobalIndex = newDist->local2global(i);
+			while(oldAcc[oldLocalIndex] < newGlobalIndex) oldLocalIndex++;
 			IndexType size;
-			if (oldDist->isLocal(newGlobalIndex)) {
+			if (oldAcc[oldLocalIndex] == newGlobalIndex) {
 				localTargetIndices.push_back(i);
-				const IndexType oldLocalIndex = oldDist->global2local(newGlobalIndex);
 				localSourceIndices.push_back(oldLocalIndex);
 				size = rSourceSizes[oldLocalIndex];
 			} else {
@@ -976,11 +978,14 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 			wTargetIA[i] = size;
 			numValues += size;
 		}
-		scai::sparsekernel::OpenMPCSRUtils::sizes2offsets( wTargetIA.get(), targetNumRows );
+		{
+			SCAI_REGION( "LocalRefinement.redistributeFromHalo.targetIA.sizes2offsets" )
+			scai::sparsekernel::OpenMPCSRUtils::sizes2offsets( wTargetIA.get(), targetNumRows );
 
-		//allocate
-		scai::hmemo::WriteOnlyAccess<IndexType> wTargetJA( targetJA, numValues );
-		scai::hmemo::WriteOnlyAccess<ValueType> wTargetValues( targetValues, numValues );
+			//allocate
+			scai::hmemo::WriteOnlyAccess<IndexType> wTargetJA( targetJA, numValues );
+			scai::hmemo::WriteOnlyAccess<ValueType> wTargetValues( targetValues, numValues );
+		}
 	}
 
 	scai::hmemo::ReadAccess<IndexType> rTargetIA(targetIA);
@@ -990,9 +995,9 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 
 	for (IndexType i = 0; i < targetNumRows; i++) {
 		assert(rTargetIA[i] <= rTargetIA[i+1]);
-                assert(rTargetIA[i] <= numValues);
-                //WARNING: the assertion was as below (added '=') but it failed when the last row was empty
-                // and rTargetIA[i] = rTargetIA[i+1]
+		assert(rTargetIA[i] <= numValues);
+		//WARNING: the assertion was as below (added '=') but it failed when the last row was empty
+		// and rTargetIA[i] = rTargetIA[i+1]
 		//assert(rTargetIA[i] < numValues);
 	}
         rTargetIA.release();

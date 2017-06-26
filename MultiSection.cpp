@@ -5,6 +5,7 @@
  */
 
 #include "MultiSection.h"
+#include <numeric>
 
 namespace ITI {
     
@@ -32,7 +33,7 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
     // check input arguments for sanity
     //
     if( coordinates.size()!=dim ){
-        throw std::runtime_error("Wrong number of settings.dimensions and coordinates.size(). They must me the same");
+        throw std::runtime_error("Wrong number of settings.dimensions and coordinates.size(). They must be the same");
     }
 
     if( globalN != coordinates[0].size() ) {
