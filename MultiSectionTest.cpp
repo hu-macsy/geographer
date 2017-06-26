@@ -39,10 +39,10 @@ class MultiSectionTest : public ::testing::Test {
 TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
     
     const IndexType dimensions = 2;
-    const IndexType k = std::pow( 4, dimensions);
+    const IndexType k = std::pow( 8, dimensions);
 
     std::string path = "meshes/trace/";
-    std::string fileName = "trace-00002.graph";
+    std::string fileName = "trace-00010.graph";
     std::string file = path + fileName;
     std::ifstream f(file);
     IndexType N, edges;
@@ -75,8 +75,8 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
         scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
         srand(time(NULL));
         for(int i=0; i<localN; i++){
-            localPart[i] = 1;
-            //localPart[i] = rand()%7*comm->getRank()+2;
+            //localPart[i] = 1;
+            localPart[i] = rand()%9*(comm->getSize()/(comm->getRank()+1) );
             actualTotalWeight += localPart[i];         
         }
     }
@@ -87,16 +87,24 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
     settings.numBlocks = k;
     
     //
-    // get the partition
+    // get the partition with multisection and one with bisection
     //
     std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
-    scai::lama::DenseVector<IndexType> partition =  MultiSection<IndexType, ValueType>::getPartitionNonUniform( adjM, coordinates, nodeWeights, settings);
+    scai::lama::DenseVector<IndexType> partitionMS =  MultiSection<IndexType, ValueType>::getPartitionNonUniform( adjM, coordinates, nodeWeights, settings);
+
+    std::chrono::duration<double> partitionMSTime = std::chrono::system_clock::now() - startTime;
+
+    startTime = std::chrono::system_clock::now();
     
-    std::chrono::duration<double> partitionTime = std::chrono::system_clock::now() - startTime;
+    settings.multisectionBisect = true;
+    scai::lama::DenseVector<IndexType> partitionBS =  MultiSection<IndexType, ValueType>::getPartitionNonUniform( adjM, coordinates, nodeWeights, settings);
+    
+    std::chrono::duration<double> partitionBSTime = std::chrono::system_clock::now() - startTime;
     
     if (comm->getRank() == 0) {
-        std::cout<< "Time to partition: "<< partitionTime.count() << std::endl;
+        std::cout<< "Time to partition with multisection: "<< partitionMSTime.count() << std::endl;
+        std::cout<< "Time to partition with bisection: "<< partitionBSTime.count() << std::endl;
     }
     
     //
@@ -104,15 +112,18 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
     //  
 
     for(IndexType i=0; i<localN; i++){
-        SCAI_ASSERT( partition.getLocalValues()[i]!=-1 , "In PE " << *comm << " local point " << i << " has no partition." );
-        
+        SCAI_ASSERT( partitionMS.getLocalValues()[i]!=-1 , "In PE " << *comm << " local point " << i << " has no partition." );
+        SCAI_ASSERT( partitionBS.getLocalValues()[i]!=-1 , "In PE " << *comm << " local point " << i << " has no partition." );
     }
     
-    const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(adjM, partition, false);
-    PRINT0( "Cut = " << cut );
+    const ValueType cutMS = ParcoRepart<IndexType, ValueType>::computeCut(adjM, partitionMS, false);
+    const ValueType cutBS = ParcoRepart<IndexType, ValueType>::computeCut(adjM, partitionBS, false);
     
-    const ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k);
-    PRINT0( "Imbalance = " << imbalance );
+    const ValueType imbalanceMS = ParcoRepart<IndexType, ValueType>::computeImbalance(partitionMS, k);
+    const ValueType imbalanceBS = ParcoRepart<IndexType, ValueType>::computeImbalance(partitionBS, k);
+    
+    PRINT0( "Multisection:  cut= " << cutMS << " , imbalance= "<< imbalanceMS);
+    PRINT0( "Bisection: cut= " << cutBS << " , imbalance= " << imbalanceBS );
     
 }
 //---------------------------------------------------------------------------------------

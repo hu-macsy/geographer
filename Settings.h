@@ -21,7 +21,8 @@ struct Settings{
     bool gainOverBalance = false;
     bool skipNoGainColors = false;
     bool writeDebugCoordinates = false;
-    bool useExtent = 1;
+    bool multisectionBisect = false;
+    bool multisectionUseExtent = false;
     double epsilon = 0.05;
     std::string fileName = "-";
     

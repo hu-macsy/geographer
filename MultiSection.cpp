@@ -116,9 +116,7 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
                 if (scaledCoord > scaledMax[d]) scaledMax[d] = scaledCoord;
             }
             scaledMin[d] = comm->min( scaledMin[d] );
-            scaledMax[d] = comm->max( scaledMax[d] );
-PRINT0( minCoords[d] << " __ " << maxCoords[d] );    
-PRINT0( scaledMin[d] << " __ " << scaledMax[d] << " ++ " << scale);                
+            scaledMax[d] = comm->max( scaledMax[d] );      
         }
     }
     
@@ -251,7 +249,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         //      maybe not the fastest way but probably would give better quality
         
         // choose the dimension to project for all leaves/rectangles
-        if( settings.useExtent ){
+        if( settings.multisectionUseExtent ){
             SCAI_REGION("MultiSection.getRectangles.forAllRectangles.useExtent");
             // for all leaves/rectangles
             for( int l=0; l<allLeaves.size(); l++){
@@ -469,7 +467,14 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     //TODO: maybe if the algorithm dynamically decides in how many parts it will mutlisect each rectangle/block?
     
     // number of cuts for each dimensions
-    std::vector<IndexType> numCuts( dim, intSqrtK );
+    std::vector<IndexType> numCuts;
+    
+    if( !settings.multisectionBisect ){
+        numCuts = std::vector<IndexType>( dim, intSqrtK );
+    }else{        
+        SCAI_ASSERT( k && !(k & (k-1)) , "k is not a power of 2 and this is required for now");  
+        numCuts = std::vector<IndexType>( log2(k) , 2 );
+    }
     
     //
     // initialize the tree
@@ -526,7 +531,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         
         //TODO: useExtent is the only option. Add another or remove settings.useExtent
         // choose the dimension to project for all leaves/rectangles
-        if( settings.useExtent or true){
+        if( settings.multisectionUseExtent or true){
             SCAI_REGION("MultiSection.getRectanglesNonUniform.forAllRectangles.useExtent");
             // for all leaves/rectangles
             for( int l=0; l<allLeaves.size(); l++){
