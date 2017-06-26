@@ -63,8 +63,6 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     std::vector<IndexType> gainPerRound(communicationScheme.size(), 0);
 
     //copy into usable data structure with iterators
-    //TODO: we only need those if redistribution happens.
-    //Maybe hold off on creating the vector until then? On the other hand, the savings would be in those processes that are faster anyway and probably have to wait.
 	std::vector<IndexType> myGlobalIndices(input.getRowDistributionPtr()->getLocalSize());
 	{
 		const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
@@ -171,9 +169,8 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				} else {
 					/*
 					 * These processes don't share a border and thus have no communication to do with each other. How did they end up in a communication scheme?
-					 * We could skip the loop entirely.
+					 * We could skip the loop entirely. However, the remaining instructions are very fast anyway.
 					 */
-                     //PRINT("PEs " << comm->getRank() << " and "<< partner << " do not share a border, nonetheless they communicate for color " << color << ". Something is wrong");
 				}
 			}
 
@@ -1200,8 +1197,6 @@ IndexType ITI::LocalRefinement<IndexType, ValueType>::getDegreeSum(const CSRSpar
 }
 
 //---------------------------------------------------------------------------------------
-
-//template std::vector<int> LocalRefinement<int, double>::distributedFMStep(CSRSparseMatrix<double> &input, DenseVector<int> &part, std::vector<DenseVector<double>> &coordinates, Settings settings);
 
 template std::vector<int> ITI::LocalRefinement<int, double>::distributedFMStep(
     CSRSparseMatrix<double>& input, 

@@ -5,6 +5,7 @@
  */
 
 #include "MultiSection.h"
+#include <numeric>
 
 namespace ITI {
 
