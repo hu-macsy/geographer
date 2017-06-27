@@ -52,7 +52,6 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSR
 
 	const IndexType maxIter = 20;
 	const ValueType eps        = 1e-5;
-	LoggerPtr logger( new CommonLogger ( "myLogger: ",	LogLevel::convergenceHistory,	LoggerWriteBehaviour::toConsoleOnly ) );
 
 	NormPtr norm( new L2Norm() );
 
@@ -62,7 +61,6 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSR
 
 	CG solver( "simpleExampleCG" );
 
-	//solver.setLogger( logger );
 	solver.setStoppingCriterion( both );
 
 	solver.initialize( laplacian );
