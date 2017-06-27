@@ -39,10 +39,10 @@ class MultiSectionTest : public ::testing::Test {
 TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
     
     const IndexType dimensions = 2;
-    const IndexType k = std::pow( 8, dimensions);
+    const IndexType k = std::pow( 4, dimensions);
 
-    std::string path = "meshes/trace/";
-    std::string fileName = "trace-00010.graph";
+    std::string path = "meshes/bigtrace/";
+    std::string fileName = "bigtrace-00010.graph";
     std::string file = path + fileName;
     std::ifstream f(file);
     IndexType N, edges;
@@ -76,7 +76,7 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
         srand(time(NULL));
         for(int i=0; i<localN; i++){
             //localPart[i] = 1;
-            localPart[i] = rand()%9*(comm->getSize()/(comm->getRank()+1) );
+            localPart[i] = rand()%9+rand()%7;
             actualTotalWeight += localPart[i];         
         }
     }

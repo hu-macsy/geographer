@@ -469,6 +469,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     // number of cuts for each dimensions
     std::vector<IndexType> numCuts;
     
+    // if the bisection option is chosen the algorithm performs a bisection
     if( !settings.multisectionBisect ){
         numCuts = std::vector<IndexType>( dim, intSqrtK );
     }else{        
