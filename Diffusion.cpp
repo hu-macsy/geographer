@@ -20,10 +20,12 @@ using scai::lama::DenseVector;
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DIASparseMatrix;
 using scai::lama::DIAStorage;
+using scai::lama::DenseMatrix;
+using scai::lama::DenseStorage;
 using scai::lama::Scalar;
 
 template<typename IndexType, typename ValueType>
-DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentials(CSRSparseMatrix<ValueType> laplacian, DenseVector<IndexType> nodeWeights, IndexType source) {
+DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSRSparseMatrix<ValueType> laplacian, DenseVector<IndexType> nodeWeights, IndexType source) {
 	using scai::lama::NormPtr;
 	using scai::lama::L2Norm;
 	using namespace scai::solver;
@@ -60,7 +62,7 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentials(CSRSparseMatr
 
 	CG solver( "simpleExampleCG" );
 
-	solver.setLogger( logger );
+	//solver.setLogger( logger );
 	solver.setStoppingCriterion( both );
 
 	solver.initialize( laplacian );
@@ -68,6 +70,33 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentials(CSRSparseMatr
 
 	return solution;
 }
+
+template<typename IndexType, typename ValueType>
+DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(scai::lama::CSRSparseMatrix<ValueType> laplacian, scai::lama::DenseVector<IndexType> nodeWeights, std::vector<IndexType> sources) {
+	using scai::hmemo::ReadAccess;
+	using scai::hmemo::WriteAccess;
+	using scai::hmemo::HArray;
+
+	const IndexType l = sources.size();
+	const IndexType n = laplacian.getNumRows();
+	HArray<ValueType> resultContainer(n*l);
+	IndexType offset = 0;
+
+	//get potentials and copy them into common vector
+	for (IndexType landmark : sources) {
+		DenseVector<ValueType> potentials = potentialsFromSource(laplacian, nodeWeights, landmark);
+		assert(potentials.size() == n);
+		WriteAccess<ValueType> wResult(resultContainer);
+		ReadAccess<ValueType> rPotentials(potentials.getLocalValues());
+		assert(offset < wResult.size());
+		std::copy(rPotentials.get(), rPotentials.get()+n, wResult.get()+offset);
+		offset += n;
+	}
+	assert(offset == n*l);
+
+	return DenseMatrix<ValueType>(DenseStorage<ValueType>(resultContainer, l, n));
+}
+
 
 template<typename IndexType, typename ValueType>
 CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(CSRSparseMatrix<ValueType> graph) {
@@ -123,7 +152,9 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 }
 
 template CSRSparseMatrix<double> Diffusion<int, double>::constructLaplacian(CSRSparseMatrix<double> graph);
-template DenseVector<double> Diffusion<int, double>::potentials(CSRSparseMatrix<double> laplacian, DenseVector<int> nodeWeights, int source);
+template DenseVector<double> Diffusion<int, double>::potentialsFromSource(CSRSparseMatrix<double> laplacian, DenseVector<int> nodeWeights, int source);
+template DenseMatrix<double> Diffusion<int, double>::multiplePotentials(CSRSparseMatrix<double> laplacian, DenseVector<int> nodeWeights, std::vector<int> sources);
+
 
 
 } /* namespace ITI */

@@ -11,6 +11,7 @@
 #include <scai/lama.hpp>
 #include <scai/lama/Vector.hpp>
 #include <scai/lama/matrix/CSRSparseMatrix.hpp>
+#include <scai/lama/matrix/DenseMatrix.hpp>
 
 namespace ITI {
 
@@ -23,8 +24,23 @@ class Diffusion {
 public:
 	Diffusion() = default;
 	virtual ~Diffusion() = default;
-	static scai::lama::DenseVector<ValueType> potentials(scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> nodeWeights, IndexType source);
+	static scai::lama::DenseVector<ValueType> potentialsFromSource(scai::lama::CSRSparseMatrix<ValueType> laplacian, scai::lama::DenseVector<IndexType> nodeWeights, IndexType source);
+	static scai::lama::DenseMatrix<ValueType> multiplePotentials(scai::lama::CSRSparseMatrix<ValueType> laplacian, scai::lama::DenseVector<IndexType> nodeWeights, std::vector<IndexType> sources);
 	static scai::lama::CSRSparseMatrix<ValueType> constructLaplacian(scai::lama::CSRSparseMatrix<ValueType>);
+
+	//taken from https://stackoverflow.com/a/9345144/494085
+	template<class BidiIter >
+	static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_random) {
+	    size_t left = std::distance(begin, end);
+	    for (IndexType i = 0; i < num_random; i++) {
+	        BidiIter r = begin;
+	        std::advance(r, rand()%left);
+	        std::swap(*begin, *r);
+	        ++begin;
+	        --left;
+	    }
+	    return begin;
+	}
 };
 
 } /* namespace ITI */
