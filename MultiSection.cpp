@@ -156,7 +156,11 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
                 scai::hmemo::ReadAccess<IndexType> coordAccess( scaledCoords[d].getLocalValues() );
                 coordAccess.getValue( point[d], i);
             }   
-            wLocalPart[i] = root->contains( point )->getLeafID();
+            try{
+                wLocalPart[i] = root->getContainingLeaf( point )->getLeafID();
+            }catch( const std::logic_error& e ){
+                PRINT0( e.what() );
+            }
         }
     }
     
@@ -249,7 +253,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         //      maybe not the fastest way but probably would give better quality
         
         // choose the dimension to project for all leaves/rectangles
-        if( settings.multisectionUseExtent ){
+        if( settings.useExtent or true){
             SCAI_REGION("MultiSection.getRectangles.forAllRectangles.useExtent");
             // for all leaves/rectangles
             for( int l=0; l<allLeaves.size(); l++){
@@ -322,7 +326,6 @@ SCAI_ASSERT( dbg_rectW==thisRectangle.weight, "Rectangle weights not correct. db
     }
     
     return root;
-    //return root->getAllLeaves();
 }
 //---------------------------------------------------------------------------------------
 
@@ -353,10 +356,13 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
     for(IndexType l=0; l<numLeaves; l++){
         SCAI_REGION("MultiSection.projection.reserveSpace");
         const IndexType dim2proj = dimensionToProject[l];
+        SCAI_ASSERT( dim2proj>=0 and dim2proj<=dimension , "Wrong dimension to project to: " << dim2proj);
+        
         // the length for every projection in the chosen dimension
         IndexType projLength = allLeaves[l]->getRect().top[dim2proj] - allLeaves[l]->getRect().bottom[dim2proj];
+
         if(projLength<1){
-            throw std::runtime_error("function: projection, line:" +std::to_string(__LINE__) +", the length of the projection is " +std::to_string(projLength) + " and is not correct");
+            throw std::runtime_error("function: projection, line:" +std::to_string(__LINE__) +", the length of projection/leaf " + std::to_string( l) +" is " +std::to_string(projLength) + " and is not correct. Number of leaves = " + std::to_string(numLeaves) );
         }
         projections[l].assign( projLength, 0 );
     }
@@ -376,14 +382,17 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
             
             // a pointer to the cell that contains point i
             SCAI_REGION_START("MultiSection.projection.localProjection.contains");
-            std::shared_ptr<rectCell<IndexType,ValueType>> thisRectCell = treeRoot->contains( coordsVal );
-            SCAI_REGION_END("MultiSection.projection.localProjection.contains");
+            std::shared_ptr<rectCell<IndexType,ValueType>> thisRectCell;
             
             //TODO: in the partition this should not happen. But it may happen in a more general case
             // if this point is not contained in any rectangle
-            if( thisRectCell==NULL ){
-                continue;
+            try{
+                 thisRectCell = treeRoot->getContainingLeaf( coordsVal );
             }
+            catch( const std::logic_error& e){
+                PRINT0("Function getContainingLeaf returns an " << e.what() << " exception");
+            }
+            SCAI_REGION_END("MultiSection.projection.localProjection.contains");
             
             IndexType thisLeafID = thisRectCell->getLeafID();
             SCAI_ASSERT( thisLeafID!=-1, "leafID for containing rectCell must be >0");
@@ -470,7 +479,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     std::vector<IndexType> numCuts;
     
     // if the bisection option is chosen the algorithm performs a bisection
-    if( !settings.multisectionBisect ){
+    if( !settings.bisect ){
         numCuts = std::vector<IndexType>( dim, intSqrtK );
     }else{        
         SCAI_ASSERT( k && !(k & (k-1)) , "k is not a power of 2 and this is required for now");  
@@ -532,7 +541,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         
         //TODO: useExtent is the only option. Add another or remove settings.useExtent
         // choose the dimension to project for all leaves/rectangles
-        if( settings.multisectionUseExtent or true){
+        if( settings.useExtent or true){
             SCAI_REGION("MultiSection.getRectanglesNonUniform.forAllRectangles.useExtent");
             // for all leaves/rectangles
             for( int l=0; l<allLeaves.size(); l++){
@@ -672,14 +681,17 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
             
             // a pointer to the cell that contains point i
             SCAI_REGION_START("MultiSection.projectionNonUniform.localProjection.contains");
-            std::shared_ptr<rectCell<IndexType,ValueType>> thisRectCell = treeRoot->contains( coords );
-            SCAI_REGION_END("MultiSection.projectionNonUniform.localProjection.contains");
+            std::shared_ptr<rectCell<IndexType,ValueType>> thisRectCell;
             
             //TODO: in the partition this should not happen. But it may happen in a more general case
             // if this point is not contained in any rectangle
-            if( thisRectCell==NULL ){
-                continue;
+            try{
+                thisRectCell = treeRoot->getContainingLeaf( coords );
             }
+            catch( const std::logic_error& e){
+                PRINT0("Function getContainingLeaf returns an " << e.what() << " exception");
+            }
+            SCAI_REGION_END("MultiSection.projectionNonUniform.localProjection.contains");
             
             IndexType thisLeafID = thisRectCell->getLeafID();
             if( thisLeafID==-1 and comm->getRank()==0 ){
@@ -797,10 +809,10 @@ std::pair<std::vector<ValueType>, std::vector<ValueType>> MultiSection<IndexType
 //---------------------------------------------------------------------------------------
 // Search if there is a partition of weights array into k parts where the maximum weight of a part is <=target.
 
-//TODO: return also the splitter found
+//TODO: return also the splitters found
 template<typename IndexType, typename ValueType>
 bool MultiSection<IndexType, ValueType>::probe(const std::vector<ValueType>& prefixSum, const IndexType k, const ValueType target){
-    
+
     const IndexType N = prefixSum.size();
     IndexType p = 1;
     const IndexType offset = N/k;
@@ -809,24 +821,30 @@ bool MultiSection<IndexType, ValueType>::probe(const std::vector<ValueType>& pre
     
     ValueType totalWeight = prefixSum.back();
 
-    std::vector<IndexType> splitters( k-1, 0);
+    bool ret = false;
     
-    while( p<k and sumOfPartition<totalWeight){
-        while( prefixSum[step]<sumOfPartition ){
-            step += offset;
-//PRINT(step);            
-            SCAI_ASSERT( step<N , "Variable step is too large: " << step);
+    if(target*k >= totalWeight){
+        std::vector<IndexType> splitters( k-1, 0);
+
+        while( p<k and sumOfPartition<totalWeight){
+            while( prefixSum[step]<sumOfPartition and step<N){
+                step += offset;
+                step = std::min( step , N-1);
+                SCAI_ASSERT( step<N , "Variable step is too large: " << step);
+            }
+
+            splitters[p-1] = std::lower_bound( prefixSum.begin()+(step-offset), prefixSum.begin()+step, sumOfPartition ) - prefixSum.begin();
+
+            sumOfPartition = prefixSum[splitters[p-1]] + target;
+            ++p;
         }
-        splitters[p-1] = std::lower_bound( prefixSum.begin()+(step-offset), prefixSum.begin()+step, sumOfPartition ) - prefixSum.begin();
-        
-        sumOfPartition = prefixSum[splitters[p-1]];
-        ++p;
+    
+        if( sumOfPartition>=totalWeight ){
+            ret = true;
+        }
     }
     
-    if( sumOfPartition>=totalWeight ){
-        return true;
-    }
-    return false;
+    return ret;
 }
 //---------------------------------------------------------------------------------------
 

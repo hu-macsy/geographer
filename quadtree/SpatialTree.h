@@ -99,8 +99,7 @@ public:
 		return root->getSubTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coords );
 	}
 	
-    //TODO: removed -const- from ...shared_ptr< const SpatialCell>... not sure if needed or not
-    //TODO: re-added the const
+   
     template<typename IndexType, typename ValueType>
 	static scai::lama::CSRSparseMatrix<ValueType>  getGraphFromForest( std::vector< std::set<std::shared_ptr< const SpatialCell>>>& graphNgbrsCells, const std::vector<std::shared_ptr< const SpatialCell>>& treePtrVector,  std::vector<std::vector<ValueType>>& coords){
             IndexType numTrees = treePtrVector.size();

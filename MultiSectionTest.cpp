@@ -41,8 +41,8 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
     const IndexType dimensions = 2;
     const IndexType k = std::pow( 4, dimensions);
 
-    std::string path = "meshes/bigtrace/";
-    std::string fileName = "bigtrace-00010.graph";
+    std::string path = "meshes/trace/";
+    std::string fileName = "trace-00010.graph";
     std::string file = path + fileName;
     std::ifstream f(file);
     IndexType N, edges;
@@ -97,7 +97,7 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
 
     startTime = std::chrono::system_clock::now();
     
-    settings.multisectionBisect = true;
+    settings.bisect = true;
     scai::lama::DenseVector<IndexType> partitionBS =  MultiSection<IndexType, ValueType>::getPartitionNonUniform( adjM, coordinates, nodeWeights, settings);
     
     std::chrono::duration<double> partitionBSTime = std::chrono::system_clock::now() - startTime;
@@ -341,9 +341,10 @@ TEST_F(MultiSectionTest, test1DPartitionOptimal){
 
 TEST_F(MultiSectionTest, testProbeFunction ){
     
-    const IndexType N = 100;
-    const IndexType k = 10;
-    std::vector<ValueType> weights( N, 2);
+    const IndexType N = 540;
+    const IndexType k = 17;
+    const IndexType w = 2;
+    std::vector<ValueType> weights( N, w);
     
     //create the prefix sum array
     //
@@ -353,28 +354,45 @@ TEST_F(MultiSectionTest, testProbeFunction ){
     for(IndexType i=1; i<N; i++ ){
         prefixSum[i] = prefixSum[i-1] + weights[i]; 
     }
-PRINT(N);    
-    bool existsPart30 = MultiSection<IndexType, ValueType>::probe( prefixSum, k, 30);
-    bool existsPart20 = MultiSection<IndexType, ValueType>::probe( prefixSum, k, 20);
-    bool existsPart10 = MultiSection<IndexType, ValueType>::probe( prefixSum, k, 10);
-
-    SCAI_ASSERT( !existsPart10 , "There does not exists a parition with bottlneck 10" );
-    //SCAI_ASSERT( existsPart30 , "There should exist a parition with bottlneck 30" );
-    //SCAI_ASSERT( existsPart20 , "There should exist a parition with bottlneck 20" );
     
-    for( int target=10; target<200; target+=5){
-        if( MultiSection<IndexType, ValueType>::probe( prefixSum, k, target)==true){
-            PRINT("Found partition with bottleneck " << target );
-            break;
+    IndexType realBottleneck = N*w/k +1;
+
+    for( int target=10; target<300; target+=5){
+        bool existsPart = MultiSection<IndexType, ValueType>::probe( prefixSum, k, target);
+        
+        if(target<realBottleneck){
+            SCAI_ASSERT( !existsPart , "There should not exist a partition with bottleneck " << target);
+        }
+        if(target>=realBottleneck){
+            SCAI_ASSERT( existsPart , "There should exist a partition with bottleneck " << target);
         }
     }
-           
+    
     // create random weights
     std::random_device rnd_dvc;
     std::mt19937 mersenne_engine(rnd_dvc());
-    std::uniform_real_distribution<ValueType> dist(1, 52);
+    std::uniform_real_distribution<ValueType> dist(1, 16);
     auto gen = std::bind(dist, mersenne_engine);
     std::generate( begin(weights), end(weights), gen);
+    
+    for(IndexType i=1; i<N; i++ ){
+        prefixSum[i] = prefixSum[i-1] + weights[i]; 
+    }
+    
+    //find the bottlneck, all larger values must haave a partitioning
+    for( int target=40; target<prefixSum.back()/2; target+=10){
+        int bottleneck = prefixSum.back();
+        bool existsPart = MultiSection<IndexType, ValueType>::probe( prefixSum, k, target);
+        
+        if( target>bottleneck){
+            SCAI_ASSERT( existsPart , "There should exist a partition with bottleneck " << target );
+        }
+        if( existsPart ){
+            //PRINT("Found partition with bottleneck " << target );
+            bottleneck = target;
+        }
+        
+    }
     
 }
 //---------------------------------------------------------------------------------------
@@ -444,7 +462,7 @@ TEST_F(MultiSectionTest, testRectTree){
     std::shared_ptr<rectCell<IndexType,ValueType>> retRect; 
     
     for(int p=0; p<points.size(); p++){
-        retRect = root->contains( points[p] );
+        retRect = root->getContainingLeaf( points[p] );
 
         if( retRect!=NULL){
             SCAI_ASSERT( retRect->getRect().bottom[0]<=points[p][0] and retRect->getRect().top[0]>=points[p][0] , "Wrong rectangle");
@@ -460,7 +478,7 @@ TEST_F(MultiSectionTest, testRectTree){
         point[0] = rand()%100;
         point[1] = rand()%100;
         
-        retRect = root->contains( point );
+        retRect = root->getContainingLeaf( point );
         if( retRect!=NULL){
             SCAI_ASSERT( retRect->getRect().bottom[0]<=point[0] and retRect->getRect().top[0]>=point[0] , "Wrong rectangle");
             SCAI_ASSERT( retRect->getRect().bottom[1]<=point[1] and retRect->getRect().top[1]>=point[1] , "Wrong rectangle");
@@ -484,7 +502,7 @@ TEST_F(MultiSectionTest, testRectTree){
             point[0]=x;
             point[1]=y;
             
-            retRect = root->contains( point );
+            retRect = root->getContainingLeaf( point );
             
             if(retRect->getRect()==r2){
                 numOfPointsIn_r2++;
@@ -682,7 +700,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
     const scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
     const IndexType localN = dist->getLocalSize();
     
-    // in this version the adjacency matrix is not used in the getPartitionNonUniform
+    // in this version the adjacency matrix is not used in the getRectanglesNonUniform
     scai::lama::CSRSparseMatrix<ValueType> adjM(dist, noDistPointer);
     
     //
@@ -965,10 +983,6 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
     for(int r=0; r<settings.numBlocks; r++){
         struct rectangle thisRectangle = rectangles[r]->getRect();
         
-        if( comm->getRank()==0 and settings.numBlocks<20){
-            thisRectangle.print();
-        }
- 
         ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( scaledCoords, nodeWeights, thisRectangle, scaledMax, settings);
         SCAI_ASSERT( thisWeight==thisRectangle.weight, "wrong weight calculation: thisWeight= " << thisWeight << " , thisRectangle.weight= " << thisRectangle.weight);
         

@@ -63,25 +63,8 @@ namespace ITI {
         
         /** Checks if the given point is inside this rectangle.
          */
-        bool owns( const std::vector<double>& point){
-            SCAI_REGION("rectangle.owns");
-            
-            IndexType dim= point.size();
-            SCAI_ASSERT( dim==this->top.size(), "Wrong dimensions: point.dim= " << dim << ", this->top.dim= "<< this->top.size() );
-            
-            bool ret= true;
-            for(int d=0; d<dim; d++){
-                if( point[d]<this->bottom[d] or point[d]>=this->top[d]){
-                    ret= false;
-                    break;
-                }
-            }
-            return ret;
-        }
-        
-        /* Overloaded version for integer coordinates.
-         */
-        bool owns( const std::vector<int>& point){
+        template< typename D>
+        bool owns( const std::vector<D>& point){
             SCAI_REGION("rectangle.owns");
             
             IndexType dim= point.size();
@@ -118,7 +101,8 @@ namespace ITI {
         
 //---------------------------------------------------------------------------------------
     template <typename IndexType, typename ValueType>
-    class rectCell{
+    class rectCell {
+        
         template <typename T, typename U> 
         friend class MultiSection;
         
@@ -181,17 +165,19 @@ namespace ITI {
          *  @param[in] point The query point given as a d dimensional vector;
          *  @return A pointer to the rectangle cell that contains the point.
          */
-        std::shared_ptr<rectCell> contains( const std::vector<ValueType>& point){
-            SCAI_REGION("rectCell.containsVal");
+        template<typename D>
+        std::shared_ptr<rectCell> getContainingLeaf( const std::vector<D>& point){
+            SCAI_REGION("rectCell.getContainingLeaf");
             
             IndexType dim = point.size();
             SCAI_ASSERT( dim==myRect.top.size(), "Dimensions do not agree");
             
             // point should be inside this rectangle
             for(int d=0; d<dim; d++){
-                //TODO: just return NULL or insert assertion to ensure point is within bounds?
+                //TODO: just throw exception or insert assertion to ensure point is within bounds?
                 if(point[d]>=myRect.top[d] or  point[d]<myRect.bottom[d]){
-                    return NULL;
+                    //return NULL;
+                    throw std::logic_error("Null pointer");
                 }
             }
             //TODO: remove variable ret or not?
@@ -201,8 +187,8 @@ namespace ITI {
                 for(int c=0; c<this->children.size(); c++){
                     if( children[c]->myRect.owns( point ) ){                    
                         foundOwnerChild = true;
-                        //ret = children[c]->contains( point );
-                        return children[c]->contains( point );
+                        //ret = children[c]->getContainingLeaf( point );
+                        return children[c]->getContainingLeaf( point );
                         break;  // if one node is found no need to search the rest of the children
                     }
                 }
@@ -214,55 +200,8 @@ namespace ITI {
                     if( myRect.owns( point ) ){
                         ret = std::make_shared<rectCell>(*this);
                     }else{
-                        //ret = NULL;
-                        return NULL;
-                    }
-                }
-            }else{
-                SCAI_ASSERT( this->myRect.owns(point), "Should not happen")    
-                //ret = std::make_shared<rectCell>(*this);
-                return  std::make_shared<rectCell>(*this);
-            }
-            return ret;
-        }
-        
-        /*Overloaded version for IndexType coordinates.
-         */
-        std::shared_ptr<rectCell> contains( const std::vector<IndexType>& point){
-            SCAI_REGION("rectCell.containsInd");
-            
-            IndexType dim = point.size();
-            SCAI_ASSERT( point.size()==myRect.top.size(), "Dimensions do not agree: point.size()= " << point.size() << " and myRect.top.size()= " << myRect.top.size() );
-            
-            // point should be inside this rectangle
-            for(int d=0; d<dim; d++){
-                //TODO: just return NULL or insert assertion to ensure point is within bounds?
-                if(point[d]>=myRect.top[d] or  point[d]<myRect.bottom[d]){
-                    return NULL;
-                }
-            }
-            //TODO: remove variable ret or not?
-            std::shared_ptr<rectCell> ret;
-            if( !this->isLeaf ){
-                bool foundOwnerChild = false;
-                for(int c=0; c<this->children.size(); c++){
-                    if( children[c]->myRect.owns( point ) ){                    
-                        foundOwnerChild = true;
-                        //ret = children[c]->contains( point );
-                        return children[c]->contains( point );
-                        break;  // if one node is found no need to search the rest of the children
-                    }
-                }
-               
-                // this is not a leaf node and none of the childrens owns the point
-                if( !foundOwnerChild ){
-                    // check again if this rectangle owns the point
-                    //TODO: not need to check again
-                    if( myRect.owns( point ) ){
-                        ret = std::make_shared<rectCell>(*this);
-                    }else{
-                        //ret = NULL;
-                        return NULL;
+                        //return NULL;
+                        throw std::logic_error("Null pointer");
                     }
                 }
             }else{
