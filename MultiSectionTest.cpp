@@ -277,7 +277,7 @@ TEST_F(MultiSectionTest, test1DPartition){
 
         for( int proj=0; proj<projection.size(); proj++){
             std::vector<ValueType> part1D, weightPerPart;
-            std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1D( projection[proj],  k1, settings);
+            std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DGreedy( projection[proj],  k1, settings);
             
             //assertions - checks - prints
             
@@ -330,6 +330,52 @@ TEST_F(MultiSectionTest, test1DPartition){
         }
         // TODO: add more tests
     }
+}
+//---------------------------------------------------------------------------------------
+
+TEST_F(MultiSectionTest, test1DPartitionOptimal){
+    
+    
+}
+//---------------------------------------------------------------------------------------
+
+TEST_F(MultiSectionTest, testProbeFunction ){
+    
+    const IndexType N = 100;
+    const IndexType k = 10;
+    std::vector<ValueType> weights( N, 2);
+    
+    //create the prefix sum array
+    //
+    std::vector<ValueType> prefixSum( N , 0);
+    prefixSum[0] = weights[0];
+    
+    for(IndexType i=1; i<N; i++ ){
+        prefixSum[i] = prefixSum[i-1] + weights[i]; 
+    }
+PRINT(N);    
+    bool existsPart30 = MultiSection<IndexType, ValueType>::probe( prefixSum, k, 30);
+    bool existsPart20 = MultiSection<IndexType, ValueType>::probe( prefixSum, k, 20);
+    bool existsPart10 = MultiSection<IndexType, ValueType>::probe( prefixSum, k, 10);
+
+    SCAI_ASSERT( !existsPart10 , "There does not exists a parition with bottlneck 10" );
+    //SCAI_ASSERT( existsPart30 , "There should exist a parition with bottlneck 30" );
+    //SCAI_ASSERT( existsPart20 , "There should exist a parition with bottlneck 20" );
+    
+    for( int target=10; target<200; target+=5){
+        if( MultiSection<IndexType, ValueType>::probe( prefixSum, k, target)==true){
+            PRINT("Found partition with bottleneck " << target );
+            break;
+        }
+    }
+           
+    // create random weights
+    std::random_device rnd_dvc;
+    std::mt19937 mersenne_engine(rnd_dvc());
+    std::uniform_real_distribution<ValueType> dist(1, 52);
+    auto gen = std::bind(dist, mersenne_engine);
+    std::generate( begin(weights), end(weights), gen);
+    
 }
 //---------------------------------------------------------------------------------------
 
@@ -876,8 +922,6 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
             }
             scaledMin[d] = comm->min( scaledMin[d] );
             scaledMax[d] = comm->max( scaledMax[d] );
-PRINT0( minCoords[d] << " __ " << maxCoords[d] );    
-PRINT0( scaledMin[d] << " __ " << scaledMax[d] << " ++ " << scale);    
         }
     }
     
@@ -1238,46 +1282,6 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
         SCAI_ASSERT( proj1Weight==bBox3Weight, "Weight of second rectangle is "<< bBox3Weight << " but the weight of the projection is "<< proj1Weight);
         SCAI_ASSERT( proj2Weight==bBox1Weight, "Weight of third rectangle is "<< bBox1Weight << " but the weight of the projection is "<< proj2Weight);
     }    
-}
-//---------------------------------------------------------------------------------------
-
-TEST_F(MultiSectionTest, testConvert2Uniform){
-
-    const IndexType N = 265400;
-    const IndexType dimensions = 3;
-    const IndexType k = std::pow( 5, dimensions);
-    const std::vector<IndexType> maxCoord= {700, 800, 900};
-    
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    const scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr("BLOCK", comm, N) );
-    const scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
-    const IndexType localN = dist->getLocalSize();
-    
-    scai::lama::CSRSparseMatrix<ValueType> adjM(dist, noDistPointer);
-  
-    std::vector<DenseVector<ValueType>> coordinates(dimensions);
-    for(IndexType i=0; i<dimensions; i++){
-	  coordinates[i].allocate(dist);
-	  coordinates[i] = static_cast<ValueType>( 0 );
-    }
-    
-    //set random coordinates in your local part
-    {
-        srand(time(NULL));
-        for(int d=0; d<dimensions; d++){
-            scai::hmemo::WriteAccess<ValueType> coordWrite( coordinates[d].getLocalValues() );
-            for(IndexType i=0; i<localN; i++){
-                coordWrite[i] = rand()%maxCoord[d];
-            }
-        }
-    }
-    
-    struct Settings settings;
-    settings.numBlocks= k;
-    settings.epsilon = 0.2;
-    settings.dimensions = dimensions;
-    
-    scai::lama::DenseVector<ValueType> uniformGrid = MultiSection<IndexType, ValueType>::convert2Uniform( adjM, coordinates, settings);
 }
 //---------------------------------------------------------------------------------------
 

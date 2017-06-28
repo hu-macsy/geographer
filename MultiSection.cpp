@@ -276,7 +276,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             //perform 1D partitioning for the chosen dimension
             std::vector<ValueType> part1D, weightPerPart;
             std::vector<ValueType> thisProjection = projections[l];
-            std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1D( thisProjection, *thisDimCuts, settings);
+            std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DGreedy( thisProjection, *thisDimCuts, settings);
             // TODO: possibly expensive assertion
             SCAI_ASSERT( std::accumulate(thisProjection.begin(), thisProjection.end(), 0)==std::accumulate( weightPerPart.begin(), weightPerPart.end(), 0), "Weights are wrong." )
             
@@ -562,7 +562,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             IndexType thisChosenDim = chosenDim[l];
 
             //partiD.size() = thisDimCuts-1 , weightPerPart.size = thisDimCuts 
-            std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1D( thisProjection, *thisDimCuts, settings);
+            std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DGreedy( thisProjection, *thisDimCuts, settings);
 
             // TODO: possibly expensive assertion
             SCAI_ASSERT( std::accumulate(thisProjection.begin(), thisProjection.end(), 0)==std::accumulate( weightPerPart.begin(), weightPerPart.end(), 0), "Weights are wrong." )
@@ -715,10 +715,9 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
 }
 //---------------------------------------------------------------------------------------
 
-//TODO: Use an optimal algorithm or maybe both and add a user parameter
 template<typename IndexType, typename ValueType>
-std::pair<std::vector<ValueType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1D( const std::vector<ValueType>& projection, const IndexType k, Settings settings){
-    SCAI_REGION("MultiSection.partition1D");
+std::pair<std::vector<ValueType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1DGreedy( const std::vector<ValueType>& projection, const IndexType k, Settings settings){
+    SCAI_REGION("MultiSection.partition1DGreedy");
     
     const IndexType dimension = settings.dimensions;
     
@@ -726,7 +725,7 @@ std::pair<std::vector<ValueType>, std::vector<ValueType>> MultiSection<IndexType
     ValueType averageWeight = totalWeight/k;
     
     if(projection.size()==0){
-        throw std::runtime_error( "In MultiSection::partition1D, input projection vector is empty");
+        throw std::runtime_error( "In MultiSection::partition1DGreedy, input projection vector is empty");
     }
 
     std::vector<ValueType> partHyperplanes(k-1,-9);
@@ -771,49 +770,63 @@ std::pair<std::vector<ValueType>, std::vector<ValueType>> MultiSection<IndexType
     return std::make_pair(partHyperplanes, weightPerPart);
 }
 //---------------------------------------------------------------------------------------
+// Based on algorithm Nicol found in Pinar, Aykanat, 2004, "Fast optimal load balancing algorithms for 1D partitioning"
+//TODO: In the same paper thers is a better, but more complicated, algorithm called Nicol+
 
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<ValueType>  MultiSection<IndexType, ValueType>::convert2Uniform(scai::lama::CSRSparseMatrix<ValueType>& input, std::vector<scai::lama::DenseVector<ValueType>>& coordinates, struct Settings settings){
-    SCAI_REGION("MultiSection.convert2Uniform");
+std::pair<std::vector<ValueType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1DOptimal( const std::vector<ValueType>& projection, const IndexType k, Settings settings){
     
-    const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
-    const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
+    const IndexType N = projection.size();
     
-    const IndexType k = settings.numBlocks;
-    const IndexType dimensions = coordinates.size();
-    const IndexType localN = inputDist->getLocalSize();
-    const IndexType globalN = inputDist->getGlobalSize();
+    //
+    //create the prefix sum array
+    //
+    std::vector<ValueType> prefixSum( N , 0);
     
-    std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
-    std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
+    prefixSum[0] = projection[0];
     
-    {
-        SCAI_REGION( "MultiSection.initialPartition.minMax" )
-        for (IndexType dim = 0; dim < dimensions; dim++) {
-            //get local parts of coordinates
-            scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
-            for (IndexType i = 0; i < localN; i++) {
-                ValueType coord = localPartOfCoords[i];
-                if (coord < minCoords[dim]) minCoords[dim] = coord;
-                if (coord > maxCoords[dim]) maxCoords[dim] = coord;
-            }
-        }
+    for(IndexType i=1; i<N; i++ ){
+        prefixSum[i] = prefixSum[i-1] + projection[i]; 
+    }
+      
+    
+    
+    
+    
+}
+//---------------------------------------------------------------------------------------
+// Search if there is a partition of weights array into k parts where the maximum weight of a part is <=target.
 
-        //communicate to get global min / max
-        for (IndexType dim = 0; dim < dimensions; dim++) {
-            minCoords[dim] = comm->min(minCoords[dim]);
-            maxCoords[dim] = comm->max(maxCoords[dim]);
+//TODO: return also the splitter found
+template<typename IndexType, typename ValueType>
+bool MultiSection<IndexType, ValueType>::probe(const std::vector<ValueType>& prefixSum, const IndexType k, const ValueType target){
+    
+    const IndexType N = prefixSum.size();
+    IndexType p = 1;
+    const IndexType offset = N/k;
+    IndexType step = offset;
+    ValueType sumOfPartition = target;
+    
+    ValueType totalWeight = prefixSum.back();
+
+    std::vector<IndexType> splitters( k-1, 0);
+    
+    while( p<k and sumOfPartition<totalWeight){
+        while( prefixSum[step]<sumOfPartition ){
+            step += offset;
+//PRINT(step);            
+            SCAI_ASSERT( step<N , "Variable step is too large: " << step);
         }
+        splitters[p-1] = std::lower_bound( prefixSum.begin()+(step-offset), prefixSum.begin()+step, sumOfPartition ) - prefixSum.begin();
+        
+        sumOfPartition = prefixSum[splitters[p-1]];
+        ++p;
     }
     
-    scai::lama::DenseVector<ValueType> ret;
-    
-    for(IndexType d=0; d<dimensions; d++){
-        IndexType resolution = maxCoords[d] / std::pow(globalN, 1.0/dimensions);
-        //PRINT0(resolution);
+    if( sumOfPartition>=totalWeight ){
+        return true;
     }
-    
-    return ret;
+    return false;
 }
 //---------------------------------------------------------------------------------------
 
@@ -1001,12 +1014,12 @@ template std::vector<std::vector<double>> MultiSection<int, double>::projection(
 template std::shared_ptr<rectCell<int,double>> MultiSection<int, double>::getRectanglesNonUniform( const scai::lama::CSRSparseMatrix<double> &input, const std::vector<scai::lama::DenseVector<int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const std::vector<double>& minCoords, const std::vector<double>& maxCoords, Settings settings);
 
 template std::vector<std::vector<double>> MultiSection<int, double>::projectionNonUniform( const std::vector<scai::lama::DenseVector<int>>& coordinates, const scai::lama::DenseVector<double>& nodeWeights, const std::shared_ptr<rectCell<int,double>> treeRoot, const std::vector<int>& dimensionToProject, Settings settings);
-
-template scai::lama::DenseVector<double>  MultiSection<int, double>::convert2Uniform(scai::lama::CSRSparseMatrix<double> &input, std::vector<scai::lama::DenseVector<double>> &coordinates, struct Settings Settings);
     
 template bool MultiSection<int, double>::inBBox( const std::vector<int>& coords, const struct rectangle& bBox);
     
-template  std::pair<std::vector<double>,std::vector<double>> MultiSection<int, double>::partition1D( const std::vector<double>& array, const int k, Settings settings);
+template  std::pair<std::vector<double>,std::vector<double>> MultiSection<int, double>::partition1DGreedy( const std::vector<double>& array, const int k, Settings settings);
+
+template  std::pair<std::vector<double>,std::vector<double>> MultiSection<int, double>::partition1DOptimal( const std::vector<double>& array, const int k, Settings settings);
 
 template double MultiSection<int, double>::getRectangleWeight( const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const int sideLen, Settings settings);
 
@@ -1016,5 +1029,6 @@ template double MultiSection<int, double>::getRectangleWeight( const std::vector
 
 template std::vector<int> MultiSection<int, double>::indexToCoords( const int ind, const int sideLen, const int dim);
 
+template bool MultiSection<int, double>::probe(const std::vector<double>& prefixSum, const int k, const double target);
 
 };

@@ -462,12 +462,11 @@ namespace ITI {
          * return.first = [ 1, 5]. Implies the partition: 0, 1 | 2, 3, 4, 5 | 6, 7, 8
          * return.second=[ 17, 15, 14]
          */
-        static std::pair<std::vector<ValueType>,std::vector<ValueType>> partition1D( const std::vector<ValueType>& array, const IndexType k, Settings settings);   
+        static std::pair<std::vector<ValueType>,std::vector<ValueType>> partition1DGreedy( const std::vector<ValueType>& array, const IndexType k, Settings settings);
         
-        /**Converts a graph with coordinates to a uniform grid. The space is divided is cubes and the weight of the cube is the
-         * sum of the weights of all the points inside the cube.
-         */
-        static scai::lama::DenseVector<ValueType> convert2Uniform(scai::lama::CSRSparseMatrix<ValueType> &input, std::vector<scai::lama::DenseVector<ValueType>> &coordinates, struct Settings Settings);
+        static std::pair<std::vector<ValueType>,std::vector<ValueType>> partition1DOptimal( const std::vector<ValueType>& array, const IndexType k, Settings settings);   
+        
+        static bool probe(const std::vector<ValueType>& prefixSum, const IndexType k, const ValueType target);
         
         /**Checks if the given index is in the given bounding box. Index corresponds to a uniform matrix given
          * as a 1D array/vector. 
