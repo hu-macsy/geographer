@@ -41,8 +41,8 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
     const IndexType dimensions = 2;
     const IndexType k = std::pow( 4, dimensions);
 
-    std::string path = "meshes/trace/";
-    std::string fileName = "trace-00010.graph";
+    std::string path = "meshes/bigtrace/";
+    std::string fileName = "bigtrace-00010.graph";
     std::string file = path + fileName;
     std::ifstream f(file);
     IndexType N, edges;
@@ -75,8 +75,8 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
         scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
         srand(time(NULL));
         for(int i=0; i<localN; i++){
-            //localPart[i] = 1;
-            localPart[i] = rand()%9+rand()%7;
+            localPart[i] = 1;
+            //localPart[i] = rand()%9+rand()%7;
             actualTotalWeight += localPart[i];         
         }
     }
@@ -116,8 +116,8 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
         SCAI_ASSERT( partitionBS.getLocalValues()[i]!=-1 , "In PE " << *comm << " local point " << i << " has no partition." );
     }
     
-    const ValueType cutMS = ParcoRepart<IndexType, ValueType>::computeCut(adjM, partitionMS, false);
-    const ValueType cutBS = ParcoRepart<IndexType, ValueType>::computeCut(adjM, partitionBS, false);
+    const ValueType cutMS = ParcoRepart<IndexType, ValueType>::computeCut(adjM, partitionMS, true);
+    const ValueType cutBS = ParcoRepart<IndexType, ValueType>::computeCut(adjM, partitionBS, true);
     
     const ValueType imbalanceMS = ParcoRepart<IndexType, ValueType>::computeImbalance(partitionMS, k);
     const ValueType imbalanceBS = ParcoRepart<IndexType, ValueType>::computeImbalance(partitionBS, k);

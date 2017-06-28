@@ -27,6 +27,7 @@
 #include "MultiLevel.h"
 #include "LocalRefinement.h"
 #include "SpectralPartition.h"
+#include "MultiSection.h"
 
 typedef double ValueType;
 typedef int IndexType;
@@ -36,7 +37,7 @@ typedef int IndexType;
  *  Examples of use:
  * 
  *  for reading from file "fileName" 
- * ./a.out --graphFile fileName --epsilon 0.05 --sfcRecursionSteps=10 --dimensions=2 --borderDepth=10  --stopAfterNoGainRounds=3 --minGainForNextGlobalRound=10
+ * ./a.out --graphFile fileName --epsilon 0.05 --minBorderNodes=10 --dimensions=2 --borderDepth=10  --stopAfterNoGainRounds=3 --minGainForNextGlobalRound=10
  * 
  * for generating a 10x20x30 mesh
  * ./a.out --generate --numX=10 --numY=20 --numZ=30 --epsilon 0.05 --sfcRecursionSteps=10 --dimensions=3 --borderDepth=10  --stopAfterNoGainRounds=3 --minGainForNextGlobalRound=10
@@ -358,6 +359,58 @@ int main(int argc, char** argv) {
         logF  << std::endl  << std::endl; 
     }
  
+ //------------------------------------------- multisection
+  
+    // the partitioning may redistribute the input graph
+    graph.redistribute(rowDistPtr, noDistPtr);
+    for(int d=0; d<dimensions; d++){
+        coordinates[d].redistribute( rowDistPtr );
+    }    
+    if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
+    
+    // unit weights
+    scai::lama::DenseVector<ValueType> nodeWeights( rowDistPtr, 1);
+    
+    beforeInitialTime =  std::chrono::system_clock::now();
+    PRINT0( "Get a partition with multisection");
+    // get a multisection partition
+    scai::lama::DenseVector<IndexType> multiSectionPartition =  MultiSection<IndexType, ValueType>::getPartitionNonUniform( graph, coordinates, nodeWeights, settings);
+    
+    partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
+    
+    assert( multiSectionPartition.size() == N);
+    assert( coordinates[0].size() == N);
+    
+    //aux::print2DGrid( graph, hilbertPartition );
+    //if(dimensions==2){
+    //    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"hilbertPart");
+    //}
+    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, multiSectionPartition);
+    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( multiSectionPartition, k);
+    if(comm->getRank()==0){
+        logF<< "-- Initial pixel partition time: " << partitionTime.count() <<  std::endl;
+        logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
+    }
+    
+    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+    //ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, multiSectionPartition, uniformWeights, coordinates, settings);
+    
+    finalPartitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
+    
+    //if(dimensions==2){
+    //   ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithHilbert");
+    //}
+    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, multiSectionPartition);
+    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( multiSectionPartition, k);
+    if(comm->getRank()==0){
+        logF<< "   After multilevel, total time: " << finalPartitionTime.count() << std::endl;
+        logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
+        logF  << std::endl  << std::endl; 
+    }
+    
+    /*
+     *  commenting out spectral, it is not correct yet
+     * 
     //------------------------------------------- spectral
     
     // the partitioning may redistribute the input graph
@@ -408,6 +461,7 @@ int main(int argc, char** argv) {
     if(comm->getRank()==0){
         std::cout<< "Output files written in " << destPath << " in file "<< logFile <<std::endl;
     }
+    */
     /*
     if (comm->getRank() == 0) {
         std::cout<< "commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");

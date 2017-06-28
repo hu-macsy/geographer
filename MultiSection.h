@@ -5,6 +5,7 @@
 //#include <scai/lama/Scalar.hpp>
 
 #include <climits>
+#include <chrono>
 
 #include "Settings.h"
 

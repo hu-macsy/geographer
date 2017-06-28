@@ -5,6 +5,8 @@
  */
 
 #include "MultiSection.h"
+#include "ParcoRepart.h"    //TODO: this is here for compute cut and imbalance. not really needed
+
 #include <numeric>
 
 namespace ITI {
@@ -20,6 +22,9 @@ namespace ITI {
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartitionNonUniform(const scai::lama::CSRSparseMatrix<ValueType> &input, const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, struct Settings settings ){ 
     SCAI_REGION("MultiSection.getPartition");
+    
+    std::chrono::time_point<std::chrono::steady_clock> start, afterMultSect;
+    start = std::chrono::steady_clock::now();
     
     const scai::dmemo::DistributionPtr inputDistPtr = input.getRowDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = inputDistPtr->getCommunicatorPtr();
@@ -74,7 +79,7 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
     }
     
     // scale= N^(1/d): this way the scaled max is N^(1/d) and this is also the maximum size of the projection arrays
-    IndexType scale = std::pow( globalN, 1.0/dim);
+    ValueType scale = std::pow( globalN, 1.0/dim);
     
     {
         SCAI_REGION( "MultiSection.getPartitionNonUniform.minMaxAndScale" )
@@ -99,24 +104,44 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
             scaledMin[d] = 0;
         }
         
+        
+        
         for (IndexType d = 0; d < dim; d++) {
+            
+            ValueType thisDimScale = scale/(maxCoords[d]-minCoords[d]);
+            ValueType thisDimMin = minCoords[d];
+            const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues(); 
+            
+            /*
+             * TODO: this code scales the coordinates a little bit faster but there is some problem in the rounding afterwards
+            
+            SCAI_REGION_START("MultiSection.getPartitionNonUniform.minMaxAndScale.lamaScale" )
+            scaledCoords[d] = (coordinates[d] - scai::lama::DenseVector<ValueType>( coordinates[d].getDistributionPtr(), minCoords[d]) );
+                       
+            scaledCoords[d] = scaledCoords[d] * thisDimScale;
+            SCAI_REGION_END("MultiSection.getPartitionNonUniform.minMaxAndScale.lamaScale" )
+            */
+            
+            SCAI_REGION_START("MultiSection.getPartitionNonUniform.minMaxAndScale.byHandScale" )
             //get local parts of coordinates
-            const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
             scai::hmemo::WriteOnlyAccess<IndexType> wScaledCoord( scaledCoords[d].getLocalValues() );
             
             SCAI_ASSERT( localN==wScaledCoord.size() , "Wrong size of local part.");
             
             for (IndexType i = 0; i < localN; i++) {
-                ValueType normalizedCoord = (localPartOfCoords[i] - minCoords[d])/(maxCoords[d]-minCoords[d]);
-                IndexType scaledCoord =  normalizedCoord * scale; 
+                ValueType normalizedCoord = localPartOfCoords[i] - thisDimMin;
+                IndexType scaledCoord =  normalizedCoord * thisDimScale; 
                 wScaledCoord[i] = scaledCoord;
                 SCAI_ASSERT( scaledCoord >=0 and scaledCoord<=scale, "Wrong scaled coordinate " << scaledCoord << " is either negative or more than "<< scale);
-                
-                if (scaledCoord < scaledMin[d]) scaledMin[d] = scaledCoord;
-                if (scaledCoord > scaledMax[d]) scaledMax[d] = scaledCoord;
+             
+                //TODO: remove scaled max and min: should be always be 0 and scale
+                //if (scaledCoord < scaledMin[d]) scaledMin[d] = scaledCoord;
+                //if (scaledCoord > scaledMax[d]) scaledMax[d] = scaledCoord;
             }
-            scaledMin[d] = comm->min( scaledMin[d] );
-            scaledMax[d] = comm->max( scaledMax[d] );      
+            SCAI_REGION_END("MultiSection.getPartitionNonUniform.minMaxAndScale.byHandScale" )
+            
+            //scaledMin[d] = comm->min( scaledMin[d] );
+            //scaledMax[d] = comm->max( scaledMax[d] );      
         }
     }
     
@@ -163,6 +188,19 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
                 std::terminate();
             }
         }
+    }
+    
+    ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut( input, partition, false);
+    ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k);
+    if (comm->getRank() == 0) {
+        afterMultSect = std::chrono::steady_clock::now();
+        std::chrono::duration<double> elapsedSeconds = afterMultSect-start;
+        if( settings.bisect ){
+            std::cout << "\033[1;36mWith Bisection (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
+        }else{
+            std::cout << "\033[1;36mWith MultiSection (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
+        }
+        std::cout<< "and imbalance= "<< imbalance << "\033[0m" << std::endl;
     }
     
     return partition;
@@ -491,7 +529,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     if( !settings.bisect ){
         numCuts = std::vector<IndexType>( dim, intSqrtK );
     }else{        
-        SCAI_ASSERT( k && !(k & (k-1)) , "k is not a power of 2 and this is required for now");  
+        SCAI_ASSERT( k && !(k & (k-1)) , "k is not a power of 2 and this is required for now for bisection");  
         numCuts = std::vector<IndexType>( log2(k) , 2 );
     }
     
