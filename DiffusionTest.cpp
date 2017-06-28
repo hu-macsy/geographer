@@ -90,5 +90,21 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 	DenseMatrix<ValueType> potentials = Diffusion<IndexType, ValueType>::multiplePotentials(L, nodeWeights, landmarks);
 	ASSERT_EQ(numLandmarks, potentials.getNumRows());
 	ASSERT_EQ(n, potentials.getNumColumns());
+
+	std::vector<DenseVector<ValueType> > convertedCoords(numLandmarks);
+	for (IndexType i = 0; i < numLandmarks; i++) {
+		convertedCoords[i] = DenseVector<ValueType>(n,0);
+		potentials.getLocalRow(convertedCoords[i].getLocalValues(), i);
+	}
+	FileIO<IndexType, ValueType>::writeCoords(convertedCoords, "diffusion-coords.xyz");
+
+}
+
+TEST_F(DiffusionTest, testConstructFJLTMatrix) {
+	const ValueType epsilon = 0.1;
+	const IndexType n = 1000000000;
+	const IndexType origDimension = 2100;
+	CSRSparseMatrix<ValueType> fjlt = Diffusion<IndexType, ValueType>::constructFJLTMatrix(epsilon, n, origDimension);
+	EXPECT_EQ(origDimension, fjlt.getLocalNumColumns());
 }
 } /* namespace ITI */

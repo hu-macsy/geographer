@@ -6,6 +6,7 @@
  */
 #include <assert.h>
 #include <vector>
+#include <random>
 
 #include <scai/hmemo/ReadAccess.hpp>
 #include <scai/hmemo/WriteAccess.hpp>
@@ -23,6 +24,8 @@ using scai::lama::DIAStorage;
 using scai::lama::DenseMatrix;
 using scai::lama::DenseStorage;
 using scai::lama::Scalar;
+using scai::hmemo::ReadAccess;
+using scai::hmemo::WriteAccess;
 
 template<typename IndexType, typename ValueType>
 DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSRSparseMatrix<ValueType> laplacian, DenseVector<IndexType> nodeWeights, IndexType source) {
@@ -71,8 +74,6 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSR
 
 template<typename IndexType, typename ValueType>
 DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(scai::lama::CSRSparseMatrix<ValueType> laplacian, scai::lama::DenseVector<IndexType> nodeWeights, std::vector<IndexType> sources) {
-	using scai::hmemo::ReadAccess;
-	using scai::hmemo::WriteAccess;
 	using scai::hmemo::HArray;
 
 	const IndexType l = sources.size();
@@ -99,8 +100,6 @@ DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(scai:
 template<typename IndexType, typename ValueType>
 CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(CSRSparseMatrix<ValueType> graph) {
 	using scai::lama::CSRStorage;
-	using scai::hmemo::ReadAccess;
-	using scai::hmemo::WriteAccess;
 	using scai::hmemo::HArray;
 	using std::vector;
 
@@ -149,7 +148,77 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 	return result;
 }
 
+template<typename IndexType, typename ValueType>
+CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension) {
+	using scai::hmemo::HArray;
+
+	const IndexType magicConstant = 0.1;
+	const ValueType logn = std::log(n);
+	const IndexType targetDimension = magicConstant * std::pow(epsilon, -2)*logn;
+
+	if (origDimension <= targetDimension) {
+		//better to just return the identity
+		std::cout << "Target dimension " << targetDimension << " is higher than original dimension " << origDimension << ". Returning identity instead." << std::endl;
+		DIASparseMatrix<ValueType> D(DIAStorage<ValueType>(origDimension, origDimension, 1, HArray<IndexType>(1,0), HArray<ValueType>(origDimension, 1)));
+		return CSRSparseMatrix<ValueType>(D);
+	}
+
+	const IndexType p = 2;
+	ValueType q = std::min((std::pow(epsilon, p-2)*std::pow(logn,p))/origDimension, 1.0);
+
+	std::default_random_engine generator;
+	std::normal_distribution<ValueType> gauss(0,q);
+	std::uniform_real_distribution<ValueType> unit_interval(0.0,1.0);
+
+	DenseMatrix<ValueType> P(targetDimension, origDimension);
+	{
+		WriteAccess<ValueType> wP(P.getLocalStorage().getData());
+		for (IndexType i = 0; i < targetDimension*origDimension; i++) {
+			if (unit_interval(generator) < q) {
+				wP[i] = gauss(generator);
+			} else {
+				wP[i] = 0;
+			}
+		}
+	}
+
+	DenseMatrix<ValueType> H = constructHadamardMatrix(origDimension);
+
+	DIASparseMatrix<ValueType> D(origDimension,origDimension);
+	HArray<ValueType> randomDiagonal(origDimension);
+	{
+		WriteAccess<ValueType> wDiagonal(randomDiagonal);
+		//the following can definitely be optimized
+		for (IndexType i = 0; i < origDimension; i++) {
+			wDiagonal[i] = 1-2*(rand() ^ 1);
+		}
+	}
+	DIAStorage<ValueType> dstor(origDimension, origDimension, 1, HArray<IndexType>(1,0), randomDiagonal );
+	D.swapLocalStorage(dstor);
+	DenseMatrix<ValueType> Ddense(D);
+
+	DenseMatrix<ValueType> PH(P*H);
+	DenseMatrix<ValueType> denseTemp(PH*Ddense);
+	return CSRSparseMatrix<ValueType>(denseTemp);
+}
+
+template<typename IndexType, typename ValueType>
+DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructHadamardMatrix(IndexType d) {
+	const ValueType scalingFactor = 1/sqrt(d);
+	DenseMatrix<ValueType> result(d,d);
+	WriteAccess<ValueType> wResult(result.getLocalStorage().getData());
+	for (IndexType i = 0; i < d; i++) {
+		for (IndexType j = 0; j < d; j++) {
+			IndexType dotProduct = (i-1) ^ (j-1);
+			IndexType entry = 1-2*(dotProduct & 1);
+			wResult[i*d+j] = scalingFactor*entry;
+		}
+	}
+	return result;
+}
+
 template CSRSparseMatrix<double> Diffusion<int, double>::constructLaplacian(CSRSparseMatrix<double> graph);
+template CSRSparseMatrix<double> Diffusion<int, double>::constructFJLTMatrix(double epsilon, int n, int origDimension);
 template DenseVector<double> Diffusion<int, double>::potentialsFromSource(CSRSparseMatrix<double> laplacian, DenseVector<int> nodeWeights, int source);
 template DenseMatrix<double> Diffusion<int, double>::multiplePotentials(CSRSparseMatrix<double> laplacian, DenseVector<int> nodeWeights, std::vector<int> sources);
 

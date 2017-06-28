@@ -41,6 +41,9 @@ public:
 	    }
 	    return begin;
 	}
+
+	static scai::lama::CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension);
+	static scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d);
 };
 
 } /* namespace ITI */
