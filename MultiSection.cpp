@@ -160,6 +160,7 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
                 wLocalPart[i] = root->getContainingLeaf( point )->getLeafID();
             }catch( const std::logic_error& e ){
                 PRINT0( e.what() );
+                std::terminate();
             }
         }
     }
@@ -381,18 +382,26 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
             SCAI_REGION_END("MultiSection.projection.localProjection.indexAndCopyCoords");
             
             // a pointer to the cell that contains point i
-            SCAI_REGION_START("MultiSection.projection.localProjection.contains");
+            //SCAI_REGION_START("MultiSection.projection.localProjection.contains");
             std::shared_ptr<rectCell<IndexType,ValueType>> thisRectCell;
             
             //TODO: in the partition this should not happen. But it may happen in a more general case
             // if this point is not contained in any rectangle
             try{
-                 thisRectCell = treeRoot->getContainingLeaf( coordsVal );
+                SCAI_REGION("MultiSection.projection.localProjection.contains");
+                thisRectCell = treeRoot->getContainingLeaf( coordsVal );
             }
             catch( const std::logic_error& e){
-                PRINT0("Function getContainingLeaf returns an " << e.what() << " exception");
+                PRINT(*comm <<": Function getContainingLeaf returns an " << e.what() << " exception");
+                for( int d=0; d<dimension; d++)
+                    std::cout<< coords[d] << ", ";
+                std::cout<< std::endl;
+                //std::cout<< std::endl << " and root:"<< std::endl;
+                //treeRoot->getRect().print();
+                continue;   
+                //std::terminate();   // not allowed in our case
             }
-            SCAI_REGION_END("MultiSection.projection.localProjection.contains");
+            //SCAI_REGION_END("MultiSection.projection.localProjection.contains");
             
             IndexType thisLeafID = thisRectCell->getLeafID();
             SCAI_ASSERT( thisLeafID!=-1, "leafID for containing rectCell must be >0");
@@ -689,7 +698,12 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
                 thisRectCell = treeRoot->getContainingLeaf( coords );
             }
             catch( const std::logic_error& e){
-                PRINT0("Function getContainingLeaf returns an " << e.what() << " exception");
+                PRINT("Function getContainingLeaf returns an " << e.what() << " exception for point: ");
+                for( int d=0; d<dimension; d++)
+                    std::cout<< coords[d] << ", ";
+                std::cout<< std::endl << " and root:"<< std::endl;
+                treeRoot->getRect().print();
+                std::terminate();   // not allowed in our case
             }
             SCAI_REGION_END("MultiSection.projectionNonUniform.localProjection.contains");
             

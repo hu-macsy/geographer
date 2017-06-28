@@ -633,7 +633,7 @@ TEST_F(MultiSectionTest, testGetRectangleWeight){
 TEST_F(MultiSectionTest, test1DProjection){
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    IndexType sideLen = 10;
+    IndexType sideLen = 5;
     IndexType dim = 3;
     IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -654,8 +654,10 @@ TEST_F(MultiSectionTest, test1DProjection){
     for(int d=0; d<dim; d++){
         rectangle bBox;
         // for all dimensions i: bottom[i]<top[i] 
-        bBox.bottom = {1, 1, 2};
-        bBox.top =    {8, 10, 9};
+        // WARNING: this test case throw Point out of bounds exception
+        bBox.bottom = {0, 0, 0};
+        bBox.top =    {5, 5, 4};
+        
         // create the root of the tree that contains the whole grid
         std::shared_ptr<rectCell<IndexType,ValueType>> root( new rectCell<IndexType,ValueType>(bBox) );
         

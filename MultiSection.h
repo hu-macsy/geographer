@@ -177,7 +177,7 @@ namespace ITI {
                 //TODO: just throw exception or insert assertion to ensure point is within bounds?
                 if(point[d]>=myRect.top[d] or  point[d]<myRect.bottom[d]){
                     //return NULL;
-                    throw std::logic_error("Null pointer");
+                    throw std::logic_error("Point out of bounds");
                 }
             }
             //TODO: remove variable ret or not?
