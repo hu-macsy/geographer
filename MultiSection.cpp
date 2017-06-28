@@ -13,7 +13,7 @@ namespace ITI {
 //TODO: Find numbers k1,k2,...,kd such that k1*k2*...*kd=k to perform multisection
 //TODO(?): Enforce initial partition and keep track which PEs need to communicate for each projection
 //TODO(?): Add an optimal algorithm for 1D partition
-//TODO(kind of): Keep in mind semi-strucutured grids
+//TODO(kind of): Keep in mind semi-structured grids
     
 
 
@@ -65,7 +65,7 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
     // scale the local coordinates so the projections are not too big and relative to the input size
     //
     //TODO: since we scale only the local part, this can be turned into a vector<vector<T>>
-    //TODO: assert if scaledMin and scaledMax are always 0 and scale respectivelly
+    //TODO: assert if scaledMin and scaledMax are always 0 and scale respectively
     std::vector<scai::lama::DenseVector<IndexType>> scaledCoords(dim);
     
     for(IndexType d=0; d<dim; d++){

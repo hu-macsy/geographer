@@ -43,7 +43,7 @@ namespace ITI {
             std::cout<< std::endl;
         }
         
-        /** Checks if this rectangle resides entirelly in the given rectangle: 
+        /** Checks if this rectangle resides entirely in the given rectangle:
          * for all dimensions i< d:  
          * this.bottom[i]> outer.bottom[i] and this.top[i]< outer.top[i]
          */
@@ -339,27 +339,27 @@ namespace ITI {
          * @param[in] sideLen The length of the side of the whole uniform, square grid.
          * @param[in] setting A settigns struct passing various arguments.
          * 
-         * @return A pointer to the root of the tree. number of lleaves = settings.numBlocks.
+         * @return A pointer to the root of the tree. number of leaves = settings.numBlocks.
          */
         static std::shared_ptr<rectCell<IndexType,ValueType>> getRectangles( const scai::lama::DenseVector<ValueType>& nodeWeights, const IndexType sideLen, Settings settings);
         
         /** Calculates the projection of all points in the bounding box (bBox) in the given dimension. Every PE
          *  creates an array of appropriate length, calculates the projection for its local coords and then
-         *  calls a all2all sum routine. We assume a uniform grid so the exact coordinates can be infered just
+         *  calls a all2all sum routine. We assume a uniform grid so the exact coordinates can be inferred just
          *  by the index of the -nodeWeights- vector.
          * 
          * @param[in] nodeWeights The weights for each point.
          * @param[in] treeRoot The root of the tree that contains all current rectangles for which we get the projections. We only calculate the projections for the leaf nodes.
          * @param[in] dimensiontoProject A vector of size treeRoot.getNumLeaves(). dimensionsToProject[i]= the dimension in which we wish to project the weights for rectangle/leaf i. Should be more or equal to 0 and less than d (where d are the total dimensions).
          * @param[in] sideLen The length of the side of the whole uniform, square grid.
-         * @param[in] setting A settigns struct passing various arguments.
-         * @return Return an vector where in each position is the sum of the weights of the corespondig coordianate (not the same).
+         * @param[in] setting A settings struct passing various arguments.
+         * @return Return a vector where in each position is the sum of the weights of the corresponding coordinate (not the same).
 
          * Example: bBox={(5,10),(8,15)} and dimensionToProject=0 (=x). Then the return vector has size |8-5|=3. return[0] is the sum of the coordinates in the bBox which have their 0-coordinate equal to 5, return[1] fot he points with 0-coordinate equal to 3 etc. If dimensionToProject=1 then return vector has size |10-15|=5.
          */
         static std::vector<std::vector<ValueType>> projection( const scai::lama::DenseVector<ValueType>& nodeWeights, const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot, const std::vector<IndexType>& dimensionToProject, const IndexType sideLen, Settings settings );
         
-        //TODO: Let coordianted be of Valuetype and round inside the function if needed.
+        //TODO: Let coordinates be of ValueType and round inside the function if needed.
         
         /** Get a tree of rectangles for a non-uniform grid.
          * 
@@ -368,7 +368,7 @@ namespace ITI {
          * @param[in] nodeWeights The weights for each point.
          * @param[in] minCoords The minimum coordinate on each dimensions. minCoords.size()= dimensions
          * @param[in] maxCoords The maximum coordinate on each dimensions. maxCoords.size()= dimensions
-         * @param[in] setting A settigns struct passing various arguments.
+         * @param[in] setting A settings struct passing various arguments.
          * @return A pointer to the root of the tree. The leaves of the tree are the rewuested rectangles.
          */
         
@@ -416,7 +416,7 @@ namespace ITI {
          */
         static bool inBBox( const std::vector<IndexType>& coords, const struct rectangle& bBox);
         
-        /** Calculates the wwight of the rentangle.
+        /** Calculates the weight of the rectangle.
          * 
          * @param[in] nodeWeights The weights for each point.
          * @param[in] bBox The bounding box/rectangle in which we wish to calculate the projection. For all dimensions, bBox.bottom[i]< bBox.top[i]
