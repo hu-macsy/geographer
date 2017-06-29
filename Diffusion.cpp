@@ -53,7 +53,7 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSR
 
 	DenseVector<ValueType> solution( n, 0.0 );
 
-	const IndexType maxIter = 20;
+	const IndexType maxIter = 200;
 	const ValueType eps        = 1e-5;
 
 	NormPtr norm( new L2Norm() );
