@@ -104,8 +104,6 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
             scaledMin[d] = 0;
         }
         
-        
-        
         for (IndexType d = 0; d < dim; d++) {
             
             ValueType thisDimScale = scale/(maxCoords[d]-minCoords[d]);
@@ -117,7 +115,6 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
             
             SCAI_REGION_START("MultiSection.getPartitionNonUniform.minMaxAndScale.lamaScale" )
             scaledCoords[d] = (coordinates[d] - scai::lama::DenseVector<ValueType>( coordinates[d].getDistributionPtr(), minCoords[d]) );
-                       
             scaledCoords[d] = scaledCoords[d] * thisDimScale;
             SCAI_REGION_END("MultiSection.getPartitionNonUniform.minMaxAndScale.lamaScale" )
             */
@@ -317,8 +314,8 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         for(int l=0; l<numLeaves; l++){        
             SCAI_REGION("MultiSection.getRectangles.createRectanglesAndPush");
             //perform 1D partitioning for the chosen dimension
-            std::vector<ValueType> part1D, weightPerPart;
-            std::vector<ValueType> thisProjection = projections[l];
+            std::vector<IndexType> part1D;
+            std::vector<ValueType> weightPerPart, thisProjection = projections[l];
             std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DGreedy( thisProjection, *thisDimCuts, settings);
             // TODO: possibly expensive assertion
             SCAI_ASSERT( std::accumulate(thisProjection.begin(), thisProjection.end(), 0)==std::accumulate( weightPerPart.begin(), weightPerPart.end(), 0), "Weights are wrong." )
@@ -613,8 +610,8 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         for(int l=0; l<numLeaves; l++){        
             SCAI_REGION("MultiSection.getRectanglesNonUniform.createRectanglesAndPush");
             //perform 1D partitioning for the chosen dimension
-            std::vector<ValueType> part1D, weightPerPart;
-            std::vector<ValueType> thisProjection = projections[l];
+            std::vector<IndexType> part1D;
+            std::vector<ValueType> weightPerPart, thisProjection = projections[l];
             IndexType thisChosenDim = chosenDim[l];
 
             //partiD.size() = thisDimCuts-1 , weightPerPart.size = thisDimCuts 
@@ -780,7 +777,7 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::pair<std::vector<ValueType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1DGreedy( const std::vector<ValueType>& projection, const IndexType k, Settings settings){
+std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1DGreedy( const std::vector<ValueType>& projection, const IndexType k, Settings settings){
     SCAI_REGION("MultiSection.partition1DGreedy");
     
     const IndexType dimension = settings.dimensions;
@@ -792,7 +789,7 @@ std::pair<std::vector<ValueType>, std::vector<ValueType>> MultiSection<IndexType
         throw std::runtime_error( "In MultiSection::partition1DGreedy, input projection vector is empty");
     }
 
-    std::vector<ValueType> partHyperplanes(k-1,-9);
+    std::vector<IndexType> partHyperplanes(k-1,-9);
     std::vector<ValueType> weightPerPart(k,-9);
     IndexType part=0;
     ValueType thisPartWeight = 0;
@@ -810,14 +807,14 @@ std::pair<std::vector<ValueType>, std::vector<ValueType>> MultiSection<IndexType
             // choose between keeping the projection[i] in the sum, having something more than the average
             // or do not add projection[i] and get something below average
             if( averageWeight-(thisPartWeight-projection[i]) < thisPartWeight-averageWeight ){
-                ValueType hyperplane = i-1;
+                IndexType hyperplane = i-1;
                 partHyperplanes[part]= hyperplane;
                 // calculate new total weight left and new average weight
                 totalWeight = totalWeight - thisPartWeight + projection[i];
                 weightPerPart[part] = thisPartWeight - projection[i];                
                 --i;
             }else{  // choose solution that is more than the average
-                ValueType hyperplane = i;
+                IndexType hyperplane = i;
                 partHyperplanes[part]= hyperplane;
                 // calculate new total weight left and new average weight
                 totalWeight = totalWeight - thisPartWeight;
@@ -838,25 +835,60 @@ std::pair<std::vector<ValueType>, std::vector<ValueType>> MultiSection<IndexType
 //TODO: In the same paper thers is a better, but more complicated, algorithm called Nicol+
 
 template<typename IndexType, typename ValueType>
-std::pair<std::vector<ValueType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1DOptimal( const std::vector<ValueType>& projection, const IndexType k, Settings settings){
+std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1DOptimal( const std::vector<ValueType>& nodeWeights, const IndexType k, Settings settings){
     
-    const IndexType N = projection.size();
+    const IndexType N = nodeWeights.size();
     
     //
     //create the prefix sum array
     //
     std::vector<ValueType> prefixSum( N , 0);
     
-    prefixSum[0] = projection[0];
+    prefixSum[0] = nodeWeights[0];
     
     for(IndexType i=1; i<N; i++ ){
-        prefixSum[i] = prefixSum[i-1] + projection[i]; 
+        prefixSum[i] = prefixSum[i-1] + nodeWeights[i]; 
     }
-      
     
+    ValueType totalWeight = prefixSum.back();
     
+    ValueType lowerBound, upperBound;
+    lowerBound = totalWeight/k;         // the optimal average weight
+    upperBound = totalWeight;
     
+    std::vector<IndexType> partIndices(k, -9);
+    std::vector<ValueType> weightPerPart(k, -9);
+    partIndices[0]=0;
     
+    for(IndexType p=1; p<k; p++){
+        //IndexType indexLow = p==0 ? 0 : partIndices[p-1];
+        IndexType indexLow = partIndices[p-1];
+        IndexType indexHigh = N;
+        while( indexLow<indexHigh ){
+            IndexType indexMid = (indexLow+indexHigh)/2;
+            ValueType tmpSum = prefixSum[indexMid] - prefixSum[partIndices[p-1]-1];
+            if( lowerBound<tmpSum and tmpSum<upperBound){
+                if( probe(prefixSum, k, tmpSum) ){
+                    indexHigh = indexMid;
+                    upperBound = tmpSum;
+                }else{
+                    indexLow = indexMid+1;
+                    lowerBound = tmpSum;
+                }
+            }else if(tmpSum>=upperBound){
+                indexHigh = indexMid;
+            }else{
+                indexLow=indexMid+1;
+            }
+        }
+        
+        partIndices[p] = indexHigh;
+        weightPerPart[p-1] = prefixSum[indexHigh] - prefixSum[partIndices[p-1]/*-1*/];
+    }
+    
+    weightPerPart[k-1] = totalWeight - prefixSum[ partIndices.back()-1 ];
+    
+    return std::make_pair(partIndices, weightPerPart);
 }
 //---------------------------------------------------------------------------------------
 // Search if there is a partition of weights array into k parts where the maximum weight of a part is <=target.
@@ -959,40 +991,8 @@ ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const scai::la
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vector<scai::lama::DenseVector<ValueType>>& coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings){
-    SCAI_REGION("MultiSection.getRectangleWeight");
-    
-    const scai::dmemo::DistributionPtr inputDist = nodeWeights.getDistributionPtr();
-    const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
-    const IndexType localN = inputDist->getLocalSize();
-    
-    const IndexType dimension = bBox.top.size();
-    ValueType localWeight=0;
-    
-    {
-        SCAI_REGION("MultiSection.getRectangleWeight.localWeight");
-        scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights.getLocalValues() );
-        
-        for(int i=0; i<localN; i++){
-            std::vector<IndexType> coords;
-            for(int d=0; d<dimension; d++){
-                coords.push_back( coordinates[d].getLocalValues()[i] );
-                //TODO: remove assertion, probably not needed
-                SCAI_ASSERT( coords.back()<maxCoords[d], "Coordinate too big, coords.back()= " << coords.back() << " , maxCoords[d]= "<< maxCoords[d] );
-            }
-            if( inBBox(coords, bBox) ){ 
-                localWeight += localWeights[i];
-            }
-        }
-    }
-    
-    // sum all local weights
-    return comm->sum(localWeight);
-}
-//---------------------------------------------------------------------------------------
-
-template<typename IndexType, typename ValueType>
-ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vector<scai::lama::DenseVector<IndexType>>& coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings){
+template<typename T>
+ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vector<scai::lama::DenseVector<T>>& coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings){
     SCAI_REGION("MultiSection.getRectangleWeight");
     
     const scai::dmemo::DistributionPtr inputDist = nodeWeights.getDistributionPtr();
@@ -1087,15 +1087,15 @@ template std::vector<std::vector<double>> MultiSection<int, double>::projectionN
     
 template bool MultiSection<int, double>::inBBox( const std::vector<int>& coords, const struct rectangle& bBox);
     
-template  std::pair<std::vector<double>,std::vector<double>> MultiSection<int, double>::partition1DGreedy( const std::vector<double>& array, const int k, Settings settings);
+template  std::pair<std::vector<int>,std::vector<double>> MultiSection<int, double>::partition1DGreedy( const std::vector<double>& array, const int k, Settings settings);
 
-template  std::pair<std::vector<double>,std::vector<double>> MultiSection<int, double>::partition1DOptimal( const std::vector<double>& array, const int k, Settings settings);
+template  std::pair<std::vector<int>,std::vector<double>> MultiSection<int, double>::partition1DOptimal( const std::vector<double>& array, const int k, Settings settings);
 
 template double MultiSection<int, double>::getRectangleWeight( const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const int sideLen, Settings settings);
 
-template double MultiSection<int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<double>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
-
 template double MultiSection<int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
+
+template double MultiSection<int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<double>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
 
 template std::vector<int> MultiSection<int, double>::indexToCoords( const int ind, const int sideLen, const int dim);
 

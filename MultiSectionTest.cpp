@@ -233,7 +233,7 @@ TEST_F(MultiSectionTest, testGetRectangles){
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(MultiSectionTest, test1DPartition){
+TEST_F(MultiSectionTest, test1DPartitionGreedy){
  
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     IndexType sideLen= 20;
@@ -276,7 +276,8 @@ TEST_F(MultiSectionTest, test1DPartition){
         std::vector<std::vector<ValueType>> projection = MultiSection<IndexType, ValueType>::projection( nodeWeights, root, dim2proj, sideLen, settings);
 
         for( int proj=0; proj<projection.size(); proj++){
-            std::vector<ValueType> part1D, weightPerPart;
+            std::vector<ValueType> weightPerPart;
+            std::vector<IndexType> part1D;
             std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DGreedy( projection[proj],  k1, settings);
             
             //assertions - checks - prints
@@ -334,11 +335,138 @@ TEST_F(MultiSectionTest, test1DPartition){
 //---------------------------------------------------------------------------------------
 
 TEST_F(MultiSectionTest, test1DPartitionOptimal){
+ 
+    const IndexType N= 100;
+    const ValueType w= 5;
+    const IndexType k= 7;
+    
+    std::vector<ValueType> nodeWeights( N, w);
+    
+    ValueType origTotalWeight = N*w;
+    
+    std::vector<ValueType> weightPerPart;
+    std::vector<IndexType> part1D;
+    
+    Settings settings;
+    
+    //get optimal 1D partitioning
+    std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( nodeWeights, k, settings);
+    
+    //assertions - prints
+    
+    SCAI_ASSERT( part1D.size()==weightPerPart.size() , "Wrong size of returned vectors: part1D.size()= " << part1D.size() << " and weightPerPart.size()= "<< weightPerPart.size());
+    
+    for(int i=0; i<part1D.size()-1; i++){
+        PRINT( i << ": from ["<< part1D[i] << " to " << part1D[i+1] <<") with weight " << weightPerPart[i]);
+    }
+    PRINT(k-1 << ": from ["<< part1D.back() << " to " << N << ") with weight " << weightPerPart.back() );
+    
+    ValueType totalWeight = std::accumulate(weightPerPart.begin(), weightPerPart.end(), 0);
+    ValueType averageWeight = totalWeight/k;
+        
+    SCAI_ASSERT( totalWeight==origTotalWeight, "totalWeight= "<< totalWeight << " should be= "<< origTotalWeight );
+    
     
     
 }
 //---------------------------------------------------------------------------------------
 
+/*
+TEST_F(MultiSectionTest, test1DPartitionOptimal){
+ 
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    IndexType sideLen= 20;
+    IndexType dim = 2;
+    IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
+    scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
+    IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
+    
+    ValueType origTotalWeight = 0;
+    
+    {
+        scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
+        srand(time(NULL));
+        for(int i=0; i<localN; i++){
+            localPart[i] = 1;
+            //localPart[i] = rand()%4*comm->getRank()+2;
+            origTotalWeight += localPart[i];
+        }
+    }
+    
+    origTotalWeight = comm->sum(origTotalWeight);
+    
+    IndexType k1= 5;
+    
+    Settings settings;
+    settings.dimensions = dim;
+    
+    rectangle bBox;
+    bBox.bottom = {0,0};
+    bBox.top = { (ValueType) sideLen, (ValueType) sideLen};
+    // create the root of the tree that contains the whole grid
+    std::shared_ptr<rectCell<IndexType,ValueType>> root( new rectCell<IndexType,ValueType>(bBox) );
+
+    // the 1D partition for all dimensions
+    for( int dimensionToPartition=0; dimensionToPartition<dim; dimensionToPartition++){
+        std::vector<IndexType> dim2proj = {dimensionToPartition};
+        
+        // get the projection in one dimension
+        std::vector<std::vector<ValueType>> projection = MultiSection<IndexType, ValueType>::projection( nodeWeights, root, dim2proj, sideLen, settings);
+
+        for( int proj=0; proj<projection.size(); proj++){
+            std::vector<ValueType> weightPerPart;
+            std::vector<IndexType> part1D;
+            std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( projection[proj],  k1, settings);
+            
+            //assertions - checks - prints
+            
+            SCAI_ASSERT( !std::is_sorted(part1D.end(), part1D.begin()) , "part1D is not sorted" );
+            for(int i=0; i<part1D.size(); i++){
+                SCAI_ASSERT( part1D[i]>=0, "Wrong partition index " << part1D[i] << " in position "<< i );
+                SCAI_ASSERT( part1D[i]<sideLen, "Wrong partition index " << part1D[i] << " in position "<< i );
+                if(i+1<part1D.size()){
+                    SCAI_ASSERT( part1D[i]!=part1D[i+1], "part1D[i]== part1D[i+1]== " << part1D[i] << ". Maybe this should not happen");
+                }
+            }
+            
+            // vectors are of expected size
+            SCAI_ASSERT( part1D.size()==k1-1, "part1D.size()= "<< part1D.size() << " and is should be = " << k1 -1);
+            SCAI_ASSERT( weightPerPart.size()==k1, "weightPerPart.size()= "<< weightPerPart.size() << " and is should be = " << k1 );
+            
+            // calculate min and max weights
+            ValueType minWeight=LONG_MAX, maxWeight=0;
+            for(int i=0; i<weightPerPart.size(); i++){
+                if( weightPerPart[i]<minWeight ){
+                    minWeight = weightPerPart[i];
+                }
+                if( weightPerPart[i]>maxWeight ){
+                    maxWeight = weightPerPart[i];
+                }
+            }
+            
+            ValueType maxOverMin = maxWeight/minWeight;
+            PRINT0("max weight / min weight = "<< maxOverMin);
+            
+            ValueType totalWeight = std::accumulate(weightPerPart.begin(), weightPerPart.end(), 0);
+            ValueType averageWeight = totalWeight/k1;
+        
+            SCAI_ASSERT( totalWeight==origTotalWeight, "totalWeight= "<< totalWeight << " should be= "<< origTotalWeight );
+            
+            PRINT0("max weight / average =" << maxWeight/averageWeight<< " , min / average =" << minWeight/averageWeight);
+            PRINT0("Average weight= "<< averageWeight);
+            
+            // print weigths for each part
+            for(int i=0; i<weightPerPart.size(); i++){
+                PRINT0("part "<< i <<" weight: "<< weightPerPart[i]);
+            }    
+           
+        }
+        // TODO: add more tests
+    }
+}
+//---------------------------------------------------------------------------------------
+*/
 TEST_F(MultiSectionTest, testProbeFunction ){
     
     const IndexType N = 540;

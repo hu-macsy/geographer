@@ -402,9 +402,9 @@ namespace ITI {
          * return.first = [ 1, 5]. Implies the partition: 0, 1 | 2, 3, 4, 5 | 6, 7, 8
          * return.second=[ 17, 15, 14]
          */
-        static std::pair<std::vector<ValueType>,std::vector<ValueType>> partition1DGreedy( const std::vector<ValueType>& array, const IndexType k, Settings settings);
+        static std::pair<std::vector<IndexType>,std::vector<ValueType>> partition1DGreedy( const std::vector<ValueType>& array, const IndexType k, Settings settings);
         
-        static std::pair<std::vector<ValueType>,std::vector<ValueType>> partition1DOptimal( const std::vector<ValueType>& array, const IndexType k, Settings settings);   
+        static std::pair<std::vector<IndexType>,std::vector<ValueType>> partition1DOptimal( const std::vector<ValueType>& array, const IndexType k, Settings settings);   
         
         static bool probe(const std::vector<ValueType>& prefixSum, const IndexType k, const ValueType target);
         
@@ -429,11 +429,8 @@ namespace ITI {
         
         /* Overloaded version for the non-uniform grid that also takes as input the coordinates.
          */
-        static ValueType getRectangleWeight( const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
-        
-        /* Overloaded version for the non-uniform grid with IndexType coordinates.
-         */
-        static ValueType getRectangleWeight( const std::vector<scai::lama::DenseVector<IndexType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);        
+        template<typename T>
+        static ValueType getRectangleWeight( const std::vector<scai::lama::DenseVector<T>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
         
         /** Function to transform a 1D index to 2D or 3D given the side length of the cubical grid.
          * For example, in a 4x4 grid, indexTo2D(1)=(0,1), indexTo2D(4)=(1,0) and indexTo2D(13)=(3,1)
