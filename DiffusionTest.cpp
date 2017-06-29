@@ -85,7 +85,7 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 	Diffusion<IndexType, ValueType>::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), numLandmarks);
 
 	std::vector<IndexType> landmarks(numLandmarks);
-	std::copy(nodeIndices.begin(), nodeIndices.begin()+10, landmarks.begin());
+	std::copy(nodeIndices.begin(), nodeIndices.begin()+numLandmarks, landmarks.begin());
 
 	DenseMatrix<ValueType> potentials = Diffusion<IndexType, ValueType>::multiplePotentials(L, nodeWeights, landmarks);
 	ASSERT_EQ(numLandmarks, potentials.getNumRows());
@@ -102,8 +102,8 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 
 TEST_F(DiffusionTest, testConstructFJLTMatrix) {
 	const ValueType epsilon = 0.1;
-	const IndexType n = 1000000000;
-	const IndexType origDimension = 2100;
+	const IndexType n = 10000;
+	const IndexType origDimension = 20;
 	CSRSparseMatrix<ValueType> fjlt = Diffusion<IndexType, ValueType>::constructFJLTMatrix(epsilon, n, origDimension);
 	EXPECT_EQ(origDimension, fjlt.getLocalNumColumns());
 }
