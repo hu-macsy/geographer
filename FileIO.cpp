@@ -152,8 +152,8 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
 		}
 
 	}
-	assert(maybeCopy[0].getDistributionPtr()->isReplicated());
-	assert(maybeCopy[0].size() == n);
+	assert(targetReference[0].getDistributionPtr()->isReplicated());
+	assert(targetReference[0].size() == n);
 
 	if (comm->getRank() == 0) {
 		std::ofstream filehandle(filename);
