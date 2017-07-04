@@ -31,6 +31,8 @@
 #include "SpectralPartition.h"
 #include "AuxiliaryFunctions.h"
 
+using scai::lama::Scalar;
+
 namespace ITI {
 
 template<typename IndexType, typename ValueType>

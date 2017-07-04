@@ -20,8 +20,8 @@
 #include "LocalRefinement.h"
 #include "Settings.h"
 
-
-using namespace scai::lama;     // for CSRSparseMatrix and DenseVector
+using scai::lama::CSRSparseMatrix;
+using scai::lama::DenseVector;
 
 namespace ITI{
     
