@@ -354,6 +354,9 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
     //read local range
     for (IndexType i = 0; i < localN; i++) {
 		bool read = std::getline(file, line).good();
+		if (!read) {
+			throw std::runtime_error("Unexpected end of coordinate file. Was the number of nodes correct?");
+		}
 		assert(read);//if we have read past the end of the file, the node count was incorrect
 		std::stringstream ss( line );
 		std::string item;
@@ -369,10 +372,16 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 		}
     }
 
+    if (endLocalRange == globalN) {
+    	bool eof = std::getline(file, line).eof();
+    	if (!eof) {
+    		throw std::runtime_error(std::to_string(numberOfPoints) + " coordinates read, but file continues.");
+    	}
+    }
+
     std::vector<DenseVector<ValueType> > result(dimension);
 
     for (IndexType i = 0; i < dimension; i++) {
-    	//result[i] = DenseVector<ValueType>(coords[i], dist);
         result[i] = DenseVector<ValueType>(dist, coords[i] );
     }
 
