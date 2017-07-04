@@ -66,7 +66,7 @@ TEST_F(DiffusionTest, testPotentials) {
 }
 
 TEST_F(DiffusionTest, testMultiplePotentials) {
-	const IndexType numLandmarks = 10;
+	const IndexType numLandmarks = 2;
 	std::string path = "meshes/bubbles/";
 	std::string fileName = "bubbles-00010.graph";
 	std::string file = path + fileName;
@@ -87,7 +87,7 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 	std::vector<IndexType> landmarks(numLandmarks);
 	std::copy(nodeIndices.begin(), nodeIndices.begin()+numLandmarks, landmarks.begin());
 
-	DenseMatrix<ValueType> potentials = Diffusion<IndexType, ValueType>::multiplePotentials(L, nodeWeights, landmarks);
+	DenseMatrix<ValueType> potentials = Diffusion<IndexType, ValueType>::multiplePotentials(L, nodeWeights, landmarks, 1e-5);
 	ASSERT_EQ(numLandmarks, potentials.getNumRows());
 	ASSERT_EQ(n, potentials.getNumColumns());
 

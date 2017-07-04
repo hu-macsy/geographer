@@ -28,7 +28,7 @@ using scai::hmemo::ReadAccess;
 using scai::hmemo::WriteAccess;
 
 template<typename IndexType, typename ValueType>
-DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSRSparseMatrix<ValueType> laplacian, DenseVector<IndexType> nodeWeights, IndexType source) {
+DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSRSparseMatrix<ValueType> laplacian, DenseVector<IndexType> nodeWeights, IndexType source, ValueType eps) {
 	using scai::lama::NormPtr;
 	using scai::lama::L2Norm;
 	using namespace scai::solver;
@@ -53,18 +53,13 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSR
 
 	DenseVector<ValueType> solution( n, 0.0 );
 
-	const IndexType maxIter = 200;
-	const ValueType eps        = 1e-5;
-
 	NormPtr norm( new L2Norm() );
 
-	CriterionPtr rt( new ResidualThreshold( norm, eps, ResidualThreshold::Absolute ) );
-	CriterionPtr it( new IterationCount( maxIter ) );
-	CriterionPtr both( new Criterion ( it, rt, Criterion::OR ) );
+	CriterionPtr rt( new ResidualThreshold( norm, eps, ResidualThreshold::Relative ) );
 
 	CG solver( "simpleExampleCG" );
 
-	solver.setStoppingCriterion( both );
+	solver.setStoppingCriterion( rt );
 
 	solver.initialize( laplacian );
 	solver.solve( solution, d );
@@ -73,7 +68,7 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSR
 }
 
 template<typename IndexType, typename ValueType>
-DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(scai::lama::CSRSparseMatrix<ValueType> laplacian, scai::lama::DenseVector<IndexType> nodeWeights, std::vector<IndexType> sources) {
+DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(scai::lama::CSRSparseMatrix<ValueType> laplacian, scai::lama::DenseVector<IndexType> nodeWeights, std::vector<IndexType> sources, ValueType eps) {
 	using scai::hmemo::HArray;
 
 	const IndexType l = sources.size();
@@ -83,7 +78,7 @@ DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(scai:
 
 	//get potentials and copy them into common vector
 	for (IndexType landmark : sources) {
-		DenseVector<ValueType> potentials = potentialsFromSource(laplacian, nodeWeights, landmark);
+		DenseVector<ValueType> potentials = potentialsFromSource(laplacian, nodeWeights, landmark, eps);
 		assert(potentials.size() == n);
 		WriteAccess<ValueType> wResult(resultContainer);
 		ReadAccess<ValueType> rPotentials(potentials.getLocalValues());
@@ -219,8 +214,8 @@ DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructHadamardMatrix(
 
 template CSRSparseMatrix<double> Diffusion<int, double>::constructLaplacian(CSRSparseMatrix<double> graph);
 template CSRSparseMatrix<double> Diffusion<int, double>::constructFJLTMatrix(double epsilon, int n, int origDimension);
-template DenseVector<double> Diffusion<int, double>::potentialsFromSource(CSRSparseMatrix<double> laplacian, DenseVector<int> nodeWeights, int source);
-template DenseMatrix<double> Diffusion<int, double>::multiplePotentials(CSRSparseMatrix<double> laplacian, DenseVector<int> nodeWeights, std::vector<int> sources);
+template DenseVector<double> Diffusion<int, double>::potentialsFromSource(CSRSparseMatrix<double> laplacian, DenseVector<int> nodeWeights, int source, double eps);
+template DenseMatrix<double> Diffusion<int, double>::multiplePotentials(CSRSparseMatrix<double> laplacian, DenseVector<int> nodeWeights, std::vector<int> sources, double eps);
 
 
 
