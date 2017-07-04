@@ -28,6 +28,9 @@
 #include <map>
 #include <tuple>
 
+using scai::lama::CSRStorage;
+using scai::lama::Scalar;
+
 namespace ITI {
 
 //-------------------------------------------------------------------------------------------------

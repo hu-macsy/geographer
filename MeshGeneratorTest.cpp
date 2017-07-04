@@ -31,6 +31,7 @@ typedef double ValueType;
 typedef int IndexType;
 
 using namespace scai;
+using scai::lama::CSRStorage;
 
 namespace ITI {
 

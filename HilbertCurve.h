@@ -19,7 +19,7 @@
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
-using namespace scai::lama;
+using scai::lama::DenseVector;
 
 namespace ITI {
 	template <typename IndexType, typename ValueType>
@@ -41,7 +41,7 @@ namespace ITI {
 			*
 	 		* @return A value in the unit interval [0,1]
 			*/                        
-                        static ValueType getHilbertIndex2D(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+			static ValueType getHilbertIndex2D(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 		
 			/**
 			*Accepts a point in 3 dimensions and calculates where along the hilbert curve it lies.
@@ -55,7 +55,7 @@ namespace ITI {
 			*
 	 		* @return A value in the unit interval [0,1]
 			*/
-                        static ValueType getHilbertIndex3D(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+			static ValueType getHilbertIndex3D(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 
 			/**
 			* Given an index between 0 and 1 returns a point in 2 dimensions along the hilbert curve based on

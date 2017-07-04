@@ -13,8 +13,8 @@
 
 #include "quadtree/QuadTreeCartesianEuclid.h"
 
-using namespace scai;
-using namespace scai::lama;
+using scai::lama::CSRSparseMatrix;
+using scai::lama::DenseVector;
 
 #include <vector>
 #include <set>

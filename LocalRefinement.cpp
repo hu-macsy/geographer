@@ -3,6 +3,7 @@
 
 #include "LocalRefinement.h"
 
+using scai::lama::Scalar;
 
 namespace ITI{
 

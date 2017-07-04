@@ -18,7 +18,9 @@
 #include "ParcoRepart.h"
 #include "PrioQueue.h"
 
-using namespace scai::lama;     // for CSRSparseMatrix and DenseVector
+using scai::lama::CSRSparseMatrix;
+using scai::lama::CSRStorage;
+using scai::lama::DenseVector;
 
 
 namespace ITI {
