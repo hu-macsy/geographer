@@ -38,6 +38,9 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSR
 		throw std::runtime_error("Matrix must be symmetric to be a Laplacian");
 	}
 
+	scai::dmemo::DistributionPtr dist(laplacian.getRowDistributionPtr());
+	laplacian.redistribute(dist, dist);
+
 	IndexType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
 
 	IndexType sourceWeight;
@@ -46,12 +49,12 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSR
 	}
 	sourceWeight = nodeWeights.getValue(source).Scalar::getValue<IndexType>();
 
-	DenseVector<ValueType> nullVector(n,0);
+	DenseVector<ValueType> nullVector(dist,0);
 	DenseVector<ValueType> d(nullVector - nodeWeights);
 	d.setValue(source, weightSum - sourceWeight);
 	assert(d.sum() == 0);
 
-	DenseVector<ValueType> solution( n, 0.0 );
+	DenseVector<ValueType> solution( dist, 0.0 );
 
 	NormPtr norm( new L2Norm() );
 
@@ -73,8 +76,12 @@ DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(scai:
 
 	const IndexType l = sources.size();
 	const IndexType n = laplacian.getNumRows();
-	HArray<ValueType> resultContainer(n*l);
+	const IndexType localN = laplacian.getLocalNumRows();
+	HArray<ValueType> resultContainer(localN*l);
 	IndexType offset = 0;
+
+	scai::dmemo::DistributionPtr dist(laplacian.getRowDistributionPtr());
+    scai::dmemo::DistributionPtr lDist(new scai::dmemo::NoDistribution(l));
 
 	//get potentials and copy them into common vector
 	for (IndexType landmark : sources) {
@@ -82,13 +89,15 @@ DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(scai:
 		assert(potentials.size() == n);
 		WriteAccess<ValueType> wResult(resultContainer);
 		ReadAccess<ValueType> rPotentials(potentials.getLocalValues());
+		assert(rPotentials.size() == localN);
 		assert(offset < wResult.size());
-		std::copy(rPotentials.get(), rPotentials.get()+n, wResult.get()+offset);
-		offset += n;
+		std::copy(rPotentials.get(), rPotentials.get()+localN, wResult.get()+offset);
+		offset += localN;
 	}
-	assert(offset == n*l);
+	assert(offset == localN*l);
 
-	return DenseMatrix<ValueType>(DenseStorage<ValueType>(resultContainer, l, n));
+	//the matrix is transposed, not sure if this is a problem.
+	return DenseMatrix<ValueType>(DenseStorage<ValueType>(resultContainer, l, localN), lDist, dist);
 }
 
 

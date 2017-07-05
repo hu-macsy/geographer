@@ -48,6 +48,7 @@ TEST_F(DiffusionTest, testConstructLaplacian) {
 	a.redistribute(dist, noDist);
 	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(a);
 
+	ASSERT_EQ(L.getRowDistribution(), a.getRowDistribution());
 	ASSERT_TRUE(L.isConsistent());
 
     DenseVector<ValueType> x( n, 1 );
@@ -82,11 +83,13 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 	const IndexType n = graph.getNumRows();
 	scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
-	graph.redistribute(noDist, noDist);
+	//graph.redistribute(noDist, noDist);
 
 	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(graph);
 
-	DenseVector<IndexType> nodeWeights(n,1);
+	ASSERT_EQ(L.getRowDistribution(), graph.getRowDistribution());
+
+	DenseVector<IndexType> nodeWeights(L.getRowDistributionPtr(),1);
 
 	std::vector<IndexType> nodeIndices(n);
 	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
