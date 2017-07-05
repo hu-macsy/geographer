@@ -6,6 +6,7 @@
 
 #include <climits>
 #include <chrono>
+#include <fstream>
 
 #include "Settings.h"
 
@@ -298,6 +299,29 @@ namespace ITI {
             
             return ret;
         }
+        
+        void printLeavesInFile( const std::string filename, IndexType dimension ){
+            std::ofstream f(filename);
+            if(f.fail())
+                throw std::runtime_error("File "+ filename+ " failed.");
+            
+            std::vector<std::shared_ptr<rectCell>> allLeaves = getAllLeaves();
+            
+            const IndexType numLeaves = allLeaves.size();
+            
+            for(int l=0; l<numLeaves; l++){
+                std::shared_ptr<rectCell> thisLeaf = allLeaves[l];
+                
+                for(int d=0; d<dimension; d++){
+                    f<< thisLeaf->getRect().bottom[d] << " ";
+                }
+                f<< std::endl;
+                for(int d=0; d<dimension; d++){
+                    f<< thisLeaf->getRect().top[d] << " ";
+                }
+                f<< std::endl;
+            }
+        }
                 
         rectangle getRect(){
             return myRect;
@@ -394,12 +418,12 @@ namespace ITI {
          *
          * @param[in] array The 1 dimensional array of positive numbers to be partitioned.
          * @param[in] k The number of parts/blocks.
-         * @return The first returned value is a vector of size k-1 and holds the indices of each part/block: first part is from 0 to return.first[0] (inluding the weight of array[return.first[0]]), second from return.first[0]+1 till return.first[1] ets. Last part if from return.first[k-2]+1 till return.first.size().
+         * @return The first returned value is a vector of size k and holds the indices of each part/block: first part is from [return.first[0], return.first[1]) ( not inluding the weight of the last element), second from [return.first[1], return.first[2]) ets. Last part if from return.first[k-1] till return.first.size().
          * The second vector is of size k and holds the weights of each part.
          * 
          * Example: input= [ 11, 6, 8, 1, 2, 4, 11, 1, 2] and k=3
          *                        |           |
-         * return.first = [ 1, 5]. Implies the partition: 0, 1 | 2, 3, 4, 5 | 6, 7, 8
+         * return.first = [ 0, 2, 6]. Implies the partition: 0, 1 | 2, 3, 4, 5 | 6, 7, 8
          * return.second=[ 17, 15, 14]
          */
         static std::pair<std::vector<IndexType>,std::vector<ValueType>> partition1DGreedy( const std::vector<ValueType>& array, const IndexType k, Settings settings);

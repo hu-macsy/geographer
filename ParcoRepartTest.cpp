@@ -65,7 +65,7 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     struct Settings settings;
     settings.numBlocks= k;
     settings.epsilon = 0.2;
-    settings.pixeledDetailLevel =4;
+    settings.pixeledSideLen = 16;
     settings.useGeometricTieBreaking = 1;
     
     //get sfc partition
@@ -86,7 +86,7 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     graph.redistribute(dist, noDistPointer);
     
     for( int i=3; i<6; i++){
-        settings.pixeledDetailLevel = i;
+        settings.pixeledSideLen = std::pow(i,2);
         DenseVector<IndexType> pixelInitialPartition = ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coords, settings);
         
         EXPECT_GE(k-1, pixelInitialPartition.getLocalValues().max() );
@@ -496,31 +496,30 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     EXPECT_TRUE(blockGraph.checkSymmetry() );
     
     comm->synchronize();
-if(comm->getRank()==0 ){            
-    std::cout<<"----------------------------"<< " Partition  "<< *comm << std::endl;    
-    for(int i=0; i<numX; i++){
-        for(int j=0; j<numY; j++){
-            if(bordViz[i][j]==1) 
-                std::cout<< "\033[1;31m"<< partViz[i][j] << "\033[0m" <<"-";
-            else
-                std::cout<< partViz[i][j]<<"-";
-        }
-        std::cout<< std::endl;
-    }
     
-    // print
-    //scai::hmemo::ReadAccess<IndexType> blockGraphRead( blockGraph );
-    std::cout<< *comm <<" , Block Graph"<< std::endl;
-    for(IndexType row=0; row<k; row++){
-        std::cout<< row << "|\t";
-        for(IndexType col=0; col<k; col++){
-            std::cout << col<< ": " << blockGraph( row,col).Scalar::getValue<ValueType>() <<" - ";
+    if(comm->getRank()==0 ){
+        std::cout<<"----------------------------"<< " Partition  "<< *comm << std::endl;    
+        for(int i=0; i<numX; i++){
+            for(int j=0; j<numY; j++){
+                if(bordViz[i][j]==1) 
+                    std::cout<< "\033[1;31m"<< partViz[i][j] << "\033[0m" <<"-";
+                else
+                    std::cout<< partViz[i][j]<<"-";
+            }
+            std::cout<< std::endl;
         }
-        std::cout<< std::endl;
+        
+        // print
+        //scai::hmemo::ReadAccess<IndexType> blockGraphRead( blockGraph );
+        std::cout<< *comm <<" , Block Graph"<< std::endl;
+        for(IndexType row=0; row<k; row++){
+            std::cout<< row << "|\t";
+            for(IndexType col=0; col<k; col++){
+                std::cout << col<< ": " << blockGraph( row,col).Scalar::getValue<ValueType>() <<" - ";
+            }
+            std::cout<< std::endl;
+        }
     }
-    
-}
-comm->synchronize();
 
 }
 

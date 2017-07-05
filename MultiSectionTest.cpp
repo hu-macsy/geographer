@@ -41,8 +41,8 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
     const IndexType dimensions = 2;
     const IndexType k = std::pow( 4, dimensions);
 
-    std::string path = "meshes/bigtrace/";
-    std::string fileName = "bigtrace-00010.graph";
+    std::string path = "meshes/";
+    std::string fileName = "Grid64x64";
     std::string file = path + fileName;
     std::ifstream f(file);
     IndexType N, edges;
@@ -257,7 +257,7 @@ TEST_F(MultiSectionTest, test1DPartitionGreedy){
     
     origTotalWeight = comm->sum(origTotalWeight);
     
-    IndexType k1= 5;
+    IndexType k= 5;
     
     Settings settings;
     settings.dimensions = dim;
@@ -278,7 +278,7 @@ TEST_F(MultiSectionTest, test1DPartitionGreedy){
         for( int proj=0; proj<projection.size(); proj++){
             std::vector<ValueType> weightPerPart;
             std::vector<IndexType> part1D;
-            std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DGreedy( projection[proj],  k1, settings);
+            std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DGreedy( projection[proj],  k, settings);
             
             //assertions - checks - prints
             
@@ -292,8 +292,8 @@ TEST_F(MultiSectionTest, test1DPartitionGreedy){
             }
             
             // vectors are of expected size
-            SCAI_ASSERT( part1D.size()==k1-1, "part1D.size()= "<< part1D.size() << " and is should be = " << k1 -1);
-            SCAI_ASSERT( weightPerPart.size()==k1, "weightPerPart.size()= "<< weightPerPart.size() << " and is should be = " << k1 );
+            SCAI_ASSERT( part1D.size()==k, "part1D.size()= "<< part1D.size() << " and is should be = " << k );
+            SCAI_ASSERT( weightPerPart.size()==k, "weightPerPart.size()= "<< weightPerPart.size() << " and is should be = " << k );
             
             // calculate min and max weights
             ValueType minWeight=LONG_MAX, maxWeight=0;
@@ -307,10 +307,10 @@ TEST_F(MultiSectionTest, test1DPartitionGreedy){
             }
             
             ValueType maxOverMin = maxWeight/minWeight;
-            PRINT0("max weight / min weight = "<< maxOverMin);
+            PRINT0("max weight = "<< maxWeight << " , min weight = " << minWeight << " , max/min= " << maxOverMin);
             
             ValueType totalWeight = std::accumulate(weightPerPart.begin(), weightPerPart.end(), 0);
-            ValueType averageWeight = totalWeight/k1;
+            ValueType averageWeight = totalWeight/k;
         
             SCAI_ASSERT( totalWeight==origTotalWeight, "totalWeight= "<< totalWeight << " should be= "<< origTotalWeight );
             
@@ -336,6 +336,8 @@ TEST_F(MultiSectionTest, test1DPartitionGreedy){
 
 TEST_F(MultiSectionTest, test1DPartitionOptimal){
  
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    
     const IndexType N= 100;
     const ValueType w= 5;
     const IndexType k= 7;
@@ -356,8 +358,9 @@ TEST_F(MultiSectionTest, test1DPartitionOptimal){
     
     SCAI_ASSERT( part1D.size()==weightPerPart.size() , "Wrong size of returned vectors: part1D.size()= " << part1D.size() << " and weightPerPart.size()= "<< weightPerPart.size());
     
+    //PRINT("0: from [0 to" << part1D[0] <<") with weight " <<  weightPerPart[0] );
     for(int i=0; i<part1D.size()-1; i++){
-        PRINT( i << ": from ["<< part1D[i] << " to " << part1D[i+1] <<") with weight " << weightPerPart[i]);
+        PRINT0( i << ": from ["<< part1D[i] << " to " << part1D[i+1] <<") with weight " << weightPerPart[i]);
     }
     PRINT(k-1 << ": from ["<< part1D.back() << " to " << N << ") with weight " << weightPerPart.back() );
     
@@ -922,7 +925,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
         ValueType thisVolume = 1;
         for(int d=0; d<dimensions; d++){
             thisVolume = thisVolume * (thisRectangle.top[d]-thisRectangle.bottom[d]);
-            SCAI_ASSERT( thisRectangle.top[d]<=maxCoords[d] , "Rectangle's top coordinate is out of bounds" );
+            SCAI_ASSERT( thisRectangle.top[d]<=maxCoords[d] , "Rectangle's top coordinate is out of bounds: thisRectangle.top[d]= " << thisRectangle.top[d] << " ,  maxCoords[d]= " << maxCoords[d] );
         }
         totalVolume += thisVolume;
 

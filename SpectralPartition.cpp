@@ -113,8 +113,7 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
     // here, every pixel must belong to a part
     //
     
-    const unsigned int detailLvl = settings.pixeledDetailLevel;
-    const unsigned long sideLen = std::pow(2,detailLvl);
+    const unsigned long sideLen = settings.pixeledSideLen;
     
     //TODO: finding the max is also done in pixeledCoarsen, maybe we can pass max as input parameter there
     std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
@@ -181,7 +180,6 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
     ValueType cut = comm->getSize() == 1 ? ParcoRepart<IndexType, ValueType>::computeCut(adjM, result) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(adjM, false)) / 2;
     ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(result, k);
     if (comm->getRank() == 0) {
-        IndexType detailLvl = settings.pixeledDetailLevel;
         std::chrono::duration<double> elapsedSeconds = std::chrono::steady_clock::now() -start;
         std::cout << "\033[1;32mSpectral partition"<<" (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
         std::cout<< "and imbalance= "<< imbalance << "\033[0m"  << std::endl;

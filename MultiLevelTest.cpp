@@ -331,13 +331,13 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
     for(IndexType i=2; i<7; i++){
         std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
         
-        Settings.pixeledDetailLevel = i;
-        IndexType sideLen = std::pow(2, Settings.pixeledDetailLevel);
+        Settings.pixeledSideLen = std::pow(i,2);
+        IndexType sideLen = Settings.pixeledSideLen;
         IndexType pixeledGraphSize =  std::pow( sideLen, dimensions);
         IndexType pixeledGraphAdjecencyMatrixSize = pixeledGraphSize*pixeledGraphSize;
         
                 
-        PRINT0("detail level="<< Settings.pixeledDetailLevel << " ,pixeledGraphSize= "<< pixeledGraphSize << " , pixeledGraphAdjecencyMatrixSize= " << pixeledGraphAdjecencyMatrixSize );
+        PRINT0("detail level="<< Settings.pixeledSideLen << " ,pixeledGraphSize= "<< pixeledGraphSize << " , pixeledGraphAdjecencyMatrixSize= " << pixeledGraphAdjecencyMatrixSize );
         if( pixeledGraphSize > N ){
             std::cout<< " size of pixeledGraph (number of pixels)= "<< pixeledGraphSize << "  > input grap " << N <<" .Hmm, not really a coarsening... Breaking..." << std::endl;
             break;

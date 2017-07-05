@@ -660,8 +660,9 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
    
     // measure density with rounding
     // have to handle 2D and 3D cases seperately
-    const unsigned int detailLvl = settings.pixeledDetailLevel;
-    const unsigned long sideLen = std::pow(2,detailLvl);
+    //const unsigned int detailLvl = settings.pixeledDetailLevel;
+    //const unsigned long sideLen = std::pow(2,detailLvl);
+    const unsigned long sideLen = settings.pixeledSideLen;
     const unsigned long cubeSize = std::pow(sideLen, dimensions);
     
     if(cubeSize > globalN){
