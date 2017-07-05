@@ -46,13 +46,13 @@ std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
 {
     std::string token;
     in >> token;
-    if (token == "SFC")
+    if (token == "SFC" or token == "0")
         method = InitialPartitioningMethods::SFC;
-    else if (token == "Pixel")
+    else if (token == "Pixel" or token == "1")
         method = InitialPartitioningMethods::Pixel;
-    else if (token == "Spectral")
+    else if (token == "Spectral" or token == "2")
     	method = InitialPartitioningMethods::Spectral;
-    else if (token == "Multisection")
+    else if (token == "Multisection" or token == "3")
     	method = InitialPartitioningMethods::Multisection;
     else
         in.setstate(std::ios_base::failbit);
