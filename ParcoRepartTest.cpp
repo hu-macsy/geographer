@@ -36,8 +36,8 @@ class ParcoRepartTest : public ::testing::Test {
 
 TEST_F(ParcoRepartTest, testInitialPartition){
     //std::string file = "Grid8x8";
-    std::string path = "meshes/bubbles/";
-    std::string fileName = "bubbles-00010.graph";
+    std::string path = "meshes/bigtrace/";
+    std::string fileName = "bigtrace-00010.graph";
     std::string file = path + fileName;
     //std::string file = "meshes/hugebubbles/hugebubbles-00010.graph";
     std::ifstream f(file);
@@ -49,7 +49,7 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     // for now local refinement requires k = P
     IndexType k = comm->getSize();
     //
-    PRINT0("nodes= "<< N);
+    PRINT0("nodes= "<< N << " and k= "<< k );
 
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
@@ -68,7 +68,24 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     settings.pixeledDetailLevel =4;
     settings.useGeometricTieBreaking = 1;
     
-    for( int i=2; i<6; i++){
+    //get sfc partition
+    DenseVector<IndexType> hilbertInitialPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coords, settings);
+    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords, N, "hilbertPartition");
+    
+    EXPECT_GE(k-1, hilbertInitialPartition.getLocalValues().max() );
+    EXPECT_EQ(N, hilbertInitialPartition.size());
+    EXPECT_EQ(0, hilbertInitialPartition.min().getValue<ValueType>());
+    EXPECT_EQ(k-1, hilbertInitialPartition.max().getValue<ValueType>());
+    EXPECT_EQ(graph.getRowDistribution(), hilbertInitialPartition.getDistribution());
+    
+    
+    // after the first partitioning cordinates are redistributed 
+    // redistribution needed because sort works only for block distribution
+    coords[0].redistribute(dist);
+    coords[1].redistribute(dist); 
+    graph.redistribute(dist, noDistPointer);
+    
+    for( int i=3; i<6; i++){
         settings.pixeledDetailLevel = i;
         DenseVector<IndexType> pixelInitialPartition = ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coords, settings);
         
@@ -78,22 +95,6 @@ TEST_F(ParcoRepartTest, testInitialPartition){
         EXPECT_EQ(k-1, pixelInitialPartition.max().getValue<ValueType>());
         EXPECT_EQ(graph.getRowDistribution(), pixelInitialPartition.getDistribution());
     }
-    
-    // after the first partitioning cordinates are redistributed 
-    // redistribution needed because sort works only for block distribution
-    coords[0].redistribute(dist);
-    coords[1].redistribute(dist); 
-    graph.redistribute(dist, noDistPointer);
-    
-    
-    DenseVector<IndexType> hilbertInitialPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coords, settings);
-    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords, N, "hilbertPartition");
-    
-    EXPECT_GE(k-1, hilbertInitialPartition.getLocalValues().max() );
-    EXPECT_EQ(N, hilbertInitialPartition.size());
-    EXPECT_EQ(0, hilbertInitialPartition.min().getValue<ValueType>());
-    EXPECT_EQ(k-1, hilbertInitialPartition.max().getValue<ValueType>());
-    EXPECT_EQ(graph.getRowDistribution(), hilbertInitialPartition.getDistribution());
     
 }
 //--------------------------------------------------------------------------------------- 

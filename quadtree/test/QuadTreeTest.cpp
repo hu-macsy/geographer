@@ -52,12 +52,11 @@ TEST_F(QuadTreeTest, testGetGraphFromForestRandom_2D){
         quad.addContent(i, pos);
         quad2.addContent(i, pos2);
     }
-
+    
     IndexType globIndexing = quad2.indexSubtree(quad.indexSubtree(0));
-	
+    
     forest.push_back(quad.getRoot());
     forest.push_back(quad2.getRoot());
-
 
     IndexType numTrees = forest.size();
 

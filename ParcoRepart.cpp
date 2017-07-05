@@ -141,7 +141,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
     
     std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
     std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
-    DenseVector<IndexType> result;
     
     if( ! inputDist->isEqual(*coordDist) ){
         throw std::runtime_error("Matrix and coordinates should have the same distribution");
@@ -212,6 +211,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
     /**
      * now sort the global indices by where they are on the space-filling curve.
      */
+    DenseVector<IndexType> result;
     scai::lama::DenseVector<IndexType> permutation;
     {
         SCAI_REGION( "ParcoRepart.hilbertPartition.sorting" )
@@ -281,7 +281,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     
     std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
     std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
-    DenseVector<IndexType> result(inputDist, 0);
     
     //TODO: probably minimum is not needed
     //TODO: if we know maximum from the input we could save that although is not too costly
@@ -314,6 +313,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     const IndexType cubeSize = std::pow(sideLen, dimensions);
     
     //TODO: generalise this to arbitrary dimensions, do not handle 2D and 3D differently
+    //TODO: by a  for(int d=0; d<dimension; d++){ ... }
     // a 2D or 3D arrays as a one dimensional vector
     // [i][j] is in position: i*sideLen + j
     // [i][j][k] is in: i*sideLen*sideLen + j*sideLen + k
@@ -373,7 +373,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
         comm->sumArray( density );
     }
     
-    //TODO; is that needed. we just can overwrite density array
+    //TODO: is that needed? we just can overwrite density array.
     // use the summed density as a Dense vector
     scai::lama::DenseVector<IndexType> sumDensity( density );
     
@@ -383,7 +383,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
   
     //using the summed density get an initial pixeled partition
     
-    std::vector<IndexType> pixeledPartition( density.size() , -1);
+    std::vector<IndexType> pixeledPartition( sumDensity.size() , -1);
     
     IndexType pointsLeft= globalN;
     IndexType pixelsLeft= cubeSize;
@@ -557,6 +557,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     //=========
     
     // set your local part of the partition/result
+    DenseVector<IndexType> result(inputDist, 0);
     scai::hmemo::WriteOnlyAccess<IndexType> wLocalPart ( result.getLocalValues() );
     
     if(dimensions==2){

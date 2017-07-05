@@ -269,7 +269,7 @@ TEST_F(MeshGeneratorTest, testWriteMetis_Dist_3D){
 TEST_F(MeshGeneratorTest, testMeshFromQuadTree_local){
 
     const IndexType numberOfAreas= 4;
-    const IndexType pointsPerArea= 100000;
+    const IndexType pointsPerArea= 1000;
     const IndexType dimension = 2;
     const ValueType maxCoord = 100;
     
