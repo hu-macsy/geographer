@@ -869,15 +869,15 @@ PRINT( totalWeight );
         IndexType indexHigh = N;
         while( indexLow<indexHigh ){
             IndexType indexMid = (indexLow+indexHigh)/2;
-            ValueType tmpSum = prefixSum[indexMid] - prefixSum[std::max(partIndices[p-1]-1,0)];
-PRINT(lowerBound << " + " << upperBound << " indexHigh = " << indexHigh );              
+            ValueType tmpSum = prefixSum[indexMid] - prefixSum[std::max(partIndices[p-1],0)];
+PRINT("lB= " << lowerBound << " , uB= " << upperBound << " __ indexLow= "<< indexLow << " mid= "<< indexMid << " indexHigh = " << indexHigh );              
 PRINT(p << ": " << tmpSum);            
             if( lowerBound<=tmpSum and tmpSum<upperBound){
                 if( probe(prefixSum, k, tmpSum) ){
                     indexHigh = indexMid;
                     upperBound = tmpSum;
                 }else{
-                    indexLow = indexMid +1;
+                    indexLow = indexMid+1;
                     lowerBound = tmpSum;
                 }
             }else if(tmpSum>=upperBound){
@@ -887,12 +887,12 @@ PRINT(p << ": " << tmpSum);
             }
         }
         
-        partIndices[p] = indexHigh;
-PRINT(p << " :: "<< partIndices[p] << " __ "<< prefixSum[indexHigh] << " @ " <<  prefixSum[std::max(partIndices[p-1]-1,0)] );        
-        weightPerPart[p-1] = prefixSum[indexHigh-1] - prefixSum[std::max(partIndices[p-1]-1,0)];
+        partIndices[p] = indexHigh;      
+        weightPerPart[p-1] = prefixSum[indexHigh] - prefixSum[std::max(partIndices[p-1],0)];
+PRINT(p << " :: "<< partIndices[p] << " __ "<< weightPerPart[p-1] );  
     }
 PRINT(prefixSum[ partIndices.back()-1 ]);    
-    weightPerPart[k-1] = totalWeight - prefixSum[ partIndices.back() -1];
+    weightPerPart[k-1] = totalWeight - prefixSum[ partIndices.back() ];
     
     return std::make_pair(partIndices, weightPerPart);
 }
