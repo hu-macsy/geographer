@@ -43,17 +43,17 @@ namespace ITI {
 	 		*/
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings Settings);
 
-                        /*
-                         * Get an initial partition using the hilbert curve.
-                         */
-                        static DenseVector<IndexType> hilbertPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+			/*
+			 * Get an initial partition using the hilbert curve.
+			 */
+			static DenseVector<IndexType> hilbertPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
                         
-                        /*
-                         * Get an initial partition by measuring the density per pixel.
-                         */
-                        static DenseVector<IndexType> pixelPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+			/*
+			 * Get an initial partition by measuring the density per pixel.
+			 */
+			static DenseVector<IndexType> pixelPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
                                                         
-                        /**
+			/**
 			 * This method takes a (possibly distributed) partition and computes its global cut.
 			 *
                          * @param[in] input The adjacency matrix of the graph.
@@ -171,11 +171,11 @@ namespace ITI {
 
 			static IndexType getDegreeSum(const CSRSparseMatrix<ValueType> &input, const std::vector<IndexType> &nodes);
                         
-                        static std::vector<IndexType> neighbourPixels(const IndexType thisPixel,const IndexType sideLen, const IndexType dimensions);
-                        
-                        /**Returns a vector of size N (if adjM is of size NxN) with the degree for every node of
-                         * the inout graph.
-                         */
-                        static scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType> adjM);
+			static std::vector<IndexType> neighbourPixels(const IndexType thisPixel,const IndexType sideLen, const IndexType dimensions);
+
+			/**Returns a vector of size N (if adjM is of size NxN) with the degree for every node of
+			 * the inout graph.
+			 */
+			static scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType> adjM);
 	};
 }
