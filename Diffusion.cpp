@@ -99,27 +99,27 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 	using std::vector;
 
 	const IndexType n = graph.getNumRows();
+	const IndexType localN = graph.getLocalNumRows();
+
 	if (graph.getNumColumns() != n) {
 		throw std::runtime_error("Matrix must be symmetric to be an adjacency matrix");
 	}
 
-	if (!graph.getRowDistribution().isReplicated()) {
-		throw std::runtime_error("Input data must be replicated, for now.");
-	}
-
+	scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
     scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
 
 	const CSRStorage<ValueType>& storage = graph.getLocalStorage();
 	const ReadAccess<IndexType> ia(storage.getIA());
 	const ReadAccess<IndexType> ja(storage.getJA());
 	const ReadAccess<ValueType> values(storage.getValues());
-	assert(ia.size() == n+1);
+	assert(ia.size() == localN+1);
 
-	vector<ValueType> targetDegree(n,0);
+	vector<ValueType> targetDegree(localN,0);
 	IndexType degreeSum = 0;
-	for (IndexType i = 0; i < n; i++) {
+	for (IndexType i = 0; i < localN; i++) {
+		const IndexType globalI = dist->local2global(i);
 		for (IndexType j = ia[i]; j < ia[i+1]; j++) {
-			if (ja[j] == i) {
+			if (ja[j] == globalI) {
 				throw std::runtime_error("No self loops allowed.");
 			}
 			if (values[j] != 1) {
@@ -131,14 +131,12 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 		degreeSum += targetDegree[i];
 	}
 	assert(degreeSum >= storage.getNumValues());
-	assert(degreeSum <= storage.getNumValues()+n);
+	assert(degreeSum <= storage.getNumValues()+localN);
 
-	DIASparseMatrix<ValueType> D(n,n);
-	DIAStorage<ValueType> dstor(n, n, 1, HArray<IndexType>(1,0), HArray<ValueType>(n, targetDegree.data()) );
+	DIASparseMatrix<ValueType> D(dist,noDist);
+	DIAStorage<ValueType> dstor(localN, n, 1, HArray<IndexType>(1,0), HArray<ValueType>(localN, targetDegree.data()) );
 	D.swapLocalStorage(dstor);
 	CSRSparseMatrix<ValueType> result(D-graph);
-
-	assert(result.isConsistent());
 
 	return result;
 }
@@ -205,7 +203,7 @@ DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructHadamardMatrix(
 	for (IndexType i = 0; i < d; i++) {
 		for (IndexType j = 0; j < d; j++) {
 			IndexType dotProduct = (i-1) ^ (j-1);
-			IndexType entry = 1-2*(dotProduct & 1);
+			IndexType entry = 1-2*(dotProduct & 1);//(-1)^{dotProduct}
 			wResult[i*d+j] = scalingFactor*entry;
 		}
 	}
