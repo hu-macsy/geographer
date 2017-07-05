@@ -465,13 +465,15 @@ namespace ITI {
          * @param[in] dimensions The dimension of the cube/grid (either 2 or 3).
          * @return A vector containing the index for every dimension. The size of the vector is equal to dimensions.
          */
-        static std::vector<IndexType> indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dimensions);
+        template<typename T>
+        static std::vector<T> indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dimensions);
         
     private:
-
-        static std::vector<IndexType> indexTo2D(IndexType ind, IndexType sideLen);
+        template<typename T>
+        static std::vector<T> indexTo2D(IndexType ind, IndexType sideLen);
         
-        static std::vector<IndexType> indexTo3D(IndexType ind, IndexType sideLen);
+        template<typename T>
+        static std::vector<T> indexTo3D(IndexType ind, IndexType sideLen);
     };
 
 }

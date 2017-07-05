@@ -152,7 +152,7 @@ TEST_F(MultiSectionTest, testGetRectangles){
 
     Settings settings;
     settings.dimensions = dim;
-    settings.numBlocks = 64;
+    settings.numBlocks = 125;
     
     std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
@@ -165,6 +165,7 @@ TEST_F(MultiSectionTest, testGetRectangles){
     if (comm->getRank() == 0) {
         std::cout<< "Time to partition: "<< partitionTime.count() << std::endl;
     }
+    
     // assertions - prints
     
     SCAI_ASSERT( rectangles.size()==settings.numBlocks , "Returned number of rectangles is wrong. Should be "<< settings.numBlocks<< " but it is "<< rectangles.size() );
@@ -183,7 +184,7 @@ TEST_F(MultiSectionTest, testGetRectangles){
         // the sum of all the volumes must be equal the volume of the grid: sideLen^dim
         ValueType thisVolume = 1;
         for(int d=0; d<dim; d++){
-            thisVolume = thisVolume * (thisRectangle.top[d]-thisRectangle.bottom[d]);
+            thisVolume = thisVolume * (thisRectangle.top[d]-thisRectangle.bottom[d]+1);
         }
         totalVolume += thisVolume;
         
@@ -339,10 +340,10 @@ TEST_F(MultiSectionTest, test1DPartitionOptimal){
  
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
-    const IndexType N= 100;
-    const ValueType w= 1;
+    const IndexType N= 50;
+    const ValueType w= 50*50;
     const IndexType k= 5;
-    const IndexType optimalWeight = N/k;  // make sure N/k is int
+    const IndexType optimalWeight = w* N/k;  // make sure N/k is int
     
     std::vector<ValueType> nodeWeights( N, w);
     
@@ -380,102 +381,6 @@ for(int i=0; i<part1D.size(); i++){
 }
 //---------------------------------------------------------------------------------------
 
-/*
-TEST_F(MultiSectionTest, test1DPartitionOptimal){
- 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    IndexType sideLen= 20;
-    IndexType dim = 2;
-    IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
-    scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-    scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
-    IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
-    
-    ValueType origTotalWeight = 0;
-    
-    {
-        scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
-        srand(time(NULL));
-        for(int i=0; i<localN; i++){
-            localPart[i] = 1;
-            //localPart[i] = rand()%4*comm->getRank()+2;
-            origTotalWeight += localPart[i];
-        }
-    }
-    
-    origTotalWeight = comm->sum(origTotalWeight);
-    
-    IndexType k1= 5;
-    
-    Settings settings;
-    settings.dimensions = dim;
-    
-    rectangle bBox;
-    bBox.bottom = {0,0};
-    bBox.top = { (ValueType) sideLen, (ValueType) sideLen};
-    // create the root of the tree that contains the whole grid
-    std::shared_ptr<rectCell<IndexType,ValueType>> root( new rectCell<IndexType,ValueType>(bBox) );
-
-    // the 1D partition for all dimensions
-    for( int dimensionToPartition=0; dimensionToPartition<dim; dimensionToPartition++){
-        std::vector<IndexType> dim2proj = {dimensionToPartition};
-        
-        // get the projection in one dimension
-        std::vector<std::vector<ValueType>> projection = MultiSection<IndexType, ValueType>::projection( nodeWeights, root, dim2proj, sideLen, settings);
-
-        for( int proj=0; proj<projection.size(); proj++){
-            std::vector<ValueType> weightPerPart;
-            std::vector<IndexType> part1D;
-            std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( projection[proj],  k1, settings);
-            
-            //assertions - checks - prints
-            
-            SCAI_ASSERT( !std::is_sorted(part1D.end(), part1D.begin()) , "part1D is not sorted" );
-            for(int i=0; i<part1D.size(); i++){
-                SCAI_ASSERT( part1D[i]>=0, "Wrong partition index " << part1D[i] << " in position "<< i );
-                SCAI_ASSERT( part1D[i]<sideLen, "Wrong partition index " << part1D[i] << " in position "<< i );
-                if(i+1<part1D.size()){
-                    SCAI_ASSERT( part1D[i]!=part1D[i+1], "part1D[i]== part1D[i+1]== " << part1D[i] << ". Maybe this should not happen");
-                }
-            }
-            
-            // vectors are of expected size
-            SCAI_ASSERT( part1D.size()==k1-1, "part1D.size()= "<< part1D.size() << " and is should be = " << k1 -1);
-            SCAI_ASSERT( weightPerPart.size()==k1, "weightPerPart.size()= "<< weightPerPart.size() << " and is should be = " << k1 );
-            
-            // calculate min and max weights
-            ValueType minWeight=LONG_MAX, maxWeight=0;
-            for(int i=0; i<weightPerPart.size(); i++){
-                if( weightPerPart[i]<minWeight ){
-                    minWeight = weightPerPart[i];
-                }
-                if( weightPerPart[i]>maxWeight ){
-                    maxWeight = weightPerPart[i];
-                }
-            }
-            
-            ValueType maxOverMin = maxWeight/minWeight;
-            PRINT0("max weight / min weight = "<< maxOverMin);
-            
-            ValueType totalWeight = std::accumulate(weightPerPart.begin(), weightPerPart.end(), 0);
-            ValueType averageWeight = totalWeight/k1;
-        
-            SCAI_ASSERT( totalWeight==origTotalWeight, "totalWeight= "<< totalWeight << " should be= "<< origTotalWeight );
-            
-            PRINT0("max weight / average =" << maxWeight/averageWeight<< " , min / average =" << minWeight/averageWeight);
-            PRINT0("Average weight= "<< averageWeight);
-            
-            // print weigths for each part
-            for(int i=0; i<weightPerPart.size(); i++){
-                PRINT0("part "<< i <<" weight: "<< weightPerPart[i]);
-            }    
-           
-        }
-        // TODO: add more tests
-    }
-}
-//---------------------------------------------------------------------------------------
-*/
 TEST_F(MultiSectionTest, testProbeFunction ){
     
     const IndexType N = 540;
@@ -612,8 +517,8 @@ TEST_F(MultiSectionTest, testRectTree){
     //random points
     srand(time(NULL));
     for(int r=0; r<10; r++){
-        point[0] = rand()%100;
-        point[1] = rand()%100;
+        point[0] = rand()%101;
+        point[1] = rand()%101;
         
         retRect = root->getContainingLeaf( point );
         if( retRect!=NULL){
@@ -634,8 +539,8 @@ TEST_F(MultiSectionTest, testRectTree){
     int numOfPointsIn_r2 =0;
     int numOfPointsIn_r4 =0;
     int numOfPointsIn_r6 =0;
-    for( int x=0; x<100; x++){
-        for(int y=0; y<100; y++){
+    for( int x=0; x<=100; x++){
+        for(int y=0; y<=100; y++){
             point[0]=x;
             point[1]=y;
             
@@ -653,10 +558,10 @@ TEST_F(MultiSectionTest, testRectTree){
         }
     }
     int r2Vol, r4Vol, r6Vol;
-    r2Vol = (r2.top[0]-r2.bottom[0])*(r2.top[1]-r2.bottom[1]);
-    r4Vol = (r4.top[0]-r4.bottom[0])*(r4.top[1]-r4.bottom[1]);
-    r6Vol = (r6.top[0]-r6.bottom[0])*(r6.top[1]-r6.bottom[1]);
-    SCAI_ASSERT( numOfPointsIn_r2==r2Vol, "Wrong number of points in rectangle r2.");
+    r2Vol = (r2.top[0]-r2.bottom[0]+1)*(r2.top[1]-r2.bottom[1]+1);
+    r4Vol = (r4.top[0]-r4.bottom[0]+1)*(r4.top[1]-r4.bottom[1]+1);
+    r6Vol = (r6.top[0]-r6.bottom[0]+1)*(r6.top[1]-r6.bottom[1]+1);
+    SCAI_ASSERT( numOfPointsIn_r2==r2Vol, "Wrong number of points= " << numOfPointsIn_r2 <<" in rectangle r2= " << r2Vol);
     SCAI_ASSERT( numOfPointsIn_r4==r4Vol, "Wrong number of points in rectangle r4.");
     SCAI_ASSERT( numOfPointsIn_r6==r6Vol, "Wrong number of points in rectangle r6.");
 }
@@ -668,17 +573,18 @@ TEST_F(MultiSectionTest, testGetRectangleWeightNonUniform){
     const IndexType dimensions = 2;
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N+1) );
     
-    scai::lama::DenseVector<ValueType> nodeWeights(N);
+    scai::lama::DenseVector<ValueType> nodeWeights(N+1);
     std::vector<scai::lama::DenseVector<ValueType>> coordinates(dimensions);
     
+    // put weights only in the line x=y
     int w=4;
     for(int d=0; d<dimensions; d++){
-        coordinates[d].allocate( N );
-        for(int i=0; i<N; i++){
+        coordinates[d].allocate( N+1 );
+        for(int i=0; i<=N; i++){
             nodeWeights[i] = w;
-            coordinates[d].setValue(i,i);   // the line x=y
+            coordinates[d].setValue(i,i);   
         }
         coordinates[d].redistribute( blockDist );
     }
@@ -695,27 +601,27 @@ TEST_F(MultiSectionTest, testGetRectangleWeightNonUniform){
     bBox.bottom = { 0, 0};
     bBox.top = { N, N };
     ValueType bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, maxCoord, settings);
-    SCAI_ASSERT( bBoxWeight==16*w, "Weight of the bounding box not correct, should be 16*w but it is "<< bBoxWeight);
+    SCAI_ASSERT( bBoxWeight==17*w, "Weight of the bounding box not correct, should be " << 16*w << " but it is "<< bBoxWeight);
     
     bBox.bottom = { 0, 0};
     bBox.top = { N/2, N/2 };
     bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, maxCoord, settings);
-    SCAI_ASSERT( bBoxWeight==8*w, "Weight of the bounding box not correct, should be 8*w but it is "<< bBoxWeight);
+    SCAI_ASSERT( bBoxWeight==9*w, "Weight of the bounding box not correct, should be " << 9*w  << " but it is "<< bBoxWeight);
     
     bBox.bottom = { N/2, N/2 };
     bBox.top = { N, N };
     bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, maxCoord, settings);
-    SCAI_ASSERT( bBoxWeight==8*w, "Weight of the bounding box not correct, should be 8*w but it is "<< bBoxWeight);
+    SCAI_ASSERT( bBoxWeight==9*w, "Weight of the bounding box not correct, should be " << 9*w << " but it is "<< bBoxWeight);
     
     bBox.bottom = { 3, 6 };
     bBox.top = { 7, 11 };
     bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, maxCoord, settings);
-    SCAI_ASSERT( bBoxWeight==1*w, "Weight of the bounding box not correct, should be 1*w but it is "<< bBoxWeight);
+    SCAI_ASSERT( bBoxWeight==2*w, "Weight of the bounding box not correct, should be " <<  2*w << " but it is "<< bBoxWeight);
     
     bBox.bottom = { 3, 1 };
     bBox.top = { 7, 11 };
     bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, maxCoord, settings);
-    SCAI_ASSERT( bBoxWeight==4*w, "Weight of the bounding box not correct, should be 4*w but it is "<< bBoxWeight);
+    SCAI_ASSERT( bBoxWeight==5*w, "Weight of the bounding box not correct, should be "<< 4*w  << " but it is "<< bBoxWeight);
     
     bBox.bottom = { 2, 6 };
     bBox.top = { 5, 11 };
@@ -745,25 +651,26 @@ TEST_F(MultiSectionTest, testGetRectangleWeight){
     
     rectangle bBox;        // the sub-rectangles of the initial grid
     
-    bBox.bottom = {0, 0};       //  1, 2
-    bBox.top = {2, 2};          //  5, 6
+    bBox.bottom = {0, 0};       //  1, 2, 3
+    bBox.top = {2, 2};          //  5, 6, 7
+                                //  9, 0, 1
     
     ValueType bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( nodeWeights, bBox, sideLen, settings);
-    SCAI_ASSERT( bBoxWeight==14, "Weight of the bounding box not correct, should be 14 but it is "<< bBoxWeight);
+    SCAI_ASSERT( bBoxWeight==34, "Weight of the bounding box not correct, should be 14 but it is "<< bBoxWeight);
     
     bBox.bottom = {2, 0};       //  9, 0, 1, 5      rows 2 and 3
-    bBox.top = {4, 4};          //  3, 4, 5, 6  
+    bBox.top = {3, 3};          //  3, 4, 5, 6  
     
     bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( nodeWeights, bBox, sideLen, settings);
     SCAI_ASSERT( bBoxWeight==33, "Weight of the bounding box not correct, should be 33 but it is "<< bBoxWeight);
     
-                                //  3
-    bBox.bottom = {0, 2};       //  7               column 3
-    bBox.top = {4, 3};          //  1
-                                //  5
+                                //  3, 4
+    bBox.bottom = {0, 2};       //  7, 8            column 3
+    bBox.top = {3, 3};          //  1, 5
+                                //  5, 6
     
     bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( nodeWeights, bBox, sideLen, settings);
-    SCAI_ASSERT( bBoxWeight==16, "Weight of the bounding box not correct, should be 16 but it is "<< bBoxWeight);
+    SCAI_ASSERT( bBoxWeight==39, "Weight of the bounding box not correct, should be 16 but it is "<< bBoxWeight);
 }
 //---------------------------------------------------------------------------------------    
     
@@ -772,7 +679,7 @@ TEST_F(MultiSectionTest, test1DProjection){
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     IndexType sideLen = 5;
     IndexType dim = 3;
-    IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
+    IndexType N= std::pow( sideLen+1, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
     IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
@@ -793,31 +700,31 @@ TEST_F(MultiSectionTest, test1DProjection){
         // for all dimensions i: bottom[i]<top[i] 
         // WARNING: this test case throw Point out of bounds exception
         bBox.bottom = {0, 0, 0};
-        bBox.top =    {5, 5, 4};
+        bBox.top =    {5, 5, 5};
         
         // create the root of the tree that contains the whole grid
         std::shared_ptr<rectCell<IndexType,ValueType>> root( new rectCell<IndexType,ValueType>(bBox) );
         
         ValueType bBoxVolume = 1;
         for(int d=0; d<dim; d++){
-            bBoxVolume = bBoxVolume * (bBox.top[d]-bBox.bottom[d]);
+            bBoxVolume = bBoxVolume * (bBox.top[d]-bBox.bottom[d]+1);
         }
         
         Settings settings;
         settings.dimensions = dim;
         std::vector<IndexType> dim2proj = {d};
         
-        std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projection( nodeWeights, root, dim2proj, sideLen, settings);
+        std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projection( nodeWeights, root, dim2proj, sideLen+1, settings);
         std::vector<ValueType> projection = projections[0];
         
         //assertions
-        const IndexType projLength = bBox.top[dim2proj[0]]-bBox.bottom[dim2proj[0]];
+        const IndexType projLength = bBox.top[dim2proj[0]]-bBox.bottom[dim2proj[0]]+1;
         SCAI_ASSERT( projLength==projection.size(), "Length of projection is not correct");
         
         ValueType projSum = std::accumulate( projection.begin(), projection.end(), 0);
         SCAI_ASSERT( bBoxVolume==projSum, "Volume of bounding box= "<< bBoxVolume<< " and should be equal to the sum of the projection which is "<< projSum );
         
-        ValueType bBoxSlice = bBoxVolume/(bBox.top[dim2proj[0]]-bBox.bottom[dim2proj[0]]);
+        ValueType bBoxSlice = bBoxVolume/(bBox.top[dim2proj[0]]-bBox.bottom[dim2proj[0]]+1);
         for(int i=0; i<projection.size(); i++){
             //this only works when dim=2 and nodeWeights=1
             SCAI_ASSERT( projection[i]==bBoxSlice , "projection["<< i<<"]= "<< projection[i] << " should be equal to "<< bBoxSlice );
@@ -831,7 +738,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
     const IndexType dimensions = 3;
     const std::vector<ValueType> minCoords= {0, 0, 0};    
     const std::vector<ValueType> maxCoords= {20, 20, 20};
-    const IndexType N = maxCoords[0]*maxCoords[1]*maxCoords[2]; 
+    const IndexType N = (maxCoords[0]+1)*(maxCoords[1]+1)*(maxCoords[2]+1); 
     const IndexType k = std::pow( 4, dimensions);
     
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -866,9 +773,9 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
     }
     
     int p=0;
-    for(int x=0; x<maxCoords[0]; x=x+1){
-        for(int y=0; y<maxCoords[1]; y=y+1){
-            for(int z=0; z<maxCoords[2]; z=z+1){
+    for(int x=0; x<=maxCoords[0]; x=x+1){
+        for(int y=0; y<=maxCoords[1]; y=y+1){
+            for(int z=0; z<=maxCoords[2]; z=z+1){
                 coordinates[0][p] = x;
                 coordinates[1][p] = y;
                 coordinates[2][p] = z;
@@ -930,7 +837,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
         // the sum of all the volumes must be equal the volume of the grid
         ValueType thisVolume = 1;
         for(int d=0; d<dimensions; d++){
-            thisVolume = thisVolume * (thisRectangle.top[d]-thisRectangle.bottom[d]);
+            thisVolume = thisVolume * (thisRectangle.top[d]-thisRectangle.bottom[d]+1);
             SCAI_ASSERT( thisRectangle.top[d]<=maxCoords[d] , "Rectangle's top coordinate is out of bounds: thisRectangle.top[d]= " << thisRectangle.top[d] << " ,  maxCoords[d]= " << maxCoords[d] );
         }
         totalVolume += thisVolume;
@@ -1182,7 +1089,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
     
     const IndexType dimensions = 2;
     const std::vector<ValueType> maxCoord= {14, 20};
-    const IndexType N = maxCoord[0]*maxCoord[1];
+    const IndexType N = (maxCoord[0]+1)*(maxCoord[1]+1);
     
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr("BLOCK", comm, N) );
@@ -1199,29 +1106,17 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
         coordinates[i] = static_cast<ValueType>( 0 );
     }
     int p=0;
-    for(int i=0; i<maxCoord[0]; i++){
-        for(int j=0; j<maxCoord[1]; j++){
+    for(int i=0; i<=maxCoord[0]; i++){
+        for(int j=0; j<=maxCoord[1]; j++){
             coordinates[0][p] = i;
             coordinates[1][p] = j;
             ++p;
         }
     }
+    SCAI_ASSERT( p==N, "Wrong number of points.");
+    
     coordinates[0].redistribute( dist );
     coordinates[1].redistribute( dist );
-    
-    /*
-    //copy local coordinates to a vector<vector<>> strucutre
-    std::vector<std::vector<IndexType>> localCoords(dimensions);
-    {
-        for (IndexType d = 0; d < dimensions; d++) {
-            const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
-            localCoords[d].assign( localPartOfCoords.size() , 0 );
-            for (IndexType i = 0; i < localN; i++) {
-                localCoords[d][i] = localPartOfCoords[i];
-            }
-        }
-    }
-    */
     
     //set local weights
     scai::lama::DenseVector<ValueType> nodeWeights( dist );
@@ -1248,29 +1143,29 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
     
     rectangle bBox0;        //not a leaf => no projection calculated
     bBox0.bottom = {0, 0};
-    bBox0.top = { std::floor(maxCoord[0]/2), maxCoord[1] };
-    ValueType bBox0Weight = (bBox0.top[0]-bBox0.bottom[0])*(bBox0.top[1]-bBox0.bottom[1]);
+    bBox0.top = { std::floor(maxCoord[0]/2-1), maxCoord[1] };
+    ValueType bBox0Weight = (bBox0.top[0]-bBox0.bottom[0]+1)*(bBox0.top[1]-bBox0.bottom[1]+1);
     bBox0.weight = bBox0Weight;
     root->insert(bBox0);
     
     rectangle bBox1;        // leafID=2 => projection[2]
     bBox1.bottom = { std::floor(maxCoord[0]/2), 0 };
     bBox1.top = maxCoord;
-    ValueType bBox1Weight = (bBox1.top[0]-bBox1.bottom[0])*(bBox1.top[1]-bBox1.bottom[1]);
+    ValueType bBox1Weight = (bBox1.top[0]-bBox1.bottom[0]+1)*(bBox1.top[1]-bBox1.bottom[1]+1);
     bBox1.weight = bBox1Weight;
     root->insert(bBox1);
     
     rectangle bBox2;        // leafID=0 => projection[0]
     bBox2.bottom = {0, 0};
-    bBox2.top = { std::floor(maxCoord[0]/2), std::floor(maxCoord[1]*0.75) };
-    ValueType bBox2Weight = (bBox2.top[0]-bBox2.bottom[0])*(bBox2.top[1]-bBox2.bottom[1]);
+    bBox2.top = { std::floor(maxCoord[0]/2-1), std::floor(maxCoord[1]*0.75 -1) };
+    ValueType bBox2Weight = (bBox2.top[0]-bBox2.bottom[0]+1)*(bBox2.top[1]-bBox2.bottom[1]+1);
     bBox2.weight = bBox2Weight;
     root->insert( bBox2 );
     
     rectangle bBox3;        // leafID=1 => projection[1]
     bBox3.bottom = {0, std::floor(maxCoord[1]*0.75) };
-    bBox3.top = { std::floor(maxCoord[0]/2) , maxCoord[1] };
-    ValueType bBox3Weight = (bBox3.top[0]-bBox3.bottom[0])*(bBox3.top[1]-bBox3.bottom[1]);
+    bBox3.top = { std::floor(maxCoord[0]/2 -1) , maxCoord[1] };
+    ValueType bBox3Weight = (bBox3.top[0]-bBox3.bottom[0]+1)*(bBox3.top[1]-bBox3.bottom[1]+1);
     bBox.weight = bBox3Weight;
     root->insert( bBox3 );
     
@@ -1278,7 +1173,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
     
     // bBox0 not leaf, bBox1=projections[2], bBox2=projections[0] , bBox3=projections[1]
 
-    ValueType totalGridWeight = maxCoord[0]*maxCoord[1];
+    ValueType totalGridWeight = N;
     SCAI_ASSERT( totalGridWeight==nodeWeights.sum() , "Wrong sum of node weights: "<< nodeWeights.sum() );
     
     for(int d=0; d<dimensions; d++){
@@ -1287,10 +1182,17 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
         SCAI_ASSERT( dim2proj.size()==root->getNumLeaves(), "Wrong size of vecctor dim2proj or number of leaves");
         
         std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projectionNonUniform( coordinates , nodeWeights, root, dim2proj, settings);
+        
+        ValueType projectionsTotalWeight =0 ;
+        
+        for( int i=0; i<projections.size(); i++){
+                projectionsTotalWeight += std::accumulate( projections[i].begin(), projections[i].end(), 0 );
+        }
+        SCAI_ASSERT( projectionsTotalWeight==totalGridWeight , "Wrong sum of projections weights: projectionsTotalWeight= " << projectionsTotalWeight << " , totalGridWeight= " << totalGridWeight);
     
-        SCAI_ASSERT( projections[0].size()==(bBox2.top[d]-bBox2.bottom[d]), "Wrong size for projection 0");
-        SCAI_ASSERT( projections[1].size()==(bBox3.top[d]-bBox3.bottom[d]), "Wrong size for projection 1");
-        SCAI_ASSERT( projections[2].size()==(bBox1.top[d]-bBox1.bottom[d]), "Wrong size for projection 2");
+        SCAI_ASSERT( projections[0].size()==(bBox2.top[d]-bBox2.bottom[d]+1), "Wrong size for projection 0");
+        SCAI_ASSERT( projections[1].size()==(bBox3.top[d]-bBox3.bottom[d]+1), "Wrong size for projection 1");
+        SCAI_ASSERT( projections[2].size()==(bBox1.top[d]-bBox1.bottom[d]+1), "Wrong size for projection 2");
         
         SCAI_ASSERT( projections.size()==3, "projections size must be 2 but it is "<< projections.size() );
         ValueType proj0Weight = std::accumulate( projections[0].begin(), projections[0].end(), 0 );
@@ -1298,7 +1200,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
         ValueType proj2Weight = std::accumulate( projections[2].begin(), projections[2].end(), 0 );
 
         SCAI_ASSERT( totalGridWeight == proj1Weight+proj0Weight+proj2Weight , "Total weight is "<< totalGridWeight << " but the sum of the two projections is "<<  proj1Weight+proj0Weight+proj2Weight );
-        SCAI_ASSERT( proj0Weight==bBox2Weight, "Weight of first rectangle is "<< bBox0Weight << " but the weight of the projection is "<< proj0Weight);
+        SCAI_ASSERT( proj0Weight==bBox2Weight, "Weight of first rectangle is "<< bBox2Weight << " but the weight of the projection is "<< proj0Weight);
         SCAI_ASSERT( proj1Weight==bBox3Weight, "Weight of second rectangle is "<< bBox3Weight << " but the weight of the projection is "<< proj1Weight);
         SCAI_ASSERT( proj2Weight==bBox1Weight, "Weight of third rectangle is "<< bBox1Weight << " but the weight of the projection is "<< proj2Weight);
     }    
@@ -1309,8 +1211,8 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
 TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
     
     const IndexType dimensions = 3;
-    const std::vector<ValueType> maxCoord= {34, 57, 49};
-    const IndexType N = maxCoord[0]*maxCoord[1]*maxCoord[2];
+    const std::vector<ValueType> maxCoord= {10, 15, 20};
+    const IndexType N = (maxCoord[0]+1)*(maxCoord[1]+1)*(maxCoord[2]+1);
     
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr("BLOCK", comm, N) );
@@ -1327,9 +1229,9 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
         coordinates[i] = static_cast<ValueType>( 0 );
     }
     int p=0;
-    for(int x=0; x<maxCoord[0]; x++){
-        for(int y=0; y<maxCoord[1]; y++){
-            for(int z=0; z<maxCoord[2]; z++){
+    for(int x=0; x<=maxCoord[0]; x++){
+        for(int y=0; y<=maxCoord[1]; y++){
+            for(int z=0; z<=maxCoord[2]; z++){
                 coordinates[0][p] = x;
                 coordinates[1][p] = y;
                 coordinates[2][p] = z;
@@ -1376,34 +1278,34 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
     // for all dimensions i: bottom[i]<top[i] 
     bBox.bottom = {0, 0, 0};
     bBox.top = maxCoord;
+    
     // create the root of the tree that contains the whole grid
     std::shared_ptr<rectCell<IndexType,ValueType>> root( new rectCell<IndexType,ValueType>(bBox) );
     
     rectangle bBox0;        //not a leaf => no projection calculated
     bBox0.bottom = {0, 0, 0};
-    bBox0.top = { std::floor(maxCoord[0]/2), maxCoord[1], maxCoord[2] };
-    ValueType bBox0Weight = (bBox0.top[0]-bBox0.bottom[0])*(bBox0.top[1]-bBox0.bottom[1])*(bBox0.top[2]-bBox0.bottom[2]);
-    bBox0.weight = bBox0Weight;
+    bBox0.top = { std::floor(maxCoord[0]/2-1), maxCoord[1], maxCoord[2] };
+    bBox0.weight = (bBox0.top[0]-bBox0.bottom[0])*(bBox0.top[1]-bBox0.bottom[1])*(bBox0.top[2]-bBox0.bottom[2]);
     root->insert(bBox0);
     
     rectangle bBox1;        // leafID=2 => projection[2]
     bBox1.bottom = { std::floor(maxCoord[0]/2), 0 , 0};
     bBox1.top = maxCoord;
-    ValueType bBox1Weight = (bBox1.top[0]-bBox1.bottom[0])*(bBox1.top[1]-bBox1.bottom[1])*(bBox1.top[2]-bBox1.bottom[2]);
+    ValueType bBox1Weight = (bBox1.top[0]-bBox1.bottom[0]+1)*(bBox1.top[1]-bBox1.bottom[1]+1)*(bBox1.top[2]-bBox1.bottom[2]+1);
     bBox1.weight = bBox1Weight;
     root->insert(bBox1);
     
     rectangle bBox2;        // leafID=0 => projection[0]
     bBox2.bottom = {0, 0, 0};
-    bBox2.top = { std::floor(maxCoord[0]/2), std::floor(maxCoord[1]*0.75), maxCoord[2] };
-    ValueType bBox2Weight = (bBox2.top[0]-bBox2.bottom[0])*(bBox2.top[1]-bBox2.bottom[1])*(bBox2.top[2]-bBox2.bottom[2]);
+    bBox2.top = { std::floor(maxCoord[0]/2-1), std::floor(maxCoord[1]*0.75-1), maxCoord[2] };
+    ValueType bBox2Weight = (bBox2.top[0]-bBox2.bottom[0]+1)*(bBox2.top[1]-bBox2.bottom[1]+1)*(bBox2.top[2]-bBox2.bottom[2]+1);
     bBox2.weight = bBox2Weight;
     root->insert( bBox2 );
-    
+
     rectangle bBox3;        // leafID=1 => projection[1]
     bBox3.bottom = {0, std::floor(maxCoord[1]*0.75), 0};
-    bBox3.top = { std::floor(maxCoord[0]/2) , maxCoord[1], maxCoord[2] };
-    ValueType bBox3Weight = (bBox3.top[0]-bBox3.bottom[0])*(bBox3.top[1]-bBox3.bottom[1])*(bBox3.top[2]-bBox3.bottom[2]);
+    bBox3.top = { std::floor(maxCoord[0]/2-1) , maxCoord[1], maxCoord[2] };
+    ValueType bBox3Weight = (bBox3.top[0]-bBox3.bottom[0]+1)*(bBox3.top[1]-bBox3.bottom[1]+1)*(bBox3.top[2]-bBox3.bottom[2]+1);
     bBox3.weight = bBox3Weight;
     root->insert( bBox3 );
     
@@ -1411,8 +1313,8 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
 
     // bBox0 not leaf, bBox1=projections[2], bBox2=projections[0] , bBox3=projections[1]
 
-    ValueType totalGridWeight = maxCoord[0]*maxCoord[1]*maxCoord[2];
-    SCAI_ASSERT( totalGridWeight==nodeWeights.sum() , "Wrong sum of node weights: "<< nodeWeights.sum() );
+    ValueType totalGridWeight = N;
+    SCAI_ASSERT( totalGridWeight==nodeWeights.sum() , "Wrong sum of node weights: "<< nodeWeights.sum().Scalar::getValue<IndexType>() );
     
     for(int d=0; d<dimensions; d++){
         //dim2proj.size() = number of leaves/rectangles
@@ -1421,17 +1323,18 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
         
         std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projectionNonUniform( coordsIndex, nodeWeights, root, dim2proj, settings);
     
-        SCAI_ASSERT( projections[0].size()==(bBox2.top[d]-bBox2.bottom[d]), "Wrong size for projection 0");
-        SCAI_ASSERT( projections[1].size()==(bBox3.top[d]-bBox3.bottom[d]), "Wrong size for projection 1");
-        SCAI_ASSERT( projections[2].size()==(bBox1.top[d]-bBox1.bottom[d]), "Wrong size for projection 2");
+        SCAI_ASSERT( projections[0].size()==(bBox2.top[d]-bBox2.bottom[d]+1), "Wrong size for projection 0");
+        SCAI_ASSERT( projections[1].size()==(bBox3.top[d]-bBox3.bottom[d]+1), "Wrong size for projection 1");
+        SCAI_ASSERT( projections[2].size()==(bBox1.top[d]-bBox1.bottom[d]+1), "Wrong size for projection 2");
         
         SCAI_ASSERT( projections.size()==3, "projections size must be 3 but it is "<< projections.size() );
+        
         ValueType proj0Weight = std::accumulate( projections[0].begin(), projections[0].end(), 0 );
         ValueType proj1Weight = std::accumulate( projections[1].begin(), projections[1].end(), 0 );
         ValueType proj2Weight = std::accumulate( projections[2].begin(), projections[2].end(), 0 );
 
         SCAI_ASSERT( totalGridWeight == proj1Weight+proj0Weight+proj2Weight , "Total weight is "<< totalGridWeight << " but the sum of the two projections is "<<  proj1Weight+proj0Weight+proj2Weight );
-        SCAI_ASSERT( proj0Weight==bBox2Weight, "Weight of first rectangle is "<< bBox0Weight << " but the weight of the projection is "<< proj0Weight);
+        SCAI_ASSERT( proj0Weight==bBox2Weight, "Weight of first rectangle is "<< bBox2Weight << " but the weight of the projection is "<< proj0Weight);
         SCAI_ASSERT( proj1Weight==bBox3Weight, "Weight of second rectangle is "<< bBox3Weight << " but the weight of the projection is "<< proj1Weight);
         SCAI_ASSERT( proj2Weight==bBox1Weight, "Weight of third rectangle is "<< bBox1Weight << " but the weight of the projection is "<< proj2Weight);
     }    
@@ -1456,12 +1359,12 @@ TEST_F(MultiSectionTest, testInbBox){
     //bBox area = number of points in the box
     IndexType bBoxArea = 1;
     for(int i=0; i<dim; i++){
-        bBoxArea *= (bBox.top[i]-bBox.bottom[i]);
+        bBoxArea *= (bBox.top[i]-bBox.bottom[i]+1);
     }
     
     IndexType numPoints=0;
     for(int i=0; i<N; i++){
-        std::vector<IndexType> coords = MultiSection<IndexType,ValueType>::indexToCoords(i, sideLen, dim);
+        std::vector<IndexType> coords = MultiSection<IndexType,ValueType>::indexToCoords<IndexType>(i, sideLen, dim);
         if( MultiSection<IndexType, ValueType>::inBBox(coords, bBox) == true){
             ++numPoints;
         }
@@ -1483,7 +1386,7 @@ TEST_F(MultiSectionTest, testIndexTo){
     dim = 2;
     gridSize= sideLen*sideLen;
     for(int i=0; i<gridSize; i++){
-        std::vector<IndexType> p = MultiSection<IndexType, ValueType>::indexToCoords( i , sideLen, dim );
+        std::vector<IndexType> p = MultiSection<IndexType, ValueType>::indexToCoords<IndexType>( i , sideLen, dim );
         //PRINT(i<< ": " << p[0] << " , "<< p[1]);
         EXPECT_LE( p[0], sideLen);
         EXPECT_LE( p[1], sideLen);
@@ -1495,7 +1398,7 @@ TEST_F(MultiSectionTest, testIndexTo){
     dim = 3;
     gridSize= sideLen*sideLen*sideLen;
     for(int i=0; i<gridSize; i++){
-        std::vector<IndexType> t = MultiSection<IndexType, ValueType>::indexToCoords( i , sideLen, dim );
+        std::vector<IndexType> t = MultiSection<IndexType, ValueType>::indexToCoords<IndexType>( i , sideLen, dim );
         //PRINT(i<< ": " << t[0] << " , "<< t[1] << " , "<< t[2] );
         EXPECT_LE( t[0], sideLen);
         EXPECT_LE( t[1], sideLen);
