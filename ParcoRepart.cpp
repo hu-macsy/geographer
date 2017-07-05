@@ -103,6 +103,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         } else if (settings.initialPartition == InitialPartitioningMethods::Multisection) {// multisection
             scai::lama::DenseVector<ValueType> nodeWeights( inputDist, 1 );
         	result = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, nodeWeights, settings);
+            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
+        	result.redistribute(newDist);
         } else {
         	throw std::runtime_error("Initial Partitioning mode undefined.");
         }
