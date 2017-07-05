@@ -43,6 +43,7 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
 
     std::string path = "meshes/";
     std::string fileName = "Grid64x64";
+    //std::string fileName = "trace-00003.graph";
     std::string file = path + fileName;
     std::ifstream f(file);
     IndexType N, edges;
@@ -339,8 +340,9 @@ TEST_F(MultiSectionTest, test1DPartitionOptimal){
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
     const IndexType N= 100;
-    const ValueType w= 5;
-    const IndexType k= 7;
+    const ValueType w= 1;
+    const IndexType k= 5;
+    const IndexType optimalWeight = N/k;  // make sure N/k is int
     
     std::vector<ValueType> nodeWeights( N, w);
     
@@ -356,20 +358,24 @@ TEST_F(MultiSectionTest, test1DPartitionOptimal){
     
     //assertions - prints
     
+for(int i=0; i<part1D.size(); i++){
+    PRINT0(i<< ": " << part1D[i] << " ++ " << weightPerPart[i] );
+}
+    
     SCAI_ASSERT( part1D.size()==weightPerPart.size() , "Wrong size of returned vectors: part1D.size()= " << part1D.size() << " and weightPerPart.size()= "<< weightPerPart.size());
     
     //PRINT("0: from [0 to" << part1D[0] <<") with weight " <<  weightPerPart[0] );
     for(int i=0; i<part1D.size()-1; i++){
-        PRINT0( i << ": from ["<< part1D[i] << " to " << part1D[i+1] <<") with weight " << weightPerPart[i]);
+        PRINT0( i << ": from ["<< part1D[i] << " to " << part1D[i+1] -1<<"] with weight " << weightPerPart[i]);
     }
-    PRINT(k-1 << ": from ["<< part1D.back() << " to " << N << ") with weight " << weightPerPart.back() );
+    PRINT(k-1 << ": from ["<< part1D.back() << " to " << N-1 << "] with weight " << weightPerPart.back() );
     
     ValueType totalWeight = std::accumulate(weightPerPart.begin(), weightPerPart.end(), 0);
     ValueType averageWeight = totalWeight/k;
         
     SCAI_ASSERT( totalWeight==origTotalWeight, "totalWeight= "<< totalWeight << " should be= "<< origTotalWeight );
     
-    
+    SCAI_ASSERT( *std::max_element(weightPerPart.begin(), weightPerPart.end())==optimalWeight, "Partition not optimal." )
     
 }
 //---------------------------------------------------------------------------------------

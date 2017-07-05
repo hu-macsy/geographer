@@ -30,6 +30,7 @@
 #include "MultiLevel.h"
 #include "SpectralPartition.h"
 #include "AuxiliaryFunctions.h"
+#include "MultiSection.h"
 
 namespace ITI {
 
@@ -93,12 +94,19 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         // get an initial partition
         DenseVector<IndexType> result;
         
-        if( settings.initialPartition==0 ){ //sfc
+        if (settings.initialPartition==InitialPartitioningMethods::SFC) { //sfc
             result= ParcoRepart<IndexType, ValueType>::hilbertPartition(input, coordinates, settings);
-        }else if( settings.initialPartition==1 ){ // pixel
+        } else if (settings.initialPartition==InitialPartitioningMethods::Pixel) { // pixel
             result = ParcoRepart<IndexType, ValueType>::pixelPartition(input, coordinates, settings);
-        }else{ // spectral
+        } else if (settings.initialPartition == InitialPartitioningMethods::Spectral) {// spectral
             result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
+        } else if (settings.initialPartition == InitialPartitioningMethods::Multisection) {// multisection
+            scai::lama::DenseVector<ValueType> nodeWeights( inputDist, 1 );
+        	result = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, nodeWeights, settings);
+            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
+        	result.redistribute(newDist);
+        } else {
+        	throw std::runtime_error("Initial Partitioning mode undefined.");
         }
         SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
         

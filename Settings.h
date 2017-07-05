@@ -1,5 +1,7 @@
 #pragma once
 
+enum class InitialPartitioningMethods {SFC = 0, Pixel = 1, Spectral = 2, Multisection = 3};
+
 struct Settings{
     IndexType dimensions= 3;
     IndexType numX = 32;
@@ -15,7 +17,7 @@ struct Settings{
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
     IndexType pixeledSideLen = 10;
-    IndexType initialPartition = 0;     //0:sfc, 1:pixeled, 2: multisection
+    InitialPartitioningMethods initialPartition = InitialPartitioningMethods::SFC;
     bool useDiffusionTieBreaking = false;
     bool useGeometricTieBreaking = false;
     bool gainOverBalance = false;
@@ -40,13 +42,15 @@ struct Settings{
         out<< "gainOverBalance: " << gainOverBalance << std::endl;
         out<< "skipNoGainColors: "<< skipNoGainColors << std::endl;
         out<< "pixeledSideLen: "<< pixeledSideLen << std::endl;
-        if( initialPartition==0){
+        if (initialPartition==InitialPartitioningMethods::SFC) {
             out<< "initial partition: hilbert curve" << std::endl;
-        }else if( initialPartition==1 ){
+        } else if (initialPartition==InitialPartitioningMethods::Pixel) {
             out<< "initial partition: pixels" << std::endl;
-        }else if( initialPartition==2 ){
-            out<< "initial partition: spectral " << std::endl;
-        }else{
+        } else if (initialPartition==InitialPartitioningMethods::Spectral) {
+            out<< "initial partition: spectral" << std::endl;
+        } else if (initialPartition==InitialPartitioningMethods::Multisection) {
+        	out<< "initial partition: multisection" << std::endl;
+        } else {
             out<< "initial partition undefined" << std::endl;
         }
     }
