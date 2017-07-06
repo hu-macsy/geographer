@@ -136,11 +136,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
     
     IndexType k = settings.numBlocks;
     const IndexType dimensions = coordinates.size();
+    assert(dimensions == settings.dimensions);
     const IndexType localN = inputDist->getLocalSize();
     const IndexType globalN = inputDist->getGlobalSize();
     
-    std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
-    std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
+    std::vector<ValueType> minCoords(dimensions);
+    std::vector<ValueType> maxCoords(dimensions);
     DenseVector<IndexType> result;
     
     if( ! inputDist->isEqual(*coordDist) ){
@@ -148,29 +149,18 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
     }
     
     /**
-     * get minimum / maximum of local coordinates
+     * get minimum / maximum of coordinates
      */
     {
 		SCAI_REGION( "ParcoRepart.initialPartition.minMax" )
 		for (IndexType dim = 0; dim < dimensions; dim++) {
-			//get local parts of coordinates
-			scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
-			for (IndexType i = 0; i < localN; i++) {
-				ValueType coord = localPartOfCoords[i];
-				if (coord < minCoords[dim]) minCoords[dim] = coord;
-				if (coord > maxCoords[dim]) maxCoords[dim] = coord;
-			}
-		}
-
-		/**
-		 * communicate to get global min / max
-		 */
-		for (IndexType dim = 0; dim < dimensions; dim++) {
-			minCoords[dim] = comm->min(minCoords[dim]);
-			maxCoords[dim] = comm->max(maxCoords[dim]);
+			minCoords[dim] = coordinates[dim].min().Scalar::getValue<ValueType>();
+			maxCoords[dim] = coordinates[dim].max().Scalar::getValue<ValueType>();
+			assert(std::isfinite(minCoords[dim]));
+			assert(std::isfinite(maxCoords[dim]));
+			assert(maxCoords[dim] > minCoords[dim]);
 		}
     }
-    
     /**
      * Several possibilities exist for choosing the recursion depth.
      * Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
@@ -313,7 +303,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     const IndexType sideLen = std::pow(2,detailLvl);
     const IndexType cubeSize = std::pow(sideLen, dimensions);
     
-    //TODO: generalise this to arbitrary dimensions, do not handle 2D and 3D differently
+    //TODO: generalize this to arbitrary dimensions, do not handle 2D and 3D differently
     // a 2D or 3D arrays as a one dimensional vector
     // [i][j] is in position: i*sideLen + j
     // [i][j][k] is in: i*sideLen*sideLen + j*sideLen + k
