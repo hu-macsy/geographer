@@ -308,8 +308,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
    
     // measure density with rounding
     // have to handle 2D and 3D cases seperately
-    const IndexType detailLvl = settings.pixeledDetailLevel;
-    const IndexType sideLen = std::pow(2,detailLvl);
+    const IndexType sideLen = settings.pixeledSideLen;
     const IndexType cubeSize = std::pow(sideLen, dimensions);
     
     //TODO: generalise this to arbitrary dimensions, do not handle 2D and 3D differently
@@ -321,7 +320,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     //std::vector<IndexType> density( cubeSize ,0);
     scai::hmemo::HArray<IndexType> density( cubeSize, 0);
     scai::hmemo::WriteAccess<IndexType> wDensity(density);
-    //std::cout<< "detailLvl= " << detailLvl <<", sideLen= " << sideLen << ", " << "density.size= " << density.size() << std::endl;
+
     SCAI_REGION_END("ParcoRepart.pixelPartition.initialise")
     
     if(dimensions==2){
@@ -381,8 +380,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
         ITI::aux::writeHeatLike_local_2D(density, sideLen, dimensions, "heat_"+settings.fileName+".plt");
     }
   
+    //
     //using the summed density get an initial pixeled partition
-    
+    //
     std::vector<IndexType> pixeledPartition( sumDensity.size() , -1);
     
     IndexType pointsLeft= globalN;
@@ -441,7 +441,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
                 toInsert.first = neighbours[j];
                 SCAI_ASSERT(neighbours[j] < sumDensity.size(), "Too big index: " + std::to_string(neighbours[j]));
                 SCAI_ASSERT(neighbours[j] >= 0, "Negative index: " + std::to_string(neighbours[j]));
-                geomSpread = 1 + 1/detailLvl*( std::abs(sideLen/2 - neighbours[j]/sideLen)/(0.8*sideLen/2) + std::abs(sideLen/2 - neighbours[j]%sideLen)/(0.8*sideLen/2) );
+                geomSpread = 1 + 1/std::log2(sideLen)*( std::abs(sideLen/2 - neighbours[j]/sideLen)/(0.8*sideLen/2) + std::abs(sideLen/2 - neighbours[j]%sideLen)/(0.8*sideLen/2) );
                 //PRINT0( geomSpread );            
                 // value to pick a border node
                 pixelDistance = aux::pixell2Distance2D( maxDensityPixel, neighbours[j], sideLen);
@@ -458,7 +458,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
         
 
         while(border.size() !=0 ){      // there are still pixels to check
-            
             //TODO: different data type to avoid that
             // sort border by the value in increasing order 
             std::sort( border.begin(), border.end(),
@@ -632,7 +631,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(result, k);
     if (comm->getRank() == 0) {
         std::chrono::duration<double> elapsedSeconds = std::chrono::steady_clock::now() -start;
-        std::cout << "\033[1;35mWith pixel detail level= "<< detailLvl<<" (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
+        std::cout << "\033[1;35mWith pixel side length= "<< sideLen<<" (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
         std::cout<< "and imbalance= " << imbalance << "\033[0m"<< std::endl;
     }
     SCAI_REGION_END("ParcoRepart.pixelPartition.finalRedistribute")

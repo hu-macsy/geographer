@@ -645,7 +645,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         scai::lama::DenseVector<IndexType> pixelPartition;
         
         for(int detail= 0; detail<np; detail++){           
-            settings.pixeledDetailLevel= detail + np;
+            settings.pixeledSideLen= std::pow( 2, detail + np );
             pixelPartition = ITI::ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coordsDV, settings);
             cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, pixelPartition, true);
             if (cut<maxCut){

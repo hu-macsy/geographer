@@ -67,8 +67,8 @@ int main(int argc, char** argv) {
 				("minBorderNodes", value<int>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
 				//("sfcRecursionSteps", value<int>(&settings.sfcResolution)->default_value(settings.sfcResolution), "Tuning parameter: Recursion Level of space filling curve. A value of 0 causes the recursion level to be derived from the graph size.")
-                                ("initialPartition", value<int>(&settings.initialPartition)->default_value(settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition")
-                                ("pixeledDetailLevel", value<int>(&settings.pixeledDetailLevel)->default_value(settings.pixeledDetailLevel), "The resolution for the pixeled partition or the spectral")
+                                ("initialPartition", value<int>(&settings.initialPartition)->default_value(settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for multisection")
+                                ("pixeledSideLen", value<int>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
 				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
 				("useDiffusionTieBreaking", value<bool>(&settings.useDiffusionTieBreaking)->default_value(settings.useDiffusionTieBreaking), "Tuning Parameter: Use diffusion to break ties in Fiduccia-Mattheyes algorithm")
@@ -239,10 +239,10 @@ int main(int argc, char** argv) {
     ValueType cut;
     ValueType imbalance;
     
-    settings.pixeledDetailLevel = 4;
     settings.minGainForNextRound = 10;
     settings.minBorderNodes = 10;
     settings.useGeometricTieBreaking = 1;
+    settings.pixeledSideLen = int ( std::min(settings.numBlocks, 100) );
     
     std::string destPath = "./partResults/testInitial/blocks_"+std::to_string(settings.numBlocks)+"/";
     boost::filesystem::create_directories( destPath );   
@@ -265,149 +265,109 @@ int main(int argc, char** argv) {
     std::chrono::duration<double> partitionTime;
     std::chrono::duration<double> finalPartitionTime;
     
+    
     using namespace ITI;
-    
-    //------------------------------------------- hilbert/sfc
-    
-    // the partitioning may redistribute the input graph
     graph.redistribute( rowDistPtr, noDistPtr);
     for(int d=0; d<dimensions; d++){
         coordinates[d].redistribute( rowDistPtr );
     }    
     if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
     
-    beforeInitialTime =  std::chrono::system_clock::now();
-    PRINT0( "Get a hilbert/sfc partition");
-    // get a hilbertPartition
-    scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition( graph, coordinates, settings);
+    comm->synchronize();
     
-    partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
+    int initialPartition = settings.initialPartition;
     
-    assert( hilbertPartition.size() == N);
-    assert( coordinates[0].size() == N);
-    
-    //aux::print2DGrid( graph, hilbertPartition );
-    //if(dimensions==2){
-    //    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"hilbertPart");
-    //}
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, hilbertPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
-    if(comm->getRank()==0){
-        logF<< "-- Initial Hilbert/sfc partition time: " << partitionTime.count() <<  std::endl;
-        logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
-    }
-    
-    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, settings);
-    
-    finalPartitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
-    
-    //if(dimensions==2){
-    //   ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithHilbert");
-    //}
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, hilbertPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
-    if(comm->getRank()==0){
-        logF<< "   After multilevel, total time: " << finalPartitionTime.count() << std::endl;
-        logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
-        logF  << std::endl  << std::endl; 
-    }
-    
-    //------------------------------------------- pixeled
+    switch(initialPartition){
+        case 0:{  //------------------------------------------- hilbert/sfc
+           
+            beforeInitialTime =  std::chrono::system_clock::now();
+            PRINT0( "Get a hilbert/sfc partition");
+            
+            // get a hilbertPartition
+            scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition( graph, coordinates, settings);
+            
+            partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
+            
+            assert( hilbertPartition.size() == N);
+            assert( coordinates[0].size() == N);
+            
+            //aux::print2DGrid( graph, hilbertPartition );
+            //if(dimensions==2){
+            //    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"hilbertPart");
+            //}
+            
+            //if(dimensions==2){
+            //   ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithHilbert");
+            //}
+            cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, hilbertPartition);
+            imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
+            if(comm->getRank()==0){
+                logF<< "   Initial sfc, total time: " << partitionTime.count() << std::endl;
+                logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
+                logF  << std::endl  << std::endl; 
+            }   
+            comm->synchronize();
+            break;
+        }
+        case 1:{  //------------------------------------------- pixeled
   
-    // the partitioning may redistribute the input graph
-    graph.redistribute(rowDistPtr, noDistPtr);
-    for(int d=0; d<dimensions; d++){
-        coordinates[d].redistribute( rowDistPtr );
-    }    
-    if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
-    
-    beforeInitialTime =  std::chrono::system_clock::now();
-    PRINT0( "Get a pixeled partition");
-    // get a hilbertPartition
-    scai::lama::DenseVector<IndexType> pixeledPartition = ParcoRepart<IndexType, ValueType>::pixelPartition( graph, coordinates, settings);
-    
-    partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
-    
-    assert( pixeledPartition.size() == N);
-    assert( coordinates[0].size() == N);
-    
-    //aux::print2DGrid( graph, hilbertPartition );
-    //if(dimensions==2){
-    //    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"hilbertPart");
-    //}
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, pixeledPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
-    if(comm->getRank()==0){
-        logF<< "-- Initial pixel partition time: " << partitionTime.count() <<  std::endl;
-        logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
-    }
-    
-    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, settings);
-    
-    finalPartitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
-    
-    //if(dimensions==2){
-    //   ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithHilbert");
-    //}
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, pixeledPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
-    if(comm->getRank()==0){
-        logF<< "   After multilevel, total time: " << finalPartitionTime.count() << std::endl;
-        logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
-        logF  << std::endl  << std::endl; 
+            beforeInitialTime =  std::chrono::system_clock::now();
+            PRINT0( "Get a pixeled partition");
+            
+            // get a pixelPartition
+            scai::lama::DenseVector<IndexType> pixeledPartition = ParcoRepart<IndexType, ValueType>::pixelPartition( graph, coordinates, settings);
+            
+            partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
+            
+            assert( pixeledPartition.size() == N);
+            assert( coordinates[0].size() == N);
+            
+            //if(dimensions==2){
+            //   ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithPixel");
+            //}
+            cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, pixeledPartition);
+            imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
+            if(comm->getRank()==0){
+                logF<< "-- Initial pixeled, total time: " << partitionTime.count() << std::endl;
+                logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
+                logF  << std::endl  << std::endl; 
+            }
+            break;
+        }
+        case 2:{  //------------------------------------------- multisection
+            
+            // unit weights
+            scai::lama::DenseVector<ValueType> nodeWeights( rowDistPtr, 1);
+            
+            beforeInitialTime =  std::chrono::system_clock::now();
+            PRINT0( "Get a partition with multisection");
+            
+            // get a multisection partition
+            scai::lama::DenseVector<IndexType> multiSectionPartition =  MultiSection<IndexType, ValueType>::getPartitionNonUniform( graph, coordinates, nodeWeights, settings);
+            
+            partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
+            
+            assert( multiSectionPartition.size() == N);
+            assert( coordinates[0].size() == N);
+            
+            //if(dimensions==2){
+            //   ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithMS");
+            //}
+            cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, multiSectionPartition);
+            imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( multiSectionPartition, k);
+            if(comm->getRank()==0){
+                logF<< "--  Initial multisection, total time: " << partitionTime.count() << std::endl;
+                logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
+                logF  << std::endl  << std::endl; 
+            }
+            break;   
+        }
+        default:{
+            PRINT0("Value "<< initialPartition << " for option initialPartition not suppoerted" );
+            break;
+        }
     }
  
- //------------------------------------------- multisection
-  
-    // the partitioning may redistribute the input graph
-    graph.redistribute(rowDistPtr, noDistPtr);
-    for(int d=0; d<dimensions; d++){
-        coordinates[d].redistribute( rowDistPtr );
-    }    
-    if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
-    
-    // unit weights
-    scai::lama::DenseVector<ValueType> nodeWeights( rowDistPtr, 1);
-    
-    beforeInitialTime =  std::chrono::system_clock::now();
-    PRINT0( "Get a partition with multisection");
-    // get a multisection partition
-    scai::lama::DenseVector<IndexType> multiSectionPartition =  MultiSection<IndexType, ValueType>::getPartitionNonUniform( graph, coordinates, nodeWeights, settings);
-    
-    partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
-    
-    assert( multiSectionPartition.size() == N);
-    assert( coordinates[0].size() == N);
-    
-    //aux::print2DGrid( graph, hilbertPartition );
-    //if(dimensions==2){
-    //    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"hilbertPart");
-    //}
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, multiSectionPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( multiSectionPartition, k);
-    if(comm->getRank()==0){
-        logF<< "-- Initial pixel partition time: " << partitionTime.count() <<  std::endl;
-        logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
-    }
-    
-    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
-    //ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, multiSectionPartition, uniformWeights, coordinates, settings);
-    
-    finalPartitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
-    
-    //if(dimensions==2){
-    //   ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithHilbert");
-    //}
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, multiSectionPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( multiSectionPartition, k);
-    if(comm->getRank()==0){
-        logF<< "   After multilevel, total time: " << finalPartitionTime.count() << std::endl;
-        logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
-        logF  << std::endl  << std::endl; 
-    }
-    
     /*
      *  commenting out spectral, it is not correct yet
      * 

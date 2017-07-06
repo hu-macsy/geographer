@@ -442,7 +442,7 @@ TEST_F(SpectralPartitionTest, testGetPartition){
        
     PRINT0("Get a spectral partition");
     // get spectral partition
-    settings.pixeledDetailLevel = 4;    //4  for a 16x16 coarsen graph
+    settings.pixeledSideLen = 16;    // for a 16x16 coarsen graph
     scai::lama::DenseVector<IndexType> spectralPartition = SpectralPartition<IndexType, ValueType>::getPartition( graph, coordinates, settings);
     
     if(dimensions==2){
@@ -487,7 +487,7 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    settings.pixeledDetailLevel = 4;    //4  for a 16x16 coarsen graph
+    settings.pixeledSideLen = 16;    // for a 16x16 coarsen graph
 
     // get a pixeled-coarsen graph , this is replicated in every PE
     scai::lama::DenseVector<IndexType> pixelWeights;
@@ -505,58 +505,58 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     IndexType numPixels = pixelGraph.getNumRows();
     SCAI_ASSERT( numPixels == pixelGraph.getNumColumns(), "Wrong pixeled graph.");
     SCAI_ASSERT( pixelGraph.isConsistent() == 1 , "Pixeled graph not consistent.");
-    if(settings.pixeledDetailLevel < 6) SCAI_ASSERT( pixelGraph.checkSymmetry() == 1 , "Pixeled graph not symmetric.");
+    if(settings.pixeledSideLen < 32) SCAI_ASSERT( pixelGraph.checkSymmetry() == 1 , "Pixeled graph not symmetric.");
     
     // get the vector using Eigen
     DenseVector<ValueType> eigenVec (numPixels, -1);
     ValueType eigenEigenValue =0;
-    //{
-        // get the laplacian of the pixeled graph , since the pixeled graph is replicated so should be the laplacian
-        scai::lama::CSRSparseMatrix<ValueType> pixelLaplacian = SpectralPartition<IndexType, ValueType>::getLaplacian( pixelGraph );
-        SCAI_ASSERT( pixelLaplacian.isConsistent() == 1 , "Laplacian graph not consistent.");
-        SCAI_ASSERT( pixelLaplacian.getNumRows() == numPixels , "Wrong size of the laplacian.");
-        ValueType sum=0;
-        {// the sum of all elements of the laplacian should be 0
-            scai::hmemo::ReadAccess<ValueType> readLaplVal(pixelLaplacian.getLocalStorage().getValues() );
-            for(int i=0; i<readLaplVal.size(); i++){
-                sum += readLaplVal[i];
-            }
-        }
-        // this does not work with the version of pixel coarsen where we add edge to isolated vertices
-        //EXPECT_EQ( sum , 0 );
-        
-        // the Eigen approach for the pixeled graph
-
-        using Eigen::MatrixXd;
-        using namespace Eigen;
-        
-        // copy to an eigen::matrix
-        MatrixXd eigenLapl( numPixels, numPixels);
-        assert(numPixels == pixelLaplacian.getNumRows());
-        for( int r=0; r<pixelLaplacian.getNumRows(); r++){
-            for( int c=0; c<pixelLaplacian.getNumColumns(); c++){
-                eigenLapl(c,r) = pixelLaplacian.getValue( r, c).Scalar::getValue<ValueType>();
-            }
-        }
     
-        // solve and get the second eigenvector
-        SelfAdjointEigenSolver<MatrixXd> eigensolver( eigenLapl );
-        VectorXd secondEigenVector = eigensolver.eigenvectors().col(1) ;
-        SCAI_ASSERT( secondEigenVector.size() == numPixels, "Sizes do not agree.");
-        eigenEigenValue= eigensolver.eigenvalues()[1];
-        
-        // copy to DenseVector
-        for(int i=0; i<secondEigenVector.size(); i++){
-            eigenVec.setValue( i, secondEigenVector[i]);
+    // get the laplacian of the pixeled graph , since the pixeled graph is replicated so should be the laplacian
+    scai::lama::CSRSparseMatrix<ValueType> pixelLaplacian = SpectralPartition<IndexType, ValueType>::getLaplacian( pixelGraph );
+    SCAI_ASSERT( pixelLaplacian.isConsistent() == 1 , "Laplacian graph not consistent.");
+    SCAI_ASSERT( pixelLaplacian.getNumRows() == numPixels , "Wrong size of the laplacian.");
+    ValueType sum=0;
+    {// the sum of all elements of the laplacian should be 0
+        scai::hmemo::ReadAccess<ValueType> readLaplVal(pixelLaplacian.getLocalStorage().getValues() );
+        for(int i=0; i<readLaplVal.size(); i++){
+            sum += readLaplVal[i];
         }
-            
-        DenseVector<ValueType> prod ( pixelGraph*eigenVec);
-        DenseVector<ValueType> prod2 ( eigensolver.eigenvalues()[1]*eigenVec);
-        for(int i=0; i<prod.getLocalValues().size(); i++){
-            //PRINT0( eigenVec.getLocalValues()[i]<< " _ "<< prod.getLocalValues()[i] << " == "<< prod2.getLocalValues()[i]);
-            //PRINT0(prod.getLocalValues()[i]/ prod2.getLocalValues()[i]);
+    }
+    // this does not work with the version of pixel coarsen where we add edge to isolated vertices
+    //EXPECT_EQ( sum , 0 );
+    
+    // the Eigen approach for the pixeled graph
+    
+    using Eigen::MatrixXd;
+    using namespace Eigen;
+    
+    // copy to an eigen::matrix
+    MatrixXd eigenLapl( numPixels, numPixels);
+    assert(numPixels == pixelLaplacian.getNumRows());
+    for( int r=0; r<pixelLaplacian.getNumRows(); r++){
+        for( int c=0; c<pixelLaplacian.getNumColumns(); c++){
+            eigenLapl(c,r) = pixelLaplacian.getValue( r, c).Scalar::getValue<ValueType>();
         }
-    //}
+    }
+    
+    // solve and get the second eigenvector
+    SelfAdjointEigenSolver<MatrixXd> eigensolver( eigenLapl );
+    VectorXd secondEigenVector = eigensolver.eigenvectors().col(1) ;
+    SCAI_ASSERT( secondEigenVector.size() == numPixels, "Sizes do not agree.");
+    eigenEigenValue= eigensolver.eigenvalues()[1];
+    
+    // copy to DenseVector
+    for(int i=0; i<secondEigenVector.size(); i++){
+        eigenVec.setValue( i, secondEigenVector[i]);
+    }
+    
+    DenseVector<ValueType> prod ( pixelGraph*eigenVec);
+    DenseVector<ValueType> prod2 ( eigensolver.eigenvalues()[1]*eigenVec);
+    for(int i=0; i<prod.getLocalValues().size(); i++){
+        //PRINT0( eigenVec.getLocalValues()[i]<< " _ "<< prod.getLocalValues()[i] << " == "<< prod2.getLocalValues()[i]);
+        //PRINT0(prod.getLocalValues()[i]/ prod2.getLocalValues()[i]);
+    }
+
     
     // get the fiedler vector for the pixeled graph using LAMA
     ValueType eigenvalue;

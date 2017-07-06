@@ -80,7 +80,7 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
     
     // scale= N^(1/d): this way the scaled max is N^(1/d) and this is also the maximum size of the projection arrays
     ValueType scale = std::pow( globalN, 1.0/dim);
-    
+PRINT0( scale );
     {
         SCAI_REGION( "MultiSection.getPartitionNonUniform.minMaxAndScale" )
         
@@ -95,14 +95,16 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
         }
         
         //  communicate to get global min / max
-        // WARNING/TODO: because the max coordinate of a bounding box does belong in the box ( box=[min,manx) )
-        //          we must +1. or TODO: do it inside the getRectanglesNonUniform() function
+        //
         for (IndexType d = 0; d < dim; d++) {
+            SCAI_REGION( "MultiSection.getPartitionNonUniform.minMaxAndScale.minMax" )
             minCoords[d] = comm->min(minCoords[d]);
-            maxCoords[d] = comm->max(maxCoords[d])+1;
-            scaledMax[d] = scale;
+            maxCoords[d] = comm->max(maxCoords[d]);
+            scaledMax[d] = int(scale)  ;
             scaledMin[d] = 0;
         }
+        
+        PRINT0("max coord= " << *std::max_element(maxCoords.begin(), maxCoords.end() ) << "  and max scaled coord= " << *std::max_element(scaledMax.begin(), scaledMax.end() ) );
         
         for (IndexType d = 0; d < dim; d++) {
             
@@ -143,7 +145,7 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
     }
     
     for (IndexType d=0; d<dim; d++) {
-        SCAI_ASSERT( scaledMax[d]<= std::pow(globalN, 1.0/dim), "Scaled maximum value "<< scaledMax[d] << " is too large. should be less than " << std::pow(globalN, 1.0/dim) );
+        SCAI_ASSERT( scaledMax[d]<= std::pow(globalN, 1.0/dim)+1, "Scaled maximum value "<< scaledMax[d] << " is too large. should be less than " << std::pow(globalN, 1.0/dim) );
         if( scaledMin[d]!=0 ){
             //TODO: it works even if scaledMin is not 0 but the projection arrays will start from 0 and the first 
             //      elements will just always be 0.
@@ -312,7 +314,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         SCAI_ASSERT( projections.size()==numLeaves, "Wrong number of projections"); 
 
         for(int l=0; l<numLeaves; l++){        
-            SCAI_REGION("MultiSection.getRectangles.createRectanglesAndPush");
+            SCAI_REGION("MultiSection.getRectangles.forAllRectangles.createRectanglesAndPush");
             //perform 1D partitioning for the chosen dimension
             std::vector<IndexType> part1D;
             std::vector<ValueType> weightPerPart, thisProjection = projections[l];
@@ -330,24 +332,24 @@ ValueType dbg_rectW=0;
             struct rectangle newRect;
             newRect.bottom = thisRectangle.bottom;
             newRect.top = thisRectangle.top;
-            
+            /*
             //first rectangle
             newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[0]+1;
             newRect.weight = weightPerPart[0];
             root->insert( newRect );     
 dbg_rectW += newRect.weight;
-
+*/
             for(int h=0; h<part1D.size()-1; h++ ){
                 //change only the chosen dimension
-                newRect.bottom[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h]+1;
-                newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h+1]+1;
-                newRect.weight = weightPerPart[h+1];
+                newRect.bottom[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h];
+                newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h+1];
+                newRect.weight = weightPerPart[h];
                 root->insert( newRect );
 dbg_rectW += newRect.weight;                
             }
             
             //last rectangle
-            newRect.bottom[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D.back()+1;
+            newRect.bottom[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D.back();
             newRect.top = thisRectangle.top;
             newRect.weight = weightPerPart.back();
             root->insert( newRect );
@@ -538,6 +540,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     struct rectangle bBox;
     
     // at first the bounding box is the whole space
+    // WARNING: because the max coordinate of a bounding box does belong in the box ( box=[min,manx) ) we must +1.
     for(int d=0; d<dim; d++){
         bBox.bottom.push_back( minCoords[d]);
         bBox.top.push_back( maxCoords[d] );
@@ -608,17 +611,23 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         SCAI_ASSERT( projections.size()==numLeaves, "Wrong number of projections"); 
  
         for(int l=0; l<numLeaves; l++){        
-            SCAI_REGION("MultiSection.getRectanglesNonUniform.createRectanglesAndPush");
+            SCAI_REGION("MultiSection.getRectanglesNonUniform.forAllRectangles.createRectanglesAndPush");
             //perform 1D partitioning for the chosen dimension
             std::vector<IndexType> part1D;
             std::vector<ValueType> weightPerPart, thisProjection = projections[l];
             IndexType thisChosenDim = chosenDim[l];
 
-            //partiD.size() = thisDimCuts-1 , weightPerPart.size = thisDimCuts 
-            std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DGreedy( thisProjection, *thisDimCuts, settings);
-
+            //partiD.size() = *thisDimCuts , weightPerPart.size = *thisDimCuts 
+            std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( thisProjection, *thisDimCuts, settings);
+            
+            SCAI_ASSERT( part1D.size()== *thisDimCuts , "Wrong size of 1D partition")
+            SCAI_ASSERT( weightPerPart.size()== *thisDimCuts , "Wrong size of 1D partition")
+            
+for(int i=0; i<*thisDimCuts; i++){
+    PRINT0(i<< ": " << part1D[i] << " ++ " << weightPerPart[i] );
+}
             // TODO: possibly expensive assertion
-            SCAI_ASSERT( std::accumulate(thisProjection.begin(), thisProjection.end(), 0)==std::accumulate( weightPerPart.begin(), weightPerPart.end(), 0), "Weights are wrong." )
+            SCAI_ASSERT( std::accumulate(thisProjection.begin(), thisProjection.end(), 0)==std::accumulate( weightPerPart.begin(), weightPerPart.end(), 0), "Weights are wrong, totalWeight of thisProjection= "  << std::accumulate(thisProjection.begin(), thisProjection.end(), 0) << " , total weight of weightPerPart= " << std::accumulate( weightPerPart.begin(), weightPerPart.end(), 0) );
             
             //TODO: make sure that projections[l] and allLeaves[l] refer to the same rectangle
             struct rectangle thisRectangle = allLeaves[l]->getRect();
@@ -628,24 +637,19 @@ ValueType dbg_rectW=0;
             struct rectangle newRect;
             newRect.bottom = thisRectangle.bottom;
             newRect.top = thisRectangle.top;
-            
-            //first rectangle
-            newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[0]+1;
-            newRect.weight = weightPerPart[0];
-            root->insert( newRect );     
-dbg_rectW += newRect.weight;
 
             for(int h=0; h<part1D.size()-1; h++ ){
                 //change only the chosen dimension
-                newRect.bottom[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h]+1;
-                newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h+1]+1;
-                newRect.weight = weightPerPart[h+1];
+                newRect.bottom[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h];
+                newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h+1];
+                newRect.weight = weightPerPart[h];
                 root->insert( newRect );
+newRect.print();                
 dbg_rectW += newRect.weight;                
             }
             
             //last rectangle
-            newRect.bottom[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D.back()+1;
+            newRect.bottom[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D.back();
             newRect.top = thisRectangle.top;
             newRect.weight = weightPerPart.back();
             root->insert( newRect );
@@ -784,50 +788,49 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
     
     ValueType totalWeight = std::accumulate(projection.begin(), projection.end(), 0);
     ValueType averageWeight = totalWeight/k;
-    
+  
     if(projection.size()==0){
         throw std::runtime_error( "In MultiSection::partition1DGreedy, input projection vector is empty");
     }
 
-    std::vector<IndexType> partHyperplanes(k-1,-9);
+    std::vector<IndexType> partHyperplanes(k,-9);
     std::vector<ValueType> weightPerPart(k,-9);
-    IndexType part=0;
-    ValueType thisPartWeight = 0;
-    ValueType epsilon = 0.05;   // imbalance parameter
     
-    /*
-     * TODO: change to a dynamic programming or iterative (or whatever) algorithm that is optimal (?)
-     */
+    partHyperplanes[0] = 0;
+    IndexType part = 1;
+    ValueType thisPartWeight = 0;
     
     // greedy 1D partition (a 2-approx solution?)
     for(int i=0; i<projection.size(); i++){
+        if( part>k) break;
+        //SCAI_ASSERT( part<k , "Index " << part << " too big, must be < " << k << " and i= " << i );
         thisPartWeight += projection[i];
-        if( thisPartWeight > averageWeight /* *(1+epsilon)*/){
+        if( thisPartWeight > averageWeight ){
             SCAI_ASSERT(part < partHyperplanes.size(), "index: "<< part << " too big, must be < "<< partHyperplanes.size() )
             // choose between keeping the projection[i] in the sum, having something more than the average
             // or do not add projection[i] and get something below average
-            if( averageWeight-(thisPartWeight-projection[i]) < thisPartWeight-averageWeight ){
-                IndexType hyperplane = i-1;
-                partHyperplanes[part]= hyperplane;
+            //if( 2*(averageWeight-thisPartWeight)+projection[i] < 0 ){
+                partHyperplanes[part]= i;
                 // calculate new total weight left and new average weight
                 totalWeight = totalWeight - thisPartWeight + projection[i];
-                weightPerPart[part] = thisPartWeight - projection[i];                
+                weightPerPart[part-1] = thisPartWeight - projection[i];                
                 --i;
-            }else{  // choose solution that is more than the average
-                IndexType hyperplane = i;
-                partHyperplanes[part]= hyperplane;
+            /*
+        }else{  // choose solution that is more than the average
+                partHyperplanes[part]= i;
                 // calculate new total weight left and new average weight
                 totalWeight = totalWeight - thisPartWeight;
                 weightPerPart[part] = thisPartWeight;
             }
-            averageWeight = totalWeight/(k-part-1);
+            */
+            averageWeight = totalWeight/(k-part);
             thisPartWeight = 0;
             ++part;
         }
     }
-    
-    weightPerPart[part] = totalWeight;
-  
+   
+    weightPerPart[k-1] = totalWeight;
+
     return std::make_pair(partHyperplanes, weightPerPart);
 }
 //---------------------------------------------------------------------------------------
@@ -842,16 +845,16 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
     //
     //create the prefix sum array
     //
-    std::vector<ValueType> prefixSum( N , 0);
+    std::vector<ValueType> prefixSum( N+1 , 0);
     
-    prefixSum[0] = nodeWeights[0];
+    prefixSum[0] = 0;// nodeWeights[0];
     
-    for(IndexType i=1; i<N; i++ ){
-        prefixSum[i] = prefixSum[i-1] + nodeWeights[i]; 
+    for(IndexType i=1; i<N+1; i++ ){
+        prefixSum[i] = prefixSum[i-1] + nodeWeights[i-1];
     }
     
     ValueType totalWeight = prefixSum.back();
-    
+PRINT( totalWeight );    
     ValueType lowerBound, upperBound;
     lowerBound = totalWeight/k;         // the optimal average weight
     upperBound = totalWeight;
@@ -866,7 +869,7 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
         IndexType indexHigh = N;
         while( indexLow<indexHigh ){
             IndexType indexMid = (indexLow+indexHigh)/2;
-            ValueType tmpSum = prefixSum[indexMid] - prefixSum[partIndices[p-1]-1];
+            ValueType tmpSum = prefixSum[indexMid] - prefixSum[std::max(partIndices[p-1]-1,0)];
             if( lowerBound<tmpSum and tmpSum<upperBound){
                 if( probe(prefixSum, k, tmpSum) ){
                     indexHigh = indexMid;
@@ -883,9 +886,10 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
         }
         
         partIndices[p] = indexHigh;
-        weightPerPart[p-1] = prefixSum[indexHigh] - prefixSum[partIndices[p-1]/*-1*/];
+PRINT(p << " :: "<< indexHigh << " __ "<< prefixSum[indexHigh-1] << " @ " <<  prefixSum[std::max(partIndices[p-1]-1,0)] );        
+        weightPerPart[p-1] = prefixSum[indexHigh-1] - prefixSum[std::max(partIndices[p-1]-1,0)];
     }
-    
+PRINT(prefixSum[ partIndices.back()-1 ]);    
     weightPerPart[k-1] = totalWeight - prefixSum[ partIndices.back()-1 ];
     
     return std::make_pair(partIndices, weightPerPart);

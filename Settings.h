@@ -14,8 +14,8 @@ struct Settings{
     IndexType diffusionRounds = 20;
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
-    IndexType pixeledDetailLevel = 3;
-    IndexType initialPartition = 0;
+    IndexType pixeledSideLen = 10;
+    IndexType initialPartition = 0;     //0:sfc, 1:pixeled, 2: multisection
     bool useDiffusionTieBreaking = false;
     bool useGeometricTieBreaking = false;
     bool gainOverBalance = false;
@@ -39,7 +39,7 @@ struct Settings{
         out<< "useGeometricTieBreaking: " << useGeometricTieBreaking <<std::endl;
         out<< "gainOverBalance: " << gainOverBalance << std::endl;
         out<< "skipNoGainColors: "<< skipNoGainColors << std::endl;
-        out<< "pixeledDetailLevel: "<< pixeledDetailLevel << std::endl;
+        out<< "pixeledSideLen: "<< pixeledSideLen << std::endl;
         if( initialPartition==0){
             out<< "initial partition: hilbert curve" << std::endl;
         }else if( initialPartition==1 ){
