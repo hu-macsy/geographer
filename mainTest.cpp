@@ -37,7 +37,6 @@ typedef int IndexType;
  * for generating a 10x20x30 mesh
  * ./a.out --generate --numX=10 --numY=20 --numZ=30 --epsilon 0.05 --sfcRecursionSteps=10 --dimensions=3 --borderDepth=10  --stopAfterNoGainRounds=3 --minGainForNextGlobalRound=10
  * 
- * !! for now, when reading a file --dimensions must be 2
  */
 
 //----------------------------------------------------------------------------
