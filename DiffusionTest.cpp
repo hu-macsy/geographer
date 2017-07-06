@@ -83,11 +83,11 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 	const IndexType n = graph.getNumRows();
 	scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
-	//graph.redistribute(noDist, noDist);
 
 	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(graph);
+	EXPECT_EQ(L.getRowDistribution(), graph.getRowDistribution());
 
-	ASSERT_EQ(L.getRowDistribution(), graph.getRowDistribution());
+	L.redistribute(noDist, noDist);
 
 	DenseVector<IndexType> nodeWeights(L.getRowDistributionPtr(),1);
 
