@@ -20,6 +20,7 @@ struct Settings{
     InitialPartitioningMethods initialPartition = InitialPartitioningMethods::SFC;
     bool useDiffusionTieBreaking = false;
     bool useGeometricTieBreaking = false;
+    bool useDiffusionCoordinates = false;
     bool gainOverBalance = false;
     bool skipNoGainColors = false;
     bool writeDebugCoordinates = false;

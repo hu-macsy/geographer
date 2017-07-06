@@ -357,12 +357,15 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 		if (!read) {
 			throw std::runtime_error("Unexpected end of coordinate file. Was the number of nodes correct?");
 		}
-		assert(read);//if we have read past the end of the file, the node count was incorrect
 		std::stringstream ss( line );
 		std::string item;
 
 		IndexType dim = 0;
-		while (std::getline(ss, item, ' ') && dim < dimension) {
+		while (dim < dimension) {
+			bool read = std::getline(ss, item, ' ');
+			if (!read or item.size() == 0) {
+				throw std::runtime_error("Unexpected end of line. Was the number of dimensions correct?");
+			}
 			ValueType coord = std::stod(item);
 			coords[dim][i] = coord;
 			dim++;
