@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <chrono>
 
+#include "Diffusion.h"
 #include "MeshGenerator.h"
 #include "FileIO.h"
 #include "ParcoRepart.h"
@@ -62,13 +63,13 @@ int main(int argc, char** argv) {
 				("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
 				("minBorderNodes", value<int>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
-				//("sfcRecursionSteps", value<int>(&settings.sfcResolution)->default_value(settings.sfcResolution), "Tuning parameter: Recursion Level of space filling curve. A value of 0 causes the recursion level to be derived from the graph size.")
 				("initialPartition", value<int>(&settings.initialPartition)->default_value(settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition")
 				("pixeledDetailLevel", value<int>(&settings.pixeledDetailLevel)->default_value(settings.pixeledDetailLevel), "The resolution for the pixeled partition or the spectral")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
 				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
 				("useDiffusionTieBreaking", value<bool>(&settings.useDiffusionTieBreaking)->default_value(settings.useDiffusionTieBreaking), "Tuning Parameter: Use diffusion to break ties in Fiduccia-Mattheyes algorithm")
 				("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
+				("useDiffusionCoordinates", value<bool>(&settings.useDiffusionCoordinates)->default_value(settings.useDiffusionCoordinates), "Use coordinates based from diffusive systems instead of loading from file")
 				("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 				("multiLevelRounds", value<int>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
@@ -91,12 +92,17 @@ int main(int argc, char** argv) {
 
 	if (vm.count("generate") + vm.count("graphFile") + vm.count("quadTreeFile") != 1) {
 		std::cout << "Pick one of --graphFile, --quadTreeFile or --generate" << std::endl;
-		return 0;
+		return 126;
 	}
 
 	if (vm.count("generate") && (vm["dimensions"].as<int>() != 3)) {
 		std::cout << "Mesh generation currently only supported for three dimensions" << std::endl;
-		return 0;
+		return 126;
+	}
+
+	if (vm.count("coordFile") && vm.count("useDiffusionCoords")) {
+		std::cout << "Cannot both load coordinates from file with --coordFile or generate them with --useDiffusionCoords." << std::endl;
+		return 126;
 	}
 
     IndexType N = -1; 		// total number of points
@@ -132,22 +138,29 @@ int main(int argc, char** argv) {
     	std::string graphFile = vm["graphFile"].as<std::string>();
     	std::string coordFile;
     	if (vm.count("coordFile")) {
-    		coordFile = vm["coordFile"].as<std::string>();
+			coordFile = vm["coordFile"].as<std::string>();
+		} else {
+			coordFile = graphFile + ".xyz";
+		}
+
+    	std::string coordString;
+    	if (settings.useDiffusionCoordinates) {
+    		coordString = " and generating coordinates with diffusive distances.";
     	} else {
-    		coordFile = graphFile + ".xyz";
+    		coordString = "and \"" + coordFile + "\" for coordinates";
     	}
 
         if (comm->getRank() == 0)
         {
-            std::cout<< "Reading from file \""<< graphFile << "\" for the graph and \"" << coordFile << "\" for coordinates"<< std::endl;
+            std::cout<< "Reading from file \""<< graphFile << "\" for the graph " << coordString << std::endl;
         }
 
         // read the adjacency matrix and the coordinates from a file
         graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
         N = graph.getNumRows();
-        scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
-        scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
-        assert(graph.getColDistribution().isEqual(*noDistPtr));
+        scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
+        scai::dmemo::DistributionPtr noDist( new scai::dmemo::NoDistribution( N ));
+        assert(graph.getColDistribution().isEqual(*noDist));
 
         // for 2D we do not know the size of every dimension
 		settings.numX = N;
@@ -158,7 +171,34 @@ int main(int argc, char** argv) {
         	std::cout<< "Read " << N << " points." << std::endl;
         }
         
-        coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions );
+        if (settings.useDiffusionCoordinates) {
+        	graph.redistribute(noDist, noDist);
+        	scai::lama::CSRSparseMatrix<ValueType> L = ITI::Diffusion<IndexType, ValueType>::constructLaplacian(graph);
+        	//L.redistribute(noDist, noDist);
+        	scai::lama::DenseVector<IndexType> nodeWeights(L.getRowDistributionPtr(),1);
+
+        	std::vector<IndexType> nodeIndices(N);
+        	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
+
+        	ITI::Diffusion<IndexType, ValueType>::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), settings.dimensions);
+
+        	std::vector<IndexType> landmarks(settings.dimensions);
+        	std::copy(nodeIndices.begin(), nodeIndices.begin()+settings.dimensions, landmarks.begin());
+
+        	scai::lama::DenseMatrix<ValueType> diffusionValues = ITI::Diffusion<IndexType, ValueType>::multiplePotentials(L, nodeWeights, landmarks);
+        	assert(diffusionValues.getNumRows() == settings.dimensions);
+        	assert(diffusionValues.getLocalNumRows() == settings.dimensions);
+        	coordinates.resize(settings.dimensions);
+			for (IndexType i = 0; i < settings.dimensions; i++) {
+				coordinates[i] = scai::lama::DenseVector<ValueType>(N,0);
+				diffusionValues.getLocalRow(coordinates[i].getLocalValues(), i);
+				coordinates[i].redistribute(inputDist);
+			}
+			graph.redistribute(inputDist, noDist);
+
+        } else {
+        	coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions );
+        }
 
         if (comm->getRank() == 0) {
         	std::cout << "Read coordinates." << std::endl;
@@ -224,7 +264,7 @@ int main(int argc, char** argv) {
 
     } else{
     	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;
-    	return 0;
+    	return 126;
     }
     
     // time needed to get the input
