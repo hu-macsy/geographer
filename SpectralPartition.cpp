@@ -220,7 +220,7 @@ scai::lama::CSRSparseMatrix<ValueType> SpectralPartition<IndexType, ValueType>::
         scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
         scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
         
-        // local data of dree vector
+        // local data of degree vector
         scai::hmemo::ReadAccess<IndexType>  rLocalDegree( degreeVector.getLocalValues() );
         assert( degreeVector.getLocalValues().size() == localN );
 

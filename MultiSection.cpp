@@ -79,7 +79,7 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
     }
     
     // scale= N^(1/d): this way the scaled max is N^(1/d) and this is also the maximum size of the projection arrays
-    ValueType scale = std::pow( globalN, 1.0/dim);
+    ValueType scale = std::pow( globalN /*WARNING*/ -1 , 1.0/dim);
 PRINT0( scale );
     {
         SCAI_REGION( "MultiSection.getPartitionNonUniform.minMaxAndScale" )
@@ -100,7 +100,7 @@ PRINT0( scale );
             SCAI_REGION( "MultiSection.getPartitionNonUniform.minMaxAndScale.minMax" )
             minCoords[d] = comm->min(minCoords[d]);
             maxCoords[d] = comm->max(maxCoords[d]);
-            scaledMax[d] = int(scale)  ;
+            scaledMax[d] = int(scale) ;
             scaledMin[d] = 0;
         }
         
@@ -121,7 +121,7 @@ PRINT0( scale );
             SCAI_REGION_END("MultiSection.getPartitionNonUniform.minMaxAndScale.lamaScale" )
             */
             
-            SCAI_REGION_START("MultiSection.getPartitionNonUniform.minMaxAndScale.byHandScale" )
+           // SCAI_REGION_START("MultiSection.getPartitionNonUniform.minMaxAndScale.byHandScale" )
             //get local parts of coordinates
             scai::hmemo::WriteOnlyAccess<IndexType> wScaledCoord( scaledCoords[d].getLocalValues() );
             
@@ -131,13 +131,14 @@ PRINT0( scale );
                 ValueType normalizedCoord = localPartOfCoords[i] - thisDimMin;
                 IndexType scaledCoord =  normalizedCoord * thisDimScale; 
                 wScaledCoord[i] = scaledCoord;
+                SCAI_ASSERT( scaledCoord<=scaledMax[d] , "Wrong scaled coord " << scaledCoord << " is larger than scaledMax= " << scaledMax[d] );
                 SCAI_ASSERT( scaledCoord >=0 and scaledCoord<=scale, "Wrong scaled coordinate " << scaledCoord << " is either negative or more than "<< scale);
              
                 //TODO: remove scaled max and min: should be always be 0 and scale
                 //if (scaledCoord < scaledMin[d]) scaledMin[d] = scaledCoord;
                 //if (scaledCoord > scaledMax[d]) scaledMax[d] = scaledCoord;
             }
-            SCAI_REGION_END("MultiSection.getPartitionNonUniform.minMaxAndScale.byHandScale" )
+            //SCAI_REGION_END("MultiSection.getPartitionNonUniform.minMaxAndScale.byHandScale" )
             
             //scaledMin[d] = comm->min( scaledMin[d] );
             //scaledMax[d] = comm->max( scaledMax[d] );      
@@ -225,7 +226,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     // at first the bounding box is the whole space
     for(int d=0; d<dim; d++){
         bBox.bottom.push_back(0);
-        bBox.top.push_back(sideLen);
+        bBox.top.push_back(sideLen -1); //WARNING: changes rectangle to be [bot, top], not [bot, top)
     }
 
     // TODO: try to avoid that, probably not needed
@@ -318,7 +319,8 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             //perform 1D partitioning for the chosen dimension
             std::vector<IndexType> part1D;
             std::vector<ValueType> weightPerPart, thisProjection = projections[l];
-            std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DGreedy( thisProjection, *thisDimCuts, settings);
+            std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( thisProjection, *thisDimCuts, settings);
+ 
             // TODO: possibly expensive assertion
             SCAI_ASSERT( std::accumulate(thisProjection.begin(), thisProjection.end(), 0)==std::accumulate( weightPerPart.begin(), weightPerPart.end(), 0), "Weights are wrong." )
             
@@ -332,17 +334,11 @@ ValueType dbg_rectW=0;
             struct rectangle newRect;
             newRect.bottom = thisRectangle.bottom;
             newRect.top = thisRectangle.top;
-            /*
-            //first rectangle
-            newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[0]+1;
-            newRect.weight = weightPerPart[0];
-            root->insert( newRect );     
-dbg_rectW += newRect.weight;
-*/
+        
             for(int h=0; h<part1D.size()-1; h++ ){
                 //change only the chosen dimension
                 newRect.bottom[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h];
-                newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h+1];
+                newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h+1]-1;
                 newRect.weight = weightPerPart[h];
                 root->insert( newRect );
 dbg_rectW += newRect.weight;                
@@ -397,9 +393,9 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
         SCAI_ASSERT( dim2proj>=0 and dim2proj<=dimension , "Wrong dimension to project to: " << dim2proj);
         
         // the length for every projection in the chosen dimension
-        IndexType projLength = allLeaves[l]->getRect().top[dim2proj] - allLeaves[l]->getRect().bottom[dim2proj];
+        IndexType projLength = allLeaves[l]->getRect().top[dim2proj] - allLeaves[l]->getRect().bottom[dim2proj] /*WARNING*/ +1; 
 
-        if(projLength<1){
+        if(projLength<2){
             throw std::runtime_error("function: projection, line:" +std::to_string(__LINE__) +", the length of projection/leaf " + std::to_string( l) +" is " +std::to_string(projLength) + " and is not correct. Number of leaves = " + std::to_string(numLeaves) );
         }
         projections[l].assign( projLength, 0 );
@@ -413,20 +409,18 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
         for(int i=0; i<localN; i++){
             SCAI_REGION_START("MultiSection.projection.localProjection.indexAndCopyCoords");
             const IndexType globalIndex = inputDist->local2global(i);
-            std::vector<IndexType> coords = indexToCoords(globalIndex, sideLen, dimension); // check the global index
-            //TODO: avoid the conversion to vector<double>
-            std::vector<ValueType> coordsVal( coords.begin(), coords.end() );
+            std::vector<ValueType> coords = indexToCoords<ValueType>(globalIndex, sideLen, dimension); // check the global index
             SCAI_REGION_END("MultiSection.projection.localProjection.indexAndCopyCoords");
             
             // a pointer to the cell that contains point i
-            //SCAI_REGION_START("MultiSection.projection.localProjection.contains");
+            //SCAI_REGION_START("MultiSection.projection.localProjection.getContainingLeaf");
             std::shared_ptr<rectCell<IndexType,ValueType>> thisRectCell;
             
             //TODO: in the partition this should not happen. But it may happen in a more general case
             // if this point is not contained in any rectangle
             try{
                 SCAI_REGION("MultiSection.projection.localProjection.contains");
-                thisRectCell = treeRoot->getContainingLeaf( coordsVal );
+                thisRectCell = treeRoot->getContainingLeaf( coords );
             }
             catch( const std::logic_error& e){
                 PRINT(*comm <<": Function getContainingLeaf returns an " << e.what() << " exception");
@@ -438,7 +432,7 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
                 continue;   
                 //std::terminate();   // not allowed in our case
             }
-            //SCAI_REGION_END("MultiSection.projection.localProjection.contains");
+            //SCAI_REGION_END("MultiSection.projection.localProjection.getContainingLeaf");
             
             IndexType thisLeafID = thisRectCell->getLeafID();
             SCAI_ASSERT( thisLeafID!=-1, "leafID for containing rectCell must be >0");
@@ -509,7 +503,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         throw std::logic_error("Number of blocks not a square number");
     }
     
-    // sqrtK is not correct, it is -1 but not sure if always
+    // TODO/check: sqrtK is not correct, it is -1 but not sure if always
     IndexType intSqrtK = sqrtK;
     
     if( std::pow( intSqrtK+1, dim ) == k){
@@ -623,9 +617,8 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             SCAI_ASSERT( part1D.size()== *thisDimCuts , "Wrong size of 1D partition")
             SCAI_ASSERT( weightPerPart.size()== *thisDimCuts , "Wrong size of 1D partition")
             
-for(int i=0; i<*thisDimCuts; i++){
-    PRINT0(i<< ": " << part1D[i] << " ++ " << weightPerPart[i] );
-}
+//for(int i=0; i<*thisDimCuts; i++)    PRINT0(i<< ": " << part1D[i] << " ++ " << weightPerPart[i] );
+
             // TODO: possibly expensive assertion
             SCAI_ASSERT( std::accumulate(thisProjection.begin(), thisProjection.end(), 0)==std::accumulate( weightPerPart.begin(), weightPerPart.end(), 0), "Weights are wrong, totalWeight of thisProjection= "  << std::accumulate(thisProjection.begin(), thisProjection.end(), 0) << " , total weight of weightPerPart= " << std::accumulate( weightPerPart.begin(), weightPerPart.end(), 0) );
             
@@ -641,10 +634,9 @@ ValueType dbg_rectW=0;
             for(int h=0; h<part1D.size()-1; h++ ){
                 //change only the chosen dimension
                 newRect.bottom[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h];
-                newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h+1];
+                newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h+1]-1;
                 newRect.weight = weightPerPart[h];
                 root->insert( newRect );
-newRect.print();                
 dbg_rectW += newRect.weight;                
             }
             
@@ -685,7 +677,8 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
     const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
     const IndexType localN = inputDist->getLocalSize();
     
-    IndexType numLeaves = treeRoot->getNumLeaves();
+    const IndexType numLeaves = treeRoot->getNumLeaves();
+    SCAI_ASSERT( numLeaves>0, "Zero or negative number of leaves.")
     
     std::vector<std::vector<ValueType>> projections(numLeaves); // 1 projection per rectangle/leaf
     
@@ -705,7 +698,7 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
         SCAI_REGION("MultiSection.projectionNonUniform.reserveSpace");
         const IndexType dim2proj = dimensionToProject[l];
         // the length for every projection in the chosen dimension
-        IndexType projLength = allLeaves[l]->getRect().top[dim2proj] - allLeaves[l]->getRect().bottom[dim2proj];
+        IndexType projLength = allLeaves[l]->getRect().top[dim2proj] - allLeaves[l]->getRect().bottom[dim2proj]  /*WARNING*/  +1;
         if(projLength<1){
             throw std::runtime_error("function: projectionNonUnifo, line:" +std::to_string(__LINE__) +", the length of the projection is " +std::to_string(projLength) + " and is not correct");
         }
@@ -723,12 +716,12 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
             SCAI_REGION_START("MultiSection.projectionNonUniform.localProjection.CopyCoords");
             std::vector<IndexType> coords;
             for(int c=0; c<dimension; c++){
-                 coords.push_back( coordinates[c].getLocalValues()[i] );
+                 coords.push_back( coordinates[c].getLocalValues()[i] );               
             }
             SCAI_REGION_END("MultiSection.projectionNonUniform.localProjection.CopyCoords");
             
             // a pointer to the cell that contains point i
-            SCAI_REGION_START("MultiSection.projectionNonUniform.localProjection.contains");
+            SCAI_REGION_START("MultiSection.projectionNonUniform.localProjection.getContainingLeaf");
             std::shared_ptr<rectCell<IndexType,ValueType>> thisRectCell;
             
             //TODO: in the partition this should not happen. But it may happen in a more general case
@@ -744,13 +737,14 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
                 treeRoot->getRect().print();
                 std::terminate();   // not allowed in our case
             }
-            SCAI_REGION_END("MultiSection.projectionNonUniform.localProjection.contains");
+            SCAI_REGION_END("MultiSection.projectionNonUniform.localProjection.getContainingLeaf");
             
             IndexType thisLeafID = thisRectCell->getLeafID();
             if( thisLeafID==-1 and comm->getRank()==0 ){
                 PRINT0( "Owner rectangle for point is ");
                 thisRectCell->getRect().print();
                 PRINT0( thisRectCell->getLeafID() );
+                // terminate() ??
             }
             SCAI_ASSERT( thisLeafID!=-1, "leafID for containing rectCell must be >0 , for coords= "<< coords[0] << ", "<< coords[1] );
             SCAI_ASSERT( thisLeafID<projections.size(), "Index too big.");
@@ -759,7 +753,7 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
             const IndexType dim2proj = dimensionToProject[ thisLeafID ];
             IndexType relativeIndex = coords[dim2proj]-thisRectCell->getRect().bottom[dim2proj];
 
-            SCAI_ASSERT( relativeIndex<projections[ thisLeafID ].capacity(), "Wrong relative index: "<< relativeIndex << " should be < "<< projections[ thisLeafID ].capacity() << " (and thisRect.bottom= "<< thisRectCell->getRect().bottom[dim2proj]  << " , thisRect.top= "<< thisRectCell->getRect().top[dim2proj] << ")" );
+            SCAI_ASSERT( relativeIndex<=projections[ thisLeafID ].capacity(), "Wrong relative index: "<< relativeIndex << " should be <= "<< projections[ thisLeafID ].capacity() << " (and thisRect.bottom= "<< thisRectCell->getRect().bottom[dim2proj]  << " , thisRect.top= "<< thisRectCell->getRect().top[dim2proj] << ")" );
 
             projections[ thisLeafID ][relativeIndex] += localWeights[i];
         }
@@ -770,9 +764,12 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
     //TODO: sum using one call to comm->sum()
     // data of vector of vectors are not stored continuously. Maybe copy to a large vector and then add
     std::vector<std::vector<ValueType>> globalProj(numLeaves);
+    
     for(int i=0; i<numLeaves; i++){
         SCAI_REGION("MultiSection.projectionNonUniform.sumImpl");
-        globalProj[i].assign( projections[i].size() ,0 );
+        SCAI_ASSERT( i<globalProj.size() and i<projections.size() , "Index too large");
+        
+        globalProj[i].assign( projections[i].size(), 0 );
         comm->sumImpl( globalProj[i].data(), projections[i].data(), projections[i].size(), scai::common::TypeTraits<ValueType>::stype);
     }
     
@@ -841,7 +838,7 @@ template<typename IndexType, typename ValueType>
 std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1DOptimal( const std::vector<ValueType>& nodeWeights, const IndexType k, Settings settings){
     
     const IndexType N = nodeWeights.size();
-    
+
     //
     //create the prefix sum array
     //
@@ -854,11 +851,11 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
     }
     
     ValueType totalWeight = prefixSum.back();
-PRINT( totalWeight );    
+
     ValueType lowerBound, upperBound;
     lowerBound = totalWeight/k;         // the optimal average weight
     upperBound = totalWeight;
-    
+  
     std::vector<IndexType> partIndices(k, -9);
     std::vector<ValueType> weightPerPart(k, -9);
     partIndices[0]=0;
@@ -869,8 +866,10 @@ PRINT( totalWeight );
         IndexType indexHigh = N;
         while( indexLow<indexHigh ){
             IndexType indexMid = (indexLow+indexHigh)/2;
-            ValueType tmpSum = prefixSum[indexMid] - prefixSum[std::max(partIndices[p-1]-1,0)];
-            if( lowerBound<tmpSum and tmpSum<upperBound){
+            ValueType tmpSum = prefixSum[indexMid] - prefixSum[std::max(partIndices[p-1],0)];
+//PRINT("lB= " << lowerBound << " , uB= " << upperBound << " __ indexLow= "<< indexLow << " mid= "<< indexMid << " indexHigh = " << indexHigh );              
+//PRINT(p << ": " << tmpSum);            
+            if( lowerBound<=tmpSum and tmpSum<upperBound){
                 if( probe(prefixSum, k, tmpSum) ){
                     indexHigh = indexMid;
                     upperBound = tmpSum;
@@ -885,17 +884,17 @@ PRINT( totalWeight );
             }
         }
         
-        partIndices[p] = indexHigh;
-PRINT(p << " :: "<< indexHigh << " __ "<< prefixSum[indexHigh-1] << " @ " <<  prefixSum[std::max(partIndices[p-1]-1,0)] );        
-        weightPerPart[p-1] = prefixSum[indexHigh-1] - prefixSum[std::max(partIndices[p-1]-1,0)];
+        partIndices[p] = indexHigh;      
+        weightPerPart[p-1] = prefixSum[indexHigh] - prefixSum[std::max(partIndices[p-1],0)];
+//PRINT(p << " :: "<< partIndices[p] << " __ "<< weightPerPart[p-1] );  
     }
-PRINT(prefixSum[ partIndices.back()-1 ]);    
-    weightPerPart[k-1] = totalWeight - prefixSum[ partIndices.back()-1 ];
+//PRINT(prefixSum[ partIndices.back()-1 ]);    
+    weightPerPart[k-1] = totalWeight - prefixSum[ partIndices.back() ];
     
     return std::make_pair(partIndices, weightPerPart);
 }
 //---------------------------------------------------------------------------------------
-// Search if there is a partition of weights array into k parts where the maximum weight of a part is <=target.
+// Search if there is a partition of the weights array into k parts where the maximum weight of a part is <=target.
 
 //TODO: return also the splitters found
 template<typename IndexType, typename ValueType>
@@ -926,7 +925,7 @@ bool MultiSection<IndexType, ValueType>::probe(const std::vector<ValueType>& pre
             sumOfPartition = prefixSum[splitters[p-1]] + target;
             ++p;
         }
-    
+
         if( sumOfPartition>=totalWeight ){
             ret = true;
         }
@@ -954,8 +953,7 @@ bool MultiSection<IndexType, ValueType>::inBBox( const std::vector<IndexType>& c
     bool ret = true;
     
     for(int i=0; i<dimension; i++){
-        // TODO: ensure if it should be coords[i]>=top[i] or coords[i]>top[i]
-        if(coords[i]>=top[i] or coords[i]<bottom[i]){
+        if(coords[i]>top[i] or coords[i]<bottom[i]){
             ret = false;
             break;
         }
@@ -982,7 +980,7 @@ ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const scai::la
         
         for(int i=0; i<localN; i++){
             const IndexType globalIndex = inputDist->local2global(i);
-            std::vector<IndexType> coords = indexToCoords(globalIndex, sideLen, dimension); // check the global index
+            std::vector<IndexType> coords = indexToCoords<IndexType>(globalIndex, sideLen, dimension); // check the global index
             if( inBBox(coords, bBox) ){ 
                 localWeight += localWeights[i];
             }
@@ -1015,7 +1013,7 @@ ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vec
             for(int d=0; d<dimension; d++){
                 coords.push_back( coordinates[d].getLocalValues()[i] );
                 //TODO: remove assertion, probably not needed
-                SCAI_ASSERT( coords.back()<maxCoords[d], "Coordinate too big, coords.back()= " << coords.back() << " , maxCoords[d]= "<< maxCoords[d] );
+                SCAI_ASSERT( coords.back()<=maxCoords[d], "Coordinate too big, coords.back()= " << coords.back() << " , maxCoords[d]= "<< maxCoords[d] );
             }
             if( inBBox(coords, bBox) ){ 
                 localWeight += localWeights[i];
@@ -1031,7 +1029,8 @@ ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vec
 //TODO: generalize for more dimensions and for non-cubic grids
 
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> MultiSection<IndexType, ValueType>::indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dim){
+template<typename T>
+std::vector<T> MultiSection<IndexType, ValueType>::indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dim){
     SCAI_REGION("MultiSection.indexToCoords");
     
     IndexType gridSize= std::pow(sideLen, dim);
@@ -1046,9 +1045,9 @@ std::vector<IndexType> MultiSection<IndexType, ValueType>::indexToCoords(const I
     }
     
     if(dim==2){
-        return  MultiSection<IndexType, ValueType>::indexTo2D( ind, sideLen);
+        return  MultiSection<IndexType, ValueType>::indexTo2D<T>( ind, sideLen);
     }else if(dim==3){
-        return MultiSection<IndexType, ValueType>::indexTo3D( ind, sideLen);
+        return MultiSection<IndexType, ValueType>::indexTo3D<T>( ind, sideLen);
     }else{
         throw std::runtime_error("function: indexToCoords, line:" +std::to_string(__LINE__) +", supporting only 2 or 3 dimensions");
     }
@@ -1057,25 +1056,27 @@ std::vector<IndexType> MultiSection<IndexType, ValueType>::indexToCoords(const I
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> MultiSection<IndexType, ValueType>::indexTo2D(IndexType ind, IndexType sideLen){
+template<typename T>
+std::vector<T> MultiSection<IndexType, ValueType>::indexTo2D(IndexType ind, IndexType sideLen){
     SCAI_REGION("MultiSection.indexTo2D");
-    IndexType x = ind/sideLen;
-    IndexType y = ind%sideLen;
+    T x = ind/sideLen;
+    T y = ind%sideLen;
     
-    return std::vector<IndexType>{x, y};
+    return std::vector<T>{x, y};
 }
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> MultiSection<IndexType, ValueType>::indexTo3D(IndexType ind, IndexType sideLen){
+template<typename T>
+std::vector<T> MultiSection<IndexType, ValueType>::indexTo3D(IndexType ind, IndexType sideLen){
     SCAI_REGION("MultiSection.indexTo3D");
     IndexType planeSize= sideLen*sideLen; // a YxZ plane
+
+    T x = ind/planeSize;
+    T y = (ind%planeSize)/sideLen;
+    T z = (ind%planeSize)%sideLen;
     
-    IndexType x = ind/planeSize;
-    IndexType y = (ind%planeSize)/sideLen;
-    IndexType z = (ind%planeSize)%sideLen;
-    
-    return std::vector<IndexType>{ x, y, z };
+    return std::vector<T>{ x, y, z };
 }
 //---------------------------------------------------------------------------------------
 

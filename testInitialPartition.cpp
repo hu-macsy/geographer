@@ -47,6 +47,40 @@ typedef int IndexType;
 
 //----------------------------------------------------------------------------
 
+std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
+{
+    std::string token;
+    in >> token;
+    if (token == "SFC" or token == "0")
+        method = InitialPartitioningMethods::SFC;
+    else if (token == "Pixel" or token == "1")
+        method = InitialPartitioningMethods::Pixel;
+    else if (token == "Spectral" or token == "2")
+    	method = InitialPartitioningMethods::Spectral;
+    else if (token == "Multisection" or token == "3")
+    	method = InitialPartitioningMethods::Multisection;
+    else
+        in.setstate(std::ios_base::failbit);
+    return in;
+}
+
+std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods& method)
+{
+    std::string token;
+
+    if (method == InitialPartitioningMethods::SFC)
+        token = "SFC";
+    else if (method == InitialPartitioningMethods::Pixel)
+    	token = "Pixel";
+    else if (method == InitialPartitioningMethods::Spectral)
+    	token = "Spectral";
+    else if (method == InitialPartitioningMethods::Multisection)
+    	token = "Multisection";
+    out << token;
+    return out;
+}
+
+
 int main(int argc, char** argv) {
 	using namespace boost::program_options;
 	options_description desc("Supported options");
@@ -66,8 +100,7 @@ int main(int argc, char** argv) {
 				("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
 				("minBorderNodes", value<int>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
-				//("sfcRecursionSteps", value<int>(&settings.sfcResolution)->default_value(settings.sfcResolution), "Tuning parameter: Recursion Level of space filling curve. A value of 0 causes the recursion level to be derived from the graph size.")
-                                ("initialPartition", value<int>(&settings.initialPartition)->default_value(settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for multisection")
+                                ("initialPartition",  value<InitialPartitioningMethods> (&settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition")
                                 ("pixeledSideLen", value<int>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
 				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
@@ -275,10 +308,10 @@ int main(int argc, char** argv) {
     
     comm->synchronize();
     
-    int initialPartition = settings.initialPartition;
+    InitialPartitioningMethods initialPartition = settings.initialPartition;
     
-    switch(initialPartition){
-        case 0:{  //------------------------------------------- hilbert/sfc
+    switch( initialPartition ){
+        case InitialPartitioningMethods::SFC:{  //------------------------------------------- hilbert/sfc
            
             beforeInitialTime =  std::chrono::system_clock::now();
             PRINT0( "Get a hilbert/sfc partition");
@@ -309,7 +342,7 @@ int main(int argc, char** argv) {
             comm->synchronize();
             break;
         }
-        case 1:{  //------------------------------------------- pixeled
+        case InitialPartitioningMethods::Pixel:{  //------------------------------------------- pixeled
   
             beforeInitialTime =  std::chrono::system_clock::now();
             PRINT0( "Get a pixeled partition");
@@ -334,7 +367,7 @@ int main(int argc, char** argv) {
             }
             break;
         }
-        case 2:{  //------------------------------------------- multisection
+        case InitialPartitioningMethods::Multisection:{  //------------------------------------------- multisection
             
             // unit weights
             scai::lama::DenseVector<ValueType> nodeWeights( rowDistPtr, 1);
@@ -363,7 +396,7 @@ int main(int argc, char** argv) {
             break;   
         }
         default:{
-            PRINT0("Value "<< initialPartition << " for option initialPartition not suppoerted" );
+            PRINT0("Value "<< initialPartition << " for option initialPartition not supported" );
             break;
         }
     }

@@ -22,6 +22,8 @@ namespace ITI {
 
     /* A d-dimensional rectangle represented by two points: the bottom and the top corner.
      * For all i: 0<i<d, it must be bottom[i]<top[i]
+     * Also, the rectangle contains the points [bottom, top], so, in a 1D rectangle, [4,8] contains
+     * the points 4,5,6,7 and 8.
      * */
     struct rectangle{
         
@@ -47,14 +49,13 @@ namespace ITI {
         
         /** Checks if this rectangle resides entirely in the given rectangle:
          * for all dimensions i< d:  
-         * this.bottom[i]> outer.bottom[i] and this.top[i]< outer.top[i]
+         * this.bottom[i]> outer.bottom[i] or this.top[i]< outer.top[i]
          */
-        bool inside(rectangle outer){
-            SCAI_REGION("rectangle.inside");
+        bool isInside(rectangle outer){
+            SCAI_REGION("rectangle.isInside");
             
             bool ret = true;
             for(int d=0; d<bottom.size(); d++){
-                //TODO: test if we need < or <= for bottom or/and top
                 if( this->bottom[d]<outer.bottom[d] or this->top[d]>outer.top[d]){
                     ret= false;
                     break;
@@ -74,7 +75,7 @@ namespace ITI {
             
             bool ret= true;
             for(int d=0; d<dim; d++){
-                if( point[d]<this->bottom[d] or point[d]>=this->top[d]){
+                if( point[d]<this->bottom[d] or point[d]>this->top[d]){
                     ret= false;
                     break;
                 }
@@ -132,7 +133,7 @@ namespace ITI {
             SCAI_ASSERT( rect.top.size()==myRect.top.size(), "Dimensions do not agree."); 
             
             // check if coordinates of the rectangle are wrong
-            if( !rect.inside(this->myRect) ){
+            if( !rect.isInside(this->myRect) ){
                 PRINT("Input rectangle:");
                 rect.print();
                 PRINT("Should be inside this:");
@@ -148,7 +149,7 @@ namespace ITI {
                 bool inserted = false;
                 // check if rect can fit inside some of the children
                 for(int c=0; c<children.size(); c++){
-                    if( rect.inside(children[c]->myRect) ){                        
+                    if( rect.isInside(children[c]->myRect) ){                        
                         inserted = true;
                         children[c]->insert(rect);
                         //TODO: with break it inserts rect to the first it fits
@@ -177,7 +178,7 @@ namespace ITI {
             // point should be inside this rectangle
             for(int d=0; d<dim; d++){
                 //TODO: just throw exception or insert assertion to ensure point is within bounds?
-                if(point[d]>=myRect.top[d] or  point[d]<myRect.bottom[d]){
+                if(point[d]>myRect.top[d] or  point[d]<myRect.bottom[d]){
                     //return NULL;
                     throw std::logic_error("Point out of bounds");
                 }
@@ -361,7 +362,7 @@ namespace ITI {
          * do not overlap.
          * 
          * @param[in] nodeWeights The weights for each point.
-         * @param[in] sideLen The length of the side of the whole uniform, square grid.
+         * @param[in] sideLen The length of the side of the whole uniform, square grid. The coordinates are from 0 to sideLen-1. Example: if sideLen=2, the poitns are (0,0),(0,1),(1,0),(1,1)
          * @param[in] setting A settigns struct passing various arguments.
          * 
          * @return A pointer to the root of the tree. number of leaves = settings.numBlocks.
@@ -464,13 +465,15 @@ namespace ITI {
          * @param[in] dimensions The dimension of the cube/grid (either 2 or 3).
          * @return A vector containing the index for every dimension. The size of the vector is equal to dimensions.
          */
-        static std::vector<IndexType> indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dimensions);
+        template<typename T>
+        static std::vector<T> indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dimensions);
         
     private:
-
-        static std::vector<IndexType> indexTo2D(IndexType ind, IndexType sideLen);
+        template<typename T>
+        static std::vector<T> indexTo2D(IndexType ind, IndexType sideLen);
         
-        static std::vector<IndexType> indexTo3D(IndexType ind, IndexType sideLen);
+        template<typename T>
+        static std::vector<T> indexTo3D(IndexType ind, IndexType sideLen);
     };
 
 }
