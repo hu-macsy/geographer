@@ -16,7 +16,7 @@
 namespace ITI {
 
 /**
- * maybe have free functions instead of a class with static members?
+ * maybe have free functions instead of a class with static functions? - Not yet, as all other code still uses static functions.
  */
 template<typename IndexType, typename ValueType>
 class Diffusion {

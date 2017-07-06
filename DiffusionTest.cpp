@@ -16,6 +16,7 @@ namespace ITI {
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
 using scai::lama::DenseMatrix;
+using scai::dmemo::DistributionPtr;
 
 typedef double ValueType;
 typedef int IndexType;
@@ -25,11 +26,16 @@ class DiffusionTest : public ::testing::Test {
 };
 
 TEST_F(DiffusionTest, testConstructLaplacian) {
-	const IndexType nroot = 2;
+	const IndexType nroot = 4;
 	const IndexType n = nroot*nroot*nroot;
 	const IndexType dimensions = 3;
 
-	CSRSparseMatrix<ValueType> a(n, n);
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+	DistributionPtr dist(new scai::dmemo::BlockDistribution(n, comm));
+	DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
+
+	CSRSparseMatrix<ValueType> a(dist, noDist);
 	std::vector<ValueType> maxCoord(dimensions, nroot);
 	std::vector<IndexType> numPoints(dimensions, nroot);
 
@@ -39,7 +45,11 @@ TEST_F(DiffusionTest, testConstructLaplacian) {
 	}
 
 	MeshGenerator<IndexType, ValueType>::createStructured3DMesh(a, coordinates, maxCoord, numPoints);
+	a.redistribute(dist, noDist);
 	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(a);
+
+	ASSERT_EQ(L.getRowDistribution(), a.getRowDistribution());
+	ASSERT_TRUE(L.isConsistent());
 
     DenseVector<ValueType> x( n, 1 );
     DenseVector<ValueType> y( L * x );
@@ -73,11 +83,13 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 	const IndexType n = graph.getNumRows();
 	scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
-	graph.redistribute(noDist, noDist);
 
 	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(graph);
+	EXPECT_EQ(L.getRowDistribution(), graph.getRowDistribution());
 
-	DenseVector<IndexType> nodeWeights(n,1);
+	L.redistribute(noDist, noDist);
+
+	DenseVector<IndexType> nodeWeights(L.getRowDistributionPtr(),1);
 
 	std::vector<IndexType> nodeIndices(n);
 	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
