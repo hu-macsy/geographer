@@ -86,31 +86,36 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	if( !coordDist->isEqual( *inputDist) ){
 		throw std::runtime_error( "Distributions should be equal.");
 	}
+
 	SCAI_REGION_END("ParcoRepart.partitionGraph.inputCheck")
 	{
 		SCAI_REGION("ParcoRepart.synchronize")
 		comm->synchronize();
 	}
 	
-        SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition")
-        // get an initial partition
-        DenseVector<IndexType> result;
-        
-        if (settings.initialPartition==InitialPartitioningMethods::SFC) { //sfc
-            result= ParcoRepart<IndexType, ValueType>::hilbertPartition(input, coordinates, settings);
-        } else if (settings.initialPartition==InitialPartitioningMethods::Pixel) { // pixel
-            result = ParcoRepart<IndexType, ValueType>::pixelPartition(input, coordinates, settings);
-        } else if (settings.initialPartition == InitialPartitioningMethods::Spectral) {// spectral
-            result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
-        } else if (settings.initialPartition == InitialPartitioningMethods::Multisection) {// multisection
-            scai::lama::DenseVector<ValueType> nodeWeights( inputDist, 1 );
-        	result = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, nodeWeights, settings);
-            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
-        	result.redistribute(newDist);
-        } else {
-        	throw std::runtime_error("Initial Partitioning mode undefined.");
-        }
-        SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
+	SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition")
+	// get an initial partition
+	DenseVector<IndexType> result;
+
+	if (settings.initialPartition==InitialPartitioningMethods::SFC) { //sfc
+		result= ParcoRepart<IndexType, ValueType>::hilbertPartition(input, coordinates, settings);
+	} else if (settings.initialPartition==InitialPartitioningMethods::Pixel) { // pixel
+		result = ParcoRepart<IndexType, ValueType>::pixelPartition(input, coordinates, settings);
+	} else if (settings.initialPartition == InitialPartitioningMethods::Spectral) {// spectral
+		result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
+	} else if (settings.initialPartition == InitialPartitioningMethods::Multisection) {// multisection
+		scai::lama::DenseVector<ValueType> nodeWeights( inputDist, 1 );
+		result = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, nodeWeights, settings);
+		scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
+		result.redistribute(newDist);
+		input.redistribute(newDist, noDist);
+		for (DenseVector<ValueType>& dimCoords : coordinates) {
+			dimCoords.redistribute(newDist);
+		}
+	} else {
+		throw std::runtime_error("Initial Partitioning mode undefined.");
+	}
+	SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
         
 	IndexType numRefinementRounds = 0;
 
