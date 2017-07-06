@@ -171,9 +171,7 @@ int main(int argc, char** argv) {
         }
         
         if (settings.useDiffusionCoordinates) {
-        	graph.redistribute(noDist, noDist);
         	scai::lama::CSRSparseMatrix<ValueType> L = ITI::Diffusion<IndexType, ValueType>::constructLaplacian(graph);
-        	//L.redistribute(noDist, noDist);
         	scai::lama::DenseVector<IndexType> nodeWeights(L.getRowDistributionPtr(),1);
 
         	std::vector<IndexType> nodeIndices(N);
@@ -181,19 +179,11 @@ int main(int argc, char** argv) {
 
         	ITI::Diffusion<IndexType, ValueType>::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), settings.dimensions);
 
-        	std::vector<IndexType> landmarks(settings.dimensions);
-        	std::copy(nodeIndices.begin(), nodeIndices.begin()+settings.dimensions, landmarks.begin());
-
-        	scai::lama::DenseMatrix<ValueType> diffusionValues = ITI::Diffusion<IndexType, ValueType>::multiplePotentials(L, nodeWeights, landmarks);
-        	assert(diffusionValues.getNumRows() == settings.dimensions);
-        	assert(diffusionValues.getLocalNumRows() == settings.dimensions);
         	coordinates.resize(settings.dimensions);
+
 			for (IndexType i = 0; i < settings.dimensions; i++) {
-				coordinates[i] = scai::lama::DenseVector<ValueType>(N,0);
-				diffusionValues.getLocalRow(coordinates[i].getLocalValues(), i);
-				coordinates[i].redistribute(inputDist);
+				coordinates[i] = ITI::Diffusion<IndexType, ValueType>::potentialsFromSource(L, nodeWeights, nodeIndices[i]);
 			}
-			graph.redistribute(inputDist, noDist);
 
         } else {
         	coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions );
