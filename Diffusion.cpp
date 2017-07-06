@@ -60,7 +60,13 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSR
 
 	CriterionPtr rt( new ResidualThreshold( norm, eps, ResidualThreshold::Relative ) );
 
-	CG solver( "simpleExampleCG" );
+	LoggerPtr logger( new CommonLogger ( "myLogger: ",
+	                                        LogLevel::convergenceHistory,
+	                                        LoggerWriteBehaviour::toConsoleOnly ) );
+
+	CG solver( "simpleCG" );
+
+	//solver.setLogger( logger );
 
 	solver.setStoppingCriterion( rt );
 
@@ -111,11 +117,18 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 	const IndexType localN = graph.getLocalNumRows();
 
 	if (graph.getNumColumns() != n) {
-		throw std::runtime_error("Matrix must be symmetric to be an adjacency matrix");
+		throw std::runtime_error("Matrix must be square to be an adjacency matrix");
 	}
 
 	scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
     scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
+
+    if (dist->getBlockDistributionSize() == nIndex) {
+    	throw std::runtime_error("Only replicated or block distributions supported.");
+    }
+
+    assert(dist->getBlockDistributionSize() == localN);
+    const IndexType firstIndex = dist->local2global(0);
 
 	const CSRStorage<ValueType>& storage = graph.getLocalStorage();
 	const ReadAccess<IndexType> ia(storage.getIA());
@@ -143,9 +156,10 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 	assert(degreeSum <= storage.getNumValues()+localN);
 
 	DIASparseMatrix<ValueType> D(dist,noDist);
-	DIAStorage<ValueType> dstor(localN, n, 1, HArray<IndexType>(1,0), HArray<ValueType>(localN, targetDegree.data()) );
+	DIAStorage<ValueType> dstor(localN, n, 1, HArray<IndexType>(1,firstIndex), HArray<ValueType>(localN, targetDegree.data()) );
 	D.swapLocalStorage(dstor);
 	CSRSparseMatrix<ValueType> result(D-graph);
+	assert(result.getNumValues() == graph.getNumValues() + n);
 
 	return result;
 }

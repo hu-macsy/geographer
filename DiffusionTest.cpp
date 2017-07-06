@@ -26,29 +26,16 @@ class DiffusionTest : public ::testing::Test {
 };
 
 TEST_F(DiffusionTest, testConstructLaplacian) {
-	const IndexType nroot = 4;
-	const IndexType n = nroot*nroot*nroot;
-	const IndexType dimensions = 3;
+	std::string path = "meshes/bubbles/";
+	std::string fileName = "bubbles-00010.graph";
+	std::string file = path + fileName;
+	const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+	const IndexType n = graph.getNumRows();
+    scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(graph);
 
-	DistributionPtr dist(new scai::dmemo::BlockDistribution(n, comm));
-	DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
-
-	CSRSparseMatrix<ValueType> a(dist, noDist);
-	std::vector<ValueType> maxCoord(dimensions, nroot);
-	std::vector<IndexType> numPoints(dimensions, nroot);
-
-	std::vector<DenseVector<ValueType>> coordinates(dimensions);
-	for(IndexType i=0; i<dimensions; i++){
-	  coordinates[i] = DenseVector<ValueType>(n, 0);
-	}
-
-	MeshGenerator<IndexType, ValueType>::createStructured3DMesh(a, coordinates, maxCoord, numPoints);
-	a.redistribute(dist, noDist);
-	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(a);
-
-	ASSERT_EQ(L.getRowDistribution(), a.getRowDistribution());
+	ASSERT_EQ(L.getRowDistribution(), graph.getRowDistribution());
 	ASSERT_TRUE(L.isConsistent());
 
     DenseVector<ValueType> x( n, 1 );
@@ -56,6 +43,13 @@ TEST_F(DiffusionTest, testConstructLaplacian) {
 
     ValueType norm = y.maxNorm().Scalar::getValue<ValueType>();
     EXPECT_EQ(0,norm);
+
+    //test consistency under distributions
+    const CSRSparseMatrix<ValueType> replicatedGraph(graph, noDist, noDist);
+    CSRSparseMatrix<ValueType> LFromReplicated = Diffusion<IndexType, ValueType>::constructLaplacian(replicatedGraph);
+    LFromReplicated.redistribute(L.getRowDistributionPtr(), L.getColDistributionPtr());
+    CSRSparseMatrix<ValueType> diff (LFromReplicated - L);
+    EXPECT_EQ(0, diff.l2Norm().Scalar::getValue<ValueType>());
 }
 
 TEST_F(DiffusionTest, testPotentials) {
@@ -65,11 +59,10 @@ TEST_F(DiffusionTest, testPotentials) {
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     const IndexType n = graph.getNumRows();
     scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
-    graph.redistribute(noDist, noDist);
 
 	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(graph);
 
-	DenseVector<IndexType> nodeWeights(n,1);
+	DenseVector<IndexType> nodeWeights(L.getRowDistributionPtr(),1);
 	DenseVector<ValueType> potentials = Diffusion<IndexType, ValueType>::potentialsFromSource(L, nodeWeights, 0);
 	ASSERT_EQ(n, potentials.size());
 	ASSERT_LT(potentials.sum().Scalar::getValue<ValueType>(), 0.000001);
@@ -87,12 +80,17 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(graph);
 	EXPECT_EQ(L.getRowDistribution(), graph.getRowDistribution());
 
-	L.redistribute(noDist, noDist);
 
 	DenseVector<IndexType> nodeWeights(L.getRowDistributionPtr(),1);
 
 	std::vector<IndexType> nodeIndices(n);
 	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
+
+	//broadcast seed value from root to ensure equal pseudorandom numbers.
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+	comm->bcast( seed, 1, 0 );
+	srand(seed[0]);
 
 	Diffusion<IndexType, ValueType>::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), numLandmarks);
 
