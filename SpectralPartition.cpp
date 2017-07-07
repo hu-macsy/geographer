@@ -8,6 +8,8 @@
 
 #include "SpectralPartition.h"
 
+using scai::lama::Scalar;
+
 namespace ITI {
 
 

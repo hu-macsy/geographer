@@ -656,7 +656,6 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         }
         // TODO: must save best distibution and redistribute with the best distribution
         
-        settings.dimensions = bestPixelCut;
         pixelPartition = ITI::ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coordsDV, settings);
         bestDist = pixelPartition.getDistributionPtr();
         for(int d=0; d<dimension; d++){

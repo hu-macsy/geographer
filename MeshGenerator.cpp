@@ -18,6 +18,11 @@ using std::ofstream;
 using std::endl;
 using std::istringstream;
 
+using scai::hmemo::HArray;
+using scai::hmemo::ReadAccess;
+using scai::hmemo::WriteAccess;
+using scai::hmemo::WriteOnlyAccess;
+
 
 namespace ITI{
 
@@ -58,17 +63,17 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix
     localMatrix.allocate( N, N );
     
     //create the adjacency matrix
-    hmemo::HArray<IndexType> csrIA;
-    hmemo::HArray<IndexType> csrJA;
-    hmemo::HArray<ValueType> csrValues;
+    HArray<IndexType> csrIA;
+    HArray<IndexType> csrJA;
+    HArray<ValueType> csrValues;
     // ja and values have size= edges of the graph
     // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
     IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
                                 -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
     {    
-        hmemo::WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
-        hmemo::WriteOnlyAccess<IndexType> ja( csrJA, numEdges*2);
-        hmemo::WriteOnlyAccess<ValueType> values( csrValues, numEdges*2);
+        WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
+        WriteOnlyAccess<IndexType> ja( csrJA, numEdges*2);
+        WriteOnlyAccess<ValueType> values( csrValues, numEdges*2);
         ia[0] = 0;
      
         IndexType nnzCounter = 0; // count non-zero elements
@@ -204,9 +209,9 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseM
     scai::lama::CSRStorage<ValueType> localMatrix;
     localMatrix.allocate( adjM.getLocalNumRows() , adjM.getLocalNumColumns() );
     
-    hmemo::HArray<IndexType> csrIA;
-    hmemo::HArray<IndexType> csrJA;
-    hmemo::HArray<ValueType> csrValues;
+    HArray<IndexType> csrIA;
+    HArray<IndexType> csrJA;
+    HArray<ValueType> csrValues;
     // ja and values have size= edges of the graph
     // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
     IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
@@ -216,11 +221,11 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseM
         SCAI_REGION("MeshGenerator.createStructured3DMesh_dist.setCSRSparseMatrix");
         IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
         
-        hmemo::WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
+        WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
         // we do not know the sizes of ja and values. 6*numOfLocalNodes is safe upper bound for a structured 3D mesh
         // after all the values are written the arrays get resized
-        hmemo::WriteOnlyAccess<IndexType> ja( csrJA , 6*adjM.getLocalNumRows() );
-        hmemo::WriteOnlyAccess<ValueType> values( csrValues, 6*adjM.getLocalNumRows() );
+        WriteOnlyAccess<IndexType> ja( csrJA , 6*adjM.getLocalNumRows() );
+        WriteOnlyAccess<ValueType> values( csrValues, 6*adjM.getLocalNumRows() );
         ia[0] = 0;
         IndexType nnzCounter = 0; // count non-zero elements
          
@@ -636,9 +641,9 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
     scai::lama::CSRStorage<ValueType> localMatrix;
     localMatrix.allocate( adjM.getLocalNumRows() , adjM.getLocalNumColumns() );
     
-    hmemo::HArray<IndexType> csrIA;
-    hmemo::HArray<IndexType> csrJA;
-    hmemo::HArray<ValueType> csrValues;
+    HArray<IndexType> csrIA;
+    HArray<IndexType> csrJA;
+    HArray<ValueType> csrValues;
     // ja.size() = values.size() = number of edges of the graph
     
     IndexType nnzCounter = 0; // count non-zero elements
@@ -652,9 +657,9 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
         for(IndexType i=0; i<localNgbs.size(); i++){
             nnzValues += localNgbs[i].size();
         }
-        hmemo::WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
-        hmemo::WriteOnlyAccess<IndexType> ja( csrJA , nnzValues);
-        hmemo::WriteOnlyAccess<ValueType> values( csrValues, nnzValues );
+        WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
+        WriteOnlyAccess<IndexType> ja( csrJA , nnzValues);
+        WriteOnlyAccess<ValueType> values( csrValues, nnzValues );
         ia[0] = 0;
          
         /*TODO:

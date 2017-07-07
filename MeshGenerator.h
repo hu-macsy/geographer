@@ -41,8 +41,9 @@ typedef int IndexType;
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
-using namespace scai;
-using namespace scai::lama;
+using scai::lama::CSRSparseMatrix;
+using scai::lama::DenseVector;
+using scai::lama::Scalar;
 
 
 namespace ITI {

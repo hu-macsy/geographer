@@ -1,9 +1,9 @@
 
 #include "MultiLevel.h"
 
+using scai::lama::Scalar;
 
 namespace ITI{
-    
     
 template<typename IndexType, typename ValueType>
 IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<IndexType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, Settings settings) {

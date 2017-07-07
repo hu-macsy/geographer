@@ -28,6 +28,9 @@
 #include <map>
 #include <tuple>
 
+using scai::lama::CSRStorage;
+using scai::lama::Scalar;
+
 namespace ITI {
 
 //-------------------------------------------------------------------------------------------------
@@ -126,23 +129,45 @@ void FileIO<IndexType, ValueType>::writeGraphDistributed (const CSRSparseMatrix<
  */
 template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<ValueType>> &coords, const std::string filename){
-    SCAI_REGION( "FileIO.writeCoords" )
+    SCAI_REGION( "FileIO.writeCoords" );
 
-    std::ofstream f(filename);
-    if(f.fail())
-        throw std::runtime_error("File "+ filename+ " failed.");
+    const IndexType dimension = coords.size();
+    const IndexType n = coords[0].size();
+    scai::dmemo::DistributionPtr dist = coords[0].getDistributionPtr();
+	scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( n ));
+	scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 
-    IndexType dimension= coords.size();
-    for (IndexType d = 1; d < dimension; d++) {
-    	assert(coords[d].size() == coords[0].size());
+    /**
+	 * If the input is replicated, we can write it directly from the root processor.
+	 * If it is not, we need to create a replicated copy.
+	 */
+
+    std::vector<DenseVector<ValueType>> maybeCopy;
+    const std::vector<DenseVector<ValueType>> &targetReference = dist->isReplicated() ? coords : maybeCopy;
+
+	if (!dist->isReplicated()) {
+		maybeCopy.resize(dimension);
+		for (IndexType d = 0; d < dimension; d++) {
+			maybeCopy[d] = DenseVector<ValueType>(coords[d], noDist);
+		}
+
+	}
+	assert(targetReference[0].getDistributionPtr()->isReplicated());
+	assert(targetReference[0].size() == n);
+
+	if (comm->getRank() == 0) {
+		std::ofstream filehandle(filename);
+		filehandle.precision(15);
+		if (filehandle.fail()) {
+			throw std::runtime_error("Could not write to file " + filename);
+		}
+		for (IndexType i = 0; i < n; i++) {
+			for (IndexType d = 0; d < dimension; d++) {
+				filehandle << coords[d].getLocalValues()[i] << " ";
+			}
+			filehandle << std::endl;
+		}
     }
-
-    for(IndexType i=0; i<coords[0].size(); i++){
-        for(IndexType j=0; j<dimension; j++)
-            f<< std::setprecision(15)<< coords[j].getValue(i).Scalar::getValue<ValueType>() << " ";
-        f<< std::endl;
-    }
-
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -329,12 +354,18 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
     //read local range
     for (IndexType i = 0; i < localN; i++) {
 		bool read = std::getline(file, line).good();
-		assert(read);//if we have read past the end of the file, the node count was incorrect
+		if (!read) {
+			throw std::runtime_error("Unexpected end of coordinate file. Was the number of nodes correct?");
+		}
 		std::stringstream ss( line );
 		std::string item;
 
 		IndexType dim = 0;
-		while (std::getline(ss, item, ' ') && dim < dimension) {
+		while (dim < dimension) {
+			bool read = std::getline(ss, item, ' ');
+			if (!read or item.size() == 0) {
+				throw std::runtime_error("Unexpected end of line. Was the number of dimensions correct?");
+			}
 			ValueType coord = std::stod(item);
 			coords[dim][i] = coord;
 			dim++;
@@ -344,10 +375,16 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 		}
     }
 
+    if (endLocalRange == globalN) {
+    	bool eof = std::getline(file, line).eof();
+    	if (!eof) {
+    		throw std::runtime_error(std::to_string(numberOfPoints) + " coordinates read, but file continues.");
+    	}
+    }
+
     std::vector<DenseVector<ValueType> > result(dimension);
 
     for (IndexType i = 0; i < dimension; i++) {
-    	//result[i] = DenseVector<ValueType>(coords[i], dist);
         result[i] = DenseVector<ValueType>(dist, coords[i] );
     }
 

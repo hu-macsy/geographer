@@ -32,6 +32,8 @@
 #include "AuxiliaryFunctions.h"
 #include "MultiSection.h"
 
+using scai::lama::Scalar;
+
 namespace ITI {
 
 template<typename IndexType, typename ValueType>
@@ -84,7 +86,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	if( !coordDist->isEqual( *inputDist) ){
 		throw std::runtime_error( "Distributions should be equal.");
 	}
-
 	SCAI_REGION_END("ParcoRepart.partitionGraph.inputCheck")
 	{
 		SCAI_REGION("ParcoRepart.synchronize")
@@ -147,37 +148,29 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
     
     IndexType k = settings.numBlocks;
     const IndexType dimensions = coordinates.size();
+    assert(dimensions == settings.dimensions);
     const IndexType localN = inputDist->getLocalSize();
     const IndexType globalN = inputDist->getGlobalSize();
     
-    std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
-    std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
+    std::vector<ValueType> minCoords(dimensions);
+    std::vector<ValueType> maxCoords(dimensions);
+    DenseVector<IndexType> result;
     
     if( ! inputDist->isEqual(*coordDist) ){
         throw std::runtime_error("Matrix and coordinates should have the same distribution");
     }
     
     /**
-     * get minimum / maximum of local coordinates
+     * get minimum / maximum of coordinates
      */
     {
 		SCAI_REGION( "ParcoRepart.initialPartition.minMax" )
 		for (IndexType dim = 0; dim < dimensions; dim++) {
-			//get local parts of coordinates
-                        scai::hmemo::ReadAccess<ValueType> localPartOfCoords( coordinates[dim].getLocalValues() );
-			for (IndexType i = 0; i < localN; i++) {
-				ValueType coord = localPartOfCoords[i];
-				if (coord < minCoords[dim]) minCoords[dim] = coord;
-				if (coord > maxCoords[dim]) maxCoords[dim] = coord;
-			}
-		}
-
-		/**
-		 * communicate to get global min / max
-		 */
-		for (IndexType dim = 0; dim < dimensions; dim++) {
-			minCoords[dim] = comm->min(minCoords[dim]);
-			maxCoords[dim] = comm->max(maxCoords[dim]);
+			minCoords[dim] = coordinates[dim].min().Scalar::getValue<ValueType>();
+			maxCoords[dim] = coordinates[dim].max().Scalar::getValue<ValueType>();
+			assert(std::isfinite(minCoords[dim]));
+			assert(std::isfinite(maxCoords[dim]));
+			assert(maxCoords[dim] > minCoords[dim]);
 		}
     }
     
@@ -222,7 +215,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
     /**
      * now sort the global indices by where they are on the space-filling curve.
      */
-    DenseVector<IndexType> result;
     scai::lama::DenseVector<IndexType> permutation;
     {
         SCAI_REGION( "ParcoRepart.hilbertPartition.sorting" )
@@ -292,6 +284,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     
     std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
     std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
+    DenseVector<IndexType> result(inputDist, 0);
     
     //TODO: probably minimum is not needed
     //TODO: if we know maximum from the input we could save that although is not too costly
@@ -301,7 +294,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
      */
     for (IndexType dim = 0; dim < dimensions; dim++) {
         //get local parts of coordinates
-        scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
+        scai::hmemo::ReadAccess<ValueType> localPartOfCoords( coordinates[dim].getLocalValues() );
         for (IndexType i = 0; i < localN; i++) {
             ValueType coord = localPartOfCoords[i];
             if (coord < minCoords[dim]) minCoords[dim] = coord;
@@ -322,7 +315,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     const IndexType sideLen = settings.pixeledSideLen;
     const IndexType cubeSize = std::pow(sideLen, dimensions);
     
-    //TODO: generalise this to arbitrary dimensions, do not handle 2D and 3D differently
+    //TODO: generalize this to arbitrary dimensions, do not handle 2D and 3D differently
     //TODO: by a  for(int d=0; d<dimension; d++){ ... }
     // a 2D or 3D arrays as a one dimensional vector
     // [i][j] is in position: i*sideLen + j
@@ -393,8 +386,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
   
     //
     //using the summed density get an initial pixeled partition
-    //
-    std::vector<IndexType> pixeledPartition( sumDensity.size() , -1);
+    
+    std::vector<IndexType> pixeledPartition( density.size() , -1);
     
     IndexType pointsLeft= globalN;
     IndexType pixelsLeft= cubeSize;
@@ -469,6 +462,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
         
 
         while(border.size() !=0 ){      // there are still pixels to check
+            
             //TODO: different data type to avoid that
             // sort border by the value in increasing order 
             std::sort( border.begin(), border.end(),
@@ -567,7 +561,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     //=========
     
     // set your local part of the partition/result
-    DenseVector<IndexType> result(inputDist, 0);
     scai::hmemo::WriteOnlyAccess<IndexType> wLocalPart ( result.getLocalValues() );
     
     if(dimensions==2){

@@ -35,6 +35,8 @@
 typedef double ValueType;
 typedef int IndexType;
 
+using scai::lama::CSRStorage;
+
 namespace ITI {
 
 class FileIOTest : public ::testing::Test {
@@ -90,7 +92,7 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
     f >>nodes >> edges;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    dmemo::DistributionPtr dist( new dmemo::NoDistribution( nodes ));
+    scai::dmemo::DistributionPtr dist( new scai::dmemo::NoDistribution( nodes ));
 
     // read graph from file
     {

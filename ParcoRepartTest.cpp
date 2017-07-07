@@ -64,6 +64,7 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     
     struct Settings settings;
     settings.numBlocks= k;
+    settings.dimensions = dimensions;
     settings.epsilon = 0.2;
     settings.pixeledSideLen = 16;
     settings.useGeometricTieBreaking = 1;
