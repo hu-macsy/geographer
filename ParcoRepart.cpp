@@ -159,7 +159,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
 		SCAI_REGION( "ParcoRepart.initialPartition.minMax" )
 		for (IndexType dim = 0; dim < dimensions; dim++) {
 			//get local parts of coordinates
-			scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
+                        scai::hmemo::ReadAccess<ValueType> localPartOfCoords( coordinates[dim].getLocalValues() );
 			for (IndexType i = 0; i < localN; i++) {
 				ValueType coord = localPartOfCoords[i];
 				if (coord < minCoords[dim]) minCoords[dim] = coord;

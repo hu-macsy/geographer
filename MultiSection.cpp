@@ -86,7 +86,7 @@ PRINT0( scale );
         
         for (IndexType d = 0; d < dim; d++) {
             //get local parts of coordinates
-            const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
+            scai::hmemo::ReadAccess<ValueType> localPartOfCoords( coordinates[d].getLocalValues() );
             for (IndexType i = 0; i < localN; i++) {
                 ValueType coord = localPartOfCoords[i];
                 if (coord < minCoords[d]) minCoords[d] = coord;
@@ -110,7 +110,7 @@ PRINT0( scale );
             
             ValueType thisDimScale = scale/(maxCoords[d]-minCoords[d]);
             ValueType thisDimMin = minCoords[d];
-            const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues(); 
+            scai::hmemo::ReadAccess<ValueType> localPartOfCoords( coordinates[d].getLocalValues() );
             
             /*
              * TODO: this code scales the coordinates a little bit faster but there is some problem in the rounding afterwards
@@ -714,9 +714,9 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
         
         for(int i=0; i<localN; i++){
             SCAI_REGION_START("MultiSection.projectionNonUniform.localProjection.CopyCoords");
-            std::vector<IndexType> coords;
+            std::vector<IndexType> coords(dimension);
             for(int c=0; c<dimension; c++){
-                 coords.push_back( coordinates[c].getLocalValues()[i] );               
+                 coords[c] = coordinates[c].getLocalValues()[i] ;               
             }
             SCAI_REGION_END("MultiSection.projectionNonUniform.localProjection.CopyCoords");
             

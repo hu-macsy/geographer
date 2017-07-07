@@ -4,14 +4,12 @@ SRCS=$(wildcard *.cpp)
 OBJ_GOOGLETEST= test_main.o ParcoRepartTest.o ParcoRepart.o MultiLevelTest.o MultiLevel.o LocalRefinementTest.o LocalRefinement.o HilbertCurve.o HilbertCurveTest.o MeshGenerator.o FileIO.o FileIOTest.o PrioQueueForInts.o quadtree/test/QuadTreeTest.o SpectralPartition.o SpectralPartitionTest.o MultiSection.o MultiSectionTest.o auxTest.o
 OBJ_TEST_MAIN= mainTest.o ParcoRepart.o MultiLevel.o LocalRefinement.o HilbertCurve.o MeshGenerator.o MultiSection.o FileIO.o PrioQueueForInts.o
 OBJ_GRAPH_GEN=  ParcoRepart.o HilbertCurve.o MeshGenerator.o FileIO.o graphGeneratorFromQuad.o
-OBJ_TEST_INITIAL_SFC= testInitialSfc.o ParcoRepart.o MultiLevel.o LocalRefinement.o HilbertCurve.o SpectralPartition.o MultiSection.o MeshGenerator.o FileIO.o PrioQueueForInts.o
-OBJ_TEST_INITIAL_MS= testInitialMultiSection.o ParcoRepart.o MultiLevel.o LocalRefinement.o HilbertCurve.o SpectralPartition.o MultiSection.o MeshGenerator.o FileIO.o PrioQueueForInts.o
+OBJ_TEST_INITIAL= testInitial.o ParcoRepart.o MultiLevel.o LocalRefinement.o HilbertCurve.o SpectralPartition.o MultiSection.o MeshGenerator.o FileIO.o PrioQueueForInts.o
 
 EXECUTABLE_GOOGLETEST=KatanomiTest
 EXECUTABLE_MAIN=Katanomi
 EXECUTABLE_GRAPH_GEN= graphGen
-EXECUTABLE_INITIAL_SFC= initTestSfc
-EXECUTABLE_INITIAL_MS= initTestMS
+EXECUTABLE_INITIAL= initTest
 
 GIT_COMMIT=$(shell git rev-parse --short HEAD)
 SCAI_INCLUDE=
@@ -22,7 +20,7 @@ BOOST_LIB=
 LFLAGS= -L$(SCAI_LIB) -L$(GTEST_LIB) -L$(BOOST_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lscai_sparsekernel -lscai_solver -lgtest -lboost_program_options -lboost_filesystem -lboost_system
 CCFLAGS= --openmp --std=c++11 -g -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -DSCAI_TRACE_ON  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR -DBUILD_COMMIT=$(GIT_COMMIT)
 
-all: main tests testInitialMS testInitialSfc
+all: main tests testInitial
 .PHONY: all
 
 tests: $(OBJ_GOOGLETEST)
@@ -34,12 +32,9 @@ main: $(OBJ_TEST_MAIN)
 graphGen: $(OBJ_GRAPH_GEN)
 	$(CC) $(CCFLAGS) $(OBJ_GRAPH_GEN) -o $(EXECUTABLE_GRAPH_GEN) $(LFLAGS)
 
-testInitialSfc: $(OBJ_TEST_INITIAL_SFC)
-	$(CC) $(CCFLAGS) $(OBJ_TEST_INITIAL_SFC) -o $(EXECUTABLE_INITIAL_SFC) $(LFLAGS)
+testInitial: $(OBJ_TEST_INITIAL)
+	$(CC) $(CCFLAGS) $(OBJ_TEST_INITIAL) -o $(EXECUTABLE_INITIAL) $(LFLAGS)
 
-testInitialMS: $(OBJ_TEST_INITIAL_MS)
-	$(CC) $(CCFLAGS) $(OBJ_TEST_INITIAL_MS) -o $(EXECUTABLE_INITIAL_MS) $(LFLAGS)	
-		
 .PHONY: clean
 clean:
 	rm -f $(EXECUTABLE_MAIN) $(EXECUTABLE_GOOGLETEST) $(EXECUTABLE_GRAPH_GEN) $(OBJ_GOOGLETEST) $(OBJ_TEST_MAIN) $(OBJ_GRAPH_GEN)
