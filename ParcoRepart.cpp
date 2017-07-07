@@ -164,7 +164,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
      * get minimum / maximum of coordinates
      */
     {
-		SCAI_REGION( "ParcoRepart.initialPartition.minMax" )
+		SCAI_REGION( "ParcoRepart.hilbertPartition.minMax" )
 		for (IndexType dim = 0; dim < dimensions; dim++) {
 			minCoords[dim] = coordinates[dim].min().Scalar::getValue<ValueType>();
 			maxCoords[dim] = coordinates[dim].max().Scalar::getValue<ValueType>();

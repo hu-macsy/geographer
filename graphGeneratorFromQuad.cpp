@@ -20,8 +20,8 @@
 #include <iostream>
 #include <chrono>
 
-#include "ParcoRepart.h"
-#include "HilbertCurve.h"
+//#include "ParcoRepart.h"
+//#include "HilbertCurve.h"
 #include "MeshGenerator.h"
 #include "Settings.h"
 #include "FileIO.h"
@@ -32,12 +32,12 @@ typedef int IndexType;
 
 int main(int argc, char** argv){
 
-    IndexType maxNumberOfAreas= 5;
-    const IndexType pointsPerArea= 200;
+    IndexType maxNumberOfAreas= 20;
+    const IndexType pointsPerArea= 50000;
     const IndexType dimension = 3;
     const ValueType maxCoord = 1000;
 
-    for(int numberOfAreas=1; numberOfAreas<maxNumberOfAreas; numberOfAreas+=2){
+    for(int numberOfAreas=4; numberOfAreas<maxNumberOfAreas; numberOfAreas+=2){
         std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
         scai::lama::CSRSparseMatrix<ValueType> graph;
@@ -52,7 +52,7 @@ int main(int argc, char** argv){
         // count the degree    
         const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
         const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-        IndexType upBound= 30*dimension;
+        IndexType upBound= 40*dimension;
         std::vector<IndexType> degreeCount( upBound, 0 );
         
         for(IndexType i=0; i<ia.size()-1; i++){
@@ -79,7 +79,7 @@ int main(int argc, char** argv){
         ITI::FileIO<IndexType, ValueType>::writeGraph( graph, outFile);
         
         std::string outCoords = outFile + ".xyz";
-        ITI::FileIO<IndexType, ValueType>::writeCoords(coords, coords[0].size(), outCoords);
+        ITI::FileIO<IndexType, ValueType>::writeCoords(coords, outCoords);
         
         std::chrono::duration<double> genTime = std::chrono::system_clock::now() - startTime;
 

@@ -737,7 +737,7 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
             randPoint[d] = dist(generator);
             // create a distribution for every dimension
             //TODO: maybe also pick deviation in random
-            ValueType deviation = (ValueType) rand()/RAND_MAX + 0.4;
+            ValueType deviation = (ValueType) rand()/RAND_MAX + 1;
             distForDim[d] = std::normal_distribution<ValueType> (randPoint[d], deviation);
         }
         
@@ -758,13 +758,13 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
     }
 
     // add random points to keep tree balanced
-    for(int i=0; i<pointsPerArea; i++){
+    for(int i=0; i<pointsPerArea*2; i++){
         SCAI_REGION("MeshGenerator.createQuadMesh.randomPoints")
         Point<ValueType> p(dimension);
         for(int d=0; d<dimension; d++){
-            //std::uniform_real_distribution<ValueType> dist(minCoord[d], maxCoord[d]);
-            //p[d] = dist(generator);
-            p[d]= ((ValueType) rand()/RAND_MAX) * maxCoord[d];
+            std::uniform_real_distribution<ValueType> dist(minCoord[d], maxCoord[d]);
+            p[d] = dist(generator);
+            //p[d]= ((ValueType) rand()/RAND_MAX) * maxCoord[d];
         }
         quad.addContent(0, p);
     }   

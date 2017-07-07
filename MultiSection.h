@@ -177,14 +177,14 @@ namespace ITI {
             
             // point should be inside this rectangle
             for(int d=0; d<dim; d++){
-                //TODO: just throw exception or insert assertion to ensure point is within bounds?
                 if(point[d]>myRect.top[d] or  point[d]<myRect.bottom[d]){
-                    //return NULL;
                     throw std::logic_error("Point out of bounds");
                 }
             }
+            
             //TODO: remove variable ret or not?
             std::shared_ptr<rectCell> ret;
+            
             if( !this->isLeaf ){
                 bool foundOwnerChild = false;
                 for(int c=0; c<this->children.size(); c++){
@@ -196,19 +196,15 @@ namespace ITI {
                     }
                 }
                
-                // this is not a leaf node and none of the childrens owns the point
+                // this is not a leaf node but none of the childrens owns the point
+                //WARNING: in our case this sdould never happen, but it may happen in a more general
+                // case where the children rectangles do not cover the entire father rectangle
                 if( !foundOwnerChild ){
-                    // check again if this rectangle owns the point
-                    //TODO: not need to check again
-                    if( myRect.owns( point ) ){
-                        ret = std::make_shared<rectCell>(*this);
-                    }else{
-                        //return NULL;
-                        throw std::logic_error("Null pointer");
-                    }
+                    throw std::logic_error("Null pointer");
                 }
             }else{
-                SCAI_ASSERT( this->myRect.owns(point), "Should not happen")    
+                //TODO: possibly a bit expensive and not needed assertion
+                SCAI_ASSERT( myRect.owns(point), "Should not happen")    
                 //ret = std::make_shared<rectCell>(*this);
                 return  std::make_shared<rectCell>(*this);
             }
