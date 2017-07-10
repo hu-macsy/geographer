@@ -67,6 +67,7 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     settings.epsilon = 0.2;
     settings.pixeledDetailLevel =4;
     settings.useGeometricTieBreaking = 1;
+    settings.dimensions = dimensions;
     
     for( int i=2; i<6; i++){
         settings.pixeledDetailLevel = i;
