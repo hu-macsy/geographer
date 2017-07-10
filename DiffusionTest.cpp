@@ -52,6 +52,15 @@ TEST_F(DiffusionTest, testConstructLaplacian) {
     EXPECT_EQ(0, diff.l2Norm().Scalar::getValue<ValueType>());
 }
 
+TEST_F(DiffusionTest, benchConstructLaplacian) {
+	std::string path = "meshes/bubbles/";
+	std::string fileName = "hugetrace-00000.graph";
+	std::string file = path + fileName;
+	const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+
+	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(graph);
+}
+
 TEST_F(DiffusionTest, testPotentials) {
     std::string path = "meshes/bubbles/";
     std::string fileName = "bubbles-00010.graph";
