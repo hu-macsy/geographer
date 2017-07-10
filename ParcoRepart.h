@@ -17,8 +17,8 @@
 
 #include "Settings.h"
 
-using scai::lama::CSRSparseMatrix;
-using scai::lama::DenseVector;
+using namespace scai::lama;
+using scai::dmemo::Halo;
 using scai::dmemo::Halo;
 
 #define STRINGIZER(arg)     #arg

@@ -30,8 +30,9 @@
 #include "MultiLevel.h"
 #include "SpectralPartition.h"
 #include "AuxiliaryFunctions.h"
+#include "MultiSection.h"
 
-#include "sort/SchizoQS.hpp"
+#include "schizoQuicksort/src/sort/SchizoQS.hpp"
 
 //#include "quadtree/QuadTreeCartesianEuclid.h"
 

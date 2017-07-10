@@ -1,4 +1,4 @@
-CC=g++
+CC=mpicxx
 
 SRCS=$(wildcard *.cpp)
 OBJ_GOOGLETEST= test_main.o ParcoRepartTest.o ParcoRepart.o MultiLevelTest.o MultiLevel.o LocalRefinementTest.o LocalRefinement.o HilbertCurve.o HilbertCurveTest.o MeshGenerator.o FileIO.o FileIOTest.o PrioQueueForInts.o quadtree/test/QuadTreeTest.o SpectralPartition.o SpectralPartitionTest.o MultiSection.o MultiSectionTest.o auxTest.o
