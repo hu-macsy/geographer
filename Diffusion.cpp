@@ -52,7 +52,10 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSR
 	DenseVector<ValueType> nullVector(dist,0);
 	DenseVector<ValueType> d(nullVector - nodeWeights);
 	d.setValue(source, weightSum - sourceWeight);
-	assert(d.sum() == 0);
+	ValueType newWeightSum = d.sum().Scalar::getValue<IndexType>();
+	if (std::abs(newWeightSum) >= eps) {
+		throw std::logic_error("Residual weight sum " + std::to_string(newWeightSum) + " too large!");
+	}
 
 	DenseVector<ValueType> solution( dist, 0.0 );
 
@@ -66,7 +69,7 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSR
 
 	CG solver( "simpleCG" );
 
-	//solver.setLogger( logger );
+	solver.setLogger( logger );
 
 	solver.setStoppingCriterion( rt );
 
