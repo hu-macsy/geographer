@@ -177,6 +177,12 @@ int main(int argc, char** argv) {
         	std::vector<IndexType> nodeIndices(N);
         	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
 
+        	//broadcast seed value from root to ensure equal pseudorandom numbers.
+        	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+        	comm->bcast( seed, 1, 0 );
+        	srand(seed[0]);
+
         	ITI::Diffusion<IndexType, ValueType>::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), settings.dimensions);
 
         	coordinates.resize(settings.dimensions);
