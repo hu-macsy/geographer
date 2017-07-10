@@ -1,0 +1,588 @@
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.021215 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.019072 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.015134 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.013331 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.013665 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.008334 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.008458 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.004501
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001884
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000790
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.005505
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000830
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.003017
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001024
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003019 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002623 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002873 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002582 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002915 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002674 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002498 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000888
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000904
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000815
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000828
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000864
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000864
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001024
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002907 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003073 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002661 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002864 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002733 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002830 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002739 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000888
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001029
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000836
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000843
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000826
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000831
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000888
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002637 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002703 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002656 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002686 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002638 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002848 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002736 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000992
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000855
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000857
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000865
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000852
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000971
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000990
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002973 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002810 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002659 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003136 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002778 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002894 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002771 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000963
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000891
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000910
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000887
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000860
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001043
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000893
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003088 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003491 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003148 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002882 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002837 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002845 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002886 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000967
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000927
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000921
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000976
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000901
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000904
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000933
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=64 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003042 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=64 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003057 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=64 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003097 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=64 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002958 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=64 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003145 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=64 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003015 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=64 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002879 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=64 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000989
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=64 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000954
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=64 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000973
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=64 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001032
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=64 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001152
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=64 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001030
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=64 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000976
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=128 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003028 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=128 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002848 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=128 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002976 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=128 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002891 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=128 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002979 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=128 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003133 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=128 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002866 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=128 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001017
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=128 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000940
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=128 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001048
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=128 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001039
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=128 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000971
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=128 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001066
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=128 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001002
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=256 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003075 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=256 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003028 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=256 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002953 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=256 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002978 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=256 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003016 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=256 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003072 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=256 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003051 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=256 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001109
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=256 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001097
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=256 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001080
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=256 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001060
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=256 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001034
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=256 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001173
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=256 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001043
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=512 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003205 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=512 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003191 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=512 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003270 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=512 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003176 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=512 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003039 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=512 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003278 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=512 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003016 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=512 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001283
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=512 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001337
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=512 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001258
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=512 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001218
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=512 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001249
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=512 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001303
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=512 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001392
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1024 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003492 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1024 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003599 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1024 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003596 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1024 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003354 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1024 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003502 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1024 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003225 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1024 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003461 depth=16.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1024 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001487
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1024 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001640
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1024 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001618
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1024 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001574
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1024 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001566
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1024 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001689
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1024 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001639
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2048 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004206 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2048 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004445 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2048 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004265 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2048 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004564 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2048 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004237 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2048 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004185 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2048 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004279 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2048 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.002599
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2048 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.002431
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2048 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.002340
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2048 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.002422
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2048 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.002458
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2048 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.002346
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=2048 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.002307
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4096 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.006242 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4096 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.006057 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4096 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.005988 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4096 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.005974 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4096 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.005877 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4096 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.006098 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4096 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.005959 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4096 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.003957
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4096 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.003918
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4096 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.003957
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4096 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.003955
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4096 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.003906
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4096 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.004008
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=4096 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.003885
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8192 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.009817 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8192 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.009761 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8192 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.009825 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8192 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.009942 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8192 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.009643 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8192 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.009884 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8192 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.009634 depth=15.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8192 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.007226
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8192 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.007206
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8192 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.007320
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8192 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.007287
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8192 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.007313
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8192 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.007208
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=8192 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.008277
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16384 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.080269 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16384 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.072909 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16384 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.080957 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16384 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.076456 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16384 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.079120 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16384 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.076877 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16384 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.071579 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16384 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.019647
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16384 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.018824
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16384 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.017307
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16384 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.018542
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16384 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.017948
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16384 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.017863
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=16384 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.017808
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32768 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.161495 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32768 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.168753 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32768 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.164732 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32768 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.158362 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32768 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.166746 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32768 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.156573 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32768 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.151235 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32768 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.030977
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32768 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.027698
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32768 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.027190
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32768 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.028394
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32768 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.028005
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32768 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.027863
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=32768 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.027924
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=65536 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.198475 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=65536 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.201070 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=65536 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.198904 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=65536 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.184670 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=65536 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.169950 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=65536 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.184818 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=65536 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.191555 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=65536 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.053887
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=65536 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.053885
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=65536 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.053869
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=65536 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.053717
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=65536 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.053963
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=65536 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.053995
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=65536 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.053437
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=131072 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.219268 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=131072 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.210486 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=131072 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.227837 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=131072 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.200547 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=131072 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.213627 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=131072 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.208669 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=131072 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.190431 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=131072 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.111886
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=131072 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.110636
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=131072 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.111110
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=131072 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.110813
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=131072 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.110682
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=131072 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.110934
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=131072 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.111772
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=262144 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.284428 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=262144 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.279233 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=262144 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.273882 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=262144 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.269999 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=262144 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.274554 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=262144 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.266841 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=262144 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.266481 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=262144 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.236966
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=262144 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.237574
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=262144 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.236522
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=262144 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.238319
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=262144 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.237032
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=262144 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.237452
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=262144 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.237928
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=524288 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.494400 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=524288 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.503366 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=524288 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.502245 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=524288 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.507051 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=524288 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.500070 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=524288 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.495221 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=524288 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.484804 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=524288 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.486116
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=524288 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.487520
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=524288 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.485527
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=524288 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.499415
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=524288 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.488200
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=524288 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.489317
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=524288 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.488686
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1048576 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=1.025712 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1048576 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=1.016108 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1048576 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=1.010500 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1048576 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=1.009198 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1048576 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=1.002201 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1048576 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=1.013233 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1048576 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=1.022592 depth=14.000000
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1048576 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.987246
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1048576 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=1.022542
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1048576 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.997531
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1048576 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.984369
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1048576 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.996905
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1048576 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.999517
+RESULT size=8192 collective=range datatype=double distribution=uniform elements=1048576 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.999109
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.032280 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.027405 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.018672 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.013467 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.011222 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.008811 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.005074 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.005956
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.003746
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001167
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000901
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000963
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000946
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000885
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003069 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.002964 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003040 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003116 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003059 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003182 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003131 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001056
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000950
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000988
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000929
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001089
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001201
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000948
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003467 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003402 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003411 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003500 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003291 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003365 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003246 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001032
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001119
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001061
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000937
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000936
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000946
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001038
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003227 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003307 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003202 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003307 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004878 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003937 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003332 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001045
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001033
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000990
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001056
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001087
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001117
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001008
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003527 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003754 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003739 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003600 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003694 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003450 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003281 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001056
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001165
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001057
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001021
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001008
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.000981
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001177
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003814 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003401 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003503 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003393 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003673 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.005593 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003448 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001285
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001095
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001146
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001157
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001133
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001129
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001307
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=64 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003786 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=64 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003556 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=64 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003604 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=64 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003458 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=64 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003557 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=64 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003565 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=64 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003470 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=64 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001246
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=64 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001218
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=64 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001109
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=64 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001337
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=64 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001100
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=64 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001085
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=64 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001095
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=128 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003545 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=128 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003484 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=128 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003694 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=128 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003489 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=128 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003548 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=128 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003650 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=128 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003606 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=128 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001197
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=128 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001166
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=128 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001180
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=128 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001165
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=128 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001197
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=128 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001143
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=128 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001211
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=256 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003627 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=256 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003757 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=256 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003610 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=256 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003574 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=256 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003783 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=256 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003643 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=256 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003628 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=256 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001469
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=256 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001218
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=256 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001270
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=256 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001270
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=256 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001261
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=256 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001304
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=256 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001433
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=512 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003895 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=512 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003992 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=512 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003800 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=512 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004231 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=512 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003723 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=512 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004099 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=512 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.003960 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=512 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001736
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=512 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001460
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=512 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001528
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=512 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001771
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=512 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001598
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=512 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001409
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=512 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001675
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1024 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004219 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1024 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004101 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1024 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004485 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1024 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004281 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1024 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004204 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1024 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004120 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1024 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.004903 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1024 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001942
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1024 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.002099
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1024 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001852
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1024 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001852
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1024 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.001988
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1024 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.002046
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1024 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.002183
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2048 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.005201 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2048 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.005543 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2048 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.005226 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2048 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.005472 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2048 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.005385 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2048 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.005559 depth=17.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2048 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.005226 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2048 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.002932
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2048 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.002935
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2048 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.002984
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2048 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.002949
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2048 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.002954
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2048 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.002992
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=2048 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.003018
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4096 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.007731 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4096 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.007511 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4096 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.007467 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4096 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.007572 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4096 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.007295 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4096 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.007613 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4096 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.007510 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4096 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.005301
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4096 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.005364
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4096 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.005254
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4096 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.005188
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4096 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.005293
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4096 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.005410
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=4096 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.005193
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8192 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.012014 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8192 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.012170 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8192 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.012116 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8192 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.012035 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8192 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.012084 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8192 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.011964 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8192 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.011732 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8192 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.009860
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8192 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.010038
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8192 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.009922
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8192 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.009863
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8192 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.009914
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8192 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.009952
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=8192 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.009848
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16384 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.095497 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16384 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.099168 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16384 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.105019 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16384 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.095535 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16384 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.088875 depth=16.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16384 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.095831 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16384 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.093252 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16384 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.023478
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16384 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.024679
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16384 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.023722
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16384 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.023813
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16384 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.023208
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16384 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.023335
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=16384 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.023448
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32768 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.198809 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32768 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.205218 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32768 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.201619 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32768 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.193674 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32768 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.193527 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32768 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.190129 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32768 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.186688 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32768 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.039648
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32768 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.041492
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32768 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.039474
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32768 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.039500
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32768 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.039818
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32768 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.038386
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=32768 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.039640
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=65536 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.245074 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=65536 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.251211 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=65536 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.255659 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=65536 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.245416 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=65536 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.233650 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=65536 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.237366 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=65536 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.235532 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=65536 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.077296
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=65536 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.077902
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=65536 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.076179
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=65536 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.076389
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=65536 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.076454
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=65536 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.076271
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=65536 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.076833
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=131072 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.289192 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=131072 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.294925 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=131072 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.275092 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=131072 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.274942 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=131072 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.281085 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=131072 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.264895 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=131072 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.282914 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=131072 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.156104
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=131072 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.156233
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=131072 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.156352
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=131072 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.156643
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=131072 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.157696
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=131072 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.155839
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=131072 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.157680
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=262144 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.360819 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=262144 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.380929 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=262144 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.364427 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=262144 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.373528 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=262144 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.362870 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=262144 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.360479 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=262144 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.366127 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=262144 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.329660
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=262144 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.331636
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=262144 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.331001
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=262144 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.329794
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=262144 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.331689
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=262144 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.333770
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=262144 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.334320
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=524288 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.657135 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=524288 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.660502 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=524288 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.652838 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=524288 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.642883 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=524288 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.645986 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=524288 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.640353 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=524288 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=0.639097 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=524288 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.670934
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=524288 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.674745
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=524288 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.675100
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=524288 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.675287
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=524288 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.679252
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=524288 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.674031
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=524288 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=0.675086
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1048576 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=1.274722 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1048576 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=1.277317 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1048576 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=1.269479 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1048576 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=1.274034 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1048576 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=1.265049 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1048576 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=1.306651 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1048576 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=ssort pivot=16_50 runtime=1.269068 depth=15.000000
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1048576 iteration=0 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=1.367227
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1048576 iteration=1 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=1.359167
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1048576 iteration=2 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=1.378464
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1048576 iteration=3 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=1.371216
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1048576 iteration=4 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=1.366427
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1048576 iteration=5 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=1.365692
+RESULT size=16384 collective=range datatype=double distribution=uniform elements=1048576 iteration=6 blocking=0 mpi_split=0 barriers=0 algo=hcsort	time=1.370047
