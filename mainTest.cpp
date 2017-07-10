@@ -258,7 +258,8 @@ int main(int argc, char** argv) {
     	return 0;
     }
     
-    // time needed to get the input
+    // time needed to get the input. Synchronize first to make sure that all processes are finished.
+    comm->synchronize();
     std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
 
     assert(N > 0);
@@ -295,7 +296,6 @@ int main(int argc, char** argv) {
     ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partition, comm->getSize() );
     
     std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
-    
     
     // Reporting output to std::cout
     ValueType inputT = ValueType ( comm->max(inputTime.count() ));
