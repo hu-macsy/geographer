@@ -73,14 +73,12 @@ namespace ITI {
             IndexType dim= point.size();
             SCAI_ASSERT( dim==this->top.size(), "Wrong dimensions: point.dim= " << dim << ", this->top.dim= "<< this->top.size() );
             
-            bool ret= true;
             for(int d=0; d<dim; d++){
-                if( point[d]<this->bottom[d] or point[d]>this->top[d]){
-                    ret= false;
-                    break;
+                if( point[d]<bottom[d] or point[d]>top[d]){
+                    return false;
                 }
             }
-            return ret;
+            return true;
         }
         
         bool operator()(rectangle& a, rectangle& b){
@@ -182,33 +180,22 @@ namespace ITI {
                 }
             }
             
-            //TODO: remove variable ret or not?
-            std::shared_ptr<rectCell> ret;
-            
             if( !this->isLeaf ){
-                bool foundOwnerChild = false;
                 for(int c=0; c<this->children.size(); c++){
                     if( children[c]->myRect.owns( point ) ){                    
-                        foundOwnerChild = true;
-                        //ret = children[c]->getContainingLeaf( point );
                         return children[c]->getContainingLeaf( point );
-                        break;  // if one node is found no need to search the rest of the children
                     }
                 }
-               
                 // this is not a leaf node but none of the childrens owns the point
                 //WARNING: in our case this sdould never happen, but it may happen in a more general
                 // case where the children rectangles do not cover the entire father rectangle
-                if( !foundOwnerChild ){
-                    throw std::logic_error("Null pointer");
-                }
+                throw std::logic_error("Null pointer");
             }else{
                 //TODO: possibly a bit expensive and not needed assertion
                 SCAI_ASSERT( myRect.owns(point), "Should not happen")    
-                //ret = std::make_shared<rectCell>(*this);
                 return  std::make_shared<rectCell>(*this);
             }
-            return ret;
+    
         }
         
         IndexType getSubtreeSize(){
