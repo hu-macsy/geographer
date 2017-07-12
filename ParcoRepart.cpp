@@ -304,7 +304,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
             if (comm->getRank() == 0) std::cout << "Redistributed coordinates" << std::endl;
         }
     }
-    
+    /*
     ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
     ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(result, k);
     if (comm->getRank() == 0) {
@@ -313,6 +313,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
         std::cout << "\033[1;31mWith SFC (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
         std::cout<< "and imbalance= "<< imbalance << "\033[0m" << std::endl;
     }
+    */
     return result;
 }
 //--------------------------------------------------------------------------------------- 

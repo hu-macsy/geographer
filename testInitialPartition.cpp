@@ -101,6 +101,7 @@ int main(int argc, char** argv) {
 				("minBorderNodes", value<int>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
                                 ("initialPartition",  value<InitialPartitioningMethods> (&settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition")
+                                ("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
                                 ("pixeledSideLen", value<int>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
 				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
@@ -108,6 +109,7 @@ int main(int argc, char** argv) {
 				("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
 				("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
 				("multiLevelRounds", value<int>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
+                                ("fileFormat", value<int>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for METIS format, 1 for MatrixMarket format. See FileIO for more details.")
 				;
 
 	variables_map vm;
@@ -186,7 +188,22 @@ int main(int argc, char** argv) {
         }
 
         // read the adjacency matrix and the coordinates from a file
-        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+        ITI::FileIO<IndexType,ValueType>::FileFormat ff;
+        switch(  settings.fileFormat ){
+            case 0:{
+                ff = ITI::FileIO<IndexType,ValueType>::FileFormat::METIS;
+                break;
+            }
+            case 1:{
+                ff = ITI::FileIO<IndexType,ValueType>::FileFormat::MATRIXMARKET;
+                break;
+            }
+            default:{
+                throw std::runtime_error("Not supported file format");
+            }
+        }
+        
+        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile ,ff );
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
         assert(graph.getColDistribution().isEqual(*noDistPtr));
@@ -195,7 +212,7 @@ int main(int argc, char** argv) {
         	std::cout<< "Read " << N << " points." << std::endl;
         }
         
-        coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions );
+        coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, ff );
 
         if (comm->getRank() == 0) {
         	std::cout << "Read coordinates." << std::endl;
@@ -300,10 +317,15 @@ int main(int argc, char** argv) {
     
     
     using namespace ITI;
+    
+    //TODO: not needed to redistribute. Reading graph and coordinates already distributes the data.
+    /*
     graph.redistribute( rowDistPtr, noDistPtr);
     for(int d=0; d<dimensions; d++){
         coordinates[d].redistribute( rowDistPtr );
-    }    
+    } 
+    */
+    
     if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
     
     comm->synchronize();
@@ -338,6 +360,9 @@ int main(int argc, char** argv) {
                 logF<< "   Initial sfc, total time: " << partitionTime.count() << std::endl;
                 logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
                 logF  << std::endl  << std::endl; 
+                std::cout << "   Initial sfc, total time: " << partitionTime.count() << std::endl;
+                std::cout << "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
+                std::cout << std::endl  << std::endl; 
             }   
             comm->synchronize();
             break;
@@ -364,6 +389,9 @@ int main(int argc, char** argv) {
                 logF<< "-- Initial pixeled, total time: " << partitionTime.count() << std::endl;
                 logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
                 logF  << std::endl  << std::endl; 
+                std::cout << "-- Initial pixeled, total time: " << partitionTime.count() << std::endl;
+                std::cout << "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
+                std::cout << std::endl  << std::endl; 
             }
             break;
         }
@@ -392,6 +420,9 @@ int main(int argc, char** argv) {
                 logF<< "--  Initial multisection, total time: " << partitionTime.count() << std::endl;
                 logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
                 logF  << std::endl  << std::endl; 
+                std::cout << "--  Initial multisection, total time: " << partitionTime.count() << std::endl;
+                std::cout << "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
+                std::cout << std::endl  << std::endl;
             }
             break;   
         }

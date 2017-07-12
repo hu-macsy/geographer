@@ -17,6 +17,7 @@ struct Settings{
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
     IndexType pixeledSideLen = 10;
+    IndexType fileFormat = 0;   // 0 for METSI, 1 for MatrixMarket
     InitialPartitioningMethods initialPartition = InitialPartitioningMethods::SFC;
     bool useDiffusionTieBreaking = false;
     bool useGeometricTieBreaking = false;
@@ -42,6 +43,7 @@ struct Settings{
         out<< "gainOverBalance: " << gainOverBalance << std::endl;
         out<< "skipNoGainColors: "<< skipNoGainColors << std::endl;
         out<< "pixeledSideLen: "<< pixeledSideLen << std::endl;
+        out<< "fileFormat: "<< fileFormat << std::endl;
         if (initialPartition==InitialPartitioningMethods::SFC) {
             out<< "initial partition: hilbert curve" << std::endl;
         } else if (initialPartition==InitialPartitioningMethods::Pixel) {
@@ -49,7 +51,7 @@ struct Settings{
         } else if (initialPartition==InitialPartitioningMethods::Spectral) {
             out<< "initial partition: spectral" << std::endl;
         } else if (initialPartition==InitialPartitioningMethods::Multisection) {
-        	out<< "initial partition: multisection" << std::endl;
+            out<< "initial partition: multisection" << std::endl;
         } else {
             out<< "initial partition undefined" << std::endl;
         }

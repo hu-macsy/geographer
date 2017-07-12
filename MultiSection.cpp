@@ -189,7 +189,7 @@ PRINT0( scale );
             }
         }
     }
-    
+    /*
     ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut( input, partition, false);
     ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k);
     if (comm->getRank() == 0) {
@@ -202,7 +202,7 @@ PRINT0( scale );
         }
         std::cout<< "and imbalance= "<< imbalance << "\033[0m" << std::endl;
     }
-    
+    */
     return partition;
 }
 

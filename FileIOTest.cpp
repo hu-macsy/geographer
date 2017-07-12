@@ -245,6 +245,54 @@ TEST_F(FileIOTest, testReadQuadTree){
 	//IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
 	//std::cout << "Read Quadtree with " << edgeList.size() << " nodes and " << m << " edges." << std::endl;
 }
+//-------------------------------------------------------------------------------------------------
 
+TEST_F(FileIOTest, testReadMatrixMarketFormat){
+    std::string path = "./meshes/grid2/";
+    std::string graphFile = path + "grid2.mtx";
+    std::string coordFile = path + "grid2_coord.mtx";
+    //std::string coordFile = path + "my_MM_coords.mtx";
+    
+    std::ifstream coordF( coordFile );
+    
+    // we do not need them for the MatrixMarket format
+    IndexType N, dimensions;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    //scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, nodes) );
+    
+    ITI::FileIO<IndexType,ValueType>::FileFormat ff = ITI::FileIO<IndexType,ValueType>::FileFormat::MATRIXMARKET;
+    
+    std::tie( N, dimensions) = FileIO<IndexType, ValueType>::getMatrixMarketCoordsInfos( coordFile );
+    
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions, ff);
+    
+    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( graphFile, ff);
+    
+    
+    //assertion - prints
+    
+    std::cout<< "Coords size= "<< coords[0].size() << " , dimensions= " << coords.size() << std::endl;
+    
+    SCAI_ASSERT( dimensions=coords.size() , "Dimensions " << dimensions << " do not agree with coordiantes size= " << coords.size() );
+    SCAI_ASSERT( N=coords[0].size() , "N= "<< N << " does not agree with coords[0].size()= " << coords[0].size() );
+    
+    /*
+    for( int i=0; i<coords[0].getLocalValues().size(); i++){
+        std::cout << *comm << " ";
+        for(int d=0; d<dimensions; d++){
+            std::cout<< coords[d].getLocalValues()[i] << ", ";
+        }
+        std::cout << std::endl;
+    }
+    */
+    
+    PRINT(*comm << ": localCoords.size()= "<< coords[0].getLocalValues().size() );
+    SCAI_ASSERT( coords[0].getLocalValues().size()>0 , "Coordinate vector is PE " << *comm << " is empty");
+    for(int d=1; d<dimensions; d++){
+        SCAI_ASSERT( coords[d].getLocalValues().size()==coords[d-1].getLocalValues().size() , "Coordinates for different dimension have different sizes, should be the same");
+        SCAI_ASSERT( coords[d].getLocalValues().size()>0 , "Coordinate vector is PE " << *comm << " is empty");
+    }
+}
 
 } /* namespace ITI */
