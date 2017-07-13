@@ -68,6 +68,7 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     settings.epsilon = 0.2;
     settings.pixeledSideLen = 16;
     settings.useGeometricTieBreaking = 1;
+    settings.dimensions = dimensions;
     
     //get sfc partition
     DenseVector<IndexType> hilbertInitialPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coords, settings);
