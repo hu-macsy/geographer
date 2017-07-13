@@ -506,11 +506,6 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     // TODO/check: sqrtK is not correct, it is -1 but not sure if always
     IndexType intSqrtK = sqrtK;
     
-    if( std::pow( intSqrtK+1, dim ) == k){
-        intSqrtK++;
-    }
-    SCAI_ASSERT( std::pow( intSqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow(k, 1/d)= " << intSqrtK);
-    
     //TODO: now for every dimension we have sqrtK cuts. This can be generalized so we have different number of cuts
     //  for each multisection but even more, different cuts for every block.
     //TODO: maybe if the algorithm dynamically decides in how many parts it will mutlisect each rectangle/block?
@@ -520,6 +515,11 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     
     // if the bisection option is chosen the algorithm performs a bisection
     if( !settings.bisect ){
+        if( std::pow( intSqrtK+1, dim ) == k){
+            intSqrtK++;
+        }
+        SCAI_ASSERT( std::pow( intSqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow(k, 1/d)= " << intSqrtK);
+    
         numCuts = std::vector<IndexType>( dim, intSqrtK );
     }else{        
         SCAI_ASSERT( k && !(k & (k-1)) , "k is not a power of 2 and this is required for now for bisection");  

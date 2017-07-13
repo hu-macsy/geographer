@@ -51,7 +51,11 @@ struct Settings{
         } else if (initialPartition==InitialPartitioningMethods::Spectral) {
             out<< "initial partition: spectral" << std::endl;
         } else if (initialPartition==InitialPartitioningMethods::Multisection) {
-            out<< "initial partition: multisection" << std::endl;
+            if (!bisect){
+                out<< "initial partition: multisection" << std::endl;
+            }else{
+                out<< "initial partition: bisection" << std::endl;
+            }
         } else {
             out<< "initial partition undefined" << std::endl;
         }
