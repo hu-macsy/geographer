@@ -22,6 +22,7 @@ using scai::lama::DenseVector;
 
 namespace ITI {
 	enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3};
+
 template <typename IndexType, typename ValueType>
 class FileIO {
 
