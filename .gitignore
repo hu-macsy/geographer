@@ -22,3 +22,7 @@ writeCoordsDist_*.xyz
 hilbertPartition_*.xyz
 SpectralPartition_+trace01_*.xyz
 octree_timestep_*.dat
+LLRUN.out.*
+LLRUN.err.*
+scorep-failed*
+scorep-2017*
