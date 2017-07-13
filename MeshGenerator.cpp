@@ -18,6 +18,11 @@ using std::ofstream;
 using std::endl;
 using std::istringstream;
 
+using scai::hmemo::HArray;
+using scai::hmemo::ReadAccess;
+using scai::hmemo::WriteAccess;
+using scai::hmemo::WriteOnlyAccess;
+
 
 namespace ITI{
 
@@ -58,17 +63,17 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix
     localMatrix.allocate( N, N );
     
     //create the adjacency matrix
-    hmemo::HArray<IndexType> csrIA;
-    hmemo::HArray<IndexType> csrJA;
-    hmemo::HArray<ValueType> csrValues;
+    HArray<IndexType> csrIA;
+    HArray<IndexType> csrJA;
+    HArray<ValueType> csrValues;
     // ja and values have size= edges of the graph
     // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
     IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
                                 -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
     {    
-        hmemo::WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
-        hmemo::WriteOnlyAccess<IndexType> ja( csrJA, numEdges*2);
-        hmemo::WriteOnlyAccess<ValueType> values( csrValues, numEdges*2);
+        WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
+        WriteOnlyAccess<IndexType> ja( csrJA, numEdges*2);
+        WriteOnlyAccess<ValueType> values( csrValues, numEdges*2);
         ia[0] = 0;
      
         IndexType nnzCounter = 0; // count non-zero elements
@@ -204,9 +209,9 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseM
     scai::lama::CSRStorage<ValueType> localMatrix;
     localMatrix.allocate( adjM.getLocalNumRows() , adjM.getLocalNumColumns() );
     
-    hmemo::HArray<IndexType> csrIA;
-    hmemo::HArray<IndexType> csrJA;
-    hmemo::HArray<ValueType> csrValues;
+    HArray<IndexType> csrIA;
+    HArray<IndexType> csrJA;
+    HArray<ValueType> csrValues;
     // ja and values have size= edges of the graph
     // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
     IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
@@ -216,11 +221,11 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseM
         SCAI_REGION("MeshGenerator.createStructured3DMesh_dist.setCSRSparseMatrix");
         IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
         
-        hmemo::WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
+        WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
         // we do not know the sizes of ja and values. 6*numOfLocalNodes is safe upper bound for a structured 3D mesh
         // after all the values are written the arrays get resized
-        hmemo::WriteOnlyAccess<IndexType> ja( csrJA , 6*adjM.getLocalNumRows() );
-        hmemo::WriteOnlyAccess<ValueType> values( csrValues, 6*adjM.getLocalNumRows() );
+        WriteOnlyAccess<IndexType> ja( csrJA , 6*adjM.getLocalNumRows() );
+        WriteOnlyAccess<ValueType> values( csrValues, 6*adjM.getLocalNumRows() );
         ia[0] = 0;
         IndexType nnzCounter = 0; // count non-zero elements
          
@@ -636,9 +641,9 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
     scai::lama::CSRStorage<ValueType> localMatrix;
     localMatrix.allocate( adjM.getLocalNumRows() , adjM.getLocalNumColumns() );
     
-    hmemo::HArray<IndexType> csrIA;
-    hmemo::HArray<IndexType> csrJA;
-    hmemo::HArray<ValueType> csrValues;
+    HArray<IndexType> csrIA;
+    HArray<IndexType> csrJA;
+    HArray<ValueType> csrValues;
     // ja.size() = values.size() = number of edges of the graph
     
     IndexType nnzCounter = 0; // count non-zero elements
@@ -652,9 +657,9 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
         for(IndexType i=0; i<localNgbs.size(); i++){
             nnzValues += localNgbs[i].size();
         }
-        hmemo::WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
-        hmemo::WriteOnlyAccess<IndexType> ja( csrJA , nnzValues);
-        hmemo::WriteOnlyAccess<ValueType> values( csrValues, nnzValues );
+        WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
+        WriteOnlyAccess<IndexType> ja( csrJA , nnzValues);
+        WriteOnlyAccess<ValueType> values( csrValues, nnzValues );
         ia[0] = 0;
          
         /*TODO:
@@ -701,7 +706,11 @@ template<typename IndexType, typename ValueType>
 void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const int dimension, const int numberOfAreas, const int pointsPerArea, const ValueType maxVal) {
     SCAI_REGION("MeshGenerator.createQuadMesh")
         
-    srand(time(NULL));
+	//broadcast seed value from root to ensure equal pseudorandom numbers.
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+	comm->bcast( seed, 1, 0 );
+	srand(seed[0]);
 
     Point<ValueType> minCoord(dimension);
     Point<ValueType> maxCoord(dimension);
@@ -731,7 +740,6 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
             ValueType deviation = (ValueType) rand()/RAND_MAX + 0.4;
             distForDim[d] = std::normal_distribution<ValueType> (randPoint[d], deviation);
         }
-        //randPoint.print();
         
         for(int i=0; i<pointsPerArea; i++){
             Point<ValueType> pInRange(dimension);
@@ -745,7 +753,6 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
                 assert(thisCoord < maxCoord[d]);
                 pInRange[d] = thisCoord; 
             }
-            //pInRange.print();
             quad.addContent(0,pInRange);
         }
     }
@@ -762,52 +769,32 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
         quad.addContent(0, p);
     }   
     
+    quad.indexSubtree(0);
+    graphFromQuadtree(adjM, coords, quad);
+}
 
-    //TODO: add points not at random, to cover holes
-    /*
-    int numGridPointsPerDim= 10;
-    int numGridPoints= std::pow(numGridPointsPerDim, dimension);    
-    std::vector<Point<ValueType>> gridPoints(numGridPoints, Point<ValueType>(dimension));
-    for(int d=0; d<dimension; d++){
-        ValueType offset = double (maxCoord[d]-minCoord[d])/ numGridPointsPerDim;
-        for(int plane=0; plane<numGridPointsPerDim; plane++){
-            int planeSize = std::pow(numGridPointsPerDim, dimension-1);
-            for(int p=0; p<planeSize; p++){
-                ValueType noise = (ValueType) rand()/RAND_MAX;
-                assert(p*plane < gridPoints.size() );
-                gridPoints[p*plane][d]=  offset*( ValueType(plane) ) + noise;
-    PRINT(noise << " _ " << gridPoints[p][d] );
-            }
-        }
-    }
-    */
-    
-    //PRINT("Num of leaves= N = "<< quad.countLeaves() );
-    IndexType numLeaves= quad.countLeaves();
-    IndexType treeSize = quad.indexSubtree(0);
-    
-    // the quad tree is created. extract is as a CSR matrix
-    // graphNgbrsCells is just empty now
-    std::vector< std::set<std::shared_ptr<SpatialCell>>> graphNgbrsCells( treeSize );
-    std::vector<std::vector<ValueType>> coordsV( dimension );
-        
-    adjM= quad.getTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coordsV );
-    assert(adjM.getNumRows() == coordsV[0].size());
-    
-    // copy from vector to DenseVector
-    for(int d=0; d<dimension; d++){
-        SCAI_REGION("MeshGenerator.createQuadMesh.copyToDenseVector")
-        coords[d].allocate(coordsV[d].size());
-        for(unsigned int i=0; i<coordsV[d].size(); i++){
-            ValueType thisCoord = coordsV[d][i];
-            coords[d].setValue(i, thisCoord);
-            assert(thisCoord>= minCoord[d]);
-            assert(thisCoord<= maxCoord[d]);
-        }
-    }
-    
-    
-}    
+template<typename IndexType, typename ValueType>
+void MeshGenerator<IndexType, ValueType>::graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid &quad) {
+	const IndexType numLeaves= quad.countLeaves();
+	const IndexType treeSize = quad.countNodes();
+	const IndexType dimension = quad.getDimensions();
+
+	// the quad tree is created. extract it as a CSR matrix
+	// graphNgbrsCells is just empty now
+	std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsCells( treeSize );
+	std::vector<std::vector<ValueType>> coordsV( dimension );
+
+	adjM = quad.getTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coordsV );
+	const IndexType n = adjM.getNumRows();
+	assert(n == coordsV[0].size());
+
+	// copy from vector to DenseVector
+	for(int d=0; d<dimension; d++){
+		SCAI_REGION("MeshGenerator.createQuadMesh.copyToDenseVector")
+		coords[d] = DenseVector<ValueType>(n, coordsV[d].data());
+	}
+}
+
 //----------------------------------------------------------------------------------------------
 /* Creates random points in the cube [0,maxCoord] in the given dimensions.
  */
@@ -815,17 +802,17 @@ template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType>> MeshGenerator<IndexType, ValueType>::randomPoints(int numberOfPoints, int dimensions, ValueType maxCoord){
     SCAI_REGION( "MeshGenerator.randomPoints" )
     int n = numberOfPoints;
-    int i, j;
+    int d, j;
     std::vector<DenseVector<ValueType>> ret(dimensions);
-    for (i=0; i<dimensions; i++)
-        ret[i] = DenseVector<ValueType>(dimensions, 0);
+    for (d=0; d<dimensions; d++)
+        ret[d] = DenseVector<ValueType>(n, 0);
     
     srand(time(NULL));
-    ValueType r;
-    for(i=0; i<n; i++){
-        for(j=0; j<dimensions; j++){
-            r= ((ValueType) rand()/RAND_MAX) * maxCoord;
-            ret[i].setValue(j, r);
+
+    for(d=0; d<dimensions; d++){
+        for(j=0; j<n; j++){
+        	ValueType r = ((ValueType) rand()/RAND_MAX) * maxCoord;
+            ret[d].setValue(j, r);
         }
     }
     return ret;

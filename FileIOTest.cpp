@@ -21,15 +21,21 @@
 
 #include <scai/utilskernel/LArray.hpp>
 
-#include "ParcoRepart.h"
+#include <memory>
+
 #include "gtest/gtest.h"
+
+#include "ParcoRepart.h"
 #include "HilbertCurve.h"
 #include "FileIO.h"
 #include "MeshGenerator.h"
 #include "Settings.h"
+#include "quadtree/SpatialTree.h"
 
 typedef double ValueType;
 typedef int IndexType;
+
+using scai::lama::CSRStorage;
 
 namespace ITI {
 
@@ -86,7 +92,7 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
     f >>nodes >> edges;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    dmemo::DistributionPtr dist( new dmemo::NoDistribution( nodes ));
+    scai::dmemo::DistributionPtr dist( new scai::dmemo::NoDistribution( nodes ));
 
     // read graph from file
     {
@@ -228,15 +234,17 @@ TEST_F(FileIOTest, testWriteCoordsDistributed){
     FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords2D, nodes, "writeCoordsDist");
 }
 //-------------------------------------------------------------------------------------------------
-/*
- // no cells.dat file
+
 TEST_F(FileIOTest, testReadQuadTree){
 	std::string filename = "cells.dat";
 
-	std::vector<std::set<std::shared_ptr<SpatialCell> > > edgeList = FileIO<IndexType, ValueType>::readQuadTree(filename);
-	IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
-	std::cout << "Read Quadtree with " << edgeList.size() << " nodes and " << m << " edges." << std::endl;
+	scai::lama::CSRSparseMatrix<ValueType> matrix = FileIO<IndexType, ValueType>::readQuadTree(filename);
+
+	std::cout << "Matrix has " << matrix.getNumRows() << " rows and " << matrix.getNumValues() << " values " << std::endl;
+	EXPECT_TRUE(matrix.isConsistent());
+	//IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
+	//std::cout << "Read Quadtree with " << edgeList.size() << " nodes and " << m << " edges." << std::endl;
 }
-*/
+
 
 } /* namespace ITI */

@@ -43,17 +43,5 @@ public:
 	void recount() {
 		this->root->recount();
 	}
-
-	count countLeaves() const {
-		return this->root->countLeaves();
-	}
-
-	index indexSubtree(index nextID) {
-		return this->root->indexSubtree(nextID);
-	}
-
-	index getCellID(Point<double> pos) const {
-		return this->root->getCellID(pos);
-	}
 };
 }

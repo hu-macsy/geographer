@@ -28,6 +28,9 @@
 #include <map>
 #include <tuple>
 
+using scai::lama::CSRStorage;
+using scai::lama::Scalar;
+
 namespace ITI {
 
 //-------------------------------------------------------------------------------------------------
@@ -125,24 +128,46 @@ void FileIO<IndexType, ValueType>::writeGraphDistributed (const CSRSparseMatrix<
 /*Given the vector of the coordinates and their dimension, writes them in file "filename".
  */
 template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename){
-    SCAI_REGION( "FileIO.writeCoords" )
+void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<ValueType>> &coords, const std::string filename){
+    SCAI_REGION( "FileIO.writeCoords" );
 
-    std::ofstream f(filename);
-    if(f.fail())
-        throw std::runtime_error("File "+ filename+ " failed.");
+    const IndexType dimension = coords.size();
+    const IndexType n = coords[0].size();
+    scai::dmemo::DistributionPtr dist = coords[0].getDistributionPtr();
+	scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( n ));
+	scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 
-    IndexType i, j;
-    IndexType dimension= coords.size();
+    /**
+	 * If the input is replicated, we can write it directly from the root processor.
+	 * If it is not, we need to create a replicated copy.
+	 */
 
-    assert(coords.size() == dimension );
-    assert(coords[0].size() == numPoints);
-    for(i=0; i<numPoints; i++){
-        for(j=0; j<dimension; j++)
-            f<< std::setprecision(15)<< coords[j].getValue(i).Scalar::getValue<ValueType>() << " ";
-        f<< std::endl;
+    std::vector<DenseVector<ValueType>> maybeCopy;
+    const std::vector<DenseVector<ValueType>> &targetReference = dist->isReplicated() ? coords : maybeCopy;
+
+	if (!dist->isReplicated()) {
+		maybeCopy.resize(dimension);
+		for (IndexType d = 0; d < dimension; d++) {
+			maybeCopy[d] = DenseVector<ValueType>(coords[d], noDist);
+		}
+
+	}
+	assert(targetReference[0].getDistributionPtr()->isReplicated());
+	assert(targetReference[0].size() == n);
+
+	if (comm->getRank() == 0) {
+		std::ofstream filehandle(filename);
+		filehandle.precision(15);
+		if (filehandle.fail()) {
+			throw std::runtime_error("Could not write to file " + filename);
+		}
+		for (IndexType i = 0; i < n; i++) {
+			for (IndexType d = 0; d < dimension; d++) {
+				filehandle << coords[d].getLocalValues()[i] << " ";
+			}
+			filehandle << std::endl;
+		}
     }
-
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -329,12 +354,18 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
     //read local range
     for (IndexType i = 0; i < localN; i++) {
 		bool read = std::getline(file, line).good();
-		assert(read);//if we have read past the end of the file, the node count was incorrect
+		if (!read) {
+			throw std::runtime_error("Unexpected end of coordinate file. Was the number of nodes correct?");
+		}
 		std::stringstream ss( line );
 		std::string item;
 
 		IndexType dim = 0;
-		while (std::getline(ss, item, ' ') && dim < dimension) {
+		while (dim < dimension) {
+			bool read = std::getline(ss, item, ' ');
+			if (!read or item.size() == 0) {
+				throw std::runtime_error("Unexpected end of line. Was the number of dimensions correct?");
+			}
 			ValueType coord = std::stod(item);
 			coords[dim][i] = coord;
 			dim++;
@@ -344,10 +375,16 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 		}
     }
 
+    if (endLocalRange == globalN) {
+    	bool eof = std::getline(file, line).eof();
+    	if (!eof) {
+    		throw std::runtime_error(std::to_string(numberOfPoints) + " coordinates read, but file continues.");
+    	}
+    }
+
     std::vector<DenseVector<ValueType> > result(dimension);
 
     for (IndexType i = 0; i < dimension; i++) {
-    	//result[i] = DenseVector<ValueType>(coords[i], dist);
         result[i] = DenseVector<ValueType>(dist, coords[i] );
     }
 
@@ -387,7 +424,7 @@ std::pair<std::vector<ValueType>, std::vector<ValueType>> FileIO<IndexType, Valu
 }
 
 template<typename IndexType, typename ValueType>
-std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueType>::readQuadTree( std::string filename ) {
+CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::string filename, std::vector<DenseVector<ValueType>> &coords ) {
 	SCAI_REGION( "FileIO.readQuadTree" );
 
 	const IndexType dimension = 3;
@@ -396,11 +433,12 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
     std::ifstream file(filename);
 
     if(file.fail())
-            throw std::runtime_error("File "+ filename+ " failed.");
+            throw std::runtime_error("Reading file "+ filename+ " failed.");
 
     std::map<std::vector<ValueType>, std::shared_ptr<SpatialCell>> nodeMap;
     std::map<std::vector<ValueType>, std::set<std::vector<ValueType>>> pendingEdges;
     std::map<std::vector<ValueType>, std::set<std::vector<ValueType>>> confirmedEdges;
+    std::set<std::shared_ptr<SpatialCell> > roots;
 
     IndexType duplicateNeighbors = 0;
 
@@ -477,6 +515,7 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 			nodeMap[parentCoords] = parentPointer;
 			assert(confirmedEdges.count(parentCoords) == 0);
 			confirmedEdges[parentCoords] = {};
+			roots.insert(parentPointer);
 
 			//check for pending edges of parent
 			if (pendingEdges.count(parentCoords) > 0) {
@@ -489,7 +528,12 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
 				pendingEdges.erase(parentCoords);
 			}
 		}
-		assert(nodeMap.count(parentCoords));
+
+		if (parentCoords[0] != -1) {
+			roots.erase(quadNodePointer);
+		}
+
+		assert(nodeMap.count(parentCoords));//Why does this assert work? Why can't it happen that the parentCoords are -1?
 		nodeMap[parentCoords]->addChild(quadNodePointer);
 		assert(nodeMap[parentCoords]->height() > 1);
 
@@ -549,14 +593,23 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
     	assert(nodeMap.count(pendingSets.first) == 0);
     }
 
+    IndexType nodesInForest = 0;
+    for (auto root : roots) {
+    	nodesInForest += root->countNodes();
+    }
+
+    std::cout << "Found " << roots.size() << " roots with " << nodesInForest << " nodes hanging from them." << std::endl;
+
+    assert(nodesInForest == nodeMap.size());
+
     //check whether all nodes have either no or the full amount of children
     for (std::pair<std::vector<ValueType>, std::shared_ptr<SpatialCell>> elems : nodeMap) {
     	bool consistent = elems.second->isConsistent();
     	if (!consistent) {
     		std::vector<ValueType> coords = elems.first;
-    		throw std::runtime_error("Node at " + std::to_string(coords[0]) + ", " + std::to_string(coords[1]) + ", " + std::to_string(coords[2]) + " inconsistent.");
+    		//throw std::runtime_error("Node at " + std::to_string(coords[0]) + ", " + std::to_string(coords[1]) + ", " + std::to_string(coords[2]) + " inconsistent.");
     	}
-    	assert(elems.second->isConsistent());
+    	//assert(elems.second->isConsistent());
     	assert(pendingEdges.count(elems.first) == 0);//list of pending edges was erased when node was handled, new edges should not be added to pending list
     }
 
@@ -588,16 +641,48 @@ std::vector<std::set<std::shared_ptr<SpatialCell> > > FileIO<IndexType, ValueTyp
     }
     assert(nodeMap.size() == i++);
     std::cout << "Read " << totalEdges << " confirmed edges, among them " << leafEdges << " edges between " << numLeaves << " leaves." << std::endl;
-    return result;
+
+    /**
+     * now convert into CSRSparseMatrix
+     */
+
+    IndexType offset = 0;
+	for (auto root : roots) {
+		offset = root->indexSubtree(offset);
+	}
+
+    std::vector<std::shared_ptr<const SpatialCell> > rootVector(roots.begin(), roots.end());
+
+	coords.clear();
+	coords.resize(dimension);
+
+	std::vector<std::vector<ValueType> > vCoords(dimension);
+	std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsCells(nodesInForest);
+
+	for (auto outgoing : confirmedEdges) {
+		std::set<std::shared_ptr<const SpatialCell>> edgeSet;
+		for (std::vector<ValueType> edgeTarget : outgoing.second) {
+			edgeSet.insert(nodeMap[edgeTarget]);
+		}
+		graphNgbrsCells[nodeMap[outgoing.first]->getID()] = edgeSet;
+	}
+
+	scai::lama::CSRSparseMatrix<ValueType> matrix = SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsCells, rootVector, vCoords);
+
+	for (IndexType d = 0; d < dimension; d++) {
+		assert(vCoords[d].size() == numLeaves);
+		coords[d] = DenseVector<ValueType>(vCoords[d].size(), vCoords[d].data());
+	}
+    return matrix;
 }
 
 template void FileIO<int, double>::writeGraph (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<double> &adjM, const std::string filename);
-template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
+template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, const std::string filename);
 template void FileIO<int, double>::writeCoordsDistributed_2D (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
 template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::string filename);
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension);
-template std::vector<std::set<std::shared_ptr<SpatialCell> > >  FileIO<int, double>::readQuadTree( std::string filename );
+template CSRSparseMatrix<double>  FileIO<int, double>::readQuadTree( std::string filename, std::vector<DenseVector<double>> &coords );
 
 
 } /* namespace ITI */

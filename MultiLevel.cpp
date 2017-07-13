@@ -1,9 +1,9 @@
 
 #include "MultiLevel.h"
 
+using scai::lama::Scalar;
 
 namespace ITI{
-    
     
 template<typename IndexType, typename ValueType>
 IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<IndexType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, Settings settings) {
@@ -58,7 +58,7 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 
 		assert(coarseWeights.sum().Scalar::getValue<IndexType>() == nodeWeights.sum().Scalar::getValue<IndexType>());
 
-                Settings settingscopy(settings);
+		Settings settingscopy(settings);
 		settingscopy.multiLevelRounds--;
 		// recursive call
 		multiLevelStep(coarseGraph, coarsePart, coarseWeights, coarseCoords, settingscopy);

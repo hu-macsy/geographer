@@ -13,8 +13,8 @@
 
 #include "quadtree/QuadTreeCartesianEuclid.h"
 
-using namespace scai;
-using namespace scai::lama;
+using scai::lama::CSRSparseMatrix;
+using scai::lama::DenseVector;
 
 #include <vector>
 #include <set>
@@ -43,7 +43,7 @@ public:
 	/** Given the vector of the coordinates and their dimension, writes them in file "filename".
 	 * Coordinates are given as a DenseVector of size dim*numPoints.
 	*/
-	static void writeCoords (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
+	static void writeCoords (const std::vector<DenseVector<ValueType>> &coords, const std::string filename);
 
     static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
 
@@ -73,11 +73,22 @@ public:
 	/**
 	 * Reads a quadtree as specified in the format of Michael Selzer
 	 */
-	static std::vector<std::set<std::shared_ptr<SpatialCell> > > readQuadTree( std::string filename );
+	static CSRSparseMatrix<ValueType> readQuadTree( std::string filename, std::vector<DenseVector<ValueType>> &coords);
+
+	/**
+	 * Reads a quadtree as specified in the format of Michael Selzer
+	 */
+	static CSRSparseMatrix<ValueType> readQuadTree( std::string filename) {
+		std::vector<DenseVector<ValueType>> coords;
+		return readQuadTree(filename, coords);
+	}
 
 
 
 private:
+	/**
+	 * given the central coordinates of a cell and its level, compute the bounding corners
+	 */
 	static std::pair<std::vector<ValueType>, std::vector<ValueType>> getBoundingCoords(std::vector<ValueType> centralCoords, IndexType level);
 };
 

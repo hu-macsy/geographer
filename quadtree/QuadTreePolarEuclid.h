@@ -72,10 +72,6 @@ public:
 		this->root->recount();
 	}
 
-	count countLeaves() const {
-		return this->root->countLeaves();
-	}
-
 	index getCellID(double phi, double r) const {
 		return this->root->getCellID({phi, r});
 	}

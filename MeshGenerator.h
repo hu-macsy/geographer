@@ -41,8 +41,9 @@ typedef int IndexType;
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
-using namespace scai;
-using namespace scai::lama;
+using scai::lama::CSRSparseMatrix;
+using scai::lama::DenseVector;
+using scai::lama::Scalar;
 
 
 namespace ITI {
@@ -73,6 +74,8 @@ namespace ITI {
                  * Adds more points in specific areas at random. 
                  */
                 static void createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords,const int dimensions, const int numberOfAreas, const int pointsPerArea, const ValueType maxCoord);
+
+                static void graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid &quad);
                     
                 /* Creates random points in the cube for the given dimension, points in [0,maxCoord]^dim.
                  */

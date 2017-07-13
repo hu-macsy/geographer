@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
     
     // options: array of integers for passing arguments.
     // Here, options[0]=0 for the default values.
-    idx_t options[0];
+    idx_t options[1];
     options[0]= 0;
     
     // OUTPUT parameters
