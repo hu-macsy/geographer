@@ -21,6 +21,7 @@ using scai::lama::DenseVector;
 #include <memory>
 
 namespace ITI {
+	enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3};
 template <typename IndexType, typename ValueType>
 class FileIO {
 
@@ -58,12 +59,17 @@ public:
 	 * @param[in] filename The file to read from. In a METIS format.
 	 * @param[out] matrix The adjacency matrix of the graph.
 	 */
-	static CSRSparseMatrix<ValueType> readGraph(const std::string filename);
+	static CSRSparseMatrix<ValueType> readGraph(const std::string filename, Format = Format::METIS);
 
 	/* Reads the 2D coordinates from file "filename" and returns then in a DenseVector where the coordinates
 	 * of point i are in [i*2][i*2+1].
 	 */
-	static std::vector<DenseVector<ValueType>> readCoords ( std::string filename, IndexType numberOfCoords, IndexType dimension);
+	static std::vector<DenseVector<ValueType>> readCoords ( std::string filename, IndexType numberOfCoords, IndexType dimension, Format = Format::METIS);
+
+	/*
+	 *
+	 */
+	static std::vector<DenseVector<ValueType>> readCoordsOcean ( std::string filename, IndexType dimension);
 
 	/**
 	 * Reads a partition from file.
