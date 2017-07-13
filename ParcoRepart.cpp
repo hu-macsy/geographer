@@ -32,6 +32,8 @@
 #include "AuxiliaryFunctions.h"
 #include "MultiSection.h"
 
+#include "sort/SchizoQS.hpp"
+
 using scai::lama::Scalar;
 
 namespace ITI {
@@ -155,6 +157,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
     
     std::vector<ValueType> minCoords(dimensions);
     std::vector<ValueType> maxCoords(dimensions);
+    DenseVector<IndexType> result;
     
     if( ! inputDist->isEqual(*coordDist) ){
         throw std::runtime_error("Matrix and coordinates should have the same distribution");
@@ -214,42 +217,91 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
     /**
      * now sort the global indices by where they are on the space-filling curve.
      */
-    DenseVector<IndexType> result;
-    scai::lama::DenseVector<IndexType> permutation;
+    std::vector<IndexType> newLocalIndices;
     {
-        SCAI_REGION( "ParcoRepart.hilbertPartition.sorting" )
-        hilbertIndices.sort(permutation, true);
+        SCAI_REGION( "ParcoRepart.initialPartition.sorting" );
+
+        int typesize;
+        MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
+        assert(typesize == sizeof(sort_pair));
+
+        const IndexType maxLocalN = comm->max(localN);
+        sort_pair localPairs[maxLocalN];
+
+        //fill with local values
+        long indexSum = 0;//for sanity checks
+        scai::hmemo::ReadAccess<ValueType> localIndices(hilbertIndices.getLocalValues());
+        for (IndexType i = 0; i < localN; i++) {
+        	localPairs[i].value = localIndices[i];
+        	localPairs[i].index = inputDist->local2global(i);
+        	indexSum += localPairs[i].index;
+        }
+
+        //create checksum
+        const long checkSum = comm->sum(indexSum);
+        assert(checkSum == (long(globalN)*(long(globalN)-1))/2);
+
+        //fill up with dummy values to ensure equal size
+        for (IndexType i = localN; i < maxLocalN; i++) {
+        	localPairs[i].value = std::numeric_limits<decltype(sort_pair::value)>::max();
+        	localPairs[i].index = std::numeric_limits<decltype(sort_pair::index)>::max();
+        }
+
+        //call distributed sort
+        SchizoQS::sort<sort_pair>(localPairs, maxLocalN);
+
+        //copy indices into array
+        IndexType newLocalN = 0;
+        newLocalIndices.resize(maxLocalN);
+        for (IndexType i = 0; i < maxLocalN; i++) {
+        	newLocalIndices[i] = localPairs[i].index;
+        	if (newLocalIndices[i] != std::numeric_limits<decltype(sort_pair::index)>::max()) newLocalN++;
+        }
+
+		//sort local indices for general distribution
+        std::sort(newLocalIndices.begin(), newLocalIndices.end());
+
+        //remove dummy values
+        auto startOfDummyValues = std::lower_bound(newLocalIndices.begin(), newLocalIndices.end(), std::numeric_limits<decltype(sort_pair::index)>::max());
+        assert(std::all_of(startOfDummyValues, newLocalIndices.end(), [](IndexType index){return index == std::numeric_limits<decltype(sort_pair::index)>::max();}));
+        newLocalIndices.resize(std::distance(newLocalIndices.begin(), startOfDummyValues));
+
+        //check size and sanity
+        assert(newLocalN == newLocalIndices.size());
+		assert( *std::max_element(newLocalIndices.begin(), newLocalIndices.end()) < globalN);
+		assert( comm->sum(newLocalIndices.size()) == globalN);
+
+        //check checksum
+        long indexSumAfter = 0;
+        for (IndexType i = 0; i < newLocalN; i++) {
+        	indexSumAfter += newLocalIndices[i];
+        }
+
+        const long newCheckSum = comm->sum(indexSumAfter);
+        SCAI_ASSERT( newCheckSum == checkSum, "Old checksum: " << checkSum << ", new checksum: " << newCheckSum );
+
+        //possible optimization: remove dummy values during first copy, then directly copy into HArray and sort with pointers. Would save one copy.
     }
     
-    if (!inputDist->isReplicated() && comm->getSize() == k) {
-        SCAI_REGION( "ParcoRepart.hilbertPartition.redistribute" )
+    {
+    	assert(!inputDist->isReplicated() && comm->getSize() == k);
+        SCAI_REGION( "ParcoRepart.initialPartition.redistribute" );
+
+        scai::utilskernel::LArray<IndexType> indexTransport(newLocalIndices.size(), newLocalIndices.data());
+        assert(comm->sum(indexTransport.size()) == globalN);
+        scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
         
-        scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(globalN, comm));
-        permutation.redistribute(blockDist);
-        scai::hmemo::WriteAccess<IndexType> wPermutation( permutation.getLocalValues() );
-        std::sort(wPermutation.get(), wPermutation.get()+wPermutation.size());
-        wPermutation.release();
-        
-        scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, permutation.getLocalValues(), comm));
-        
-        input.redistribute(newDistribution, input.getColDistributionPtr());
+        if (comm->getRank() == 0) std::cout << "Created distribution." << std::endl;
         result = DenseVector<IndexType>(newDistribution, comm->getRank());
+        if (comm->getRank() == 0) std::cout << "Created initial partition." << std::endl;
+        input.redistribute(newDistribution, input.getColDistributionPtr());
+        if (comm->getRank() == 0) std::cout << "Redistributed input matrix" << std::endl;
         
         if (settings.useGeometricTieBreaking) {
             for (IndexType dim = 0; dim < dimensions; dim++) {
                 coordinates[dim].redistribute(newDistribution);
             }
-        }
-        
-    } else {
-        scai::lama::DenseVector<IndexType> inversePermutation;
-        DenseVector<IndexType> tmpPerm = permutation;
-        tmpPerm.sort( inversePermutation, true);
-        
-        scai::hmemo::WriteOnlyAccess<IndexType> wResult(result.getLocalValues(), localN);
-        
-        for (IndexType i = 0; i < localN; i++) {
-        	wResult[i] = static_cast<IndexType>(inversePermutation.getLocalValues()[i] *k/globalN);
+            if (comm->getRank() == 0) std::cout << "Redistributed coordinates" << std::endl;
         }
     }
     

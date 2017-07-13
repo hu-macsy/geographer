@@ -38,7 +38,6 @@ typedef int IndexType;
  * for generating a 10x20x30 mesh
  * ./a.out --generate --numX=10 --numY=20 --numZ=30 --epsilon 0.05 --sfcRecursionSteps=10 --dimensions=3 --borderDepth=10  --stopAfterNoGainRounds=3 --minGainForNextGlobalRound=10
  * 
- * !! for now, when reading a file --dimensions must be 2
  */
 
 //----------------------------------------------------------------------------
@@ -200,29 +199,25 @@ int main(int argc, char** argv) {
         }
         
         if (settings.useDiffusionCoordinates) {
-        	graph.redistribute(noDist, noDist);
         	scai::lama::CSRSparseMatrix<ValueType> L = ITI::Diffusion<IndexType, ValueType>::constructLaplacian(graph);
-        	//L.redistribute(noDist, noDist);
         	scai::lama::DenseVector<IndexType> nodeWeights(L.getRowDistributionPtr(),1);
 
         	std::vector<IndexType> nodeIndices(N);
         	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
 
+        	//broadcast seed value from root to ensure equal pseudorandom numbers.
+        	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+        	comm->bcast( seed, 1, 0 );
+        	srand(seed[0]);
+
         	ITI::Diffusion<IndexType, ValueType>::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), settings.dimensions);
 
-        	std::vector<IndexType> landmarks(settings.dimensions);
-        	std::copy(nodeIndices.begin(), nodeIndices.begin()+settings.dimensions, landmarks.begin());
-
-        	scai::lama::DenseMatrix<ValueType> diffusionValues = ITI::Diffusion<IndexType, ValueType>::multiplePotentials(L, nodeWeights, landmarks);
-        	assert(diffusionValues.getNumRows() == settings.dimensions);
-        	assert(diffusionValues.getLocalNumRows() == settings.dimensions);
         	coordinates.resize(settings.dimensions);
+
 			for (IndexType i = 0; i < settings.dimensions; i++) {
-				coordinates[i] = scai::lama::DenseVector<ValueType>(N,0);
-				diffusionValues.getLocalRow(coordinates[i].getLocalValues(), i);
-				coordinates[i].redistribute(inputDist);
+				coordinates[i] = ITI::Diffusion<IndexType, ValueType>::potentialsFromSource(L, nodeWeights, nodeIndices[i]);
 			}
-			graph.redistribute(inputDist, noDist);
 
         } else {
         	coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions );
@@ -295,7 +290,8 @@ int main(int argc, char** argv) {
     	return 126;
     }
     
-    // time needed to get the input
+    // time needed to get the input. Synchronize first to make sure that all processes are finished.
+    comm->synchronize();
     std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
 
     assert(N > 0);
@@ -332,7 +328,6 @@ int main(int argc, char** argv) {
     ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partition, comm->getSize() );
     
     std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
-    
     
     // Reporting output to std::cout
     ValueType inputT = ValueType ( comm->max(inputTime.count() ));

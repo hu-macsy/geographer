@@ -185,6 +185,15 @@ TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
     }
     
 }
+
+TEST_F(SpectralPartitionTest, benchConstructLaplacian) {
+	std::string path = "meshes/bubbles/";
+	std::string fileName = "hugetrace-00000.graph";
+	std::string file = path + fileName;
+	const scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+
+    scai::lama::CSRSparseMatrix<ValueType> L = SpectralPartition<IndexType, ValueType>::getLaplacian( graph );
+}
 //------------------------------------------------------------------------------
 
 TEST_F(SpectralPartitionTest, testSpectralPartition){

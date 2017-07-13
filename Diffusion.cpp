@@ -41,18 +41,28 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSR
 	scai::dmemo::DistributionPtr dist(laplacian.getRowDistributionPtr());
 	laplacian.redistribute(dist, dist);
 
+	//making sure that the source is the same on all processors
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	IndexType sourceSum = comm->sum(source);
+	assert(sourceSum == source*comm->getSize());
+
 	IndexType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
 
 	IndexType sourceWeight;
-	if (nodeWeights.getDistributionPtr()->isReplicated()) {
-		sourceWeight = nodeWeights.getLocalValues()[source];
-	}
-	sourceWeight = nodeWeights.getValue(source).Scalar::getValue<IndexType>();
+
+	IndexType sourceIndex = dist->global2local(source);
 
 	DenseVector<ValueType> nullVector(dist,0);
 	DenseVector<ValueType> d(nullVector - nodeWeights);
-	d.setValue(source, weightSum - sourceWeight);
-	assert(d.sum() == 0);
+
+	if (sourceIndex != nIndex) {
+		d.getLocalValues()[sourceIndex] = weightSum - nodeWeights.getLocalValues()[sourceIndex];
+	}
+
+	ValueType newWeightSum = d.sum().Scalar::getValue<IndexType>();
+	if (std::abs(newWeightSum) >= eps) {
+		throw std::logic_error("Residual weight sum " + std::to_string(newWeightSum) + " too large!");
+	}
 
 	DenseVector<ValueType> solution( dist, 0.0 );
 
@@ -60,7 +70,13 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSR
 
 	CriterionPtr rt( new ResidualThreshold( norm, eps, ResidualThreshold::Relative ) );
 
-	CG solver( "simpleExampleCG" );
+	LoggerPtr logger( new CommonLogger ( "myLogger: ",
+	                                        LogLevel::convergenceHistory,
+	                                        LoggerWriteBehaviour::toConsoleOnly ) );
+
+	CG solver( "simpleCG" );
+
+	//solver.setLogger( logger );
 
 	solver.setStoppingCriterion( rt );
 
@@ -111,11 +127,18 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 	const IndexType localN = graph.getLocalNumRows();
 
 	if (graph.getNumColumns() != n) {
-		throw std::runtime_error("Matrix must be symmetric to be an adjacency matrix");
+		throw std::runtime_error("Matrix must be square to be an adjacency matrix");
 	}
 
 	scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
     scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
+
+    if (dist->getBlockDistributionSize() == nIndex) {
+    	throw std::runtime_error("Only replicated or block distributions supported.");
+    }
+
+    assert(dist->getBlockDistributionSize() == localN);
+    const IndexType firstIndex = dist->local2global(0);
 
 	const CSRStorage<ValueType>& storage = graph.getLocalStorage();
 	const ReadAccess<IndexType> ia(storage.getIA());
@@ -143,9 +166,10 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 	assert(degreeSum <= storage.getNumValues()+localN);
 
 	DIASparseMatrix<ValueType> D(dist,noDist);
-	DIAStorage<ValueType> dstor(localN, n, 1, HArray<IndexType>(1,0), HArray<ValueType>(localN, targetDegree.data()) );
+	DIAStorage<ValueType> dstor(localN, n, 1, HArray<IndexType>(1,firstIndex), HArray<ValueType>(localN, targetDegree.data()) );
 	D.swapLocalStorage(dstor);
 	CSRSparseMatrix<ValueType> result(D-graph);
+	assert(result.getNumValues() == graph.getNumValues() + n);
 
 	return result;
 }
