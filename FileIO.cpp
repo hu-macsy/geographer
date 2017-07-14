@@ -424,10 +424,8 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
     SCAI_REGION( "FileIO.readCoords" );
 
 	if (format == Format::OCEAN) {
-		std::cout << "Calling Ocean reader" << std::endl;
 		return readCoordsOcean(filename, dimension);
 	}
-	std::cout << "Calling normal reader" << std::endl;
 
     IndexType globalN= numberOfPoints;
     std::ifstream file(filename);
