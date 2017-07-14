@@ -228,7 +228,14 @@ int main(int argc, char** argv) {
 			}
 
         } else {
-        	coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, vm["coordFormat"].as<ITI::Format>() );
+        	ITI::Format format;
+        	if (vm.count("coordFormat")) {
+        		format = vm["coordFormat"].as<ITI::Format>();
+        		coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format);
+        	} else {
+        		coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
+        	}
+
         }
 
         if (comm->getRank() == 0) {
