@@ -286,6 +286,10 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         std::vector<IndexType> neighbors;
 
         while (std::getline(ss, item, ' ')) {
+        	if (item.size() == 0) {
+        		//probably some whitespace at end of line
+        		continue;
+        	}
         	IndexType neighbor = std::stoi(item)-1;//-1 because of METIS format
         	if (neighbor >= globalN || neighbor < 0) {
         		throw std::runtime_error(std::string(__FILE__) +", "+std::to_string(__LINE__) + ": Found illegal neighbor " + std::to_string(neighbor) + " in line " + std::to_string(i+beginLocalRange));
