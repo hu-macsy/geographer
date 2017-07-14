@@ -258,7 +258,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
         	if (newLocalIndices[i] != std::numeric_limits<decltype(sort_pair::index)>::max()) newLocalN++;
         }
 
-		//sort local indices for general distribution
+        //sort local indices for general distribution
         std::sort(newLocalIndices.begin(), newLocalIndices.end());
 
         //remove dummy values
