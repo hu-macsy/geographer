@@ -155,7 +155,7 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 				throw std::runtime_error("No self loops allowed.");
 			}
 			if (values[j] != 1) {
-				throw std::runtime_error("Wrong edge weights.");
+				throw std::runtime_error("Only unweighted graphs are supported.");
 			}
 		}
 
