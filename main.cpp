@@ -24,6 +24,7 @@
 #include "FileIO.h"
 #include "ParcoRepart.h"
 #include "Settings.h"
+#include "SpectralPartition.h"
 
 typedef double ValueType;
 typedef int IndexType;
@@ -180,7 +181,7 @@ int main(int argc, char** argv) {
 
     	std::string coordString;
     	if (settings.useDiffusionCoordinates) {
-    		coordString = " and generating coordinates with diffusive distances.";
+    		coordString = "and generating coordinates with diffusive distances.";
     	} else {
     		coordString = "and \"" + coordFile + "\" for coordinates";
     	}
