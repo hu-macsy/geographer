@@ -16,6 +16,8 @@
 #include <scai/lama/storage/MatrixStorage.hpp>
 #include <scai/tracing.hpp>
 
+#include <boost/algorithm/string.hpp>
+
 #include <assert.h>
 #include <cmath>
 #include <set>
@@ -243,15 +245,56 @@ template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, Format format) {
 	SCAI_REGION("FileIO.readGraph");
 
+	if (!(format == Format::METIS or format == Format::AUTO)) {
+		throw std::logic_error("Format not yet implemented.");
+	}
+
 	std::ifstream file(filename);
 
 	if (file.fail()) {
 		throw std::runtime_error("Reading graph from " + filename + " failed.");
 	}
 
+	//define variables
+	std::string line;
 	IndexType globalN, globalM;
+	IndexType numberNodeWeights;
+	bool hasEdgeWeights;
+	std::vector<ValueType> edgeWeights;//possibly of size 0
 
-	file >> globalN >> globalM;
+	//read first line to get header information
+	std::getline(file, line);
+	std::stringstream ss( line );
+	std::string item;
+
+	{
+		//node count and edge count are mandatory. If these fail, std::stoi will raise an error. TODO: maybe wrap into proper error message
+		std::getline(ss, item, ' ');
+		globalN = std::stoi(item);
+		std::getline(ss, item, ' ');
+		globalM = std::stoi(item);
+
+		bool readWeightInfo = std::getline(ss, item, ' ');
+		if (readWeightInfo && item.size() > 0) {
+			//three bits, describing presence of edge weights, vertex weights and vertex sizes
+			int bitmask = std::stoi(item);
+			hasEdgeWeights = bitmask % 10;
+			if ((bitmask / 10) % 10) {
+				bool readNodeWeightCount = std::getline(ss, item, ' ');
+				if (readNodeWeightCount && item.size() > 0) {
+					numberNodeWeights = std::stoi(item);
+				} else {
+					numberNodeWeights = 1;
+				}
+				if (numberNodeWeights > 0) {
+					std::cout << "Warning: Node weights not yet supported, ignoring them" << std::endl;
+				}
+			}
+		} else {
+			numberNodeWeights = 0;
+			hasEdgeWeights = false;
+		}
+	}
 
 	const ValueType avgDegree = ValueType(2*globalM) / globalN;
 
@@ -265,14 +308,13 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     const IndexType localN = endLocalRange - beginLocalRange;
 
     //scroll to begin of local range. Neighbors of node i are in line i+1
-    std::string line;
-    std::getline(file, line);
     for (IndexType i = 0; i < beginLocalRange; i++) {
     	std::getline(file, line);
     }
 
     std::vector<IndexType> ia(localN+1, 0);
     std::vector<IndexType> ja;
+    std::vector<ValueType> values;
 
     //we don't know exactly how many edges we are going to have, but in a regular mesh the average degree times the local nodes is a good estimate.
     ja.reserve(localN*avgDegree*1.1);
@@ -280,10 +322,22 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     //now read in local edges
     for (IndexType i = 0; i < localN; i++) {
     	bool read = std::getline(file, line).good();
+    	//remove leading and trailing whitespace, since these can confuse the string splitter
+    	boost::algorithm::trim(line);
     	assert(read);//if we have read past the end of the file, the node count was incorrect
         std::stringstream ss( line );
         std::string item;
         std::vector<IndexType> neighbors;
+        std::vector<IndexType> weights;
+
+        for (IndexType j = 0; j < numberNodeWeights; j++) {
+        	bool readWeight = std::getline(ss, item, ' ');
+        	if (readWeight && item.size() > 0) {
+        		weights.push_back(std::stoi(item));
+        	} else {
+        		std::cout << "Could not parse " << item << std::endl;
+        	}
+        }
 
         while (std::getline(ss, item, ' ')) {
         	if (item.size() == 0) {
@@ -294,6 +348,15 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         	if (neighbor >= globalN || neighbor < 0) {
         		throw std::runtime_error(std::string(__FILE__) +", "+std::to_string(__LINE__) + ": Found illegal neighbor " + std::to_string(neighbor) + " in line " + std::to_string(i+beginLocalRange));
         	}
+        	if (hasEdgeWeights) {
+        		bool readEdgeWeight = std::getline(ss, item, ' ');
+        		if (!readEdgeWeight) {
+        			throw std::runtime_error("Edge weight for " + std::to_string(neighbor) + " not found in line " + std::to_string(beginLocalRange + i) + ".");
+        		}
+        		ValueType edgeWeight = std::stod(item);
+        		values.push_back(edgeWeight);
+
+        	}
         	//std::cout << "Converted " << item << " to " << neighbor << std::endl;
         	neighbors.push_back(neighbor);
         }
@@ -302,13 +365,25 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         ia[i+1] = ia[i] + neighbors.size();
         //copy neighbors to Ja array
         std::copy(neighbors.begin(), neighbors.end(), std::back_inserter(ja));
+        if (hasEdgeWeights) {
+        	assert(ja.size() == values.size());
+        }
     }
 
-    //TODO: maybe check that file is not longer than expected
+    if (endLocalRange == globalN) {
+		bool eof = std::getline(file, line).eof();
+		if (!eof) {
+			throw std::runtime_error(std::to_string(globalN) + " lines read, but file continues.");
+		}
+	}
 
     file.close();
 
-    scai::utilskernel::LArray<ValueType> values(ja.size(), 1);//unweighted edges
+    if (!hasEdgeWeights) {
+    	assert(values.size() == 0);
+    	values.resize(localN, 1);//unweighted edges
+    }
+
     assert(ja.size() == ia[localN]);
     SCAI_ASSERT(comm->sum(localN) == globalN, "Sum " << comm->sum(localN) << " should be " << globalN);
 
@@ -318,7 +393,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
     //assign matrix
     scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, ja.size(), scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
-	scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()), values);
+    		scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
+    		scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
 
     return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
 }
