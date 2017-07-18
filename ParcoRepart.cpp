@@ -814,11 +814,11 @@ ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<
 	const IndexType maxK = part.max().Scalar::getValue<IndexType>();
 
 	if (minK < 0) {
-		throw std::runtime_error("Block id " + std::to_string(minK) + " found in partition with supposedly" + std::to_string(k) + " blocks.");
+		throw std::runtime_error("Block id " + std::to_string(minK) + " found in partition with supposedly " + std::to_string(k) + " blocks.");
 	}
 
 	if (maxK >= k) {
-		throw std::runtime_error("Block id " + std::to_string(maxK) + " found in partition with supposedly" + std::to_string(k) + " blocks.");
+		throw std::runtime_error("Block id " + std::to_string(maxK) + " found in partition with supposedly " + std::to_string(k) + " blocks.");
 	}
 
 	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
