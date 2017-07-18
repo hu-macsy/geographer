@@ -960,9 +960,9 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 
 		for (IndexType i = 0; i < targetNumRows; i++) {
 			IndexType newGlobalIndex = newDist->local2global(i);
-			while(oldAcc[oldLocalIndex] < newGlobalIndex) oldLocalIndex++;
+			while(oldLocalIndex < sourceNumRows && oldAcc[oldLocalIndex] < newGlobalIndex) oldLocalIndex++;
 			IndexType size;
-			if (oldAcc[oldLocalIndex] == newGlobalIndex) {
+			if (oldLocalIndex < sourceNumRows && oldAcc[oldLocalIndex] == newGlobalIndex) {
 				localTargetIndices.push_back(i);
 				localSourceIndices.push_back(oldLocalIndex);
 				size = rSourceSizes[oldLocalIndex];

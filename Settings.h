@@ -18,6 +18,7 @@ struct Settings{
     IndexType initialPartition = 0;
     bool useDiffusionTieBreaking = false;
     bool useGeometricTieBreaking = false;
+    bool useDiffusionCoordinates = false;
     bool gainOverBalance = false;
     bool skipNoGainColors = false;
     bool writeDebugCoordinates = false;
