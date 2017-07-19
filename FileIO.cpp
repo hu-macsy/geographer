@@ -249,6 +249,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 		throw std::logic_error("Format not yet implemented.");
 	}
 
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	std::ifstream file(filename);
 
 	if (file.fail()) {
@@ -258,8 +259,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 	//define variables
 	std::string line;
 	IndexType globalN, globalM;
-	IndexType numberNodeWeights;
-	bool hasEdgeWeights;
+	IndexType numberNodeWeights = 0;
+	bool hasEdgeWeights = false;
 	std::vector<ValueType> edgeWeights;//possibly of size 0
 
 	//read first line to get header information
@@ -286,20 +287,32 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 				} else {
 					numberNodeWeights = 1;
 				}
-				if (numberNodeWeights > 0) {
+				if (numberNodeWeights > 0 && comm->getRank() == 0) {
 					std::cout << "Warning: Node weights not yet supported, ignoring them" << std::endl;
 				}
 			}
-		} else {
-			numberNodeWeights = 0;
-			hasEdgeWeights = false;
+		}
+
+		if (comm->getRank() == 0) {
+			std::cout << "Expecting " << globalN << " nodes and " << globalM << " edges, ";
+			if (!hasEdgeWeights && numberNodeWeights == 0) {
+				std::cout << "with no edge or node weights.";
+			}
+			else if (hasEdgeWeights && numberNodeWeights == 0) {
+				std::cout << "with edge weights, but no node weights.";
+			}
+			else if (!hasEdgeWeights && numberNodeWeights > 0) {
+				std::cout << "with no edge weights, but " << numberNodeWeights << " node weights.";
+			}
+			else {
+				std::cout << "with edge weights and " << numberNodeWeights << " weights per node.";
+			}
 		}
 	}
 
 	const ValueType avgDegree = ValueType(2*globalM) / globalN;
 
 	//get distribution and local range
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 
@@ -348,6 +361,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         	if (neighbor >= globalN || neighbor < 0) {
         		throw std::runtime_error(std::string(__FILE__) +", "+std::to_string(__LINE__) + ": Found illegal neighbor " + std::to_string(neighbor) + " in line " + std::to_string(i+beginLocalRange));
         	}
+
         	if (hasEdgeWeights) {
         		bool readEdgeWeight = std::getline(ss, item, ' ');
         		if (!readEdgeWeight) {
@@ -355,7 +369,6 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         		}
         		ValueType edgeWeight = std::stod(item);
         		values.push_back(edgeWeight);
-
         	}
         	//std::cout << "Converted " << item << " to " << neighbor << std::endl;
         	neighbors.push_back(neighbor);
@@ -381,7 +394,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
     if (!hasEdgeWeights) {
     	assert(values.size() == 0);
-    	values.resize(localN, 1);//unweighted edges
+    	values.resize(ja.size(), 1);//unweighted edges
     }
 
     assert(ja.size() == ia[localN]);
