@@ -110,9 +110,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
         SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
 	if (comm->getSize() == 1 || comm->getSize() == k) {
-		ValueType gain = settings.minGainForNextRound;
-		ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
-
 		DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(result.getDistributionPtr(), 1);
 
 		ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, uniformWeights, coordinates, settings);
@@ -292,7 +289,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
         }
     }
     
-    ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
+    ValueType cut = comm->getSize() == 1 ? computeCut(input, result, true) : comm->sum(localSumOutgoingEdges(input, true)) / 2;
     ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(result, k);
     if (comm->getRank() == 0) {
         afterSFC = std::chrono::steady_clock::now();
