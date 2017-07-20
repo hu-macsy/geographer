@@ -147,23 +147,15 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 	assert(ia.size() == localN+1);
 
 	vector<ValueType> targetDegree(localN,0);
-	IndexType degreeSum = 0;
 	for (IndexType i = 0; i < localN; i++) {
 		const IndexType globalI = dist->local2global(i);
 		for (IndexType j = ia[i]; j < ia[i+1]; j++) {
 			if (ja[j] == globalI) {
 				throw std::runtime_error("No self loops allowed.");
 			}
-			if (values[j] != 1) {
-				throw std::runtime_error("Wrong edge weights.");
-			}
+			targetDegree[i] += values[j];
 		}
-
-		targetDegree[i] = ia[i+1]-ia[i];
-		degreeSum += targetDegree[i];
 	}
-	assert(degreeSum >= storage.getNumValues());
-	assert(degreeSum <= storage.getNumValues()+localN);
 
 	DIASparseMatrix<ValueType> D(dist,noDist);
 	DIAStorage<ValueType> dstor(localN, n, 1, HArray<IndexType>(1,firstIndex), HArray<ValueType>(localN, targetDegree.data()) );

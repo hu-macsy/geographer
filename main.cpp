@@ -24,6 +24,7 @@
 #include "FileIO.h"
 #include "ParcoRepart.h"
 #include "Settings.h"
+#include "SpectralPartition.h"
 
 typedef double ValueType;
 typedef int IndexType;
@@ -41,6 +42,41 @@ typedef int IndexType;
  */
 
 //----------------------------------------------------------------------------
+//enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3};
+namespace ITI {
+	std::istream& operator>>(std::istream& in, Format& format)
+	{
+		std::string token;
+		in >> token;
+		if (token == "AUTO" or token == "0")
+			format = ITI::Format::AUTO ;
+		else if (token == "METIS" or token == "1")
+			format = ITI::Format::METIS;
+		else if (token == "ADCIRC" or token == "2")
+			format = ITI::Format::ADCIRC;
+		else if (token == "OCEAN" or token == "3")
+			format = ITI::Format::OCEAN;
+		else
+			in.setstate(std::ios_base::failbit);
+		return in;
+	}
+
+	std::ostream& operator<<(std::ostream& out, Format& method)
+	{
+		std::string token;
+
+		if (method == ITI::Format::AUTO)
+			token = "AUTO";
+		else if (method == ITI::Format::METIS)
+			token = "METIS";
+		else if (method == ITI::Format::ADCIRC)
+			token = "ADCIRC";
+		else if (method == ITI::Format::OCEAN)
+			token = "OCEAN";
+		out << token;
+		return out;
+	}
+}
 
 std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
 {
@@ -87,6 +123,7 @@ int main(int argc, char** argv) {
 				("graphFile", value<std::string>(), "read graph from file")
 				("quadTreeFile", value<std::string>(), "read QuadTree from file")
 				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
+				("coordFormat", value<ITI::Format>(), "format of coordinate file")
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 				("numX", value<int>(&settings.numX)->default_value(settings.numX), "Number of points in x dimension of generated graph")
@@ -177,7 +214,7 @@ int main(int argc, char** argv) {
 
     	std::string coordString;
     	if (settings.useDiffusionCoordinates) {
-    		coordString = " and generating coordinates with diffusive distances.";
+    		coordString = "and generating coordinates with diffusive distances.";
     	} else {
     		coordString = "and \"" + coordFile + "\" for coordinates";
     	}
@@ -220,7 +257,14 @@ int main(int argc, char** argv) {
 			}
 
         } else {
-        	coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions );
+        	ITI::Format format;
+        	if (vm.count("coordFormat")) {
+        		format = vm["coordFormat"].as<ITI::Format>();
+        		coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format);
+        	} else {
+        		coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
+        	}
+
         }
 
         if (comm->getRank() == 0) {
