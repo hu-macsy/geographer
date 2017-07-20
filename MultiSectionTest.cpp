@@ -492,47 +492,45 @@ TEST_F(MultiSectionTest, testRectTree){
     SCAI_ASSERT( root->getNumLeaves()==root->indexLeaves(0), "Wrong leaf indexing");
     
     std::vector<std::vector<ValueType>> points = {  
-                                                    {60.0, 31},     // in r0
-                                                    { 3.4, 8.5},    // in r1
+                                                    {33.0, 31},     // in r6
+                                                    {13.4, 28.5},   // in r5
                                                     {75.0, 91.0},   // in r2
-                                                    {10.2, 20},     // in r1 and r3
                                                     {12.0, 71.5},   // in r4                                                    
-                                                    {15.0, 30},     // in r1, r3 and r5
-                                                    {33.1, 33.1}    // in r1, r3 and r6 
+                                                    {15.0, 30},     // in r5
+                                                    {33.1, 33.1}    // in r6
                                                 };
                                                     
     std::shared_ptr<rectCell<IndexType,ValueType>> retRect; 
     
     for(int p=0; p<points.size(); p++){
-        retRect = root->getContainingLeaf( points[p] );
-
-        if( retRect!=NULL){
-            SCAI_ASSERT( retRect->getRect().bottom[0]<=points[p][0] and retRect->getRect().top[0]>=points[p][0] , "Wrong rectangle");
-            SCAI_ASSERT( retRect->getRect().bottom[1]<=points[p][1] and retRect->getRect().top[1]>=points[p][1] , "Wrong rectangle");
+        try{
+            retRect = root->getContainingLeaf( points[p] );
+        }catch( const std::logic_error& e ){
+            PRINT( e.what() );
+            std::cout<< "point ("<< points[p][0] << ", " << points[p][1] << ") is not in any rectangle" << std::endl;
+            std::terminate();
         }
+
+        SCAI_ASSERT( retRect->getRect().bottom[0]<=points[p][0] and retRect->getRect().top[0]>=points[p][0] , "Wrong rectangle");
+        SCAI_ASSERT( retRect->getRect().bottom[1]<=points[p][1] and retRect->getRect().top[1]>=points[p][1] , "Wrong rectangle");
+        
     }
     
     std::vector<ValueType> point(2); 
     
     //random points
     srand(time(NULL));
-    for(int r=0; r<10; r++){
+    for(int r=0; r<100; r++){
         point[0] = rand()%101;
         point[1] = rand()%101;
         
-        retRect = root->getContainingLeaf( point );
-        if( retRect!=NULL){
-            SCAI_ASSERT( retRect->getRect().bottom[0]<=point[0] and retRect->getRect().top[0]>=point[0] , "Wrong rectangle");
-            SCAI_ASSERT( retRect->getRect().bottom[1]<=point[1] and retRect->getRect().top[1]>=point[1] , "Wrong rectangle");
+        try{
+            retRect = root->getContainingLeaf( point );
+        }catch( const std::logic_error& e ){
+            continue;
         }
-        /*
-        if( retRect!=NULL){
-            PRINT("point ("<< point[0]<<", "<< point[1] <<") found in rectangle:");
-            retRect->getRect().print();
-        }else{
-            PRINT("point ("<< point[0]<<", "<< point[1] <<") was not found in any rectangle.");
-        }
-        */
+        SCAI_ASSERT( retRect->getRect().bottom[0]<=point[0] and retRect->getRect().top[0]>=point[0] , "Wrong rectangle");
+        SCAI_ASSERT( retRect->getRect().bottom[1]<=point[1] and retRect->getRect().top[1]>=point[1] , "Wrong rectangle");
     }
     
     //all the points
@@ -544,7 +542,11 @@ TEST_F(MultiSectionTest, testRectTree){
             point[0]=x;
             point[1]=y;
             
-            retRect = root->getContainingLeaf( point );
+            try{
+                retRect = root->getContainingLeaf( point );
+            }catch( const std::logic_error& e ){
+                continue;
+            }
             
             if(retRect->getRect()==r2){
                 numOfPointsIn_r2++;
@@ -789,15 +791,13 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
     coordinates[1].redistribute( dist );
     coordinates[2].redistribute( dist );
     
-    // copy local coordinates to a ValueType DenseVector
-    std::vector<scai::lama::DenseVector<ValueType>> coordsVal(dimensions);
+    // copy local coordinates to a vector<vector<IndexType>>
+    std::vector<std::vector<IndexType>> coords( localN, std::vector<IndexType>( dimensions, 0) );
     {
         for (IndexType d = 0; d < dimensions; d++) {
             const scai::utilskernel::LArray<IndexType>& localPartOfCoords = coordinates[d].getLocalValues();
-            coordsVal[d].allocate ( localN );
-            scai::hmemo::WriteAccess<ValueType> wCoordsVal( coordsVal[d].getLocalValues() );
             for (IndexType i = 0; i < localN; i++) {
-                wCoordsVal[i] = ValueType (localPartOfCoords[i]);
+                coords[i][d] = IndexType (localPartOfCoords[i]);
             }
         }
     }
@@ -808,7 +808,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
     
     std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
-    std::shared_ptr<rectCell<IndexType,ValueType>> root = MultiSection<IndexType, ValueType>::getRectanglesNonUniform( adjM, coordinates, nodeWeights, minCoords, maxCoords, settings);
+    std::shared_ptr<rectCell<IndexType,ValueType>> root = MultiSection<IndexType, ValueType>::getRectanglesNonUniform( adjM, coords, nodeWeights, minCoords, maxCoords, settings);
 
     std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> rectangles = root->getAllLeaves();
     
@@ -842,7 +842,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
         }
         totalVolume += thisVolume;
 
-        ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordsVal, nodeWeights, thisRectangle, maxCoords, settings);
+        ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, thisRectangle, maxCoords, settings);
         SCAI_ASSERT( thisWeight==thisRectangle.weight, "wrong weight calculation: thisWeight= " << thisWeight << " , thisRectangle.weight= " << thisRectangle.weight);
         SCAI_ASSERT( thisVolume==thisWeight , "This rectangle's area= "<< thisVolume << " and should be equal to its weight that is= "<< thisWeight);   // that is true only when all weights are 1
         
@@ -943,15 +943,15 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
     std::vector<ValueType> scaledMin( dimensions, std::numeric_limits<ValueType>::max());
     std::vector<ValueType> scaledMax( dimensions, std::numeric_limits<ValueType>::lowest());
     
-    std::vector<scai::lama::DenseVector<IndexType>> scaledCoords(dimensions);
+    std::vector<std::vector<IndexType>> scaledCoords( localN , std::vector<IndexType>(dimensions,0) );
     // scale= N^(1/d): this way the scaled max is N^(1/d) and this is also the maximum size of the projection arrays
     IndexType scale = std::pow( N, 1.0/dimensions);
     
     {   
         // gel local min/max
         for (IndexType d = 0; d < dimensions; d++) {
-            scaledCoords[d].allocate( dist );
-            scaledCoords[d] = static_cast<ValueType>( 0 );
+            //scaledCoords[d].allocate( dist );
+            //scaledCoords[d] = static_cast<ValueType>( 0 );
             const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
             
             for (IndexType i = 0; i < localN; i++) {
@@ -972,14 +972,11 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
         for (IndexType d = 0; d < dimensions; d++) {
             //get local parts of coordinates
             const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
-            scai::hmemo::WriteOnlyAccess<IndexType> wScaledCoord( scaledCoords[d].getLocalValues() );
-            
-            SCAI_ASSERT( localN==wScaledCoord.size() , "Wrong size of local part.");
             
             for (IndexType i = 0; i < localN; i++) {
                 ValueType normalizedCoord = (localPartOfCoords[i] - minCoords[d])/(maxCoords[d]-minCoords[d]);
                 IndexType scaledCoord =  normalizedCoord * scale; 
-                wScaledCoord[i] = scaledCoord;
+                scaledCoords[i][d] = scaledCoord;
                 
                 if (scaledCoord < scaledMin[d]) scaledMin[d] = scaledCoord;
                 if (scaledCoord > scaledMax[d]) scaledMax[d] = scaledCoord;
@@ -990,7 +987,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
     }
     
     for (IndexType d=0; d<dimensions; d++) {
-        SCAI_ASSERT( scaledMax[d]<= std::pow(N, 1.0/dimensions), "Scaled maximum value "<< scaledMax[d] << " is too large. should be less than " << std::pow(N, 1.0/dimensions) );
+        SCAI_ASSERT( scaledMax[d]<= scale, "Scaled maximum value "<< scaledMax[d] << " is too large. should be less than " << scale );
         if( scaledMin[d]!=0 ){
             //TODO: it works even if scaledMin is not 0 but the projection arrays will start from 0 and the first 
             //      elements will just always be 0.
@@ -998,7 +995,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
             throw std::logic_error("Minimum scaled value should be 0 but it is " + std::to_string(scaledMin[d]) );
         }
     }
-    SCAI_ASSERT( localN==scaledCoords[0].getLocalValues().size(), "Wrong size of scaled coordinates vector: localN= "<< localN << " and scaledCoords.size()= " << scaledCoords[0].getLocalValues().size() );
+    SCAI_ASSERT( localN==scaledCoords.size(), "Wrong size of scaled coordinates vector: localN= "<< localN << " and scaledCoords.size()= " << scaledCoords.size() );
     
     //
     // get tree of rectangles
@@ -1030,6 +1027,14 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
         struct rectangle thisRectangle = rectangles[r]->getRect();
         
         ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( scaledCoords, nodeWeights, thisRectangle, scaledMax, settings);
+        /*
+        //re-scale rectangle
+        for (IndexType d=0; d<dimensions; d++) {
+            thisRectangle.bottom[d] = (thisRectangle.bottom[d]/scale)*(maxCoords[d]-minCoords[d]) + minCoords[d];
+            thisRectangle.top[d] = (thisRectangle.top[d]/scale)*(maxCoords[d]-minCoords[d]) + minCoords[d];
+        }
+        ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, thisRectangle, maxCoords, settings);
+        */
         SCAI_ASSERT( thisWeight==thisRectangle.weight, "wrong weight calculation: thisWeight= " << thisWeight << " , thisRectangle.weight= " << thisRectangle.weight);
         
         if( thisWeight<minWeight ){
@@ -1118,14 +1123,23 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
     coordinates[0].redistribute( dist );
     coordinates[1].redistribute( dist );
     
-    //set local weights
+    //set local weights + convert local part of coordinates to a vector<vector<IndexType>>
     scai::lama::DenseVector<ValueType> nodeWeights( dist );
+    std::vector<std::vector<IndexType>> localPoints( localN, std::vector<IndexType>( dimensions, 0) );
     {
         scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
         srand(time(NULL));
         for(int i=0; i<localN; i++){
             localPart[i] = 1; //rand()%10;
         }
+        
+        for(int d=0; d<dimensions; d++){
+            scai::hmemo::ReadAccess<IndexType> localCoordR( coordinates[d].getLocalValues() );
+            for(int i=0; i<localN; i++){
+                localPoints[i][d] = localCoordR[i];
+            }
+        }
+        
     }
     SCAI_ASSERT( coordinates[0].getLocalValues().size()==nodeWeights.getLocalValues().size(), "Wrong local sizes for coordinates and weights vectors");
     
@@ -1181,7 +1195,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
         std::vector<IndexType> dim2proj = {d, d, d};
         SCAI_ASSERT( dim2proj.size()==root->getNumLeaves(), "Wrong size of vecctor dim2proj or number of leaves");
         
-        std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projectionNonUniform( coordinates , nodeWeights, root, dim2proj, settings);
+        std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projectionNonUniform( localPoints , nodeWeights, root, dim2proj, settings);
         
         ValueType projectionsTotalWeight =0 ;
         
@@ -1246,19 +1260,17 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
     coordinates[2].redistribute( dist );
     
     //copy local coordinates to a vector<vector<>> structure
-    std::vector<scai::lama::DenseVector<IndexType>> coordsIndex(dimensions);
+    std::vector<std::vector<IndexType>> coordsIndex( localN, std::vector<IndexType>(dimensions,0) );
     {
         for (IndexType d = 0; d < dimensions; d++) {
             const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
-            coordsIndex[d].allocate( localN );
-            scai::hmemo::WriteAccess<IndexType> wCoordsIndex( coordsIndex[d].getLocalValues() );
             
             for (IndexType i = 0; i < localN; i++) {
-                wCoordsIndex[i] = localPartOfCoords[i];
+                coordsIndex[i][d] = localPartOfCoords[i];
             }
         }
     }
-    
+PRINT0("");    
     //set local weights
     scai::lama::DenseVector<ValueType> nodeWeights( dist );
     {
@@ -1312,7 +1324,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
     SCAI_ASSERT( root->getNumLeaves()==3 , "Tree must have 3 leaves but has "<< root->getNumLeaves() );
 
     // bBox0 not leaf, bBox1=projections[2], bBox2=projections[0] , bBox3=projections[1]
-
+PRINT0("");
     ValueType totalGridWeight = N;
     SCAI_ASSERT( totalGridWeight==nodeWeights.sum() , "Wrong sum of node weights: "<< nodeWeights.sum().Scalar::getValue<IndexType>() );
     

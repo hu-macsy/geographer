@@ -93,6 +93,7 @@ int main(int argc, char** argv) {
 				("graphFile", value<std::string>(), "read graph from file")
 				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
+                                ("weakScaling", "generate coordinates locally for weak scaling")
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 				("numX", value<int>(&settings.numX)->default_value(settings.numX), "Number of points in x dimension of generated graph")
 				("numY", value<int>(&settings.numY)->default_value(settings.numY), "Number of points in y dimension of generated graph")
@@ -142,6 +143,7 @@ int main(int argc, char** argv) {
 
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
+    scai::lama::DenseVector<ValueType> nodeWeights;     // node weights
 
     std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
 
@@ -213,9 +215,48 @@ int main(int argc, char** argv) {
         if (comm->getRank() == 0) {
             std::cout << "Read " << N << " points." << std::endl;
             std::cout << "Read coordinates." << std::endl;
-            std::cout << "On average there are about " << N/comm->getSize() << " points per PE");
+            std::cout << "On average there are about " << N/comm->getSize() << " points per PE."<<std::endl;
         }
 
+    }
+    else if(vm.count("weakScaling")){
+        const IndexType dim = settings.dimensions;
+        const IndexType localN = 40000;   // 4M points in every PE
+        N = localN * comm->getSize(); // total number of points
+        
+        std::random_device rnd_dvc;
+        std::mt19937 mersenne_engine(rnd_dvc());
+        
+        //create random local part of graph
+        scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+        scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
+        graph.allocate( rowDistPtr, noDistPtr );
+        scai::lama::MatrixCreator::fillRandom(graph, 0.1);
+        PRINT0("Created local part of graph");
+        
+        //create random local weights
+        std::uniform_real_distribution<ValueType> dist(0.0, 1000.0);
+        auto gen = std::bind(dist, mersenne_engine);
+        
+        std::vector<ValueType> tmpLocalWeights(localN);
+        std::generate( begin(tmpLocalWeights), end(tmpLocalWeights), gen);
+        
+        scai::hmemo::HArray<ValueType> tmpWeights( *tmpLocalWeights.data() );
+        nodeWeights.getLocalValues() = tmpWeights;
+        PRINT0("Created local part of weights");
+        
+        // create random local coordinates   
+        for(IndexType d=0; d<dim; d++){  
+            std::uniform_real_distribution<ValueType> dist(0.0, 1000.0);
+            auto gen = std::bind(dist, mersenne_engine);
+            
+            std::vector<ValueType> tmpLocalCoords(localN);
+            std::generate( begin(tmpLocalCoords), end(tmpLocalCoords), gen);
+            
+            scai::hmemo::HArray<ValueType> tmpHarray ( *tmpLocalCoords.data() ) ;
+            coordinates[d].getLocalValues()  = tmpHarray;
+        }
+        PRINT0("Created local part of coordinates");
     }
     /*
      else if(vm.count("generate")){
@@ -299,13 +340,15 @@ int main(int argc, char** argv) {
     std::string logFile = destPath + "results_" + graphFile.substr(found+1)+ ".log";
     std::ofstream logF(logFile);
     std::ifstream f(graphFile);
-    
-    logF<< "Results for file " << graphFile << std::endl;
-    logF<< "node= "<< N << " , edges= "<< edges << std::endl<< std::endl;
-    settings.print( logF );
-    if( comm->getRank()==0)    settings.print( std::cout );
-    logF<< std::endl<< std::endl << "Only initial partition, no MultiLevel or LocalRefinement"<< std::endl << std::endl;
-
+  /*  
+    if( comm->getRank()==0){ 
+        logF<< "Results for file " << graphFile << std::endl;
+        logF<< "node= "<< N << " , edges= "<< edges << std::endl<< std::endl;
+        settings.print( std::cout );
+        settings.print( logF );
+        logF<< std::endl<< std::endl << "Only initial partition, no MultiLevel or LocalRefinement"<< std::endl << std::endl;
+    }
+*/
     IndexType dimensions = settings.dimensions;
     IndexType k = settings.numBlocks;
     
@@ -397,7 +440,10 @@ int main(int argc, char** argv) {
         case InitialPartitioningMethods::Multisection:{  //------------------------------------------- multisection
             
             // unit weights
-            scai::lama::DenseVector<ValueType> nodeWeights( rowDistPtr, 1);
+            //scai::lama::DenseVector<ValueType> nodeWeights( rowDistPtr, 1);
+            //nodeWeights.assign( 1 );
+            scai::hmemo::HArray<ValueType> localWeights( rowDistPtr->getLocalSize(), 1 );
+            nodeWeights.assign( localWeights, rowDistPtr );
             
             beforeInitialTime =  std::chrono::system_clock::now();
             if (!settings.bisect){
@@ -439,8 +485,12 @@ int main(int argc, char** argv) {
             cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, multiSectionPartition);
             imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( multiSectionPartition, k);
             if(comm->getRank()==0){
-                logF<< "--  Initial multisection, total time: " << partitionTime.count() << std::endl;
-                logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
+                if( settings.bisect ){
+                    logF << "--  Initial bisection, total time: " << partitionTime.count() << std::endl;
+                }else{
+                    logF << "--  Initial multisection, total time: " << partitionTime.count() << std::endl;
+                }
+                logF << "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
                 logF  << std::endl  << std::endl; 
                 std::cout << "\033[1;36m--Initial multisection, total time: " << partitionTime.count() << std::endl;
                 std::cout << "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance << "\033[0m";
@@ -457,7 +507,14 @@ int main(int argc, char** argv) {
             break;
         }
     }
- 
+    
+    if( comm->getRank()==0){ 
+        logF<< "Results for file " << graphFile << std::endl;
+        logF<< "node= "<< N << " , edges= "<< edges << std::endl<< std::endl;
+        settings.print( std::cout );
+        settings.print( logF );
+        logF<< std::endl<< std::endl << "Only initial partition, no MultiLevel or LocalRefinement"<< std::endl << std::endl;
+    }
     /*
      *  commenting out spectral, it is not correct yet
      * 

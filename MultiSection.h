@@ -383,7 +383,7 @@ namespace ITI {
         
         static std::shared_ptr<rectCell<IndexType,ValueType>> getRectanglesNonUniform( 
             const scai::lama::CSRSparseMatrix<ValueType> &input,
-            const std::vector<scai::lama::DenseVector<IndexType>> &coordinates,
+            const std::vector<std::vector<IndexType> > &coordinates,
             const scai::lama::DenseVector<ValueType>& nodeWeights,
             const std::vector<ValueType>& minCoords,
             const std::vector<ValueType>& maxCoords,
@@ -392,7 +392,7 @@ namespace ITI {
         /** Projection for the non-uniform grid case. Coordinates must be Indextype.
          */
         static std::vector<std::vector<ValueType>> projectionNonUniform( 
-            const std::vector<scai::lama::DenseVector<IndexType>>& coordinates,
+            const std::vector<std::vector<IndexType> >& coordinates,
             const scai::lama::DenseVector<ValueType>& nodeWeights,
             const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
             const std::vector<IndexType>& dimensionToProject,
@@ -423,7 +423,8 @@ namespace ITI {
          * @param[in] bBox The bounding box given as two vectors; one for the bottom point and one for the top point. For all dimensions i, should be: bBox.first(i)< bBox.second(i).
          * 
          */
-        static bool inBBox( const std::vector<IndexType>& coords, const struct rectangle& bBox);
+        template<typename T>
+        static bool inBBox( const std::vector<T>& coords, const struct rectangle& bBox);
         
         /** Calculates the weight of the rectangle.
          * 
@@ -439,6 +440,9 @@ namespace ITI {
          */
         template<typename T>
         static ValueType getRectangleWeight( const std::vector<scai::lama::DenseVector<T>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
+        
+        template<typename T>
+        static ValueType getRectangleWeight( const std::vector<std::vector<T>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
         
         /** Function to transform a 1D index to 2D or 3D given the side length of the cubical grid.
          * For example, in a 4x4 grid, indexTo2D(1)=(0,1), indexTo2D(4)=(1,0) and indexTo2D(13)=(3,1)

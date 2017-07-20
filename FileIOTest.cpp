@@ -248,10 +248,11 @@ TEST_F(FileIOTest, testReadQuadTree){
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadMatrixMarketFormat){
-    std::string path = "./meshes/grid2/";
-    std::string graphFile = path + "grid2.mtx";
-    std::string coordFile = path + "grid2_coord.mtx";
-    //std::string coordFile = path + "my_MM_coords.mtx";
+    std::string path = "./meshes/whitaker3/";
+    std::string graphFile = path + "whitaker3.mtx";
+    std::string coordFile = path + "whitaker3_coord.mtx";
+    //std::string coordFile = "./meshes/my_MM_coords.mtx";
+    
     
     std::ifstream coordF( coordFile );
     
@@ -263,7 +264,7 @@ TEST_F(FileIOTest, testReadMatrixMarketFormat){
     
     ITI::FileIO<IndexType,ValueType>::FileFormat ff = ITI::FileIO<IndexType,ValueType>::FileFormat::MATRIXMARKET;
     
-    std::tie( N, dimensions) = FileIO<IndexType, ValueType>::getMatrixMarketCoordsInfos( coordFile );
+    //std::tie( N, dimensions) = FileIO<IndexType, ValueType>::getMatrixMarketCoordsInfos( coordFile );
     
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions, ff);
     

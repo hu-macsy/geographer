@@ -73,6 +73,9 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
     //TODO: assert if scaledMin and scaledMax are always 0 and scale respectively
     std::vector<scai::lama::DenseVector<IndexType>> scaledCoords(dim);
     
+    // localPoints[i].size()= dimensions
+    std::vector< std::vector<IndexType> > localPoints( localN, std::vector<IndexType>(dim,0) );
+    
     for(IndexType d=0; d<dim; d++){
         scaledCoords[d].allocate(inputDistPtr);
         scaledCoords[d] = static_cast<ValueType>( 0 );
@@ -121,7 +124,7 @@ PRINT0( scale );
             SCAI_REGION_END("MultiSection.getPartitionNonUniform.minMaxAndScale.lamaScale" )
             */
             
-           // SCAI_REGION_START("MultiSection.getPartitionNonUniform.minMaxAndScale.byHandScale" )
+            //SCAI_REGION_START("MultiSection.getPartitionNonUniform.minMaxAndScale.byHandScale" )
             //get local parts of coordinates
             scai::hmemo::WriteOnlyAccess<IndexType> wScaledCoord( scaledCoords[d].getLocalValues() );
             
@@ -131,17 +134,12 @@ PRINT0( scale );
                 ValueType normalizedCoord = localPartOfCoords[i] - thisDimMin;
                 IndexType scaledCoord =  normalizedCoord * thisDimScale; 
                 wScaledCoord[i] = scaledCoord;
-                SCAI_ASSERT( scaledCoord<=scaledMax[d] , "Wrong scaled coord " << scaledCoord << " is larger than scaledMax= " << scaledMax[d] );
+                //
+                localPoints[i][d] = scaledCoord;
+                //
                 SCAI_ASSERT( scaledCoord >=0 and scaledCoord<=scale, "Wrong scaled coordinate " << scaledCoord << " is either negative or more than "<< scale);
-             
-                //TODO: remove scaled max and min: should be always be 0 and scale
-                //if (scaledCoord < scaledMin[d]) scaledMin[d] = scaledCoord;
-                //if (scaledCoord > scaledMax[d]) scaledMax[d] = scaledCoord;
             }
             //SCAI_REGION_END("MultiSection.getPartitionNonUniform.minMaxAndScale.byHandScale" )
-            
-            //scaledMin[d] = comm->min( scaledMin[d] );
-            //scaledMax[d] = comm->max( scaledMax[d] );      
         }
     }
     
@@ -159,7 +157,7 @@ PRINT0( scale );
     //
     // get a partitioning into rectangles
     //
-    std::shared_ptr<rectCell<IndexType,ValueType>> root = MultiSection<IndexType, ValueType>::getRectanglesNonUniform( input, scaledCoords, nodeWeights, scaledMin, scaledMax, settings);
+    std::shared_ptr<rectCell<IndexType,ValueType>> root = MultiSection<IndexType, ValueType>::getRectanglesNonUniform( input, localPoints, nodeWeights, scaledMin, scaledMax, settings);
     
     const IndexType numLeaves = root->getNumLeaves();
     
@@ -175,14 +173,16 @@ PRINT0( scale );
         scai::hmemo::WriteOnlyAccess<IndexType> wLocalPart( partition.getLocalValues() );
         
         for(IndexType i=0; i<localN; i++){
+            /*
             std::vector<IndexType> point(dim);            
             //TODO: probably not the most efficient way to do it, maybe avoid ReadAccess
             for(IndexType d=0; d<dim; d++){
                 scai::hmemo::ReadAccess<IndexType> coordAccess( scaledCoords[d].getLocalValues() );
                 coordAccess.getValue( point[d], i);
-            }   
+            } 
+            */
             try{
-                wLocalPart[i] = root->getContainingLeaf( point )->getLeafID();
+                wLocalPart[i] = root->getContainingLeaf( localPoints[i] )->getLeafID();
             }catch( const std::logic_error& e ){
                 PRINT0( e.what() );
                 std::terminate();
@@ -468,7 +468,7 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
 template<typename IndexType, typename ValueType>
 std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType>::getRectanglesNonUniform( 
     const scai::lama::CSRSparseMatrix<ValueType> &input,
-    const std::vector<scai::lama::DenseVector<IndexType>> &coordinates,
+    const std::vector< std::vector<IndexType> > &coordinates,
     const scai::lama::DenseVector<ValueType>& nodeWeights,
     const std::vector<ValueType>& minCoords,
     const std::vector<ValueType>& maxCoords,
@@ -483,7 +483,8 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     const IndexType localN = inputDist->getLocalSize();
     const IndexType globalN = inputDist->getGlobalSize();
     
-    SCAI_ASSERT( coordinates.size()==dim , "Dimensions given and size of coordinates do not agree." );
+    SCAI_ASSERT( coordinates.size()==localN , "Size of coordinatred vector is not right" );
+    SCAI_ASSERT( coordinates[0].size()==dim ,"Dimensions given and size of coordinates do not agree." );
     SCAI_ASSERT( minCoords.size()==maxCoords.size() and maxCoords.size()==dim , "Wrong size of maxCoords or minCoords." );
     
     for(int d=0; d<dim; d++){
@@ -518,7 +519,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         if( std::pow( intSqrtK+1, dim ) == k){
             intSqrtK++;
         }
-        SCAI_ASSERT( std::pow( intSqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow(k, 1/d)= " << intSqrtK);
+        SCAI_ASSERT( std::pow( intSqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow( sqrtK, 1/d)= " << std::pow(intSqrtK,dim));
     
         numCuts = std::vector<IndexType>( dim, intSqrtK );
     }else{        
@@ -664,7 +665,7 @@ SCAI_ASSERT( dbg_rectW==thisRectangle.weight, "Rectangle weights not correct. db
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projectionNonUniform( 
-    const std::vector<scai::lama::DenseVector<IndexType>>& coordinates,
+    const std::vector<std::vector<IndexType>>& coordinates,
     const scai::lama::DenseVector<ValueType>& nodeWeights,
     const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
     const std::vector<IndexType>& dimensionToProject,
@@ -713,13 +714,14 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
         scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights.getLocalValues() );
         
         for(int i=0; i<localN; i++){
+            /*
             SCAI_REGION_START("MultiSection.projectionNonUniform.localProjection.CopyCoords");
             std::vector<IndexType> coords(dimension);
             for(int c=0; c<dimension; c++){
                  coords[c] = coordinates[c].getLocalValues()[i] ;               
             }
             SCAI_REGION_END("MultiSection.projectionNonUniform.localProjection.CopyCoords");
-            
+            */
             // a pointer to the cell that contains point i
             SCAI_REGION_START("MultiSection.projectionNonUniform.localProjection.getContainingLeaf");
             std::shared_ptr<rectCell<IndexType,ValueType>> thisRectCell;
@@ -727,12 +729,12 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
             //TODO: in the partition this should not happen. But it may happen in a more general case
             // if this point is not contained in any rectangle
             try{
-                thisRectCell = treeRoot->getContainingLeaf( coords );
+                thisRectCell = treeRoot->getContainingLeaf( coordinates[i] );
             }
             catch( const std::logic_error& e){
                 PRINT("Function getContainingLeaf returns an " << e.what() << " exception for point: ");
                 for( int d=0; d<dimension; d++)
-                    std::cout<< coords[d] << ", ";
+                    std::cout<< coordinates[i][d] << ", ";
                 std::cout<< std::endl << " and root:"<< std::endl;
                 treeRoot->getRect().print();
                 std::terminate();   // not allowed in our case
@@ -746,12 +748,12 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
                 PRINT0( thisRectCell->getLeafID() );
                 // terminate() ??
             }
-            SCAI_ASSERT( thisLeafID!=-1, "leafID for containing rectCell must be >0 , for coords= "<< coords[0] << ", "<< coords[1] );
+            SCAI_ASSERT( thisLeafID!=-1, "leafID for containing rectCell must be >0 , for coords= "<< coordinates[i][0] << ", "<< coordinates[i][1] );
             SCAI_ASSERT( thisLeafID<projections.size(), "Index too big.");
 
             // the chosen dimension to project for this rectangle
             const IndexType dim2proj = dimensionToProject[ thisLeafID ];
-            IndexType relativeIndex = coords[dim2proj]-thisRectCell->getRect().bottom[dim2proj];
+            IndexType relativeIndex = coordinates[i][dim2proj]-thisRectCell->getRect().bottom[dim2proj];
 
             SCAI_ASSERT( relativeIndex<=projections[ thisLeafID ].capacity(), "Wrong relative index: "<< relativeIndex << " should be <= "<< projections[ thisLeafID ].capacity() << " (and thisRect.bottom= "<< thisRectCell->getRect().bottom[dim2proj]  << " , thisRect.top= "<< thisRectCell->getRect().top[dim2proj] << ")" );
 
@@ -937,7 +939,8 @@ bool MultiSection<IndexType, ValueType>::probe(const std::vector<ValueType>& pre
 
 // Checks if given index is in the bounding box bBox.
 template<typename IndexType, typename ValueType>
-bool MultiSection<IndexType, ValueType>::inBBox( const std::vector<IndexType>& coords, const struct rectangle& bBox){
+template<typename T>
+bool MultiSection<IndexType, ValueType>::inBBox( const std::vector<T>& coords, const struct rectangle& bBox){
     SCAI_REGION("MultiSection.inBBox");
     
     IndexType dimension = bBox.top.size();
@@ -1009,7 +1012,7 @@ ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vec
         scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights.getLocalValues() );
         
         for(int i=0; i<localN; i++){
-            std::vector<IndexType> coords;
+            std::vector<T> coords;
             for(int d=0; d<dimension; d++){
                 coords.push_back( coordinates[d].getLocalValues()[i] );
                 //TODO: remove assertion, probably not needed
@@ -1019,8 +1022,42 @@ ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vec
                 localWeight += localWeights[i];
             }
         }
-    }
+    }    
+    // sum all local weights
+    return comm->sum(localWeight);
+}
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+template<typename T>
+ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vector<std::vector<T>>& coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings){
+    SCAI_REGION("MultiSection.getRectangleWeight");
     
+    const scai::dmemo::DistributionPtr inputDist = nodeWeights.getDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
+    const IndexType localN = inputDist->getLocalSize();
+    
+    const IndexType dimension = bBox.top.size();
+    ValueType localWeight=0;
+    
+    {
+        SCAI_REGION("MultiSection.getRectangleWeight.localWeight");
+        scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights.getLocalValues() );
+        
+        for(int i=0; i<localN; i++){
+            std::vector<T> coords= coordinates[i];
+            /*
+            for(int d=0; d<dimension; d++){
+                coords.push_back( coordinates[d].getLocalValues()[i] );
+                //TODO: remove assertion, probably not needed
+                SCAI_ASSERT( coords.back()<=maxCoords[d], "Coordinate too big, coords.back()= " << coords.back() << " , maxCoords[d]= "<< maxCoords[d] );
+            }
+            */
+            if( inBBox(coords, bBox) ){ 
+                localWeight += localWeights[i];
+            }
+        }
+    }    
     // sum all local weights
     return comm->sum(localWeight);
 }
@@ -1086,9 +1123,9 @@ template std::shared_ptr<rectCell<int,double>> MultiSection<int, double>::getRec
 
 template std::vector<std::vector<double>> MultiSection<int, double>::projection( const scai::lama::DenseVector<double>& nodeWeights, const std::shared_ptr<rectCell<int,double>> treeRoot, const std::vector<int>& dimensionToProject, const int sideLen, Settings settings);
 
-template std::shared_ptr<rectCell<int,double>> MultiSection<int, double>::getRectanglesNonUniform( const scai::lama::CSRSparseMatrix<double> &input, const std::vector<scai::lama::DenseVector<int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const std::vector<double>& minCoords, const std::vector<double>& maxCoords, Settings settings);
+template std::shared_ptr<rectCell<int,double>> MultiSection<int, double>::getRectanglesNonUniform( const scai::lama::CSRSparseMatrix<double> &input, const std::vector<std::vector<int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const std::vector<double>& minCoords, const std::vector<double>& maxCoords, Settings settings);
 
-template std::vector<std::vector<double>> MultiSection<int, double>::projectionNonUniform( const std::vector<scai::lama::DenseVector<int>>& coordinates, const scai::lama::DenseVector<double>& nodeWeights, const std::shared_ptr<rectCell<int,double>> treeRoot, const std::vector<int>& dimensionToProject, Settings settings);
+template std::vector<std::vector<double>> MultiSection<int, double>::projectionNonUniform( const std::vector<std::vector<int>>& coordinates, const scai::lama::DenseVector<double>& nodeWeights, const std::shared_ptr<rectCell<int,double>> treeRoot, const std::vector<int>& dimensionToProject, Settings settings);
     
 template bool MultiSection<int, double>::inBBox( const std::vector<int>& coords, const struct rectangle& bBox);
     
@@ -1101,6 +1138,10 @@ template double MultiSection<int, double>::getRectangleWeight( const scai::lama:
 template double MultiSection<int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
 
 template double MultiSection<int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<double>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
+
+template double MultiSection<int, double>::getRectangleWeight( const std::vector<std::vector<double>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
+
+template double MultiSection<int, double>::getRectangleWeight( const std::vector<std::vector<int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
 
 template std::vector<int> MultiSection<int, double>::indexToCoords( const int ind, const int sideLen, const int dim);
 
