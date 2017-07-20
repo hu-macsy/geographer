@@ -5,23 +5,27 @@
  *      Author: moritz
  */
 
+#include <set>
+
+#include <scai/dmemo/NoDistribution.hpp>
+
 #include "KMeans.h"
 
 namespace ITI {
 namespace KMeans {
 
-
-
 template<typename IndexType, typename ValueType>
-std::vector<DenseVector<ValueType> > ITI::KMeans::findInitialCenters(
+std::vector<std::vector<ValueType> > findInitialCenters(
 		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const DenseVector<IndexType> &nodeWeights) {
 
 	const IndexType dim = coordinates.size();
 	const IndexType n = coordinates[0].size();
-	std::vector<DenseVector<ValueType> > result(dim);
+	const IndexType localN = coordinates[0].getLocalValues().size();
+
+	std::vector<std::vector<ValueType> > result(dim);
 
 	for (IndexType d = 0; d < dim; d++) {
-		result[d] = DenseVector(k, 0);
+		result[d].resize(k);
 	}
 
 	//broadcast seed value from root to ensure equal pseudorandom numbers.
@@ -32,16 +36,16 @@ std::vector<DenseVector<ValueType> > ITI::KMeans::findInitialCenters(
 
 	std::set<IndexType> indices;
 	while (indices.size() < k) {
-		indices.insert(rand() % n);
+		indices.insert(rand() % localN);
 	}
-
-	//const scai::hmemo::ReadAccess<IndexType> rWeights(nodeWeights.getLocalValues());
 
 	for (IndexType d = 0; d < dim; d++) {
 		const scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
-		const scai::hmemo::WriteAccess<ValueType> wResult(result[d].getLocalValues());
-		for (IndexType i = 0; i < k; i++) {
-			wResult[i] = rCoords[indices[i]];
+
+		IndexType i = 0;
+		for (IndexType index : indices) {
+			result[d][i] = rCoords[index];
+			i++;
 		}
 	}
 
@@ -52,7 +56,7 @@ std::vector<DenseVector<ValueType> > ITI::KMeans::findInitialCenters(
 }
 
 template<typename IndexType, typename ValueType>
-std::vector<DenseVector<IndexType> > ITI::KMeans::findCenters(
+std::vector<std::vector<ValueType> > findCenters(
 		const std::vector<DenseVector<ValueType> >& coordinates,
 		const DenseVector<IndexType>& partition,
 		const IndexType k,
@@ -61,11 +65,12 @@ std::vector<DenseVector<IndexType> > ITI::KMeans::findCenters(
 	const IndexType dim = coordinates.size();
 	const IndexType n = partition.size();
 	const IndexType localN = partition.getLocalValues().size();
+	const scai::dmemo::DistributionPtr resultDist(new scai::dmemo::NoDistribution(k));
 	const scai::dmemo::CommunicatorPtr comm = partition.getDistribution().getCommunicatorPtr();
 
 	//TODO: check that distributions align
 
-	std::vector<DenseVector<ValueType> > result(dim);
+	std::vector<std::vector<ValueType> > result(dim);
 	std::vector<IndexType> weightSum(k, 0);
 
 	scai::hmemo::ReadAccess<IndexType> rWeights(nodeWeights.getLocalValues());
@@ -80,13 +85,13 @@ std::vector<DenseVector<IndexType> > ITI::KMeans::findCenters(
 
 	//find local centers
 	for (IndexType d = 0; d < dim; d++) {
-		result[d] = DenseVector(k, 0);
-		scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d]);
-		scai::hmemo::WriteAccess<ValueType> wResult(result[d]);
+		result[d].resize(k);
+		scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
+
 		for (IndexType i = 0; i < localN; i++) {
 			const IndexType part = rPartition[i];
 			const IndexType weight = rWeights[i];
-			wResult[part] += rCoords[i]*rWeights[i] / weightSum[part];//this is more expensive than summing first and dividing later, but avoids overflows
+			result[d][part] += rCoords[i]*rWeights[i] / weightSum[part];//this is more expensive than summing first and dividing later, but avoids overflows
 		}
 	}
 
@@ -98,10 +103,10 @@ std::vector<DenseVector<IndexType> > ITI::KMeans::findCenters(
 
 	//compute updated centers as weighted average
 	for (IndexType d = 0; d < dim; d++) {
-		scai::hmemo::WriteAccess<ValueType> wResult(result[d]);
 		for (IndexType j = 0; j < k; j++) {
 			ValueType weightRatio = (ValueType(weightSum[j]) / totalWeight[j]);
-			wResult[j] = comm->sum(wResult[j] * weightRatio);
+			ValueType weightedCoord = result[d][j] * weightRatio;
+			result[d][j] = comm->sum(weightedCoord);
 		}
 	}
 
@@ -109,33 +114,33 @@ std::vector<DenseVector<IndexType> > ITI::KMeans::findCenters(
 }
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ITI::KMeans::assignBlocks(
+DenseVector<IndexType> assignBlocks(
 		const std::vector<DenseVector<ValueType> >& coordinates,
-		const std::vector<DenseVector<IndexType> >& centers,
-		const DenseVector<IndexType> &nodeWeights, const std::vector<IndexType> &targetBlockSizes,  const ValueType epsilon = 0.05) {
+		const std::vector<std::vector<ValueType> >& centers,
+		const DenseVector<IndexType> &nodeWeights, const std::vector<IndexType> &targetBlockSizes,  const ValueType epsilon) {
 
 	const IndexType dim = coordinates.size();
 	const IndexType n = nodeWeights.size();
-	const scai::dmemo::DistributionPtr dist = nodeWeights.getDistributionPtr();
+	const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
 	const IndexType localN = nodeWeights.getLocalValues().size();
 	const IndexType k = targetBlockSizes.size();
 
 	//prepare data structure for squared distances
 	std::vector<std::vector<ValueType>> squaredDistances(k);
-	for (std::vector<ValueType> sublist : squaredDistances) {
+	for (std::vector<ValueType>& sublist : squaredDistances) {
 		sublist.resize(localN, 0);
 	}
 
 	//compute squared distances. Since only the nearest neighbor is required, we could speed this up with a suitable data structure.
 	for (IndexType d = 0; d < dim; d++) {
 		scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
-		scai::hmemo::ReadAccess<ValueType> rCenters(centers[d].getLocalValues());
+
 		for (IndexType j = 0; j < k; j++) {
-			ValueType centerCoord = rCenters[j];
+			ValueType centerCoord = centers[d][j];
 			for (IndexType i = 0; i < localN; i++) {
 				ValueType coord = rCoords[i];
 				ValueType dist = (centerCoord - coord);
-				squaredDistances[j][i] += dist*dist; //maybe use Manhattan distance here?
+				squaredDistances[j][i] += dist*dist; //maybe use Manhattan distance here? Should align better with grid structure.
 			}
 		}
 	}
@@ -158,10 +163,15 @@ DenseVector<IndexType> ITI::KMeans::assignBlocks(
 		}
 
 
+		//iterate if necessary to achieve balance
 	}
 
 	return assignment;
 }
+
+template std::vector<std::vector<double> > findInitialCenters(const std::vector<DenseVector<double>> &coordinates, int k, const DenseVector<int> &nodeWeights);
+template std::vector<std::vector<double> > findCenters(const std::vector<DenseVector<double>> &coordinates, const DenseVector<int> &partition, const int k, const DenseVector<int> &nodeWeights);
+template DenseVector<int> assignBlocks(const std::vector<DenseVector<double>> &coordinates, const std::vector<std::vector<double> > &centers, const DenseVector<int> &nodeWeights, const std::vector<int> &blockSizes,  const double epsilon);
 
 }
 } /* namespace ITI */

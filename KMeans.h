@@ -17,14 +17,14 @@ namespace ITI {
 namespace KMeans {
 
 template<typename IndexType, typename ValueType>
-std::vector<DenseVector<IndexType> > findInitialCenters(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<IndexType> &nodeWeights);
+std::vector<std::vector<ValueType> > findInitialCenters(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<IndexType> &nodeWeights);
 
 template<typename IndexType, typename ValueType>
-std::vector<DenseVector<IndexType> > findCenters(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<IndexType> &partition, const IndexType k,
+std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<IndexType> &partition, const IndexType k,
 		const DenseVector<IndexType> &nodeWeights);
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType>> &coordinates, const std::vector<DenseVector<IndexType> > &centers,
+DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType>> &coordinates, const std::vector<std::vector<ValueType> > &centers,
 		const DenseVector<IndexType> &nodeWeights, const std::vector<IndexType> &blockSizes,  const ValueType epsilon = 0.05);
 
 }

@@ -29,6 +29,7 @@
 #include "HilbertCurve.h"
 #include "MultiLevel.h"
 #include "SpectralPartition.h"
+#include "KMeans.h"
 #include "AuxiliaryFunctions.h"
 
 #include "sort/SchizoQS.hpp"
@@ -96,13 +97,41 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition")
         // get an initial partition
         DenseVector<IndexType> result;
+		DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(inputDist, 1);
+
         
         if( settings.initialPartition==0 ){ //sfc
             result= ParcoRepart<IndexType, ValueType>::hilbertPartition(input, coordinates, settings);
-        }else if( settings.initialPartition==1 ){ // pixel
+        } else if ( settings.initialPartition==1 ){ // pixel
             result = ParcoRepart<IndexType, ValueType>::pixelPartition(input, coordinates, settings);
-        }else{ // spectral
+        } else if ( settings.initialPartition == 2) {// spectral
             result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
+        } else if (settings.initialPartition == 3) {// k-means
+        	std::vector<std::vector<ValueType> > centers = ITI::KMeans::findInitialCenters(coordinates, settings.numBlocks, uniformWeights);
+        	const std::vector<IndexType> blockSizes(settings.numBlocks, n/settings.numBlocks);
+        	for (IndexType i = 0; i < 20; i++) {
+        		result = ITI::KMeans::assignBlocks(coordinates, centers, uniformWeights, blockSizes, settings.epsilon);
+        		centers = ITI::KMeans::findCenters(coordinates, result, settings.numBlocks, uniformWeights);
+        	}
+
+        	std::cout << "Max block:" << result.getLocalValues().max();
+
+        	//std::cout << "K-Means, Cut:" << computeCut(input, result, false) << ", imbalance:" << computeImbalance(result, settings.numBlocks) << std::endl;
+        	assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
+        	assert(result.min().Scalar::getValue<IndexType>() == 0);
+
+            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
+            assert(newDist->getGlobalSize() == n);
+
+            result.redistribute(newDist);
+            input.redistribute(newDist, noDist);
+            for (IndexType d = 0; d < dimensions; d++) {
+            	coordinates[d].redistribute(newDist);
+            }
+
+
+        } else {
+        	throw std::runtime_error("No method implemented for " + std::to_string(settings.initialPartition));
         }
         SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
         
@@ -110,8 +139,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
         SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
 	if (comm->getSize() == 1 || comm->getSize() == k) {
-		DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(result.getDistributionPtr(), 1);
-
+		uniformWeights = DenseVector<IndexType>(result.getDistributionPtr(), 1);
 		ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, uniformWeights, coordinates, settings);
 
 	} else {
