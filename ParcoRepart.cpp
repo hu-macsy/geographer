@@ -109,8 +109,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         } else if (settings.initialPartition == 3) {// k-means
         	std::vector<std::vector<ValueType> > centers = ITI::KMeans::findInitialCenters(coordinates, settings.numBlocks, uniformWeights);
         	const std::vector<IndexType> blockSizes(settings.numBlocks, n/settings.numBlocks);
+        	std::vector<ValueType> influence(settings.numBlocks,1);
         	for (IndexType i = 0; i < 20; i++) {
-        		result = ITI::KMeans::assignBlocks(coordinates, centers, uniformWeights, blockSizes, settings.epsilon);
+        		result = ITI::KMeans::assignBlocks(coordinates, centers, uniformWeights, blockSizes, settings.epsilon, influence);
         		centers = ITI::KMeans::findCenters(coordinates, result, settings.numBlocks, uniformWeights);
         	}
 

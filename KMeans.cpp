@@ -7,6 +7,7 @@
 
 #include <set>
 #include <cmath>
+#include <assert.h>
 
 #include <scai/dmemo/NoDistribution.hpp>
 
@@ -108,8 +109,10 @@ std::vector<std::vector<ValueType> > findCenters(
 	for (IndexType d = 0; d < dim; d++) {
 		for (IndexType j = 0; j < k; j++) {
 			ValueType weightRatio = (ValueType(weightSum[j]) / totalWeight[j]);
-			ValueType weightedCoord = result[d][j] * weightRatio;
+			//if no points in cluster, set it to left upper corner. TODO: find better way to seed new cluster.
+			ValueType weightedCoord = weightSum[j] == 0 ? 0 : result[d][j] * weightRatio;
 			result[d][j] = comm->sum(weightedCoord);
+			assert(std::isfinite(result[d][j]));
 		}
 	}
 
@@ -120,7 +123,9 @@ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> assignBlocks(
 		const std::vector<DenseVector<ValueType> >& coordinates,
 		const std::vector<std::vector<ValueType> >& centers,
-		const DenseVector<IndexType> &nodeWeights, const std::vector<IndexType> &targetBlockSizes,  const ValueType epsilon) {
+		const DenseVector<IndexType> &nodeWeights, const std::vector<IndexType> &targetBlockSizes,
+		const ValueType epsilon,
+		std::vector<ValueType> &influence) {
 
 	const IndexType dim = coordinates.size();
 	const IndexType n = nodeWeights.size();
@@ -133,6 +138,8 @@ DenseVector<IndexType> assignBlocks(
 	const IndexType maxIter = 20;
 
 	const IndexType optSize = std::ceil(totalWeightSum / k );
+
+	assert(influence.size() == k);
 
 	//prepare data structure for squared distances
 	std::vector<std::vector<ValueType>> squaredDistances(k);
@@ -148,14 +155,13 @@ DenseVector<IndexType> assignBlocks(
 			ValueType centerCoord = centers[d][j];
 			for (IndexType i = 0; i < localN; i++) {
 				ValueType coord = rCoords[i];
-				ValueType dist = (centerCoord - coord);
+				ValueType dist = std::abs(centerCoord - coord);
 				squaredDistances[j][i] += dist*dist; //maybe use Manhattan distance here? Should align better with grid structure.
 			}
 		}
 	}
 
 	//compute assignment and balance
-	std::vector<ValueType> influence(k, 1);
 	DenseVector<IndexType> assignment(dist, 0);
 
 	ValueType imbalance;
@@ -180,7 +186,7 @@ DenseVector<IndexType> assignBlocks(
 		std::vector<IndexType> totalWeight(k, 0);
 		for (IndexType j = 0; j < k; j++) {
 			totalWeight[j] = comm->sum(blockWeights[j]);
-			influence[j] = std::min(influence[j] * std::pow(ValueType(optSize) / totalWeight[j], 0.7), ValueType(20));
+			influence[j] = std::min(influence[j] * std::pow(ValueType(targetBlockSizes[j]) / totalWeight[j], 0.6), influence[j]*1.3);
 
 			if (comm->getRank() == 0) {
 				std::cout << "Iter " << iter << ", block " << j << " has size " << totalWeight[j] << ", setting influence to ";
@@ -202,7 +208,7 @@ DenseVector<IndexType> assignBlocks(
 
 template std::vector<std::vector<double> > findInitialCenters(const std::vector<DenseVector<double>> &coordinates, int k, const DenseVector<int> &nodeWeights);
 template std::vector<std::vector<double> > findCenters(const std::vector<DenseVector<double>> &coordinates, const DenseVector<int> &partition, const int k, const DenseVector<int> &nodeWeights);
-template DenseVector<int> assignBlocks(const std::vector<DenseVector<double>> &coordinates, const std::vector<std::vector<double> > &centers, const DenseVector<int> &nodeWeights, const std::vector<int> &blockSizes,  const double epsilon);
+template DenseVector<int> assignBlocks(const std::vector<DenseVector<double>> &coordinates, const std::vector<std::vector<double> > &centers, const DenseVector<int> &nodeWeights, const std::vector<int> &blockSizes,  const double epsilon, std::vector<double> &influence);
 
 }
 } /* namespace ITI */

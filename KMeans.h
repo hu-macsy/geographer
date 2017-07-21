@@ -25,7 +25,14 @@ std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<V
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType>> &coordinates, const std::vector<std::vector<ValueType> > &centers,
-		const DenseVector<IndexType> &nodeWeights, const std::vector<IndexType> &blockSizes,  const ValueType epsilon = 0.05);
+		const DenseVector<IndexType> &nodeWeights, const std::vector<IndexType> &blockSizes,  const ValueType epsilon = 0.05) {
+	std::vector<ValueType> influence(blockSizes.size(), 1);
+	return assignBlocks(coordinates, centers, nodeWeights, blockSizes, epsilon, influence);
+}
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType>> &coordinates, const std::vector<std::vector<ValueType> > &centers,
+		const DenseVector<IndexType> &nodeWeights, const std::vector<IndexType> &blockSizes,  const ValueType epsilon, std::vector<ValueType> &influence);
 
 }
 } /* namespace ITI */
