@@ -114,9 +114,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         		centers = ITI::KMeans::findCenters(coordinates, result, settings.numBlocks, uniformWeights);
         	}
 
-        	std::cout << "Max block:" << result.getLocalValues().max();
-
-        	//std::cout << "K-Means, Cut:" << computeCut(input, result, false) << ", imbalance:" << computeImbalance(result, settings.numBlocks) << std::endl;
+        	std::cout << "K-Means, Cut:" << computeCut(input, result, false) << ", imbalance:" << computeImbalance(result, settings.numBlocks) << std::endl;
         	assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
         	assert(result.min().Scalar::getValue<IndexType>() == 0);
 
