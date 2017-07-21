@@ -44,7 +44,8 @@ namespace ITI {
             for(int i=0; i<top.size(); i++){
                 std::cout<< top[i] << ", ";
             }
-            std::cout<< std::endl;
+            
+            std::cout<< "          weight: "<< weight << std::endl;
         }
         
         /** Checks if this rectangle resides entirely in the given rectangle:
@@ -317,6 +318,10 @@ namespace ITI {
         
         IndexType getLeafID(){
             return leafID;
+        }
+        
+        ValueType getLeafWeight(){
+            return weight;
         }
 
     protected:

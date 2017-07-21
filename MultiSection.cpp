@@ -82,7 +82,7 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
     }
     
     // scale= N^(1/d): this way the scaled max is N^(1/d) and this is also the maximum size of the projection arrays
-    ValueType scale = std::pow( globalN /*WARNING*/ -1 , 1.0/dim);
+    ValueType scale = 2*dim*std::pow( globalN /*WARNING*/ -1 , 1.0/dim);
 PRINT0( scale );
     {
         SCAI_REGION( "MultiSection.getPartitionNonUniform.minMaxAndScale" )
@@ -144,7 +144,7 @@ PRINT0( scale );
     }
     
     for (IndexType d=0; d<dim; d++) {
-        SCAI_ASSERT( scaledMax[d]<= std::pow(globalN, 1.0/dim)+1, "Scaled maximum value "<< scaledMax[d] << " is too large. should be less than " << std::pow(globalN, 1.0/dim) );
+        SCAI_ASSERT( scaledMax[d]<= scale   , "Scaled maximum value "<< scaledMax[d] << " is too large. should be less than " << scale );
         if( scaledMin[d]!=0 ){
             //TODO: it works even if scaledMin is not 0 but the projection arrays will start from 0 and the first 
             //      elements will just always be 0.
@@ -546,7 +546,11 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     ValueType averageWeight = totalWeight/k;
 
     bBox.weight = totalWeight;
-
+if( comm->getRank()==0 ){
+    PRINT("");    
+    bBox.print();    
+}
+    
     // create the root of the tree that contains the whole grid
     std::shared_ptr<rectCell<IndexType,ValueType>> root( new rectCell<IndexType,ValueType>(bBox) );
     
@@ -563,10 +567,6 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         //std::vector<ValueType> minDifference ( numLeaves, LONG_MAX );        
 
         std::vector<IndexType> chosenDim ( numLeaves, -1);
-        
-        /* 
-         * WARNING: projections[i], chosenDim[i] and numLeaves[i] should all refer to the same leaf/rectangle i
-         */
 
         // a vector with pointers to all the neave nodes of the tree
         std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> allLeaves = root->getAllLeaves();        
@@ -610,11 +610,15 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             //perform 1D partitioning for the chosen dimension
             std::vector<IndexType> part1D;
             std::vector<ValueType> weightPerPart, thisProjection = projections[l];
-            IndexType thisChosenDim = chosenDim[l];
+            IndexType thisChosenDim = chosenDim[l];            
 
-            //partiD.size() = *thisDimCuts , weightPerPart.size = *thisDimCuts 
+//for(int rr=0; rr<thisProjection.size(); rr++)  PRINT0( rr << ": " << thisProjection[rr] );
+
+            //part1D.size() = *thisDimCuts , weightPerPart.size = *thisDimCuts 
             std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( thisProjection, *thisDimCuts, settings);
             
+//for(int k=0; k<part1D.size(); k++)    PRINT0("dim= " << thisChosenDim << " , thisDimCuts= " << *thisDimCuts << " :: " << part1D[k] );
+
             SCAI_ASSERT( part1D.size()== *thisDimCuts , "Wrong size of 1D partition")
             SCAI_ASSERT( weightPerPart.size()== *thisDimCuts , "Wrong size of 1D partition")
             
@@ -625,6 +629,9 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             
             //TODO: make sure that projections[l] and allLeaves[l] refer to the same rectangle
             struct rectangle thisRectangle = allLeaves[l]->getRect();
+            ValueType thisRectWeight = thisRectangle.weight;
+            ValueType optWeight = thisRectWeight/(*thisDimCuts);
+            ValueType maxWeight = 0;
             
             // create the new rectangles and add them to the queue
 ValueType dbg_rectW=0;
@@ -638,6 +645,10 @@ ValueType dbg_rectW=0;
                 newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h+1]-1;
                 newRect.weight = weightPerPart[h];
                 root->insert( newRect );
+                if(newRect.weight>maxWeight){
+                    maxWeight = newRect.weight;
+                }
+if( comm->getRank()==0 ) newRect.print();
 dbg_rectW += newRect.weight;                
             }
             
@@ -646,8 +657,13 @@ dbg_rectW += newRect.weight;
             newRect.top = thisRectangle.top;
             newRect.weight = weightPerPart.back();
             root->insert( newRect );
+            if(newRect.weight>maxWeight){
+                maxWeight = newRect.weight;
+            }
+if( comm->getRank()==0 )  newRect.print();            
 dbg_rectW += newRect.weight;    
-        
+            
+PRINT0("this rect imbalance= " << (maxWeight-optWeight)/optWeight << "  (opt= " << optWeight << " , max= "<< maxWeight << ")" );
 
 //TODO: only for debuging, remove variable dbg_rectW
 SCAI_ASSERT( dbg_rectW==thisRectangle.weight, "Rectangle weights not correct. dbg_rectW= " << dbg_rectW << " , this.weight= "<< thisRectangle.weight);
