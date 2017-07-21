@@ -285,7 +285,8 @@ int main(int argc, char** argv) {
 
     
     if(comm->getRank()==0){
-        std::cout<< std::endl << "ParMetisKway cut= "<< cutKway <<" and imbalance= " << imbalanceKway<<", time for partition: "<< partKwayTime << std::endl;
+    	std::cout << std::endl << "Graph " << graphFile << " with " << N << " nodes, target imbalance " << settings.epsilon;
+        std::cout << std::endl << "ParMetisGeomKway cut= "<< cutKway <<", imbalance= " << imbalanceKway<<", time for partition: "<< partKwayTime << std::endl;
         //td::cout<< std::endl << "ParMetisGeom cut= "<< cutGeom <<" and imbalance= " << imbalanceGeom<<", time for partition: "<< partGeomTime << std::endl;
 
     }
