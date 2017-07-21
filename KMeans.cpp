@@ -202,10 +202,29 @@ DenseVector<IndexType> assignBlocks(
 		if (comm->getRank() == 0) std::cout << "Iter " << iter << ", imbalance : " << imbalance << std::endl;
 	} while (imbalance > epsilon && iter < maxIter);
 
-
 	return assignment;
 }
 
+template<typename ValueType>
+ValueType biggestDelta(const std::vector<std::vector<ValueType>> &firstCoords, const std::vector<std::vector<ValueType>> &secondCoords) {
+	assert(firstCoords.size() == secondCoords.size());
+	const int dim = firstCoords.size();
+	assert(dim > 0);
+	const int n = firstCoords[0].size();
+
+	ValueType result = 0;
+	for (int i = 0; i < n; i++) {
+		ValueType squaredDistance = 0;
+		for (int d = 0; d < dim; d++) {
+			ValueType diff = (firstCoords[d][i] - secondCoords[d][i]);
+			squaredDistance +=  diff*diff;
+		}
+		result = std::max(squaredDistance, result);
+	}
+	return std::sqrt(result);
+}
+
+template double biggestDelta(const std::vector<std::vector<double>> &firstCoords, const std::vector<std::vector<double>> &secondCoords);
 template std::vector<std::vector<double> > findInitialCenters(const std::vector<DenseVector<double>> &coordinates, int k, const DenseVector<int> &nodeWeights);
 template std::vector<std::vector<double> > findCenters(const std::vector<DenseVector<double>> &coordinates, const DenseVector<int> &partition, const int k, const DenseVector<int> &nodeWeights);
 template DenseVector<int> assignBlocks(const std::vector<DenseVector<double>> &coordinates, const std::vector<std::vector<double> > &centers, const DenseVector<int> &nodeWeights, const std::vector<int> &blockSizes,  const double epsilon, std::vector<double> &influence);
