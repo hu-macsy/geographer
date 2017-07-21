@@ -1,7 +1,5 @@
 #pragma once
 
-enum class InitialPartitioningMethods {SFC = 0, Pixel = 1, Spectral = 2, Multisection = 3};
-
 struct Settings{
     IndexType dimensions= 3;
     IndexType numX = 32;
@@ -18,9 +16,10 @@ struct Settings{
     IndexType coarseningStepsBetweenRefinement = 3;
     IndexType pixeledSideLen = 10;
     IndexType fileFormat = 0;   // 0 for METSI, 1 for MatrixMarket
-    InitialPartitioningMethods initialPartition = InitialPartitioningMethods::SFC;
+    IndexType initialPartition = 0;
     bool useDiffusionTieBreaking = false;
     bool useGeometricTieBreaking = false;
+    bool useDiffusionCoordinates = false;
     bool gainOverBalance = false;
     bool skipNoGainColors = false;
     bool writeDebugCoordinates = false;
@@ -44,20 +43,29 @@ struct Settings{
         out<< "skipNoGainColors: "<< skipNoGainColors << std::endl;
         out<< "pixeledSideLen: "<< pixeledSideLen << std::endl;
         out<< "fileFormat: "<< fileFormat << std::endl;
-        if (initialPartition==InitialPartitioningMethods::SFC) {
-            out<< "initial partition: hilbert curve" << std::endl;
-        } else if (initialPartition==InitialPartitioningMethods::Pixel) {
-            out<< "initial partition: pixels" << std::endl;
-        } else if (initialPartition==InitialPartitioningMethods::Spectral) {
-            out<< "initial partition: spectral" << std::endl;
-        } else if (initialPartition==InitialPartitioningMethods::Multisection) {
-            if (!bisect){
-                out<< "initial partition: multisection" << std::endl;
-            }else{
-                out<< "initial partition: bisection" << std::endl;
+        switch( initialPartition){
+            case 0: {
+                out<< "initial partition: hilbert curve" << std::endl;  break;
+            } 
+            case 1:{
+                out<< "initial partition: pixels" << std::endl;     break;
             }
-        } else {
-            out<< "initial partition undefined" << std::endl;
+            case 2:{
+                out<< "initial partition: spectral" << std::endl;   break;
+            }
+            case 3:{
+                out<< "initial partition: k-means" << std::endl;   break;
+            }
+            case 4:{
+                if (!bisect){
+                    out<< "initial partition: multisection" << std::endl;
+                }else{
+                    out<< "initial partition: bisection" << std::endl;
+                }
+            }
+            default:{
+                out<< "initial partition undefined" << std::endl;   break;
+            }
         }
     }
 };

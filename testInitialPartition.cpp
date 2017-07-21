@@ -46,40 +46,44 @@ typedef int IndexType;
  */
 
 //----------------------------------------------------------------------------
-
-std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
+/*
+std::istream& operator>>(std::istream& in, IndexType& method)
 {
     std::string token;
     in >> token;
     if (token == "SFC" or token == "0")
-        method = InitialPartitioningMethods::SFC;
+        method = 0;
     else if (token == "Pixel" or token == "1")
-        method = InitialPartitioningMethods::Pixel;
+        method = 1;
     else if (token == "Spectral" or token == "2")
-    	method = InitialPartitioningMethods::Spectral;
-    else if (token == "Multisection" or token == "3")
-    	method = InitialPartitioningMethods::Multisection;
+    	method = 2;
+    else if (token == "KMeans" or token == "3")
+    	method = 3;
+    else if (token == "Multisection" or token == "4")
+    	method = 4;
     else
         in.setstate(std::ios_base::failbit);
     return in;
 }
 
-std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods& method)
+std::ostream& operator<<(std::ostream& out, IndexType& method)
 {
     std::string token;
 
-    if (method == InitialPartitioningMethods::SFC)
+    if (method == 0)
         token = "SFC";
-    else if (method == InitialPartitioningMethods::Pixel)
+    else if (method == 1)
     	token = "Pixel";
-    else if (method == InitialPartitioningMethods::Spectral)
+    else if (method == 2)
     	token = "Spectral";
-    else if (method == InitialPartitioningMethods::Multisection)
+    else if (method == 3)
+    	token = "KMeans";
+    else if (method == 4)
     	token = "Multisection";
     out << token;
     return out;
 }
-
+*/
 
 int main(int argc, char** argv) {
 	using namespace boost::program_options;
@@ -102,7 +106,7 @@ int main(int argc, char** argv) {
                                 ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
 				("minBorderNodes", value<int>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
-                                ("initialPartition",  value<InitialPartitioningMethods> (&settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition")
+                                ("initialPartition",  value<int> (&settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition")
                                 ("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
                                 ("pixeledSideLen", value<int>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
@@ -150,7 +154,7 @@ int main(int argc, char** argv) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-    InitialPartitioningMethods initialPartition = settings.initialPartition;
+    IndexType initialPartition = settings.initialPartition;
     
     /* timing information
      */
@@ -183,40 +187,25 @@ int main(int argc, char** argv) {
             throw std::runtime_error("File "+ graphFile + " failed.");
         }
         
-        f >> N >> edges;			// first line must have total number of nodes and edges
+        if (comm->getRank() == 0)
+        {
+            std::cout<< "Reading from file \""<< graphFile << "\" for the graph and \"" << coordFile << "\" for coordinates"<< std::endl;
+        }
+
+        // read the adjacency matrix and the coordinates from a file        
+        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+        N = graph.getNumRows();
+        scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
+        scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
+        assert(graph.getColDistribution().isEqual(*noDistPtr));
         
         // for 2D we do not know the size of every dimension
         settings.numX = N;
         settings.numY = 1;
         settings.numZ = 1;
         
-        if (comm->getRank() == 0)
-        {
-            std::cout<< "Reading from file \""<< graphFile << "\" for the graph and \"" << coordFile << "\" for coordinates"<< std::endl;
-        }
-
-        // read the adjacency matrix and the coordinates from a file
-        ITI::FileIO<IndexType,ValueType>::FileFormat ff;
-        switch(  settings.fileFormat ){
-            case 0:{
-                ff = ITI::FileIO<IndexType,ValueType>::FileFormat::METIS;
-                break;
-            }
-            case 1:{
-                ff = ITI::FileIO<IndexType,ValueType>::FileFormat::MATRIXMARKET;
-                break;
-            }
-            default:{
-                throw std::runtime_error("Not supported file format");
-            }
-        }
-        
-        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile ,ff );
-        scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
-        scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
-        assert(graph.getColDistribution().isEqual(*noDistPtr));
-        
-        coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, ff );
+        ITI::Format format = vm["coordFormat"].as<ITI::Format>();
+        coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format );
         
         //unit weights
         scai::hmemo::HArray<ValueType> localWeights( rowDistPtr->getLocalSize(), 1 );
@@ -234,7 +223,7 @@ int main(int argc, char** argv) {
             std::cout<< "input: weakScaling" << std::endl;
         }
         //TODO: the scai::lama::MatrixCreator::fillRandom is too expensive but the graph is not needed in multisection
-        if( initialPartition!=InitialPartitioningMethods::Multisection){
+        if( initialPartition!=3 ){
             std::cout << "Weak scaling works only for multisection (for now)" << std::endl;
             std::terminate();
         }
@@ -393,7 +382,7 @@ int main(int argc, char** argv) {
     comm->synchronize();
     
     switch( initialPartition ){
-        case InitialPartitioningMethods::SFC:{  //------------------------------------------- hilbert/sfc
+        case 0:{  //------------------------------------------- hilbert/sfc
            
             beforeInitialTime =  std::chrono::system_clock::now();
             PRINT0( "Get a hilbert/sfc partition");
@@ -427,7 +416,7 @@ int main(int argc, char** argv) {
             comm->synchronize();
             break;
         }
-        case InitialPartitioningMethods::Pixel:{  //------------------------------------------- pixeled
+        case 1:{  //------------------------------------------- pixeled
   
             beforeInitialTime =  std::chrono::system_clock::now();
             PRINT0( "Get a pixeled partition");
@@ -456,7 +445,9 @@ int main(int argc, char** argv) {
             }
             break;
         }
-        case InitialPartitioningMethods::Multisection:{  //------------------------------------------- multisection
+        case 3:{  //------------------------------------------- k-means
+        }
+        case 4:{  //------------------------------------------- multisection
             
             beforeInitialTime =  std::chrono::system_clock::now();
             if (!settings.bisect){

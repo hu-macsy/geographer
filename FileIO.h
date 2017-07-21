@@ -24,12 +24,8 @@ using scai::lama::DenseVector;
 #define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
 namespace ITI {
-        
-template <typename IndexType, typename ValueType>
-class FileIO {
-
-public:
-        /** METIS format: for graphs: first line are the nodes, N, and edges, E, of the graph
+    
+       /** METIS format: for graphs: first line are the nodes, N, and edges, E, of the graph
          *                            the next N lines contain the neighbours for every node. 
          *                            So if line 100 is "120 1234 8 2133" means that node 100
          *                            has edges to nodes 120, 1234, 8 and 2133.
@@ -41,11 +37,16 @@ public:
          *                            the dimension d. Then next N*d lines contain the coordinates
          *                            for the poitns: every d lines are the coordinates for a point.
         */
-        enum class FileFormat{ METIS = 0 , MATRIXMARKET = 1};
+	enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4};
+    
+template <typename IndexType, typename ValueType>
+class FileIO {
 
+public:
 	/** Given an adjacency matrix and a filename writes the matrix in the file using the METIS format.
+	 *  Not distributed.
 	 *
-	 * @param[in] adjM The graph's adjacency matrix. 
+	 * @param[in] adjM The graph's adjacency matrix.
 	 * @param[in] filename The file's name to write to
 	 */
 	static void writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
@@ -62,11 +63,12 @@ public:
 	*/
 	static void writeCoords (const std::vector<DenseVector<ValueType>> &coords, const std::string filename);
 
-        static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
+    static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
 
-        /** Writes a partition to file.
-	 * @param[in] part The partition to br written.
-	 * @param[in] filename The file's name to write to.
+    /**
+	 * Writes a partition to file.
+	 * @param[in] part
+	 * @param[in] filename The file's name to write to
 	 */
 	static void writePartition(const DenseVector<IndexType> &part, const std::string filename);
         
@@ -75,11 +77,17 @@ public:
          * @param[in] fileFormat The type of file to read from. 
 	 * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
 	 */
-	static CSRSparseMatrix<ValueType> readGraph(const std::string filename , const FileFormat fileFormat=FileFormat::METIS);
+	static CSRSparseMatrix<ValueType> readGraph(const std::string filename, Format = Format::METIS);
 
-	/** Reads the 2D coordinates from file "filename" and returns then in a DenseVector where the coordinates of point i are in [i*2][i*2+1].
+	/* Reads the 2D coordinates from file "filename" and returns then in a DenseVector where the coordinates
+	 * of point i are in [i*2][i*2+1].
 	 */
-	static std::vector<DenseVector<ValueType>> readCoords ( const std::string filename, const IndexType numberOfCoords, const IndexType dimension, const FileFormat fileFormat=FileFormat::METIS);
+	static std::vector<DenseVector<ValueType>> readCoords ( std::string filename, IndexType numberOfCoords, IndexType dimension, Format = Format::METIS);
+
+	/*
+	 *
+	 */
+	static std::vector<DenseVector<ValueType>> readCoordsOcean ( std::string filename, IndexType dimension);
 
 	/**
 	 * Reads a partition from file.

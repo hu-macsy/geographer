@@ -29,12 +29,13 @@
 #include "HilbertCurve.h"
 #include "MultiLevel.h"
 #include "SpectralPartition.h"
+#include "KMeans.h"
 #include "AuxiliaryFunctions.h"
 #include "MultiSection.h"
 
 #include "schizoQuicksort/src/sort/SchizoQS.hpp"
 
-//#include "quadtree/QuadTreeCartesianEuclid.h"
+using scai::lama::Scalar;
 
 namespace ITI {
 
@@ -94,17 +95,40 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		comm->synchronize();
 	}
 	
-	SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition")
-	// get an initial partition
-	DenseVector<IndexType> result;
+        SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition")
+        // get an initial partition
+        DenseVector<IndexType> result;
+	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(inputDist, 1);
 
-	if (settings.initialPartition==InitialPartitioningMethods::SFC) { //sfc
-		result= ParcoRepart<IndexType, ValueType>::hilbertPartition(input, coordinates, settings);
-	} else if (settings.initialPartition==InitialPartitioningMethods::Pixel) { // pixel
-		result = ParcoRepart<IndexType, ValueType>::pixelPartition(input, coordinates, settings);
-	} else if (settings.initialPartition == InitialPartitioningMethods::Spectral) {// spectral
-		result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
-	} else if (settings.initialPartition == InitialPartitioningMethods::Multisection) {// multisection
+        
+        if( settings.initialPartition==0 ){ //sfc
+            result= ParcoRepart<IndexType, ValueType>::hilbertPartition(input, coordinates, settings);
+        } else if ( settings.initialPartition==1 ){ // pixel
+            result = ParcoRepart<IndexType, ValueType>::pixelPartition(input, coordinates, settings);
+        } else if ( settings.initialPartition == 2) {// spectral
+            result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
+        } else if (settings.initialPartition == 3) {// k-means
+        	std::vector<std::vector<ValueType> > centers = ITI::KMeans::findInitialCenters(coordinates, settings.numBlocks, uniformWeights);
+        	const std::vector<IndexType> blockSizes(settings.numBlocks, n/settings.numBlocks);
+        	std::vector<ValueType> influence(settings.numBlocks,1);
+        	for (IndexType i = 0; i < 20; i++) {
+        		result = ITI::KMeans::assignBlocks(coordinates, centers, uniformWeights, blockSizes, settings.epsilon, influence);
+        		centers = ITI::KMeans::findCenters(coordinates, result, settings.numBlocks, uniformWeights);
+        	}
+
+        	std::cout << "K-Means, Cut:" << computeCut(input, result, false) << ", imbalance:" << computeImbalance(result, settings.numBlocks) << std::endl;
+        	assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
+        	assert(result.min().Scalar::getValue<IndexType>() == 0);
+
+            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
+            assert(newDist->getGlobalSize() == n);
+
+            result.redistribute(newDist);
+            input.redistribute(newDist, noDist);
+            for (IndexType d = 0; d < dimensions; d++) {
+            	coordinates[d].redistribute(newDist);
+            }
+        } else if (settings.initialPartition == 4) {// multisection
 		scai::lama::DenseVector<ValueType> nodeWeights( inputDist, 1 );
 		result = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, nodeWeights, settings);
 		scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
@@ -113,20 +137,17 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		for (DenseVector<ValueType>& dimCoords : coordinates) {
 			dimCoords.redistribute(newDist);
 		}
-	} else {
-		throw std::runtime_error("Initial Partitioning mode undefined.");
 	}
-	SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
+	else {
+        	throw std::runtime_error("No method implemented for " + std::to_string(settings.initialPartition));
+        }
+        SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
         
 	IndexType numRefinementRounds = 0;
 
         SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
 	if (comm->getSize() == 1 || comm->getSize() == k) {
-		ValueType gain = settings.minGainForNextRound;
-		ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
-
-		DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(result.getDistributionPtr(), 1);
-
+		uniformWeights = DenseVector<IndexType>(result.getDistributionPtr(), 1);
 		ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, uniformWeights, coordinates, settings);
 
 	} else {
@@ -304,16 +325,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
             if (comm->getRank() == 0) std::cout << "Redistributed coordinates" << std::endl;
         }
     }
-    /*
-    ValueType cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
-    ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(result, k);
-    if (comm->getRank() == 0) {
-        afterSFC = std::chrono::steady_clock::now();
-        std::chrono::duration<double> elapsedSeconds = afterSFC-start;
-        std::cout << "\033[1;31mWith SFC (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
-        std::cout<< "and imbalance= "<< imbalance << "\033[0m" << std::endl;
-    }
-    */
+
     return result;
 }
 //--------------------------------------------------------------------------------------- 
@@ -829,11 +841,11 @@ ValueType ParcoRepart<IndexType, ValueType>::computeImbalance(const DenseVector<
 	const IndexType maxK = part.max().Scalar::getValue<IndexType>();
 
 	if (minK < 0) {
-		throw std::runtime_error("Block id " + std::to_string(minK) + " found in partition with supposedly" + std::to_string(k) + " blocks.");
+		throw std::runtime_error("Block id " + std::to_string(minK) + " found in partition with supposedly " + std::to_string(k) + " blocks.");
 	}
 
 	if (maxK >= k) {
-		throw std::runtime_error("Block id " + std::to_string(maxK) + " found in partition with supposedly" + std::to_string(k) + " blocks.");
+		throw std::runtime_error("Block id " + std::to_string(maxK) + " found in partition with supposedly " + std::to_string(k) + " blocks.");
 	}
 
 	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());

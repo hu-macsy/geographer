@@ -48,8 +48,10 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 
 		//project coordinates and partition
 		std::vector<DenseVector<ValueType> > coarseCoords(settings.dimensions);
-		for (IndexType i = 0; i < settings.dimensions; i++) {
-			coarseCoords[i] = projectToCoarse(coordinates[i], fineToCoarseMap);
+		if (settings.useGeometricTieBreaking) {
+			for (IndexType i = 0; i < settings.dimensions; i++) {
+				coarseCoords[i] = projectToCoarse(coordinates[i], fineToCoarseMap);
+			}
 		}
 
 		DenseVector<IndexType> coarsePart = DenseVector<IndexType>(coarseGraph.getRowDistributionPtr(), comm->getRank());
@@ -483,9 +485,9 @@ DenseVector<ValueType> MultiLevel<IndexType, ValueType>::projectToCoarse(const D
         
 	scai::dmemo::DistributionPtr fineDist = fineToCoarse.getDistributionPtr();
 	const IndexType fineLocalN = fineDist->getLocalSize();
+	assert(inputDist->getLocalSize() == fineLocalN);
 	scai::dmemo::DistributionPtr coarseDist = projectToCoarse(fineToCoarse);
 	IndexType coarseLocalN = coarseDist->getLocalSize();
-	assert(inputDist->getLocalSize() == fineLocalN);
 
 	//add values in preparation for interpolation
 	std::vector<ValueType> sum(coarseLocalN, 0);

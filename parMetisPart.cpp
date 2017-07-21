@@ -10,6 +10,8 @@
 #include <chrono>
 #include <numeric>
 
+#include <boost/program_options.hpp>
+
 #include <scai/dmemo/BlockDistribution.hpp>
 
 #include "FileIO.h"
@@ -21,27 +23,103 @@
 typedef double ValueType;
 typedef int IndexType;
 
+namespace ITI {
+std::istream& operator>>(std::istream& in, Format& format)
+{
+	std::string token;
+	in >> token;
+	if (token == "AUTO" or token == "0")
+		format = ITI::Format::AUTO ;
+	else if (token == "METIS" or token == "1")
+		format = ITI::Format::METIS;
+	else if (token == "ADCIRC" or token == "2")
+		format = ITI::Format::ADCIRC;
+	else if (token == "OCEAN" or token == "3")
+		format = ITI::Format::OCEAN;
+	else
+		in.setstate(std::ios_base::failbit);
+	return in;
+}
+
+std::ostream& operator<<(std::ostream& out, Format& method)
+{
+	std::string token;
+
+	if (method == ITI::Format::AUTO)
+		token = "AUTO";
+	else if (method == ITI::Format::METIS)
+		token = "METIS";
+	else if (method == ITI::Format::ADCIRC)
+		token = "ADCIRC";
+	else if (method == ITI::Format::OCEAN)
+		token = "OCEAN";
+	out << token;
+	return out;
+}
+}
 
 int main(int argc, char** argv) {
-    
-    std::string file = std::string(argv[1]);
-    std::ifstream f(file);
-    IndexType dimensions= 2;
-    if(f.fail()) 
-        throw std::runtime_error("File "+ file+ " failed.");
-    IndexType N, edges;
-    f >> N >> edges; 
+
+	using namespace boost::program_options;
+	options_description desc("Supported options");
+
+	struct Settings settings;
+
+	desc.add_options()
+		("help", "display options")
+		("version", "show version")
+		("graphFile", value<std::string>(), "read graph from file")
+		("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
+		("coordFormat", value<ITI::Format>(), "format of coordinate file")
+		("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
+		("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
+		;
+
+	variables_map vm;
+	store(command_line_parser(argc, argv).
+			  options(desc).run(), vm);
+	notify(vm);
+
+	if (vm.count("help")) {
+		std::cout << desc << "\n";
+		return 0;
+	}
+
+	if (vm.count("version")) {
+		std::cout << "Git commit " << version << std::endl;
+		return 0;
+	}
+
+	if (!vm.count("graphFile")) {
+		std::cout << "Input file needed, specify with --graphFile" << std::endl; //TODO: change into positional argument
+	}
+
+	std::string graphFile = vm["graphFile"].as<std::string>();
+	std::string coordFile;
+	if (vm.count("coordFile")) {
+		coordFile = vm["coordFile"].as<std::string>();
+	} else {
+		coordFile = graphFile + ".xyz";
+	}
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-    CSRSparseMatrix<ValueType> graph = ITI::FileIO<IndexType, ValueType>::readGraph( file );
+    CSRSparseMatrix<ValueType> graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+    const IndexType N = graph.getNumRows();
     
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
     
     SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
-    SCAI_ASSERT_EQUAL( edges, (graph.getNumValues())/2 , "numEdges and numValues do not agree"); 
-    std::vector<DenseVector<ValueType>> coords = ITI::FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+
+    std::vector<DenseVector<ValueType>> coords;
+	if (vm.count("coordFormat")) {
+		ITI::Format format = vm["coordFormat"].as<ITI::Format>();
+		coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format);
+	} else {
+		coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
+	}
+
     SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size() , coords[1].getLocalValues().size(), "coordinates not of same size" );
     
     //get the vtx array
@@ -110,12 +188,16 @@ int main(int argc, char** argv) {
     idx_t numflag= 0;
     
     // ndims: the number of dimensions
-    idx_t ndims= 2;
+    idx_t ndims = settings.dimensions;
 
     // the xyz array for coordinates of size dim*localN contains the local coords
     // convert the vector<DenseVector> to idx_t*
     IndexType localN= dist->getLocalSize();
-    real_t xyzLocal[2*localN];
+    real_t xyzLocal[ndims*localN];
+
+    if (ndims != 2) {
+    	throw std::logic_error("Not yet implemented for dimensions != 2");
+    }
 
     // TODO: only for 2D now
     scai::utilskernel::LArray<ValueType>& localPartOfCoords0 = coords[0].getLocalValues();
@@ -147,7 +229,7 @@ int main(int argc, char** argv) {
 
     // ubvec: array of size ncon to specify imbalance for every vertex weigth.
     // 1 is perfect balance and nparts perfect imbalance. Here 1 for now
-    real_t ubvec= 1.05;
+    real_t ubvec= settings.epsilon + 1;
     
     // options: array of integers for passing arguments.
     // Here, options[0]=0 for the default values.
@@ -192,46 +274,15 @@ int main(int argc, char** argv) {
     ValueType imbalanceKway = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partitionKway, comm->getSize() );
     assert(sizeof(xyzLocal)/sizeof(real_t) == 2*sizeof(partKway)/sizeof(idx_t) );
   
-    // check correct trasformation to DenseVector
+    // check correct transformation to DenseVector
     for(int i=0; i<localN; i++){
         //PRINT(*comm << ": "<< part[i] << " _ "<< partition.getLocalValues()[i] );
         assert( partKway[i]== partitionKway.getLocalValues()[i]);
     }
     std::chrono::duration<double> partitionKwayTime =  std::chrono::system_clock::now() - beforePartTime;
 
-	//
-	// only using coordinates
-	//
-    // this is very fast but the cuts are very bad, so after k=60 (or 90) it gives way worst cuts than the Hilbert curve 
-
-   /*
-    std::chrono::time_point<std::chrono::system_clock> beforePartTime2 =  std::chrono::system_clock::now();
-
-    idx_t partGeom[localN];
-
-    metisRet = ParMETIS_V3_PartGeom(vtxDist, &ndims, xyzLocal, partGeom, &metisComm);
-
-    DenseVector<IndexType> partitionGeom(dist);
-    for(unsigned int i=0; i<localN; i++){
-        //localWrite[i]= part[i];
-        partitionGeom.getLocalValues()[i] = partGeom[i];
-    }   
-    ValueType cutGeom = ITI::ParcoRepart<IndexType, ValueType>::computeCut(graph, partitionGeom, true); 
-    ValueType imbalanceGeom = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partitionGeom, comm->getSize() );
-    assert(sizeof(xyzLocal)/sizeof(real_t) == 2*sizeof(partGeom)/sizeof(idx_t) );
- 
-    std::chrono::duration<double> partitionGeomTime =  std::chrono::system_clock::now() - beforePartTime2;
-     
-    // check correct trasformation to DenseVector
-    for(int i=0; i<localN; i++){
-        //PRINT(*comm << ": "<< part[i] << " _ "<< partition.getLocalValues()[i] );
-        assert( partGeom[i]== partitionGeom.getLocalValues()[i]);
-    }
-    */
-    
-
     double partKwayTime= comm->max(partitionKwayTime.count() );
-    //double partGeomTime= comm->max(partitionGeomTime.count() );
+
     
     if(comm->getRank()==0){
         std::cout<< std::endl << "ParMetisKway cut= "<< cutKway <<" and imbalance= " << imbalanceKway<<", time for partition: "<< partKwayTime << std::endl;

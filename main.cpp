@@ -19,10 +19,12 @@
 #include <cstdlib>
 #include <chrono>
 
+#include "Diffusion.h"
 #include "MeshGenerator.h"
 #include "FileIO.h"
 #include "ParcoRepart.h"
 #include "Settings.h"
+#include "SpectralPartition.h"
 
 typedef double ValueType;
 typedef int IndexType;
@@ -40,38 +42,40 @@ typedef int IndexType;
  */
 
 //----------------------------------------------------------------------------
+//enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3};
+namespace ITI {
+	std::istream& operator>>(std::istream& in, Format& format)
+	{
+		std::string token;
+		in >> token;
+		if (token == "AUTO" or token == "0")
+			format = ITI::Format::AUTO ;
+		else if (token == "METIS" or token == "1")
+			format = ITI::Format::METIS;
+		else if (token == "ADCIRC" or token == "2")
+			format = ITI::Format::ADCIRC;
+		else if (token == "OCEAN" or token == "3")
+			format = ITI::Format::OCEAN;
+		else
+			in.setstate(std::ios_base::failbit);
+		return in;
+	}
 
-std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
-{
-    std::string token;
-    in >> token;
-    if (token == "SFC" or token == "0")
-        method = InitialPartitioningMethods::SFC;
-    else if (token == "Pixel" or token == "1")
-        method = InitialPartitioningMethods::Pixel;
-    else if (token == "Spectral" or token == "2")
-    	method = InitialPartitioningMethods::Spectral;
-    else if (token == "Multisection" or token == "3")
-    	method = InitialPartitioningMethods::Multisection;
-    else
-        in.setstate(std::ios_base::failbit);
-    return in;
-}
+	std::ostream& operator<<(std::ostream& out, Format& method)
+	{
+		std::string token;
 
-std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods& method)
-{
-    std::string token;
-
-    if (method == InitialPartitioningMethods::SFC)
-        token = "SFC";
-    else if (method == InitialPartitioningMethods::Pixel)
-    	token = "Pixel";
-    else if (method == InitialPartitioningMethods::Spectral)
-    	token = "Spectral";
-    else if (method == InitialPartitioningMethods::Multisection)
-    	token = "Multisection";
-    out << token;
-    return out;
+		if (method == ITI::Format::AUTO)
+			token = "AUTO";
+		else if (method == ITI::Format::METIS)
+			token = "METIS";
+		else if (method == ITI::Format::ADCIRC)
+			token = "ADCIRC";
+		else if (method == ITI::Format::OCEAN)
+			token = "OCEAN";
+		out << token;
+		return out;
+	}
 }
 
 int main(int argc, char** argv) {
@@ -86,6 +90,7 @@ int main(int argc, char** argv) {
 				("graphFile", value<std::string>(), "read graph from file")
 				("quadTreeFile", value<std::string>(), "read QuadTree from file")
 				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
+				("coordFormat", value<ITI::Format>(), "format of coordinate file")
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 				("numX", value<int>(&settings.numX)->default_value(settings.numX), "Number of points in x dimension of generated graph")
@@ -95,12 +100,13 @@ int main(int argc, char** argv) {
 				("minBorderNodes", value<int>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
                                 ("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
-				("initialPartition", value<InitialPartitioningMethods>(&settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition")
+				("initialPartition", value<int>(&settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition")
 				("pixeledSideLen", value<int>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
 				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
 				("useDiffusionTieBreaking", value<bool>(&settings.useDiffusionTieBreaking)->default_value(settings.useDiffusionTieBreaking), "Tuning Parameter: Use diffusion to break ties in Fiduccia-Mattheyes algorithm")
 				("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
+				("useDiffusionCoordinates", value<bool>(&settings.useDiffusionCoordinates)->default_value(settings.useDiffusionCoordinates), "Use coordinates based from diffusive systems instead of loading from file")
 				("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 				("multiLevelRounds", value<int>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
@@ -123,12 +129,17 @@ int main(int argc, char** argv) {
 
 	if (vm.count("generate") + vm.count("graphFile") + vm.count("quadTreeFile") != 1) {
 		std::cout << "Pick one of --graphFile, --quadTreeFile or --generate" << std::endl;
-		return 0;
+		return 126;
 	}
 
 	if (vm.count("generate") && (vm["dimensions"].as<int>() != 3)) {
 		std::cout << "Mesh generation currently only supported for three dimensions" << std::endl;
-		return 0;
+		return 126;
+	}
+
+	if (vm.count("coordFile") && vm.count("useDiffusionCoords")) {
+		std::cout << "Cannot both load coordinates from file with --coordFile or generate them with --useDiffusionCoords." << std::endl;
+		return 126;
 	}
 
     IndexType N = -1; 		// total number of points
@@ -164,34 +175,70 @@ int main(int argc, char** argv) {
     	std::string graphFile = vm["graphFile"].as<std::string>();
     	std::string coordFile;
     	if (vm.count("coordFile")) {
-    		coordFile = vm["coordFile"].as<std::string>();
+	   	coordFile = vm["coordFile"].as<std::string>();
+	} else {
+		coordFile = graphFile + ".xyz";
+	}
+
+    	std::string coordString;
+    	if (settings.useDiffusionCoordinates) {
+    		coordString = "and generating coordinates with diffusive distances.";
     	} else {
-    		coordFile = graphFile + ".xyz";
+    		coordString = "and \"" + coordFile + "\" for coordinates";
     	}
 
         if (comm->getRank() == 0)
         {
-            std::cout<< "Reading from file \""<< graphFile << "\" for the graph and \"" << coordFile << "\" for coordinates"<< std::endl;
+            std::cout<< "Reading from file \""<< graphFile << "\" for the graph " << coordString << std::endl;
         }
 
         // read the adjacency matrix and the coordinates from a file
-        ITI::FileIO<IndexType,ValueType>::FileFormat ff = ITI::FileIO<IndexType,ValueType>::FileFormat::METIS;
-        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile , ff );
+        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
         N = graph.getNumRows();
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
         assert(graph.getColDistribution().isEqual(*noDistPtr));
 
         // for 2D we do not know the size of every dimension
-		settings.numX = N;
-		settings.numY = 1;
-		settings.numZ = 1;
+        settings.numX = N;
+	settings.numY = 1;
+	settings.numZ = 1;
 
         if (comm->getRank() == 0) {
         	std::cout<< "Read " << N << " points." << std::endl;
         }
         
-        coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, ff );
+        if (settings.useDiffusionCoordinates) {
+        	scai::lama::CSRSparseMatrix<ValueType> L = ITI::Diffusion<IndexType, ValueType>::constructLaplacian(graph);
+        	scai::lama::DenseVector<IndexType> nodeWeights(L.getRowDistributionPtr(),1);
+
+        	std::vector<IndexType> nodeIndices(N);
+        	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
+
+        	//broadcast seed value from root to ensure equal pseudorandom numbers.
+        	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+        	comm->bcast( seed, 1, 0 );
+        	srand(seed[0]);
+
+        	ITI::Diffusion<IndexType, ValueType>::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), settings.dimensions);
+
+        	coordinates.resize(settings.dimensions);
+
+			for (IndexType i = 0; i < settings.dimensions; i++) {
+				coordinates[i] = ITI::Diffusion<IndexType, ValueType>::potentialsFromSource(L, nodeWeights, nodeIndices[i]);
+			}
+
+        } else {
+        	ITI::Format format;
+        	if (vm.count("coordFormat")) {
+        		format = vm["coordFormat"].as<ITI::Format>();
+        		coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format);
+        	} else {
+        		coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
+        	}
+
+        }
 
         if (comm->getRank() == 0) {
         	std::cout << "Read coordinates." << std::endl;
@@ -257,7 +304,7 @@ int main(int argc, char** argv) {
 
     } else{
     	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;
-    	return 0;
+    	return 126;
     }
     
     // time needed to get the input. Synchronize first to make sure that all processes are finished.
@@ -284,6 +331,7 @@ int main(int argc, char** argv) {
     
     // the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================
+    /*
     if (settings.writeDebugCoordinates) {
 		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
 			assert( coordinates[dim].size() == N);
@@ -291,7 +339,7 @@ int main(int argc, char** argv) {
 		}
 		ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, "debugResult");
     }
-    
+    */
     std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
     ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true); 

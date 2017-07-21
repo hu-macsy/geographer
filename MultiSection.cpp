@@ -546,10 +546,6 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     ValueType averageWeight = totalWeight/k;
 
     bBox.weight = totalWeight;
-if( comm->getRank()==0 ){
-    PRINT("");    
-    bBox.print();    
-}
     
     // create the root of the tree that contains the whole grid
     std::shared_ptr<rectCell<IndexType,ValueType>> root( new rectCell<IndexType,ValueType>(bBox) );
@@ -612,17 +608,11 @@ if( comm->getRank()==0 ){
             std::vector<ValueType> weightPerPart, thisProjection = projections[l];
             IndexType thisChosenDim = chosenDim[l];            
 
-//for(int rr=0; rr<thisProjection.size(); rr++)  PRINT0( rr << ": " << thisProjection[rr] );
-
             //part1D.size() = *thisDimCuts , weightPerPart.size = *thisDimCuts 
             std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( thisProjection, *thisDimCuts, settings);
-            
-//for(int k=0; k<part1D.size(); k++)    PRINT0("dim= " << thisChosenDim << " , thisDimCuts= " << *thisDimCuts << " :: " << part1D[k] );
 
             SCAI_ASSERT( part1D.size()== *thisDimCuts , "Wrong size of 1D partition")
             SCAI_ASSERT( weightPerPart.size()== *thisDimCuts , "Wrong size of 1D partition")
-            
-//for(int i=0; i<*thisDimCuts; i++)    PRINT0(i<< ": " << part1D[i] << " ++ " << weightPerPart[i] );
 
             // TODO: possibly expensive assertion
             SCAI_ASSERT( std::accumulate(thisProjection.begin(), thisProjection.end(), 0)==std::accumulate( weightPerPart.begin(), weightPerPart.end(), 0), "Weights are wrong, totalWeight of thisProjection= "  << std::accumulate(thisProjection.begin(), thisProjection.end(), 0) << " , total weight of weightPerPart= " << std::accumulate( weightPerPart.begin(), weightPerPart.end(), 0) );
@@ -648,7 +638,6 @@ ValueType dbg_rectW=0;
                 if(newRect.weight>maxWeight){
                     maxWeight = newRect.weight;
                 }
-if( comm->getRank()==0 ) newRect.print();
 dbg_rectW += newRect.weight;                
             }
             
@@ -659,11 +648,10 @@ dbg_rectW += newRect.weight;
             root->insert( newRect );
             if(newRect.weight>maxWeight){
                 maxWeight = newRect.weight;
-            }
-if( comm->getRank()==0 )  newRect.print();            
+            }        
 dbg_rectW += newRect.weight;    
             
-PRINT0("this rect imbalance= " << (maxWeight-optWeight)/optWeight << "  (opt= " << optWeight << " , max= "<< maxWeight << ")" );
+            PRINT0("this rect imbalance= " << (maxWeight-optWeight)/optWeight << "  (opt= " << optWeight << " , max= "<< maxWeight << ")" );
 
 //TODO: only for debuging, remove variable dbg_rectW
 SCAI_ASSERT( dbg_rectW==thisRectangle.weight, "Rectangle weights not correct. dbg_rectW= " << dbg_rectW << " , this.weight= "<< thisRectangle.weight);

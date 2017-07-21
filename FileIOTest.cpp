@@ -232,7 +232,17 @@ TEST_F(FileIOTest, testWriteCoordsDistributed){
     EXPECT_TRUE(coords2D[0].getDistributionPtr()->isEqual(*distPtr));
     
     FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords2D, nodes, "writeCoordsDist");
+    //TODO: delete files after they have been written!
 }
+
+TEST_F(FileIOTest, testReadCoordsOcean) {
+	std::string graphFile = "fesom_core2.graph";
+	std::string coordFile = "nod2d_core2.out";
+
+	std::vector<DenseVector<ValueType> > coords = FileIO<IndexType, ValueType>::readCoordsOcean(coordFile, 2);
+	EXPECT_EQ(126858, coords[0].size());
+}
+
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadQuadTree){
@@ -252,8 +262,7 @@ TEST_F(FileIOTest, testReadMatrixMarketFormat){
     std::string graphFile = path + "whitaker3.mtx";
     std::string coordFile = path + "whitaker3_coord.mtx";
     //std::string coordFile = "./meshes/my_MM_coords.mtx";
-    
-    
+        
     std::ifstream coordF( coordFile );
     
     // we do not need them for the MatrixMarket format
@@ -262,9 +271,10 @@ TEST_F(FileIOTest, testReadMatrixMarketFormat){
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     //scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, nodes) );
     
-    ITI::FileIO<IndexType,ValueType>::FileFormat ff = ITI::FileIO<IndexType,ValueType>::FileFormat::MATRIXMARKET;
+    ITI::Format ff = ITI::Format::MATRIXMARKET;
     
-    //std::tie( N, dimensions) = FileIO<IndexType, ValueType>::getMatrixMarketCoordsInfos( coordFile );
+    std::tie( N, dimensions) = FileIO<IndexType, ValueType>::getMatrixMarketCoordsInfos( coordFile );
+    PRINT0(" number of points= " << N << ", dimensions= " << dimensions);
     
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions, ff);
     
