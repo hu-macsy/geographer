@@ -79,7 +79,7 @@ int main(int argc, char** argv){
         ITI::FileIO<IndexType, ValueType>::writeGraph( graph, outFile);
         
         std::string outCoords = outFile + ".xyz";
-        ITI::FileIO<IndexType, ValueType>::writeCoords(coords, coords[0].size(), outCoords);
+        ITI::FileIO<IndexType, ValueType>::writeCoords(coords, outCoords);
         
         std::chrono::duration<double> genTime = std::chrono::system_clock::now() - startTime;
 

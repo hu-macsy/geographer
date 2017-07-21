@@ -20,15 +20,7 @@ namespace ITI {
 typedef uint64_t index; // more expressive name for an index into an array
 typedef uint64_t count; // more expressive name for an integer quantity
 
-//template<class T> class Point;
-//
-//template<class T>
-//std::ostream& operator <<(std::ostream& out, Point<T>& point);
-
-
-
 /**
- * @ingroup viz
  *
  *
  * Points in any dimension of templated type.
