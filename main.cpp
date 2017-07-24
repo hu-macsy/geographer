@@ -212,8 +212,8 @@ int main(int argc, char** argv) {
 
         // for 2D we do not know the size of every dimension
         settings.numX = N;
-	settings.numY = 1;
-	settings.numZ = 1;
+        settings.numY = 1;
+        settings.numZ = 1;
 
         if (comm->getRank() == 0) {
         	std::cout<< "Read " << N << " points." << std::endl;
