@@ -19,6 +19,8 @@
 #include <cstdlib>
 #include <chrono>
 
+#include <unistd.h>
+
 #include "Diffusion.h"
 #include "MeshGenerator.h"
 #include "FileIO.h"
@@ -142,6 +144,15 @@ int main(int argc, char** argv) {
 	}
 
     IndexType N = -1; 		// total number of points
+
+    char machineChar[255];
+    std::string machine;
+    gethostname(machineChar, 255);
+    if (machineChar) {
+    	machine = std::string(machineChar);
+    } else {
+    	std::cout << "machine char not valid" << std::endl;
+    }
 
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
@@ -351,13 +362,13 @@ int main(int argc, char** argv) {
     ValueType repT = ValueType (comm->max(reportTime.count()));
         
     if (comm->getRank() == 0) {
-        std::cout<< "commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
+        std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
         std::cout<< " nodes:"<< N<< " dimensions:"<< settings.dimensions <<" k:" << settings.numBlocks;
         std::cout<< " epsilon:" << settings.epsilon << " minBorderNodes:"<< settings.minBorderNodes;
         std::cout<< " minGainForNextRound:" << settings.minGainForNextRound;
         std::cout<< " stopAfterNoGainRounds:"<< settings.stopAfterNoGainRounds << std::endl;
         
-        std::cout<< "Cut is: "<< cut<< " and imbalance: "<< imbalance << std::endl;
+        std::cout<< "cut:"<< cut<< " imbalance:"<< imbalance << std::endl;
         std::cout<<"inputTime:" << inputT << " partitionTime:" << partT <<" reportTime:"<< repT << std::endl;
     }
 }
