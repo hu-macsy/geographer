@@ -1,5 +1,13 @@
 #pragma once
 
+#define STRINGIZER(arg)     #arg
+#define STR_VALUE(arg)      STRINGIZER(arg)
+#define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
+#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
+#define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
+
+const std::string version = BUILD_COMMIT_STRING;
+
 struct Settings{
     IndexType dimensions= 3;
     IndexType numX = 32;

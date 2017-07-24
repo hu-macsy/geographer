@@ -10,14 +10,6 @@
 
 #include "Settings.h"
 
-#define STRINGIZER(arg)     #arg
-#define STR_VALUE(arg)      STRINGIZER(arg)
-#define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
-#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-#define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-
-        
-
 namespace ITI {
 
     /* A d-dimensional rectangle represented by two points: the bottom and the top corner.
