@@ -274,9 +274,10 @@ TEST_F(FileIOTest, testReadMatrixMarketFormat){
     ITI::Format ff = ITI::Format::MATRIXMARKET;
     
     std::tie( N, dimensions) = FileIO<IndexType, ValueType>::getMatrixMarketCoordsInfos( coordFile );
-    PRINT0(" number of points= " << N << ", dimensions= " << dimensions);
+    PRINT(" number of points= " << N << ", dimensions= " << dimensions);
     
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions, ff);
+    PRINT0("Read " << coords.size() << " coordinates");
     
     scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( graphFile, ff);
     

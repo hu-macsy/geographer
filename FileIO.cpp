@@ -246,9 +246,13 @@ template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, Format format) {
 	SCAI_REGION("FileIO.readGraph");
 
-	if (!(format == Format::METIS or format == Format::AUTO)) {
+	if (!(format == Format::METIS or format == Format::AUTO or format == Format::MATRIXMARKET)) {
 		throw std::logic_error("Format not yet implemented.");
 	}
+	
+	if(format == Format::MATRIXMARKET){
+            return FileIO<IndexType, ValueType>::readGraphMatrixMarket(filename);
+        }
 
 	std::ifstream file(filename);
 
@@ -260,67 +264,67 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         
 	//define variables
 	std::string line;
-	IndexType globalN, globalM;
-	IndexType numberNodeWeights = 0;
-	bool hasEdgeWeights = false;
-	std::vector<ValueType> edgeWeights;//possibly of size 0
-
-	//read first line to get header information
-	std::getline(file, line);
-	std::stringstream ss( line );
-	std::string item;
-
-	{
-		//node count and edge count are mandatory. If these fail, std::stoi will raise an error. TODO: maybe wrap into proper error message
-		std::getline(ss, item, ' ');
-		globalN = std::stoi(item);
-		std::getline(ss, item, ' ');
-		globalM = std::stoi(item);
-
-		bool readWeightInfo = std::getline(ss, item, ' ');
-		if (readWeightInfo && item.size() > 0) {
-			//three bits, describing presence of edge weights, vertex weights and vertex sizes
-			int bitmask = std::stoi(item);
-			hasEdgeWeights = bitmask % 10;
-			if ((bitmask / 10) % 10) {
-				bool readNodeWeightCount = std::getline(ss, item, ' ');
-				if (readNodeWeightCount && item.size() > 0) {
-					numberNodeWeights = std::stoi(item);
-				} else {
-					numberNodeWeights = 1;
-				}
-				if (numberNodeWeights > 0 && comm->getRank() == 0) {
-					std::cout << "Warning: Node weights not yet supported, ignoring them" << std::endl;
-				}
-			}
-		}
-
-		if (comm->getRank() == 0) {
-			std::cout << "Expecting " << globalN << " nodes and " << globalM << " edges, ";
-			if (!hasEdgeWeights && numberNodeWeights == 0) {
-				std::cout << "with no edge or node weights.";
-			}
-			else if (hasEdgeWeights && numberNodeWeights == 0) {
-				std::cout << "with edge weights, but no node weights.";
-			}
-			else if (!hasEdgeWeights && numberNodeWeights > 0) {
-				std::cout << "with no edge weights, but " << numberNodeWeights << " node weights.";
-			}
-			else {
-				std::cout << "with edge weights and " << numberNodeWeights << " weights per node.";
-			}
-		}
-	}
-
-	const ValueType avgDegree = ValueType(2*globalM) / globalN;
-
-	//get distribution and local range
-    const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
-    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
-
-    IndexType beginLocalRange, endLocalRange;
-    scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
-    const IndexType localN = endLocalRange - beginLocalRange;
+        IndexType globalN, globalM;
+        IndexType numberNodeWeights = 0;
+        bool hasEdgeWeights = false;
+        std::vector<ValueType> edgeWeights;//possibly of size 0
+        
+        //read first line to get header information
+        std::getline(file, line);
+        std::stringstream ss( line );
+        std::string item;
+        
+        {
+            //node count and edge count are mandatory. If these fail, std::stoi will raise an error. TODO: maybe wrap into proper error message
+            std::getline(ss, item, ' ');
+            globalN = std::stoi(item);
+            std::getline(ss, item, ' ');
+            globalM = std::stoi(item);
+            
+            bool readWeightInfo = std::getline(ss, item, ' ');
+            if (readWeightInfo && item.size() > 0) {
+                //three bits, describing presence of edge weights, vertex weights and vertex sizes
+                int bitmask = std::stoi(item);
+                hasEdgeWeights = bitmask % 10;
+                if ((bitmask / 10) % 10) {
+                    bool readNodeWeightCount = std::getline(ss, item, ' ');
+                    if (readNodeWeightCount && item.size() > 0) {
+                        numberNodeWeights = std::stoi(item);
+                    } else {
+                        numberNodeWeights = 1;
+                    }
+                    if (numberNodeWeights > 0 && comm->getRank() == 0) {
+                        std::cout << "Warning: Node weights not yet supported, ignoring them" << std::endl;
+                    }
+                }
+            }
+            
+            if (comm->getRank() == 0) {
+                std::cout << "Expecting " << globalN << " nodes and " << globalM << " edges, ";
+                if (!hasEdgeWeights && numberNodeWeights == 0) {
+                    std::cout << "with no edge or node weights.";
+                }
+                else if (hasEdgeWeights && numberNodeWeights == 0) {
+                    std::cout << "with edge weights, but no node weights.";
+                }
+                else if (!hasEdgeWeights && numberNodeWeights > 0) {
+                    std::cout << "with no edge weights, but " << numberNodeWeights << " node weights.";
+                }
+                else {
+                    std::cout << "with edge weights and " << numberNodeWeights << " weights per node.";
+                }
+            }
+        }
+        
+        const ValueType avgDegree = ValueType(2*globalM) / globalN;
+        
+        //get distribution and local range
+        const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
+        const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
+        
+        IndexType beginLocalRange, endLocalRange;
+        scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
+        const IndexType localN = endLocalRange - beginLocalRange;
 
     //scroll to begin of local range. Neighbors of node i are in line i+1
     for (IndexType i = 0; i < beginLocalRange; i++) {
@@ -413,7 +417,52 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
     return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
 }
+//-------------------------------------------------------------------------------------------------
 
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphMatrixMarket(const std::string filename){
+    SCAI_REGION( "FileIO.readGraphMatrixMarket" );
+    std::ifstream file(filename);
+    
+    if(file.fail())
+        throw std::runtime_error("Could not open file "+ filename + ".");
+    
+    //skip the first lines that have comments starting with '%'
+    std::string line;
+    std::getline(file, line);
+
+    while( line[0]== '%'){
+       std::getline(file, line);
+    }
+    std::stringstream ss;
+    ss.str( line );
+   
+    IndexType numRows;
+    IndexType numColumns;
+    IndexType numValues;
+    
+    ss >> numRows>> numColumns >> numValues;
+    
+    SCAI_ASSERT( numRows==numColumns , "Number of rows should be equal to number o columns");
+
+    scai::lama::CSRSparseMatrix<ValueType> graph;
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    /*
+    IndexType numRows, numColumns, numValues;
+    scai::common::scalar::ScalarType dataType;
+    bool isVector;
+    scai::lama::MatrixMarketIO::Symmetry sym;
+    
+    scai::lama::MatrixMarketIO::readMMHeader( filename, numRows, numColumns, numValues, dataType, isVector, sym);
+    */
+    const scai::dmemo::DistributionPtr rowDist(new scai::dmemo::BlockDistribution(numRows, comm));
+    
+    graph.readFromFile( filename, rowDist );
+    return graph;
+}
+//-------------------------------------------------------------------------------------------------
+  
+    
 template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOcean(std::string filename, IndexType dimension) {
 	SCAI_REGION( "FileIO.readCoords" );
@@ -517,11 +566,7 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( std::string filename, IndexType numberOfPoints, IndexType dimension, Format format){
     SCAI_REGION( "FileIO.readCoords" );
-
-	if (format == Format::OCEAN) {
-		return readCoordsOcean(filename, dimension);
-	}
-
+    
     IndexType globalN= numberOfPoints;
     std::ifstream file(filename);
 
@@ -531,6 +576,15 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
 
+    if (format == Format::OCEAN) {
+        PRINT0("Reading coordinates in OCEAN format");
+        return readCoordsOcean(filename, dimension);
+    }
+    else if( format== Format::MATRIXMARKET){
+        PRINT0("Reading coordinates in MATRIXMARKET format");
+        return readCoordsMatrixMarket( filename );
+    }
+    
     IndexType beginLocalRange, endLocalRange;
     scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
     const IndexType localN = endLocalRange - beginLocalRange;
