@@ -223,7 +223,7 @@ int main(int argc, char** argv) {
             std::cout<< "input: weakScaling" << std::endl;
         }
         //TODO: the scai::lama::MatrixCreator::fillRandom is too expensive but the graph is not needed in multisection
-        if( initialPartition!=3 ){
+        if( initialPartition!=4 ){
             std::cout << "Weak scaling works only for multisection (for now)" << std::endl;
             std::terminate();
         }
@@ -243,7 +243,7 @@ int main(int argc, char** argv) {
         PRINT0("Created local part of graph");
         
         //create random local weights
-        std::uniform_real_distribution<ValueType> dist(0.0, 100.0);
+        std::uniform_real_distribution<ValueType> dist(1.0, 2.0);
         auto gen = std::bind(dist, mersenne_engine);
         
         std::vector<ValueType> tmpLocalWeights(localN);
@@ -453,7 +453,7 @@ int main(int argc, char** argv) {
             if (!settings.bisect){
                 PRINT0( "Get a partition with multisection");
             }else{
-                PRINT0( "Get a partition with bsection");
+                PRINT0( "Get a partition with bisection");
             }
             
             // get a multisection partition
