@@ -703,15 +703,15 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const int dimension, const int numberOfAreas, const int pointsPerArea, const ValueType maxVal) {
+void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const int dimension, const int numberOfAreas, const long pointsPerArea, const ValueType maxVal) {
     SCAI_REGION("MeshGenerator.createQuadMesh")
         
-	//broadcast seed value from root to ensure equal pseudorandom numbers.
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
-	comm->bcast( seed, 1, 0 );
-	srand(seed[0]);
-
+    //broadcast seed value from root to ensure equal pseudorandom numbers.
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+    comm->bcast( seed, 1, 0 );
+    srand(seed[0]);
+    
     Point<ValueType> minCoord(dimension);
     Point<ValueType> maxCoord(dimension);
     for(int i=0; i< dimension; i++){
@@ -728,6 +728,9 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
     std::default_random_engine generator(rd());
     //std::mt19937 generator(rd());
     std::vector<std::normal_distribution<ValueType>> distForDim(dimension);
+    
+    std::cout<< "Creating graph for " << numberOfAreas << " areas."<<std::endl;
+
     for(int n=0; n<numberOfAreas; n++){
         SCAI_REGION("MeshGenerator.createQuadMesh.addPointsInQuadtree")
         Point<ValueType> randPoint(dimension);
@@ -737,7 +740,7 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
             randPoint[d] = dist(generator);
             // create a distribution for every dimension
             //TODO: maybe also pick deviation in random
-            ValueType deviation = (ValueType) rand()/RAND_MAX + 0.4;
+            ValueType deviation = (ValueType) rand()/RAND_MAX + 1;
             distForDim[d] = std::normal_distribution<ValueType> (randPoint[d], deviation);
         }
         
@@ -758,13 +761,13 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
     }
 
     // add random points to keep tree balanced
-    for(int i=0; i<pointsPerArea; i++){
+    for(int i=0; i<pointsPerArea*2; i++){
         SCAI_REGION("MeshGenerator.createQuadMesh.randomPoints")
         Point<ValueType> p(dimension);
         for(int d=0; d<dimension; d++){
-            //std::uniform_real_distribution<ValueType> dist(minCoord[d], maxCoord[d]);
-            //p[d] = dist(generator);
-            p[d]= ((ValueType) rand()/RAND_MAX) * maxCoord[d];
+            std::uniform_real_distribution<ValueType> dist(minCoord[d], maxCoord[d]);
+            p[d] = dist(generator);
+            //p[d]= ((ValueType) rand()/RAND_MAX) * maxCoord[d];
         }
         quad.addContent(0, p);
     }   
@@ -875,7 +878,7 @@ template void MeshGenerator<int, double>::createStructured3DMesh_dist(CSRSparseM
 
 template void MeshGenerator<int, double>::createRandomStructured3DMesh_dist(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
 
-template void MeshGenerator<int, double>::createQuadMesh( CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords,const int dimensions, const int numberOfPoints,  const int pointsPerArea, const double maxCoord);
+template void MeshGenerator<int, double>::createQuadMesh( CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords,const int dimensions, const int numberOfPoints,  const long pointsPerArea, const double maxCoord);
 
 template std::vector<DenseVector<double>> MeshGenerator<int, double>::randomPoints(int numberOfPoints, int dimensions, double maxCoord);
 

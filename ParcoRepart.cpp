@@ -31,8 +31,9 @@
 #include "SpectralPartition.h"
 #include "KMeans.h"
 #include "AuxiliaryFunctions.h"
+#include "MultiSection.h"
 
-#include "sort/SchizoQS.hpp"
+#include "schizoQuicksort/src/sort/SchizoQS.hpp"
 
 using scai::lama::Scalar;
 
@@ -97,7 +98,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition")
         // get an initial partition
         DenseVector<IndexType> result;
-		DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(inputDist, 1);
+	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(inputDist, 1);
 
         
         if( settings.initialPartition==0 ){ //sfc
@@ -124,8 +125,17 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			coordinates[d].redistribute(newDist);
 		}
             }
-
-        } else {
+        } else if (settings.initialPartition == 4) {// multisection
+		scai::lama::DenseVector<ValueType> nodeWeights( inputDist, 1 );
+		result = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, nodeWeights, settings);
+		scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
+		result.redistribute(newDist);
+		input.redistribute(newDist, noDist);
+		for (DenseVector<ValueType>& dimCoords : coordinates) {
+			dimCoords.redistribute(newDist);
+		}
+	}
+	else {
         	throw std::runtime_error("No method implemented for " + std::to_string(settings.initialPartition));
         }
         SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
@@ -174,7 +184,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
      * get minimum / maximum of coordinates
      */
     {
-		SCAI_REGION( "ParcoRepart.initialPartition.minMax" )
+		SCAI_REGION( "ParcoRepart.hilbertPartition.minMax" )
 		for (IndexType dim = 0; dim < dimensions; dim++) {
 			minCoords[dim] = coordinates[dim].min().Scalar::getValue<ValueType>();
 			maxCoords[dim] = coordinates[dim].max().Scalar::getValue<ValueType>();
@@ -183,6 +193,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
 			assert(maxCoords[dim] > minCoords[dim]);
 		}
     }
+    
     /**
      * Several possibilities exist for choosing the recursion depth.
      * Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
@@ -226,7 +237,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
      */
     std::vector<IndexType> newLocalIndices;
     {
-        SCAI_REGION( "ParcoRepart.initialPartition.sorting" );
+        SCAI_REGION( "ParcoRepart.hilbertPartition.sorting" );
 
         int typesize;
         MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
@@ -265,7 +276,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
         	if (newLocalIndices[i] != std::numeric_limits<decltype(sort_pair::index)>::max()) newLocalN++;
         }
 
-		//sort local indices for general distribution
+        //sort local indices for general distribution
         std::sort(newLocalIndices.begin(), newLocalIndices.end());
 
         //remove dummy values
@@ -292,7 +303,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
     
     {
     	assert(!inputDist->isReplicated() && comm->getSize() == k);
-        SCAI_REGION( "ParcoRepart.initialPartition.redistribute" );
+        SCAI_REGION( "ParcoRepart.hilbertPartition.redistribute" );
 
         scai::utilskernel::LArray<IndexType> indexTransport(newLocalIndices.size(), newLocalIndices.data());
         assert(comm->sum(indexTransport.size()) == globalN);
@@ -311,15 +322,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(CSRSp
             if (comm->getRank() == 0) std::cout << "Redistributed coordinates" << std::endl;
         }
     }
-    
-    ValueType cut = comm->getSize() == 1 ? computeCut(input, result, true) : comm->sum(localSumOutgoingEdges(input, true)) / 2;
-    ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(result, k);
-    if (comm->getRank() == 0) {
-        afterSFC = std::chrono::steady_clock::now();
-        std::chrono::duration<double> elapsedSeconds = afterSFC-start;
-        std::cout << "\033[1;31mWith SFC (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
-        std::cout<< "and imbalance= "<< imbalance << "\033[0m" << std::endl;
-    }
+
     return result;
 }
 //--------------------------------------------------------------------------------------- 
@@ -353,7 +356,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
      */
     for (IndexType dim = 0; dim < dimensions; dim++) {
         //get local parts of coordinates
-        scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
+        scai::hmemo::ReadAccess<ValueType> localPartOfCoords( coordinates[dim].getLocalValues() );
         for (IndexType i = 0; i < localN; i++) {
             ValueType coord = localPartOfCoords[i];
             if (coord < minCoords[dim]) minCoords[dim] = coord;
@@ -371,11 +374,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
    
     // measure density with rounding
     // have to handle 2D and 3D cases seperately
-    const IndexType detailLvl = settings.pixeledDetailLevel;
-    const IndexType sideLen = std::pow(2,detailLvl);
+    const IndexType sideLen = settings.pixeledSideLen;
     const IndexType cubeSize = std::pow(sideLen, dimensions);
     
     //TODO: generalize this to arbitrary dimensions, do not handle 2D and 3D differently
+    //TODO: by a  for(int d=0; d<dimension; d++){ ... }
     // a 2D or 3D arrays as a one dimensional vector
     // [i][j] is in position: i*sideLen + j
     // [i][j][k] is in: i*sideLen*sideLen + j*sideLen + k
@@ -383,7 +386,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     //std::vector<IndexType> density( cubeSize ,0);
     scai::hmemo::HArray<IndexType> density( cubeSize, 0);
     scai::hmemo::WriteAccess<IndexType> wDensity(density);
-    //std::cout<< "detailLvl= " << detailLvl <<", sideLen= " << sideLen << ", " << "density.size= " << density.size() << std::endl;
+
     SCAI_REGION_END("ParcoRepart.pixelPartition.initialise")
     
     if(dimensions==2){
@@ -435,7 +438,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
         comm->sumArray( density );
     }
     
-    //TODO; is that needed. we just can overwrite density array
+    //TODO: is that needed? we just can overwrite density array.
     // use the summed density as a Dense vector
     scai::lama::DenseVector<IndexType> sumDensity( density );
     
@@ -443,6 +446,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
         ITI::aux::writeHeatLike_local_2D(density, sideLen, dimensions, "heat_"+settings.fileName+".plt");
     }
   
+    //
     //using the summed density get an initial pixeled partition
     
     std::vector<IndexType> pixeledPartition( density.size() , -1);
@@ -503,7 +507,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
                 toInsert.first = neighbours[j];
                 SCAI_ASSERT(neighbours[j] < sumDensity.size(), "Too big index: " + std::to_string(neighbours[j]));
                 SCAI_ASSERT(neighbours[j] >= 0, "Negative index: " + std::to_string(neighbours[j]));
-                geomSpread = 1 + 1/detailLvl*( std::abs(sideLen/2 - neighbours[j]/sideLen)/(0.8*sideLen/2) + std::abs(sideLen/2 - neighbours[j]%sideLen)/(0.8*sideLen/2) );
+                geomSpread = 1 + 1/std::log2(sideLen)*( std::abs(sideLen/2 - neighbours[j]/sideLen)/(0.8*sideLen/2) + std::abs(sideLen/2 - neighbours[j]%sideLen)/(0.8*sideLen/2) );
                 //PRINT0( geomSpread );            
                 // value to pick a border node
                 pixelDistance = aux::pixell2Distance2D( maxDensityPixel, neighbours[j], sideLen);
@@ -693,7 +697,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
     ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(result, k);
     if (comm->getRank() == 0) {
         std::chrono::duration<double> elapsedSeconds = std::chrono::steady_clock::now() -start;
-        std::cout << "\033[1;35mWith pixel detail level= "<< detailLvl<<" (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
+        std::cout << "\033[1;35mWith pixel side length= "<< sideLen<<" (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
         std::cout<< "and imbalance= " << imbalance << "\033[0m"<< std::endl;
     }
     SCAI_REGION_END("ParcoRepart.pixelPartition.finalRedistribute")

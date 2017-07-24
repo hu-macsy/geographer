@@ -36,8 +36,8 @@ class ParcoRepartTest : public ::testing::Test {
 
 TEST_F(ParcoRepartTest, testInitialPartition){
     //std::string file = "Grid8x8";
-    std::string path = "meshes/bubbles/";
-    std::string fileName = "bubbles-00010.graph";
+    std::string path = "meshes/bigtrace/";
+    std::string fileName = "bigtrace-00010.graph";
     std::string file = path + fileName;
     //std::string file = "meshes/hugebubbles/hugebubbles-00010.graph";
     std::ifstream f(file);
@@ -49,7 +49,7 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     // for now local refinement requires k = P
     IndexType k = comm->getSize();
     //
-    PRINT0("nodes= "<< N);
+    PRINT0("nodes= "<< N << " and k= "<< k );
 
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
@@ -64,29 +64,13 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     
     struct Settings settings;
     settings.numBlocks= k;
+    settings.dimensions = dimensions;
     settings.epsilon = 0.2;
-    settings.pixeledDetailLevel =4;
+    settings.pixeledSideLen = 16;
     settings.useGeometricTieBreaking = 1;
     settings.dimensions = dimensions;
     
-    for( int i=2; i<6; i++){
-        settings.pixeledDetailLevel = i;
-        DenseVector<IndexType> pixelInitialPartition = ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coords, settings);
-        
-        EXPECT_GE(k-1, pixelInitialPartition.getLocalValues().max() );
-        EXPECT_EQ(N, pixelInitialPartition.size());
-        EXPECT_EQ(0, pixelInitialPartition.min().getValue<ValueType>());
-        EXPECT_EQ(k-1, pixelInitialPartition.max().getValue<ValueType>());
-        EXPECT_EQ(graph.getRowDistribution(), pixelInitialPartition.getDistribution());
-    }
-    
-    // after the first partitioning cordinates are redistributed 
-    // redistribution needed because sort works only for block distribution
-    coords[0].redistribute(dist);
-    coords[1].redistribute(dist); 
-    graph.redistribute(dist, noDistPointer);
-    
-    
+    //get sfc partition
     DenseVector<IndexType> hilbertInitialPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coords, settings);
     ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords, N, "hilbertPartition");
     
@@ -95,6 +79,24 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     EXPECT_EQ(0, hilbertInitialPartition.min().getValue<ValueType>());
     EXPECT_EQ(k-1, hilbertInitialPartition.max().getValue<ValueType>());
     EXPECT_EQ(graph.getRowDistribution(), hilbertInitialPartition.getDistribution());
+    
+    
+    // after the first partitioning cordinates are redistributed 
+    // redistribution needed because sort works only for block distribution
+    coords[0].redistribute(dist);
+    coords[1].redistribute(dist); 
+    graph.redistribute(dist, noDistPointer);
+    
+    for( int i=3; i<6; i++){
+        settings.pixeledSideLen = std::pow(i,2);
+        DenseVector<IndexType> pixelInitialPartition = ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coords, settings);
+        
+        EXPECT_GE(k-1, pixelInitialPartition.getLocalValues().max() );
+        EXPECT_EQ(N, pixelInitialPartition.size());
+        EXPECT_EQ(0, pixelInitialPartition.min().getValue<ValueType>());
+        EXPECT_EQ(k-1, pixelInitialPartition.max().getValue<ValueType>());
+        EXPECT_EQ(graph.getRowDistribution(), pixelInitialPartition.getDistribution());
+    }
     
 }
 //--------------------------------------------------------------------------------------- 
@@ -496,31 +498,30 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     EXPECT_TRUE(blockGraph.checkSymmetry() );
     
     comm->synchronize();
-if(comm->getRank()==0 ){            
-    std::cout<<"----------------------------"<< " Partition  "<< *comm << std::endl;    
-    for(int i=0; i<numX; i++){
-        for(int j=0; j<numY; j++){
-            if(bordViz[i][j]==1) 
-                std::cout<< "\033[1;31m"<< partViz[i][j] << "\033[0m" <<"-";
-            else
-                std::cout<< partViz[i][j]<<"-";
-        }
-        std::cout<< std::endl;
-    }
     
-    // print
-    //scai::hmemo::ReadAccess<IndexType> blockGraphRead( blockGraph );
-    std::cout<< *comm <<" , Block Graph"<< std::endl;
-    for(IndexType row=0; row<k; row++){
-        std::cout<< row << "|\t";
-        for(IndexType col=0; col<k; col++){
-            std::cout << col<< ": " << blockGraph( row,col).Scalar::getValue<ValueType>() <<" - ";
+    if(comm->getRank()==0 ){
+        std::cout<<"----------------------------"<< " Partition  "<< *comm << std::endl;    
+        for(int i=0; i<numX; i++){
+            for(int j=0; j<numY; j++){
+                if(bordViz[i][j]==1) 
+                    std::cout<< "\033[1;31m"<< partViz[i][j] << "\033[0m" <<"-";
+                else
+                    std::cout<< partViz[i][j]<<"-";
+            }
+            std::cout<< std::endl;
         }
-        std::cout<< std::endl;
+        
+        // print
+        //scai::hmemo::ReadAccess<IndexType> blockGraphRead( blockGraph );
+        std::cout<< *comm <<" , Block Graph"<< std::endl;
+        for(IndexType row=0; row<k; row++){
+            std::cout<< row << "|\t";
+            for(IndexType col=0; col<k; col++){
+                std::cout << col<< ": " << blockGraph( row,col).Scalar::getValue<ValueType>() <<" - ";
+            }
+            std::cout<< std::endl;
+        }
     }
-    
-}
-comm->synchronize();
 
 }
 

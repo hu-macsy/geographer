@@ -1,1 +1,0 @@
-SCAI_TRACE=time:PREFIX=$JMS_stdout mpirun ./Katanomi --graphFile hugetrace-00000.graph --epsilon 0.05 --borderDepth=200 --dimensions=2

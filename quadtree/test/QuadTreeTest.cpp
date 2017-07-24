@@ -52,12 +52,11 @@ TEST_F(QuadTreeTest, testGetGraphFromForestRandom_2D){
         quad.addContent(i, pos);
         quad2.addContent(i, pos2);
     }
-
+    
     IndexType globIndexing = quad2.indexSubtree(quad.indexSubtree(0));
-	
+    
     forest.push_back(quad.getRoot());
     forest.push_back(quad2.getRoot());
-
 
     IndexType numTrees = forest.size();
 
@@ -646,7 +645,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         scai::lama::DenseVector<IndexType> pixelPartition;
         
         for(int detail= 0; detail<np; detail++){           
-            settings.pixeledDetailLevel= detail + np;
+            settings.pixeledSideLen= std::pow( 2, detail + np );
             pixelPartition = ITI::ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coordsDV, settings);
             cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, pixelPartition, true);
             if (cut<maxCut){
@@ -657,7 +656,6 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         }
         // TODO: must save best distibution and redistribute with the best distribution
         
-        settings.dimensions = bestPixelCut;
         pixelPartition = ITI::ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coordsDV, settings);
         bestDist = pixelPartition.getDistributionPtr();
         for(int d=0; d<dimension; d++){

@@ -73,7 +73,7 @@ namespace ITI {
                 /*Creates points in a cube of side maxCoord in dimensions and adds them in a quad tree.
                  * Adds more points in specific areas at random. 
                  */
-                static void createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords,const int dimensions, const int numberOfAreas, const int pointsPerArea, const ValueType maxCoord);
+                static void createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords,const int dimensions, const int numberOfAreas, const long pointsPerArea, const ValueType maxCoord);
 
                 static void graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid &quad);
                     
