@@ -94,6 +94,8 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
     
     //coordinates at random and redistribute
     std::vector<DenseVector<ValueType>> coords(settings.dimensions);
+    srand(time(NULL));
+    
     for(IndexType i=0; i<settings.dimensions; i++){
     	coords[i] = DenseVector<ValueType>(distPtr, 0);
         // set random coordinates
@@ -101,6 +103,8 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
         for(IndexType j=0; j<localN; j++){
             wCoords[i] = rand()%k;
         }
+        wCoords.release();
+        coords[i].redistribute( distPtr );
     }
     
     DenseVector<IndexType> partition= ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coords, settings);
@@ -163,7 +167,7 @@ TEST_F (auxTest, testInitialPartitions){
     settings.numBlocks= k;
     settings.epsilon = 0.1;
     settings.dimensions = dimensions;
-    settings.pixeledDetailLevel = 8;        //4 for a 16x16 coarsen graph in 2D, 16x16x16 in 3D
+    settings.pixeledSideLen = 16;        //4 for a 16x16 coarsen graph in 2D, 16x16x16 in 3D
     settings.useGeometricTieBreaking =1;
     settings.fileName = fileName;
     settings.useGeometricTieBreaking =1;
@@ -318,6 +322,7 @@ TEST_F (auxTest, testPixelDistance) {
     
     srand(time(NULL));
     IndexType pixel= rand()/(sideLen*(sideLen-2)) +2*sideLen;
+    PRINT(pixel);    
     
     EXPECT_EQ(aux::pixelDistance2D( pixel, pixel, sideLen), 0);
     EXPECT_EQ(aux::pixelDistance2D( pixel, pixel+1, sideLen), 1);

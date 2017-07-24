@@ -101,8 +101,9 @@ int main(int argc, char** argv) {
 				("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
 				("minBorderNodes", value<int>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
-				("initialPartition", value<int>(&settings.initialPartition)->default_value(settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition")
-				("pixeledDetailLevel", value<int>(&settings.pixeledDetailLevel)->default_value(settings.pixeledDetailLevel), "The resolution for the pixeled partition or the spectral")
+                                ("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
+				("initialPartition", value<int>(&settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition")
+				("pixeledSideLen", value<int>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
 				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
 				("useDiffusionTieBreaking", value<bool>(&settings.useDiffusionTieBreaking)->default_value(settings.useDiffusionTieBreaking), "Tuning Parameter: Use diffusion to break ties in Fiduccia-Mattheyes algorithm")
@@ -185,10 +186,10 @@ int main(int argc, char** argv) {
     	std::string graphFile = vm["graphFile"].as<std::string>();
     	std::string coordFile;
     	if (vm.count("coordFile")) {
-			coordFile = vm["coordFile"].as<std::string>();
-		} else {
-			coordFile = graphFile + ".xyz";
-		}
+	   	coordFile = vm["coordFile"].as<std::string>();
+	} else {
+		coordFile = graphFile + ".xyz";
+	}
 
     	std::string coordString;
     	if (settings.useDiffusionCoordinates) {
@@ -205,14 +206,14 @@ int main(int argc, char** argv) {
         // read the adjacency matrix and the coordinates from a file
         graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
         N = graph.getNumRows();
-        scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
-        scai::dmemo::DistributionPtr noDist( new scai::dmemo::NoDistribution( N ));
-        assert(graph.getColDistribution().isEqual(*noDist));
+        scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
+        scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
+        assert(graph.getColDistribution().isEqual(*noDistPtr));
 
         // for 2D we do not know the size of every dimension
-		settings.numX = N;
-		settings.numY = 1;
-		settings.numZ = 1;
+        settings.numX = N;
+	settings.numY = 1;
+	settings.numZ = 1;
 
         if (comm->getRank() == 0) {
         	std::cout<< "Read " << N << " points." << std::endl;
@@ -341,6 +342,7 @@ int main(int argc, char** argv) {
     
     // the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================
+    /*
     if (settings.writeDebugCoordinates) {
 		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
 			assert( coordinates[dim].size() == N);
@@ -348,7 +350,7 @@ int main(int argc, char** argv) {
 		}
 		ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, "debugResult");
     }
-    
+    */
     std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
     ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true); 

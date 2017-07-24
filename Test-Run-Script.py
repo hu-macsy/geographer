@@ -5,17 +5,18 @@ import os
 import math
 import random
 
-iterations = 5
+iterations = 2
 dimension = 2
 minExp = -1.5
 maxExp = 1
 
-dirString = os.path.expanduser("~/WAVE/Giesse-Repart/mesh-sequences")
+#dirString = os.path.expanduser("~/WAVE/Giesse-Repart/mesh-sequences")
+dirString = os.path.expanduser("./meshes/hugetrace")
 
-graphNumber = 1
+graphNumber = 0
 formatString = '%02d' % graphNumber
 p = 16*2**graphNumber
-filename = os.path.join(dirString, "refinedtrace-"+'000'+formatString+".graph")
+filename = os.path.join(dirString, "hugetrace-"+'000'+formatString+".graph")
 n = 4500000*2**graphNumber
 
 scalingFactor = math.pow(float(n / p), float(1)/dimension)

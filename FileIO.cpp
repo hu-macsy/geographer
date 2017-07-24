@@ -30,6 +30,7 @@
 #include <map>
 #include <tuple>
 
+
 using scai::lama::CSRStorage;
 using scai::lama::Scalar;
 
@@ -249,13 +250,14 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 		throw std::logic_error("Format not yet implemented.");
 	}
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	std::ifstream file(filename);
 
 	if (file.fail()) {
 		throw std::runtime_error("Reading graph from " + filename + " failed.");
 	}
-
+        
+        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        
 	//define variables
 	std::string line;
 	IndexType globalN, globalM;
@@ -584,6 +586,107 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 
     return result;
 }
+//-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsMatrixMarket ( const std::string filename){
+    std::ifstream file(filename);
+
+    if(file.fail())
+        throw std::runtime_error("File "+ filename+ " failed.");
+        
+    //skip the first lines that have comments starting with '%'
+    std::string line;
+    std::getline(file, line);
+
+    while( line[0]== '%'){
+       std::getline(file, line);
+    }
+    std::stringstream ss;
+    ss.str( line );
+    
+    IndexType numPoints ;
+    IndexType dimensions ;
+    
+    ss >> numPoints >> dimensions;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(numPoints, comm));
+
+    PRINT0( "numPoints= "<< numPoints << " , " << dimensions);
+    
+    IndexType beginLocalRange, endLocalRange;
+    scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, numPoints, comm->getRank(), comm->getSize());
+    
+    // the local ranges for the MatrixMarket format
+    const IndexType beginLocalRangeMM = beginLocalRange*dimensions;
+    const IndexType endLocalRangeMM = endLocalRange*dimensions;
+    const IndexType localN = endLocalRange - beginLocalRange;
+    const IndexType localNMM = endLocalRangeMM - beginLocalRangeMM;
+    
+    //PRINT( *comm << ": localN= "<< localNMM << ", numPoints= "<< numPoints << ", beginLocalRange= "<< beginLocalRangeMM << ", endLocalRange= " << endLocalRangeMM );
+    
+    //scroll forward to begin of local range
+    for (IndexType i = 0; i < beginLocalRangeMM; i++) {
+    	std::getline(file, line);
+    }
+    
+    //create result vector
+    std::vector<scai::utilskernel::LArray<ValueType> > coords(dimensions);
+    for (IndexType dim = 0; dim < dimensions; dim++) {
+    	coords[dim] = scai::utilskernel::LArray<ValueType>(localN, 0);
+    }
+    
+    //read local range
+    for (IndexType i = 0; i < localNMM; i++) {
+		bool read = std::getline(file, line).good();  
+		
+                if (!read and i!=localNMM-1 ) {
+			throw std::runtime_error("In FileIO.cpp, line " + std::to_string(__LINE__) +"Unexpected end of coordinate file. Was the number of nodes correct?");
+		}
+		
+		std::stringstream ss;
+		ss.str( line );
+                         
+                ValueType c;
+                ss >> c;
+                coords[i%dimensions][int(i/dimensions)] = c;
+                
+//PRINT( *comm << ": " << i%dimensions << " , " << i/dimensions << " :: " << coords[i%dimensions][int(i/dimensions)]  );
+                /*
+		IndexType dim = 0;
+		while (dim < dimensions) {
+			bool read = std::getline(ss, item, ' ');
+			if (!read or item.size() == 0) {
+				throw std::runtime_error("Unexpected end of line. Was the number of dimensions correct?");
+			}
+			ValueType coord = std::stod(item);
+			coords[dim][i] = coord;
+			dim++;
+		}
+		
+		if (dim < dimensions) {
+			throw std::runtime_error("Only " + std::to_string(dim - 1)  + " values found, but " + std::to_string(dimensions) + " expected in line '" + line + "'");
+		}
+		*/
+    }
+
+    if (endLocalRange == numPoints) {
+    	bool eof = std::getline(file, line).eof();
+    	if (!eof) {
+    		throw std::runtime_error(std::to_string(numPoints) + " coordinates read, but file continues.");
+    	}
+    }
+
+    std::vector<DenseVector<ValueType> > result(dimensions);
+
+    for (IndexType i = 0; i < dimensions; i++) {
+        result[i] = DenseVector<ValueType>(dist, coords[i] );
+    }
+
+    return result;
+}
+
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::string filename) {
@@ -870,6 +973,36 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
     return matrix;
 }
 
+
+template<typename IndexType, typename ValueType>
+std::pair<IndexType, IndexType> FileIO<IndexType, ValueType>::getMatrixMarketCoordsInfos(const std::string filename){
+        
+    std::ifstream file(filename);
+    
+    if(file.fail())
+        throw std::runtime_error("File "+ filename+ " failed.");
+        
+    //skip the first lines that have comments starting with '%'
+    std::string line;
+    std::getline(file, line);
+
+    while( line[0]== '%'){
+       std::getline(file, line);
+    }
+    std::stringstream ss;
+    ss.str( line );
+    
+    IndexType numPoints ;
+    IndexType dimensions ;
+    
+    ss >> numPoints >> dimensions;
+    
+    return std::make_pair( numPoints, dimensions);
+}
+
+
+
+
 template void FileIO<int, double>::writeGraph (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, const std::string filename);
@@ -878,6 +1011,7 @@ template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::strin
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension, Format format);
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsOcean( std::string filename, int dimension );
 template CSRSparseMatrix<double>  FileIO<int, double>::readQuadTree( std::string filename, std::vector<DenseVector<double>> &coords );
+template std::pair<int, int> FileIO<int, double>::getMatrixMarketCoordsInfos(const std::string filename);
 
 
 } /* namespace ITI */

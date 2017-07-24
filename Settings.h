@@ -14,7 +14,8 @@ struct Settings{
     IndexType diffusionRounds = 20;
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
-    IndexType pixeledDetailLevel = 3;
+    IndexType pixeledSideLen = 10;
+    IndexType fileFormat = 0;   // 0 for METSI, 1 for MatrixMarket
     IndexType initialPartition = 0;
     bool useDiffusionTieBreaking = false;
     bool useGeometricTieBreaking = false;
@@ -22,7 +23,8 @@ struct Settings{
     bool gainOverBalance = false;
     bool skipNoGainColors = false;
     bool writeDebugCoordinates = false;
-    bool useExtent = 1;
+    bool bisect = false;
+    bool useExtent = false;
     double epsilon = 0.05;
     std::string fileName = "-";
     
@@ -39,15 +41,31 @@ struct Settings{
         out<< "useGeometricTieBreaking: " << useGeometricTieBreaking <<std::endl;
         out<< "gainOverBalance: " << gainOverBalance << std::endl;
         out<< "skipNoGainColors: "<< skipNoGainColors << std::endl;
-        out<< "pixeledDetailLevel: "<< pixeledDetailLevel << std::endl;
-        if( initialPartition==0){
-            out<< "initial partition: hilbert curve" << std::endl;
-        }else if( initialPartition==1 ){
-            out<< "initial partition: pixels" << std::endl;
-        }else if( initialPartition==2 ){
-            out<< "initial partition: spectral " << std::endl;
-        }else{
-            out<< "initial partition undefined" << std::endl;
+        out<< "pixeledSideLen: "<< pixeledSideLen << std::endl;
+        out<< "fileFormat: "<< fileFormat << std::endl;
+        switch( initialPartition){
+            case 0: {
+                out<< "initial partition: hilbert curve" << std::endl;  break;
+            } 
+            case 1:{
+                out<< "initial partition: pixels" << std::endl;     break;
+            }
+            case 2:{
+                out<< "initial partition: spectral" << std::endl;   break;
+            }
+            case 3:{
+                out<< "initial partition: k-means" << std::endl;   break;
+            }
+            case 4:{
+                if (!bisect){
+                    out<< "initial partition: multisection" << std::endl;
+                }else{
+                    out<< "initial partition: bisection" << std::endl;
+                }
+            }
+            default:{
+                out<< "initial partition undefined" << std::endl;   break;
+            }
         }
     }
 };
