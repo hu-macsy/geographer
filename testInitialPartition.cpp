@@ -217,7 +217,8 @@ int main(int argc, char** argv) {
         settings.numY = 1;
         settings.numZ = 1;
         
-        ITI::Format format = vm["coordFormat"].as<ITI::Format>();
+//        ITI::Format format = vm["coordFormat"].as<ITI::Format>();
+        ITI::Format format;
         coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format );
         PRINT0("read  graph and coordinates");        
         
@@ -343,7 +344,10 @@ int main(int argc, char** argv) {
     if (comm->getSize() > 0) {
     	//settings.numBlocks = comm->getSize();
     }
-
+    
+    if( !vm.count("numBlocks") ){
+        settings.numBlocks = comm->getSize();
+    }
     
     //----------
     
@@ -460,6 +464,8 @@ int main(int argc, char** argv) {
             break;
         }
         case 3:{  //------------------------------------------- k-means
+            std::cout<< "Not included in testInitial yet, choose another option."<< std::endl;
+            std::terminate();
         }
         case 4:{  //------------------------------------------- multisection
             

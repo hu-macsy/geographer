@@ -518,9 +518,9 @@ template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( std::string filename, IndexType numberOfPoints, IndexType dimension, Format format){
     SCAI_REGION( "FileIO.readCoords" );
 
-	if (format == Format::OCEAN) {
-		return readCoordsOcean(filename, dimension);
-	}
+    if (format == Format::OCEAN) {
+	return readCoordsOcean(filename, dimension);
+    }
 
     IndexType globalN= numberOfPoints;
     std::ifstream file(filename);
