@@ -28,6 +28,9 @@ TEST_F(KMeansTest, testFindInitialCenters) {
 	const IndexType n = graph.getNumRows();
 	std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
 	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	const IndexType p = comm->getSize();
+
 
 	std::vector<std::vector<ValueType> > centers = KMeans::findInitialCenters(coords, k, uniformWeights);
 
@@ -35,8 +38,8 @@ TEST_F(KMeansTest, testFindInitialCenters) {
 	EXPECT_EQ(dimensions, centers.size());
 	EXPECT_EQ(k, centers[0].size());
 
-	bool allDistinct = true;
 	//check for distinctness
+	bool allDistinct = true;
 	for (IndexType i = 0; i < k; i++) {
 		for (IndexType j = i+1; j < k; j++) {
 			bool differenceFound = false;
@@ -56,6 +59,13 @@ TEST_F(KMeansTest, testFindInitialCenters) {
 		}
 	}
 	EXPECT_TRUE(allDistinct);
+
+	//check for equality across processors
+	for (IndexType d = 0; d < dimensions; d++) {
+		ValueType coordSum = std::accumulate(centers[d].begin(), centers[d].end(), 0);
+		ValueType totalSum = comm->sum(coordSum);
+		EXPECT_EQ(p*coordSum, totalSum);
+	}
 }
 
 TEST_F(KMeansTest, testFindCenters) {
