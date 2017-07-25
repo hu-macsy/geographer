@@ -362,8 +362,12 @@ int main(int argc, char** argv) {
     ValueType inputT = ValueType ( comm->max(inputTime.count() ));
     ValueType partT = ValueType (comm->max(partitionTime.count()));
     ValueType repT = ValueType (comm->max(reportTime.count()));
-        
+
     if (comm->getRank() == 0) {
+        for (IndexType i = 0; i < argc; i++) {
+            std::cout << std::string(argv[i]) << " ";
+        }
+        std::cout << std::endl;
         std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
         std::cout<< " nodes:"<< N<< " dimensions:"<< settings.dimensions <<" k:" << settings.numBlocks;
         std::cout<< " epsilon:" << settings.epsilon << " minBorderNodes:"<< settings.minBorderNodes;
