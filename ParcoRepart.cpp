@@ -513,7 +513,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
                 geomSpread = 1 + 1/std::log2(sideLen)*( std::abs(sideLen/2 - neighbours[j]/sideLen)/(0.8*sideLen/2) + std::abs(sideLen/2 - neighbours[j]%sideLen)/(0.8*sideLen/2) );
                 //PRINT0( geomSpread );            
                 // value to pick a border node
-                pixelDistance = aux::pixell2Distance2D( maxDensityPixel, neighbours[j], sideLen);
+                pixelDistance = aux::pixelL2Distance2D( maxDensityPixel, neighbours[j], sideLen);
                 toInsert.second = (1/pixelDistance)* geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[maxDensityPixel], 0.5) );
                 border.push_back(toInsert);
             }
@@ -588,7 +588,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
                     for(IndexType l=0; l<border.size(); l++){                        
                         if( border[l].first == neighbours[j]){ // its already in border, update value
                             //border[l].second = 1.3*border[l].second + geomSpread * (spreadFactor*(std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5) );
-                            pixelDistance = aux::pixell2Distance2D( maxDensityPixel, neighbours[j], sideLen);    
+                            pixelDistance = aux::pixelL2Distance2D( maxDensityPixel, neighbours[j], sideLen);    
                             border[l].second += geomSpread*  (1/(pixelDistance*pixelDistance))* ( spreadFactor *std::pow(localSumDens[neighbours[j]], 0.5) + std::pow(localSumDens[bestIndex], 0.5) );
                             inBorder= true;
                         }
@@ -597,7 +597,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
                         std::pair<IndexType, ValueType> toInsert;
                         toInsert.first = neighbours[j];
                         //toInsert.second = geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5));
-                        pixelDistance = aux::pixell2Distance2D( maxDensityPixel, neighbours[j], sideLen);    
+                        pixelDistance = aux::pixelL2Distance2D( maxDensityPixel, neighbours[j], sideLen);    
                         //toInsert.second = (1/(pixelDistance*pixelDistance))* geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5));
                         toInsert.second = geomSpread*  (1/(pixelDistance*pixelDistance))* ( spreadFactor *(std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5) );
                         //toInsert.second = geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5))/(std::pow( std::abs( localSumDens[bestIndex] - localSumDens[neighbours[j]]),0.5));
