@@ -98,7 +98,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition")
         // get an initial partition
         DenseVector<IndexType> result;
-	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(inputDist, 1);
+        DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(inputDist, 1);
 
         
         if( settings.initialPartition==0 ){ //sfc
@@ -121,9 +121,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             result.redistribute(newDist);
             input.redistribute(newDist, noDist);
             if (settings.useGeometricTieBreaking) {
-		for (IndexType d = 0; d < dimensions; d++) {
-			coordinates[d].redistribute(newDist);
-		}
+				for (IndexType d = 0; d < dimensions; d++) {
+					coordinates[d].redistribute(newDist);
+				}
             }
         } else if (settings.initialPartition == 4) {// multisection
 		scai::lama::DenseVector<ValueType> nodeWeights( inputDist, 1 );

@@ -32,23 +32,18 @@ std::vector<std::vector<ValueType> > findInitialCenters(
 		result[d].resize(k);
 	}
 
-	//broadcast seed value from root to ensure equal pseudorandom numbers.
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
-	comm->bcast( seed, 1, 0 );
-	srand(seed[0]);
+	std::vector<IndexType> indices(k);
 
-	std::set<IndexType> indices;
-	while (indices.size() < k) {
-		indices.insert(rand() % localN);
+	for (IndexType i = 0; i < k; i++) {
+		indices[i] = i * (n / k);
 	}
 
 	for (IndexType d = 0; d < dim; d++) {
-		const scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
 
 		IndexType i = 0;
 		for (IndexType index : indices) {
-			result[d][i] = rCoords[index];
+			//yes, this is very expensive, since each call triggers a global communication. However, this needs to be done anyway, if not here then later.
+			result[d][i] = coordinates[d].getValue(index).Scalar::getValue<ValueType>();
 			i++;
 		}
 	}
@@ -189,10 +184,12 @@ DenseVector<IndexType> assignBlocks(
 			double ratio = ValueType(targetBlockSizes[j]) / totalWeight[j];
 			if (ratio > 1) {
 				//block to small
-				influence[j] = std::min(influence[j] * std::pow(ratio, 0.6), influence[j]*1.1);
+				influence[j] = std::min(influence[j] * std::pow(ratio, 0.5), influence[j]*1.05);
+				//influence[j] *= 1.03;
 			} else if (ratio < 1) {
 				//block too large
-				influence[j] = std::max(influence[j] * std::pow(ratio, 0.6), influence[j]*0.9);
+				influence[j] = std::max(influence[j] * std::pow(ratio, 0.5), influence[j]*0.95);
+				//influence[j] /= 1.03;
 			}
 
 			if (comm->getRank() == 0) {
