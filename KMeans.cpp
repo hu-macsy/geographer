@@ -186,7 +186,14 @@ DenseVector<IndexType> assignBlocks(
 		std::vector<IndexType> totalWeight(k, 0);
 		for (IndexType j = 0; j < k; j++) {
 			totalWeight[j] = comm->sum(blockWeights[j]);
-			influence[j] = std::min(influence[j] * std::pow(ValueType(targetBlockSizes[j]) / totalWeight[j], 0.6), influence[j]*1.3);
+			double ratio = ValueType(targetBlockSizes[j]) / totalWeight[j];
+			if (ratio > 1) {
+				//block to small
+				influence[j] = std::min(influence[j] * std::pow(ratio, 0.6), influence[j]*1.1);
+			} else if (ratio < 1) {
+				//block too large
+				influence[j] = std::max(influence[j] * std::pow(ratio, 0.6), influence[j]*0.9);
+			}
 
 			if (comm->getRank() == 0) {
 				std::cout << "Iter " << iter << ", block " << j << " has size " << totalWeight[j] << ", setting influence to ";
