@@ -30,7 +30,7 @@ namespace ITI {
          *                            So if line 100 is "120 1234 8 2133" means that node 100
          *                            has edges to nodes 120, 1234, 8 and 2133.
          *                for coordinates (up to 3D): every line has 3 numbers, the real valued
-         *                            coordiantes. If the coordinates are in 2D the last number is 0.
+         *                            coordinates. If the coordinates are in 2D the last number is 0.
          * MATRIXMARKET format: for graphs: we use the function readFromFile (or readFromSingleFile) 
          *                            provided by LAMA.
          *                for coordiantes: first line has two numbers, the number of points N and

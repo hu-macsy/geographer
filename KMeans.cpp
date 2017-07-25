@@ -32,23 +32,18 @@ std::vector<std::vector<ValueType> > findInitialCenters(
 		result[d].resize(k);
 	}
 
-	//broadcast seed value from root to ensure equal pseudorandom numbers.
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
-	comm->bcast( seed, 1, 0 );
-	srand(seed[0]);
+	std::vector<IndexType> indices(k);
 
-	std::set<IndexType> indices;
-	while (indices.size() < k) {
-		indices.insert(rand() % localN);
+	for (IndexType i = 0; i < k; i++) {
+		indices[i] = i * (n / k);
 	}
 
 	for (IndexType d = 0; d < dim; d++) {
-		const scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
 
 		IndexType i = 0;
 		for (IndexType index : indices) {
-			result[d][i] = rCoords[index];
+			//yes, this is very expensive, since each call triggers a global communication. However, this needs to be done anyway, if not here then later.
+			result[d][i] = coordinates[d].getValue(index).Scalar::getValue<ValueType>();
 			i++;
 		}
 	}
@@ -186,7 +181,16 @@ DenseVector<IndexType> assignBlocks(
 		std::vector<IndexType> totalWeight(k, 0);
 		for (IndexType j = 0; j < k; j++) {
 			totalWeight[j] = comm->sum(blockWeights[j]);
-			influence[j] = std::min(influence[j] * std::pow(ValueType(targetBlockSizes[j]) / totalWeight[j], 0.6), influence[j]*1.3);
+			double ratio = ValueType(targetBlockSizes[j]) / totalWeight[j];
+			if (ratio > 1) {
+				//block to small
+				influence[j] = std::min(influence[j] * std::pow(ratio, 0.5), influence[j]*1.05);
+				//influence[j] *= 1.03;
+			} else if (ratio < 1) {
+				//block too large
+				influence[j] = std::max(influence[j] * std::pow(ratio, 0.5), influence[j]*0.95);
+				//influence[j] /= 1.03;
+			}
 
 			if (comm->getRank() == 0) {
 				std::cout << "Iter " << iter << ", block " << j << " has size " << totalWeight[j] << ", setting influence to ";
@@ -202,10 +206,29 @@ DenseVector<IndexType> assignBlocks(
 		if (comm->getRank() == 0) std::cout << "Iter " << iter << ", imbalance : " << imbalance << std::endl;
 	} while (imbalance > epsilon && iter < maxIter);
 
-
 	return assignment;
 }
 
+template<typename ValueType>
+ValueType biggestDelta(const std::vector<std::vector<ValueType>> &firstCoords, const std::vector<std::vector<ValueType>> &secondCoords) {
+	assert(firstCoords.size() == secondCoords.size());
+	const int dim = firstCoords.size();
+	assert(dim > 0);
+	const int n = firstCoords[0].size();
+
+	ValueType result = 0;
+	for (int i = 0; i < n; i++) {
+		ValueType squaredDistance = 0;
+		for (int d = 0; d < dim; d++) {
+			ValueType diff = (firstCoords[d][i] - secondCoords[d][i]);
+			squaredDistance +=  diff*diff;
+		}
+		result = std::max(squaredDistance, result);
+	}
+	return std::sqrt(result);
+}
+
+template double biggestDelta(const std::vector<std::vector<double>> &firstCoords, const std::vector<std::vector<double>> &secondCoords);
 template std::vector<std::vector<double> > findInitialCenters(const std::vector<DenseVector<double>> &coordinates, int k, const DenseVector<int> &nodeWeights);
 template std::vector<std::vector<double> > findCenters(const std::vector<DenseVector<double>> &coordinates, const DenseVector<int> &partition, const int k, const DenseVector<int> &nodeWeights);
 template DenseVector<int> assignBlocks(const std::vector<DenseVector<double>> &coordinates, const std::vector<std::vector<double> > &centers, const DenseVector<int> &nodeWeights, const std::vector<int> &blockSizes,  const double epsilon, std::vector<double> &influence);

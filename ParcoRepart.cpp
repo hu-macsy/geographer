@@ -98,7 +98,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition")
         // get an initial partition
         DenseVector<IndexType> result;
-	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(inputDist, 1);
+        DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(inputDist, 1);
 
         
         if( settings.initialPartition==0 ){ //sfc
@@ -108,25 +108,22 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         } else if ( settings.initialPartition == 2) {// spectral
             result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
         } else if (settings.initialPartition == 3) {// k-means
-        	std::vector<std::vector<ValueType> > centers = ITI::KMeans::findInitialCenters(coordinates, settings.numBlocks, uniformWeights);
-        	const std::vector<IndexType> blockSizes(settings.numBlocks, n/settings.numBlocks);
-        	std::vector<ValueType> influence(settings.numBlocks,1);
-        	for (IndexType i = 0; i < 20; i++) {
-        		result = ITI::KMeans::assignBlocks(coordinates, centers, uniformWeights, blockSizes, settings.epsilon, influence);
-        		centers = ITI::KMeans::findCenters(coordinates, result, settings.numBlocks, uniformWeights);
-        	}
+            const std::vector<IndexType> blockSizes(settings.numBlocks, n/settings.numBlocks);
+            result = ITI::KMeans::computePartition(coordinates, settings.numBlocks, uniformWeights, blockSizes, settings.epsilon);
 
-        	std::cout << "K-Means, Cut:" << computeCut(input, result, false) << ", imbalance:" << computeImbalance(result, settings.numBlocks) << std::endl;
-        	assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
-        	assert(result.min().Scalar::getValue<IndexType>() == 0);
+            std::cout << "K-Means, Cut:" << computeCut(input, result, false) << ", imbalance:" << computeImbalance(result, settings.numBlocks) << std::endl;
+            assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
+            assert(result.min().Scalar::getValue<IndexType>() == 0);
 
             scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
             assert(newDist->getGlobalSize() == n);
 
             result.redistribute(newDist);
             input.redistribute(newDist, noDist);
-            for (IndexType d = 0; d < dimensions; d++) {
-            	coordinates[d].redistribute(newDist);
+            if (settings.useGeometricTieBreaking) {
+				for (IndexType d = 0; d < dimensions; d++) {
+					coordinates[d].redistribute(newDist);
+				}
             }
         } else if (settings.initialPartition == 4) {// multisection
 		scai::lama::DenseVector<ValueType> nodeWeights( inputDist, 1 );
