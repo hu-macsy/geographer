@@ -70,6 +70,7 @@ struct Settings{
                 }else{
                     out<< "initial partition: bisection" << std::endl;
                 }
+                break;
             }
             default:{
                 out<< "initial partition undefined" << std::endl;   break;

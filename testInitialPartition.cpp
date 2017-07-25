@@ -46,44 +46,42 @@ typedef int IndexType;
  */
 
 //----------------------------------------------------------------------------
-/*
-std::istream& operator>>(std::istream& in, IndexType& method)
-{
-    std::string token;
-    in >> token;
-    if (token == "SFC" or token == "0")
-        method = 0;
-    else if (token == "Pixel" or token == "1")
-        method = 1;
-    else if (token == "Spectral" or token == "2")
-    	method = 2;
-    else if (token == "KMeans" or token == "3")
-    	method = 3;
-    else if (token == "Multisection" or token == "4")
-    	method = 4;
-    else
-        in.setstate(std::ios_base::failbit);
-    return in;
+
+namespace ITI {
+	std::istream& operator>>(std::istream& in, Format& format)
+	{
+		std::string token;
+		in >> token;
+		if (token == "AUTO" or token == "0")
+			format = ITI::Format::AUTO ;
+		else if (token == "METIS" or token == "1")
+			format = ITI::Format::METIS;
+		else if (token == "ADCIRC" or token == "2")
+			format = ITI::Format::ADCIRC;
+		else if (token == "OCEAN" or token == "3")
+			format = ITI::Format::OCEAN;
+		else
+			in.setstate(std::ios_base::failbit);
+		return in;
+	}
+
+	std::ostream& operator<<(std::ostream& out, Format& method)
+	{
+		std::string token;
+
+		if (method == ITI::Format::AUTO)
+			token = "AUTO";
+		else if (method == ITI::Format::METIS)
+			token = "METIS";
+		else if (method == ITI::Format::ADCIRC)
+			token = "ADCIRC";
+		else if (method == ITI::Format::OCEAN)
+			token = "OCEAN";
+		out << token;
+		return out;
+	}
 }
 
-std::ostream& operator<<(std::ostream& out, IndexType& method)
-{
-    std::string token;
-
-    if (method == 0)
-        token = "SFC";
-    else if (method == 1)
-    	token = "Pixel";
-    else if (method == 2)
-    	token = "Spectral";
-    else if (method == 3)
-    	token = "KMeans";
-    else if (method == 4)
-    	token = "Multisection";
-    out << token;
-    return out;
-}
-*/
 
 int main(int argc, char** argv) {
 	using namespace boost::program_options;
@@ -96,6 +94,7 @@ int main(int argc, char** argv) {
 				("version", "show version")
 				("graphFile", value<std::string>(), "read graph from file")
 				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
+                                ("coordFormat", value<ITI::Format>(), "format of coordinate file")
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
                                 ("weakScaling", "generate coordinates locally for weak scaling")
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
@@ -119,8 +118,7 @@ int main(int argc, char** argv) {
 				;
 
 	variables_map vm;
-	store(command_line_parser(argc, argv).
-			  options(desc).run(), vm);
+	store(command_line_parser(argc, argv).options(desc).run(), vm);
 	notify(vm);
 
 	if (vm.count("help")) {
@@ -144,8 +142,16 @@ int main(int argc, char** argv) {
 	}
 
     IndexType N = -1; 		// total number of points
-    IndexType edges= -1;        // number of edges
 
+    char machineChar[255];
+    std::string machine;
+    gethostname(machineChar, 255);
+    if (machineChar) {
+    	machine = std::string(machineChar);
+    } else {
+    	std::cout << "machine char not valid" << std::endl;
+    }
+    
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
     scai::lama::DenseVector<ValueType> nodeWeights;     // node weights
@@ -162,9 +168,16 @@ int main(int argc, char** argv) {
      
     startTime = std::chrono::system_clock::now();
     
-    if (comm->getRank() == 0)
-	{
-        std::cout<< "commit:"<< version<< /*", input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :" generate") <<*/ std::endl;
+    if (comm->getRank() == 0){
+        std::string inputstring;
+    	if (vm.count("graphFile")) {
+    		inputstring = vm["graphFile"].as<std::string>();
+    	} else if (vm.count("quadTreeFile")) {
+    		inputstring = vm["quadTreeFile"].as<std::string>();
+    	} else {
+    		inputstring = "generate";
+    	}
+        std::cout<< "commit:"<< version<<  " input:"<< inputstring << std::endl;
 	}
 
     std::string graphFile;
@@ -204,8 +217,10 @@ int main(int argc, char** argv) {
         settings.numY = 1;
         settings.numZ = 1;
         
-        ITI::Format format = vm["coordFormat"].as<ITI::Format>();
+//        ITI::Format format = vm["coordFormat"].as<ITI::Format>();
+        ITI::Format format;
         coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format );
+        PRINT0("read  graph and coordinates");        
         
         //unit weights
         scai::hmemo::HArray<ValueType> localWeights( rowDistPtr->getLocalSize(), 1 );
@@ -329,7 +344,10 @@ int main(int argc, char** argv) {
     if (comm->getSize() > 0) {
     	//settings.numBlocks = comm->getSize();
     }
-
+    
+    if( !vm.count("numBlocks") ){
+        settings.numBlocks = comm->getSize();
+    }
     
     //----------
     
@@ -446,6 +464,8 @@ int main(int argc, char** argv) {
             break;
         }
         case 3:{  //------------------------------------------- k-means
+            std::cout<< "Not included in testInitial yet, choose another option."<< std::endl;
+            std::terminate();
         }
         case 4:{  //------------------------------------------- multisection
             
@@ -514,7 +534,7 @@ int main(int argc, char** argv) {
     
     if( comm->getRank()==0){ 
         logF<< "Results for file " << graphFile << std::endl;
-        logF<< "node= "<< N << " , edges= "<< edges << std::endl<< std::endl;
+        logF<< "node= "<< N << std::endl<< std::endl;
         settings.print( logF );
         logF<< std::endl<< std::endl << "Only initial partition, no MultiLevel or LocalRefinement"<< std::endl << std::endl;
     }

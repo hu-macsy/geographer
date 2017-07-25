@@ -49,7 +49,7 @@ def createLLSubmitFile(filename, commandString, walltime, processors, memory):
 
 def assembleCommandString(partitioner, graphFile, processors, others=""):
     if partitioner.lower() == "parco":
-        return "Katanomi" + " --graphFile "+graphFile+" --dimensions 2"+others
+        return "Katanomi" + " --graphFile "+graphFile+others
     elif partitioner.lower() == "metis":
         return "metisWrapper" + " " + str(graphFile)
     #else if partitioner.lower() == "rcb":

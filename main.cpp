@@ -115,8 +115,7 @@ int main(int argc, char** argv) {
 				;
 
 	variables_map vm;
-	store(command_line_parser(argc, argv).
-			  options(desc).run(), vm);
+	store(command_line_parser(argc, argv).options(desc).run(), vm);
 	notify(vm);
 
 	if (vm.count("help")) {

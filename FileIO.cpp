@@ -298,16 +298,16 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 		if (comm->getRank() == 0) {
 			std::cout << "Expecting " << globalN << " nodes and " << globalM << " edges, ";
 			if (!hasEdgeWeights && numberNodeWeights == 0) {
-				std::cout << "with no edge or node weights.";
+				std::cout << "with no edge or node weights."<< std::endl;
 			}
 			else if (hasEdgeWeights && numberNodeWeights == 0) {
-				std::cout << "with edge weights, but no node weights.";
+				std::cout << "with edge weights, but no node weights."<< std::endl;
 			}
 			else if (!hasEdgeWeights && numberNodeWeights > 0) {
-				std::cout << "with no edge weights, but " << numberNodeWeights << " node weights.";
+				std::cout << "with no edge weights, but " << numberNodeWeights << " node weights."<< std::endl;
 			}
 			else {
-				std::cout << "with edge weights and " << numberNodeWeights << " weights per node.";
+				std::cout << "with edge weights and " << numberNodeWeights << " weights per node."<< std::endl;
 			}
 		}
 	}
@@ -518,9 +518,9 @@ template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( std::string filename, IndexType numberOfPoints, IndexType dimension, Format format){
     SCAI_REGION( "FileIO.readCoords" );
 
-	if (format == Format::OCEAN) {
-		return readCoordsOcean(filename, dimension);
-	}
+    if (format == Format::OCEAN) {
+	return readCoordsOcean(filename, dimension);
+    }
 
     IndexType globalN= numberOfPoints;
     std::ifstream file(filename);
