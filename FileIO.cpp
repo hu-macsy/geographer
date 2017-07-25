@@ -13,6 +13,7 @@
 #include <scai/lama/Scalar.hpp>
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/common/Math.hpp>
+#include <scai/common/Settings.hpp>
 #include <scai/lama/storage/MatrixStorage.hpp>
 #include <scai/tracing.hpp>
 
@@ -424,6 +425,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphMa
     SCAI_REGION( "FileIO.readGraphMatrixMarket" );
     std::ifstream file(filename);
     
+    scai::common::Settings::putEnvironment( "SCAI_IO_TYPE_DATA", "_Pattern" );
+    
     if(file.fail())
         throw std::runtime_error("Could not open file "+ filename + ".");
     
@@ -458,6 +461,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphMa
     const scai::dmemo::DistributionPtr rowDist(new scai::dmemo::BlockDistribution(numRows, comm));
     
     graph.readFromFile( filename, rowDist );
+    
+    //unsetenv( "SCAI_IO_TYPE_DATA" );
     return graph;
 }
 //-------------------------------------------------------------------------------------------------
