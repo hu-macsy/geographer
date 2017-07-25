@@ -37,7 +37,7 @@ namespace ITI {
          *                            the dimension d. Then next N*d lines contain the coordinates
          *                            for the poitns: every d lines are the coordinates for a point.
         */
-	enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4};
+	enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4    };
     
 template <typename IndexType, typename ValueType>
 class FileIO {
