@@ -120,7 +120,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         } else if ( settings.initialPartition == 2) {// spectral
             result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
         } else if (settings.initialPartition == 3) {// k-means
-            const std::vector<IndexType> blockSizes(settings.numBlocks, n/settings.numBlocks);
+        	const IndexType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
+            const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
             result = ITI::KMeans::computePartition(coordinates, settings.numBlocks, nodeWeights, blockSizes, settings.epsilon);
 
             std::cout << "K-Means, Cut:" << computeCut(input, result, false) << ", imbalance:" << computeImbalance(result, settings.numBlocks) << std::endl;
