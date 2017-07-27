@@ -394,7 +394,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
 	nodeWeights.resize(numberNodeWeights);
 	for (IndexType i = 0; i < numberNodeWeights; i++) {
-		nodeWeights[i] = DenseVector<IndexType>(dist, scai::utilskernel::LArray<IndexType>(localN, nodeWeightStorage.data()));
+		nodeWeights[i] = DenseVector<IndexType>(dist, scai::utilskernel::LArray<IndexType>(localN, nodeWeightStorage[i].data()));
 	}
 
     if (endLocalRange == globalN) {
