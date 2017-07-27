@@ -3,13 +3,8 @@
 #include <chrono>
 #include <fstream>
 
-#include "PrioQueue.h"
+#include <scai/lama/DenseVector.hpp>
 #include "ParcoRepart.h"
-#include "MultiLevel.h"
-#include "HilbertCurve.h"
-#include "Settings.h"
-#include "FileIO.h"
-
 
 namespace ITI{
 
