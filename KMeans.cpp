@@ -278,18 +278,17 @@ DenseVector<IndexType> assignBlocks(
 
 		std::vector<ValueType> oldInfluence = influence;
 
+		double minRatio = 1.05;
+
 		for (IndexType j = 0; j < k; j++) {
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.influence" );
 			double ratio = ValueType(totalWeight[j]) / targetBlockSizes[j];
 			influence[j] = std::max(influence[j]*0.95, std::min(influence[j] * std::pow(ratio, 0.5), influence[j]*1.05));
 
-			if (comm->getRank() == 0) {
-				std::cout << "Iter " << iter << ", block " << j << " has size " << totalWeight[j] << ", setting influence to ";
-				std::cout << influence[j];
-				std::cout << std::endl;
-			}
-			assert(influence[j] / oldInfluence[j] <= 1.05 + 1e-10);
-			assert(influence[j] / oldInfluence[j] >= 0.95 - 1e-10);
+			double influenceRatio = influence[j] / oldInfluence[j];
+			assert(influenceRatio <= 1.05 + 1e-10);
+			assert(influenceRatio >= 0.95 - 1e-10);
+			if (influenceRatio < minRatio) minRatio = influenceRatio;
 		}
 
 		//update bounds
@@ -297,7 +296,7 @@ DenseVector<IndexType> assignBlocks(
 			const IndexType cluster = wAssignment[i];
 			upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]);
 			upperBoundOwnCenter[i] += 1e-10;
-			lowerBoundNextCenter[i] *= 0.95;//this could be tighter. TODO: put in constant instead of magic number
+			lowerBoundNextCenter[i] *= minRatio;
 			lowerBoundNextCenter[i] -= 1e-10;
 		}
 

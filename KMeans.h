@@ -56,6 +56,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<ValueType> influence(k,1);
 	const IndexType dim = coordinates.size();
 	const IndexType localN = nodeWeights.getLocalValues().size();
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	std::vector<std::vector<ValueType> > convertedCoords(dim);
 	for (IndexType d = 0; d < dim; d++) {
@@ -66,9 +67,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		for (IndexType i = 0; i < localN; i++) {
 			assert(convertedCoords[d][i] == rAccess[i]);
 		}
-		ValueType convertedSum = std::accumulate(convertedCoords[d].begin(), convertedCoords[d].end(), 0);
-		ValueType nativeSum = coordinates[d].getLocalValues().sum();
-		std::cout << convertedSum << " | " << nativeSum << std::endl;
 	}
 
 	result = assignBlocks<IndexType, ValueType>(coordinates, centers);
@@ -103,7 +101,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		}
 		centers = newCenters;
 
-		std::cout << "i: " << i << ", delta: " << delta << std::endl;
+		if (comm->getRank() == 0) {
+			std::cout << "i: " << i << ", delta: " << delta << std::endl;
+		}
 		i++;
 	} while (i < 50 && delta > threshold);
 	return result;
