@@ -283,10 +283,16 @@ int main(int argc, char** argv) {
 
     double partKwayTime= comm->max(partitionKwayTime.count() );
 
+    char machineChar[255];
+    std::string machine;
+    gethostname(machineChar, 255);
+    if (machineChar) {
+        machine = std::string(machineChar);
+    }
     
     if(comm->getRank()==0){
-    	std::cout << std::endl << "Graph " << graphFile << " with " << N << " nodes, target imbalance " << settings.epsilon;
-        std::cout << std::endl << "ParMetisGeomKway cut= "<< cutKway <<", imbalance= " << imbalanceKway<<", time for partition: "<< partKwayTime << std::endl;
+    	std::cout << std::endl << "machine:" << machine << " input:" << graphFile << " nodes:" << N << " epsilon:" << settings.epsilon;
+        std::cout << std::endl << "ParMetisGeomKway cut= "<< cutKway <<" imbalance:" << imbalanceKway<<", time for partition: "<< partKwayTime << std::endl;
         //td::cout<< std::endl << "ParMetisGeom cut= "<< cutGeom <<" and imbalance= " << imbalanceGeom<<", time for partition: "<< partGeomTime << std::endl;
 
     }

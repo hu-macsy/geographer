@@ -93,6 +93,7 @@ int main(int argc, char** argv) {
 				("quadTreeFile", value<std::string>(), "read QuadTree from file")
 				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
 				("coordFormat", value<ITI::Format>(), "format of coordinate file")
+				("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 				("numX", value<int>(&settings.numX)->default_value(settings.numX), "Number of points in x dimension of generated graph")
@@ -159,6 +160,8 @@ int main(int argc, char** argv) {
 
     std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
 
+    DenseVector<IndexType> nodeWeights;
+
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
     /* timing information
@@ -203,11 +206,25 @@ int main(int argc, char** argv) {
         }
 
         // read the adjacency matrix and the coordinates from a file
-        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+        std::vector<DenseVector<IndexType> > vectorOfNodeWeights;
+        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights );
+
         N = graph.getNumRows();
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
         assert(graph.getColDistribution().isEqual(*noDistPtr));
+
+        IndexType numNodeWeights = vectorOfNodeWeights.size();
+        if (numNodeWeights == 0) {
+			nodeWeights = DenseVector<IndexType>(rowDistPtr, 1);
+		}
+		else if (numNodeWeights == 1) {
+			nodeWeights = vectorOfNodeWeights[0];
+		} else {
+			IndexType index = vm["nodeWeightIndex"].as<int>();
+			assert(index < numNodeWeights);
+			nodeWeights = vectorOfNodeWeights[index];
+		}
 
         // for 2D we do not know the size of every dimension
         settings.numX = N;
@@ -220,7 +237,6 @@ int main(int argc, char** argv) {
         
         if (settings.useDiffusionCoordinates) {
         	scai::lama::CSRSparseMatrix<ValueType> L = ITI::Diffusion<IndexType, ValueType>::constructLaplacian(graph);
-        	scai::lama::DenseVector<IndexType> nodeWeights(L.getRowDistributionPtr(),1);
 
         	std::vector<IndexType> nodeIndices(N);
         	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
@@ -294,6 +310,9 @@ int main(int argc, char** argv) {
             IndexType edges= graph.getNumValues()/2;	
             std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
         }
+
+		nodeWeights = scai::lama::DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+
 	} else if (vm.count("quadTreeFile")) {
 		//if (comm->getRank() == 0) {
 			graph = ITI::FileIO<IndexType, ValueType>::readQuadTree(vm["quadTreeFile"].as<std::string>(), coordinates);
@@ -311,6 +330,7 @@ int main(int argc, char** argv) {
         for (IndexType i = 0; i < settings.dimensions; i++) {
         	coordinates[i].redistribute(rowDistPtr);
         }
+		nodeWeights = scai::lama::DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
 
     } else{
     	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;
@@ -333,7 +353,7 @@ int main(int argc, char** argv) {
     
     std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
     
-    scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, settings );
+    scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, settings );
     assert( partition.size() == N);
     assert( coordinates[0].size() == N);
     

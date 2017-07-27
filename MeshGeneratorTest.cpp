@@ -374,27 +374,6 @@ TEST_F(MeshGeneratorTest, testSimpleMeshFromQuadTree_2D){
         ITI::FileIO<IndexType, ValueType>::writeCoords(coords, outCoords);
     }
 }
-//-----------------------------------------------------------------
-
-TEST_F(MeshGeneratorTest, testIndex2_3DPoint){
-    std::vector<IndexType> numPoints= {9, 11, 7};
-    
-    srand(time(NULL));
-    for(int i=0; i<3; i++){
-        numPoints[i] = (IndexType) (rand()%5 + 10);
-    }
-    IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
-    
-    for(IndexType i=0; i<N; i++){
-        std::tuple<IndexType, IndexType, IndexType> ind = MeshGenerator<IndexType, ValueType>::index2_3DPoint(i, numPoints);
-        EXPECT_LE(std::get<0>(ind) , numPoints[0]-1);
-        EXPECT_LE(std::get<1>(ind) , numPoints[1]-1);
-        EXPECT_LE(std::get<2>(ind) , numPoints[2]-1);
-        EXPECT_GE(std::get<0>(ind) , 0);
-        EXPECT_GE(std::get<1>(ind) , 0);
-        EXPECT_GE(std::get<2>(ind) , 0);
-    }
-}
 
 //-----------------------------------------------------------------
     

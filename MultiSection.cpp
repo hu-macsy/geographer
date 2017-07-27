@@ -676,7 +676,6 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
         SCAI_REGION("MultiSection.projectionNonUniform.localProjection");
         scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights.getLocalValues() );
         std::shared_ptr<rectCell<IndexType,ValueType>> thisRectCell;
-        struct rectangle thisRect;
         
         for(int i=0; i<localN; i++){
             SCAI_REGION_START("MultiSection.projectionNonUniform.localProjection.getContainingLeaf");
@@ -697,11 +696,10 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
             SCAI_REGION_END("MultiSection.projectionNonUniform.localProjection.getContainingLeaf");
             
             IndexType thisLeafID = thisRectCell->getLeafID();
-            thisRect = thisRectCell->getRect();
             
             if( thisLeafID==-1 and comm->getRank()==0 ){
                 PRINT0( "Owner rectangle for point is ");
-                thisRect.print();
+                thisRectCell->getRect().print();
                 PRINT0( thisRectCell->getLeafID() );
                 // terminate() ??
             }
@@ -710,9 +708,9 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
 
             // the chosen dimension to project for this rectangle
             const IndexType dim2proj = dimensionToProject[ thisLeafID ];
-            IndexType relativeIndex = coordinates[i][dim2proj]-thisRect.bottom[dim2proj];
+            IndexType relativeIndex = coordinates[i][dim2proj]-thisRectCell->getRect().bottom[dim2proj];
 
-            SCAI_ASSERT( relativeIndex<=projections[ thisLeafID ].capacity(), "Wrong relative index: "<< relativeIndex << " should be <= "<< projections[ thisLeafID ].capacity() << " (and thisRect.bottom= "<< thisRect.bottom[dim2proj]  << " , thisRect.top= "<< thisRect.top[dim2proj] << ")" );
+            SCAI_ASSERT( relativeIndex<=projections[ thisLeafID ].capacity(), "Wrong relative index: "<< relativeIndex << " should be <= "<< projections[ thisLeafID ].capacity() << " (and thisRect.bottom= "<< thisRectCell->getRect().bottom[dim2proj]  << " , thisRect.top= "<< thisRectCell->getRect().top[dim2proj] << ")" );
 
             projections[ thisLeafID ][relativeIndex] += localWeights[i];
         }

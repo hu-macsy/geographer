@@ -34,6 +34,7 @@
 #include "quadtree/SpatialTree.h"
 #include "quadtree/SpatialCell.h"
 #include "quadtree/QuadTreeCartesianEuclid.h" 
+#include "AuxiliaryFunctions.h"
  
 typedef double ValueType;
 typedef int IndexType;
@@ -90,7 +91,7 @@ namespace ITI {
                 /*  Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
                  *  of the index in 3D. The return value is not the coordinates of the point!
                  */
-                static std::tuple<IndexType, IndexType, IndexType> index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints);
+                //static std::tuple<IndexType, IndexType, IndexType> index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints);
         };//class MeshGenerator
         
 }//namespace ITI

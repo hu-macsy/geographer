@@ -217,9 +217,13 @@ int main(int argc, char** argv) {
         settings.numY = 1;
         settings.numZ = 1;
         
-//        ITI::Format format = vm["coordFormat"].as<ITI::Format>();
-        ITI::Format format;
-        coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format );
+        
+        if (vm.count("coordFormat")) {
+            ITI::Format format = vm["coordFormat"].as<ITI::Format>();
+            coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format);
+        } else {
+            coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
+        }
         PRINT0("read  graph and coordinates");        
         
         //unit weights
