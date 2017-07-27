@@ -10,6 +10,7 @@
 #include <vector>
 
 #include <scai/lama/DenseVector.hpp>
+#include <scai/tracing.hpp>
 
 using scai::lama::DenseVector;
 
@@ -48,6 +49,7 @@ DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType>> &c
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<IndexType> &nodeWeights,
 		const std::vector<IndexType> &blockSizes, const ValueType epsilon) {
+	SCAI_REGION( "KMeans.computePartition" );
 
 	std::vector<std::vector<ValueType> > centers = findInitialCenters(coordinates, k, nodeWeights);
 	DenseVector<IndexType> result;

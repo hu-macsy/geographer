@@ -22,6 +22,8 @@ template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCenters(
 		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const DenseVector<IndexType> &nodeWeights) {
 
+	SCAI_REGION( "KMeans.findInitialCenters" );
+
 	const IndexType dim = coordinates.size();
 	const IndexType n = coordinates[0].size();
 	const IndexType localN = coordinates[0].getLocalValues().size();
@@ -60,6 +62,7 @@ std::vector<std::vector<ValueType> > findCenters(
 		const DenseVector<IndexType>& partition,
 		const IndexType k,
 		const DenseVector<IndexType>& nodeWeights) {
+	SCAI_REGION( "KMeans.findCenters" );
 
 	const IndexType dim = coordinates.size();
 	const IndexType n = partition.size();
@@ -121,6 +124,7 @@ DenseVector<IndexType> assignBlocks(
 		const DenseVector<IndexType> &nodeWeights, const std::vector<IndexType> &targetBlockSizes,
 		const ValueType epsilon,
 		std::vector<ValueType> &influence) {
+	SCAI_REGION( "KMeans.assignBlocks" );
 
 	const IndexType dim = coordinates.size();
 	const IndexType n = nodeWeights.size();
@@ -142,16 +146,19 @@ DenseVector<IndexType> assignBlocks(
 		sublist.resize(localN, 0);
 	}
 
-	//compute squared distances. Since only the nearest neighbor is required, we could speed this up with a suitable data structure.
-	for (IndexType d = 0; d < dim; d++) {
-		scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
+	{
+		SCAI_REGION( "KMeans.assignBlocks.squaredDistances" );
+		//compute squared distances. Since only the nearest neighbor is required, we could speed this up with a suitable data structure.
+		for (IndexType d = 0; d < dim; d++) {
+			scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
 
-		for (IndexType j = 0; j < k; j++) {
-			ValueType centerCoord = centers[d][j];
-			for (IndexType i = 0; i < localN; i++) {
-				ValueType coord = rCoords[i];
-				ValueType dist = std::abs(centerCoord - coord);
-				squaredDistances[j][i] += dist*dist; //maybe use Manhattan distance here? Should align better with grid structure.
+			for (IndexType j = 0; j < k; j++) {
+				ValueType centerCoord = centers[d][j];
+				for (IndexType i = 0; i < localN; i++) {
+					ValueType coord = rCoords[i];
+					ValueType dist = std::abs(centerCoord - coord);
+					squaredDistances[j][i] += dist*dist; //maybe use Manhattan distance here? Should align better with grid structure.
+				}
 			}
 		}
 	}
@@ -164,33 +171,36 @@ DenseVector<IndexType> assignBlocks(
 	//iterate if necessary to achieve balance
 	do
 	{
+		SCAI_REGION( "KMeans.assignBlocks.balanceLoop" );
 		std::vector<IndexType> blockWeights(k,0);
 		scai::hmemo::ReadAccess<IndexType> rWeights(nodeWeights.getLocalValues());
 		scai::hmemo::WriteAccess<IndexType> wAssignment(assignment.getLocalValues());
-		for (IndexType i = 0; i < localN; i++) {
-			int bestBlock = 0;
-			for (IndexType j = 0; j < k; j++) {
-				if (squaredDistances[j][i]/influence[j] < squaredDistances[bestBlock][i]/influence[bestBlock]) {
-					bestBlock = j;
+		{
+			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.assign" );
+			for (IndexType i = 0; i < localN; i++) {
+				int bestBlock = 0;
+				int bestValue = squaredDistances[bestBlock][i]*influence[0];
+				for (IndexType j = 0; j < k; j++) {
+					if (squaredDistances[j][i]*influence[j] < bestValue) {
+						bestBlock = j;
+						bestValue = squaredDistances[bestBlock][i]*influence[bestBlock];
+					}
 				}
+				wAssignment[i] = bestBlock;
+				blockWeights[bestBlock] += rWeights[i];
 			}
-			wAssignment[i] = bestBlock;
-			blockWeights[bestBlock] += rWeights[i];
 		}
 
 		std::vector<IndexType> totalWeight(k, 0);
 		for (IndexType j = 0; j < k; j++) {
+			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.blockWeightSum" );
 			totalWeight[j] = comm->sum(blockWeights[j]);
-			double ratio = ValueType(targetBlockSizes[j]) / totalWeight[j];
-			if (ratio > 1) {
-				//block to small
-				influence[j] = std::min(influence[j] * std::pow(ratio, 0.5), influence[j]*1.05);
-				//influence[j] *= 1.03;
-			} else if (ratio < 1) {
-				//block too large
-				influence[j] = std::max(influence[j] * std::pow(ratio, 0.5), influence[j]*0.95);
-				//influence[j] /= 1.03;
-			}
+		}
+
+		for (IndexType j = 0; j < k; j++) {
+			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.influence" );
+			double ratio = ValueType(totalWeight[j]) / targetBlockSizes[j];
+			influence[j] = std::max(influence[j]*0.95, std::min(influence[j] * std::pow(ratio, 0.5), influence[j]*1.05));
 
 			if (comm->getRank() == 0) {
 				std::cout << "Iter " << iter << ", block " << j << " has size " << totalWeight[j] << ", setting influence to ";
@@ -211,6 +221,7 @@ DenseVector<IndexType> assignBlocks(
 
 template<typename ValueType>
 ValueType biggestDelta(const std::vector<std::vector<ValueType>> &firstCoords, const std::vector<std::vector<ValueType>> &secondCoords) {
+	SCAI_REGION( "KMeans.biggestDelta" );
 	assert(firstCoords.size() == secondCoords.size());
 	const int dim = firstCoords.size();
 	assert(dim > 0);
