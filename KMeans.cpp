@@ -198,24 +198,6 @@ DenseVector<IndexType> assignBlocks(
 
 	assert(influence.size() == k);
 
-	{
-		scai::hmemo::ReadAccess<IndexType> rPrevious(previousAssignment.getLocalValues());
-
-		for (IndexType i = 0; i < localN; i++) {
-			//assert(upperBoundOwnCenter[i] >= lowerBoundNextCenter[i]);
-			ValueType sqDistToOwn = 0;
-			for (IndexType d = 0; d < dim; d++) {
-				sqDistToOwn += std::pow(centers[d][rPrevious[i]] - coordinates[d][i], 2);
-			}
-			ValueType newEffectiveDistance = sqDistToOwn*influence[rPrevious[i]];
-			if (upperBoundOwnCenter[i] < newEffectiveDistance) {
-				std::cout << "bound:" << upperBoundOwnCenter[i] << ", real distance:" << newEffectiveDistance << std::endl;
-				std::cout << "difference:" << std::abs(upperBoundOwnCenter[i] - newEffectiveDistance) << std::endl;
-			}
-			assert(upperBoundOwnCenter[i] >= newEffectiveDistance);
-		}
-	}
-
 	//compute assignment and balance
 	DenseVector<IndexType> assignment = previousAssignment;
 

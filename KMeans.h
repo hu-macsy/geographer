@@ -80,20 +80,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	do {
 		result = assignBlocks(convertedCoords, centers, nodeWeights, result, blockSizes, epsilon, upperBoundOwnCenter, lowerBoundNextCenter, influence);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
-		for (IndexType i = 0; i < localN; i++) {
-			//assert(upperBoundOwnCenter[i] >= lowerBoundNextCenter[i]);
-			ValueType sqDistToOwn = 0;
-			for (IndexType d = 0; d < dim; d++) {
-				sqDistToOwn += std::pow(centers[d][rResult[i]] - convertedCoords[d][i], 2);
-			}
-			ValueType newEffectiveDistance = sqDistToOwn*influence[rResult[i]];
-			if (upperBoundOwnCenter[i] < newEffectiveDistance) {
-				std::cout << "cluster:" << rResult[i] << ", influence:" << influence[rResult[i]] << std::endl;
-				std::cout << "bound:" << upperBoundOwnCenter[i] << ", real distance:" << newEffectiveDistance << std::endl;
-				std::cout << "difference:" << std::abs(upperBoundOwnCenter[i] - newEffectiveDistance) << std::endl;
-			}
-			assert(upperBoundOwnCenter[i] >= newEffectiveDistance);
-		}
+
 		std::vector<std::vector<ValueType> > newCenters = findCenters(coordinates, result, k, nodeWeights);
 		std::vector<ValueType> squaredDeltas(k,0);
 		std::vector<ValueType> deltas(k,0);
@@ -112,32 +99,10 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		for (IndexType i = 0; i < localN; i++) {
 			IndexType cluster = rResult[i];
 			upperBoundOwnCenter[i] += (2*deltas[cluster]*std::sqrt(upperBoundOwnCenter[i]/influence[cluster]) + squaredDeltas[cluster])*(influence[cluster] + 1e-10);
-			lowerBoundNextCenter[i] -= (2*delta*std::sqrt(lowerBoundNextCenter[i]/minInfluence) + delta*delta)*(maxInfluence + 1e-10);
+			lowerBoundNextCenter[i] -= (2*delta*std::sqrt(lowerBoundNextCenter[i]/maxInfluence) + delta*delta)*(maxInfluence + 1e-10);
 		}
 		centers = newCenters;
-		for (IndexType i = 0; i < localN; i++) {
-			//assert(upperBoundOwnCenter[i] >= lowerBoundNextCenter[i]);
-			ValueType sqDistToOwn = 0;
-			for (IndexType d = 0; d < dim; d++) {
-				sqDistToOwn += std::pow(centers[d][rResult[i]] - convertedCoords[d][i], 2);
-			}
-			ValueType newEffectiveDistance = sqDistToOwn*influence[rResult[i]];
-			if (upperBoundOwnCenter[i] < newEffectiveDistance) {
-				std::cout << "cluster:" << rResult[i] << ", influence:" << influence[rResult[i]] << ", delta: " << deltas[rResult[i]] << std::endl;
-				std::cout << "bound:" << upperBoundOwnCenter[i] << ", real distance:" << newEffectiveDistance << std::endl;
-				std::cout << "center: (";
-				for (IndexType d = 0; d < dim; d++) {
-					std::cout << centers[d][rResult[i]] << ",";
-				}
-				std::cout << "), point: (";
-				for (IndexType d = 0; d < dim; d++) {
-					std::cout << convertedCoords[d][i] << ",";
-				}
-				std::cout << ")" << std::endl;
-				std::cout << "difference:" << std::abs(upperBoundOwnCenter[i] - newEffectiveDistance) << std::endl;
-			}
-			assert(upperBoundOwnCenter[i] >= newEffectiveDistance);
-		}
+
 		std::cout << "i: " << i << ", delta: " << delta << std::endl;
 		i++;
 	} while (i < 50 && delta > threshold);
