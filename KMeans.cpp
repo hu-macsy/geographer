@@ -8,6 +8,7 @@
 #include <set>
 #include <cmath>
 #include <assert.h>
+#include <algorithm>
 
 #include <scai/dmemo/NoDistribution.hpp>
 
@@ -204,13 +205,8 @@ DenseVector<IndexType> assignBlocks(
 	DenseVector<IndexType> assignment = previousAssignment;
 
 	//pre-filter possible closest blocks
+	std::vector<ValueType> effectiveMinDistance(k);
 	std::vector<ValueType> minDistance(k);
-	std::vector<ValueType> maxDistance(k);
-	ValueType minMaxSquaredDistance = std::numeric_limits<ValueType>::max();
-
-	std::set<IndexType> possibleClosestCenters;
-	ValueType minExcluded  = std::numeric_limits<ValueType>::max();
-	IndexType minExcludedIndex = -1;
 	{
 		SCAI_REGION( "KMeans.assignBlocks.filterCenters" );
 		for (IndexType j = 0; j < k; j++) {
@@ -220,22 +216,21 @@ DenseVector<IndexType> assignBlocks(
 			for (IndexType d = 0; d < dim; d++) {
 				center[d] = centers[d][j];
 			}
-			std::tie(minDistance[j], maxDistance[j]) = boundingBox.distances(center);
-			minMaxSquaredDistance = std::min(minMaxSquaredDistance, maxDistance[j]*maxDistance[j]*influence[j]);
+			minDistance[j] = boundingBox.distances(center).first;
+			effectiveMinDistance[j] = minDistance[j]*minDistance[j]*influence[j];
 		}
+	}
 
-		ValueType threshold = minMaxSquaredDistance;
-		for (IndexType j = 0; j < k; j++) {
-			if (minDistance[j]*minDistance[j]*influence[j] > threshold) {
-				if (minDistance[j]*minDistance[j]*influence[j] < minExcluded) {
-					minExcluded = minDistance[j]*minDistance[j]*influence[j];
-					minExcludedIndex = j;
-				}
-				//std::cout << "Process " << comm->getRank() << " excluded center " << j << std::endl;
-			} else {
-				possibleClosestCenters.insert(j);
-			}
-		}
+	std::vector<IndexType> clusterIndices(k);
+	std::iota(clusterIndices.begin(), clusterIndices.end(), 0);
+	std::sort(clusterIndices.begin(), clusterIndices.end(),
+			[&effectiveMinDistance](IndexType a, IndexType b){return effectiveMinDistance[a] < effectiveMinDistance[b] || (effectiveMinDistance[a] == effectiveMinDistance[b] && a < b);});
+	std::sort(effectiveMinDistance.begin(), effectiveMinDistance.end());
+
+	for (IndexType i = 0; i < k; i++) {
+		IndexType c = clusterIndices[i];
+		ValueType effectiveDist = minDistance[c]*minDistance[c]*influence[c];
+		assert(effectiveMinDistance[i] == effectiveDist);
 	}
 
 	std::vector<ValueType> distThreshold(k);
@@ -258,6 +253,7 @@ DenseVector<IndexType> assignBlocks(
 
 	ValueType imbalance;
 	IndexType iter = 0;
+	IndexType skippedLoops = 0;
 	//iterate if necessary to achieve balance
 	do
 	{
@@ -273,6 +269,7 @@ DenseVector<IndexType> assignBlocks(
 					//std::cout << upperBoundOwnCenter[i] << " " << lowerBoundNextCenter[i] << " " << distThreshold[oldCluster] << std::endl;
 					//cluster assignment cannot have changed.
 					//wAssignment[i] = wAssignment[i];
+					skippedLoops++;
 				} else {
 					ValueType sqDistToOwn = 0;
 					for (IndexType d = 0; d < dim; d++) {
@@ -284,13 +281,16 @@ DenseVector<IndexType> assignBlocks(
 					if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i] || upperBoundOwnCenter[i] < distThreshold[oldCluster]) {
 						//cluster assignment cannot have changed.
 						//wAssignment[i] = wAssignment[i];
+						skippedLoops++;
 					} else {
 						int bestBlock = 0;
 						ValueType bestValue = std::numeric_limits<ValueType>::max();
 						IndexType secondBest = 0;
 						ValueType secondBestValue = std::numeric_limits<ValueType>::max();
 
-						for (IndexType j : possibleClosestCenters) {
+						IndexType c = 0;
+						while(c < k && secondBestValue > effectiveMinDistance[c]) {
+							IndexType j = clusterIndices[c];
 							ValueType sqDist = 0;
 							for (IndexType d = 0; d < dim; d++) {
 								ValueType dist = centers[d][j] - coordinates[d][i];
@@ -306,22 +306,20 @@ DenseVector<IndexType> assignBlocks(
 								secondBest = j;
 								secondBestValue = sqDist*influence[j];
 							}
+							c++;
 						}
 						assert(bestBlock != secondBest);
 						assert(secondBestValue >= bestValue);
 						if (bestBlock != oldCluster) {
 							if (bestValue < lowerBoundNextCenter[i]) {
-								std::cout << "bestValue: " << bestValue << " lowerBoundNextCenter[ " << i << "]: "<< lowerBoundNextCenter[i];
+								std::cout << "bestValue: " << bestValue << " lowerBoundNextCenter[" << i << "]: "<< lowerBoundNextCenter[i];
 								std::cout << " difference " << std::abs(bestValue - lowerBoundNextCenter[i]) << std::endl;
 							}
 							assert(bestValue >= lowerBoundNextCenter[i]);
 						}
 
 						upperBoundOwnCenter[i] = bestValue;
-						if (minExcluded < secondBestValue) {
-							//std::cout << "Worsened bound: " << minExcluded << " instead of " << secondBestValue << std::endl;
-						}
-						lowerBoundNextCenter[i] = std::max(lowerBoundNextCenter[i], std::min(minExcluded, secondBestValue));
+						lowerBoundNextCenter[i] = secondBestValue;
 						wAssignment[i] = bestBlock;
 					}
 				}
@@ -365,25 +363,14 @@ DenseVector<IndexType> assignBlocks(
 		//update possible closest centers
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.filterCenters" );
-			minMaxSquaredDistance = std::numeric_limits<ValueType>::max();
 			for (IndexType j = 0; j < k; j++) {
-				if (maxDistance[j]*maxDistance[j]*influence[j] < minMaxSquaredDistance) minMaxSquaredDistance = maxDistance[j]*maxDistance[j]*influence[j];
+				effectiveMinDistance[j] = minDistance[j]*minDistance[j]*influence[j];
 			}
 
-			ValueType threshold = minMaxSquaredDistance;
-			minExcluded = std::numeric_limits<ValueType>::max();
-			possibleClosestCenters.clear();
-			for (IndexType j = 0; j < k; j++) {
-				if (minDistance[j]*minDistance[j]*influence[j] > threshold) {
-					if (minDistance[j]*minDistance[j]*influence[j] < minExcluded) {
-						minExcluded = minDistance[j]*minDistance[j]*influence[j];
-						minExcludedIndex = j;
-					}
-					//std::cout << "Process " << comm->getRank() << " excluded center " << j << std::endl;
-				} else {
-					possibleClosestCenters.insert(j);
-				}
-			}
+			std::sort(clusterIndices.begin(), clusterIndices.end(),
+						[&effectiveMinDistance](IndexType a, IndexType b){return effectiveMinDistance[a] < effectiveMinDistance[b] || (effectiveMinDistance[a] == effectiveMinDistance[b] && a < b);});
+			std::sort(effectiveMinDistance.begin(), effectiveMinDistance.end());
+
 		}
 
 		{
@@ -408,6 +395,7 @@ DenseVector<IndexType> assignBlocks(
 
 		if (comm->getRank() == 0) std::cout << "Iter " << iter << ", imbalance : " << imbalance << std::endl;
 	} while (imbalance > epsilon && iter < maxIter);
+	//std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
 
 	return assignment;
 }
