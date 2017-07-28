@@ -221,8 +221,7 @@ DenseVector<IndexType> assignBlocks(
 				center[d] = centers[d][j];
 			}
 			std::tie(minDistance[j], maxDistance[j]) = boundingBox.distances(center);
-
-			if (maxDistance[j]*maxDistance[j]*influence[j] < minMaxSquaredDistance) minMaxSquaredDistance = maxDistance[j]*maxDistance[j]*influence[j];
+			minMaxSquaredDistance = std::min(minMaxSquaredDistance, maxDistance[j]*maxDistance[j]*influence[j]);
 		}
 
 		ValueType threshold = minMaxSquaredDistance;
@@ -239,6 +238,24 @@ DenseVector<IndexType> assignBlocks(
 		}
 	}
 
+	std::vector<ValueType> distThreshold(k);
+	{
+		SCAI_REGION( "KMeans.assignBlocks.pairWise" );
+		for (IndexType j = 0; j < k; j++) {
+			distThreshold[j] = std::numeric_limits<ValueType>::max();
+			for (IndexType l = 0; l < k; l++) {
+				if (j == l) continue;
+				ValueType sqDist = 0;
+				for (IndexType d = 0; d < dim; d++) {
+					sqDist += std::pow(centers[d][j] - centers[d][l], 2);
+				}
+				ValueType weightedDist = sqDist * influence[j]*influence[l] / (influence[j]+influence[l]+2*std::sqrt(influence[j]*influence[l]));
+				if (weightedDist < distThreshold[j]) distThreshold[j] = weightedDist;
+			}
+
+		}
+	}
+
 	ValueType imbalance;
 	IndexType iter = 0;
 	//iterate if necessary to achieve balance
@@ -251,18 +268,20 @@ DenseVector<IndexType> assignBlocks(
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.assign" );
 			for (IndexType i = 0; i < localN; i++) {
-				if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i]) {
+				const IndexType oldCluster = wAssignment[i];
+				if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i] || upperBoundOwnCenter[i] < distThreshold[oldCluster]) {
+					//std::cout << upperBoundOwnCenter[i] << " " << lowerBoundNextCenter[i] << " " << distThreshold[oldCluster] << std::endl;
 					//cluster assignment cannot have changed.
 					//wAssignment[i] = wAssignment[i];
 				} else {
 					ValueType sqDistToOwn = 0;
 					for (IndexType d = 0; d < dim; d++) {
-						sqDistToOwn += std::pow(centers[d][wAssignment[i]] - coordinates[d][i], 2);
+						sqDistToOwn += std::pow(centers[d][oldCluster] - coordinates[d][i], 2);
 					}
-					ValueType newEffectiveDistance = sqDistToOwn*influence[wAssignment[i]];
+					ValueType newEffectiveDistance = sqDistToOwn*influence[oldCluster];
 					assert(upperBoundOwnCenter[i] >= newEffectiveDistance);
 					upperBoundOwnCenter[i] = newEffectiveDistance;
-					if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i]) {
+					if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i] || upperBoundOwnCenter[i] < distThreshold[oldCluster]) {
 						//cluster assignment cannot have changed.
 						//wAssignment[i] = wAssignment[i];
 					} else {
@@ -274,7 +293,8 @@ DenseVector<IndexType> assignBlocks(
 						for (IndexType j : possibleClosestCenters) {
 							ValueType sqDist = 0;
 							for (IndexType d = 0; d < dim; d++) {
-								sqDist += std::pow(centers[d][j] - coordinates[d][i], 2);
+								ValueType dist = centers[d][j] - coordinates[d][i];
+								sqDist += dist*dist;
 							}
 
 							if (sqDist*influence[j] < bestValue) {
@@ -289,7 +309,7 @@ DenseVector<IndexType> assignBlocks(
 						}
 						assert(bestBlock != secondBest);
 						assert(secondBestValue >= bestValue);
-						if (bestBlock != wAssignment[i]) {
+						if (bestBlock != oldCluster) {
 							if (bestValue < lowerBoundNextCenter[i]) {
 								std::cout << "bestValue: " << bestValue << " lowerBoundNextCenter[ " << i << "]: "<< lowerBoundNextCenter[i];
 								std::cout << " difference " << std::abs(bestValue - lowerBoundNextCenter[i]) << std::endl;
@@ -303,9 +323,7 @@ DenseVector<IndexType> assignBlocks(
 						}
 						lowerBoundNextCenter[i] = std::max(lowerBoundNextCenter[i], std::min(minExcluded, secondBestValue));
 						wAssignment[i] = bestBlock;
-
 					}
-
 				}
 				blockWeights[wAssignment[i]] += rWeights[i];
 			}
@@ -365,6 +383,24 @@ DenseVector<IndexType> assignBlocks(
 				} else {
 					possibleClosestCenters.insert(j);
 				}
+			}
+		}
+
+		{
+			SCAI_REGION( "KMeans.assignBlocks.pairWise" );
+			for (IndexType j = 0; j < k; j++) {
+				distThreshold[j] = std::numeric_limits<ValueType>::max();
+
+				for (IndexType l = 0; l < k; l++) {
+					if (j == l) continue;
+					ValueType sqDist = 0;
+					for (IndexType d = 0; d < dim; d++) {
+						sqDist += std::pow(centers[d][j] - centers[d][l], 2);
+					}
+					ValueType weightedDist = sqDist * influence[j]*influence[l] / (influence[j]+influence[l]+2*std::sqrt(influence[j]*influence[l]));
+					if (weightedDist < distThreshold[j]) distThreshold[j] = weightedDist;
+				}
+
 			}
 		}
 
