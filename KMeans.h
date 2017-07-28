@@ -111,8 +111,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 			for (IndexType i = 0; i < localN; i++) {
 				IndexType cluster = rResult[i];
 				upperBoundOwnCenter[i] += (2*deltas[cluster]*std::sqrt(upperBoundOwnCenter[i]/influence[cluster]) + squaredDeltas[cluster])*(influence[cluster] + 1e-10);
-				lowerBoundNextCenter[i] -= (2*delta*std::sqrt(lowerBoundNextCenter[i]/maxInfluence) + delta*delta)*(maxInfluence + 1e-10);
-				upperBoundNextCenter[i] += (2*delta*std::sqrt(upperBoundNextCenter[i]/maxInfluence) + delta*delta)*(maxInfluence + 1e-10);
+				lowerBoundNextCenter[i]-= (2*delta*std::sqrt(lowerBoundNextCenter[i]/maxInfluence) + delta*delta)*(maxInfluence + 1e-10);
+				if (!(lowerBoundNextCenter[i] > 0)) lowerBoundNextCenter[i] = 0;
+				assert(std::isfinite(lowerBoundNextCenter[i]));
 			}
 		}
 		centers = newCenters;
