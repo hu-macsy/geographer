@@ -88,13 +88,15 @@ int main(int argc, char** argv) {
 	options_description desc("Supported options");
 
 	struct Settings settings;
-
+        //ITI::Format ff = ITI::Format::METIS;
+        IndexType ff = 1;
+        
 	desc.add_options()
 				("help", "display options")
 				("version", "show version")
 				("graphFile", value<std::string>(), "read graph from file")
 				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
-                                ("coordFormat", value<ITI::Format>(), "format of coordinate file")
+                                ("fileFormat", value<int>(&ff)->default_value(ff), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
                                 ("weakScaling", "generate coordinates locally for weak scaling")
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
@@ -114,7 +116,6 @@ int main(int argc, char** argv) {
 				("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
 				("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
 				("multiLevelRounds", value<int>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
-                                ("fileFormat", value<int>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for METIS format, 1 for MatrixMarket format. See FileIO for more details.")
 				;
 
 	variables_map vm;
@@ -203,8 +204,15 @@ int main(int argc, char** argv) {
             std::cout<< "Reading from file \""<< graphFile << "\" for the graph and \"" << coordFile << "\" for coordinates"<< std::endl;
         }
 
-        // read the adjacency matrix and the coordinates from a file        
-        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+        // read the adjacency matrix and the coordinates from a file  
+        
+        ITI::Format format = static_cast<ITI::Format>(ff);
+        
+        if (vm.count("fileFormat")) {
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, format );
+        } else{
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+        }
         N = graph.getNumRows();
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
@@ -216,8 +224,7 @@ int main(int argc, char** argv) {
         settings.numZ = 1;
         
         
-        if (vm.count("coordFormat")) {
-            ITI::Format format = vm["coordFormat"].as<ITI::Format>();
+        if (vm.count("fileFormat")) {
             coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format);
         } else {
             coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);

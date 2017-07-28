@@ -9,7 +9,7 @@
 const std::string version = BUILD_COMMIT_STRING;
 
 struct Settings{
-    IndexType dimensions= 3;
+    IndexType dimensions= 2;
     IndexType numX = 32;
     IndexType numY = 32;
     IndexType numZ = 32;
@@ -23,7 +23,7 @@ struct Settings{
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
     IndexType pixeledSideLen = 10;
-    IndexType fileFormat = 0;   // 0 for METSI, 1 for MatrixMarket
+    IndexType fileFormat = 1;   // 0 for METSI, 1 for MatrixMarket
     IndexType initialPartition = 0;
     bool useDiffusionTieBreaking = false;
     bool useGeometricTieBreaking = false;

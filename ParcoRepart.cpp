@@ -1280,13 +1280,9 @@ std::vector<std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getLocalB
     }
     return edges;
 }
-
 //-----------------------------------------------------------------------------------------
 
-// in this version the graph is an HArray with size k*k and [i,j] = i*k+j
-//
-// Not distributed.
-//
+
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> ParcoRepart<IndexType, ValueType>::getBlockGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const int k) {
     SCAI_REGION("ParcoRepart.getBlockGraph");
