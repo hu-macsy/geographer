@@ -108,18 +108,5 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	} while (i < 50 && delta > threshold);
 	return result;
 }
-/**
- * DenseVector<IndexType> assignBlocks(
-		const std::vector<std::vector<ValueType> >& coordinates,
-		const std::vector<std::vector<ValueType> >& centers,
-		const DenseVector<IndexType> &nodeWeights,
-		const DenseVector<IndexType> &previousAssignment,
-		const std::vector<IndexType> &targetBlockSizes,
-		const ValueType epsilon,
-		std::vector<ValueType> &upperBoundOwnCenter,
-		std::vector<ValueType> &lowerBoundNextCenter,
-		std::vector<ValueType> &influence) {
- */
-
 }
 } /* namespace ITI */

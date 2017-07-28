@@ -256,6 +256,10 @@ DenseVector<IndexType> assignBlocks(
 						assert(bestBlock != secondBest);
 						assert(secondBestValue >= bestValue);
 						if (bestBlock != wAssignment[i]) {
+							if (bestValue < lowerBoundNextCenter[i]) {
+								std::cout << "bestValue: " << bestValue << " lowerBoundNextCenter[ " << i << "]: "<< lowerBoundNextCenter[i];
+								std::cout << " difference " << std::abs(bestValue - lowerBoundNextCenter[i]) << std::endl;
+							}
 							assert(bestValue >= lowerBoundNextCenter[i]);
 						}
 
@@ -294,10 +298,8 @@ DenseVector<IndexType> assignBlocks(
 		//update bounds
 		for (IndexType i = 0; i < localN; i++) {
 			const IndexType cluster = wAssignment[i];
-			upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]);
-			upperBoundOwnCenter[i] += 1e-10;
-			lowerBoundNextCenter[i] *= minRatio;
-			lowerBoundNextCenter[i] -= 1e-10;
+			upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]) + 1e-12;
+			lowerBoundNextCenter[i] *= minRatio - 1e-12;
 		}
 
 		IndexType maxBlockWeight = *std::max_element(totalWeight.begin(), totalWeight.end());
