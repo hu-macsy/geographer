@@ -206,9 +206,11 @@ DenseVector<IndexType> assignBlocks(
 	//pre-filter possible closest blocks
 	std::vector<ValueType> minDistance(k);
 	std::vector<ValueType> maxDistance(k);
-	ValueType minMaxDistance = std::numeric_limits<ValueType>::max();
+	ValueType minMaxSquaredDistance = std::numeric_limits<ValueType>::max();
 
 	std::set<IndexType> possibleClosestCenters;
+	ValueType minExcluded  = std::numeric_limits<ValueType>::max();
+	IndexType minExcludedIndex = -1;
 	{
 		SCAI_REGION( "KMeans.assignBlocks.filterCenters" );
 		for (IndexType j = 0; j < k; j++) {
@@ -219,13 +221,18 @@ DenseVector<IndexType> assignBlocks(
 				center[d] = centers[d][j];
 			}
 			std::tie(minDistance[j], maxDistance[j]) = boundingBox.distances(center);
-			if (maxDistance[j]*influence[j] < minMaxDistance) minMaxDistance = maxDistance[j]*influence[j];
+
+			if (maxDistance[j]*maxDistance[j]*influence[j] < minMaxSquaredDistance) minMaxSquaredDistance = maxDistance[j]*maxDistance[j]*influence[j];
 		}
 
-		ValueType threshold = std::max(minMaxDistance, *std::max_element(upperBoundNextCenter.begin(), upperBoundNextCenter.end()));
+		ValueType threshold = minMaxSquaredDistance;
 		for (IndexType j = 0; j < k; j++) {
-			if (minDistance[j]*influence[j] > threshold) {
-				std::cout << "Process " << comm->getRank() << " excluded center " << j << std::endl;
+			if (minDistance[j]*minDistance[j]*influence[j] > threshold) {
+				if (minDistance[j]*minDistance[j]*influence[j] < minExcluded) {
+					minExcluded = minDistance[j]*minDistance[j]*influence[j];
+					minExcludedIndex = j;
+				}
+				//std::cout << "Process " << comm->getRank() << " excluded center " << j << std::endl;
 			} else {
 				possibleClosestCenters.insert(j);
 			}
@@ -264,7 +271,7 @@ DenseVector<IndexType> assignBlocks(
 						IndexType secondBest = 0;
 						ValueType secondBestValue = std::numeric_limits<ValueType>::max();
 
-						for (IndexType j = 0; j < k; j++) {
+						for (IndexType j : possibleClosestCenters) {
 							ValueType sqDist = 0;
 							for (IndexType d = 0; d < dim; d++) {
 								sqDist += std::pow(centers[d][j] - coordinates[d][i], 2);
@@ -282,8 +289,6 @@ DenseVector<IndexType> assignBlocks(
 						}
 						assert(bestBlock != secondBest);
 						assert(secondBestValue >= bestValue);
-						assert(possibleClosestCenters.count(bestBlock));
-						assert(possibleClosestCenters.count(secondBest));
 						if (bestBlock != wAssignment[i]) {
 							if (bestValue < lowerBoundNextCenter[i]) {
 								std::cout << "bestValue: " << bestValue << " lowerBoundNextCenter[ " << i << "]: "<< lowerBoundNextCenter[i];
@@ -293,8 +298,10 @@ DenseVector<IndexType> assignBlocks(
 						}
 
 						upperBoundOwnCenter[i] = bestValue;
-						lowerBoundNextCenter[i] = secondBestValue;
-						upperBoundNextCenter[i] = secondBestValue;
+						if (minExcluded < secondBestValue) {
+							//std::cout << "Worsened bound: " << minExcluded << " instead of " << secondBestValue << std::endl;
+						}
+						lowerBoundNextCenter[i] = std::max(lowerBoundNextCenter[i], std::min(minExcluded, secondBestValue));
 						wAssignment[i] = bestBlock;
 
 					}
@@ -331,28 +338,30 @@ DenseVector<IndexType> assignBlocks(
 		}
 
 		//update bounds
-		ValueType maxUpperBoundNextCenter = 0;
 		for (IndexType i = 0; i < localN; i++) {
 			const IndexType cluster = wAssignment[i];
 			upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]) + 1e-12;
 			lowerBoundNextCenter[i] *= minRatio - 1e-12;
-			upperBoundNextCenter[i] *= maxRatio + 1e-12;
-			if (upperBoundNextCenter[i] > maxUpperBoundNextCenter) maxUpperBoundNextCenter = upperBoundNextCenter[i];
 		}
 
 		//update possible closest centers
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.filterCenters" );
-			minMaxDistance = std::numeric_limits<ValueType>::max();
+			minMaxSquaredDistance = std::numeric_limits<ValueType>::max();
 			for (IndexType j = 0; j < k; j++) {
-				if (maxDistance[j]*influence[j] < minMaxDistance) minMaxDistance = maxDistance[j]*influence[j];
+				if (maxDistance[j]*maxDistance[j]*influence[j] < minMaxSquaredDistance) minMaxSquaredDistance = maxDistance[j]*maxDistance[j]*influence[j];
 			}
 
-			ValueType threshold = std::max(minMaxDistance, maxUpperBoundNextCenter);
+			ValueType threshold = minMaxSquaredDistance;
+			minExcluded = std::numeric_limits<ValueType>::max();
 			possibleClosestCenters.clear();
 			for (IndexType j = 0; j < k; j++) {
-				if (minDistance[j]*influence[j] > threshold) {
-					std::cout << "Process " << comm->getRank() << " excluded center " << j << std::endl;
+				if (minDistance[j]*minDistance[j]*influence[j] > threshold) {
+					if (minDistance[j]*minDistance[j]*influence[j] < minExcluded) {
+						minExcluded = minDistance[j]*minDistance[j]*influence[j];
+						minExcludedIndex = j;
+					}
+					//std::cout << "Process " << comm->getRank() << " excluded center " << j << std::endl;
 				} else {
 					possibleClosestCenters.insert(j);
 				}
