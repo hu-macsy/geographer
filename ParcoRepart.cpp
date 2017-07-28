@@ -113,6 +113,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         
         assert(nodeWeights.getDistribution().isEqual(*inputDist));
 
+        std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
+
         if( settings.initialPartition==0 ){ //sfc
             result= ParcoRepart<IndexType, ValueType>::hilbertPartition(input, coordinates, settings);
         } else if ( settings.initialPartition==1 ){ // pixel
@@ -124,7 +126,13 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         	nodeWeights.redistribute(tempResult.getDistributionPtr());
         	const IndexType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
             const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
+            std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
             result = ITI::KMeans::computePartition(coordinates, settings.numBlocks, nodeWeights, blockSizes, settings.epsilon);
+            std::chrono::duration<double> kMeansTime =  std::chrono::system_clock::now() - beforeKMeans;
+			ValueType timeForInitPart = ValueType ( comm->max(kMeansTime.count() ));
+			if (comm->getRank() == 0) {
+				std::cout << "Time for kMeans:" << timeForInitPart << std::endl;
+			}
             assert(result.getLocalValues().min() >= 0);
             assert(result.getLocalValues().max() < k);
 
@@ -135,7 +143,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( result.getDistribution(), result.getLocalValues() ) );
             assert(newDist->getGlobalSize() == n);
 
-            nodeWeights.redistribute(newDist);
             result.redistribute(newDist);
             input.redistribute(newDist, noDist);
             if (settings.useGeometricTieBreaking) {
@@ -144,22 +151,27 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				}
             }
         } else if (settings.initialPartition == 4) {// multisection
-        DenseVector<ValueType> convertedWeights(nodeWeights);
-		result = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, settings);
-		scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
-		result.redistribute(newDist);
-		input.redistribute(newDist, noDist);
-		for (DenseVector<ValueType>& dimCoords : coordinates) {
-			dimCoords.redistribute(newDist);
+			DenseVector<ValueType> convertedWeights(nodeWeights);
+			result = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, settings);
+			scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
+			result.redistribute(newDist);
+			input.redistribute(newDist, noDist);
+			for (DenseVector<ValueType>& dimCoords : coordinates) {
+				dimCoords.redistribute(newDist);
+			}
 		}
-	}
-	else {
+		else {
         	throw std::runtime_error("No method implemented for " + std::to_string(settings.initialPartition));
         }
+        nodeWeights.redistribute(input.getRowDistributionPtr());
         SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
+        std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
+        ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
+        if (comm->getRank() == 0) {
+        	std::cout << "Time for initial partition and redistribution:" << timeForInitPart << std::endl;
+        }
         
         IndexType numRefinementRounds = 0;
-        nodeWeights.redistribute(input.getRowDistributionPtr());
 
         SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
 	if (comm->getSize() == 1 || comm->getSize() == k) {
