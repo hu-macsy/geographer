@@ -120,15 +120,19 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         } else if ( settings.initialPartition == 2) {// spectral
             result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
         } else if (settings.initialPartition == 3) {// k-means
+        	DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(input, coordinates, settings);
+        	nodeWeights.redistribute(tempResult.getDistributionPtr());
         	const IndexType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
             const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
             result = ITI::KMeans::computePartition(coordinates, settings.numBlocks, nodeWeights, blockSizes, settings.epsilon);
+            assert(result.getLocalValues().min() >= 0);
+            assert(result.getLocalValues().max() < k);
 
             std::cout << "K-Means, Cut:" << computeCut(input, result, false) << ", imbalance:" << computeImbalance(result, settings.numBlocks) << std::endl;
             assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
             assert(result.min().Scalar::getValue<IndexType>() == 0);
 
-            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
+            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( result.getDistribution(), result.getLocalValues() ) );
             assert(newDist->getGlobalSize() == n);
 
             nodeWeights.redistribute(newDist);

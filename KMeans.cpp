@@ -179,9 +179,11 @@ DenseVector<IndexType> assignBlocks(
 		const DenseVector<IndexType> &nodeWeights,
 		const DenseVector<IndexType> &previousAssignment,
 		const std::vector<IndexType> &targetBlockSizes,
+		const SpatialCell &boundingBox,
 		const ValueType epsilon,
 		std::vector<ValueType> &upperBoundOwnCenter,
 		std::vector<ValueType> &lowerBoundNextCenter,
+		std::vector<ValueType> &upperBoundNextCenter,
 		std::vector<ValueType> &influence) {
 	SCAI_REGION( "KMeans.assignBlocks" );
 
@@ -200,6 +202,35 @@ DenseVector<IndexType> assignBlocks(
 
 	//compute assignment and balance
 	DenseVector<IndexType> assignment = previousAssignment;
+
+	//pre-filter possible closest blocks
+	std::vector<ValueType> minDistance(k);
+	std::vector<ValueType> maxDistance(k);
+	ValueType minMaxDistance = std::numeric_limits<ValueType>::max();
+
+	std::set<IndexType> possibleClosestCenters;
+	{
+		SCAI_REGION( "KMeans.assignBlocks.filterCenters" );
+		for (IndexType j = 0; j < k; j++) {
+			std::vector<ValueType> center(dim);
+			//TODO: this conversion into points is annoying. Maybe change coordinate format and use n in the outer dimension and d in the inner?
+			//Can even use points as data structure.
+			for (IndexType d = 0; d < dim; d++) {
+				center[d] = centers[d][j];
+			}
+			std::tie(minDistance[j], maxDistance[j]) = boundingBox.distances(center);
+			if (maxDistance[j]*influence[j] < minMaxDistance) minMaxDistance = maxDistance[j]*influence[j];
+		}
+
+		ValueType threshold = std::max(minMaxDistance, *std::max_element(upperBoundNextCenter.begin(), upperBoundNextCenter.end()));
+		for (IndexType j = 0; j < k; j++) {
+			if (minDistance[j]*influence[j] > threshold) {
+				std::cout << "Process " << comm->getRank() << " excluded center " << j << std::endl;
+			} else {
+				possibleClosestCenters.insert(j);
+			}
+		}
+	}
 
 	ValueType imbalance;
 	IndexType iter = 0;
@@ -222,10 +253,6 @@ DenseVector<IndexType> assignBlocks(
 						sqDistToOwn += std::pow(centers[d][wAssignment[i]] - coordinates[d][i], 2);
 					}
 					ValueType newEffectiveDistance = sqDistToOwn*influence[wAssignment[i]];
-					if (upperBoundOwnCenter[i] < newEffectiveDistance) {
-						std::cout << "bound:" << upperBoundOwnCenter[i] << ", real distance:" << newEffectiveDistance << std::endl;
-						std::cout << "difference:" << std::abs(upperBoundOwnCenter[i] - newEffectiveDistance) << std::endl;
-					}
 					assert(upperBoundOwnCenter[i] >= newEffectiveDistance);
 					upperBoundOwnCenter[i] = newEffectiveDistance;
 					if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i]) {
@@ -255,6 +282,8 @@ DenseVector<IndexType> assignBlocks(
 						}
 						assert(bestBlock != secondBest);
 						assert(secondBestValue >= bestValue);
+						assert(possibleClosestCenters.count(bestBlock));
+						assert(possibleClosestCenters.count(secondBest));
 						if (bestBlock != wAssignment[i]) {
 							if (bestValue < lowerBoundNextCenter[i]) {
 								std::cout << "bestValue: " << bestValue << " lowerBoundNextCenter[ " << i << "]: "<< lowerBoundNextCenter[i];
@@ -265,6 +294,7 @@ DenseVector<IndexType> assignBlocks(
 
 						upperBoundOwnCenter[i] = bestValue;
 						lowerBoundNextCenter[i] = secondBestValue;
+						upperBoundNextCenter[i] = secondBestValue;
 						wAssignment[i] = bestBlock;
 
 					}
@@ -274,16 +304,20 @@ DenseVector<IndexType> assignBlocks(
 			}
 		}
 
-		std::vector<IndexType> totalWeight(k, 0);
-		for (IndexType j = 0; j < k; j++) {
+		std::vector<IndexType> totalWeight(k);
+		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.blockWeightSum" );
-			totalWeight[j] = comm->sum(blockWeights[j]);
+			for (IndexType j = 0; j < k; j++) {
+				totalWeight[j] = comm->sum(blockWeights[j]);
+			}
 		}
+		IndexType maxBlockWeight = *std::max_element(totalWeight.begin(), totalWeight.end());
+		imbalance = (ValueType(maxBlockWeight - optSize)/ optSize);
 
 		std::vector<ValueType> oldInfluence = influence;
 
 		double minRatio = 1.05;
-
+		double maxRatio = 0.95;
 		for (IndexType j = 0; j < k; j++) {
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.influence" );
 			double ratio = ValueType(totalWeight[j]) / targetBlockSizes[j];
@@ -293,17 +327,38 @@ DenseVector<IndexType> assignBlocks(
 			assert(influenceRatio <= 1.05 + 1e-10);
 			assert(influenceRatio >= 0.95 - 1e-10);
 			if (influenceRatio < minRatio) minRatio = influenceRatio;
+			if (influenceRatio > maxRatio) maxRatio = influenceRatio;
 		}
 
 		//update bounds
+		ValueType maxUpperBoundNextCenter = 0;
 		for (IndexType i = 0; i < localN; i++) {
 			const IndexType cluster = wAssignment[i];
 			upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]) + 1e-12;
 			lowerBoundNextCenter[i] *= minRatio - 1e-12;
+			upperBoundNextCenter[i] *= maxRatio + 1e-12;
+			if (upperBoundNextCenter[i] > maxUpperBoundNextCenter) maxUpperBoundNextCenter = upperBoundNextCenter[i];
 		}
 
-		IndexType maxBlockWeight = *std::max_element(totalWeight.begin(), totalWeight.end());
-		imbalance = (ValueType(maxBlockWeight - optSize)/ optSize);
+		//update possible closest centers
+		{
+			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.filterCenters" );
+			minMaxDistance = std::numeric_limits<ValueType>::max();
+			for (IndexType j = 0; j < k; j++) {
+				if (maxDistance[j]*influence[j] < minMaxDistance) minMaxDistance = maxDistance[j]*influence[j];
+			}
+
+			ValueType threshold = std::max(minMaxDistance, maxUpperBoundNextCenter);
+			possibleClosestCenters.clear();
+			for (IndexType j = 0; j < k; j++) {
+				if (minDistance[j]*influence[j] > threshold) {
+					std::cout << "Process " << comm->getRank() << " excluded center " << j << std::endl;
+				} else {
+					possibleClosestCenters.insert(j);
+				}
+			}
+		}
+
 		iter++;
 
 		if (comm->getRank() == 0) std::cout << "Iter " << iter << ", imbalance : " << imbalance << std::endl;
@@ -336,8 +391,9 @@ template double biggestDelta(const std::vector<std::vector<double>> &firstCoords
 template std::vector<std::vector<double> > findInitialCenters(const std::vector<DenseVector<double>> &coordinates, int k, const DenseVector<int> &nodeWeights);
 template std::vector<std::vector<double> > findCenters(const std::vector<DenseVector<double>> &coordinates, const DenseVector<int> &partition, const int k, const DenseVector<int> &nodeWeights);
 template DenseVector<int> assignBlocks(const std::vector<std::vector<double>> &coordinates, const std::vector<std::vector<double> > &centers,
-		const DenseVector<int> &nodeWeights, const DenseVector<int> &previousAssignment, const std::vector<int> &blockSizes,
-		const double epsilon, std::vector<double> &upperBoundOwnCenter, std::vector<double> &lowerBoundNextCenter, std::vector<double> &influence);
+		const DenseVector<int> &nodeWeights, const DenseVector<int> &previousAssignment, const std::vector<int> &blockSizes, const SpatialCell &boundingBox,
+		const double epsilon, std::vector<double> &upperBoundOwnCenter, std::vector<double> &lowerBoundNextCenter, std::vector<double> &upperBoundNextCenter,
+		std::vector<double> &influence);
 template DenseVector<int> assignBlocks(const std::vector<DenseVector<double> >& coordinates, const std::vector<std::vector<double> >& centers);
 
 }
