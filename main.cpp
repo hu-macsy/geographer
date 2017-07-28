@@ -19,6 +19,8 @@
 #include <cstdlib>
 #include <chrono>
 
+#include <unistd.h>
+
 #include "Diffusion.h"
 #include "MeshGenerator.h"
 #include "FileIO.h"
@@ -99,8 +101,8 @@ int main(int argc, char** argv) {
 				("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
 				("minBorderNodes", value<int>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
-                                ("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
-				("initialPartition", value<int>(&settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition")
+				("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
+				("initialPartition", value<int>(&settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition, 3 for k-means, 4 for multisection")
 				("pixeledSideLen", value<int>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
 				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
@@ -113,8 +115,7 @@ int main(int argc, char** argv) {
 				;
 
 	variables_map vm;
-	store(command_line_parser(argc, argv).
-			  options(desc).run(), vm);
+	store(command_line_parser(argc, argv).options(desc).run(), vm);
 	notify(vm);
 
 	if (vm.count("help")) {
@@ -143,6 +144,15 @@ int main(int argc, char** argv) {
 	}
 
     IndexType N = -1; 		// total number of points
+
+    char machineChar[255];
+    std::string machine;
+    gethostname(machineChar, 255);
+    if (machineChar) {
+    	machine = std::string(machineChar);
+    } else {
+    	std::cout << "machine char not valid" << std::endl;
+    }
 
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
@@ -201,8 +211,8 @@ int main(int argc, char** argv) {
 
         // for 2D we do not know the size of every dimension
         settings.numX = N;
-	settings.numY = 1;
-	settings.numZ = 1;
+        settings.numY = 1;
+        settings.numZ = 1;
 
         if (comm->getRank() == 0) {
         	std::cout<< "Read " << N << " points." << std::endl;
@@ -351,15 +361,19 @@ int main(int argc, char** argv) {
     ValueType inputT = ValueType ( comm->max(inputTime.count() ));
     ValueType partT = ValueType (comm->max(partitionTime.count()));
     ValueType repT = ValueType (comm->max(reportTime.count()));
-        
+
     if (comm->getRank() == 0) {
-        std::cout<< "commit:"<< version<< " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
+        for (IndexType i = 0; i < argc; i++) {
+            std::cout << std::string(argv[i]) << " ";
+        }
+        std::cout << std::endl;
+        std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
         std::cout<< " nodes:"<< N<< " dimensions:"<< settings.dimensions <<" k:" << settings.numBlocks;
         std::cout<< " epsilon:" << settings.epsilon << " minBorderNodes:"<< settings.minBorderNodes;
         std::cout<< " minGainForNextRound:" << settings.minGainForNextRound;
         std::cout<< " stopAfterNoGainRounds:"<< settings.stopAfterNoGainRounds << std::endl;
         
-        std::cout<< "Cut is: "<< cut<< " and imbalance: "<< imbalance << std::endl;
+        std::cout<< "cut:"<< cut<< " imbalance:"<< imbalance << std::endl;
         std::cout<<"inputTime:" << inputT << " partitionTime:" << partT <<" reportTime:"<< repT << std::endl;
     }
 }

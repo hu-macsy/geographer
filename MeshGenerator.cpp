@@ -87,7 +87,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix
             int numRowElems= 0;
             ValueType max_offset =  *max_element(offset.begin(),offset.end());
             
-            std::tuple<IndexType, IndexType, IndexType> thisPoint = MeshGenerator<IndexType, ValueType>::index2_3DPoint( i, numPoints);
+            std::tuple<IndexType, IndexType, IndexType> thisPoint = aux::index2_3DPoint( i, numPoints);
             
             {
             SCAI_REGION("createStructured3DMesh.setAdjacencyMatrix");
@@ -103,7 +103,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix
                 }
                 
                 if(ngb_node>=0 && ngb_node<N){
-                	std::tuple<IndexType, IndexType, IndexType> ngbPoint = MeshGenerator<IndexType, ValueType>::index2_3DPoint( ngb_node, numPoints);
+                	std::tuple<IndexType, IndexType, IndexType> ngbPoint = aux::index2_3DPoint( ngb_node, numPoints);
                     
                     // we need to check distance for the nodes at the outer borders of the grid: eg:
                     // in a 4x4 grid with 16 nodes {0, 1, 2, ...} , for p1= node 3 there is an edge with
@@ -235,7 +235,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseM
             IndexType ngb_node = globalInd;
             IndexType numRowElems= 0;     // the number of neighbours for each node. Can be less than 6.
             // the position of this node in 3D
-            std::tuple<IndexType, IndexType, IndexType> thisPoint = MeshGenerator<IndexType, ValueType>::index2_3DPoint( globalInd, numPoints);
+            std::tuple<IndexType, IndexType, IndexType> thisPoint = aux::index2_3DPoint( globalInd, numPoints);
             
             // for all 6 possible neighbours
             for(IndexType m=0; m<6; m++){
@@ -250,7 +250,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseM
        
                 if(ngb_node>=0 && ngb_node<N){
                     // get the position in the 3D of the neighbouring node
-                	std::tuple<IndexType, IndexType, IndexType> ngbPoint = MeshGenerator<IndexType, ValueType>::index2_3DPoint( ngb_node, numPoints);
+                	std::tuple<IndexType, IndexType, IndexType> ngbPoint = aux::index2_3DPoint( ngb_node, numPoints);
                 	ValueType distanceSquared = dist3DSquared( thisPoint, ngbPoint);
                 	assert(distanceSquared <= numPoints[0]*numPoints[0]+numPoints[1]*numPoints[1]+numPoints[2]*numPoints[2]);
                     
@@ -411,7 +411,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
         IndexType ngbGlobalInd;                             // the global id of the neighbouring nodes
         //PRINT(*comm << ": i= " << i<< ", "<< thisGlobalInd);
         // the position of this node in 3D
-        std::tuple<IndexType, IndexType, IndexType>  thisPoint = MeshGenerator<IndexType, ValueType>::index2_3DPoint( thisGlobalInd, numPoints);
+        std::tuple<IndexType, IndexType, IndexType>  thisPoint = aux::index2_3DPoint( thisGlobalInd, numPoints);
             
         // if point is on the faces it will have only 3 edges
         // TODO: not correct, ridge nodes must have >4 edges and face nodes have >5
@@ -477,7 +477,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
                 assert( ngbGlobalInd >= 0);
                 
                 // so here, the neighbour's global index should be: >0 && <N
-                ngbPoint = MeshGenerator<IndexType, ValueType>::index2_3DPoint( ngbGlobalInd, numPoints);
+                ngbPoint = aux::index2_3DPoint( ngbGlobalInd, numPoints);
                 // if the two points are too far, recalculate neighbour index
                 if( dist3DSquared(thisPoint, ngbPoint)> 3*boxRadius*boxRadius ){
                     continue;
@@ -851,6 +851,7 @@ ValueType MeshGenerator<IndexType, ValueType>::dist3DSquared(std::tuple<IndexTyp
   ValueType distanceSquared = distX*distX+distY*distY+distZ*distZ;
   return distanceSquared;
 }
+/*
 //-------------------------------------------------------------------------------------------------
 // Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
 // of the index in 3D. The return value is not the coordinates of the point!
@@ -869,7 +870,7 @@ std::tuple<IndexType, IndexType, IndexType> MeshGenerator<IndexType, ValueType>:
     assert(zIndex < numPoints[2]);
     return std::make_tuple(xIndex, yIndex, zIndex);
 }
-
+*/
 //-------------------------------------------------------------------------------------------------
 
 template void MeshGenerator<int, double>::createStructured3DMesh(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
@@ -886,6 +887,6 @@ template Scalar MeshGenerator<int, double>::dist3D(DenseVector<double> p1, Dense
 
 template double MeshGenerator<int, double>::dist3DSquared(std::tuple<int, int, int> p1, std::tuple<int, int, int> p2);
 
-template std::tuple<IndexType, IndexType, IndexType> MeshGenerator<int, double>::index2_3DPoint(int index,  std::vector<int> numPoints);
+//template std::tuple<IndexType, IndexType, IndexType> MeshGenerator<int, double>::index2_3DPoint(int index,  std::vector<int> numPoints);
 
 } //namespace ITI

@@ -10,14 +10,6 @@
 
 #include "Settings.h"
 
-#define STRINGIZER(arg)     #arg
-#define STR_VALUE(arg)      STRINGIZER(arg)
-#define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
-#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-#define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-
-        
-
 namespace ITI {
 
     /* A d-dimensional rectangle represented by two points: the bottom and the top corner.
@@ -321,7 +313,7 @@ namespace ITI {
         }
         
         ValueType getLeafWeight(){
-            return weight;
+            return myRect.weight;
         }
 
     protected:
@@ -345,6 +337,9 @@ namespace ITI {
         /* A partition of non-uniform grid.
          */
         static scai::lama::DenseVector<IndexType> getPartitionNonUniform( const scai::lama::CSRSparseMatrix<ValueType> &input, const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, struct Settings settings );
+        
+        static scai::lama::DenseVector<IndexType> setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr distPtr, const std::vector<std::vector<IndexType>>& localPoints);
+        
         
         /** Get a tree of rectangles of a uniform grid with side length sideLen. The rectangles cover the whole grid and 
          * do not overlap.

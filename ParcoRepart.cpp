@@ -98,7 +98,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition")
         // get an initial partition
         DenseVector<IndexType> result;
-	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(inputDist, 1);
+        DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(inputDist, 1);
 
         
         if( settings.initialPartition==0 ){ //sfc
@@ -108,25 +108,22 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         } else if ( settings.initialPartition == 2) {// spectral
             result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
         } else if (settings.initialPartition == 3) {// k-means
-        	std::vector<std::vector<ValueType> > centers = ITI::KMeans::findInitialCenters(coordinates, settings.numBlocks, uniformWeights);
-        	const std::vector<IndexType> blockSizes(settings.numBlocks, n/settings.numBlocks);
-        	std::vector<ValueType> influence(settings.numBlocks,1);
-        	for (IndexType i = 0; i < 20; i++) {
-        		result = ITI::KMeans::assignBlocks(coordinates, centers, uniformWeights, blockSizes, settings.epsilon, influence);
-        		centers = ITI::KMeans::findCenters(coordinates, result, settings.numBlocks, uniformWeights);
-        	}
+            const std::vector<IndexType> blockSizes(settings.numBlocks, n/settings.numBlocks);
+            result = ITI::KMeans::computePartition(coordinates, settings.numBlocks, uniformWeights, blockSizes, settings.epsilon);
 
-        	std::cout << "K-Means, Cut:" << computeCut(input, result, false) << ", imbalance:" << computeImbalance(result, settings.numBlocks) << std::endl;
-        	assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
-        	assert(result.min().Scalar::getValue<IndexType>() == 0);
+            std::cout << "K-Means, Cut:" << computeCut(input, result, false) << ", imbalance:" << computeImbalance(result, settings.numBlocks) << std::endl;
+            assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
+            assert(result.min().Scalar::getValue<IndexType>() == 0);
 
             scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
             assert(newDist->getGlobalSize() == n);
 
             result.redistribute(newDist);
             input.redistribute(newDist, noDist);
-            for (IndexType d = 0; d < dimensions; d++) {
-            	coordinates[d].redistribute(newDist);
+            if (settings.useGeometricTieBreaking) {
+				for (IndexType d = 0; d < dimensions; d++) {
+					coordinates[d].redistribute(newDist);
+				}
             }
         } else if (settings.initialPartition == 4) {// multisection
 		scai::lama::DenseVector<ValueType> nodeWeights( inputDist, 1 );
@@ -513,7 +510,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
                 geomSpread = 1 + 1/std::log2(sideLen)*( std::abs(sideLen/2 - neighbours[j]/sideLen)/(0.8*sideLen/2) + std::abs(sideLen/2 - neighbours[j]%sideLen)/(0.8*sideLen/2) );
                 //PRINT0( geomSpread );            
                 // value to pick a border node
-                pixelDistance = aux::pixell2Distance2D( maxDensityPixel, neighbours[j], sideLen);
+                pixelDistance = aux::pixelL2Distance2D( maxDensityPixel, neighbours[j], sideLen);
                 toInsert.second = (1/pixelDistance)* geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[maxDensityPixel], 0.5) );
                 border.push_back(toInsert);
             }
@@ -588,7 +585,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
                     for(IndexType l=0; l<border.size(); l++){                        
                         if( border[l].first == neighbours[j]){ // its already in border, update value
                             //border[l].second = 1.3*border[l].second + geomSpread * (spreadFactor*(std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5) );
-                            pixelDistance = aux::pixell2Distance2D( maxDensityPixel, neighbours[j], sideLen);    
+                            pixelDistance = aux::pixelL2Distance2D( maxDensityPixel, neighbours[j], sideLen);    
                             border[l].second += geomSpread*  (1/(pixelDistance*pixelDistance))* ( spreadFactor *std::pow(localSumDens[neighbours[j]], 0.5) + std::pow(localSumDens[bestIndex], 0.5) );
                             inBorder= true;
                         }
@@ -597,7 +594,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(CSRSpar
                         std::pair<IndexType, ValueType> toInsert;
                         toInsert.first = neighbours[j];
                         //toInsert.second = geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5));
-                        pixelDistance = aux::pixell2Distance2D( maxDensityPixel, neighbours[j], sideLen);    
+                        pixelDistance = aux::pixelL2Distance2D( maxDensityPixel, neighbours[j], sideLen);    
                         //toInsert.second = (1/(pixelDistance*pixelDistance))* geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5));
                         toInsert.second = geomSpread*  (1/(pixelDistance*pixelDistance))* ( spreadFactor *(std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5) );
                         //toInsert.second = geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5))/(std::pow( std::abs( localSumDens[bestIndex] - localSumDens[neighbours[j]]),0.5));

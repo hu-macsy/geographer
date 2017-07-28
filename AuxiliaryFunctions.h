@@ -119,7 +119,7 @@ static void print2DGrid(scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama
   * 
   * @return The l1 distance of the pixels.
   */
-static IndexType pixelDistance2D(IndexType pixel1, IndexType pixel2, IndexType sideLen){
+static IndexType pixelL1Distance2D(IndexType pixel1, IndexType pixel2, IndexType sideLen){
      
      IndexType col1 = pixel1/sideLen;
      IndexType col2 = pixel2/sideLen;
@@ -130,7 +130,7 @@ static IndexType pixelDistance2D(IndexType pixel1, IndexType pixel2, IndexType s
      return std::abs(col1-col2) + std::abs(row1-row2);;
 }
 
-static ValueType pixell2Distance2D(IndexType pixel1, IndexType pixel2, IndexType sideLen){
+static ValueType pixelL2Distance2D(IndexType pixel1, IndexType pixel2, IndexType sideLen){
      
      IndexType col1 = pixel1/sideLen;
      IndexType col2 = pixel2/sideLen;
@@ -140,7 +140,42 @@ static ValueType pixell2Distance2D(IndexType pixel1, IndexType pixel2, IndexType
      
      return std::pow( ValueType (std::pow(std::abs(col1-col2),2) + std::pow(std::abs(row1-row2),2)) , 0.5);
 }
- 
+//------------------------------------------------------------------------------
+
+/* Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
+ * of the index in 3D. The return value is not the coordinates of the point!
+ * */
+static std::tuple<IndexType, IndexType, IndexType> index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints){
+    // a YxZ plane
+    SCAI_ASSERT( numPoints.size()==3 , "Wrong dimensions, should be 3");
+    
+    IndexType planeSize= numPoints[1]*numPoints[2];
+    IndexType xIndex = index/planeSize;
+    IndexType yIndex = (index % planeSize) / numPoints[2];
+    IndexType zIndex = (index % planeSize) % numPoints[2];
+    SCAI_ASSERT(xIndex >= 0, xIndex);
+    SCAI_ASSERT(yIndex >= 0, yIndex);
+    SCAI_ASSERT(zIndex >= 0, zIndex);
+    assert(xIndex < numPoints[0]);
+    assert(yIndex < numPoints[1]);
+    assert(zIndex < numPoints[2]);
+    return std::make_tuple(xIndex, yIndex, zIndex);
+}
+
+static std::tuple<IndexType, IndexType> index2_2DPoint(IndexType index,  std::vector<IndexType> numPoints){
+    SCAI_ASSERT( numPoints.size()==2 , "Wrong dimensions, should be 2");
+    
+    IndexType xIndex = index/numPoints[1];
+    IndexType yIndex = index%numPoints[1];
+
+    SCAI_ASSERT(xIndex >= 0, xIndex);
+    SCAI_ASSERT(yIndex >= 0, yIndex);
+
+    SCAI_ASSERT(xIndex < numPoints[0], xIndex << " for index: "<< index);
+    SCAI_ASSERT(yIndex < numPoints[1], yIndex << " for index: "<< index);
+
+    return std::make_tuple(xIndex, yIndex);
+} 
  
 }; //class aux
 }// namespace ITI

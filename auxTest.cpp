@@ -305,33 +305,80 @@ TEST_F (auxTest, testInitialPartitions){
     }
 
 }
-
+//-----------------------------------------------------------------
 
 TEST_F (auxTest, testPixelDistance) {
     
-    IndexType sideLen = 139;
+    IndexType sideLen = 100;
     
-    //for pixel=18 and an 8x8 grid max dist is with pixel 63 and is equal to 10
-    ValueType maxl2Dist = aux::pixell2Distance2D(0,sideLen*sideLen-1, sideLen);
-    std::cout<< maxl2Dist << std::endl;
+    ValueType maxl2Dist = aux::pixelL2Distance2D(0,sideLen*sideLen-1, sideLen);
+    PRINT( maxl2Dist );
     for(int i=0; i<sideLen*sideLen; i++){
         //std::cout << "dist1(" << 0<< ", "<< i << ")= "<< aux::pixelDistance2D( 0, i, sideLen) << std::endl;
-        EXPECT_LE(aux::pixelDistance2D( 0, i, sideLen), sideLen+sideLen-2);
-        EXPECT_LE(aux::pixell2Distance2D( 0, i, sideLen), maxl2Dist);
+        EXPECT_LE(aux::pixelL1Distance2D( 0, i, sideLen), sideLen+sideLen-2);
+        EXPECT_LE(aux::pixelL2Distance2D( 0, i, sideLen), maxl2Dist);
     }
     
     srand(time(NULL));
-    IndexType pixel= rand()/(sideLen*(sideLen-2)) +2*sideLen;
-    PRINT(pixel);    
+    IndexType pixel;
+    std::tuple<IndexType, IndexType> coords2D;
+    std::vector<IndexType> maxPoints= {sideLen, sideLen};
+    do{
+        pixel= rand()%(sideLen*(sideLen-2)) +2*sideLen;
+        coords2D = aux::index2_2DPoint( pixel, maxPoints );
+    }while( (std::get<0>(coords2D)>sideLen-4 or std::get<0>(coords2D)<4) and ( std::get<1>(coords2D)>sideLen-4 or std::get<1>(coords2D)<4) );
     
-    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel, sideLen), 0);
-    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel+1, sideLen), 1);
-    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel+sideLen, sideLen), 1);
-    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel-sideLen, sideLen), 1);
-    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel+sideLen-3, sideLen), 4);
-    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel-sideLen-2, sideLen), 3);
-    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel-2*sideLen+3, sideLen), 5);
-    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel-2*sideLen-3, sideLen), 5);
+    //PRINT( std::get<0>(coords2D) << " , " << std::get<1>(coords2D) );
+    
+    EXPECT_EQ(aux::pixelL1Distance2D( pixel, pixel, sideLen), 0);
+    EXPECT_EQ(aux::pixelL1Distance2D( pixel, pixel+1, sideLen), 1);
+    EXPECT_EQ(aux::pixelL1Distance2D( pixel, pixel+sideLen, sideLen), 1);
+    EXPECT_EQ(aux::pixelL1Distance2D( pixel, pixel-sideLen, sideLen), 1);
+    EXPECT_EQ(aux::pixelL1Distance2D( pixel, pixel+sideLen-3, sideLen), 4);
+    EXPECT_EQ(aux::pixelL1Distance2D( pixel, pixel-sideLen-2, sideLen), 3);
+    EXPECT_EQ(aux::pixelL1Distance2D( pixel, pixel-2*sideLen+3, sideLen), 5);
+    EXPECT_EQ(aux::pixelL1Distance2D( pixel, pixel-2*sideLen-3, sideLen), 5);
 }
+//-----------------------------------------------------------------
+
+TEST_F(auxTest, testIndex2_3DPoint){
+    std::vector<IndexType> numPoints(3);
+    
+    srand(time(NULL));
+    for(int i=0; i<3; i++){
+        numPoints[i] = (IndexType) (rand()%5 + 10);
+    }
+    IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
+    
+    for(IndexType i=0; i<N; i++){
+        std::tuple<IndexType, IndexType, IndexType> ind = aux::index2_3DPoint(i, numPoints);
+        EXPECT_LE(std::get<0>(ind) , numPoints[0]-1);
+        EXPECT_LE(std::get<1>(ind) , numPoints[1]-1);
+        EXPECT_LE(std::get<2>(ind) , numPoints[2]-1);
+        EXPECT_GE(std::get<0>(ind) , 0);
+        EXPECT_GE(std::get<1>(ind) , 0);
+        EXPECT_GE(std::get<2>(ind) , 0);
+    }
+}
+//-----------------------------------------------------------------
+
+TEST_F(auxTest, testIndex2_2DPoint){
+    std::vector<IndexType> numPoints= {9, 11};
+    
+    srand(time(NULL));
+    for(int i=0; i<2; i++){
+        numPoints[i] = (IndexType) (rand()%5 + 10);
+    }
+    IndexType N= numPoints[0]*numPoints[1];
+    
+    for(IndexType i=0; i<N; i++){
+        std::tuple<IndexType, IndexType> ind = aux::index2_2DPoint(i, numPoints);
+        EXPECT_LE(std::get<0>(ind) , numPoints[0]-1);
+        EXPECT_LE(std::get<1>(ind) , numPoints[1]-1);
+        EXPECT_GE(std::get<0>(ind) , 0);
+        EXPECT_GE(std::get<1>(ind) , 0);
+    }
+}
+
 
 }

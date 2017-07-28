@@ -247,13 +247,13 @@ template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, Format format) {
 	SCAI_REGION("FileIO.readGraph");
 
-	if (!(format == Format::METIS or format == Format::AUTO or format == Format::MATRIXMARKET)) {
-		throw std::logic_error("Format not yet implemented.");
-	}
-	
 	if(format == Format::MATRIXMARKET){
             return FileIO<IndexType, ValueType>::readGraphMatrixMarket(filename);
         }
+        
+	if (!(format == Format::METIS or format == Format::AUTO)) {
+		throw std::logic_error("Format not yet implemented.");
+	}
 
 	std::ifstream file(filename);
 
@@ -571,7 +571,11 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( std::string filename, IndexType numberOfPoints, IndexType dimension, Format format){
     SCAI_REGION( "FileIO.readCoords" );
-    
+
+    if (format == Format::OCEAN) {
+	return readCoordsOcean(filename, dimension);
+    }
+
     IndexType globalN= numberOfPoints;
     std::ifstream file(filename);
 

@@ -46,44 +46,42 @@ typedef int IndexType;
  */
 
 //----------------------------------------------------------------------------
-/*
-std::istream& operator>>(std::istream& in, IndexType& method)
-{
-    std::string token;
-    in >> token;
-    if (token == "SFC" or token == "0")
-        method = 0;
-    else if (token == "Pixel" or token == "1")
-        method = 1;
-    else if (token == "Spectral" or token == "2")
-    	method = 2;
-    else if (token == "KMeans" or token == "3")
-    	method = 3;
-    else if (token == "Multisection" or token == "4")
-    	method = 4;
-    else
-        in.setstate(std::ios_base::failbit);
-    return in;
+
+namespace ITI {
+	std::istream& operator>>(std::istream& in, Format& format)
+	{
+		std::string token;
+		in >> token;
+		if (token == "AUTO" or token == "0")
+			format = ITI::Format::AUTO ;
+		else if (token == "METIS" or token == "1")
+			format = ITI::Format::METIS;
+		else if (token == "ADCIRC" or token == "2")
+			format = ITI::Format::ADCIRC;
+		else if (token == "OCEAN" or token == "3")
+			format = ITI::Format::OCEAN;
+		else
+			in.setstate(std::ios_base::failbit);
+		return in;
+	}
+
+	std::ostream& operator<<(std::ostream& out, Format& method)
+	{
+		std::string token;
+
+		if (method == ITI::Format::AUTO)
+			token = "AUTO";
+		else if (method == ITI::Format::METIS)
+			token = "METIS";
+		else if (method == ITI::Format::ADCIRC)
+			token = "ADCIRC";
+		else if (method == ITI::Format::OCEAN)
+			token = "OCEAN";
+		out << token;
+		return out;
+	}
 }
 
-std::ostream& operator<<(std::ostream& out, IndexType& method)
-{
-    std::string token;
-
-    if (method == 0)
-        token = "SFC";
-    else if (method == 1)
-    	token = "Pixel";
-    else if (method == 2)
-    	token = "Spectral";
-    else if (method == 3)
-    	token = "KMeans";
-    else if (method == 4)
-    	token = "Multisection";
-    out << token;
-    return out;
-}
-*/
 
 int main(int argc, char** argv) {
 	using namespace boost::program_options;
@@ -96,6 +94,7 @@ int main(int argc, char** argv) {
 				("version", "show version")
 				("graphFile", value<std::string>(), "read graph from file")
 				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
+                                ("coordFormat", value<ITI::Format>(), "format of coordinate file")
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
                                 ("weakScaling", "generate coordinates locally for weak scaling")
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
@@ -119,8 +118,7 @@ int main(int argc, char** argv) {
 				;
 
 	variables_map vm;
-	store(command_line_parser(argc, argv).
-			  options(desc).run(), vm);
+	store(command_line_parser(argc, argv).options(desc).run(), vm);
 	notify(vm);
 
 	if (vm.count("help")) {
@@ -144,8 +142,16 @@ int main(int argc, char** argv) {
 	}
 
     IndexType N = -1; 		// total number of points
-    IndexType edges= -1;        // number of edges
 
+    char machineChar[255];
+    std::string machine;
+    gethostname(machineChar, 255);
+    if (machineChar) {
+    	machine = std::string(machineChar);
+    } else {
+    	std::cout << "machine char not valid" << std::endl;
+    }
+    
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
     scai::lama::DenseVector<ValueType> nodeWeights;     // node weights
@@ -158,13 +164,18 @@ int main(int argc, char** argv) {
     
     /* timing information
      */
-    std::chrono::time_point<std::chrono::system_clock> startTime;
-     
-    startTime = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
-    if (comm->getRank() == 0)
-	{
-        std::cout<< "commit:"<< version<< /*", input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :" generate") <<*/ std::endl;
+    if (comm->getRank() == 0){
+        std::string inputstring;
+    	if (vm.count("graphFile")) {
+    		inputstring = vm["graphFile"].as<std::string>();
+    	} else if (vm.count("quadTreeFile")) {
+    		inputstring = vm["quadTreeFile"].as<std::string>();
+    	} else {
+    		inputstring = "generate";
+    	}
+        std::cout<< "commit:"<< version<<  " input:"<< inputstring << std::endl;
 	}
 
     std::string graphFile;
@@ -204,8 +215,14 @@ int main(int argc, char** argv) {
         settings.numY = 1;
         settings.numZ = 1;
         
-        ITI::Format format = vm["coordFormat"].as<ITI::Format>();
-        coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format );
+        
+        if (vm.count("coordFormat")) {
+            ITI::Format format = vm["coordFormat"].as<ITI::Format>();
+            coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format);
+        } else {
+            coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
+        }
+        PRINT0("read  graph and coordinates");        
         
         //unit weights
         scai::hmemo::HArray<ValueType> localWeights( rowDistPtr->getLocalSize(), 1 );
@@ -223,15 +240,22 @@ int main(int argc, char** argv) {
             std::cout<< "input: weakScaling" << std::endl;
         }
         //TODO: the scai::lama::MatrixCreator::fillRandom is too expensive but the graph is not needed in multisection
-        if( initialPartition!=3 ){
+        if( initialPartition!=4 ){
             std::cout << "Weak scaling works only for multisection (for now)" << std::endl;
             std::terminate();
         }
+        /*
+        if( comm->getSize()!=settings.numBlocks ){
+            PRINT("Setting numBlocks= comm->getSize()= "<< comm->getSize() << " since is needed for redistribution to measure cut");
+            settings.numBlocks = comm->getSize();
+        }
+        */
+        IndexType k = settings.numBlocks;
         
         const IndexType dim = settings.dimensions;
-        const IndexType localN = 4000000;   // 4M points in every PE
+        const IndexType localN = 1000000;   // 4M points in every PE
         N = localN * comm->getSize(); // total number of points
-        
+PRINT0("localN= "<< localN << ", globalN= " << N);        
         std::random_device rnd_dvc;
         std::mt19937 mersenne_engine(rnd_dvc());
         
@@ -242,8 +266,11 @@ int main(int argc, char** argv) {
         //scai::lama::MatrixCreator::fillRandom(graph, 0.1);    // too expensive
         PRINT0("Created local part of graph");
         
+        //
         //create random local weights
-        std::uniform_real_distribution<ValueType> dist(0.0, 100.0);
+        //
+    
+        std::uniform_real_distribution<ValueType> dist(1.0, 10.0);
         auto gen = std::bind(dist, mersenne_engine);
         
         std::vector<ValueType> tmpLocalWeights(localN);
@@ -253,11 +280,27 @@ int main(int argc, char** argv) {
   
         //nodeWeights.assign( tmpWeights, rowDistPtr);
         nodeWeights.swap( tmpWeights, rowDistPtr);
-        PRINT0("Created local part of weights");
+        
+        ValueType totalLocalWeight = std::accumulate( tmpLocalWeights.begin(), tmpLocalWeights.end(), 0.0);
+        ValueType totalGlobalWeight = comm->sum(totalLocalWeight);
+        
+        PRINT0("Created local part of weights, totalGlobalWeight= " << totalGlobalWeight);
         
         // create random local coordinates   
+        //
+        std::vector< std::vector<IndexType> > localPoints( localN, std::vector<IndexType>(dim,0) );
+        
+        std::vector<ValueType> scaledMin(dim, std::numeric_limits<ValueType>::max());
+        std::vector<ValueType> scaledMax(dim, std::numeric_limits<ValueType>::lowest());
+        
+        ValueType scale = std::pow( N -1 , 1.0/dim);
+        PRINT0( scale );
+        
+        std::vector<ValueType> maxCoords( dim, 1000);
+        std::vector<ValueType> minCoords( dim, 0);
+        
         for(IndexType d=0; d<dim; d++){  
-            std::uniform_real_distribution<ValueType> dist(0.0, 1000.0);
+            std::uniform_real_distribution<ValueType> dist(0.0, maxCoords[d]);
             auto gen = std::bind(dist, mersenne_engine);
             
             std::vector<ValueType> tmpLocalCoords(localN);
@@ -265,56 +308,154 @@ int main(int argc, char** argv) {
             
             scai::hmemo::HArray<ValueType> tmpHarray ( tmpLocalCoords.size(), tmpLocalCoords.data() ) ;
             coordinates[d].swap( tmpHarray, rowDistPtr );
+        
+            scai::hmemo::ReadAccess<ValueType> localPartOfCoords( coordinates[d].getLocalValues() );
+            
+            scaledMax[d] = int(scale) ;
+            scaledMin[d] = 0;
+            
+            ValueType thisDimScale = scale/(maxCoords[d]-minCoords[d]);
+            ValueType thisDimMin = minCoords[d];
+        
+            for (IndexType i = 0; i < localN; i++) {
+                ValueType normalizedCoord = localPartOfCoords[i] - thisDimMin;
+                IndexType scaledCoord =  normalizedCoord * thisDimScale; 
+                
+                localPoints[i][d] = scaledCoord;
+                
+                SCAI_ASSERT( scaledCoord >=0 and scaledCoord<=scale, "Wrong scaled coordinate " << scaledCoord << " is either negative or more than "<< scale);
+            }
         }
         PRINT0("Created local part of coordinates");
-    }
-    /*
-     else if(vm.count("generate")){
-         if (comm->getRank() == 0){
-            std::cout<< "input: generate" << std::endl;
-        }
-    	if (settings.dimensions == 2) {
-    		settings.numZ = 1;
-    	}
-
-        N = settings.numX * settings.numY * settings.numZ;
             
-        maxCoord[0] = settings.numX;
-        maxCoord[1] = settings.numY;
-        maxCoord[2] = settings.numZ;
+        std::chrono::time_point<std::chrono::system_clock>  beforeInitialTime =  std::chrono::system_clock::now();
 
-        std::vector<IndexType> numPoints(3); // number of points in each dimension, used only for 3D
+        // get a multisection partition
+        //scai::lama::DenseVector<IndexType> multiSectionPartition =  ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform( graph, coordinates, nodeWeights, settings);
 
-        for (IndexType i = 0; i < 3; i++) {
-        	numPoints[i] = maxCoord[i];
-        }
+        std::shared_ptr<ITI::rectCell<IndexType,ValueType>> root = ITI::MultiSection<IndexType, ValueType>::getRectanglesNonUniform( graph, localPoints, nodeWeights, scaledMin, scaledMax, settings);
+        scai::lama::DenseVector<IndexType> multiSectionPartition = ITI::MultiSection<IndexType, ValueType>::setPartition( root, rowDistPtr, localPoints);
+        std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
 
-        if( comm->getRank()== 0){
-            std::cout<< "Generating for dim= "<< settings.dimensions << " and numPoints= "<< settings.numX << ", " << settings.numY << ", "<< settings.numZ << ", in total "<< N << " number of points" << std::endl;
-            std::cout<< "\t\t and maxCoord= "<< maxCoord[0] << ", "<< maxCoord[1] << ", " << maxCoord[2]<< std::endl;
+        //
+        // prints - assertions
+        //
+
+        assert( multiSectionPartition.size() == N);
+        assert( coordinates[0].size() == N);
+                
+        //if(dimensions==2){
+        //   ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithMS");
+        //}
+
+        std::string destPath = "./partResults/weakScaling/";
+        boost::filesystem::create_directories( destPath );   
+        std::string logFile = destPath + "resultsWS_" +std::to_string(settings.numBlocks)+".log";
+        std::ofstream logF(logFile);
+        
+        std::vector<std::shared_ptr<ITI::rectCell<IndexType, ValueType>>> allLeaves = root->getAllLeaves();
+        std::shared_ptr<ITI::rectCell<IndexType, ValueType>> thisLeaf;
+        ValueType thisLeafWeight;
+        
+        ValueType totalLeafWeight=0, maxLeafWeight=0, minLeafWeight=totalGlobalWeight;
+        struct ITI::rectangle maxRect, minRect;
+        
+        for(int l=0; l<allLeaves.size(); l++){
+            thisLeaf = allLeaves[l];
+            thisLeafWeight = thisLeaf->getLeafWeight();
+            PRINT0("leaf " << ": "<< thisLeafWeight );        
+            
+            totalLeafWeight += thisLeafWeight;
+            
+            if( thisLeafWeight>maxLeafWeight ){
+                maxLeafWeight = thisLeafWeight;
+                maxRect = thisLeaf->getRect();
+            }
+            if( thisLeafWeight<minLeafWeight ){
+                minLeafWeight = thisLeafWeight;
+                minRect = thisLeaf->getRect();
+            }
         }
         
-        scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-        scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
-        graph = scai::lama::CSRSparseMatrix<ValueType>( rowDistPtr , noDistPtr );
+        SCAI_ASSERT_LE_ERROR( totalLeafWeight-totalGlobalWeight, 0.00000001 , "Wrong weights sum.");
         
-        scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-        for(IndexType i=0; i<settings.dimensions; i++){
-            coordinates[i].allocate(coordDist);
-            coordinates[i] = static_cast<ValueType>( 0 );
+        ValueType optWeight = totalGlobalWeight/settings.numBlocks;
+        
+        PRINT0("maxWeight= " << maxLeafWeight << ", optWeight= "<< optWeight << " , minWeight= "<< minLeafWeight );
+        if( comm->getRank()==0){
+            std::cout<< "max rectangle is"<< std::endl;
+            maxRect.print();
+            std::cout<< "min rectangle is"<< std::endl;
+            minRect.print();
         }
-
-        // create the adjacency matrix and the coordinates
-        ITI::MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist( graph, coordinates, maxCoord, numPoints);
         
+        //ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut( graph, multiSectionPartition);
+        ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( multiSectionPartition, k);
         if(comm->getRank()==0){
-            IndexType nodes= graph.getNumRows();
-            IndexType edges= graph.getNumValues()/2;	
-            std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
-	}
+            if( settings.bisect ){
+                logF << "--  Initial bisection, total time: " << partitionTime.count() << std::endl;
+            }else{
+                logF << "--  Initial multisection, total time: " << partitionTime.count() << std::endl;
+            }
+            logF << "\tfinal imbalance= "<< imbalance;
+            logF  << std::endl  << std::endl  << std::endl; 
+            std::cout << "\033[1;32m--Initial multisection, total time: " << partitionTime.count() << std::endl;
+            std::cout << "\tfinal imbalance= "<< imbalance << "\033[0m";
+            std::cout << std::endl  << std::endl  << std::endl;
+        }
+        PRINT0("\nGot rectangles in time: " << partitionTime.count() << " - imbalance is " << (maxLeafWeight - optWeight)/optWeight);
+        /*
+        i f(*dimensions==2){
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"multisectPart");
+            }
+            */        
+        return 0;
+        }
+        /*
+        else if(vm.count("generate")){
+            if (comm->getRank() == 0){
+                std::cout<< "input: generate" << std::endl;
+            }
+            if (settings.dimensions == 2) {
+                    settings.numZ = 1;
+            }
 
+            N = settings.numX * settings.numY * settings.numZ;
+                
+            maxCoord[0] = settings.numX;
+            maxCoord[1] = settings.numY;
+            maxCoord[2] = settings.numZ;
 
-    }
+            std::vector<IndexType> numPoints(3); // number of points in each dimension, used only for 3D
+
+            for (IndexType i = 0; i < 3; i++) {
+                    numPoints[i] = maxCoord[i];
+            }
+
+            if( comm->getRank()== 0){
+                std::cout<< "Generating for dim= "<< settings.dimensions << " and numPoints= "<< settings.numX << ", " << settings.numY << ", "<< settings.numZ << ", in total "<< N << " number of points" << std::endl;
+                std::cout<< "\t\t and maxCoord= "<< maxCoord[0] << ", "<< maxCoord[1] << ", " << maxCoord[2]<< std::endl;
+            }
+            
+            scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+            scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
+            graph = scai::lama::CSRSparseMatrix<ValueType>( rowDistPtr , noDistPtr );
+            
+            scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+            for(IndexType i=0; i<settings.dimensions; i++){
+                coordinates[i].allocate(coordDist);
+                coordinates[i] = static_cast<ValueType>( 0 );
+            }
+
+            // create the adjacency matrix and the coordinates
+            ITI::MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist( graph, coordinates, maxCoord, numPoints);
+            
+            if(comm->getRank()==0){
+                IndexType nodes= graph.getNumRows();
+                IndexType edges= graph.getNumValues()/2;	
+                std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
+            }
+        }
     */
     else{
     	std::cout << "Only input file as input. Call again with --graphFile" << std::endl;
@@ -329,7 +470,10 @@ int main(int argc, char** argv) {
     if (comm->getSize() > 0) {
     	//settings.numBlocks = comm->getSize();
     }
-
+    
+    if( !vm.count("numBlocks") ){
+        settings.numBlocks = comm->getSize();
+    }
     
     //----------
     
@@ -446,15 +590,18 @@ int main(int argc, char** argv) {
             break;
         }
         case 3:{  //------------------------------------------- k-means
+            std::cout<< "Not included in testInitial yet, choose another option."<< std::endl;
+            std::terminate();
         }
         case 4:{  //------------------------------------------- multisection
             
-            beforeInitialTime =  std::chrono::system_clock::now();
             if (!settings.bisect){
                 PRINT0( "Get a partition with multisection");
             }else{
-                PRINT0( "Get a partition with bsection");
+                PRINT0( "Get a partition with bisection");
             }
+            
+            beforeInitialTime =  std::chrono::system_clock::now();
             
             // get a multisection partition
             scai::lama::DenseVector<IndexType> multiSectionPartition =  MultiSection<IndexType, ValueType>::getPartitionNonUniform( graph, coordinates, nodeWeights, settings);
@@ -500,10 +647,11 @@ int main(int argc, char** argv) {
                 std::cout << "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance << "\033[0m";
                 std::cout << std::endl  << std::endl  << std::endl;
             }
-            
+            /*
             if(dimensions==2){
                 ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"multisectPart");
             }
+            */
             break;   
         }
         default:{
@@ -514,7 +662,7 @@ int main(int argc, char** argv) {
     
     if( comm->getRank()==0){ 
         logF<< "Results for file " << graphFile << std::endl;
-        logF<< "node= "<< N << " , edges= "<< edges << std::endl<< std::endl;
+        logF<< "node= "<< N << std::endl<< std::endl;
         settings.print( logF );
         logF<< std::endl<< std::endl << "Only initial partition, no MultiLevel or LocalRefinement"<< std::endl << std::endl;
     }

@@ -261,7 +261,6 @@ TEST_F(FileIOTest, testReadMatrixMarketFormat){
     std::string path = "./meshes/whitaker3/";
     std::string graphFile = path + "whitaker3.mtx";
     std::string coordFile = path + "whitaker3_coord.mtx";
-    //std::string coordFile = "./meshes/my_MM_coords.mtx";
         
     std::ifstream coordF( coordFile );
     
@@ -273,13 +272,24 @@ TEST_F(FileIOTest, testReadMatrixMarketFormat){
     
     ITI::Format ff = ITI::Format::MATRIXMARKET;
     
+    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
+    
     std::tie( N, dimensions) = FileIO<IndexType, ValueType>::getMatrixMarketCoordsInfos( coordFile );
-    PRINT(" number of points= " << N << ", dimensions= " << dimensions);
+    PRINT0(" number of points= " << N << ", dimensions= " << dimensions);
     
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions, ff);
-    PRINT0("Read " << coords.size() << " coordinates");
+    
+    std::chrono::duration<double> readTime =  std::chrono::system_clock::now() - startTime;
+    
+    PRINT0("Read " << coords.size() << " coordinates in time " << readTime.count() );
+    
+    startTime = std::chrono::system_clock::now();
     
     scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( graphFile, ff);
+    
+    readTime =  std::chrono::system_clock::now() - startTime;
+    
+    PRINT0("Read  graph in time " << readTime.count() );
     
     
     //assertion - prints
@@ -304,6 +314,14 @@ TEST_F(FileIOTest, testReadMatrixMarketFormat){
     for(int d=1; d<dimensions; d++){
         SCAI_ASSERT( coords[d].getLocalValues().size()==coords[d-1].getLocalValues().size() , "Coordinates for different dimension have different sizes, should be the same");
         SCAI_ASSERT( coords[d].getLocalValues().size()>0 , "Coordinate vector is PE " << *comm << " is empty");
+    }
+    
+    {
+        const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();    	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+
+        for(int i=0; i<10; i++){
+            //PRINT0(ja[i]);
+        }
     }
 }
 
