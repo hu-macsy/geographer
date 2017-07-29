@@ -34,6 +34,7 @@ for i in range(iterations):
             others += " --useGeometricTieBreaking="+str(useGeometricTieBreaking)            
             others += " --multiLevelRounds="+str(multiLevelRounds)
             others += " --initialPartition 3"
+            others += " --dimensions 2"
             commandString = assembleCommandString("parco", filename, p, others)
             submitfile = createMOABSubmitFile("msub-"+str(p)+"-"+str(i)+".cmd", commandString, "00:25:00", p, "4000mb")
             call(["msub", submitfile])
