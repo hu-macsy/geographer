@@ -103,6 +103,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		}
 
 		delta = *std::max_element(deltas.begin(), deltas.end());
+		const double deltaSq = delta*delta;
 		double maxInfluence = *std::max_element(influence.begin(), influence.end());
 		double minInfluence = *std::min_element(influence.begin(), influence.end());
 
@@ -111,8 +112,15 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 			for (IndexType i = 0; i < localN; i++) {
 				IndexType cluster = rResult[i];
 				upperBoundOwnCenter[i] += (2*deltas[cluster]*std::sqrt(upperBoundOwnCenter[i]/influence[cluster]) + squaredDeltas[cluster])*(influence[cluster] + 1e-10);
-				lowerBoundNextCenter[i]-= (2*delta*std::sqrt(lowerBoundNextCenter[i]/maxInfluence) + delta*delta)*(maxInfluence + 1e-10);
-				if (!(lowerBoundNextCenter[i] > 0)) lowerBoundNextCenter[i] = 0;
+				ValueType pureSqrt(std::sqrt(lowerBoundNextCenter[i]/maxInfluence));
+				if (pureSqrt < delta) {
+					lowerBoundNextCenter[i] = 0;
+				} else {
+					ValueType diff = (-2*delta*pureSqrt + deltaSq)*(maxInfluence + 1e-10);
+					assert(diff < 0);
+					lowerBoundNextCenter[i] += diff;
+					if (!(lowerBoundNextCenter[i] > 0)) lowerBoundNextCenter[i] = 0;
+				}
 				assert(std::isfinite(lowerBoundNextCenter[i]));
 			}
 		}
