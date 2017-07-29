@@ -136,7 +136,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             assert(result.getLocalValues().min() >= 0);
             assert(result.getLocalValues().max() < k);
 
-            std::cout << "K-Means, Cut:" << computeCut(input, result, false) << ", imbalance:" << computeImbalance(result, settings.numBlocks) << std::endl;
+            ValueType cut = computeCut(input, result, true);
+            ValueType imbalance = computeImbalance(result, settings.numBlocks);
+            if (comm->getRank() == 0) {
+				std::cout << "K-Means, Cut:" << cut << ", imbalance:" << imbalance << std::endl;
+            }
             assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
             assert(result.min().Scalar::getValue<IndexType>() == 0);
 
