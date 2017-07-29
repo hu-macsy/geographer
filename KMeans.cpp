@@ -100,9 +100,7 @@ std::vector<std::vector<ValueType> > findCenters(
 
 	//communicate local centers and weight sums
 	std::vector<IndexType> totalWeight(k, 0);
-	for (IndexType j = 0; j < k; j++) {
-		totalWeight[j] = comm->sum(weightSum[j]);
-	}
+	comm->sumImpl(totalWeight.data(), weightSum.data(), k, scai::common::TypeTraits<IndexType>::stype);
 
 	//compute updated centers as weighted average
 	for (IndexType d = 0; d < dim; d++) {
@@ -110,9 +108,10 @@ std::vector<std::vector<ValueType> > findCenters(
 			ValueType weightRatio = (ValueType(weightSum[j]) / totalWeight[j]);
 			//if no points in cluster, set it to left upper corner. TODO: find better way to seed new cluster.
 			ValueType weightedCoord = weightSum[j] == 0 ? 0 : result[d][j] * weightRatio;
-			result[d][j] = comm->sum(weightedCoord);
+			result[d][j] = weightedCoord;
 			assert(std::isfinite(result[d][j]));
 		}
+		comm->sumImpl(result[d].data(), result[d].data(), k, scai::common::TypeTraits<ValueType>::stype);
 	}
 
 	return result;
@@ -325,16 +324,14 @@ DenseVector<IndexType> assignBlocks(
 				}
 				blockWeights[wAssignment[i]] += rWeights[i];
 			}
+			comm->synchronize();
 		}
 
-		std::vector<IndexType> totalWeight(k);
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.blockWeightSum" );
-			for (IndexType j = 0; j < k; j++) {
-				totalWeight[j] = comm->sum(blockWeights[j]);
-			}
+			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<IndexType>::stype);
 		}
-		IndexType maxBlockWeight = *std::max_element(totalWeight.begin(), totalWeight.end());
+		IndexType maxBlockWeight = *std::max_element(blockWeights.begin(), blockWeights.end());
 		imbalance = (ValueType(maxBlockWeight - optSize)/ optSize);
 
 		std::vector<ValueType> oldInfluence = influence;
@@ -343,7 +340,7 @@ DenseVector<IndexType> assignBlocks(
 		double maxRatio = 0.95;
 		for (IndexType j = 0; j < k; j++) {
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.influence" );
-			double ratio = ValueType(totalWeight[j]) / targetBlockSizes[j];
+			double ratio = ValueType(blockWeights[j]) / targetBlockSizes[j];
 			influence[j] = std::max(influence[j]*0.95, std::min(influence[j] * std::pow(ratio, 0.5), influence[j]*1.05));
 
 			double influenceRatio = influence[j] / oldInfluence[j];
