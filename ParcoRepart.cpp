@@ -122,13 +122,16 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         } else if ( settings.initialPartition == 2) {// spectral
             result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
         } else if (settings.initialPartition == 3) {// k-means
-        	DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(input, coordinates, settings);
-        	nodeWeights.redistribute(tempResult.getDistributionPtr());
+            DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(input, coordinates, settings);
+            nodeWeights.redistribute(tempResult.getDistributionPtr());
+            for (IndexType d = 0; d < dimensions; d++) {
+                coordinates[d].redistribute(tempResult.getDistributionPtr());
+            }
         	const IndexType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
             const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
             std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
             result = ITI::KMeans::computePartition(coordinates, settings.numBlocks, nodeWeights, blockSizes, settings.epsilon);
-            std::chrono::duration<double> kMeansTime =  std::chrono::system_clock::now() - beforeKMeans;
+            std::chrono::duration<double> kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
 			ValueType timeForInitPart = ValueType ( comm->max(kMeansTime.count() ));
 			if (comm->getRank() == 0) {
 				std::cout << "Time for kMeans:" << timeForInitPart << std::endl;
@@ -137,7 +140,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             assert(result.getLocalValues().max() < k);
 
             ValueType cut = computeCut(input, result, true);
-            ValueType imbalance = computeImbalance(result, settings.numBlocks);
+            ValueType imbalance = computeImbalance(result, settings.numBlocks, nodeWeights);
             if (comm->getRank() == 0) {
 				std::cout << "K-Means, Cut:" << cut << ", imbalance:" << imbalance << std::endl;
             }

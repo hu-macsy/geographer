@@ -58,6 +58,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<ValueType> influence(k,1);
 	const IndexType dim = coordinates.size();
 	const IndexType localN = nodeWeights.getLocalValues().size();
+	assert(nodeWeights.getLocalValues().size() == coordinates[0].getLocalValues().size());
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	std::vector<ValueType> minCoords(dim);
