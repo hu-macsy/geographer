@@ -37,7 +37,7 @@ class ParcoRepartTest : public ::testing::Test {
 TEST_F(ParcoRepartTest, testInitialPartition){
     //std::string file = "Grid8x8";
     std::string path = "meshes/bigtrace/";
-    std::string fileName = "bigtrace-00010.graph";
+    std::string fileName = "bigtrace-00000.graph";
     std::string file = path + fileName;
     //std::string file = "meshes/hugebubbles/hugebubbles-00010.graph";
     std::ifstream f(file);

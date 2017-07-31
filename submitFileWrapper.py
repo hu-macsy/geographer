@@ -2,7 +2,7 @@ SCAI_LIB="/home/kit/iti/cq6340/WAVE/scai_lama/install/lib/"
 BOOST_LIB="/home/kit/iti/cq6340/boost_1_61_0/stage/lib"
 JOB_DIR="/home/hpc/pr87si/di36sop/WAVE/ParcoRepart/Implementation"
 
-def createMOABSubmitFile(filename, commandString, walltime, processors, memory):
+def createMOABSubmitFile(filename, commandString, walltime, processors, memory, otherPreparation=[]):
     classString = "singlenode" if processors <= 16 else "multinode"
     with open(filename, 'w') as f:
         f.write("#!/bin/bash"+"\n")
@@ -13,6 +13,8 @@ def createMOABSubmitFile(filename, commandString, walltime, processors, memory):
 
         f.write("module load mpi/openmpi/2.0-gnu-5.2"+"\n")
         f.write("export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"+SCAI_LIB+":"+BOOST_LIB+"\n")
+        for entry in otherPreparation:
+            f.write(entry + "\n")
 
         f.write("mpirun "+commandString+"\n")
     
@@ -52,9 +54,9 @@ def assembleCommandString(partitioner, graphFile, processors, others=""):
         return "Katanomi" + " --graphFile "+graphFile+others
     elif partitioner.lower() == "metis":
         return "metisWrapper" + " " + str(graphFile)
-    #else if partitioner.lower() == "rcb":
-    #    return graphFile+" rcb"
-    #else if partitioner.lower() == "multijagged":
-    #    return graphFile+" multijagged"
+    elif partitioner.lower() == "rcb":
+        return "zoltanWrapper" + " " + graphFile + " rcb"
+    elif partitioner.lower() == "multijagged":
+        return "zoltanWrapper" + " " + graphFile+" multijagged"
     else:
         raise ValueError("Partitioner "+str(partitioner)+" not supported.")

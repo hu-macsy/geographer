@@ -245,6 +245,12 @@ void FileIO<IndexType, ValueType>::writePartition(const DenseVector<IndexType> &
 
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, Format format) {
+	std::vector<DenseVector<IndexType>> dummyWeightContainer;
+	return readGraph(filename, dummyWeightContainer, format);
+}
+
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, std::vector<DenseVector<IndexType>>& nodeWeights, Format format) {
 	SCAI_REGION("FileIO.readGraph");
 
 	if(format == Format::MATRIXMARKET){
@@ -335,6 +341,10 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     std::vector<IndexType> ia(localN+1, 0);
     std::vector<IndexType> ja;
     std::vector<ValueType> values;
+    std::vector<std::vector<IndexType> > nodeWeightStorage(numberNodeWeights);
+    for (IndexType i = 0; i < numberNodeWeights; i++) {
+    	nodeWeightStorage[i].resize(localN);
+    }
 
     //we don't know exactly how many edges we are going to have, but in a regular mesh the average degree times the local nodes is a good estimate.
     ja.reserve(localN*avgDegree*1.1);
@@ -353,7 +363,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         for (IndexType j = 0; j < numberNodeWeights; j++) {
         	bool readWeight = std::getline(ss, item, ' ');
         	if (readWeight && item.size() > 0) {
-        		weights.push_back(std::stoi(item));
+        		nodeWeightStorage[j][i] = std::stoi(item);
         	} else {
         		std::cout << "Could not parse " << item << std::endl;
         	}
@@ -389,6 +399,11 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         	assert(ja.size() == values.size());
         }
     }
+
+	nodeWeights.resize(numberNodeWeights);
+	for (IndexType i = 0; i < numberNodeWeights; i++) {
+		nodeWeights[i] = DenseVector<IndexType>(dist, scai::utilskernel::LArray<IndexType>(localN, nodeWeightStorage[i].data()));
+	}
 
     if (endLocalRange == globalN) {
 		bool eof = std::getline(file, line).eof();

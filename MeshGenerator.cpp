@@ -303,7 +303,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
         std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and coordinates dist: "<< coords[0].getDistribution() << std::endl;
         throw std::runtime_error( "Distributions: should (?) be equal.");
     }
-    
+
     //for simplicity
     IndexType numX = numPoints[0] , numY= numPoints[1], numZ= numPoints[2];
     IndexType N = numX* numY* numZ;
@@ -314,7 +314,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
        
     // get the local part of the coordinates vectors
     std::vector<scai::utilskernel::LArray<ValueType>* > localCoords(3);
-    
+
     for(IndexType i=0; i<3; i++){
         localCoords[i] = &coords[i].getLocalValues();
     }
@@ -373,7 +373,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
     
     for(IndexType x=-boxRadius; x<=boxRadius; x++){
         for(IndexType y=-boxRadius; y<=boxRadius; y++){
-                for(IndexType z=-boxRadius; z<=boxRadius; z++){
+            for(IndexType z=-boxRadius; z<=boxRadius; z++){
                 IndexType globalNeighbourIndex= x*planeSize + y*numZ + z;
                 neighbourGlobalIndices.push_back( globalNeighbourIndex );
             }
@@ -397,13 +397,11 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
     
                 
     // a set for every local node. localNgbs[i] keeps the neighbours of node i that are also local. We use set in order to prevent the insertion of an index multiple times
-    //std::vector< std::list<IndexType> > localNgbs(localSize);
     std::vector< std::set<IndexType> > localNgbs(localSize);
         
     // two vector that keep the edges that nees to be communicated with their global indices
     std::vector<IndexType> localNodeInd;
     std::vector<IndexType> nonLocalNodeInd;
-    
         
     for(IndexType i=0; i<localSize; i++){                   // for all local nodes
         SCAI_REGION("MeshGenerator.createRandomStructured3DMesh_dist.findNgbrs");
@@ -590,7 +588,6 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
     }
     */
     
-    
     for(IndexType round=1; round<comm->getSize(); round++){
         SCAI_REGION("MeshGenerator.createRandomStructured3DMesh_dist.commNonLocalEdges");
         // to find from what PE you receive
@@ -623,8 +620,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
         // the data you received must be passed on, not your own again
         sendPart.resize(recvPart.size());
         sendPart.swap(recvPart);
-    }
-    
+    }    
     
     /* 
      * after gathering all non local indices, set the CSR sparse matrix
@@ -647,7 +643,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
     // ja.size() = values.size() = number of edges of the graph
     
     IndexType nnzCounter = 0; // count non-zero elements
-    
+
     {
         SCAI_REGION("MeshGenerator.createRandomStructured3DMesh_dist.setCSRSparseMatrix");
         IndexType globalN= numX* numY* numZ;
@@ -682,7 +678,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
             }
             ia[i+1] = ia[i] + numRowElems;
             //PRINT(numRowElems << " should be == "<< localNgbs[i].size() );
-            SCAI_ASSERT(numRowElems == localNgbs[i].size(),  __FILE__<<" ,"<<__LINE__<<"something is wrong");
+            SCAI_ASSERT(numRowElems == localNgbs[i].size(),  __FILE__<<" ,"<<__LINE__<<" something is wrong");
         }
         ja.resize(nnzCounter);
         values.resize(nnzCounter);
@@ -690,7 +686,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
         SCAI_ASSERT_EQUAL_ERROR( nnzCounter, nnzValues);
     } //read/write block
     
-    
+
     {
         SCAI_REGION( "MeshGenerator.createRandomStructured3DMesh_dist.swap_assign" )
         localMatrix.swap( csrIA, csrJA, csrValues );

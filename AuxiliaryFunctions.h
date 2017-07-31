@@ -3,13 +3,8 @@
 #include <chrono>
 #include <fstream>
 
-#include "PrioQueue.h"
+#include <scai/lama/DenseVector.hpp>
 #include "ParcoRepart.h"
-#include "MultiLevel.h"
-#include "HilbertCurve.h"
-#include "Settings.h"
-#include "FileIO.h"
-
 
 namespace ITI{
 
@@ -105,6 +100,35 @@ static void print2DGrid(scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama
 
 }
 //------------------------------------------------------------------------------
+
+static IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM){
+
+    const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = distPtr->getCommunicatorPtr();
+    const IndexType localN = distPtr->getLocalSize();
+    const IndexType globalN = distPtr->getGlobalSize();
+    
+    {
+        scai::dmemo::DistributionPtr noDist (new scai::dmemo::NoDistribution( globalN ));
+        SCAI_ASSERT( adjM.getColDistributionPtr()->isEqual(*noDist) , "Adjacency matrix should have no column distribution." );
+    }
+    
+    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+    scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+    
+    // local maximum degree 
+    IndexType maxDegree = ia[1]-ia[0];
+    
+    for(int i=1; i<ia.size(); i++){
+        IndexType thisDegree = ia[i]-ia[i-1];
+        if( thisDegree>maxDegree){
+            maxDegree = thisDegree;
+        }
+    }
+    //return global maximum
+    return comm->max( maxDegree );
+}
+
 
 /*  From pixel (int) coords, either in 2S or 3D, to a 1D index. 
  * Only for cubes, where every side has the same length, maxLen;

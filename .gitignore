@@ -29,3 +29,4 @@ LLRUN.out.*
 LLRUN.err.*
 scorep-failed*
 scorep-2017*
+*.cmd

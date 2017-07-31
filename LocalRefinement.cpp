@@ -213,7 +213,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			{
 				scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
 				scai::hmemo::HArrayRef<IndexType> arrProvidedIndexes( interfaceNodes );
-				scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, /*arrProvidedIndexes, partner,*/ graphHalo );
+				scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, arrProvidedIndexes, partner, graphHalo );
 			}
 
 			//all required halo indices are in the halo

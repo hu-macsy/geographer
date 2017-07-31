@@ -307,6 +307,37 @@ TEST_F (auxTest, testInitialPartitions){
 }
 //-----------------------------------------------------------------
 
+TEST_F (auxTest,testGraphMaxDegree){
+    
+    const IndexType N = 1000;
+    const IndexType k = 10;
+
+    //define distributions
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+
+    //generate random complete matrix
+    scai::lama::CSRSparseMatrix<ValueType> graph(dist, noDistPointer);
+    
+    for( int i=0; i<10; i++){
+        scai::lama::MatrixCreator::fillRandom(graph, i/9.0);
+    
+        IndexType maxDegree;
+        maxDegree = aux::getGraphMaxDegree(graph);
+        //PRINT0("maxDegree= " << maxDegree);
+        
+        EXPECT_LE( maxDegree, N);
+        EXPECT_LE( 0, maxDegree);
+        if ( i==0 ){
+            EXPECT_EQ( maxDegree, 0);
+        }else if( i==9 ){
+            EXPECT_EQ( maxDegree, N);
+        }
+    }
+}
+//-----------------------------------------------------------------
+
 TEST_F (auxTest, testPixelDistance) {
     
     IndexType sideLen = 100;

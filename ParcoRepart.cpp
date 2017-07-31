@@ -38,9 +38,15 @@
 using scai::lama::Scalar;
 
 namespace ITI {
-
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings)
+{
+	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(input.getRowDistributionPtr(), 1);
+	return partitionGraph(input, coordinates, uniformWeights, settings);
+}
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<IndexType> &nodeWeights, Settings settings)
 {
 	IndexType k = settings.numBlocks;
 	ValueType epsilon = settings.epsilon;
@@ -89,6 +95,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	if( !coordDist->isEqual( *inputDist) ){
 		throw std::runtime_error( "Distributions should be equal.");
 	}
+
+	if (nodeWeights.size() != 0)
+
 	SCAI_REGION_END("ParcoRepart.partitionGraph.inputCheck")
 	{
 		SCAI_REGION("ParcoRepart.synchronize")
@@ -98,24 +107,48 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition")
         // get an initial partition
         DenseVector<IndexType> result;
-        DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(inputDist, 1);
-
+        if (nodeWeights.size() == 0) {
+        	nodeWeights = DenseVector<IndexType>(inputDist, 1);
+        }
         
+        assert(nodeWeights.getDistribution().isEqual(*inputDist));
+
+        std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
+
         if( settings.initialPartition==0 ){ //sfc
+            PRINT0("Initial partition with SFCs");
             result= ParcoRepart<IndexType, ValueType>::hilbertPartition(input, coordinates, settings);
         } else if ( settings.initialPartition==1 ){ // pixel
+            PRINT0("Initial partition with pixels.");
             result = ParcoRepart<IndexType, ValueType>::pixelPartition(input, coordinates, settings);
         } else if ( settings.initialPartition == 2) {// spectral
+            PRINT0("Initial partition with spectral");
             result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
         } else if (settings.initialPartition == 3) {// k-means
-            const std::vector<IndexType> blockSizes(settings.numBlocks, n/settings.numBlocks);
-            result = ITI::KMeans::computePartition(coordinates, settings.numBlocks, uniformWeights, blockSizes, settings.epsilon);
+            PRINT0("Initial partition with k-means");
+            DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(input, coordinates, settings);
+            nodeWeights.redistribute(tempResult.getDistributionPtr());
+            const IndexType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
+            const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
+            std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
+            result = ITI::KMeans::computePartition(coordinates, settings.numBlocks, nodeWeights, blockSizes, settings.epsilon);
+            std::chrono::duration<double> kMeansTime =  std::chrono::system_clock::now() - beforeKMeans;
+			ValueType timeForInitPart = ValueType ( comm->max(kMeansTime.count() ));
+			if (comm->getRank() == 0) {
+				std::cout << "Time for kMeans:" << timeForInitPart << std::endl;
+			}
+            assert(result.getLocalValues().min() >= 0);
+            assert(result.getLocalValues().max() < k);
 
-            std::cout << "K-Means, Cut:" << computeCut(input, result, false) << ", imbalance:" << computeImbalance(result, settings.numBlocks) << std::endl;
+            ValueType cut = computeCut(input, result, true);
+            ValueType imbalance = computeImbalance(result, settings.numBlocks);
+            if (comm->getRank() == 0) {
+				std::cout << "K-Means, Cut:" << cut << ", imbalance:" << imbalance << std::endl;
+            }
             assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
             assert(result.min().Scalar::getValue<IndexType>() == 0);
 
-            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
+            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( result.getDistribution(), result.getLocalValues() ) );
             assert(newDist->getGlobalSize() == n);
 
             result.redistribute(newDist);
@@ -126,26 +159,33 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				}
             }
         } else if (settings.initialPartition == 4) {// multisection
-		scai::lama::DenseVector<ValueType> nodeWeights( inputDist, 1 );
-		result = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, nodeWeights, settings);
-		scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
-		result.redistribute(newDist);
-		input.redistribute(newDist, noDist);
-		for (DenseVector<ValueType>& dimCoords : coordinates) {
-			dimCoords.redistribute(newDist);
-		}
-	}
-	else {
-        	throw std::runtime_error("No method implemented for " + std::to_string(settings.initialPartition));
+            PRINT0("Initial partition with multisection");
+            DenseVector<ValueType> convertedWeights(nodeWeights);
+            result = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, settings);
+            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *inputDist, result.getLocalValues() ) );
+            result.redistribute(newDist);
+            input.redistribute(newDist, noDist);
+            for (DenseVector<ValueType>& dimCoords : coordinates) {
+                dimCoords.redistribute(newDist);
+            }
         }
+        else {
+            throw std::runtime_error("No method implemented for " + std::to_string(settings.initialPartition) );
+        }
+        nodeWeights.redistribute(input.getRowDistributionPtr());
         SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
+        std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
+        ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
+        if (comm->getRank() == 0) {
+        	std::cout << "Time for initial partition and redistribution:" << timeForInitPart << std::endl;
+        }
         
-	IndexType numRefinementRounds = 0;
+        IndexType numRefinementRounds = 0;
 
         SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
 	if (comm->getSize() == 1 || comm->getSize() == k) {
-		uniformWeights = DenseVector<IndexType>(result.getDistributionPtr(), 1);
-		ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, uniformWeights, coordinates, settings);
+
+		ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, settings);
 
 	} else {
 		std::cout << "Local refinement only implemented sequentially and for one block per process. Called with " << comm->getSize() << " processes and " << k << " blocks." << std::endl;
@@ -1523,6 +1563,8 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const 
 //---------------------------------------------------------------------------------------
 
 //to force instantiation
+
+template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, DenseVector<int> &nodeWeights, struct Settings);
 
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings);
 

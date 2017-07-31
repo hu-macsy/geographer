@@ -80,6 +80,13 @@ public:
 	 */
 	static CSRSparseMatrix<ValueType> readGraph(const std::string filename, Format = Format::METIS);
 
+	/** Reads a graph from filename in METIS format and returns the adjacency matrix.
+	 * @param[in] filename The file to read from.
+		 * @param[in] fileFormat The type of file to read from.
+	 * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
+	 */
+	static CSRSparseMatrix<ValueType> readGraph(const std::string filename, std::vector<DenseVector<IndexType>>& nodeWeights, Format = Format::METIS);
+
 	/* Reads the 2D coordinates from file "filename" and returns then in a DenseVector where the coordinates
 	 * of point i are in [i*2][i*2+1].
 	 */

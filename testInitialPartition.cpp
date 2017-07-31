@@ -28,6 +28,7 @@
 #include "LocalRefinement.h"
 #include "SpectralPartition.h"
 #include "MultiSection.h"
+#include "KMeans.h"
 
 typedef double ValueType;
 typedef int IndexType;
@@ -242,52 +243,52 @@ int main(int argc, char** argv) {
         }
 
     }
-        /*
-        else if(vm.count("generate")){
-            if (comm->getRank() == 0){
-                std::cout<< "input: generate" << std::endl;
-            }
-            if (settings.dimensions == 2) {
-                    settings.numZ = 1;
-            }
-
-            N = settings.numX * settings.numY * settings.numZ;
-                
-            maxCoord[0] = settings.numX;
-            maxCoord[1] = settings.numY;
-            maxCoord[2] = settings.numZ;
-
-            std::vector<IndexType> numPoints(3); // number of points in each dimension, used only for 3D
-
-            for (IndexType i = 0; i < 3; i++) {
-                    numPoints[i] = maxCoord[i];
-            }
-
-            if( comm->getRank()== 0){
-                std::cout<< "Generating for dim= "<< settings.dimensions << " and numPoints= "<< settings.numX << ", " << settings.numY << ", "<< settings.numZ << ", in total "<< N << " number of points" << std::endl;
-                std::cout<< "\t\t and maxCoord= "<< maxCoord[0] << ", "<< maxCoord[1] << ", " << maxCoord[2]<< std::endl;
-            }
-            
-            scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-            scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
-            graph = scai::lama::CSRSparseMatrix<ValueType>( rowDistPtr , noDistPtr );
-            
-            scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-            for(IndexType i=0; i<settings.dimensions; i++){
-                coordinates[i].allocate(coordDist);
-                coordinates[i] = static_cast<ValueType>( 0 );
-            }
-
-            // create the adjacency matrix and the coordinates
-            ITI::MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist( graph, coordinates, maxCoord, numPoints);
-            
-            if(comm->getRank()==0){
-                IndexType nodes= graph.getNumRows();
-                IndexType edges= graph.getNumValues()/2;	
-                std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
-            }
+    else if(vm.count("generate")){
+        if (comm->getRank() == 0){
+            std::cout<< "input: generate" << std::endl;
         }
-    */
+        if (settings.dimensions == 2) {
+            settings.numZ = 1;
+        }
+        
+        N = settings.numX * settings.numY * settings.numZ;
+        
+        maxCoord[0] = settings.numX;
+        maxCoord[1] = settings.numY;
+        maxCoord[2] = settings.numZ;
+        
+        std::vector<IndexType> numPoints(3); // number of points in each dimension, used only for 3D
+        
+        for (IndexType i = 0; i < 3; i++) {
+            numPoints[i] = maxCoord[i];
+        }
+        
+        if( comm->getRank()== 0){
+            std::cout<< "Generating for dim= "<< settings.dimensions << " and numPoints= "<< settings.numX << ", " << settings.numY << ", "<< settings.numZ << ", in total "<< N << " number of points" << std::endl;
+            std::cout<< "\t\t and maxCoord= "<< maxCoord[0] << ", "<< maxCoord[1] << ", " << maxCoord[2]<< std::endl;
+        }
+        
+        scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+        scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
+        graph = scai::lama::CSRSparseMatrix<ValueType>( rowDistPtr , noDistPtr );
+        
+        scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+        for(IndexType i=0; i<settings.dimensions; i++){
+            coordinates[i].allocate(coordDist);
+            coordinates[i] = static_cast<ValueType>( 0 );
+        }
+        
+        // create the adjacency matrix and the coordinates
+        ITI::MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist( graph, coordinates, maxCoord, numPoints);
+        
+        IndexType nodes= graph.getNumRows();
+        IndexType edges= graph.getNumValues()/2;	
+        
+        if(comm->getRank()==0){
+            std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
+        }
+        
+    }
     else{
     	std::cout << "Only input file as input. Call again with --graphFile" << std::endl;
     	return 0;
@@ -312,9 +313,6 @@ int main(int argc, char** argv) {
     scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
     
     DenseVector<IndexType> uniformWeights;
-    
-    ValueType cut;
-    ValueType imbalance;
     
     settings.minGainForNextRound = 10;
     settings.minBorderNodes = 10;
@@ -354,6 +352,8 @@ int main(int argc, char** argv) {
     
     if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
     
+    scai::lama::DenseVector<IndexType> partition;
+    
     comm->synchronize();
     
     switch( initialPartition ){
@@ -363,32 +363,13 @@ int main(int argc, char** argv) {
             PRINT0( "Get a hilbert/sfc partition");
             
             // get a hilbertPartition
-            scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition( graph, coordinates, settings);
+            partition = ParcoRepart<IndexType, ValueType>::hilbertPartition( graph, coordinates, settings);
             
             partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
             
-            assert( hilbertPartition.size() == N);
+            assert( partition.size() == N);
             assert( coordinates[0].size() == N);
             
-            //aux::print2DGrid( graph, hilbertPartition );
-            //if(dimensions==2){
-            //    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"hilbertPart");
-            //}
-            
-            //if(dimensions==2){
-            //   ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithHilbert");
-            //}
-            cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, hilbertPartition);
-            imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
-            if(comm->getRank()==0){
-                logF<< "   Initial sfc, total time: " << partitionTime.count() << std::endl;
-                logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
-                logF  << std::endl  <<  std::endl  << std::endl; 
-                std::cout << "\033[1;31m--Initial sfc, total time: " << partitionTime.count() << std::endl;
-                std::cout << "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance << "\033[0m";
-                std::cout << std::endl  << std::endl  << std::endl; 
-            }   
-            comm->synchronize();
             break;
         }
         case 1:{  //------------------------------------------- pixeled
@@ -397,32 +378,43 @@ int main(int argc, char** argv) {
             PRINT0( "Get a pixeled partition");
             
             // get a pixelPartition
-            scai::lama::DenseVector<IndexType> pixeledPartition = ParcoRepart<IndexType, ValueType>::pixelPartition( graph, coordinates, settings);
+            partition = ParcoRepart<IndexType, ValueType>::pixelPartition( graph, coordinates, settings);
             
             partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
             
-            assert( pixeledPartition.size() == N);
+            assert( partition.size() == N);
             assert( coordinates[0].size() == N);
             
-            //if(dimensions==2){
-            //   ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithPixel");
-            //}
-           
-            cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, pixeledPartition);
-            imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
-            if(comm->getRank()==0){
-                logF<< "-- Initial pixeled, total time: " << partitionTime.count() << std::endl;
-                logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
-                logF  << std::endl  << std::endl  << std::endl; 
-                std::cout << "\033[1;35m--Initial pixeled, total time: " << partitionTime.count() << std::endl;
-                std::cout << "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance << "\033[0m";
-                std::cout << std::endl  << std::endl  << std::endl; 
-            }
             break;
         }
-        case 3:{  //------------------------------------------- k-means
+        case 2:{  //------------------------------------------- spectral
             std::cout<< "Not included in testInitial yet, choose another option."<< std::endl;
             std::terminate();
+        }
+        case 3:{  //------------------------------------------- k-means
+            beforeInitialTime =  std::chrono::system_clock::now();
+            PRINT0( "Get a k-means partition");
+            
+            // get a k-means partition
+            //partition = ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, settings);
+            
+            DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coordinates, settings);
+            
+            scai::hmemo::HArray<IndexType> localWeightsInt( rowDistPtr->getLocalSize(), 1 );
+            scai::lama::DenseVector<IndexType> nodeWeightsInt;     // node weights
+            nodeWeightsInt.swap( localWeightsInt, rowDistPtr );
+            nodeWeightsInt.redistribute(tempResult.getDistributionPtr());
+            
+            const IndexType weightSum = nodeWeightsInt.sum().Scalar::getValue<IndexType>();
+            const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
+            
+            partition = ITI::KMeans::computePartition(coordinates, settings.numBlocks, nodeWeightsInt, blockSizes, settings.epsilon);      
+            
+            partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
+            
+            assert( partition.size() == N);
+            assert( coordinates[0].size() == N);
+            break;
         }
         case 4:{  //------------------------------------------- multisection
             
@@ -435,25 +427,21 @@ int main(int argc, char** argv) {
             beforeInitialTime =  std::chrono::system_clock::now();
             
             // get a multisection partition
-            scai::lama::DenseVector<IndexType> multiSectionPartition =  MultiSection<IndexType, ValueType>::getPartitionNonUniform( graph, coordinates, nodeWeights, settings);
+            partition =  MultiSection<IndexType, ValueType>::getPartitionNonUniform( graph, coordinates, nodeWeights, settings);
             
             partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
             
-            assert( multiSectionPartition.size() == N);
+            assert( partition.size() == N);
             assert( coordinates[0].size() == N);
             
-            //if(dimensions==2){
-            //   ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithMS");
-            //}
-            
+c
              //get new distribution
-            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *rowDistPtr, multiSectionPartition.getLocalValues() ) );
-            
-            //TODO: not sure if this is needed...
-            multiSectionPartition.redistribute( newDist);
+            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *rowDistPtr, partition.getLocalValues() ) );
+    
+            partition.redistribute( newDist);
             
             graph.redistribute(newDist, graph.getColDistributionPtr());
-            
+    
             // redistibute coordinates
             for (IndexType dim = 0; dim < dimensions; dim++) {
                 coordinates[dim].redistribute( newDist );
@@ -464,20 +452,6 @@ int main(int argc, char** argv) {
                 assert( coordinates[dim].getLocalValues().size() == newDist->getLocalSize() );
             }
             
-            cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, multiSectionPartition);
-            imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( multiSectionPartition, k);
-            if(comm->getRank()==0){
-                if( settings.bisect ){
-                    logF << "--  Initial bisection, total time: " << partitionTime.count() << std::endl;
-                }else{
-                    logF << "--  Initial multisection, total time: " << partitionTime.count() << std::endl;
-                }
-                logF << "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
-                logF  << std::endl  << std::endl  << std::endl; 
-                std::cout << "\033[1;36m--Initial multisection, total time: " << partitionTime.count() << std::endl;
-                std::cout << "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance << "\033[0m";
-                std::cout << std::endl  << std::endl  << std::endl;
-            }
             /*
             if(dimensions==2){
                 ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"multisectPart");
@@ -491,12 +465,24 @@ int main(int argc, char** argv) {
         }
     }
     
-    if( comm->getRank()==0){ 
+    
+    ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, partition);
+    ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( partition, k);
+    if(comm->getRank()==0){
+        logF << "--  Initial parition, total time: " << partitionTime.count() << std::endl;
+        logF << "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
+        logF  << std::endl  << std::endl  << std::endl; 
+        std::cout << "\033[1;36m--Initial partition, total time: " << partitionTime.count() << std::endl;
+        std::cout << "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance << "\033[0m";
+        std::cout << std::endl  << std::endl  << std::endl;
+        
         logF<< "Results for file " << graphFile << std::endl;
-        logF<< "node= "<< N << std::endl<< std::endl;
+        logF<< "nodes= "<< N << std::endl<< std::endl;
         settings.print( logF );
         logF<< std::endl<< std::endl << "Only initial partition, no MultiLevel or LocalRefinement"<< std::endl << std::endl;
     }
+    
+    
     /*
      *  commenting out spectral, it is not correct yet
      * 
