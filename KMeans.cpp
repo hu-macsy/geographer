@@ -289,21 +289,23 @@ DenseVector<IndexType> assignBlocks(
 
 						IndexType c = 0;
 						while(c < k && secondBestValue > effectiveMinDistance[c]) {
-							IndexType j = clusterIndices[c];
+							IndexType j = clusterIndices[c];//maybe it would be useful to sort the whole centers array, aligning memory accesses.
 							ValueType sqDist = 0;
+							//TODO: restructure arrays to align memory accesses better in inner loop
 							for (IndexType d = 0; d < dim; d++) {
 								ValueType dist = centers[d][j] - coordinates[d][i];
 								sqDist += dist*dist;
 							}
 
-							if (sqDist*influence[j] < bestValue) {
+							const ValueType effectiveDistance = sqDist*influence[j];
+							if (effectiveDistance < bestValue) {
 								secondBest = bestBlock;
 								secondBestValue = bestValue;
 								bestBlock = j;
-								bestValue = sqDist*influence[j];
-							} else if (sqDist*influence[j] < secondBestValue) {
+								bestValue = effectiveDistance;
+							} else if (effectiveDistance < secondBestValue) {
 								secondBest = j;
-								secondBestValue = sqDist*influence[j];
+								secondBestValue = effectiveDistance;
 							}
 							c++;
 						}
