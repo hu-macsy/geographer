@@ -305,9 +305,9 @@ int main(int argc, char** argv) {
         // create the adjacency matrix and the coordinates
         ITI::MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist( graph, coordinates, maxCoord, numPoints);
         
+        IndexType nodes= graph.getNumRows();
+        IndexType edges= graph.getNumValues()/2;
         if(comm->getRank()==0){
-            IndexType nodes= graph.getNumRows();
-            IndexType edges= graph.getNumValues()/2;	
             std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
         }
 
@@ -373,7 +373,7 @@ int main(int argc, char** argv) {
     std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
     ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true); 
-    ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partition, comm->getSize() );
+    ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partition, comm->getSize(), nodeWeights );
     
     std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
     

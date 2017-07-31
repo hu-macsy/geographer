@@ -54,9 +54,9 @@ def assembleCommandString(partitioner, graphFile, processors, others=""):
         return "Katanomi" + " --graphFile "+graphFile+others
     elif partitioner.lower() == "metis":
         return "metisWrapper" + " " + str(graphFile)
-    #else if partitioner.lower() == "rcb":
-    #    return graphFile+" rcb"
-    #else if partitioner.lower() == "multijagged":
-    #    return graphFile+" multijagged"
+    elif partitioner.lower() == "rcb":
+        return "zoltanWrapper" + " " + graphFile + " rcb"
+    elif partitioner.lower() == "multijagged":
+        return "zoltanWrapper" + " " + graphFile+" multijagged"
     else:
         raise ValueError("Partitioner "+str(partitioner)+" not supported.")
