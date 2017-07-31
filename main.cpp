@@ -373,7 +373,7 @@ int main(int argc, char** argv) {
     std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
     ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true); 
-    ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partition, comm->getSize() );
+    ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partition, comm->getSize(), nodeWeights );
     
     std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
     
