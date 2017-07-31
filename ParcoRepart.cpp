@@ -122,8 +122,13 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         } else if ( settings.initialPartition == 2) {// spectral
             result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
         } else if (settings.initialPartition == 3) {// k-means
-        	DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(input, coordinates, settings);
-        	nodeWeights.redistribute(tempResult.getDistributionPtr());
+        	if (settings.dimensions == 2 || settings.dimensions == 3) {
+				DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(input, coordinates, settings);
+				nodeWeights.redistribute(tempResult.getDistributionPtr());
+				for (IndexType d = 0; d < dimensions; d++) {
+					coordinates[d].redistribute(tempResult.getDistributionPtr());
+				}
+        	}
         	const IndexType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
             const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
             std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
