@@ -80,13 +80,15 @@ int main(int argc, char** argv) {
         
 	struct Settings settings;
         IndexType localN = -1; 		// total number of points
-
+        IndexType ff = 1;
+        
 	desc.add_options()
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 				("numX", value<int>(&settings.numX)->default_value(settings.numX), "Number of points in x dimension of generated graph")
 				("numY", value<int>(&settings.numY)->default_value(settings.numY), "Number of points in y dimension of generated graph")
 				("numZ", value<int>(&settings.numZ)->default_value(settings.numZ), "Number of points in z dimension of generated graph")
 				("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
+                                ("fileFormat", value<int>(&ff)->default_value(ff), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
                                 ("distribution", value<std::string>(&pointDist)->default_value(pointDist), "The distribution of the points: can be normal or uniform")
                                 ("numPoints", value<IndexType>(&localN) , "Number of local per PE to be generated.")
                                 ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
@@ -101,7 +103,6 @@ int main(int argc, char** argv) {
 				("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
 				("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
 				("multiLevelRounds", value<int>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
-                                ("fileFormat", value<int>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for METIS format, 1 for MatrixMarket format. See FileIO for more details.")
 				;
 
         variables_map vm;
@@ -313,11 +314,18 @@ int main(int argc, char** argv) {
             std::cout << "\tfinal imbalance= "<< imbalance << "\033[0m";
             std::cout << std::endl  << std::endl  << std::endl;
         }
-        PRINT0("\nGot rectangles in time: " << partitionTime.count() << " - imbalance is " << (maxLeafWeight - optWeight)/optWeight);
+        PRINT0("\nGot rectangles in time: " << partitionTime.count() << " - imbalance is " << maxLeafWeight/optWeight -1);
         /*
         i f(*dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"multisectPart");
             }
             */        
+        scai::lama::CSRSparseMatrix<ValueType> blockGraph = ITI::ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, multiSectionPartition, k);
+        
+        /* TODO:
+         getIA values and find block-node with maximum degree
+         and also total degree
+         */
+        
         return 0;
 }
