@@ -21,6 +21,7 @@
 #include "MeshGenerator.h"
 #include "FileIO.h"
 #include "LocalRefinement.h"
+#include "GraphUtils.h"
 #include "gtest/gtest.h"
 
 typedef double ValueType;
@@ -34,58 +35,6 @@ class LocalRefinementTest : public ::testing::Test {
 
 };
 
-/*
-TEST_F(LocalRefinementTest, testFiducciaMattheysesLocal) {
-  std::string file = "Grid32x32";
-  const IndexType k = 10;
-  const ValueType epsilon = 0.05;
-  const IndexType iterations = 1;
-
-  //generate random matrix
-
-  CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
-  const IndexType n = graph.getRowDistributionPtr()->getGlobalSize();
-
-  //we want a replicated matrix
-  scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
-  graph.redistribute(noDistPointer, noDistPointer);
-
-  //generate random partition
-  scai::lama::DenseVector<IndexType> part(n, 0);
-  for (IndexType i = 0; i < n; i++) {
-    IndexType blockId = rand() % k;
-    part.setValue(i, blockId);
-  }
-
-  ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
-  for (IndexType i = 0; i < iterations; i++) {
-    ValueType gain = ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(graph, part, k, epsilon);
-
-    //check correct gain calculation
-    const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
-    EXPECT_EQ(cut - gain, newCut) << "Old cut " << cut << ", gain " << gain << " newCut " << newCut;
-    EXPECT_LE(newCut, cut);
-    cut = newCut;
-  }
-  
-  //generate balanced partition
-  for (IndexType i = 0; i < n; i++) {
-    IndexType blockId = i % k;
-    part.setValue(i, blockId);
-  }
-
-  //check correct cut with balanced partition
-  cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
-  ValueType gain = ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(graph, part, k, epsilon);
-  const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
-  EXPECT_EQ(cut - gain, newCut);
-  EXPECT_LE(newCut, cut);
-
-  //check for balance
-  ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k);
-  EXPECT_LE(imbalance, epsilon);
-}
-*/
 //--------------------------------------------------------------------------------------- 
  
 TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
@@ -128,7 +77,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	}
 	//test initial partion for imbalance
 	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
-        ValueType initialImbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k, uniformWeights);
+        ValueType initialImbalance = GraphUtils::computeImbalance<IndexType, ValueType>(part, k, uniformWeights);
         
         // If initial partition is highly imbalanced local refinement cannot fix it.
         // TODO: should the final partion be balances no matter how imbalanced is the initial one???
@@ -153,7 +102,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 		coordinates[dim].redistribute(newDistribution);
 	}
 
-	std::vector<IndexType> localBorder = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(graph);
+	std::vector<IndexType> localBorder = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(graph);
 
 	Settings settings;
 	settings.numBlocks= k;
@@ -185,7 +134,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	//get distances
 	std::vector<double> distances = ParcoRepart<IndexType,ValueType>::distancesFromBlockCenter(coordinates);
 
-	ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
+	ValueType cut = GraphUtils::computeCut(graph, part, true);
 	ASSERT_GE(cut, 0);
 	for (IndexType i = 0; i < iterations; i++) {
 		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights,
@@ -194,7 +143,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 		for (IndexType roundGain : gainPerRound) gain += roundGain;
 
 		//check correct gain calculation
-		const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
+		const ValueType newCut = GraphUtils::computeCut(graph, part, true);
 		EXPECT_EQ(cut - gain, newCut) << "Old cut " << cut << ", gain " << gain << " newCut " << newCut;
 
 		EXPECT_LE(newCut, cut);
@@ -202,7 +151,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	}
 
 	//check for balance
-	ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k, weights);
+	ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(part, k, weights);
         PRINT0("final imbalance: " << imbalance);
         // TODO: I do not know, both assertion fail from time to time...
         // at least return a solution less imbalanced than the initial one
@@ -259,7 +208,7 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 	//std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::computeCommunicationPairings(a, part, mapping);
         scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( a, part, k);
 	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
-	std::vector<IndexType> localBorder = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(a);
+	std::vector<IndexType> localBorder = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(a);
 
 	IndexType thisBlock = comm->getRank();
 
@@ -268,7 +217,7 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 		IndexType partner = commAccess[scheme[round].getDistributionPtr()->global2local(comm->getRank())];
 
 		if (partner == thisBlock) {
-			scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildNeighborHalo(a);
+			scai::dmemo::Halo partHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(a);
 			scai::utilskernel::LArray<IndexType> haloData;
 			comm->updateHalo( haloData, part.getLocalValues(), partHalo );
 
@@ -308,7 +257,7 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 			const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 			const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
-			scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildNeighborHalo(a);
+			scai::dmemo::Halo partHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(a);
 			scai::utilskernel::LArray<IndexType> haloData;
 			comm->updateHalo( haloData, localData, partHalo );
 

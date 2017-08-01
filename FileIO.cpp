@@ -167,7 +167,7 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
 		}
 		for (IndexType i = 0; i < n; i++) {
 			for (IndexType d = 0; d < dimension; d++) {
-				filehandle << coords[d].targetReference()[i] << " ";
+				filehandle << targetReference[d].getLocalValues()[i] << " ";
 			}
 			filehandle << std::endl;
 		}

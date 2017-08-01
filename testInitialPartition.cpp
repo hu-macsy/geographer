@@ -425,8 +425,8 @@ int main(int argc, char** argv) {
             //if(dimensions==2){
             //   ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithHilbert");
             //}
-            cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, hilbertPartition);
-            imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
+            cut = GraphUtils::computeCut( graph, hilbertPartition);
+            imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( hilbertPartition, k);
             if(comm->getRank()==0){
                 logF<< "   Initial sfc, total time: " << partitionTime.count() << std::endl;
                 logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
@@ -455,8 +455,8 @@ int main(int argc, char** argv) {
             //   ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithPixel");
             //}
            
-            cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, pixeledPartition);
-            imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
+            cut = GraphUtils::computeCut( graph, pixeledPartition);
+            imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( pixeledPartition, k);
             if(comm->getRank()==0){
                 logF<< "-- Initial pixeled, total time: " << partitionTime.count() << std::endl;
                 logF<< "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance;
@@ -510,8 +510,8 @@ int main(int argc, char** argv) {
                 assert( coordinates[dim].getLocalValues().size() == newDist->getLocalSize() );
             }
             
-            cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, multiSectionPartition);
-            imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( multiSectionPartition, k);
+            cut = GraphUtils::computeCut( graph, multiSectionPartition);
+            imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( multiSectionPartition, k);
             if(comm->getRank()==0){
                 if( settings.bisect ){
                     logF << "--  Initial bisection, total time: " << partitionTime.count() << std::endl;

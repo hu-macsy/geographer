@@ -1,5 +1,6 @@
 
 #include "MultiLevel.h"
+#include "GraphUtils.h"
 
 using scai::lama::Scalar;
 
@@ -88,7 +89,7 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 
 		std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
 
-		std::vector<IndexType> nodesWithNonLocalNeighbors = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(input);
+		std::vector<IndexType> nodesWithNonLocalNeighbors = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(input);
 
 		std::vector<ValueType> distances;
 		if (settings.useGeometricTieBreaking) {
@@ -117,7 +118,7 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 				}
 			}
 
-			ValueType cut = comm->getSize() == 1 ? ParcoRepart<IndexType, ValueType>::computeCut(input, part) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;
+			ValueType cut = comm->getSize() == 1 ? GraphUtils::computeCut(input, part) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;
 			SCAI_ASSERT(comm->sum(cut) == comm->getSize()*cut, "Cut sum inconsistency.");
 			if (numRefinementRounds > 0) {
 				SCAI_ASSERT(gain == oldCut - cut, "Old cut is " << oldCut << ", new cut is " << cut << ", but gain is " << gain);
@@ -220,7 +221,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     assert(newGlobalN == comm->sum(newLocalN));
 
     //build halo of new global indices
-    Halo halo = ITI::ParcoRepart<IndexType, ValueType>::buildNeighborHalo(adjM);
+    Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(adjM);
     scai::utilskernel::LArray<IndexType> haloData;
     comm->updateHalo(haloData, fineToCoarse.getLocalValues(), halo);
     
@@ -713,7 +714,7 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
     }
     
     // get halo for the non-local coordinates
-    scai::dmemo::Halo coordHalo = ParcoRepart<IndexType, ValueType>::buildNeighborHalo(adjM);
+    scai::dmemo::Halo coordHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(adjM);
     std::vector<scai::utilskernel::LArray<ValueType>> coordHaloData(dimensions);
     for(int d=0; d<dimensions; d++){        
         comm->updateHalo( coordHaloData[d], coordinates[d].getLocalValues(), coordHalo );

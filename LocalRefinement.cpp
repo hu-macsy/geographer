@@ -2,6 +2,7 @@
 #include <unordered_set>
 
 #include "LocalRefinement.h"
+#include "GraphUtils.h"
 
 using scai::lama::Scalar;
 
@@ -393,7 +394,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				 */
 				{
 					SCAI_REGION( "LocalRefinement.distributedFMStep.loop.updateLocalBorder" )
-					nodesWithNonLocalNeighbors = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(input);
+					nodesWithNonLocalNeighbors = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(input);
 				}
 
 				/**
