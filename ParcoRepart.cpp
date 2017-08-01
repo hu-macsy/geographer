@@ -1506,6 +1506,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
     
     return retG;
 }
+
 //---------------------------------------------------------------------------------------
 
 /* A 2D or 3D matrix given as a 1D array of size sideLen^dimesion

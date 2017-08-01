@@ -74,16 +74,19 @@ namespace ITI {
             return true;
         }
         
+        /*  Checks if two rectangles share a common border. In our case if top[d]=10 and bottom[d]=11
+         *  then the rectangles are adjacent: their difference must be more than 1 in order NOT to be
+         *  adjacent.
+        */
         bool isAdjacent(const rectangle& other) const {
             int dim = bottom.size();
-
             // if 0 or 1 OK, if 2 cells share just an edge, if 3 they share a corner
             int strictEqualities= 0;
             for(int d=0; d<dim; d++){
                 // this ensures that share a face but not sure if edge or corner
-                if(top[d]< other.bottom[d]){
+                if(top[d]-other.bottom[d]<1){
                     return false;
-                }else if(bottom[d]> other.top[d]){
+                }else if(bottom[d]-other.top[d]>1){
                     return false;
                 }
                 

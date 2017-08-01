@@ -1043,18 +1043,27 @@ scai::lama::CSRSparseMatrix<ValueType> MultiSection<IndexType, ValueType>::getBl
     std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> allLeaves = treeRoot->getAllLeaves();
     const IndexType numLeaves = allLeaves.size();
     SCAI_ASSERT_EQ_ERROR( numLeaves, treeRoot->getNumLeaves() , "Number of leaves is wrong");
+
+    scai::lama::CSRSparseMatrix<ValueType> ret( numLeaves, numLeaves );
     
-    scai::lama::CSRSparseMatrix<ValueType> res( numLeaves, numLeaves );
+    //TODO: has size k^2, change that to save memory and time
+    scai::common::scoped_array<ValueType> rawArray( new ValueType[ numLeaves*numLeaves ] );
     
     for(IndexType l=0; l<numLeaves; l++){
-        for(IndexType l2=l; l2<numLeaves; l2++){
+        for(IndexType l2=0; l2<numLeaves; l2++){
+            if( l==l2) continue;
+            
             if( allLeaves[l]->getRect().isAdjacent( allLeaves[l2]->getRect() ) ){
-                res.setValue( l, l2, 1);
-                res.setValue( l2, l, 1);
+                rawArray[ l +l2*numLeaves] = 1;
+                rawArray[ l*numLeaves +l2] = 1;
+            }else{
+                rawArray[ l +l2*numLeaves] = 0;
+                rawArray[ l*numLeaves +l2] = 0;
             }
         }
     }
-    return res;
+    ret.setRawDenseData( numLeaves, numLeaves, rawArray.get() );
+    return ret;
 }
 //---------------------------------------------------------------------------------------
 

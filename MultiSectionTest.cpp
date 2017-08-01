@@ -1112,7 +1112,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
     }
     int p=0;
     for(int i=0; i<=maxCoord[0]; i++){
-        for(int j=0; j<=maxCoord[1]; j++){
+        for(int j=0; j<=maxCoord[1]; j++){  
             coordinates[0][p] = i;
             coordinates[1][p] = j;
             ++p;
@@ -1161,6 +1161,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
     ValueType bBox0Weight = (bBox0.top[0]-bBox0.bottom[0]+1)*(bBox0.top[1]-bBox0.bottom[1]+1);
     bBox0.weight = bBox0Weight;
     root->insert(bBox0);
+    //if(comm->getRank()==0) bBox0.print();    
     
     rectangle bBox1;        // leafID=2 => projection[2]
     bBox1.bottom = { std::floor(maxCoord[0]/2), 0 };
@@ -1168,6 +1169,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
     ValueType bBox1Weight = (bBox1.top[0]-bBox1.bottom[0]+1)*(bBox1.top[1]-bBox1.bottom[1]+1);
     bBox1.weight = bBox1Weight;
     root->insert(bBox1);
+    //if(comm->getRank()==0) bBox1.print();    
     
     rectangle bBox2;        // leafID=0 => projection[0]
     bBox2.bottom = {0, 0};
@@ -1175,6 +1177,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
     ValueType bBox2Weight = (bBox2.top[0]-bBox2.bottom[0]+1)*(bBox2.top[1]-bBox2.bottom[1]+1);
     bBox2.weight = bBox2Weight;
     root->insert( bBox2 );
+    //if(comm->getRank()==0)  bBox2.print();        
     
     rectangle bBox3;        // leafID=1 => projection[1]
     bBox3.bottom = {0, std::floor(maxCoord[1]*0.75) };
@@ -1182,6 +1185,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
     ValueType bBox3Weight = (bBox3.top[0]-bBox3.bottom[0]+1)*(bBox3.top[1]-bBox3.bottom[1]+1);
     bBox.weight = bBox3Weight;
     root->insert( bBox3 );
+    //if(comm->getRank()==0)  bBox3.print();         
     
     SCAI_ASSERT( root->getNumLeaves()==3 , "Tree must have 3 leaves but has "<< root->getNumLeaves() );
     
@@ -1219,14 +1223,33 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
         SCAI_ASSERT( proj2Weight==bBox1Weight, "Weight of third rectangle is "<< bBox1Weight << " but the weight of the projection is "<< proj2Weight);
     } 
     
+    //add extra rectangle to check block graph
+    // graph should be:    0 - 2    =>  0 1 1 1
+    //                     | \ |        1 0 1 1
+    //                     3 - 1        1 1 0 0
+    //                                  1 1 0 0
+    
+    rectangle bBox4;
+    bBox4.bottom =  { std::floor(maxCoord[0]/2), 0 };
+    bBox4.top = { std::floor(maxCoord[0]/3 -1) , maxCoord[1] };
+    ValueType bBox4Weight = (bBox4.top[0]-bBox4.bottom[0]+1)*(bBox4.top[1]-bBox4.bottom[1]+1);
+    bBox.weight = bBox4Weight;
+    root->insert( bBox4 );
+    //if(comm->getRank()==0)  bBox4.print();     
+
     scai::lama::CSRSparseMatrix<ValueType> blockGraph = MultiSection<IndexType, ValueType>::getBlockGraphFromTree_local(root);
+
     IndexType numRows = blockGraph.getNumRows() , numCols = blockGraph.getNumColumns();
     PRINT0( numRows<< " x "<< numCols );
-    SCAI_ASSERT_EQ_ERROR( numRows, numCols, "Number of rows and colums must be equal");
-    
-    for(int i=0; i<numRows; i++){
-        for(int j=0; j<numCols; j++){
-            std::cout<< blockGraph.getValue(i,j).Scalar::getValue<IndexType>() << std::endl;
+    SCAI_ASSERT_EQ_ERROR( numRows, numCols, "Number of rows and colums must be equal");        EXPECT_TRUE( blockGraph.isConsistent() );
+    EXPECT_TRUE( blockGraph.checkSymmetry() );
+
+    if( comm->getRank()==0 ){
+        for(int i=0; i<numRows; i++){
+            for(int j=0; j<numCols; j++){
+                std::cout<< blockGraph.getValue(i,j).Scalar::getValue<IndexType>() << " ";
+            }
+            std::cout << std::endl;
         }
     }
 }

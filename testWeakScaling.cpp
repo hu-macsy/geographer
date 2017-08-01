@@ -163,6 +163,7 @@ int main(int argc, char** argv) {
         scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
         scai::lama::CSRSparseMatrix<ValueType> graph( rowDistPtr, noDistPtr);     // the adjacency matrix of the graph
+        /*
         {
             std::vector<DenseVector<ValueType>> coords(2);
             for(IndexType i=0; i<2; i++){ 
@@ -175,6 +176,7 @@ int main(int argc, char** argv) {
             }
             ITI::MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(graph, coords, maxCoords, tmpPoints );
         }
+        */
         
         PRINT0("\"Created\" local part of graph. (for MultiSection the adjacency graph is not needed and it is empty)");
         
@@ -317,9 +319,13 @@ int main(int argc, char** argv) {
         
         //ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut( graph, multiSectionPartition);
         //ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( multiSectionPartition, k);
+        
+        scai::lama::CSRSparseMatrix<ValueType> blockGraph = ITI::MultiSection<IndexType, ValueType>::getBlockGraphFromTree_local(root);
+        
+        IndexType maxComm = ITI::aux::getGraphMaxDegree( blockGraph);
+        IndexType totalComm = blockGraph.getNumValues()/2;
         ValueType imbalance = (maxLeafWeight - optWeight)/optWeight;
-        IndexType maxComm = ITI::aux::computeMaxComm( graph, multiSectionPartition, k);
-        IndexType totalComm = ITI::aux::computeTotalComm( graph, multiSectionPartition, k);
+
         if(comm->getRank()==0){
             if( settings.bisect==1 ){
                 logF << "--  Initial bisection, total time: " << partitionTime.count() << std::endl;
