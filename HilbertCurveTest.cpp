@@ -17,7 +17,7 @@
 #include <iostream>
 #include <chrono>
 
-#include "ParcoRepart.h"
+#include "GraphUtils.h"
 #include "gtest/gtest.h"
 #include "HilbertCurve.h"
 #include "MeshGenerator.h"

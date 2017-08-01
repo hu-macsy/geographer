@@ -51,18 +51,12 @@ namespace ITI {
 			 */
 			static DenseVector<IndexType> pixelPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
 
-			static std::vector<ValueType> distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates);
-
 			/**
 			 * Iterates over the local part of the adjacency matrix and counts local edges.
 			 * If an inconsistency in the graph is detected, it tries to find the inconsistent edge and throw a runtime error.
 			 * Not guaranteed to find inconsistencies. Iterates once over the edge list.
 			 */
 			static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
-
-			/** Get the borders nodes of each block.
-			*/
-			static DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
 
 			/**Returns the processor graph. Every processor traverses its local part of adjM: and for every
 			 * edge (u,v) that one node, say u, is not local it gets the owner processor of u. The returned graph is distributed with a BLOCK distribution.

@@ -93,7 +93,7 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 
 		std::vector<ValueType> distances;
 		if (settings.useGeometricTieBreaking) {
-			distances = ParcoRepart<IndexType, ValueType>::distancesFromBlockCenter(coordinates);
+			distances = LocalRefinement<IndexType, ValueType>::distancesFromBlockCenter(coordinates);
 		}
 
 		IndexType numRefinementRounds = 0;

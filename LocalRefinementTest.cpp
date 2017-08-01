@@ -132,7 +132,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	//DenseVector<IndexType> nonWeights = DenseVector<IndexType>(0, 1);
 
 	//get distances
-	std::vector<double> distances = ParcoRepart<IndexType,ValueType>::distancesFromBlockCenter(coordinates);
+	std::vector<double> distances = LocalRefinement<IndexType,ValueType>::distancesFromBlockCenter(coordinates);
 
 	ValueType cut = GraphUtils::computeCut(graph, part, true);
 	ASSERT_GE(cut, 0);
@@ -297,6 +297,43 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 	}
 }
 //----------------------------------------------------------
+
+TEST_F(LocalRefinementTest, testDistancesFromBlockCenter) {
+	const IndexType nroot = 16;
+	const IndexType n = nroot * nroot * nroot;
+	const IndexType dimensions = 3;
+
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+	scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+
+	scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
+	std::vector<ValueType> maxCoord(dimensions, nroot);
+	std::vector<IndexType> numPoints(dimensions, nroot);
+
+	scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+
+	std::vector<DenseVector<ValueType>> coordinates(dimensions);
+	for(IndexType i=0; i<dimensions; i++){
+	  coordinates[i].allocate(coordDist);
+	  coordinates[i] = static_cast<ValueType>( 0 );
+	}
+
+	MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(a, coordinates, maxCoord, numPoints);
+
+	const IndexType localN = dist->getLocalSize();
+
+	std::vector<ValueType> distances = LocalRefinement<IndexType, ValueType>::distancesFromBlockCenter(coordinates);
+	EXPECT_EQ(localN, distances.size());
+	const ValueType maxPossibleDistance = pow(dimensions*(nroot*nroot),0.5);
+
+	for (IndexType i = 0; i < distances.size(); i++) {
+		EXPECT_LE(distances[i], maxPossibleDistance);
+	}
+}
+//---------------------------------------------------------------------------------------
+
 
 
 }// namespace ITI

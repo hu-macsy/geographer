@@ -15,8 +15,8 @@
 #include <scai/dmemo/BlockDistribution.hpp>
 
 #include "FileIO.h"
-#include "ParcoRepart.h"
 #include "GraphUtils.h"
+#include "Settings.h"
 
 #include <parmetis.h>
 

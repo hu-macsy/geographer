@@ -64,6 +64,12 @@ std::vector<IndexType> getNodesWithNonLocalNeighbors(const scai::lama::CSRSparse
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> nonLocalNeighbors(const scai::lama::CSRSparseMatrix<ValueType>& input);
 
+/** Get the borders nodes of each block.
+*/
+template<typename IndexType, typename ValueType>
+scai::lama::DenseVector<IndexType> getBorderNodes( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part);
+
+
 }
 
 } /* namespace ITI */

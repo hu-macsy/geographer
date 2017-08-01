@@ -9,7 +9,6 @@
 #include <queue>
 #include <set>
 
-
 #include <scai/hmemo/ReadAccess.hpp>
 #include <scai/hmemo/WriteAccess.hpp>
 #include <scai/dmemo/Halo.hpp>
@@ -341,6 +340,57 @@ std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<Value
 }
 //---------------------------------------------------------------------------------------
 
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part) {
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const IndexType localN = dist->getLocalSize();
+    const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
+    DenseVector<IndexType> border(dist,0);
+    scai::utilskernel::LArray<IndexType>& localBorder= border.getLocalValues();
+
+    IndexType globalN = dist->getGlobalSize();
+    IndexType max = part.max().Scalar::getValue<IndexType>();
+
+    if( !dist->isEqual( part.getDistribution() ) ){
+        std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and partition dist: "<< part.getDistribution() << std::endl;
+        throw std::runtime_error( "Distributions: should (?) be equal.");
+    }
+
+    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
+
+	scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
+	scai::utilskernel::LArray<IndexType> haloData;
+	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
+
+    for(IndexType i=0; i<localN; i++){    // for all local nodes
+    	IndexType thisBlock = localPart[i];
+    	for(IndexType j=ia[i]; j<ia[i+1]; j++){                   // for all the edges of a node
+    		IndexType neighbor = ja[j];
+    		IndexType neighborBlock;
+			if (dist->isLocal(neighbor)) {
+				neighborBlock = partAccess[dist->global2local(neighbor)];
+			} else {
+				neighborBlock = haloData[partHalo.global2halo(neighbor)];
+			}
+			assert( neighborBlock < max +1 );
+			if (thisBlock != neighborBlock) {
+				localBorder[i] = 1;
+				break;
+			}
+    	}
+    }
+
+    assert(border.getDistributionPtr()->getLocalSize() == localN);
+    return border;
+}
+
+//---------------------------------------------------------------------------------------
+
 template int getFarthestLocalNode(const CSRSparseMatrix<double> graph, std::vector<int> seedNodes);
 template double computeCut(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, bool weighted = false);
 template double computeImbalance(const DenseVector<int> &part, int k, const DenseVector<int> &nodeWeights = {});
@@ -348,6 +398,8 @@ template scai::dmemo::Halo buildNeighborHalo<int,double>(const CSRSparseMatrix<d
 template bool hasNonLocalNeighbors(const CSRSparseMatrix<double> &input, int globalID);
 template std::vector<int> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<double>& input);
 template std::vector<int> nonLocalNeighbors(const CSRSparseMatrix<double>& input);
+template DenseVector<int> getBorderNodes( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part);
+
 
 }
 

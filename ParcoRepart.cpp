@@ -780,33 +780,6 @@ IndexType ParcoRepart<IndexType, ValueType>::localBlockSize(const DenseVector<In
 //--------------------------------------------------------------------------------------- 
 
 template<typename IndexType, typename ValueType>
-std::vector<ValueType> ITI::ParcoRepart<IndexType, ValueType>::distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates) {
-	SCAI_REGION("ParcoRepart.distanceFromBlockCenter");
-
-	const IndexType localN = coordinates[0].getDistributionPtr()->getLocalSize();
-	const IndexType dimensions = coordinates.size();
-
-	std::vector<ValueType> geometricCenter(dimensions);
-	for (IndexType dim = 0; dim < dimensions; dim++) {
-		const scai::utilskernel::LArray<ValueType>& localValues = coordinates[dim].getLocalValues();
-		assert(localValues.size() == localN);
-		geometricCenter[dim] = localValues.sum() / localN;
-	}
-
-	std::vector<ValueType> result(localN);
-	for (IndexType i = 0; i < localN; i++) {
-		ValueType distanceSquared = 0;
-		for (IndexType dim = 0; dim < dimensions; dim++) {
-			const ValueType diff = coordinates[dim].getLocalValues()[i] - geometricCenter[dim];
-			distanceSquared += diff*diff;
-		}
-		result[i] = pow(distanceSquared, 0.5);
-	}
-	return result;
-}
-//--------------------------------------------------------------------------------------- 
-
-template<typename IndexType, typename ValueType>
 void ITI::ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input) {
 	SCAI_REGION( "ParcoRepart.checkLocalDegreeSymmetry" )
 
@@ -857,56 +830,6 @@ void ITI::ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRS
 			}
 		}
 	}
-}
-//--------------------------------------------------------------------------------------- 
-
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part) {
-
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
-    const IndexType localN = dist->getLocalSize();
-    const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
-    DenseVector<IndexType> border(dist,0);
-    scai::utilskernel::LArray<IndexType>& localBorder= border.getLocalValues();
-    
-    IndexType globalN = dist->getGlobalSize();
-    IndexType max = part.max().Scalar::getValue<IndexType>();
-    
-    if( !dist->isEqual( part.getDistribution() ) ){
-        std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and partition dist: "<< part.getDistribution() << std::endl;
-        throw std::runtime_error( "Distributions: should (?) be equal.");
-    }
-
-    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
-
-	scai::dmemo::Halo partHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(adjM);
-	scai::utilskernel::LArray<IndexType> haloData;
-	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
-
-    for(IndexType i=0; i<localN; i++){    // for all local nodes
-    	IndexType thisBlock = localPart[i];
-    	for(IndexType j=ia[i]; j<ia[i+1]; j++){                   // for all the edges of a node
-    		IndexType neighbor = ja[j];
-    		IndexType neighborBlock;
-			if (dist->isLocal(neighbor)) {
-				neighborBlock = partAccess[dist->global2local(neighbor)];
-			} else {
-				neighborBlock = haloData[partHalo.global2halo(neighbor)];
-			}
-			assert( neighborBlock < max +1 );
-			if (thisBlock != neighborBlock) {
-				localBorder[i] = 1;
-				break;
-			}
-    	}
-    }
-
-    assert(border.getDistributionPtr()->getLocalSize() == localN);
-    return border;
 }
 
 //----------------------------------------------------------------------------------------
@@ -1313,11 +1236,7 @@ template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatr
 
 template DenseVector<int> ParcoRepart<int, double>::pixelPartition(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, Settings settings);
 
-template std::vector<double> ITI::ParcoRepart<int, double>::distancesFromBlockCenter(const std::vector<DenseVector<double>> &coordinates);
-
 template void ParcoRepart<int, double>::checkLocalDegreeSymmetry(const CSRSparseMatrix<double> &input);
-
-template DenseVector<int> ParcoRepart<int, double>::getBorderNodes( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part);
 
 template scai::lama::CSRSparseMatrix<double> ParcoRepart<int, double>::getPEGraph( const CSRSparseMatrix<double> &adjM);
 
