@@ -2,6 +2,7 @@
 #include <unordered_set>
 
 #include "LocalRefinement.h"
+#include "GraphUtils.h"
 
 using scai::lama::Scalar;
 
@@ -393,7 +394,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				 */
 				{
 					SCAI_REGION( "LocalRefinement.distributedFMStep.loop.updateLocalBorder" )
-					nodesWithNonLocalNeighbors = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(input);
+					nodesWithNonLocalNeighbors = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(input);
 				}
 
 				/**
@@ -410,7 +411,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 						redistributeFromHalo<ValueType>(coordinates[dim], newDistribution, graphHalo, haloData);
 					}
 
-					distances = ParcoRepart<IndexType, ValueType>::distancesFromBlockCenter(coordinates);
+					distances = LocalRefinement<IndexType, ValueType>::distancesFromBlockCenter(coordinates);
 				}
 			}
 		}
@@ -428,7 +429,7 @@ template<typename IndexType, typename ValueType>
 ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
     const CSRSparseMatrix<ValueType> &input,
     const CSRStorage<ValueType> &haloStorage,
-    const Halo &matrixHalo,
+    const scai::dmemo::Halo &matrixHalo,
     const std::vector<IndexType>& borderRegionIDs,
     const std::vector<IndexType>& nodeWeights,
     std::pair<IndexType, IndexType> secondRoundMarkers,
@@ -744,7 +745,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 
 template<typename IndexType, typename ValueType>
 std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-		const Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
+		const scai::dmemo::Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
 		const std::vector<bool>& assignedToSecondBlock, Settings settings) {
 
 	SCAI_REGION( "LocalRefinement.twoWayLocalDiffusion" )
@@ -864,7 +865,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalDi
 
 template<typename IndexType, typename ValueType>
 template<typename T>
-void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, Halo& halo, scai::utilskernel::LArray<T>& haloData) {
+void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, scai::dmemo::Halo& halo, scai::utilskernel::LArray<T>& haloData) {
 	SCAI_REGION( "LocalRefinement.redistributeFromHalo.Vector" )
 
 	using scai::utilskernel::LArray;
@@ -896,7 +897,7 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(DenseVecto
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseMatrix<ValueType>& matrix, scai::dmemo::DistributionPtr newDist, Halo& halo, CSRStorage<ValueType>& haloStorage) {
+void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseMatrix<ValueType>& matrix, scai::dmemo::DistributionPtr newDist, scai::dmemo::Halo& halo, CSRStorage<ValueType>& haloStorage) {
 	SCAI_REGION( "LocalRefinement.redistributeFromHalo" )
 
 	scai::dmemo::DistributionPtr oldDist = matrix.getRowDistributionPtr();
@@ -1193,6 +1194,34 @@ IndexType ITI::LocalRefinement<IndexType, ValueType>::getDegreeSum(const CSRSpar
 	for (IndexType node : nodes) {
 		IndexType localID = input.getRowDistributionPtr()->global2local(node);
 		result += localIa[localID+1] - localIa[localID];
+	}
+	return result;
+}
+
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates) {
+	SCAI_REGION("ParcoRepart.distanceFromBlockCenter");
+
+	const IndexType localN = coordinates[0].getDistributionPtr()->getLocalSize();
+	const IndexType dimensions = coordinates.size();
+
+	std::vector<ValueType> geometricCenter(dimensions);
+	for (IndexType dim = 0; dim < dimensions; dim++) {
+		const scai::utilskernel::LArray<ValueType>& localValues = coordinates[dim].getLocalValues();
+		assert(localValues.size() == localN);
+		geometricCenter[dim] = localValues.sum() / localN;
+	}
+
+	std::vector<ValueType> result(localN);
+	for (IndexType i = 0; i < localN; i++) {
+		ValueType distanceSquared = 0;
+		for (IndexType dim = 0; dim < dimensions; dim++) {
+			const ValueType diff = coordinates[dim].getLocalValues()[i] - geometricCenter[dim];
+			distanceSquared += diff*diff;
+		}
+		result[i] = pow(distanceSquared, 0.5);
 	}
 	return result;
 }

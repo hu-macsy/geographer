@@ -15,7 +15,8 @@
 #include <scai/dmemo/BlockDistribution.hpp>
 
 #include "FileIO.h"
-#include "ParcoRepart.h"
+#include "GraphUtils.h"
+#include "Settings.h"
 
 #include <parmetis.h>
 
@@ -270,8 +271,8 @@ int main(int argc, char** argv) {
     for(unsigned int i=0; i<localN; i++){
         partitionKway.getLocalValues()[i] = partKway[i];
     }
-    ValueType cutKway = ITI::ParcoRepart<IndexType, ValueType>::computeCut(graph, partitionKway, true); 
-    ValueType imbalanceKway = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partitionKway, comm->getSize() );
+    ValueType cutKway = ITI::GraphUtils::computeCut(graph, partitionKway, true);
+    ValueType imbalanceKway = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partitionKway, comm->getSize() );
     assert(sizeof(xyzLocal)/sizeof(real_t) == 2*sizeof(partKway)/sizeof(idx_t) );
   
     // check correct transformation to DenseVector

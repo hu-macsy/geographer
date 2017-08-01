@@ -4,7 +4,7 @@
 #include <fstream>
 
 #include <scai/lama/DenseVector.hpp>
-#include "ParcoRepart.h"
+#include "GraphUtils.h"
 
 namespace ITI{
 
@@ -72,7 +72,7 @@ static void print2DGrid(scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama
         
     //get the border nodes
     scai::lama::DenseVector<IndexType> border(adjM.getColDistributionPtr(), 0);
-    border = ParcoRepart<IndexType,ValueType>::getBorderNodes( adjM , partition);
+    border = GraphUtils::getBorderNodes( adjM , partition);
     
     IndexType partViz[numX][numY];   
     IndexType bordViz[numX][numY]; 

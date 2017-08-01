@@ -17,7 +17,7 @@
 #include <iostream>
 #include <chrono>
 
-#include "ParcoRepart.h"
+#include "GraphUtils.h"
 #include "gtest/gtest.h"
 #include "HilbertCurve.h"
 #include "MeshGenerator.h"
@@ -165,11 +165,6 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
     assert( part <= k);
     
   }
-  /*
-  ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, partition, true);
-  ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(partition, k);
-  std::cout<< "Cut = "<< cut << std::endl << "Imbalance= "<< imbalance << std::endl;
-  */
 }
 //-------------------------------------------------------------------------------------------------
 // Create and test a specific input in 3D.

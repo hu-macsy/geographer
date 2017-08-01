@@ -50,49 +50,6 @@ namespace ITI {
 			 * Get an initial partition using the morton curve and measuring density per square.
 			 */
 			static DenseVector<IndexType> pixelPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
-			                                
-            /**
-			 * This method takes a (possibly distributed) partition and computes its global cut.
-			 *
-                         * @param[in] input The adjacency matrix of the graph.
-			 * @param[in] part The partition vector for the input graph.
-			 * @param[in] weighted If edges are weighted or not.
-			 */
-			static ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool weighted = false);
-
-			/**
-			 * This method takes a (possibly distributed) partition and computes its imbalance.
-			 * The number of blocks is also a required input, since it cannot be guessed accurately from the partition vector if a block is empty.
-			 *
-			 * @param[in] part partition
-			 * @param[in] k number of blocks in partition.
-			 */
-			static ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<IndexType> &nodeWeights = {});
-
-			/**
-			 * Computes a list of global IDs of nodes which are adjacent to nodes local on this processor, but are themselves not local.
-			 */
-			static std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
-
-			static std::vector<ValueType> distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates);
-
-			/**
-			 * Builds a halo containing all non-local neighbors.
-			 */
-			static scai::dmemo::Halo buildNeighborHalo(const CSRSparseMatrix<ValueType> &input);
-
-			/**
-			 * Returns true if the node identified with globalID has a neighbor that is not local on this process.
-			 * Since this method acquires reading locks on the CSR structure, it might be expensive to call often
-			 */
-			static bool hasNonLocalNeighbors(const CSRSparseMatrix<ValueType> &input, IndexType globalID);
-
-			/**
-			 * Returns a vector of global indices of nodes which are local on this process, but have neighbors that are node.
-			 * No communication required, iterates once over the local adjacency matrix
-			 * @param[in] input Adjacency matrix of the input graph
-			 */
-			static std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
 
 			/**
 			 * Iterates over the local part of the adjacency matrix and counts local edges.
@@ -100,10 +57,6 @@ namespace ITI {
 			 * Not guaranteed to find inconsistencies. Iterates once over the edge list.
 			 */
 			static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
-
-			/** Get the borders nodes of each block.
-			*/
-			static DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
 
 			/**Returns the processor graph. Every processor traverses its local part of adjM: and for every
 			 * edge (u,v) that one node, say u, is not local it gets the owner processor of u. The returned graph is distributed with a BLOCK distribution.
