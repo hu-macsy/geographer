@@ -74,6 +74,39 @@ namespace ITI {
             return true;
         }
         
+        bool isAdjacent(const rectangle& other) const {
+            int dim = bottom.size();
+
+            // if 0 or 1 OK, if 2 cells share just an edge, if 3 they share a corner
+            int strictEqualities= 0;
+            for(int d=0; d<dim; d++){
+                // this ensures that share a face but not sure if edge or corner
+                if(top[d]< other.bottom[d]){
+                    return false;
+                }else if(bottom[d]> other.top[d]){
+                    return false;
+                }
+                
+                // this rules out if they share only an edge or a corner
+                if( top[d]== other.bottom[d] or bottom[d]== other.top[d]){
+                    ++strictEqualities;
+                }
+            }
+            
+            // for arbitrary dimension this can be >d-2 (?)
+            if(dim==2){
+                if( strictEqualities > 1){
+                    return false;
+                }
+            }else {
+                if( strictEqualities > dim-2){
+                    return false;
+                }
+            }
+            // if none of the above failed
+            return true;
+        }
+        
         bool operator()(rectangle& a, rectangle& b){
             return a.weight < b.weight;
         }
@@ -180,8 +213,9 @@ namespace ITI {
                     }
                 }
                 // this is not a leaf node but none of the childrens owns the point
-                //WARNING: in our case this sdould never happen, but it may happen in a more general
+                //WARNING: in our case this should never happen, but it may happen in a more general
                 // case where the children rectangles do not cover the entire father rectangle
+                this->getRect().print();
                 throw std::logic_error("Null pointer");
             }else{
                 //TODO: possibly a bit expensive and not needed assertion
@@ -345,7 +379,7 @@ namespace ITI {
          * do not overlap.
          * 
          * @param[in] nodeWeights The weights for each point.
-         * @param[in] sideLen The length of the side of the whole uniform, square grid. The coordinates are from 0 to sideLen-1. Example: if sideLen=2, the poitns are (0,0),(0,1),(1,0),(1,1)
+         * @param[in] sideLen The length of the side of the whole uniform, square grid. The coordinates are from 0 to sideLen-1. Example: if sideLen=2, the points are (0,0),(0,1),(1,0),(1,1)
          * @param[in] setting A settigns struct passing various arguments.
          * 
          * @return A pointer to the root of the tree. number of leaves = settings.numBlocks.
@@ -444,6 +478,8 @@ namespace ITI {
         template<typename T>
         static ValueType getRectangleWeight( const std::vector<std::vector<T>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
         
+        
+        static scai::lama::CSRSparseMatrix<ValueType> getBlockGraphFromTree_local( const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot );
         /** Function to transform a 1D index to 2D or 3D given the side length of the cubical grid.
          * For example, in a 4x4 grid, indexTo2D(1)=(0,1), indexTo2D(4)=(1,0) and indexTo2D(13)=(3,1)
          * 

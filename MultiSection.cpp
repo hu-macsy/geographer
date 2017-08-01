@@ -102,13 +102,12 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
         for (IndexType d = 0; d < dim; d++) {
             
             ValueType thisDimScale = scale/(maxCoords[d]-minCoords[d]);
-            ValueType thisDimMin = minCoords[d];
             scai::hmemo::ReadAccess<ValueType> localPartOfCoords( coordinates[d].getLocalValues() );
             
             //get local parts of coordinates
             //
             for (IndexType i = 0; i < localN; i++) {
-                ValueType normalizedCoord = localPartOfCoords[i] - thisDimMin;
+                ValueType normalizedCoord = localPartOfCoords[i] - minCoords[d];
                 IndexType scaledCoord =  normalizedCoord * thisDimScale; 
                 //
                 localPoints[i][d] = scaledCoord;
@@ -127,28 +126,6 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
     
     SCAI_ASSERT( numLeaves==k , "Returned number of rectangles is not equal k, rectangles.size()= " << numLeaves << " and k= "<< k );
     
-    //
-    // set the partition of every local point/vertex according to which rectangle it belongs to
-    //
-    /*
-    scai::lama::DenseVector<IndexType> partition( inputDistPtr );
-    
-    {
-        SCAI_REGION( "MultiSection.getPartitionNonUniform.setLocalPartition" )
-        scai::hmemo::WriteOnlyAccess<IndexType> wLocalPart( partition.getLocalValues() );
-        
-        for(IndexType i=0; i<localN; i++){
-            try{
-                wLocalPart[i] = root->getContainingLeaf( localPoints[i] )->getLeafID();
-            }catch( const std::logic_error& e ){
-                PRINT0( e.what() );
-                std::terminate();
-            }
-        }
-    }
-    
-    return partition;
-    */
     return MultiSection<IndexType, ValueType>::setPartition( root, inputDistPtr, localPoints);
 }
 
@@ -222,18 +199,30 @@ PRINT0( totalWeight );
     std::vector<IndexType> numCuts;
     
     // if the bisection option is chosen the algorithm performs a bisection
-    if( !settings.bisect ){
-        IndexType intSqrtK = sqrtK;
-        if( std::pow( intSqrtK+1, dim ) == k){
-            intSqrtK++;
+    if( settings.bisect==0 ){
+        if( settings.cutsPerDim.empty() ){        // no user-specific number of cuts
+            IndexType intSqrtK = sqrtK;
+            if( std::pow( intSqrtK+1, dim ) == k){
+                intSqrtK++;
+            }
+            SCAI_ASSERT( std::pow( intSqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow( sqrtK, 1/d)= " << std::pow(intSqrtK,dim));
+        
+            numCuts = std::vector<IndexType>( dim, intSqrtK );
+        }else{                                  // user-specific number of cuts per dimensions
+            numCuts = settings.cutsPerDim;
         }
-        SCAI_ASSERT( std::pow( intSqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow( sqrtK, 1/d)= " << std::pow(intSqrtK,dim));
-    
-        numCuts = std::vector<IndexType>( dim, intSqrtK );
-    }else{        
+    }else if( settings.bisect==1 ){        
         SCAI_ASSERT( k && !(k & (k-1)) , "k is not a power of 2 and this is required for now for bisection");  
         numCuts = std::vector<IndexType>( log2(k) , 2 );
     }
+    /*
+     * else if( settings.msOptions==2 ){        
+        numCuts = settings.cutsPerDim;
+    }else{
+        std::cout << "Wrong value " << settings.msOptions << " for option msOptions" << std::endl;
+        std::terminate();
+    }
+    */
     
     IndexType numLeaves = root->getNumLeaves();
 
@@ -492,14 +481,19 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     std::vector<IndexType> numCuts;
     
     // if the bisection option is chosen the algorithm performs a bisection
-    if( !settings.bisect ){
-        if( std::pow( intSqrtK+1, dim ) == k){
-            intSqrtK++;
+    if( settings.bisect==0 ){
+        if( settings.cutsPerDim.empty() ){        // no user-specific number of cuts
+            IndexType intSqrtK = sqrtK;
+            if( std::pow( intSqrtK+1, dim ) == k){
+                intSqrtK++;
+            }
+            SCAI_ASSERT( std::pow( intSqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow( sqrtK, 1/d)= " << std::pow(intSqrtK,dim));
+        
+            numCuts = std::vector<IndexType>( dim, intSqrtK );
+        }else{                                  // user-specific number of cuts per dimensions
+            numCuts = settings.cutsPerDim;
         }
-        SCAI_ASSERT( std::pow( intSqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow( sqrtK, 1/d)= " << std::pow(intSqrtK,dim));
-    
-        numCuts = std::vector<IndexType>( dim, intSqrtK );
-    }else{        
+    }else if( settings.bisect==1 ){        
         SCAI_ASSERT( k && !(k & (k-1)) , "k is not a power of 2 and this is required for now for bisection");  
         numCuts = std::vector<IndexType>( log2(k) , 2 );
     }
@@ -587,7 +581,9 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
 
             //part1D.size() = *thisDimCuts , weightPerPart.size = *thisDimCuts 
             std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( thisProjection, *thisDimCuts, settings);
-
+            
+            //for(int i=0; i<part1D.size(); i++) PRINT0( part1D[i] );
+            
             SCAI_ASSERT( part1D.size()== *thisDimCuts , "Wrong size of 1D partition")
             SCAI_ASSERT( weightPerPart.size()== *thisDimCuts , "Wrong size of 1D partition")
 
@@ -612,29 +608,34 @@ ValueType dbg_rectW=0;
                 newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h+1]-1;
                 newRect.weight = weightPerPart[h];
                 root->insert( newRect );
+                SCAI_ASSERT_GT_ERROR( newRect.weight, 0, "Aborting: found rectangle with 0 weight, maybe inappropriate input data or needs bigger scaling.");
                 if(newRect.weight>maxWeight){
                     maxWeight = newRect.weight;
                 }
 dbg_rectW += newRect.weight;                
+                //if(comm->getRank()==0) newRect.print();
             }
             
             //last rectangle
+            SCAI_ASSERT_LE_ERROR(part1D.back(), maxCoords[thisChosenDim], "Partition hyperplane bigger than max coordinate. Probaby too dense data to find solution." );
             newRect.bottom[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D.back();
             newRect.top = thisRectangle.top;
             newRect.weight = weightPerPart.back();
+            SCAI_ASSERT_GT_ERROR( newRect.weight, 0, "Found rectangle with 0 weight, maybe inappropriate input data or needs bigger scaling of the coordinates (aka refinement) to find suitable hyperplane).");
             root->insert( newRect );
             if(newRect.weight>maxWeight){
                 maxWeight = newRect.weight;
             }        
 dbg_rectW += newRect.weight;    
-            
-            //PRINT0("this rect imbalance= " << (maxWeight-optWeight)/optWeight << "  (opt= " << optWeight << " , max= "<< maxWeight << ")" );
+            //if(comm->getRank()==0) newRect.print();            
+            PRINT0("this rect imbalance= " << (maxWeight-optWeight)/optWeight << "  (opt= " << optWeight << " , max= "<< maxWeight << ")" );
 
 //TODO: only for debuging, remove variable dbg_rectW
 SCAI_ASSERT_LE_ERROR( dbg_rectW-thisRectangle.weight, 0.0000001, "Rectangle weights not correct: dbg_rectW-this.weight= " << dbg_rectW - thisRectangle.weight);
 
         }
         numLeaves = root->getNumLeaves();
+PRINT0( numLeaves );        
     }
     
     std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> ret = root->getAllLeaves();
@@ -842,8 +843,7 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
         while( indexLow<indexHigh ){
             IndexType indexMid = (indexLow+indexHigh)/2;
             ValueType tmpSum = prefixSum[indexMid] - prefixSum[std::max(partIndices[p-1],0)];
-//PRINT("lB= " << lowerBound << " , uB= " << upperBound << " __ indexLow= "<< indexLow << " mid= "<< indexMid << " indexHigh = " << indexHigh );              
-//PRINT(p << ": " << tmpSum);            
+         
             if( lowerBound<=tmpSum and tmpSum<upperBound){
                 if( probe(prefixSum, k, tmpSum) ){
                     indexHigh = indexMid;
@@ -1036,8 +1036,29 @@ ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vec
 }
 //---------------------------------------------------------------------------------------
 
-//TODO: generalize for more dimensions and for non-cubic grids
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> MultiSection<IndexType, ValueType>::getBlockGraphFromTree_local( const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot ){
+    SCAI_REGION("MultiSection.getBlockGraphFromTree_local");
+    
+    std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> allLeaves = treeRoot->getAllLeaves();
+    const IndexType numLeaves = allLeaves.size();
+    SCAI_ASSERT_EQ_ERROR( numLeaves, treeRoot->getNumLeaves() , "Number of leaves is wrong");
+    
+    scai::lama::CSRSparseMatrix<ValueType> res( numLeaves, numLeaves );
+    
+    for(IndexType l=0; l<numLeaves; l++){
+        for(IndexType l2=l; l2<numLeaves; l2++){
+            if( allLeaves[l]->getRect().isAdjacent( allLeaves[l2]->getRect() ) ){
+                res.setValue( l, l2, 1);
+                res.setValue( l2, l, 1);
+            }
+        }
+    }
+    return res;
+}
+//---------------------------------------------------------------------------------------
 
+//TODO: generalize for more dimensions and for non-cubic grids
 template<typename IndexType, typename ValueType>
 template<typename T>
 std::vector<T> MultiSection<IndexType, ValueType>::indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dim){
@@ -1117,6 +1138,8 @@ template double MultiSection<int, double>::getRectangleWeight( const std::vector
 template double MultiSection<int, double>::getRectangleWeight( const std::vector<std::vector<double>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
 
 template double MultiSection<int, double>::getRectangleWeight( const std::vector<std::vector<int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
+
+template scai::lama::CSRSparseMatrix<double> MultiSection<int, double>::getBlockGraphFromTree_local( const std::shared_ptr<rectCell<int,double>> treeRoot );
 
 template std::vector<int> MultiSection<int, double>::indexToCoords( const int ind, const int sideLen, const int dim);
 

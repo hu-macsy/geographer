@@ -98,7 +98,7 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
 
     startTime = std::chrono::system_clock::now();
     
-    settings.bisect = true;
+    settings.bisect = 1;
     scai::lama::DenseVector<IndexType> partitionBS =  MultiSection<IndexType, ValueType>::getPartitionNonUniform( adjM, coordinates, nodeWeights, settings);
     
     std::chrono::duration<double> partitionBSTime = std::chrono::system_clock::now() - startTime;
@@ -125,92 +125,6 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
     
     PRINT0( "Multisection:  cut= " << cutMS << " , imbalance= "<< imbalanceMS);
     PRINT0( "Bisection: cut= " << cutBS << " , imbalance= " << imbalanceBS );
-    
-}
-//---------------------------------------------------------------------------------------
-
-
-TEST_F(MultiSectionTest, testGetPartitionNonUniform_3D){
-    
-    const IndexType dimensions = 3;
-    const IndexType k = std::pow( 3, dimensions);
-    /*
-    std::string path = "graphFromQuad3D/";
-    std::string fileName = "graphFromQuad3D_1";
-    //std::string fileName = "trace-00003.graph";
-    std::string file = path + fileName;
-    std::ifstream f(file);
-    f >> N >> edges; 
-    */
-    
-    IndexType N;
-    scai::lama::CSRSparseMatrix<ValueType> adjM;
-    
-    rectangle initialRect;
-    initialRect.bottom= {0, 0, 0};
-    initialRect.top= {100, 100, 100};
-    
-    /*
-    //
-    //create weights locally
-    //
-    scai::lama::DenseVector<ValueType> nodeWeights( dist );
-    IndexType actualTotalWeight = 0;
-    {
-        scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
-        srand(time(NULL));
-        for(int i=0; i<localN; i++){
-            localPart[i] = 1;
-            //localPart[i] = rand()%9+rand()%7;
-            actualTotalWeight += localPart[i];         
-        }
-    }
-    actualTotalWeight =  comm->sum(actualTotalWeight);
-    
-    Settings settings;
-    settings.dimensions = dimensions;
-    settings.numBlocks = k;
-    
-    
-    //
-    // get the partition with multisection and one with bisection
-    //
-    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
-    
-    scai::lama::DenseVector<IndexType> partitionMS =  MultiSection<IndexType, ValueType>::getPartitionNonUniform( adjM, coordinates, nodeWeights, settings);
-
-    std::chrono::duration<double> partitionMSTime = std::chrono::system_clock::now() - startTime;
-
-    startTime = std::chrono::system_clock::now();
-    
-    settings.bisect = true;
-    scai::lama::DenseVector<IndexType> partitionBS =  MultiSection<IndexType, ValueType>::getPartitionNonUniform( adjM, coordinates, nodeWeights, settings);
-    
-    std::chrono::duration<double> partitionBSTime = std::chrono::system_clock::now() - startTime;
-    
-    if (comm->getRank() == 0) {
-        std::cout<< "Time to partition with multisection: "<< partitionMSTime.count() << std::endl;
-        std::cout<< "Time to partition with bisection: "<< partitionBSTime.count() << std::endl;
-    }
-    
-    //
-    // assertions - prints
-    //  
-
-    for(IndexType i=0; i<localN; i++){
-        SCAI_ASSERT( partitionMS.getLocalValues()[i]!=-1 , "In PE " << *comm << " local point " << i << " has no partition." );
-        SCAI_ASSERT( partitionBS.getLocalValues()[i]!=-1 , "In PE " << *comm << " local point " << i << " has no partition." );
-    }
-    
-    const ValueType cutMS = ParcoRepart<IndexType, ValueType>::computeCut(adjM, partitionMS, true);
-    const ValueType cutBS = ParcoRepart<IndexType, ValueType>::computeCut(adjM, partitionBS, true);
-    
-    const ValueType imbalanceMS = ParcoRepart<IndexType, ValueType>::computeImbalance(partitionMS, k);
-    const ValueType imbalanceBS = ParcoRepart<IndexType, ValueType>::computeImbalance(partitionBS, k);
-    
-    PRINT0( "Multisection:  cut= " << cutMS << " , imbalance= "<< imbalanceMS);
-    PRINT0( "Bisection: cut= " << cutBS << " , imbalance= " << imbalanceBS );
-    */
     
 }
 //---------------------------------------------------------------------------------------
@@ -1303,7 +1217,18 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
         SCAI_ASSERT( proj0Weight==bBox2Weight, "Weight of first rectangle is "<< bBox2Weight << " but the weight of the projection is "<< proj0Weight);
         SCAI_ASSERT( proj1Weight==bBox3Weight, "Weight of second rectangle is "<< bBox3Weight << " but the weight of the projection is "<< proj1Weight);
         SCAI_ASSERT( proj2Weight==bBox1Weight, "Weight of third rectangle is "<< bBox1Weight << " but the weight of the projection is "<< proj2Weight);
-    }    
+    } 
+    
+    scai::lama::CSRSparseMatrix<ValueType> blockGraph = MultiSection<IndexType, ValueType>::getBlockGraphFromTree_local(root);
+    IndexType numRows = blockGraph.getNumRows() , numCols = blockGraph.getNumColumns();
+    PRINT0( numRows<< " x "<< numCols );
+    SCAI_ASSERT_EQ_ERROR( numRows, numCols, "Number of rows and colums must be equal");
+    
+    for(int i=0; i<numRows; i++){
+        for(int j=0; j<numCols; j++){
+            std::cout<< blockGraph.getValue(i,j).Scalar::getValue<IndexType>() << std::endl;
+        }
+    }
 }
 //---------------------------------------------------------------------------------------
 /* same example as in the 2D case

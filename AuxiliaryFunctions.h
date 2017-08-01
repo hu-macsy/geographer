@@ -101,6 +101,8 @@ static void print2DGrid(scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama
 }
 //------------------------------------------------------------------------------
 
+/** Get the maximum degree of a graph.
+ * */
 static IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM){
 
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -113,7 +115,7 @@ static IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>
         SCAI_ASSERT( adjM.getColDistributionPtr()->isEqual(*noDist) , "Adjacency matrix should have no column distribution." );
     }
     
-    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+    const scai::lama::CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
     scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
     
     // local maximum degree 
@@ -128,7 +130,27 @@ static IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>
     //return global maximum
     return comm->max( maxDegree );
 }
+//------------------------------------------------------------------------------
 
+/** Compute maximum communication= max degree of the block graph.
+ */
+static IndexType computeMaxComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const int k){
+    
+    scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( adjM, part, k);
+    
+    return getGraphMaxDegree( blockGraph );
+}
+//------------------------------------------------------------------------------
+
+/** Compute total communication= sum of all edges of the block graph.
+ */
+static IndexType computeTotalComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const int k){
+    
+    scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( adjM, part, k);
+    
+    return blockGraph.getNumValues()/2;
+}
+//------------------------------------------------------------------------------
 
 /*  From pixel (int) coords, either in 2S or 3D, to a 1D index. 
  * Only for cubes, where every side has the same length, maxLen;

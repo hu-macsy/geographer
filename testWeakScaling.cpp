@@ -28,6 +28,7 @@
 #include "LocalRefinement.h"
 #include "SpectralPartition.h"
 #include "MultiSection.h"
+#include "AuxiliaryFunctions.h"
 
 typedef double ValueType;
 typedef int IndexType;
@@ -96,6 +97,7 @@ int main(int argc, char** argv) {
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
                                 ("initialPartition",  value<int> (&settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition")
                                 ("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
+                                ("cutsPerDim", value<std::vector<IndexType>>(&settings.cutsPerDim)->multitoken(), "If msOption=2, then provide d values that define the number of cuts per dimension.")
                                 ("pixeledSideLen", value<int>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
 				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
@@ -126,12 +128,9 @@ int main(int argc, char** argv) {
         const IndexType initialPartition = settings.initialPartition;
         const IndexType dim = settings.dimensions;
         const IndexType k = settings.numBlocks;
-        
-        scai::lama::CSRSparseMatrix<ValueType> graph; 	                // the adjacency matrix of the graph
-        std::vector<DenseVector<ValueType>> coordinates(dim);           // the coordinates of the graph
-        scai::lama::DenseVector<ValueType> nodeWeights;                 // node weights
             
-        std::vector<ValueType> maxCoord(dim);                           // the max coordinate in every dimensions
+        std::vector<ValueType> maxCoords( dim, 10);
+        std::vector<ValueType> minCoords( dim, 0);
         
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
                 
@@ -156,16 +155,33 @@ int main(int argc, char** argv) {
         std::random_device rnd_dvc;
         std::mt19937 mersenne_engine(rnd_dvc());
         
-        //create random local part of graph
+        //
+        //create structured local part of graph
+        //
+        std::vector<DenseVector<ValueType>> coordinates(dim);           // the coordinates of the graph
+        
         scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
-        graph.allocate( rowDistPtr, noDistPtr );
-    
+        scai::lama::CSRSparseMatrix<ValueType> graph( rowDistPtr, noDistPtr);     // the adjacency matrix of the graph
+        {
+            std::vector<DenseVector<ValueType>> coords(2);
+            for(IndexType i=0; i<2; i++){ 
+                coords[i].allocate( rowDistPtr );
+                coords[i] = static_cast<ValueType>( 0 );
+            }
+            std::vector<IndexType> tmpPoints( maxCoords.size() );
+            for(int i=0; i<maxCoords.size(); i++){
+                tmpPoints[i] = (IndexType) maxCoords[i];
+            }
+            ITI::MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(graph, coords, maxCoords, tmpPoints );
+        }
+        
         PRINT0("\"Created\" local part of graph. (for MultiSection the adjacency graph is not needed and it is empty)");
         
         //
         //create random local weights
         //
+        scai::lama::DenseVector<ValueType> nodeWeights;                 // node weights
         
         std::uniform_real_distribution<ValueType> dist(1.0, 3.0);
         auto gen = std::bind(dist, mersenne_engine);
@@ -175,7 +191,6 @@ int main(int argc, char** argv) {
 
         scai::hmemo::HArray<ValueType> tmpWeights( tmpLocalWeights.size(), tmpLocalWeights.data() );
 
-        //nodeWeights.assign( tmpWeights, rowDistPtr);
         nodeWeights.swap( tmpWeights, rowDistPtr);
         
         ValueType totalLocalWeight = std::accumulate( tmpLocalWeights.begin(), tmpLocalWeights.end(), 0.0);
@@ -183,8 +198,11 @@ int main(int argc, char** argv) {
         
         PRINT0("Created local part of weights, totalGlobalWeight= " << totalGlobalWeight);
         
+        //
         // create random local coordinates   
         //
+        // overwrite coordinates created by MeshGenerator
+        
         std::vector< std::vector<IndexType> > localPoints( localN, std::vector<IndexType>(dim,0) );
         
         std::vector<ValueType> scaledMin(dim, std::numeric_limits<ValueType>::max());
@@ -192,9 +210,6 @@ int main(int argc, char** argv) {
         
         ValueType scale = std::pow( N -1 , 1.0/dim);
         PRINT0( scale );
-        
-        std::vector<ValueType> maxCoords( dim, 1000);
-        std::vector<ValueType> minCoords( dim, 0);
         
         for(IndexType d=0; d<dim; d++){  
             std::vector<ValueType> tmpLocalCoords(localN);
@@ -301,9 +316,12 @@ int main(int argc, char** argv) {
         }
         
         //ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut( graph, multiSectionPartition);
-        ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( multiSectionPartition, k);
+        //ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( multiSectionPartition, k);
+        ValueType imbalance = (maxLeafWeight - optWeight)/optWeight;
+        IndexType maxComm = ITI::aux::computeMaxComm( graph, multiSectionPartition, k);
+        IndexType totalComm = ITI::aux::computeTotalComm( graph, multiSectionPartition, k);
         if(comm->getRank()==0){
-            if( settings.bisect ){
+            if( settings.bisect==1 ){
                 logF << "--  Initial bisection, total time: " << partitionTime.count() << std::endl;
             }else{
                 logF << "--  Initial multisection, total time: " << partitionTime.count() << std::endl;
@@ -311,21 +329,15 @@ int main(int argc, char** argv) {
             logF << "\tfinal imbalance= "<< imbalance;
             logF  << std::endl  << std::endl  << std::endl; 
             std::cout << "\033[1;32m--Initial multisection, total time: " << partitionTime.count() << std::endl;
-            std::cout << "\tfinal imbalance= "<< imbalance << "\033[0m";
+            std::cout << "\t imbalance= "<< imbalance << " , maxComm= "<< maxComm << " , totalComm= " << totalComm <<"\033[0m";
             std::cout << std::endl  << std::endl  << std::endl;
         }
-        PRINT0("\nGot rectangles in time: " << partitionTime.count() << " - imbalance is " << maxLeafWeight/optWeight -1);
+        //PRINT0("\nGot rectangles in time: " << partitionTime.count() << " - imbalance is " << maxLeafWeight/optWeight -1);
         /*
         i f(*dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"multisectPart");
             }
             */        
-        scai::lama::CSRSparseMatrix<ValueType> blockGraph = ITI::ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, multiSectionPartition, k);
-        
-        /* TODO:
-         getIA values and find block-node with maximum degree
-         and also total degree
-         */
-        
+
         return 0;
 }
