@@ -17,6 +17,9 @@ local/
 *.graph
 *.graph.xyz
 *.csv
+*.cmd
+*.output
+*.map
 SpectralPartition_Grid32x32_*.xyz
 writeCoordsDist_*.xyz
 hilbertPartition_*.xyz

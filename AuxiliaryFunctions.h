@@ -166,8 +166,8 @@ static std::tuple<IndexType, IndexType> index2_2DPoint(IndexType index,  std::ve
     SCAI_ASSERT(xIndex >= 0, xIndex);
     SCAI_ASSERT(yIndex >= 0, yIndex);
 
-    SCAI_ASSERT(xIndex < numPoints[0], xIndex);
-    SCAI_ASSERT(yIndex < numPoints[1], yIndex);
+    SCAI_ASSERT(xIndex < numPoints[0], xIndex << " for index: "<< index);
+    SCAI_ASSERT(yIndex < numPoints[1], yIndex << " for index: "<< index);
 
     return std::make_tuple(xIndex, yIndex);
 } 

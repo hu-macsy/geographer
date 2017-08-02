@@ -23,6 +23,8 @@
 #include "ParcoRepart.h"
 #include "LocalRefinement.h"
 #include "SpectralPartition.h"
+#include "GraphUtils.h"
+
 #include "gtest/gtest.h"
 
 #include <boost/filesystem.hpp>
@@ -44,7 +46,7 @@ class auxTest : public ::testing::Test {
 
 TEST_F (auxTest, testMultiLevelStep_dist) {
 
-    const IndexType N = 120;
+    const IndexType N = 200;
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -102,7 +104,7 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
         // set random coordinates
     	scai::hmemo::WriteOnlyAccess<ValueType> wCoords(coords[i].getLocalValues());
         for(IndexType j=0; j<localN; j++){
-            wCoords[i] = rand()%k;
+            wCoords[i] = rand()%100;      
         }
         wCoords.release();
         coords[i].redistribute( distPtr );
@@ -311,6 +313,37 @@ TEST_F (auxTest, testInitialPartitions){
 }
 //-----------------------------------------------------------------
 
+TEST_F (auxTest,testGraphMaxDegree){
+    
+    const IndexType N = 1000;
+    const IndexType k = 10;
+
+    //define distributions
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+
+    //generate random complete matrix
+    scai::lama::CSRSparseMatrix<ValueType> graph(dist, noDistPointer);
+    
+    for( int i=0; i<10; i++){
+        scai::lama::MatrixCreator::fillRandom(graph, i/9.0);
+    
+        IndexType maxDegree;
+        maxDegree = GraphUtils::getGraphMaxDegree<IndexType, ValueType>(graph);
+        //PRINT0("maxDegree= " << maxDegree);
+        
+        EXPECT_LE( maxDegree, N);
+        EXPECT_LE( 0, maxDegree);
+        if ( i==0 ){
+            EXPECT_EQ( maxDegree, 0);
+        }else if( i==9 ){
+            EXPECT_EQ( maxDegree, N);
+        }
+    }
+}
+//-----------------------------------------------------------------
+
 TEST_F (auxTest, testPixelDistance) {
     
     IndexType sideLen = 100;
@@ -346,7 +379,7 @@ TEST_F (auxTest, testPixelDistance) {
 //-----------------------------------------------------------------
 
 TEST_F(auxTest, testIndex2_3DPoint){
-    std::vector<IndexType> numPoints= {9, 11, 7};
+    std::vector<IndexType> numPoints(3);
     
     srand(time(NULL));
     for(int i=0; i<3; i++){

@@ -9,7 +9,7 @@
 const std::string version = BUILD_COMMIT_STRING;
 
 struct Settings{
-    IndexType dimensions= 3;
+    IndexType dimensions= 2;
     IndexType numX = 32;
     IndexType numY = 32;
     IndexType numZ = 32;
@@ -23,18 +23,19 @@ struct Settings{
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
     IndexType pixeledSideLen = 10;
-    IndexType fileFormat = 0;   // 0 for METSI, 1 for MatrixMarket
+    IndexType fileFormat = 1;   // 0 for METSI, 1 for MatrixMarket
     IndexType initialPartition = 0;
+    bool bisect = 0;    // 0: works for square k, 1: bisect, for k=power of 2, 2: user defined cutsPerDim
     bool useDiffusionTieBreaking = false;
     bool useGeometricTieBreaking = false;
     bool useDiffusionCoordinates = false;
     bool gainOverBalance = false;
     bool skipNoGainColors = false;
     bool writeDebugCoordinates = false;
-    bool bisect = false;
     bool useExtent = false;
     double epsilon = 0.05;
     std::string fileName = "-";
+    std::vector<IndexType> cutsPerDim;
     
     void print(std::ostream& out){
         IndexType numPoints = numX* numY* numZ;
@@ -65,7 +66,7 @@ struct Settings{
                 out<< "initial partition: k-means" << std::endl;   break;
             }
             case 4:{
-                if (!bisect){
+                if ( !bisect ){
                     out<< "initial partition: multisection" << std::endl;
                 }else{
                     out<< "initial partition: bisection" << std::endl;
