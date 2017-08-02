@@ -284,13 +284,13 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 		std::getline(ss, item, ' ');
 		globalM = std::stoi(item);
 
-		bool readWeightInfo = std::getline(ss, item, ' ');
+		bool readWeightInfo = std::getline(ss, item, ' ').good();
 		if (readWeightInfo && item.size() > 0) {
 			//three bits, describing presence of edge weights, vertex weights and vertex sizes
 			int bitmask = std::stoi(item);
 			hasEdgeWeights = bitmask % 10;
 			if ((bitmask / 10) % 10) {
-				bool readNodeWeightCount = std::getline(ss, item, ' ');
+				bool readNodeWeightCount = std::getline(ss, item, ' ').good();
 				if (readNodeWeightCount && item.size() > 0) {
 					numberNodeWeights = std::stoi(item);
 				} else {
@@ -354,7 +354,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         std::vector<IndexType> weights;
 
         for (IndexType j = 0; j < numberNodeWeights; j++) {
-        	bool readWeight = std::getline(ss, item, ' ');
+        	bool readWeight = std::getline(ss, item, ' ').good();
         	if (readWeight && item.size() > 0) {
         		nodeWeightStorage[j][i] = std::stoi(item);
         	} else {
@@ -362,7 +362,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         	}
         }
 
-        while (std::getline(ss, item, ' ')) {
+        while (std::getline(ss, item, ' ').good()) {
         	if (item.size() == 0) {
         		//probably some whitespace at end of line
         		continue;
@@ -373,7 +373,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         	}
 
         	if (hasEdgeWeights) {
-        		bool readEdgeWeight = std::getline(ss, item, ' ');
+        		bool readEdgeWeight = std::getline(ss, item, ' ').good();
         		if (!readEdgeWeight) {
         			throw std::runtime_error("Edge weight for " + std::to_string(neighbor) + " not found in line " + std::to_string(beginLocalRange + i) + ".");
         		}
@@ -443,7 +443,7 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 
 	std::stringstream ss( line );
 	std::string item;
-	bool readLine = std::getline(ss, item, ' ');
+	bool readLine = std::getline(ss, item, ' ').good();
 	if (!readLine or item.size() == 0) {
 		throw std::runtime_error("Unexpected end of first line.");
 	}
@@ -482,7 +482,7 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 		std::string item;
 
 		//first column contains index
-		bool readIndex = std::getline(ss, item, ' ');
+		bool readIndex = std::getline(ss, item, ' ').good();
 		if (!readIndex or item.size() == 0) {
 			throw std::runtime_error("Could not read first element of line " + std::to_string(i+1));
 		}
@@ -495,7 +495,7 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 		//remaining columns contain coordinates
 		IndexType dim = 0;
 		while (dim < dimension) {
-			bool read = std::getline(ss, item, ' ');
+			bool read = std::getline(ss, item, ' ').good();
 			if (!read or item.size() == 0) {
 				throw std::runtime_error("Unexpected end of line. Was the number of dimensions correct?");
 			}
@@ -710,7 +710,7 @@ DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::st
 
 	std::vector<IndexType> part;
 	std::string line;
-	while (std::getline(file, line)) {
+	while (std::getline(file, line).good()) {
 		part.push_back(std::stoi(line));
 	}
 
@@ -753,7 +753,7 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
     IndexType duplicateNeighbors = 0;
 
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(file, line).good()) {
     	std::vector<ValueType> values;
     	std::stringstream ss( line );
 		std::string item;
@@ -767,7 +767,7 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
 
 		IndexType i = 0;
 
-		while (std::getline(ss, item, ' ')) {
+		while (std::getline(ss, item, ' ').good()) {
 			if (item.size() == 0) {
 				continue;
 			}
