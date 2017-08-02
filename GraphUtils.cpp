@@ -711,8 +711,8 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueTy
 
 
 template int getFarthestLocalNode(const CSRSparseMatrix<double> graph, std::vector<int> seedNodes);
-template double computeCut(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, bool weighted = false);
-template double computeImbalance(const DenseVector<int> &part, int k, const DenseVector<int> &nodeWeights = {});
+template double computeCut(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, bool weighted);
+template double computeImbalance(const DenseVector<int> &part, int k, const DenseVector<int> &nodeWeights);
 template scai::dmemo::Halo buildNeighborHalo<int,double>(const CSRSparseMatrix<double> &input);
 template bool hasNonLocalNeighbors(const CSRSparseMatrix<double> &input, int globalID);
 template std::vector<int> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<double>& input);
