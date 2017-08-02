@@ -608,7 +608,7 @@ ValueType dbg_rectW=0;
                 newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h+1]-1;
                 newRect.weight = weightPerPart[h];
                 root->insert( newRect );
-                SCAI_ASSERT_GT_ERROR( newRect.weight, 0, "Aborting: found rectangle with 0 weight, maybe inappropriate input data or needs bigger scaling.");
+                SCAI_ASSERT_GT_ERROR( newRect.weight, 0, "Aborting: found rectangle " << l << " with 0 weight, maybe inappropriate input data or needs bigger scaling.");
                 if(newRect.weight>maxWeight){
                     maxWeight = newRect.weight;
                 }
