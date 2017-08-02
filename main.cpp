@@ -166,7 +166,7 @@ int main(int argc, char** argv) {
 
     std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
 
-    DenseVector<IndexType> nodeWeights;
+    DenseVector<ValueType> nodeWeights;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -212,7 +212,7 @@ int main(int argc, char** argv) {
         }
 
         // read the adjacency matrix and the coordinates from a file
-        std::vector<DenseVector<IndexType> > vectorOfNodeWeights;
+        std::vector<DenseVector<ValueType> > vectorOfNodeWeights;
         graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights );
 
         N = graph.getNumRows();
@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
 
         IndexType numNodeWeights = vectorOfNodeWeights.size();
         if (numNodeWeights == 0) {
-			nodeWeights = DenseVector<IndexType>(rowDistPtr, 1);
+			nodeWeights = DenseVector<ValueType>(rowDistPtr, 1);
 		}
 		else if (numNodeWeights == 1) {
 			nodeWeights = vectorOfNodeWeights[0];
@@ -325,7 +325,7 @@ int main(int argc, char** argv) {
             std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
         }
 
-		nodeWeights = scai::lama::DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+        nodeWeights = scai::lama::DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
 
 	} else if (vm.count("quadTreeFile")) {
 		//if (comm->getRank() == 0) {
@@ -344,7 +344,7 @@ int main(int argc, char** argv) {
         for (IndexType i = 0; i < settings.dimensions; i++) {
         	coordinates[i].redistribute(rowDistPtr);
         }
-		nodeWeights = scai::lama::DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+        nodeWeights = scai::lama::DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
 
     } else{
     	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;

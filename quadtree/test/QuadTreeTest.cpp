@@ -678,8 +678,8 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
             ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordsDV, N, destPath+"hilbert");
         }
         
-        cut = GraphUtils::computeCut(graph, hilbertPartition, true);
-        imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(hilbertPartition, k);
+        cut = ITI::GraphUtils::computeCut(graph, hilbertPartition, true);
+        imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>(hilbertPartition, k);
         
         if( imbalance>epsilon ){
             PRINT0("WARNING, imbalance: "<< imbalance <<" more than epislon: "<< epsilon);

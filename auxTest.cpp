@@ -115,7 +115,7 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
     
     DenseVector<IndexType> partition= ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coords, settings);
     // node weights = 1
-    DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(partition.getDistributionPtr(), 1);
+    DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(partition.getDistributionPtr(), 1);
     
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, settings);
     //ITI::aux::multiLevelStep(graph, partition, uniformWeights, coords, Settings);
@@ -183,7 +183,7 @@ TEST_F (auxTest, testInitialPartitions){
     settings.minBorderNodes = N*std::pow(0.6, settings.multiLevelRounds)/k * 0.05;
     settings.coarseningStepsBetweenRefinement =2;
     
-    DenseVector<IndexType> uniformWeights;
+    DenseVector<ValueType> uniformWeights;
     
     ValueType cut;
     ValueType imbalance;
@@ -217,7 +217,7 @@ TEST_F (auxTest, testInitialPartitions){
         logF<< "-- Initial Pixeled partition " << std::endl;
         logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
     }
-    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+    uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, settings);
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithPixel");
@@ -253,7 +253,7 @@ TEST_F (auxTest, testInitialPartitions){
         logF<< "-- Initial Hilbert/sfc partition " << std::endl;
         logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
     }
-    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+    uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, settings);
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithHilbert");

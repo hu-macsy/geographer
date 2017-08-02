@@ -460,18 +460,6 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     //
     //decide the number of multisection for every dimension
     //
-
-    // from k get d numbers such that their product equals k
-    // TODO: now k must be number such that k^(1/d) is an integer, drop this condition, generalize
-    const ValueType sqrtK = std::pow( k,  1.0/dim );
-
-    if( !std::floor(sqrtK)==sqrtK ){
-        PRINT0("Input k= "<< k << " and sqrt(k)= "<< sqrtK );
-        throw std::logic_error("Number of blocks not a square number");
-    }
-    
-    // TODO/check: sqrtK is not correct, it is -1 but not sure if always
-    IndexType intSqrtK = sqrtK;
     
     //TODO: now for every dimension we have sqrtK cuts. This can be generalized so we have different number of cuts
     //  for each multisection but even more, different cuts for every block.
@@ -483,17 +471,26 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     // if the bisection option is chosen the algorithm performs a bisection
     if( settings.bisect==0 ){
         if( settings.cutsPerDim.empty() ){        // no user-specific number of cuts
+            // from k get d numbers such that their product equals k
+            // TODO: now k must be number such that k^(1/d) is an integer, drop this condition, generalize
+            const ValueType sqrtK = std::pow( k,  1.0/dim );
+            if( !(std::floor(sqrtK)==sqrtK) ){
+                PRINT0("Input k= "<< k << " and sqrt(k)= "<< sqrtK );
+                throw std::logic_error("Number of blocks not a square number");
+            }
+            
+            // TODO/check: sqrtK is not correct, it is -1 but not sure if always
             IndexType intSqrtK = sqrtK;
             if( std::pow( intSqrtK+1, dim ) == k){
                 intSqrtK++;
             }
             SCAI_ASSERT( std::pow( intSqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow( sqrtK, 1/d)= " << std::pow(intSqrtK,dim));
-        
+            
             numCuts = std::vector<IndexType>( dim, intSqrtK );
         }else{                                  // user-specific number of cuts per dimensions
             numCuts = settings.cutsPerDim;
         }
-    }else if( settings.bisect==1 ){        
+    }else{        
         SCAI_ASSERT( k && !(k & (k-1)) , "k is not a power of 2 and this is required for now for bisection");  
         numCuts = std::vector<IndexType>( log2(k) , 2 );
     }
@@ -506,7 +503,6 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     struct rectangle bBox;
     
     // at first the bounding box is the whole space
-    // WARNING: because the max coordinate of a bounding box does belong in the box ( box=[min,manx) ) we must +1.
     for(int d=0; d<dim; d++){
         bBox.bottom.push_back( minCoords[d]);
         bBox.top.push_back( maxCoords[d] );

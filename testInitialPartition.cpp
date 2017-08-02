@@ -417,7 +417,7 @@ int main(int argc, char** argv) {
             const IndexType weightSum = nodeWeightsInt.sum().Scalar::getValue<IndexType>();
             const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
             
-            partition = ITI::KMeans::computePartition(coordinates, settings.numBlocks, nodeWeightsInt, blockSizes, settings.epsilon);      
+            partition = ITI::KMeans::computePartition(coordinates, settings.numBlocks, nodeWeights, blockSizes, settings.epsilon);      
             
             partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
             

@@ -205,12 +205,10 @@ int main(int argc, char** argv) {
         // create random local coordinates   
         //
         
-        std::vector< std::vector<IndexType> > localPoints( localN, std::vector<IndexType>(dim,0) );
-        
         std::vector<ValueType> scaledMin(dim, std::numeric_limits<ValueType>::max());
         std::vector<ValueType> scaledMax(dim, std::numeric_limits<ValueType>::lowest());
         
-        ValueType scale = std::pow( N -1 , 1.0/dim);
+        ValueType scale = std::pow( N -1 , 1.0  /dim);
         PRINT0( scale );
         
         for(IndexType d=0; d<dim; d++){  
@@ -224,6 +222,10 @@ int main(int argc, char** argv) {
                 std::normal_distribution<ValueType> dist(0.0, maxCoords[d]);
                 auto gen = std::bind(dist, mersenne_engine);
                 std::generate( begin(tmpLocalCoords), end(tmpLocalCoords), gen);
+            }else if( pointDist=="DANorm" ){
+                std::normal_distribution<ValueType> dist(0.0, maxCoords[d]);
+                auto gen = std::bind(dist, mersenne_engine);
+                ValueType coord = gen();
             }else{
                 PRINT0("Aborting, distribution " << pointDist << " not available");
                 return -1;
@@ -240,6 +242,8 @@ int main(int argc, char** argv) {
         // scale the coordinates. Done in a separate loop to mimic the running time of MultiSection::getPartition better
         
         std::chrono::time_point<std::chrono::system_clock>  beforeInitialTime =  std::chrono::system_clock::now();
+        
+        std::vector< std::vector<IndexType> > localPoints( localN, std::vector<IndexType>(dim,0) );
         
         for(IndexType d=0; d<dim; d++){  
             scai::hmemo::ReadAccess<ValueType> localPartOfCoords( coordinates[d].getLocalValues() );
@@ -321,15 +325,12 @@ int main(int argc, char** argv) {
         
         std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
         
-        ValueType imbalanceUtils = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( multiSectionPartition, k, nodeWeights);
-        
         scai::lama::CSRSparseMatrix<ValueType> blockGraph = ITI::MultiSection<IndexType, ValueType>::getBlockGraphFromTree_local(root);
         
         IndexType maxComm = ITI::GraphUtils::getGraphMaxDegree<IndexType, ValueType>( blockGraph);
         IndexType totalComm = blockGraph.getNumValues()/2;
-        ValueType imbalance = (maxLeafWeight - optWeight)/optWeight;
+        ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( multiSectionPartition, k, nodeWeights);
 
-PRINT0("imbalanceUtils= " << imbalanceUtils << " , custom imbalance= " << imbalance );
         std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
         
         if(comm->getRank()==0){

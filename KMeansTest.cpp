@@ -27,7 +27,7 @@ TEST_F(KMeansTest, testFindInitialCenters) {
 	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
 	const IndexType n = graph.getNumRows();
 	std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
-	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+	DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType p = comm->getSize();
 
@@ -91,7 +91,7 @@ TEST_F(KMeansTest, testFindCenters) {
 	DenseVector<IndexType> part = DenseVector<IndexType>(randomValues.getDistributionPtr(), comm->getRank());
 	part.redistribute(dist);
 
-	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+	DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
 
 	//get centers
 	std::vector<std::vector<ValueType> > centers = KMeans::findCenters(coords, part, k,	uniformWeights);
