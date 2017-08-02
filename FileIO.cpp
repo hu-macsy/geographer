@@ -634,7 +634,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 
 		IndexType dim = 0;
 		while (dim < dimension) {
-			bool read = std::getline(ss, item, ' ');
+			bool read = !std::getline(ss, item, ' ').fail();
 			if (!read or item.size() == 0) {
 				throw std::runtime_error("Unexpected end of line. Was the number of dimensions correct?");
 			}
