@@ -7,6 +7,7 @@
 
 
 #include "SpectralPartition.h"
+#include "GraphUtils.h"
 
 using scai::lama::Scalar;
 
@@ -179,8 +180,8 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
         assert( coordinates[dim].getLocalValues().size() == newDist->getLocalSize() );
     }
 
-    ValueType cut = comm->getSize() == 1 ? ParcoRepart<IndexType, ValueType>::computeCut(adjM, result) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(adjM, false)) / 2;
-    ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(result, k);
+    ValueType cut = comm->getSize() == 1 ? GraphUtils::computeCut(adjM, result) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(adjM, false)) / 2;
+    ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k);
     if (comm->getRank() == 0) {
         std::chrono::duration<double> elapsedSeconds = std::chrono::steady_clock::now() -start;
         std::cout << "\033[1;32mSpectral partition"<<" (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;

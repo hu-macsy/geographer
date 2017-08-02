@@ -5,7 +5,7 @@
  */
 
 #include "MultiSection.h"
-#include "ParcoRepart.h"    //TODO: this is here for compute cut and imbalance. not really needed
+#include "GraphUtils.h"
 
 #include <numeric>
 

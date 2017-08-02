@@ -407,6 +407,7 @@ public:
 		double maxDistance = 0;
 		double minDistance = std::numeric_limits<double>::max();
 		const count dimension = this->minCoords.getDimensions();
+		assert(std::isfinite(query.length()));
 
 		if (this->responsible(query)) minDistance = 0;
 
@@ -434,7 +435,7 @@ public:
 		updateMinMax(Point<double>(closestValues));
 		updateMinMax(Point<double>(farthestValues));
 
-		assert(minDistance < query.length() + this->maxCoords.length());
+		assert(minDistance <= query.length() + this->maxCoords.length());//triangle inequality
 		assert(minDistance < maxDistance);
 		return std::pair<double, double>(minDistance, maxDistance);
 	}

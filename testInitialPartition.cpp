@@ -280,7 +280,7 @@ int main(int argc, char** argv) {
             coordinates[i].allocate(coordDist);
             coordinates[i] = static_cast<ValueType>( 0 );
         }
-        
+
         // create the adjacency matrix and the coordinates
         ITI::MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist( graph, coordinates, maxCoord, numPoints);
         
@@ -469,9 +469,9 @@ int main(int argc, char** argv) {
     }
     
     
-    ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, partition);
-    ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( partition, k);
-    IndexType maxComm = aux::computeMaxComm( graph, partition, k);
+    ValueType cut = GraphUtils::computeCut<IndexType, ValueType>( graph, partition);
+    ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( partition, k);
+    IndexType maxComm = GraphUtils::computeMaxComm<IndexType, ValueType>( graph, partition, k);
     if(comm->getRank()==0){
         logF << "--  Initial parition, total time: " << partitionTime.count() << std::endl;
         logF << "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance << " ,maxComm= "<< maxComm;

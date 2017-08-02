@@ -15,6 +15,7 @@
 #include "QuadTreeTest.h"
 #include "../../ParcoRepart.h"
 #include "../../FileIO.h"
+#include "../../GraphUtils.h"
 
 #include "../QuadTreeCartesianEuclid.h"
 #include "../QuadTreePolarEuclid.h"
@@ -392,9 +393,10 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
         scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordsDV, Settings);
 
         ParcoRepart<IndexType, ValueType> repart;
-        EXPECT_LE(repart.computeImbalance(partition, k), epsilon);
+        const ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(partition, k);
+        EXPECT_LE(imbalance, epsilon);
 
-        const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true);
+        const ValueType cut = GraphUtils::computeCut<IndexType, ValueType>(graph, partition, true);
 
         if (comm->getRank() == 0) {
             std::cout << "Commit " << version << ": Partitioned graph with " << N << " nodes into " << k << " blocks with a total cut of " << cut << std::endl;
@@ -647,7 +649,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         for(int detail= 0; detail<np; detail++){           
             settings.pixeledSideLen= std::pow( 2, detail + np );
             pixelPartition = ITI::ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coordsDV, settings);
-            cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, pixelPartition, true);
+            cut = GraphUtils::computeCut<IndexType, ValueType>(graph, pixelPartition, true);
             if (cut<maxCut){
                 maxCut = cut;
                 bestPixelCut = detail;
@@ -676,8 +678,8 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
             ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordsDV, N, destPath+"hilbert");
         }
         
-        cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, hilbertPartition, true);
-        imbalance = repart.computeImbalance(hilbertPartition, k);
+        cut = GraphUtils::computeCut(graph, hilbertPartition, true);
+        imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(hilbertPartition, k);
         
         if( imbalance>epsilon ){
             PRINT0("WARNING, imbalance: "<< imbalance <<" more than epislon: "<< epsilon);

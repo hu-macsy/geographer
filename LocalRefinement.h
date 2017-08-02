@@ -15,7 +15,6 @@
 #include <assert.h>
 
 #include "Settings.h"
-#include "ParcoRepart.h"
 #include "PrioQueue.h"
 
 using scai::lama::CSRSparseMatrix;
@@ -65,7 +64,10 @@ namespace ITI {
         template<typename T>
         static void redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, scai::dmemo::Halo& halo, scai::utilskernel::LArray<T>& haloData);
         
+		static std::vector<ValueType> distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates);
+
         
+
     private:
         
         static ValueType twoWayLocalFM(

@@ -4,7 +4,7 @@
 #include <fstream>
 
 #include <scai/lama/DenseVector.hpp>
-#include "ParcoRepart.h"
+#include "GraphUtils.h"
 
 namespace ITI{
 
@@ -72,7 +72,7 @@ static void print2DGrid(scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama
         
     //get the border nodes
     scai::lama::DenseVector<IndexType> border(adjM.getColDistributionPtr(), 0);
-    border = ParcoRepart<IndexType,ValueType>::getBorderNodes( adjM , partition);
+    border = GraphUtils::getBorderNodes( adjM , partition);
     
     IndexType partViz[numX][numY];   
     IndexType bordViz[numX][numY]; 
@@ -98,57 +98,6 @@ static void print2DGrid(scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama
         }
     }
 
-}
-//------------------------------------------------------------------------------
-
-/** Get the maximum degree of a graph.
- * */
-static IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM){
-
-    const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-    const scai::dmemo::CommunicatorPtr comm = distPtr->getCommunicatorPtr();
-    const IndexType localN = distPtr->getLocalSize();
-    const IndexType globalN = distPtr->getGlobalSize();
-    
-    {
-        scai::dmemo::DistributionPtr noDist (new scai::dmemo::NoDistribution( globalN ));
-        SCAI_ASSERT( adjM.getColDistributionPtr()->isEqual(*noDist) , "Adjacency matrix should have no column distribution." );
-    }
-    
-    const scai::lama::CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-    scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-    
-    // local maximum degree 
-    IndexType maxDegree = ia[1]-ia[0];
-    
-    for(int i=1; i<ia.size(); i++){
-        IndexType thisDegree = ia[i]-ia[i-1];
-        if( thisDegree>maxDegree){
-            maxDegree = thisDegree;
-        }
-    }
-    //return global maximum
-    return comm->max( maxDegree );
-}
-//------------------------------------------------------------------------------
-
-/** Compute maximum communication= max degree of the block graph.
- */
-static IndexType computeMaxComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const int k){
-    
-    scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( adjM, part, k);
-    
-    return getGraphMaxDegree( blockGraph );
-}
-//------------------------------------------------------------------------------
-
-/** Compute total communication= sum of all edges of the block graph.
- */
-static IndexType computeTotalComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const int k){
-    
-    scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( adjM, part, k);
-    
-    return blockGraph.getNumValues()/2;
 }
 //------------------------------------------------------------------------------
 

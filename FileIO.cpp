@@ -138,6 +138,7 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
     const IndexType dimension = coords.size();
     const IndexType n = coords[0].size();
     scai::dmemo::DistributionPtr dist = coords[0].getDistributionPtr();
+    assert(dist->getGlobalSize() == n);
 	scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( n ));
 	scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 
@@ -167,7 +168,7 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
 		}
 		for (IndexType i = 0; i < n; i++) {
 			for (IndexType d = 0; d < dimension; d++) {
-				filehandle << coords[d].getLocalValues()[i] << " ";
+				filehandle << targetReference[d].getLocalValues()[i] << " ";
 			}
 			filehandle << std::endl;
 		}

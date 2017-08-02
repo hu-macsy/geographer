@@ -27,6 +27,7 @@
 #include "ParcoRepart.h"
 #include "Settings.h"
 #include "SpectralPartition.h"
+#include "GraphUtils.h"
 
 typedef double ValueType;
 typedef int IndexType;
@@ -254,6 +255,14 @@ int main(int argc, char** argv) {
 
         	ITI::Diffusion<IndexType, ValueType>::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), settings.dimensions);
 
+        	if (comm->getRank() == 0) {
+        		std::cout << "Chose diffusion sources";
+        		for (IndexType i = 0; i < settings.dimensions; i++) {
+        			std::cout << " " << nodeIndices[i];
+        		}
+        		std::cout << "." << std::endl;
+        	}
+
         	coordinates.resize(settings.dimensions);
 
 			for (IndexType i = 0; i < settings.dimensions; i++) {
@@ -310,9 +319,9 @@ int main(int argc, char** argv) {
         // create the adjacency matrix and the coordinates
         ITI::MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist( graph, coordinates, maxCoord, numPoints);
         
+        IndexType nodes= graph.getNumRows();
+        IndexType edges= graph.getNumValues()/2;
         if(comm->getRank()==0){
-            IndexType nodes= graph.getNumRows();
-            IndexType edges= graph.getNumValues()/2;	
             std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
         }
 
@@ -377,8 +386,8 @@ int main(int argc, char** argv) {
     */
     std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
-    ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true); 
-    ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( partition, comm->getSize() );
+    ValueType cut = ITI::GraphUtils::computeCut(graph, partition, true);
+    ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, comm->getSize(), nodeWeights );
     
     std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
     

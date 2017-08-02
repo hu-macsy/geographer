@@ -23,10 +23,13 @@
 #include "ParcoRepart.h"
 #include "LocalRefinement.h"
 #include "SpectralPartition.h"
+#include "GraphUtils.h"
+
 #include "gtest/gtest.h"
 
 #include <boost/filesystem.hpp>
 
+#include "GraphUtils.h"
 #include "AuxiliaryFunctions.h"
 
 typedef double ValueType;
@@ -105,6 +108,9 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
         }
         wCoords.release();
         coords[i].redistribute( distPtr );
+        ValueType min = coords[i].min().Scalar::getValue<ValueType>();
+        ValueType max = coords[i].max().Scalar::getValue<ValueType>();
+        ASSERT_LT(min, max);
     }
     
     DenseVector<IndexType> partition= ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coords, settings);
@@ -205,8 +211,8 @@ TEST_F (auxTest, testInitialPartitions){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"pixelPart");
     }
     //cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, pixeledPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
+    cut = GraphUtils::computeCut( graph, pixeledPartition);
+    imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( pixeledPartition, k);
     if(comm->getRank()==0){
         logF<< "-- Initial Pixeled partition " << std::endl;
         logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
@@ -216,8 +222,8 @@ TEST_F (auxTest, testInitialPartitions){
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithPixel");
     }
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, pixeledPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
+    cut = GraphUtils::computeCut( graph, pixeledPartition);
+    imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( pixeledPartition, k);
     if(comm->getRank()==0){
         logF<< "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
         logF  << std::endl  << std::endl; 
@@ -241,8 +247,8 @@ TEST_F (auxTest, testInitialPartitions){
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"hilbertPart");
     }
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, hilbertPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
+    cut = GraphUtils::computeCut( graph, hilbertPartition);
+    imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( hilbertPartition, k);
     if(comm->getRank()==0){
         logF<< "-- Initial Hilbert/sfc partition " << std::endl;
         logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
@@ -252,8 +258,8 @@ TEST_F (auxTest, testInitialPartitions){
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithHilbert");
     }
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, hilbertPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
+    cut = GraphUtils::computeCut( graph, hilbertPartition);
+    imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( hilbertPartition, k);
     if(comm->getRank()==0){
         logF<< "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
         logF  << std::endl  << std::endl; 
@@ -280,8 +286,8 @@ TEST_F (auxTest, testInitialPartitions){
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"spectralPart");
     }
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, spectralPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( spectralPartition, k);
+    cut = GraphUtils::computeCut( graph, spectralPartition);
+    imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( spectralPartition, k);
     logF<< "-- Initial Spectral partition " << std::endl;
     logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
     
@@ -291,8 +297,8 @@ TEST_F (auxTest, testInitialPartitions){
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithSpectral");
     }
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, spectralPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( spectralPartition, k);
+    cut = GraphUtils::computeCut( graph, spectralPartition);
+    imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( spectralPartition, k);
     if(comm->getRank()==0){
         logF<< "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
         logF  << std::endl  << std::endl; 
@@ -324,7 +330,7 @@ TEST_F (auxTest,testGraphMaxDegree){
         scai::lama::MatrixCreator::fillRandom(graph, i/9.0);
     
         IndexType maxDegree;
-        maxDegree = aux::getGraphMaxDegree(graph);
+        maxDegree = GraphUtils::getGraphMaxDegree<IndexType, ValueType>(graph);
         //PRINT0("maxDegree= " << maxDegree);
         
         EXPECT_LE( maxDegree, N);

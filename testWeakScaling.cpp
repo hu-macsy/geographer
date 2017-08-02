@@ -322,7 +322,7 @@ int main(int argc, char** argv) {
         
         scai::lama::CSRSparseMatrix<ValueType> blockGraph = ITI::MultiSection<IndexType, ValueType>::getBlockGraphFromTree_local(root);
         
-        IndexType maxComm = ITI::aux::getGraphMaxDegree( blockGraph);
+        IndexType maxComm = ITI::GraphUtils::getGraphMaxDegree<IndexType, ValueType>( blockGraph);
         IndexType totalComm = blockGraph.getNumValues()/2;
         ValueType imbalance = (maxLeafWeight - optWeight)/optWeight;
 
