@@ -72,7 +72,7 @@ TEST_F (MultiLevelTest, testCoarseningGrid_2D) {
     // coarsen the graph
     CSRSparseMatrix<ValueType> coarseGraph;
     DenseVector<IndexType> fineToCoarseMap;
-    DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+    DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1.0);
 
     MultiLevel<IndexType, ValueType>::coarsen(graph, uniformWeights, coarseGraph, fineToCoarseMap);
     
@@ -123,7 +123,7 @@ TEST_F (MultiLevelTest, testGetMatchingGrid_2D) {
 
     //check distributions
     //assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
-    DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+    DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1.0);
 
     std::vector<std::pair<IndexType,IndexType>> matching = MultiLevel<IndexType, ValueType>::maxLocalMatching( graph, uniformWeights );
     //assert( matching[0].size() == matching[1].size() );
@@ -256,7 +256,7 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     graph.redistribute( newDist , noDistPtr);
 
     // node weights = 1
-    DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+    DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1.0);
     //ValueType beforeSumWeigths = uniformWeights.l1Norm().Scalar::getValue<ValueType>();
     IndexType beforeSumWeights = N;
     
@@ -343,7 +343,7 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
             break;
         }
         
-        DenseVector<IndexType> pixelWeights;
+        DenseVector<ValueType> pixelWeights;
         
         scai::lama::CSRSparseMatrix<ValueType> pixelGraph = MultiLevel<IndexType, ValueType>::pixeledCoarsen(graph, coords, pixelWeights, Settings);
         

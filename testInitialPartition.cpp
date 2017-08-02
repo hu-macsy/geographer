@@ -29,6 +29,7 @@
 #include "SpectralPartition.h"
 #include "MultiSection.h"
 #include "KMeans.h"
+#include "GraphUtils.h"
 
 typedef double ValueType;
 typedef int IndexType;
@@ -143,7 +144,15 @@ int main(int argc, char** argv) {
             return 0;
         }
         
-        //if( vm.count("cutsPerDim")){
+        if( vm.count("cutsPerDim") ){
+            SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
+            SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
+            IndexType tmpK = 1;
+            for( const auto& i: settings.cutsPerDim){
+                tmpK *= i;
+            }
+            settings.numBlocks= tmpK;
+        }
             
         IndexType N = -1; 		// total number of points
         
@@ -302,11 +311,7 @@ int main(int argc, char** argv) {
 
     assert(N > 0);
 
-    if (comm->getSize() > 0) {
-    	//settings.numBlocks = comm->getSize();
-    }
-    
-    if( !vm.count("numBlocks") ){
+    if( !vm.count("numBlocks") or !vm.count("cutsPerDim") ){
         settings.numBlocks = comm->getSize();
     }
     
@@ -412,7 +417,7 @@ int main(int argc, char** argv) {
             const IndexType weightSum = nodeWeightsInt.sum().Scalar::getValue<IndexType>();
             const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
             
-            partition = ITI::KMeans::computePartition(coordinates, settings.numBlocks, nodeWeightsInt, blockSizes, settings.epsilon);      
+            partition = ITI::KMeans::computePartition(coordinates, settings.numBlocks, nodeWeights, blockSizes, settings.epsilon);      
             
             partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
             
@@ -468,10 +473,15 @@ int main(int argc, char** argv) {
         }
     }
     
+    std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
     ValueType cut = GraphUtils::computeCut<IndexType, ValueType>( graph, partition);
     ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( partition, k);
     IndexType maxComm = GraphUtils::computeMaxComm<IndexType, ValueType>( graph, partition, k);
+    IndexType totalComm = GraphUtils::computeTotalComm<IndexType, ValueType>( graph, partition, k);
+    
+    std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
+    
     if(comm->getRank()==0){
         logF << "--  Initial parition, total time: " << partitionTime.count() << std::endl;
         logF << "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance << " ,maxComm= "<< maxComm;
@@ -486,7 +496,25 @@ int main(int argc, char** argv) {
         logF<< std::endl<< std::endl << "Only initial partition, no MultiLevel or LocalRefinement"<< std::endl << std::endl;
     }
     
-    
+    // Reporting output to std::cout
+    ValueType inputT = ValueType ( comm->max(inputTime.count() ));
+    ValueType partT = ValueType (comm->max(partitionTime.count()));
+    ValueType repT = ValueType (comm->max(reportTime.count()));
+
+    if (comm->getRank() == 0) {
+        for (IndexType i = 0; i < argc; i++) {
+            std::cout << std::string(argv[i]) << " ";
+        }
+        std::cout << std::endl;
+        std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
+        std::cout<< " nodes:"<< N<< " dimensions:"<< settings.dimensions <<" k:" << settings.numBlocks;
+        std::cout<< " epsilon:" << settings.epsilon << " minBorderNodes:"<< settings.minBorderNodes;
+        std::cout<< " minGainForNextRound:" << settings.minGainForNextRound;
+        std::cout<< " stopAfterNoGainRounds:"<< settings.stopAfterNoGainRounds << std::endl;
+        
+        std::cout<< "cut:"<< cut<< " imbalance:"<< imbalance << std::endl;
+        std::cout<<"inputTime:" << inputT << " partitionTime:" << partT <<" reportTime:"<< repT << std::endl;
+    }
     /*
      *  commenting out spectral, it is not correct yet
      * 

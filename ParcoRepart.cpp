@@ -42,12 +42,12 @@ namespace ITI {
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings)
 {
-	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(input.getRowDistributionPtr(), 1);
+	DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(input.getRowDistributionPtr(), 1);
 	return partitionGraph(input, coordinates, uniformWeights, settings);
 }
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<IndexType> &nodeWeights, Settings settings)
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings)
 {
 	IndexType k = settings.numBlocks;
 	ValueType epsilon = settings.epsilon;
@@ -109,7 +109,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         // get an initial partition
         DenseVector<IndexType> result;
         if (nodeWeights.size() == 0) {
-        	nodeWeights = DenseVector<IndexType>(inputDist, 1);
+        	nodeWeights = DenseVector<ValueType>(inputDist, 1);
         }
         
         assert(nodeWeights.getDistribution().isEqual(*inputDist));
@@ -986,7 +986,7 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const 
 
 //to force instantiation
 
-template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, DenseVector<int> &nodeWeights, struct Settings);
+template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, struct Settings);
 
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings);
 

@@ -22,7 +22,7 @@ using scai::lama::Scalar;
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCenters(
-		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const DenseVector<IndexType> &nodeWeights) {
+		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights) {
 
 	SCAI_REGION( "KMeans.findInitialCenters" );
 
@@ -63,7 +63,7 @@ std::vector<std::vector<ValueType> > findCenters(
 		const std::vector<DenseVector<ValueType> >& coordinates,
 		const DenseVector<IndexType>& partition,
 		const IndexType k,
-		const DenseVector<IndexType>& nodeWeights) {
+		const DenseVector<ValueType>& nodeWeights) {
 	SCAI_REGION( "KMeans.findCenters" );
 
 	const IndexType dim = coordinates.size();
@@ -77,7 +77,7 @@ std::vector<std::vector<ValueType> > findCenters(
 	std::vector<std::vector<ValueType> > result(dim);
 	std::vector<IndexType> weightSum(k, 0);
 
-	scai::hmemo::ReadAccess<IndexType> rWeights(nodeWeights.getLocalValues());
+	scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
 	scai::hmemo::ReadAccess<IndexType> rPartition(partition.getLocalValues());
 
 	//compute weight sums
@@ -177,7 +177,7 @@ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> assignBlocks(
 		const std::vector<std::vector<ValueType> >& coordinates,
 		const std::vector<std::vector<ValueType> >& centers,
-		const DenseVector<IndexType> &nodeWeights,
+		const DenseVector<ValueType> &nodeWeights,
 		const DenseVector<IndexType> &previousAssignment,
 		const std::vector<IndexType> &targetBlockSizes,
 		const SpatialCell &boundingBox,
@@ -192,7 +192,7 @@ DenseVector<IndexType> assignBlocks(
 	const scai::dmemo::DistributionPtr dist = nodeWeights.getDistributionPtr();
 	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 	const IndexType localN = nodeWeights.getLocalValues().size();
-	const IndexType totalWeightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
+	const ValueType totalWeightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
 	const IndexType k = targetBlockSizes.size();
 
 	const IndexType maxIter = 20;
@@ -259,7 +259,7 @@ DenseVector<IndexType> assignBlocks(
 	{
 		SCAI_REGION( "KMeans.assignBlocks.balanceLoop" );
 		std::vector<IndexType> blockWeights(k,0);
-		scai::hmemo::ReadAccess<IndexType> rWeights(nodeWeights.getLocalValues());
+		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
 		scai::hmemo::WriteAccess<IndexType> wAssignment(assignment.getLocalValues());
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.assign" );
@@ -421,10 +421,10 @@ ValueType biggestDelta(const std::vector<std::vector<ValueType>> &firstCoords, c
 }
 
 template double biggestDelta(const std::vector<std::vector<double>> &firstCoords, const std::vector<std::vector<double>> &secondCoords);
-template std::vector<std::vector<double> > findInitialCenters(const std::vector<DenseVector<double>> &coordinates, int k, const DenseVector<int> &nodeWeights);
-template std::vector<std::vector<double> > findCenters(const std::vector<DenseVector<double>> &coordinates, const DenseVector<int> &partition, const int k, const DenseVector<int> &nodeWeights);
+template std::vector<std::vector<double> > findInitialCenters(const std::vector<DenseVector<double>> &coordinates, int k, const DenseVector<double> &nodeWeights);
+template std::vector<std::vector<double> > findCenters(const std::vector<DenseVector<double>> &coordinates, const DenseVector<int> &partition, const int k, const DenseVector<double> &nodeWeights);
 template DenseVector<int> assignBlocks(const std::vector<std::vector<double>> &coordinates, const std::vector<std::vector<double> > &centers,
-		const DenseVector<int> &nodeWeights, const DenseVector<int> &previousAssignment, const std::vector<int> &blockSizes, const SpatialCell &boundingBox,
+		const DenseVector<double> &nodeWeights, const DenseVector<int> &previousAssignment, const std::vector<int> &blockSizes, const SpatialCell &boundingBox,
 		const double epsilon, std::vector<double> &upperBoundOwnCenter, std::vector<double> &lowerBoundNextCenter, std::vector<double> &upperBoundNextCenter,
 		std::vector<double> &influence);
 template DenseVector<int> assignBlocks(const std::vector<DenseVector<double> >& coordinates, const std::vector<std::vector<double> >& centers);

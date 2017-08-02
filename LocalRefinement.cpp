@@ -13,7 +13,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     CSRSparseMatrix<ValueType>& input, 
     DenseVector<IndexType>& part,
     std::vector<IndexType>& nodesWithNonLocalNeighbors,
-    DenseVector<IndexType> &nodeWeights, 
+    DenseVector<ValueType> &nodeWeights, 
     const std::vector<DenseVector<IndexType>>& communicationScheme, 
     std::vector<DenseVector<ValueType>> &coordinates, 
     std::vector<ValueType> &distances, 
@@ -49,7 +49,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     }
 
     const IndexType optSize_old = ceil(double(globalN) / settings.numBlocks);
-    const IndexType optSize = std::ceil( nodeWeights.sum().Scalar::getValue<IndexType>() / settings.numBlocks);
+    const IndexType optSize =  nodeWeights.sum().Scalar::getValue<IndexType>() / settings.numBlocks;
     const IndexType maxAllowableBlockSize = optSize*(1+settings.epsilon);
 
     //for now, we are assuming equal numbers of blocks and processes
@@ -120,7 +120,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
 		scai::dmemo::Halo graphHalo;
 		CSRStorage<ValueType> haloMatrix;
-		scai::utilskernel::LArray<IndexType> nodeWeightHaloData;
+		scai::utilskernel::LArray<ValueType> nodeWeightHaloData;
 
 		if (partner != comm->getRank()) {
 			//processor is active this round
@@ -147,7 +147,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				throw std::runtime_error(std::to_string(localN) + " local nodes, but only " + std::to_string(blockSize) + " of them belong to block " + std::to_string(localBlockID) + ".");
 			}
 
-			const IndexType blockWeightSum = nodeWeights.getLocalValues().sum();
+			const ValueType blockWeightSum = nodeWeights.getLocalValues().sum();
 
 			IndexType swapField[6];
 			swapField[0] = interfaceNodes.size();
@@ -243,9 +243,9 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			/**
 			 * If nodes are weighted, exchange Halo for node weights
 			 */
-			std::vector<IndexType> borderNodeWeights = {};
+			std::vector<ValueType> borderNodeWeights = {};
 			if (nodesWeighted) {
-				const scai::utilskernel::LArray<IndexType>& localWeights = nodeWeights.getLocalValues();
+				const scai::utilskernel::LArray<ValueType>& localWeights = nodeWeights.getLocalValues();
 				assert(localWeights.size() == localN);
 				comm->updateHalo( nodeWeightHaloData, localWeights, graphHalo );
 				borderNodeWeights.resize(borderRegionSize);
@@ -383,7 +383,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 					redistributeFromHalo(input, newDistribution, graphHalo, haloMatrix);
 					part = DenseVector<IndexType>(newDistribution, localBlockID);
 					if (nodesWeighted) {
-						redistributeFromHalo<IndexType>(nodeWeights, newDistribution, graphHalo, nodeWeightHaloData);
+						redistributeFromHalo<ValueType>(nodeWeights, newDistribution, graphHalo, nodeWeightHaloData);
 					}
 				}
 				assert(input.getRowDistributionPtr()->isEqual(*part.getDistributionPtr()));
@@ -431,7 +431,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
     const CSRStorage<ValueType> &haloStorage,
     const scai::dmemo::Halo &matrixHalo,
     const std::vector<IndexType>& borderRegionIDs,
-    const std::vector<IndexType>& nodeWeights,
+    const std::vector<ValueType>& nodeWeights,
     std::pair<IndexType, IndexType> secondRoundMarkers,
     std::vector<bool>& assignedToSecondBlock,
     const std::pair<IndexType, IndexType> blockCapacities,
@@ -654,7 +654,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 		gainSumList.push_back(gainSum);
 
 		//update sizes
-		const IndexType nodeWeight = nodesWeighted ? nodeWeights[veryLocalID] : 1;
+		const ValueType nodeWeight = nodesWeighted ? nodeWeights[veryLocalID] : 1;
 		blockSizes.first += bestQueueIndex == 0 ? -nodeWeight : nodeWeight;
 		blockSizes.second += bestQueueIndex == 0 ? nodeWeight : -nodeWeight;
 		sizeList.push_back(std::max(blockSizes.first, blockSizes.second));
@@ -732,7 +732,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 
 		//apply movement in reverse
 		assignedToSecondBlock[veryLocalID] = previousBlock;
-		const IndexType nodeWeight = nodesWeighted ? nodeWeights[veryLocalID] : 1;
+		const ValueType nodeWeight = nodesWeighted ? nodeWeights[veryLocalID] : 1;
 		blockSizes.first += previousBlock == 0 ? nodeWeight : -nodeWeight;
 		blockSizes.second += previousBlock == 0 ? -nodeWeight : nodeWeight;
 
@@ -1232,7 +1232,7 @@ template std::vector<int> ITI::LocalRefinement<int, double>::distributedFMStep(
     CSRSparseMatrix<double>& input, 
     DenseVector<int>& part,
     std::vector<int>& nodesWithNonLocalNeighbors,
-    DenseVector<int> &nodeWeights, 
+    DenseVector<double> &nodeWeights, 
     const std::vector<DenseVector<int>>& communicationScheme, 
     std::vector<DenseVector<double>> &coordinates, 
     std::vector<double> &distances, 

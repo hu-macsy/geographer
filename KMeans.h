@@ -19,15 +19,15 @@ namespace ITI {
 namespace KMeans {
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<IndexType> &nodeWeights,
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights,
 		const std::vector<IndexType> &blockSizes, const ValueType epsilon = 0.05);
 
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType> > findInitialCenters(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<IndexType> &nodeWeights);
+std::vector<std::vector<ValueType> > findInitialCenters(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights);
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<IndexType> &partition, const IndexType k,
-		const DenseVector<IndexType> &nodeWeights);
+		const DenseVector<ValueType> &nodeWeights);
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType> >& coordinates,
@@ -35,7 +35,7 @@ DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType> >& 
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &coordinates, const std::vector<std::vector<ValueType> > &centers,
-		const DenseVector<IndexType> &nodeWeights, const DenseVector<IndexType> &previousAssignment,
+		const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment,
 		const std::vector<IndexType> &blockSizes,  const SpatialCell &boundingBox, const ValueType epsilon,
 		std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter,
 		std::vector<ValueType> &upperBoundNextCenter, std::vector<ValueType> &influence);
@@ -49,8 +49,7 @@ ValueType biggestDelta(const std::vector<std::vector<ValueType>> &firstCoords, c
 
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<IndexType> &nodeWeights,
-		const std::vector<IndexType> &blockSizes, const ValueType epsilon) {
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const ValueType epsilon) {
 	SCAI_REGION( "KMeans.computePartition" );
 
 	std::vector<std::vector<ValueType> > centers = findInitialCenters(coordinates, k, nodeWeights);

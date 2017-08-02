@@ -29,6 +29,7 @@
 #include "SpectralPartition.h"
 #include "MultiSection.h"
 #include "AuxiliaryFunctions.h"
+#include "GraphUtils.h"
 
 typedef double ValueType;
 typedef int IndexType;
@@ -76,7 +77,7 @@ int main(int argc, char** argv) {
 	using namespace boost::program_options;
 	options_description desc("Supported options");
 
-        enum class pointDistribution { uniform, normal};
+        //enum class pointDistribution { uniform, normal};
         std::string pointDist = "uniform";
         
 	struct Settings settings;
@@ -125,6 +126,16 @@ int main(int argc, char** argv) {
             std::cout << "machine char not valid" << std::endl;
         }
         
+        if( vm.count("cutsPerDim") ){
+            SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
+            SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
+            IndexType tmpK = 1;
+            for( const auto& i: settings.cutsPerDim){
+                tmpK *= i;
+            }
+            settings.numBlocks= tmpK;
+        }
+        
         const IndexType initialPartition = settings.initialPartition;
         const IndexType dim = settings.dimensions;
         const IndexType k = settings.numBlocks;
@@ -155,6 +166,10 @@ int main(int argc, char** argv) {
         std::random_device rnd_dvc;
         std::mt19937 mersenne_engine(rnd_dvc());
         
+        /* timing information
+         */
+        std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
+        
         //
         //create structured local part of graph
         //
@@ -163,20 +178,6 @@ int main(int argc, char** argv) {
         scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
         scai::lama::CSRSparseMatrix<ValueType> graph( rowDistPtr, noDistPtr);     // the adjacency matrix of the graph
-        /*
-        {
-            std::vector<DenseVector<ValueType>> coords(2);
-            for(IndexType i=0; i<2; i++){ 
-                coords[i].allocate( rowDistPtr );
-                coords[i] = static_cast<ValueType>( 0 );
-            }
-            std::vector<IndexType> tmpPoints( maxCoords.size() );
-            for(int i=0; i<maxCoords.size(); i++){
-                tmpPoints[i] = (IndexType) maxCoords[i];
-            }
-            ITI::MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(graph, coords, maxCoords, tmpPoints );
-        }
-        */
         
         PRINT0("\"Created\" local part of graph. (for MultiSection the adjacency graph is not needed and it is empty)");
         
@@ -185,7 +186,7 @@ int main(int argc, char** argv) {
         //
         scai::lama::DenseVector<ValueType> nodeWeights;                 // node weights
         
-        std::uniform_real_distribution<ValueType> dist(1.0, 3.0);
+        std::uniform_real_distribution<ValueType> dist(1.0, 5.0);
         auto gen = std::bind(dist, mersenne_engine);
         
         std::vector<ValueType> tmpLocalWeights(localN);
@@ -196,21 +197,18 @@ int main(int argc, char** argv) {
         nodeWeights.swap( tmpWeights, rowDistPtr);
         
         ValueType totalLocalWeight = std::accumulate( tmpLocalWeights.begin(), tmpLocalWeights.end(), 0.0);
-        ValueType totalGlobalWeight = comm->sum(totalLocalWeight);
+        long double totalGlobalWeight = comm->sum(totalLocalWeight);
         
         PRINT0("Created local part of weights, totalGlobalWeight= " << totalGlobalWeight);
         
         //
         // create random local coordinates   
         //
-        // overwrite coordinates created by MeshGenerator
-        
-        std::vector< std::vector<IndexType> > localPoints( localN, std::vector<IndexType>(dim,0) );
         
         std::vector<ValueType> scaledMin(dim, std::numeric_limits<ValueType>::max());
         std::vector<ValueType> scaledMax(dim, std::numeric_limits<ValueType>::lowest());
         
-        ValueType scale = std::pow( N -1 , 1.0/dim);
+        ValueType scale = std::pow( N -1 , 1.0  /dim);
         PRINT0( scale );
         
         for(IndexType d=0; d<dim; d++){  
@@ -224,6 +222,10 @@ int main(int argc, char** argv) {
                 std::normal_distribution<ValueType> dist(0.0, maxCoords[d]);
                 auto gen = std::bind(dist, mersenne_engine);
                 std::generate( begin(tmpLocalCoords), end(tmpLocalCoords), gen);
+            }else if( pointDist=="DANorm" ){
+                std::normal_distribution<ValueType> dist(0.0, maxCoords[d]);
+                auto gen = std::bind(dist, mersenne_engine);
+                ValueType coord = gen();
             }else{
                 PRINT0("Aborting, distribution " << pointDist << " not available");
                 return -1;
@@ -233,13 +235,15 @@ int main(int argc, char** argv) {
             coordinates[d].swap( tmpHarray, rowDistPtr );
         }
         PRINT0("Created local part of coordinates");
-        
-        // get a multisection partition
-        //scai::lama::DenseVector<IndexType> multiSectionPartition =  ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform( graph, coordinates, nodeWeights, settings);
+                
+        // time needed to get the input
+        std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
         
         // scale the coordinates. Done in a separate loop to mimic the running time of MultiSection::getPartition better
         
         std::chrono::time_point<std::chrono::system_clock>  beforeInitialTime =  std::chrono::system_clock::now();
+        
+        std::vector< std::vector<IndexType> > localPoints( localN, std::vector<IndexType>(dim,0) );
         
         for(IndexType d=0; d<dim; d++){  
             scai::hmemo::ReadAccess<ValueType> localPartOfCoords( coordinates[d].getLocalValues() );
@@ -285,7 +289,7 @@ int main(int argc, char** argv) {
         std::shared_ptr<ITI::rectCell<IndexType, ValueType>> thisLeaf;
         ValueType thisLeafWeight;
         
-        ValueType totalLeafWeight=0, maxLeafWeight=0, minLeafWeight=totalGlobalWeight;
+        long double totalLeafWeight=0, maxLeafWeight=0, minLeafWeight=totalGlobalWeight;
         struct ITI::rectangle maxRect, minRect;
         
         for(int l=0; l<allLeaves.size(); l++){
@@ -318,14 +322,17 @@ int main(int argc, char** argv) {
         }
         
         //ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut( graph, multiSectionPartition);
-        //ValueType imbalance = ITI::ParcoRepart<IndexType, ValueType>::computeImbalance( multiSectionPartition, k);
+        
+        std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
         
         scai::lama::CSRSparseMatrix<ValueType> blockGraph = ITI::MultiSection<IndexType, ValueType>::getBlockGraphFromTree_local(root);
         
         IndexType maxComm = ITI::GraphUtils::getGraphMaxDegree<IndexType, ValueType>( blockGraph);
         IndexType totalComm = blockGraph.getNumValues()/2;
-        ValueType imbalance = (maxLeafWeight - optWeight)/optWeight;
+        ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( multiSectionPartition, k, nodeWeights);
 
+        std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
+        
         if(comm->getRank()==0){
             if( settings.bisect==1 ){
                 logF << "--  Initial bisection, total time: " << partitionTime.count() << std::endl;
@@ -338,12 +345,32 @@ int main(int argc, char** argv) {
             std::cout << "\t imbalance= "<< imbalance << " , maxComm= "<< maxComm << " , totalComm= " << totalComm <<"\033[0m";
             std::cout << std::endl  << std::endl  << std::endl;
         }
-        //PRINT0("\nGot rectangles in time: " << partitionTime.count() << " - imbalance is " << maxLeafWeight/optWeight -1);
+      
         /*
         i f(*dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"multisectPart");
             }
-            */        
+        */        
+        
+        // Reporting output to std::cout
+        ValueType inputT = ValueType ( comm->max(inputTime.count() ));
+        ValueType partT = ValueType (comm->max(partitionTime.count()));
+        ValueType repT = ValueType (comm->max(reportTime.count()));
+        
+        if (comm->getRank() == 0) {
+            for (IndexType i = 0; i < argc; i++) {
+                std::cout << std::string(argv[i]) << " ";
+            }
+            std::cout << std::endl;
+            std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
+            std::cout<< " nodes:"<< N<< " dimensions:"<< settings.dimensions <<" k:" << settings.numBlocks;
+            std::cout<< " epsilon:" << settings.epsilon << " minBorderNodes:"<< settings.minBorderNodes;
+            std::cout<< " minGainForNextRound:" << settings.minGainForNextRound;
+            std::cout<< " stopAfterNoGainRounds:"<< settings.stopAfterNoGainRounds << std::endl;
+            
+            std::cout<<" imbalance:"<< imbalance << std::endl;
+            std::cout<<"inputTime:" << inputT << " partitionTime:" << partT <<" reportTime:"<< repT << std::endl;
+        }
 
         return 0;
 }

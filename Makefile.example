@@ -8,6 +8,7 @@ OBJ_GRAPH_GEN=  $(OBJ_COMMON) graphGeneratorFromQuad.o
 OBJ_CONVERTER = quadTreeConverter.o FileIO.o
 OBJ_DIFFUSIONCOORDS = FileIO.o Diffusion.o diffusionCoords.o
 OBJ_TEST_INITIAL= testInitial.o ParcoRepart.o MultiLevel.o LocalRefinement.o HilbertCurve.o SpectralPartition.o MultiSection.o MeshGenerator.o FileIO.o PrioQueueForInts.o KMeans.o Diffusion.o
+OBJ_WEAKSCALING= testWeakScaling.o MultiSection.o ParcoRepart.o MeshGenerator.o MultiLevel.o LocalRefinement.o HilbertCurve.o SpectralPartition.o KMeans.o Diffusion.o GraphUtils.o
 
 EXECUTABLE_GOOGLETEST=KatanomiTest
 EXECUTABLE_MAIN=Katanomi
@@ -15,6 +16,7 @@ EXECUTABLE_GRAPH_GEN= graphGen
 EXECUTABLE_CONVERTER= converter
 EXECUTABLE_DIFFUSIONCOORDS=diffCoords
 EXECUTABLE_INITIAL= initTest
+EXECUTABLE_WEAKSCALING= weakScaling
 
 GIT_COMMIT=$(shell git rev-parse --short HEAD)
 SCAI_INCLUDE=
@@ -29,7 +31,7 @@ MPI_LIB=/usr/lib/openmpi/lib/
 LFLAGS= -Wl,-rpath=$(SCAI_LIB) -L$(SCAI_LIB) -L$(GTEST_LIB) -L$(QUICKSORT_LIB) -L$(MPI_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lscai_sparsekernel -lscai_solver -lboost_program_options -lboost_filesystem -lboost_system -lquicksort -lparmetis -lmetis
 CCFLAGS= --openmp --std=c++11 -g -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -I$(QUICKSORT_INCLUDE) -I$(MPI_INCLUDE) -DSCAI_TRACE_ON  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR -DBUILD_COMMIT=$(GIT_COMMIT)
 
-all: main tests metisWrapper lib converter diffusionCoords graphGen testInitial
+all: main tests metisWrapper lib converter diffusionCoords graphGen testInitial weakScaling
 .PHONY: all
 
 tests: $(OBJ_GOOGLETEST)
@@ -52,6 +54,9 @@ converter: $(OBJ_CONVERTER)
 
 diffusionCoords: $(OBJ_DIFFUSIONCOORDS)
 	$(CC) $(CCFLAGS) $(OBJ_DIFFUSIONCOORDS) -o $(EXECUTABLE_DIFFUSIONCOORDS) $(LFLAGS)
+	
+weakScaling: $(OBJ_WEAKSCALING)
+	$(CC) $(CCFLAGS) $(OBJ_WEAKSCALING) -o $(EXECUTABLE_WEAKSCALING) $(LFLAGS)	
 
 lib: $(OBJ_COMMON)
 	ar rcs libparcorepart.a $(OBJ_COMMON)

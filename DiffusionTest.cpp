@@ -71,7 +71,7 @@ TEST_F(DiffusionTest, testPotentials) {
 
 	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(graph);
 
-	DenseVector<IndexType> nodeWeights(L.getRowDistributionPtr(),1);
+	DenseVector<ValueType> nodeWeights(L.getRowDistributionPtr(),1);
 	DenseVector<ValueType> potentials = Diffusion<IndexType, ValueType>::potentialsFromSource(L, nodeWeights, 0);
 	ASSERT_EQ(n, potentials.size());
 	ASSERT_LT(potentials.sum().Scalar::getValue<ValueType>(), 0.000001);
@@ -90,7 +90,7 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 	EXPECT_EQ(L.getRowDistribution(), graph.getRowDistribution());
 
 
-	DenseVector<IndexType> nodeWeights(L.getRowDistributionPtr(),1);
+	DenseVector<ValueType> nodeWeights(L.getRowDistributionPtr(),1);
 
 	std::vector<IndexType> nodeIndices(n);
 	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);

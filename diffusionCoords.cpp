@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
 
 	CSRSparseMatrix<ValueType> L = ITI::Diffusion<IndexType, ValueType>::constructLaplacian(graph);
 
-	DenseVector<IndexType> nodeWeights(n,1);
+	DenseVector<ValueType> nodeWeights(n,1.0);
 
 	std::vector<IndexType> nodeIndices(n);
 	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
