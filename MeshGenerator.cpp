@@ -327,7 +327,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(CSRSparseM
         
         (*localCoords[0])[i] = indX*offset[0];
         (*localCoords[1])[i] = indY*offset[1];
-        PRINT( *comm << ": "<< (*localCoords[0])[i] << "_ "<< (*localCoords[1])[i] );
+        //PRINT( *comm << ": "<< (*localCoords[0])[i] << "_ "<< (*localCoords[1])[i] );
 
         ++indY;
         

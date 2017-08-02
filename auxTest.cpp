@@ -46,7 +46,7 @@ class auxTest : public ::testing::Test {
 
 TEST_F (auxTest, testMultiLevelStep_dist) {
 
-    const IndexType N = 120;
+    const IndexType N = 200;
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -104,7 +104,7 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
         // set random coordinates
     	scai::hmemo::WriteOnlyAccess<ValueType> wCoords(coords[i].getLocalValues());
         for(IndexType j=0; j<localN; j++){
-            wCoords[i] = rand()%k;
+            wCoords[i] = rand()%100;      
         }
         wCoords.release();
         coords[i].redistribute( distPtr );
