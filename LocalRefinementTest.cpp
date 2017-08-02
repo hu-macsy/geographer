@@ -40,7 +40,7 @@ class LocalRefinementTest : public ::testing::Test {
 TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType k = comm->getSize();
-	const ValueType epsilon = 0.05;
+	const ValueType epsilon = 0.1;
 	const IndexType iterations = 1;
 
 	srand(time(NULL));

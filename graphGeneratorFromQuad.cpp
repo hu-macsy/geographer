@@ -20,8 +20,6 @@
 #include <iostream>
 #include <chrono>
 
-//#include "ParcoRepart.h"
-//#include "HilbertCurve.h"
 #include "MeshGenerator.h"
 #include "Settings.h"
 #include "FileIO.h"

@@ -9,6 +9,7 @@
 #include <cmath>
 #include <assert.h>
 #include <algorithm>
+#include <numeric>
 
 #include <scai/dmemo/NoDistribution.hpp>
 
