@@ -284,13 +284,13 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 		std::getline(ss, item, ' ');
 		globalM = std::stoi(item);
 
-		bool readWeightInfo = std::getline(ss, item, ' ').good();
+		bool readWeightInfo = !std::getline(ss, item, ' ').fail();
 		if (readWeightInfo && item.size() > 0) {
 			//three bits, describing presence of edge weights, vertex weights and vertex sizes
 			int bitmask = std::stoi(item);
 			hasEdgeWeights = bitmask % 10;
 			if ((bitmask / 10) % 10) {
-				bool readNodeWeightCount = std::getline(ss, item, ' ').good();
+				bool readNodeWeightCount = !std::getline(ss, item, ' ').fail();
 				if (readNodeWeightCount && item.size() > 0) {
 					numberNodeWeights = std::stoi(item);
 				} else {
@@ -344,7 +344,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
     //now read in local edges
     for (IndexType i = 0; i < localN; i++) {
-    	bool read = std::getline(file, line).good();
+    	bool read = !std::getline(file, line).fail();
     	//remove leading and trailing whitespace, since these can confuse the string splitter
     	boost::algorithm::trim(line);
     	assert(read);//if we have read past the end of the file, the node count was incorrect
@@ -354,7 +354,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         std::vector<IndexType> weights;
 
         for (IndexType j = 0; j < numberNodeWeights; j++) {
-        	bool readWeight = std::getline(ss, item, ' ').good();
+        	bool readWeight = !std::getline(ss, item, ' ').fail();
         	if (readWeight && item.size() > 0) {
         		nodeWeightStorage[j][i] = std::stoi(item);
         	} else {
@@ -362,7 +362,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         	}
         }
 
-        while (std::getline(ss, item, ' ').good()) {
+        while (!std::getline(ss, item, ' ').fail()) {
         	if (item.size() == 0) {
         		//probably some whitespace at end of line
         		continue;
@@ -373,7 +373,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         	}
 
         	if (hasEdgeWeights) {
-        		bool readEdgeWeight = std::getline(ss, item, ' ').good();
+        		bool readEdgeWeight = !std::getline(ss, item, ' ').fail();
         		if (!readEdgeWeight) {
         			throw std::runtime_error("Edge weight for " + std::to_string(neighbor) + " not found in line " + std::to_string(beginLocalRange + i) + ".");
         		}
@@ -436,14 +436,14 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 		throw std::runtime_error("Could not open file "+ filename + ".");
 
 	std::string line;
-	bool read = std::getline(file, line).good();
+	bool read = !std::getline(file, line).fail();
 	if (!read) {
 		throw std::runtime_error("Could not read first line of " + filename + ".");
 	}
 
 	std::stringstream ss( line );
 	std::string item;
-	bool readLine = std::getline(ss, item, ' ').good();
+	bool readLine = !std::getline(ss, item, ' ').fail();
 	if (!readLine or item.size() == 0) {
 		throw std::runtime_error("Unexpected end of first line.");
 	}
@@ -474,7 +474,7 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 
 	//read local range
 	for (IndexType i = 0; i < localN; i++) {
-		bool read = std::getline(file, line).good();
+		bool read = !std::getline(file, line).fail();
 		if (!read) {
 			throw std::runtime_error("Unexpected end of coordinate file. Was the number of nodes correct?");
 		}
@@ -482,7 +482,7 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 		std::string item;
 
 		//first column contains index
-		bool readIndex = std::getline(ss, item, ' ').good();
+		bool readIndex = !std::getline(ss, item, ' ').fail();
 		if (!readIndex or item.size() == 0) {
 			throw std::runtime_error("Could not read first element of line " + std::to_string(i+1));
 		}
@@ -495,7 +495,7 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 		//remaining columns contain coordinates
 		IndexType dim = 0;
 		while (dim < dimension) {
-			bool read = std::getline(ss, item, ' ').good();
+			bool read = !std::getline(ss, item, ' ').fail();
 			if (!read or item.size() == 0) {
 				throw std::runtime_error("Unexpected end of line. Was the number of dimensions correct?");
 			}
@@ -562,7 +562,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 
     //read local range
     for (IndexType i = 0; i < localN; i++) {
-		bool read = std::getline(file, line).good();
+		bool read = !std::getline(file, line).fail();
 		if (!read) {
 			throw std::runtime_error("Unexpected end of coordinate file. Was the number of nodes correct?");
 		}
@@ -652,7 +652,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsMatr
     
     //read local range
     for (IndexType i = 0; i < localNMM; i++) {
-		bool read = std::getline(file, line).good();  
+		bool read = !std::getline(file, line).fail();
 		
                 if (!read and i!=localNMM-1 ) {
 			throw std::runtime_error("In FileIO.cpp, line " + std::to_string(__LINE__) +"Unexpected end of coordinate file. Was the number of nodes correct?");
@@ -710,7 +710,7 @@ DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::st
 
 	std::vector<IndexType> part;
 	std::string line;
-	while (std::getline(file, line).good()) {
+	while (!std::getline(file, line).fail()) {
 		part.push_back(std::stoi(line));
 	}
 
@@ -753,7 +753,7 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
     IndexType duplicateNeighbors = 0;
 
     std::string line;
-    while (std::getline(file, line).good()) {
+    while (!std::getline(file, line).fail()) {
     	std::vector<ValueType> values;
     	std::stringstream ss( line );
 		std::string item;
@@ -767,7 +767,7 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
 
 		IndexType i = 0;
 
-		while (std::getline(ss, item, ' ').good()) {
+		while (!std::getline(ss, item, ' ').fail()) {
 			if (item.size() == 0) {
 				continue;
 			}
