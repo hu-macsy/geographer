@@ -68,7 +68,9 @@ namespace ITI {
                 /** Creates the adjacency matrix and the coordinate vector for a 3D mesh in a distributed way.
                  */
                 static void createStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
-
+                
+                static void createStructured2DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
+                
                 static void createRandomStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
                 
                 /*Creates points in a cube of side maxCoord in dimensions and adds them in a quad tree.

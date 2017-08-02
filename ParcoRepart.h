@@ -58,42 +58,6 @@ namespace ITI {
 			 */
 			static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
 
-			/**Returns the processor graph. Every processor traverses its local part of adjM: and for every
-			 * edge (u,v) that one node, say u, is not local it gets the owner processor of u. The returned graph is distributed with a BLOCK distribution.
-			 *
-			 * @param[in] adjM The adjacency matrix of the input graph.
-			 * @return A [#PE x #PE] adjacency matrix of the processor graph.
-			 */
-			static scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueType> &adjM);
-
-			/** Returns the edges of the block graph only for the local part. Eg. if blocks 1 and 2 are local
-			 * in this processor it finds the edge (1,2) ( and the edge (2,1)).
-			 * Also if the other endpoint is in another processor it finds this edge: block 1 is local, it
-			 * shares an edge with block 3 that is not local, this edge is found and returned.
-			 *
-			 * @param[in] adjM The adjacency matrix of the input graph.
-			 * @param[in] part The partition of the input graph.
-			 *
-			 * @return A 2 dimensional vector with the edges of the local parts of the block graph:
-			 * edge (u,v) is (ret[0][i], ret[1][i]) if block u and block v are connected.
-			*/
-			static std::vector<std::vector<IndexType> > getLocalBlockGraphEdges( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
-			
-			/** Builds the block graph of the given partition.
-			 * Creates an HArray that is passed around in numPEs (=comm->getSize()) rounds and every time
-			 * a processor writes in the array its part.
-			 *
-			 * Not distributed.
-			 *
-			 * @param[in] adjM The adjacency matric of the input graph.
-			 * @param[in] part The partition of the input garph.
-			 * @param[in] k Number of blocks.
-			 *
-			 * @return The "adjacency matrix" of the block graph. In this version is a 1-dimensional array
-			 * with size k*k and [i,j]= i*k+j.
-			 */
-			static scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const int k);
-
 			/** Colors the edges of the graph using max_vertex_degree + 1 colors.
 			 *
 			 * @param[in] adjM The graph with N vertices given as an NxN adjacency matrix.

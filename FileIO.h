@@ -10,6 +10,7 @@
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/CSRSparseMatrix.hpp>
 #include <scai/lama/DenseVector.hpp>
+#include <scai/lama/io/MatrixMarketIO.hpp>
 
 #include "quadtree/QuadTreeCartesianEuclid.h"
 
@@ -120,7 +121,12 @@ private:
 	/**
 	 * given the central coordinates of a cell and its level, compute the bounding corners
 	 */
-	static std::pair<std::vector<ValueType>, std::vector<ValueType>> getBoundingCoords(std::vector<ValueType> centralCoords, IndexType level);
+	static std::pair<std::vector<ValueType>, std::vector<ValueType>> getBoundingCoords(std::vector<ValueType> centralCoords, 
+        IndexType level);
+        
+        /*Reads a graph in Matrix Market format
+        */
+        static scai::lama::CSRSparseMatrix<ValueType> readGraphMatrixMarket(const std::string filename);
         
         /** Reads the coordinates for the MatrixMarket file format.
          */

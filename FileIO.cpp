@@ -13,6 +13,7 @@
 #include <scai/lama/Scalar.hpp>
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/common/Math.hpp>
+#include <scai/common/Settings.hpp>
 #include <scai/lama/storage/MatrixStorage.hpp>
 #include <scai/tracing.hpp>
 
@@ -253,6 +254,10 @@ template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, std::vector<DenseVector<IndexType>>& nodeWeights, Format format) {
 	SCAI_REGION("FileIO.readGraph");
 
+	if(format == Format::MATRIXMARKET){
+            return FileIO<IndexType, ValueType>::readGraphMatrixMarket(filename);
+        }
+        
 	if (!(format == Format::METIS or format == Format::AUTO)) {
 		throw std::logic_error("Format not yet implemented.");
 	}
@@ -426,7 +431,56 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
     return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
 }
+//-------------------------------------------------------------------------------------------------
 
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphMatrixMarket(const std::string filename){
+    SCAI_REGION( "FileIO.readGraphMatrixMarket" );
+    std::ifstream file(filename);
+    
+    scai::common::Settings::putEnvironment( "SCAI_IO_TYPE_DATA", "_Pattern" );
+    
+    if(file.fail())
+        throw std::runtime_error("Could not open file "+ filename + ".");
+    
+    //skip the first lines that have comments starting with '%'
+    std::string line;
+    std::getline(file, line);
+
+    while( line[0]== '%'){
+       std::getline(file, line);
+    }
+    std::stringstream ss;
+    ss.str( line );
+   
+    IndexType numRows;
+    IndexType numColumns;
+    IndexType numValues;
+    
+    ss >> numRows>> numColumns >> numValues;
+    
+    SCAI_ASSERT( numRows==numColumns , "Number of rows should be equal to number o columns");
+
+    scai::lama::CSRSparseMatrix<ValueType> graph;
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    /*
+    IndexType numRows, numColumns, numValues;
+    scai::common::scalar::ScalarType dataType;
+    bool isVector;
+    scai::lama::MatrixMarketIO::Symmetry sym;
+    
+    scai::lama::MatrixMarketIO::readMMHeader( filename, numRows, numColumns, numValues, dataType, isVector, sym);
+    */
+    const scai::dmemo::DistributionPtr rowDist(new scai::dmemo::BlockDistribution(numRows, comm));
+    
+    graph.readFromFile( filename, rowDist );
+    
+    //unsetenv( "SCAI_IO_TYPE_DATA" );
+    return graph;
+}
+//-------------------------------------------------------------------------------------------------
+  
+    
 template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOcean(std::string filename, IndexType dimension) {
 	SCAI_REGION( "FileIO.readCoords" );
@@ -544,6 +598,15 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
 
+    if (format == Format::OCEAN) {
+        PRINT0("Reading coordinates in OCEAN format");
+        return readCoordsOcean(filename, dimension);
+    }
+    else if( format== Format::MATRIXMARKET){
+        PRINT0("Reading coordinates in MATRIXMARKET format");
+        return readCoordsMatrixMarket( filename );
+    }
+    
     IndexType beginLocalRange, endLocalRange;
     scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
     const IndexType localN = endLocalRange - beginLocalRange;
