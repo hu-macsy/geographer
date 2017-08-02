@@ -125,6 +125,14 @@ int main(int argc, char** argv) {
             std::cout << "machine char not valid" << std::endl;
         }
         
+        if( vm.count("cutsPerDim") ){
+            IndexType tmpK = 1;
+            for( const auto& i: settings.cutsPerDim){
+                tmpK *= i;
+            }
+            settings.numBlocks= tmpK;
+        }
+        
         const IndexType initialPartition = settings.initialPartition;
         const IndexType dim = settings.dimensions;
         const IndexType k = settings.numBlocks;
@@ -163,20 +171,6 @@ int main(int argc, char** argv) {
         scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
         scai::lama::CSRSparseMatrix<ValueType> graph( rowDistPtr, noDistPtr);     // the adjacency matrix of the graph
-        /*
-        {
-            std::vector<DenseVector<ValueType>> coords(2);
-            for(IndexType i=0; i<2; i++){ 
-                coords[i].allocate( rowDistPtr );
-                coords[i] = static_cast<ValueType>( 0 );
-            }
-            std::vector<IndexType> tmpPoints( maxCoords.size() );
-            for(int i=0; i<maxCoords.size(); i++){
-                tmpPoints[i] = (IndexType) maxCoords[i];
-            }
-            ITI::MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(graph, coords, maxCoords, tmpPoints );
-        }
-        */
         
         PRINT0("\"Created\" local part of graph. (for MultiSection the adjacency graph is not needed and it is empty)");
         
@@ -185,7 +179,7 @@ int main(int argc, char** argv) {
         //
         scai::lama::DenseVector<ValueType> nodeWeights;                 // node weights
         
-        std::uniform_real_distribution<ValueType> dist(1.0, 3.0);
+        std::uniform_real_distribution<ValueType> dist(1.0, 5.0);
         auto gen = std::bind(dist, mersenne_engine);
         
         std::vector<ValueType> tmpLocalWeights(localN);
@@ -196,14 +190,13 @@ int main(int argc, char** argv) {
         nodeWeights.swap( tmpWeights, rowDistPtr);
         
         ValueType totalLocalWeight = std::accumulate( tmpLocalWeights.begin(), tmpLocalWeights.end(), 0.0);
-        ValueType totalGlobalWeight = comm->sum(totalLocalWeight);
+        long long totalGlobalWeight = comm->sum(totalLocalWeight);
         
         PRINT0("Created local part of weights, totalGlobalWeight= " << totalGlobalWeight);
         
         //
         // create random local coordinates   
         //
-        // overwrite coordinates created by MeshGenerator
         
         std::vector< std::vector<IndexType> > localPoints( localN, std::vector<IndexType>(dim,0) );
         
@@ -285,7 +278,7 @@ int main(int argc, char** argv) {
         std::shared_ptr<ITI::rectCell<IndexType, ValueType>> thisLeaf;
         ValueType thisLeafWeight;
         
-        ValueType totalLeafWeight=0, maxLeafWeight=0, minLeafWeight=totalGlobalWeight;
+        long long totalLeafWeight=0, maxLeafWeight=0, minLeafWeight=totalGlobalWeight;
         struct ITI::rectangle maxRect, minRect;
         
         for(int l=0; l<allLeaves.size(); l++){
