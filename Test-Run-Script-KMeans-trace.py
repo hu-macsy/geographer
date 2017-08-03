@@ -37,7 +37,7 @@ for i in range(iterations):
             others += " --dimensions 2"
             commandString = assembleCommandString("parco", filename, p, others)
             
-            tracingSetup = ["export SCAI_TRACE=time","export PREFIX=$MOAB_JOBID"]
+            tracingSetup = ["export SCAI_TRACE=time:PREFIX=$MOAB_JOBID"]
             submitfile = createMOABSubmitFile("msub-"+str(p)+"-"+str(i)+".cmd", commandString, "00:25:00", p, "4000mb", tracingSetup)
             call(["msub", submitfile])
 

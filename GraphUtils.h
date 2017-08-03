@@ -123,6 +123,19 @@ IndexType computeTotalComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, 
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM);
 
+//taken from https://stackoverflow.com/a/9345144/494085
+template<class BidiIter >
+static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_random) {
+    size_t left = std::distance(begin, end);
+    for (IndexType i = 0; i < num_random; i++) {
+        BidiIter r = begin;
+        std::advance(r, rand()%left);
+        std::swap(*begin, *r);
+        ++begin;
+        --left;
+    }
+    return begin;
+}
 
 } /*namespace GraphUtils*/
 

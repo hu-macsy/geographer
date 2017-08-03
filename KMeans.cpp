@@ -9,7 +9,6 @@
 #include <cmath>
 #include <assert.h>
 #include <algorithm>
-#include <numeric>
 
 #include <scai/dmemo/NoDistribution.hpp>
 
@@ -58,11 +57,13 @@ std::vector<std::vector<ValueType> > findInitialCenters(
 	return result;
 }
 
-template<typename IndexType, typename ValueType>
+template<typename IndexType, typename ValueType, typename Iterator>
 std::vector<std::vector<ValueType> > findCenters(
 		const std::vector<DenseVector<ValueType> >& coordinates,
 		const DenseVector<IndexType>& partition,
 		const IndexType k,
+		const Iterator firstIndex,
+		const Iterator lastIndex,
 		const DenseVector<ValueType>& nodeWeights) {
 	SCAI_REGION( "KMeans.findCenters" );
 
@@ -81,7 +82,8 @@ std::vector<std::vector<ValueType> > findCenters(
 	scai::hmemo::ReadAccess<IndexType> rPartition(partition.getLocalValues());
 
 	//compute weight sums
-	for (IndexType i = 0; i < localN; i++) {
+	for (Iterator it = firstIndex; it != lastIndex; it++) {
+		const IndexType i = *it;
 		const IndexType part = rPartition[i];
 		const IndexType weight = rWeights[i];
 		weightSum[part] += weight;
@@ -92,7 +94,8 @@ std::vector<std::vector<ValueType> > findCenters(
 		result[d].resize(k);
 		scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
 
-		for (IndexType i = 0; i < localN; i++) {
+		for (Iterator it = firstIndex; it != lastIndex; it++) {
+			const IndexType i = *it;
 			const IndexType part = rPartition[i];
 			const IndexType weight = rWeights[i];
 			result[d][part] += rCoords[i]*rWeights[i] / weightSum[part];//this is more expensive than summing first and dividing later, but avoids overflows
@@ -173,10 +176,12 @@ DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType> >& 
 //	std::vector<ValueType> upperBoundToOwnCenter(localN);
 //std::vector<ValueType> lowerBoundToNextCenter(localN, 0);
 
-template<typename IndexType, typename ValueType>
+template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(
 		const std::vector<std::vector<ValueType> >& coordinates,
 		const std::vector<std::vector<ValueType> >& centers,
+		const Iterator firstIndex,
+		const Iterator lastIndex,
 		const DenseVector<ValueType> &nodeWeights,
 		const DenseVector<IndexType> &previousAssignment,
 		const std::vector<IndexType> &targetBlockSizes,
@@ -184,7 +189,6 @@ DenseVector<IndexType> assignBlocks(
 		const ValueType epsilon,
 		std::vector<ValueType> &upperBoundOwnCenter,
 		std::vector<ValueType> &lowerBoundNextCenter,
-		std::vector<ValueType> &upperBoundNextCenter,
 		std::vector<ValueType> &influence) {
 	SCAI_REGION( "KMeans.assignBlocks" );
 
@@ -192,12 +196,9 @@ DenseVector<IndexType> assignBlocks(
 	const scai::dmemo::DistributionPtr dist = nodeWeights.getDistributionPtr();
 	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 	const IndexType localN = nodeWeights.getLocalValues().size();
-	const ValueType totalWeightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
 	const IndexType k = targetBlockSizes.size();
 
 	const IndexType maxIter = 20;
-
-	const IndexType optSize = std::ceil(totalWeightSum / k );
 
 	assert(influence.size() == k);
 
@@ -212,7 +213,7 @@ DenseVector<IndexType> assignBlocks(
 		for (IndexType j = 0; j < k; j++) {
 			std::vector<ValueType> center(dim);
 			//TODO: this conversion into points is annoying. Maybe change coordinate format and use n in the outer dimension and d in the inner?
-			//Can even use points as data structure.
+			//Can even use points as data structure. Update: Tried it, gave no performance benefit.
 			for (IndexType d = 0; d < dim; d++) {
 				center[d] = centers[d][j];
 			}
@@ -247,9 +248,19 @@ DenseVector<IndexType> assignBlocks(
 				ValueType weightedDist = sqDist * influence[j]*influence[l] / (influence[j]+influence[l]+2*std::sqrt(influence[j]*influence[l]));
 				if (weightedDist < distThreshold[j]) distThreshold[j] = weightedDist;
 			}
-
 		}
 	}
+
+	ValueType localSampleWeightSum = 0;
+	{
+		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
+
+		for (Iterator it = firstIndex; it != lastIndex; it++) {
+			localSampleWeightSum += rWeights[*it];
+		}
+	}
+	const ValueType totalWeightSum = comm->sum(localSampleWeightSum);
+	const IndexType optSize = std::ceil(totalWeightSum / k );
 
 	ValueType imbalance;
 	IndexType iter = 0;
@@ -263,7 +274,8 @@ DenseVector<IndexType> assignBlocks(
 		scai::hmemo::WriteAccess<IndexType> wAssignment(assignment.getLocalValues());
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.assign" );
-			for (IndexType i = 0; i < localN; i++) {
+			for (Iterator it = firstIndex; it != lastIndex; it++) {
+				const IndexType i = *it;
 				const IndexType oldCluster = wAssignment[i];
 				if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i] || upperBoundOwnCenter[i] < distThreshold[oldCluster]) {
 					//std::cout << upperBoundOwnCenter[i] << " " << lowerBoundNextCenter[i] << " " << distThreshold[oldCluster] << std::endl;
@@ -354,10 +366,14 @@ DenseVector<IndexType> assignBlocks(
 		}
 
 		//update bounds
-		for (IndexType i = 0; i < localN; i++) {
-			const IndexType cluster = wAssignment[i];
-			upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]) + 1e-12;
-			lowerBoundNextCenter[i] *= minRatio - 1e-12;
+		{
+			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.updateBounds" );
+			for (Iterator it = firstIndex; it != lastIndex; it++) {
+				const IndexType i = *it;
+				const IndexType cluster = wAssignment[i];
+				upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]) + 1e-12;
+				lowerBoundNextCenter[i] *= minRatio - 1e-12;
+			}
 		}
 
 		//update possible closest centers
@@ -422,11 +438,12 @@ ValueType biggestDelta(const std::vector<std::vector<ValueType>> &firstCoords, c
 
 template double biggestDelta(const std::vector<std::vector<double>> &firstCoords, const std::vector<std::vector<double>> &secondCoords);
 template std::vector<std::vector<double> > findInitialCenters(const std::vector<DenseVector<double>> &coordinates, int k, const DenseVector<double> &nodeWeights);
-template std::vector<std::vector<double> > findCenters(const std::vector<DenseVector<double>> &coordinates, const DenseVector<int> &partition, const int k, const DenseVector<double> &nodeWeights);
+template std::vector<std::vector<double> > findCenters(const std::vector<DenseVector<double>> &coordinates, const DenseVector<int> &partition, const int k,
+		std::vector<int>::iterator firstIndex, std::vector<int>::iterator lastIndex, const DenseVector<double> &nodeWeights);
 template DenseVector<int> assignBlocks(const std::vector<std::vector<double>> &coordinates, const std::vector<std::vector<double> > &centers,
+		std::vector<int>::iterator firstIndex, std::vector<int>::iterator lastIndex,
 		const DenseVector<double> &nodeWeights, const DenseVector<int> &previousAssignment, const std::vector<int> &blockSizes, const SpatialCell &boundingBox,
-		const double epsilon, std::vector<double> &upperBoundOwnCenter, std::vector<double> &lowerBoundNextCenter, std::vector<double> &upperBoundNextCenter,
-		std::vector<double> &influence);
+		const double epsilon, std::vector<double> &upperBoundOwnCenter, std::vector<double> &lowerBoundNextCenter, std::vector<double> &influence);
 template DenseVector<int> assignBlocks(const std::vector<DenseVector<double> >& coordinates, const std::vector<std::vector<double> >& centers);
 
 }
