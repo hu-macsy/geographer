@@ -23,7 +23,7 @@ struct Settings{
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
     IndexType pixeledSideLen = 10;
-    IndexType fileFormat = 1;   // 0 for METSI, 1 for MatrixMarket
+    IndexType fileFormat = 1;   // 0 for METIS, 1 for MatrixMarket
     IndexType initialPartition = 0;
     bool bisect = 0;    // 0: works for square k, 1: bisect, for k=power of 2, 2: user defined cutsPerDim
     bool useDiffusionTieBreaking = false;

@@ -94,7 +94,9 @@ TEST_F(KMeansTest, testFindCenters) {
 	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
 
 	//get centers
-	std::vector<std::vector<ValueType> > centers = KMeans::findCenters(coords, part, k,	uniformWeights);
+	std::vector<IndexType> nodeIndices(uniformWeights.getLocalValues().size());
+	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
+	std::vector<std::vector<ValueType> > centers = KMeans::findCenters(coords, part, k,	nodeIndices.begin(), nodeIndices.end(), uniformWeights);
 
 	//check for size
 	EXPECT_EQ(dimensions, centers.size());
@@ -104,7 +106,7 @@ TEST_F(KMeansTest, testFindCenters) {
 	part = DenseVector<IndexType>(dist, 0);
 
 	//get centers
-	centers = KMeans::findCenters(coords, part, k,	uniformWeights);
+	centers = KMeans::findCenters(coords, part, k, nodeIndices.begin(), nodeIndices.end(), uniformWeights);
 }
 
 }

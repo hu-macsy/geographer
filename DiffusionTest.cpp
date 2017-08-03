@@ -101,7 +101,7 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 	comm->bcast( seed, 1, 0 );
 	srand(seed[0]);
 
-	Diffusion<IndexType, ValueType>::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), numLandmarks);
+	GraphUtils::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), numLandmarks);
 
 	std::vector<IndexType> landmarks(numLandmarks);
 	std::copy(nodeIndices.begin(), nodeIndices.begin()+numLandmarks, landmarks.begin());
