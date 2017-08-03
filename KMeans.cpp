@@ -248,7 +248,6 @@ DenseVector<IndexType> assignBlocks(
 				ValueType weightedDist = sqDist * influence[j]*influence[l] / (influence[j]+influence[l]+2*std::sqrt(influence[j]*influence[l]));
 				if (weightedDist < distThreshold[j]) distThreshold[j] = weightedDist;
 			}
-
 		}
 	}
 

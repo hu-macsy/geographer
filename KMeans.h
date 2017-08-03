@@ -56,9 +56,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	SCAI_REGION( "KMeans.computePartition" );
 
 	std::vector<std::vector<ValueType> > centers = findInitialCenters(coordinates, k, nodeWeights);
-	DenseVector<IndexType> result;
 	std::vector<ValueType> influence(k,1);
 	const IndexType dim = coordinates.size();
+	assert(dim > 0);
 	const IndexType localN = nodeWeights.getLocalValues().size();
 	assert(nodeWeights.getLocalValues().size() == coordinates[0].getLocalValues().size());
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -82,7 +82,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	for (auto coord : maxCoords) std::cout << coord << " ";
 	std::cout << ")" << std::endl;
 
-	result = assignBlocks<IndexType, ValueType>(coordinates, centers);
+	DenseVector<IndexType> result(coordinates[0].getDistributionPtr(), 0);
 	std::vector<ValueType> upperBoundOwnCenter(localN, std::numeric_limits<ValueType>::max());
 	std::vector<ValueType> lowerBoundNextCenter(localN, 0);
 
