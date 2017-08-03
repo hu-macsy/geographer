@@ -38,7 +38,7 @@ DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &c
 		const DenseVector<IndexType> &nodeWeights, const DenseVector<IndexType> &previousAssignment,
 		const std::vector<IndexType> &blockSizes,  const SpatialCell &boundingBox, const ValueType epsilon,
 		std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter,
-		std::vector<ValueType> &upperBoundNextCenter, std::vector<ValueType> &influence);
+		std::vector<ValueType> &influence);
 
 template<typename ValueType>
 ValueType biggestDelta(const std::vector<std::vector<ValueType>> &firstCoords, const std::vector<std::vector<ValueType>> &secondCoords);
@@ -46,8 +46,6 @@ ValueType biggestDelta(const std::vector<std::vector<ValueType>> &firstCoords, c
 /**
  * Implementations
  */
-
-
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<IndexType> &nodeWeights,
 		const std::vector<IndexType> &blockSizes, const ValueType epsilon) {
@@ -83,13 +81,12 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	result = assignBlocks<IndexType, ValueType>(coordinates, centers);
 	std::vector<ValueType> upperBoundOwnCenter(localN, std::numeric_limits<ValueType>::max());
 	std::vector<ValueType> lowerBoundNextCenter(localN, 0);
-	std::vector<ValueType> upperBoundNextCenter(localN, std::numeric_limits<ValueType>::max());
 
 	IndexType i = 0;
 	ValueType delta = 0;
 	ValueType threshold = 2;
 	do {
-		result = assignBlocks(convertedCoords, centers, nodeWeights, result, blockSizes, boundingBox, epsilon, upperBoundOwnCenter, lowerBoundNextCenter, upperBoundNextCenter, influence);
+		result = assignBlocks(convertedCoords, centers, nodeWeights, result, blockSizes, boundingBox, epsilon, upperBoundOwnCenter, lowerBoundNextCenter, influence);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
 		std::vector<std::vector<ValueType> > newCenters = findCenters(coordinates, result, k, nodeWeights);
@@ -98,7 +95,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		for (IndexType j = 0; j < k; j++) {
 			for (int d = 0; d < dim; d++) {
 				ValueType diff = (centers[d][j] - newCenters[d][j]);
-				squaredDeltas[j] +=  diff*diff;
+				squaredDeltas[j] += diff*diff;
 			}
 			deltas[j] = std::sqrt(squaredDeltas[j]);
 		}

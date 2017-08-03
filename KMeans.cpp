@@ -184,7 +184,6 @@ DenseVector<IndexType> assignBlocks(
 		const ValueType epsilon,
 		std::vector<ValueType> &upperBoundOwnCenter,
 		std::vector<ValueType> &lowerBoundNextCenter,
-		std::vector<ValueType> &upperBoundNextCenter,
 		std::vector<ValueType> &influence) {
 	SCAI_REGION( "KMeans.assignBlocks" );
 
@@ -212,7 +211,7 @@ DenseVector<IndexType> assignBlocks(
 		for (IndexType j = 0; j < k; j++) {
 			std::vector<ValueType> center(dim);
 			//TODO: this conversion into points is annoying. Maybe change coordinate format and use n in the outer dimension and d in the inner?
-			//Can even use points as data structure.
+			//Can even use points as data structure. Update: Tried it, gave no performance benefit.
 			for (IndexType d = 0; d < dim; d++) {
 				center[d] = centers[d][j];
 			}
@@ -230,7 +229,7 @@ DenseVector<IndexType> assignBlocks(
 	for (IndexType i = 0; i < k; i++) {
 		IndexType c = clusterIndices[i];
 		ValueType effectiveDist = minDistance[c]*minDistance[c]*influence[c];
-		SCAI_ASSERT_EQ_ERROR(effectiveMinDistance[i] == effectiveDist);
+		assert(effectiveMinDistance[i] == effectiveDist);
 	}
 
 	std::vector<ValueType> distThreshold(k);
@@ -425,8 +424,7 @@ template std::vector<std::vector<double> > findInitialCenters(const std::vector<
 template std::vector<std::vector<double> > findCenters(const std::vector<DenseVector<double>> &coordinates, const DenseVector<int> &partition, const int k, const DenseVector<int> &nodeWeights);
 template DenseVector<int> assignBlocks(const std::vector<std::vector<double>> &coordinates, const std::vector<std::vector<double> > &centers,
 		const DenseVector<int> &nodeWeights, const DenseVector<int> &previousAssignment, const std::vector<int> &blockSizes, const SpatialCell &boundingBox,
-		const double epsilon, std::vector<double> &upperBoundOwnCenter, std::vector<double> &lowerBoundNextCenter, std::vector<double> &upperBoundNextCenter,
-		std::vector<double> &influence);
+		const double epsilon, std::vector<double> &upperBoundOwnCenter, std::vector<double> &lowerBoundNextCenter, std::vector<double> &influence);
 template DenseVector<int> assignBlocks(const std::vector<DenseVector<double> >& coordinates, const std::vector<std::vector<double> >& centers);
 
 }

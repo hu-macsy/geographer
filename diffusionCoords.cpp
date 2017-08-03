@@ -8,6 +8,7 @@
 
 #include "Diffusion.h"
 #include "FileIO.h"
+#include "GraphUtils.h"
 
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
@@ -39,7 +40,7 @@ int main(int argc, char *argv[])
 	std::vector<IndexType> nodeIndices(n);
 	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
 
-	ITI::Diffusion<IndexType, ValueType>::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), numLandmarks);
+	ITI::GraphUtils::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), numLandmarks);
 
 	std::vector<IndexType> landmarks(numLandmarks);
 	std::copy(nodeIndices.begin(), nodeIndices.begin()+numLandmarks, landmarks.begin());
