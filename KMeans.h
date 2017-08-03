@@ -109,15 +109,15 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	}
 	assert(samples[samplingRounds-1] == localN);
 
-	IndexType i = 0;
+	IndexType iter = 0;
 	ValueType delta = 0;
 	ValueType threshold = 2;
 	do {
 
-		if (i < samplingRounds) {
-			lastIndex = firstIndex + samples[i];
+		if (iter < samplingRounds) {
+			lastIndex = firstIndex + samples[iter];
 			std::sort(firstIndex, lastIndex);//sorting not really necessary, but increases locality
-			ValueType ratio = ValueType(samples[i]) / localN;
+			ValueType ratio = ValueType(samples[iter]) / localN;
 			for (IndexType j = 0; j < k; j++) {
 				adjustedBlockSizes[j] = ValueType(blockSizes[j]) * ratio;
 			}
@@ -146,7 +146,8 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 
 		{
 			SCAI_REGION( "KMeans.computePartition.updateBounds" );
-			for (IndexType i = 0; i < localN; i++) {
+			for (auto it = firstIndex; it != lastIndex; it++) {
+				const IndexType i = *it;
 				IndexType cluster = rResult[i];
 				upperBoundOwnCenter[i] += (2*deltas[cluster]*std::sqrt(upperBoundOwnCenter[i]/influence[cluster]) + squaredDeltas[cluster])*(influence[cluster] + 1e-10);
 				ValueType pureSqrt(std::sqrt(lowerBoundNextCenter[i]/maxInfluence));
@@ -164,10 +165,10 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		centers = newCenters;
 
 		if (comm->getRank() == 0) {
-			std::cout << "i: " << i << ", delta: " << delta << std::endl;
+			std::cout << "i: " << iter << ", delta: " << delta << std::endl;
 		}
-		i++;
-	} while (i < samplingRounds || (i < 50 && delta > threshold));
+		iter++;
+	} while (iter < samplingRounds || (iter < 50 && delta > threshold));
 	return result;
 }
 }

@@ -367,10 +367,14 @@ DenseVector<IndexType> assignBlocks(
 		}
 
 		//update bounds
-		for (IndexType i = 0; i < localN; i++) {
-			const IndexType cluster = wAssignment[i];
-			upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]) + 1e-12;
-			lowerBoundNextCenter[i] *= minRatio - 1e-12;
+		{
+			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.updateBounds" );
+			for (Iterator it = firstIndex; it != lastIndex; it++) {
+				const IndexType i = *it;
+				const IndexType cluster = wAssignment[i];
+				upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]) + 1e-12;
+				lowerBoundNextCenter[i] *= minRatio - 1e-12;
+			}
 		}
 
 		//update possible closest centers
