@@ -311,7 +311,7 @@ TEST_F(MultiSectionTest, test1DPartitionGreedy){
             ValueType maxOverMin = maxWeight/minWeight;
             PRINT0("max weight = "<< maxWeight << " , min weight = " << minWeight << " , max/min= " << maxOverMin);
             
-            ValueType totalWeight = std::accumulate(weightPerPart.begin(), weightPerPart.end(), 0);
+            ValueType totalWeight = std::accumulate(weightPerPart.begin(), weightPerPart.end(), 0.0);
             ValueType averageWeight = totalWeight/k;
         
             SCAI_ASSERT( totalWeight==origTotalWeight, "totalWeight= "<< totalWeight << " should be= "<< origTotalWeight );
@@ -340,8 +340,8 @@ TEST_F(MultiSectionTest, test1DPartitionOptimal){
  
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
-    const IndexType N= 50;
-    const ValueType w= 50*50;
+    const IndexType N= 500;
+    const ValueType w= 50;
     const IndexType k= 5;
     const IndexType optimalWeight = w* N/k;  // make sure N/k is int
     
@@ -371,7 +371,7 @@ for(int i=0; i<part1D.size(); i++){
     }
     PRINT(k-1 << ": from ["<< part1D.back() << " to " << N-1 << "] with weight " << weightPerPart.back() );
     
-    ValueType totalWeight = std::accumulate(weightPerPart.begin(), weightPerPart.end(), 0);
+    ValueType totalWeight = std::accumulate(weightPerPart.begin(), weightPerPart.end(), 0.0);
     ValueType averageWeight = totalWeight/k;
         
     SCAI_ASSERT( totalWeight==origTotalWeight, "totalWeight= "<< totalWeight << " should be= "<< origTotalWeight );
@@ -381,20 +381,94 @@ for(int i=0; i<part1D.size(); i++){
 }
 //---------------------------------------------------------------------------------------
 
+TEST_F(MultiSectionTest, test1DPartitionOptimalRandomWeights){
+ 
+    const IndexType N= 87;
+    const IndexType k= 13;
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+    //
+    //create random local weights
+    //
+    
+    std::random_device rnd_dvc;
+    std::mt19937 mersenne_engine(rnd_dvc());
+    std::uniform_real_distribution<ValueType> dist(10.0, 13.0);
+    auto gen = std::bind(dist, mersenne_engine);
+    
+    std::vector<ValueType> nodeWeights(N);
+    std::generate( begin(nodeWeights), end(nodeWeights), gen);
+
+    //
+//    std::vector<ValueType> nodeWeights= {10.2484 , 10.9272 , 10.5296 , 10.5115 , 10.039 , 10.1079 , 10.0137 , 10.4012 , 10.7798 , 10.8752 , 10.0367 , 10.5632 , 10.904 , 10.4084 , 10.7319 , 10.9817 , 10.3689 , 10.4523 , 10.8339};
+    //
+    
+for(int i=0; i<nodeWeights.size(); i++){
+        std::cout << nodeWeights[i] << " , ";
+}
+std::cout << std::endl;
+
+    
+    const ValueType origTotalWeight = std::accumulate( nodeWeights.begin(), nodeWeights.end(), 0.0);
+    const ValueType optimalWeight = origTotalWeight/k;
+PRINT0(origTotalWeight << " @@ " << optimalWeight);
+    
+    std::vector<ValueType> weightPerPart, weightPerPartGreedy, weightPerPartMine;
+    std::vector<IndexType> part1D, part1DGreedy, part1DMine;
+    
+    Settings settings;
+    
+    //get optimal 1D partitioning
+    std::tie( part1DGreedy, weightPerPartGreedy) = MultiSection<IndexType, ValueType>::partition1DGreedy( nodeWeights, k, settings);
+
+    std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( nodeWeights, k, settings);
+    
+    //assertions - prints
+    
+    ValueType maxWeightOpt = *std::max_element(weightPerPart.begin(), weightPerPart.end());
+    ValueType maxWeightGrd = *std::max_element(weightPerPartGreedy.begin(), weightPerPartGreedy.end());
+    
+    SCAI_ASSERT( maxWeightOpt- maxWeightGrd <0, "Greedy solution better than \"optimal\"... :( ");
+    SCAI_ASSERT_EQ_ERROR( weightPerPartGreedy.size(), k , "Return vector has wrong size");
+    SCAI_ASSERT_EQ_ERROR( part1DGreedy.size(), k , "Return vector has wrong size");
+       
+    SCAI_ASSERT_EQ_ERROR( weightPerPart.size(), k , "Return vector has wrong size");
+    SCAI_ASSERT_EQ_ERROR( part1D.size(), k , "Return vector has wrong size");
+    
+    const ValueType totalWeight = std::accumulate(weightPerPart.begin(), weightPerPart.end(), 0.0);        
+    SCAI_ASSERT( totalWeight==origTotalWeight, "totalWeight= "<< totalWeight << " should be= "<< origTotalWeight );
+    const ValueType totalWeightGreedy = std::accumulate(weightPerPartGreedy.begin(), weightPerPartGreedy.end(), 0.0);        
+    SCAI_ASSERT( totalWeightGreedy-origTotalWeight<0.000001, "totalWeight= "<< totalWeightGreedy << " should be= "<< origTotalWeight );
+    
+    SCAI_ASSERT( part1D.size()==weightPerPart.size() , "Wrong size of returned vectors: part1D.size()= " << part1D.size() << " and weightPerPart.size()= "<< weightPerPart.size());
+    
+    //PRINT("0: from [0 to" << part1D[0] <<") with weight " <<  weightPerPart[0] );
+    for(int i=0; i<part1D.size()-1; i++){
+        PRINT0( i << " OPT: ["<< part1D[i] << " to " << part1D[i+1] -1<<"] with weight " << weightPerPart[i]);
+        //PRINT0( i << " GRD: ["<< part1DGreedy[i] << " to " << part1DGreedy[i+1] -1<<"] with weight " << weightPerPartGreedy[i]);
+    }
+    PRINT(k-1 << " OPT: ["<< part1D.back() << " to " << N-1 << "] with weight " << weightPerPart.back() );
+    PRINT(k-1 << " GRD: ["<< part1DGreedy.back() << " to " << N-1 << "] with weight " << weightPerPartGreedy.back() );
+    
+    PRINT("max weight, OPT: "<<maxWeightOpt << " , GRD: " << maxWeightGrd );
+  
+}
+//---------------------------------------------------------------------------------------
+
 TEST_F(MultiSectionTest, testProbeFunction ){
     
-    const IndexType N = 540;
+    const IndexType N = 88;
     const IndexType k = 17;
     const IndexType w = 2;
     std::vector<ValueType> weights( N, w);
     
     //create the prefix sum array
     //
-    std::vector<ValueType> prefixSum( N , 0);
-    prefixSum[0] = weights[0];
+    std::vector<ValueType> prefixSum( N+1 , 0);
+    prefixSum[0] = 0;
     
-    for(IndexType i=1; i<N; i++ ){
-        prefixSum[i] = prefixSum[i-1] + weights[i]; 
+    for(IndexType i=1; i<N+1; i++ ){
+        prefixSum[i] = prefixSum[i-1] + weights[i-1]; 
     }
     
     IndexType realBottleneck = N*w/k +1;
@@ -433,8 +507,29 @@ TEST_F(MultiSectionTest, testProbeFunction ){
             //PRINT("Found partition with bottleneck " << target );
             bottleneck = target;
         }
-        
     }
+    
+    ////
+    std::vector<ValueType> nodeWeights2= {10.2484 , 10.9272 , 10.5296 , 10.5115 , 10.039 , 10.1079 , 10.0137 , 10.4012 , 10.7798 , 10.8752 , 10.0367 , 10.5632 , 10.904 , 10.4084 , 10.7319 , 10.9817 , 10.3689 , 10.4523 , 10.8339};
+    std::vector<ValueType> prefixSum2( nodeWeights2.size()+1, 0);
+    prefixSum2[0] = 0;
+    
+    for(IndexType i=1; i<=nodeWeights2.size(); i++ ){
+        prefixSum2[i] = prefixSum2[i-1] + nodeWeights2[i-1]; 
+        std::cout<< i << ": "<< prefixSum2[i] << " , " ;
+    }
+    std::cout << std::endl;
+    
+    ValueType target2 = 30.0;
+    bool existsPart = false;
+    std::vector<IndexType> splitters;
+    while( !existsPart ){
+        std::tie(existsPart,splitters) = MultiSection<IndexType, ValueType>::probeAndGetSplitters( prefixSum2, 6, target2);
+        PRINT(" -- " << target2);
+        target2 += 1.0;
+    }
+    PRINT(" ++ " << target2-1);
+    aux::printVector(splitters);
     
 }
 //---------------------------------------------------------------------------------------
@@ -723,7 +818,7 @@ TEST_F(MultiSectionTest, test1DProjection){
         const IndexType projLength = bBox.top[dim2proj[0]]-bBox.bottom[dim2proj[0]]+1;
         SCAI_ASSERT( projLength==projection.size(), "Length of projection is not correct");
         
-        ValueType projSum = std::accumulate( projection.begin(), projection.end(), 0);
+        ValueType projSum = std::accumulate( projection.begin(), projection.end(), 0.0);
         SCAI_ASSERT( bBoxVolume==projSum, "Volume of bounding box= "<< bBoxVolume<< " and should be equal to the sum of the projection which is "<< projSum );
         
         ValueType bBoxSlice = bBoxVolume/(bBox.top[dim2proj[0]]-bBox.bottom[dim2proj[0]]+1);
@@ -1204,7 +1299,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
         ValueType projectionsTotalWeight =0 ;
         
         for( int i=0; i<projections.size(); i++){
-                projectionsTotalWeight += std::accumulate( projections[i].begin(), projections[i].end(), 0 );
+                projectionsTotalWeight += std::accumulate( projections[i].begin(), projections[i].end(), 0.0 );
         }
         SCAI_ASSERT( projectionsTotalWeight==totalGridWeight , "Wrong sum of projections weights: projectionsTotalWeight= " << projectionsTotalWeight << " , totalGridWeight= " << totalGridWeight);
     
@@ -1213,9 +1308,9 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
         SCAI_ASSERT( projections[2].size()==(bBox1.top[d]-bBox1.bottom[d]+1), "Wrong size for projection 2");
         
         SCAI_ASSERT( projections.size()==3, "projections size must be 2 but it is "<< projections.size() );
-        ValueType proj0Weight = std::accumulate( projections[0].begin(), projections[0].end(), 0 );
-        ValueType proj1Weight = std::accumulate( projections[1].begin(), projections[1].end(), 0 );
-        ValueType proj2Weight = std::accumulate( projections[2].begin(), projections[2].end(), 0 );
+        ValueType proj0Weight = std::accumulate( projections[0].begin(), projections[0].end(), 0.0 );
+        ValueType proj1Weight = std::accumulate( projections[1].begin(), projections[1].end(), 0.0 );
+        ValueType proj2Weight = std::accumulate( projections[2].begin(), projections[2].end(), 0.0 );
 
         SCAI_ASSERT( totalGridWeight == proj1Weight+proj0Weight+proj2Weight , "Total weight is "<< totalGridWeight << " but the sum of the two projections is "<<  proj1Weight+proj0Weight+proj2Weight );
         SCAI_ASSERT( proj0Weight==bBox2Weight, "Weight of first rectangle is "<< bBox2Weight << " but the weight of the projection is "<< proj0Weight);
@@ -1375,9 +1470,9 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
         
         SCAI_ASSERT( projections.size()==3, "projections size must be 3 but it is "<< projections.size() );
         
-        ValueType proj0Weight = std::accumulate( projections[0].begin(), projections[0].end(), 0 );
-        ValueType proj1Weight = std::accumulate( projections[1].begin(), projections[1].end(), 0 );
-        ValueType proj2Weight = std::accumulate( projections[2].begin(), projections[2].end(), 0 );
+        ValueType proj0Weight = std::accumulate( projections[0].begin(), projections[0].end(), 0.0 );
+        ValueType proj1Weight = std::accumulate( projections[1].begin(), projections[1].end(), 0.0 );
+        ValueType proj2Weight = std::accumulate( projections[2].begin(), projections[2].end(), 0.0 );
 
         SCAI_ASSERT( totalGridWeight == proj1Weight+proj0Weight+proj2Weight , "Total weight is "<< totalGridWeight << " but the sum of the two projections is "<<  proj1Weight+proj0Weight+proj2Weight );
         SCAI_ASSERT( proj0Weight==bBox2Weight, "Weight of first rectangle is "<< bBox2Weight << " but the weight of the projection is "<< proj0Weight);

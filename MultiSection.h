@@ -451,7 +451,11 @@ namespace ITI {
         
         static std::pair<std::vector<IndexType>,std::vector<ValueType>> partition1DOptimal( const std::vector<ValueType>& array, const IndexType k, Settings settings);   
         
+        static std::pair<std::vector<IndexType>, std::vector<ValueType>> partition1DMine( const std::vector<ValueType>& nodeWeights, const IndexType k, Settings settings);
+
         static bool probe(const std::vector<ValueType>& prefixSum, const IndexType k, const ValueType target);
+
+        static std::pair<bool, std::vector<IndexType>> probeAndGetSplitters(const std::vector<ValueType>& prefixSum, const IndexType k, const ValueType target);
         
         /**Checks if the given index is in the given bounding box. Index corresponds to a uniform matrix given
          * as a 1D array/vector. 

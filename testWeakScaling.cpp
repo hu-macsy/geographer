@@ -162,9 +162,7 @@ int main(int argc, char** argv) {
          
         const IndexType N = localN * comm->getSize();                   // total number of points
         PRINT0("localN= "<< localN << ", globalN= " << N);        
-        
-        std::random_device rnd_dvc;
-        std::mt19937 mersenne_engine(rnd_dvc());
+
         
         /* timing information
          */
@@ -185,8 +183,10 @@ int main(int argc, char** argv) {
         //create random local weights
         //
         scai::lama::DenseVector<ValueType> nodeWeights;                 // node weights
-        
-        std::uniform_real_distribution<ValueType> dist(1.0, 5.0);
+                
+        std::random_device rnd_dvc;
+        std::mt19937 mersenne_engine(rnd_dvc());
+        std::uniform_real_distribution<ValueType> dist(1.0, 2.0);
         auto gen = std::bind(dist, mersenne_engine);
         
         std::vector<ValueType> tmpLocalWeights(localN);

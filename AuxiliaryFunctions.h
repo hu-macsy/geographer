@@ -101,6 +101,16 @@ static void print2DGrid(scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama
 }
 //------------------------------------------------------------------------------
 
+template<typename T>
+static void printVector( std::vector<T> v){
+    for(int i=0; i<v.size(); i++){
+        std::cout<< v[i] << ", ";
+    }
+    std::cout<< "\b\b\b" << std::endl;
+}
+
+//------------------------------------------------------------------------------
+
 /*  From pixel (int) coords, either in 2S or 3D, to a 1D index. 
  * Only for cubes, where every side has the same length, maxLen;
  */

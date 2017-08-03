@@ -62,7 +62,7 @@ TEST_F(KMeansTest, testFindInitialCenters) {
 
 	//check for equality across processors
 	for (IndexType d = 0; d < dimensions; d++) {
-		ValueType coordSum = std::accumulate(centers[d].begin(), centers[d].end(), 0);
+		ValueType coordSum = std::accumulate(centers[d].begin(), centers[d].end(), 0.0);
 		ValueType totalSum = comm->sum(coordSum);
 		EXPECT_EQ(p*coordSum, totalSum);
 	}
