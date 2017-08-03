@@ -8,10 +8,12 @@
 #pragma once
 
 #include <vector>
+#include <numeric>
 #include <scai/lama/DenseVector.hpp>
 #include <scai/tracing.hpp>
 
 #include "quadtree/QuadNodeCartesianEuclid.h"
+#include "GraphUtils.h"
 
 using scai::lama::DenseVector;
 
@@ -25,16 +27,18 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCenters(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<IndexType> &nodeWeights);
 
-template<typename IndexType, typename ValueType>
+template<typename IndexType, typename ValueType, typename Iterator>
 std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<IndexType> &partition, const IndexType k,
+		const Iterator firstIndex, const Iterator lastIndex,
 		const DenseVector<IndexType> &nodeWeights);
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType> >& coordinates,
 		const std::vector<std::vector<ValueType> >& centers);
 
-template<typename IndexType, typename ValueType>
+template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &coordinates, const std::vector<std::vector<ValueType> > &centers,
+		const Iterator firstIndex, const Iterator lastIndex,
 		const DenseVector<IndexType> &nodeWeights, const DenseVector<IndexType> &previousAssignment,
 		const std::vector<IndexType> &blockSizes,  const SpatialCell &boundingBox, const ValueType epsilon,
 		std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter,
@@ -82,14 +86,49 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<ValueType> upperBoundOwnCenter(localN, std::numeric_limits<ValueType>::max());
 	std::vector<ValueType> lowerBoundNextCenter(localN, 0);
 
+	//prepare sampling
+	std::vector<IndexType> localIndices(localN);
+	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
+	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();;
+	std::iota(firstIndex, lastIndex, 0);
+
+	IndexType minNodes = 500;
+	IndexType samplingRounds = 0;
+	std::vector<IndexType> samples;
+	std::vector<IndexType> adjustedBlockSizes(blockSizes);
+	if (localN > minNodes) {
+		ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
+
+		samplingRounds = 2*std::ceil(std::log2(ValueType(localN) / minNodes))+1;
+		samples.resize(samplingRounds);
+		samples[0] = minNodes;
+	}
+
+	for (IndexType i = 1; i < samplingRounds; i++) {
+		samples[i] = std::min(IndexType(samples[i-1]*1.415), localN);
+	}
+	assert(samples[samplingRounds-1] == localN);
+
 	IndexType i = 0;
 	ValueType delta = 0;
 	ValueType threshold = 2;
 	do {
-		result = assignBlocks(convertedCoords, centers, nodeWeights, result, blockSizes, boundingBox, epsilon, upperBoundOwnCenter, lowerBoundNextCenter, influence);
+
+		if (i < samplingRounds) {
+			lastIndex = firstIndex + samples[i];
+			std::sort(firstIndex, lastIndex);//sorting not really necessary, but increases locality
+			ValueType ratio = ValueType(samples[i]) / localN;
+			for (IndexType j = 0; j < k; j++) {
+				adjustedBlockSizes[j] = ValueType(blockSizes[j]) * ratio;
+			}
+		} else {
+			assert(lastIndex == localIndices.end());
+		}
+
+		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, epsilon, upperBoundOwnCenter, lowerBoundNextCenter, influence);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
-		std::vector<std::vector<ValueType> > newCenters = findCenters(coordinates, result, k, nodeWeights);
+		std::vector<std::vector<ValueType> > newCenters = findCenters(coordinates, result, k, firstIndex, lastIndex, nodeWeights);
 		std::vector<ValueType> squaredDeltas(k,0);
 		std::vector<ValueType> deltas(k,0);
 		for (IndexType j = 0; j < k; j++) {
@@ -128,7 +167,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 			std::cout << "i: " << i << ", delta: " << delta << std::endl;
 		}
 		i++;
-	} while (i < 50 && delta > threshold);
+	} while (i < samplingRounds || (i < 50 && delta > threshold));
 	return result;
 }
 }
