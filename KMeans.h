@@ -92,20 +92,20 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();;
 	std::iota(firstIndex, lastIndex, 0);
 
-	IndexType minNodes = 500;
+	IndexType minNodes = 100;
 	IndexType samplingRounds = 0;
 	std::vector<IndexType> samples;
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
 	if (localN > minNodes) {
 		ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
 
-		samplingRounds = 2*std::ceil(std::log2(ValueType(localN) / minNodes))+1;
+		samplingRounds = std::ceil(std::log2(ValueType(localN) / minNodes))+1;
 		samples.resize(samplingRounds);
 		samples[0] = minNodes;
 	}
 
 	for (IndexType i = 1; i < samplingRounds; i++) {
-		samples[i] = std::min(IndexType(samples[i-1]*1.415), localN);
+		samples[i] = std::min(IndexType(samples[i-1]*2), localN);
 	}
 	assert(samples[samplingRounds-1] == localN);
 
