@@ -64,7 +64,7 @@ public:
 	*/
 	static void writeCoords (const std::vector<DenseVector<ValueType>> &coords, const std::string filename);
 
-    static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
+        static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
 
     /**
 	 * Writes a partition to file.
@@ -85,7 +85,7 @@ public:
 		 * @param[in] fileFormat The type of file to read from.
 	 * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
 	 */
-	static CSRSparseMatrix<ValueType> readGraph(const std::string filename, std::vector<DenseVector<IndexType>>& nodeWeights, Format = Format::METIS);
+	static CSRSparseMatrix<ValueType> readGraph(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights, Format = Format::METIS);
 
 	/* Reads the 2D coordinates from file "filename" and returns then in a DenseVector where the coordinates
 	 * of point i are in [i*2][i*2+1].

@@ -34,7 +34,7 @@ namespace ITI {
                         *
 	 		* @return Distributed DenseVector	, at position i is the block node i is assigned to
 	 		*/
-			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<IndexType> &nodeWeights, struct Settings settings);
+			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, struct Settings settings);
 
 			/**
 			 * Wrapper without node weights.

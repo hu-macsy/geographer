@@ -76,7 +76,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 		part.setValue(globalID, blockId);
 	}
 	//test initial partion for imbalance
-	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+	DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1.0);
         ValueType initialImbalance = GraphUtils::computeImbalance<IndexType, ValueType>(part, k, uniformWeights);
         
         // If initial partition is highly imbalanced local refinement cannot fix it.
@@ -116,13 +116,13 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
 
 	//get random node weights
-	DenseVector<IndexType> weights;
+	DenseVector<ValueType> weights;
         // setRandom creates too big numbers and weights.sum() < 0 because (probably) sum does not fit in int
 	//weights.setRandom(graph.getRowDistributionPtr(), 1);
         weights.setSequence(1, 1, graph.getRowDistributionPtr() );
-        IndexType totalWeight = n*(n+1)/2;
-	IndexType minNodeWeight = weights.min().Scalar::getValue<IndexType>();
-	IndexType maxNodeWeight = weights.max().Scalar::getValue<IndexType>();
+        ValueType totalWeight = n*(n+1)/2;
+	ValueType minNodeWeight = weights.min().Scalar::getValue<IndexType>();
+	ValueType maxNodeWeight = weights.max().Scalar::getValue<IndexType>();
 
         EXPECT_EQ(weights.sum(), totalWeight );
 	if (comm->getRank() == 0) {
@@ -137,8 +137,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	ValueType cut = GraphUtils::computeCut(graph, part, true);
 	ASSERT_GE(cut, 0);
 	for (IndexType i = 0; i < iterations; i++) {
-		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights,
-				communicationScheme, coordinates, distances, settings);
+		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, communicationScheme, coordinates, distances, settings);
 		IndexType gain = 0;
 		for (IndexType roundGain : gainPerRound) gain += roundGain;
 

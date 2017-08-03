@@ -31,7 +31,7 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
     const IndexType globalN = inputDist->getGlobalSize();
 
     // get a pixeled-coarsen graph , this is replicated in every PE
-    scai::lama::DenseVector<IndexType> pixelWeights;
+    scai::lama::DenseVector<ValueType> pixelWeights;
     scai::lama::CSRSparseMatrix<ValueType> pixelGraph = MultiLevel<IndexType, ValueType>::pixeledCoarsen(adjM, coordinates, pixelWeights, settings);
     SCAI_ASSERT( pixelGraph.getRowDistributionPtr()->isReplicated() == 1, "Pixel graph should (?) be replicated.");
     
@@ -82,7 +82,7 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
         SCAI_ASSERT( pixelWeights.getDistributionPtr()->isReplicated() == 1, "Should be (?) replicated.");
         
         scai::hmemo::WriteOnlyAccess<IndexType> wPixelPart( localPixelPartition.getLocalValues() );
-        scai::hmemo::ReadAccess<IndexType> rPixelWeights( pixelWeights.getLocalValues() );
+        scai::hmemo::ReadAccess<ValueType> rPixelWeights( pixelWeights.getLocalValues() );
         
         while( thisBlockSize < averageBlockSize){ 
             SCAI_ASSERT( serialPixelInd<permutation.getLocalValues().size(), "Pixel index " << serialPixelInd << " too big.");
