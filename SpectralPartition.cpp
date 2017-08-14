@@ -15,7 +15,7 @@ namespace ITI {
 
 
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getPartition(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coordinates, Settings settings){
+scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getPartition(const CSRSparseMatrix<ValueType> &adjM, const std::vector<DenseVector<ValueType>> &coordinates, Settings settings){
     SCAI_REGION( "SpectralPartition.getPartition" )
     	
     std::chrono::time_point<std::chrono::steady_clock> start, round;
@@ -124,7 +124,7 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
     // get local max
     for (IndexType dim = 0; dim < dimensions; dim++) {
         //get local parts of coordinates
-        scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
+        const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
         for (IndexType i = 0; i < localN; i++) {
             ValueType coord = localPartOfCoords[i];
             if (coord > maxCoords[dim]) maxCoords[dim] = coord;
@@ -411,7 +411,7 @@ template scai::lama::DenseVector<int> SpectralPartition<int, double>::getDegreeV
 
 template scai::lama::CSRSparseMatrix<double> SpectralPartition<int, double>::getLaplacian( const scai::lama::CSRSparseMatrix<double>& adjM);
 
-template scai::lama::DenseVector<int> SpectralPartition<int, double>::getPartition(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coordinates, Settings settings);
+template scai::lama::DenseVector<int> SpectralPartition<int, double>::getPartition(const CSRSparseMatrix<double> &adjM, const std::vector<DenseVector<double>> &coordinates, Settings settings);
 
 template scai::lama::DenseVector<double> SpectralPartition<int, double>::getFiedlerVector(const scai::lama::CSRSparseMatrix<double>& adjM, double& eigenvalue );
 

@@ -143,10 +143,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             assert(result.getLocalValues().min() >= 0);
             assert(result.getLocalValues().max() < k);
 
-            ValueType cut = GraphUtils::computeCut(input, result, true);
-            ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, settings.numBlocks);
             if (comm->getRank() == 0) {
-				std::cout << "K-Means, Time:" << timeForInitPart << ", Cut:" << cut << ", imbalance:" << imbalance << std::endl;
+				std::cout << "K-Means, Time:" << timeForInitPart << std::endl;
             }
             assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
             assert(result.min().Scalar::getValue<IndexType>() == 0);
@@ -177,8 +175,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
         std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
         ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
-        ValueType cut = comm->getSize() == 1 ? GraphUtils::computeCut(input, result) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;
-        ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k);
+        ValueType cut = comm->getSize() == 1 ? GraphUtils::computeCut(input, result, true) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;
+        ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k, nodeWeights);
 
         if (comm->getRank() == 0) {
         	std::cout << "Time for initial partition and redistribution:" << timeForInitPart << std::endl;
@@ -201,7 +199,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 //--------------------------------------------------------------------------------------- 
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(std::vector<DenseVector<ValueType>> &coordinates, Settings settings){
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings){
     SCAI_REGION( "ParcoRepart.hilbertPartition" )
     	
     std::chrono::time_point<std::chrono::steady_clock> start, afterSFC;
@@ -359,7 +357,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(std::
 //--------------------------------------------------------------------------------------- 
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(std::vector<DenseVector<ValueType>> &coordinates, Settings settings){
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings){
     SCAI_REGION( "ParcoRepart.pixelPartition" )
     	
     SCAI_REGION_START("ParcoRepart.pixelPartition.initialise")
@@ -945,7 +943,7 @@ template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatr
 
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings);
 
-template DenseVector<int> ParcoRepart<int, double>::pixelPartition(std::vector<DenseVector<double>> &coordinates, Settings settings);
+template DenseVector<int> ParcoRepart<int, double>::pixelPartition(const std::vector<DenseVector<double>> &coordinates, Settings settings);
 
 template void ParcoRepart<int, double>::checkLocalDegreeSymmetry(const CSRSparseMatrix<double> &input);
 

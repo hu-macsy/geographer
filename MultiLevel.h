@@ -65,7 +65,7 @@ namespace ITI{
          * @param[in] settings Descibe different setting for the coarsening. Here we need settings.pixeledDetailLevel.
          * @return The adjacency matric of the coarsened/pixeled graph. This has side length 2^detailLevel and the whole size is dimension^sideLength.
          */
-        static scai::lama::CSRSparseMatrix<ValueType> pixeledCoarsen (const CSRSparseMatrix<ValueType>& adjM, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings);
+        static scai::lama::CSRSparseMatrix<ValueType> pixeledCoarsen (const CSRSparseMatrix<ValueType>& adjM, const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings);
     
     }; // class MultiLevel
 } // namespace ITI

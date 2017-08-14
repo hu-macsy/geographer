@@ -44,12 +44,12 @@ namespace ITI {
 			/*
 			 * Get an initial partition using the hilbert curve.
 			 */
-			static DenseVector<IndexType> hilbertPartition(std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+			static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
 
 			/*
 			 * Get an initial partition using the morton curve and measuring density per square.
 			 */
-			static DenseVector<IndexType> pixelPartition(std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+			static DenseVector<IndexType> pixelPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
 
 			/**
 			 * Iterates over the local part of the adjacency matrix and counts local edges.
