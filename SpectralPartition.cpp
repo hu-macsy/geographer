@@ -163,31 +163,7 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
             wLocalPart[i] = rPixelPart[ thisPixel ];
         }
     }
-        
-    // redistribute based on the new partition
-    scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution( *inputDist, result.getLocalValues()) );
-    
-    result.redistribute( newDist);
-    adjM.redistribute(newDist, adjM.getColDistributionPtr());
-    
-    // redistibute coordinates
-    for (IndexType dim = 0; dim < dimensions; dim++) {
-          coordinates[dim].redistribute( newDist );
-    }    
-    // check coordinates size
-    for (IndexType dim = 0; dim < dimensions; dim++) {
-        assert( coordinates[dim].size() == globalN);
-        assert( coordinates[dim].getLocalValues().size() == newDist->getLocalSize() );
-    }
 
-    ValueType cut = comm->getSize() == 1 ? GraphUtils::computeCut(adjM, result) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(adjM, false)) / 2;
-    ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k);
-    if (comm->getRank() == 0) {
-        std::chrono::duration<double> elapsedSeconds = std::chrono::steady_clock::now() -start;
-        std::cout << "\033[1;32mSpectral partition"<<" (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
-        std::cout<< "and imbalance= "<< imbalance << "\033[0m"  << std::endl;
-    }
-    
     return result;
 }
 //---------------------------------------------------------------------------------------

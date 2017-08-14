@@ -72,15 +72,13 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     settings.dimensions = dimensions;
     
     //get sfc partition
-    DenseVector<IndexType> hilbertInitialPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coords, settings);
+    DenseVector<IndexType> hilbertInitialPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition(coords, settings);
     ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords, N, "hilbertPartition");
     
     EXPECT_GE(k-1, hilbertInitialPartition.getLocalValues().max() );
     EXPECT_EQ(N, hilbertInitialPartition.size());
     EXPECT_EQ(0, hilbertInitialPartition.min().getValue<ValueType>());
     EXPECT_EQ(k-1, hilbertInitialPartition.max().getValue<ValueType>());
-    EXPECT_EQ(graph.getRowDistribution(), hilbertInitialPartition.getDistribution());
-    
     
     // after the first partitioning cordinates are redistributed 
     // redistribution needed because sort works only for block distribution
@@ -90,15 +88,13 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     
     for( int i=3; i<6; i++){
         settings.pixeledSideLen = std::pow(i,2);
-        DenseVector<IndexType> pixelInitialPartition = ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coords, settings);
+        DenseVector<IndexType> pixelInitialPartition = ParcoRepart<IndexType, ValueType>::pixelPartition(coords, settings);
         
         EXPECT_GE(k-1, pixelInitialPartition.getLocalValues().max() );
         EXPECT_EQ(N, pixelInitialPartition.size());
         EXPECT_EQ(0, pixelInitialPartition.min().getValue<ValueType>());
         EXPECT_EQ(k-1, pixelInitialPartition.max().getValue<ValueType>());
-        EXPECT_EQ(graph.getRowDistribution(), pixelInitialPartition.getDistribution());
     }
-    
 }
 //--------------------------------------------------------------------------------------- 
 
@@ -487,7 +483,6 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
             std::cout<< std::endl;
         }
     }
-
 }
 
 //------------------------------------------------------------------------------
