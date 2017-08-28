@@ -69,7 +69,6 @@ TEST_F(MeshGeneratorTest, testCreateStructured3DMeshLocalDegreeSymmetry) {
 		std::cout << "Not tested, since called with <= 16 processes, this implies you don't have enough memory for " << n << " nodes."<< std::endl;
 	}
 }
-
 //-----------------------------------------------------------------
 // Creates the part of a structured mesh in each processor ditributed and checks the matrix and the coordinates.
 // For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
@@ -134,7 +133,7 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_3D) {
             if(ia[i+1]-ia[i] == 4){
                 ++cntEdges;
             }
-            // count the nodes with 4 edges
+            // count the nodes with 5 edges
             if(ia[i+1]-ia[i] == 5){
                 ++cntSides;
             }
@@ -167,6 +166,102 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_3D) {
         EXPECT_LE( localCoords[2][i] , maxCoord[2]);
         EXPECT_GE( localCoords[2][i] , 0);
     }
+    }
+    
+}
+//-----------------------------------------------------------------
+// Creates the part of a structured mesh in each processor ditributed and checks the matrix and the coordinates.
+// For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
+// less than 6 ones ( every node has 3,4,5, or 6 neighbours).
+TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_2D) {
+    std::vector<IndexType> numPoints= { 31, 45};
+    std::vector<ValueType> maxCoord= {441, 711};
+    IndexType N= numPoints[0]*numPoints[1];
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
+    
+    PRINT0("Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< " , N=" << N );
+    
+    std::vector<DenseVector<ValueType>> coords(2);
+    for(IndexType i=0; i<2; i++){ 
+	  coords[i].allocate(dist);
+	  coords[i] = static_cast<ValueType>( 0 );
+    }
+    
+    scai::lama::CSRSparseMatrix<ValueType> adjM( dist, noDistPointer);
+    
+    // create the adjacency matrix and the coordinates
+    MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(adjM, coords, maxCoord, numPoints);
+    
+    // print local values 
+    /*
+    for(IndexType i=0; i<dist->getLocalSize(); i++){
+        std::cout<< i<< ": "<< *comm<< " - " <<coords[0].getLocalValues()[i] << " , " << coords[1].getLocalValues()[i] << " , " << coords[2].getLocalValues()[i] << std::endl;   
+    }
+    */
+    
+    EXPECT_EQ( adjM.getLocalNumColumns() , N);
+    EXPECT_EQ( adjM.getLocalNumRows() , coords[0].getLocalValues().size() );
+    EXPECT_EQ( true , adjM.getRowDistribution().isEqual(coords[0].getDistribution()) );
+    
+    // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
+    IndexType numEdges= (numPoints[0]-1)*numPoints[1] + numPoints[0]*(numPoints[1]-1);
+    EXPECT_EQ( adjM.getNumValues() , numEdges*2 );     
+
+    IndexType cntCorners= 0 , cntSides= 0, cntCenter= 0;
+    
+    {
+        SCAI_REGION("testCreateStructuredMesh_Distributed_2D.check_adjM_2")
+        const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+        
+        for(IndexType i=0; i<ia.size()-1; i++){
+            // this checks that the number of non-zero elements in each row is less than 4 
+            // (6 is the maximum number of neighbours a node can have in a structured grid)
+            EXPECT_LE( ia[i+1]-ia[i], 4 );
+            // and also more than 2 which is the minimum
+            EXPECT_GE( ia[i+1]-ia[i], 2 );
+            
+            // count the nodes with 2 edges
+            if(ia[i+1]-ia[i] == 2){
+                ++cntCorners;
+            }
+            // count the nodes with 3 edges
+            if(ia[i+1]-ia[i] == 3){
+                ++cntSides;
+            }
+            // count the nodes with 4 edges
+            if(ia[i+1]-ia[i] == 4){
+                ++cntCenter;
+            }
+        }
+    }
+    IndexType numX= numPoints[0];
+    IndexType numY= numPoints[1];
+    
+    //PRINT( comm->sum(cntCorners) );
+    
+    // check the global values
+    EXPECT_EQ( comm->sum(cntCorners), 4);
+    EXPECT_EQ( comm->sum(cntSides) , 2*(numPoints[0]+numPoints[1]-4));
+    EXPECT_EQ( comm->sum(cntCenter) , N-2*(numPoints[0]+numPoints[1]-4)-4 );
+    
+    //PRINT(comm << ", corner nodes= "<< cntCorners << " , edge nodes= "<< cntEdges<< " , side nodes= "<< cntSides);
+    
+    {
+        SCAI_REGION("testCreateStructuredMesh_Distributed_3D.check_coords_2")
+        std::vector<scai::utilskernel::LArray<ValueType>> localCoords(2);
+        for(IndexType i=0; i<2; i++){
+            localCoords[i] = coords[i].getLocalValues();
+        }
+        for(IndexType i=0; i<localCoords[0].size(); i++){
+            EXPECT_LE( localCoords[0][i] , maxCoord[0]);
+            EXPECT_GE( localCoords[0][i] , 0);
+            EXPECT_LE( localCoords[1][i] , maxCoord[1]);
+            EXPECT_GE( localCoords[1][i] , 0);
+        }
     }
     
 }
@@ -372,27 +467,6 @@ TEST_F(MeshGeneratorTest, testSimpleMeshFromQuadTree_2D){
         
         std::string outCoords = outFile + ".xyz";
         ITI::FileIO<IndexType, ValueType>::writeCoords(coords, outCoords);
-    }
-}
-//-----------------------------------------------------------------
-
-TEST_F(MeshGeneratorTest, testIndex2_3DPoint){
-    std::vector<IndexType> numPoints= {9, 11, 7};
-    
-    srand(time(NULL));
-    for(int i=0; i<3; i++){
-        numPoints[i] = (IndexType) (rand()%5 + 10);
-    }
-    IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
-    
-    for(IndexType i=0; i<N; i++){
-        std::tuple<IndexType, IndexType, IndexType> ind = MeshGenerator<IndexType, ValueType>::index2_3DPoint(i, numPoints);
-        EXPECT_LE(std::get<0>(ind) , numPoints[0]-1);
-        EXPECT_LE(std::get<1>(ind) , numPoints[1]-1);
-        EXPECT_LE(std::get<2>(ind) , numPoints[2]-1);
-        EXPECT_GE(std::get<0>(ind) , 0);
-        EXPECT_GE(std::get<1>(ind) , 0);
-        EXPECT_GE(std::get<2>(ind) , 0);
     }
 }
 

@@ -17,6 +17,9 @@ local/
 *.graph
 *.graph.xyz
 *.csv
+*.cmd
+*.output
+*.map
 SpectralPartition_Grid32x32_*.xyz
 writeCoordsDist_*.xyz
 hilbertPartition_*.xyz
@@ -26,3 +29,4 @@ LLRUN.out.*
 LLRUN.err.*
 scorep-failed*
 scorep-2017*
+*.cmd

@@ -15,7 +15,6 @@
 #include <assert.h>
 
 #include "Settings.h"
-#include "ParcoRepart.h"
 #include "PrioQueue.h"
 
 using scai::lama::CSRSparseMatrix;
@@ -35,7 +34,7 @@ namespace ITI {
             CSRSparseMatrix<ValueType> &input, 
             DenseVector<IndexType> &part, 
             std::vector<IndexType>& nodesWithNonLocalNeighbors,
-            DenseVector<IndexType> &nodeWeights, 
+            DenseVector<ValueType> &nodeWeights, 
             const std::vector<DenseVector<IndexType>>& communicationScheme, 
             std::vector<DenseVector<ValueType>> &coordinates,
             std::vector<ValueType> &distances, 
@@ -65,7 +64,10 @@ namespace ITI {
         template<typename T>
         static void redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, scai::dmemo::Halo& halo, scai::utilskernel::LArray<T>& haloData);
         
+		static std::vector<ValueType> distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates);
+
         
+
     private:
         
         static ValueType twoWayLocalFM(
@@ -73,7 +75,7 @@ namespace ITI {
             const CSRStorage<ValueType> &haloStorage,
             const scai::dmemo::Halo &matrixHalo, 
             const std::vector<IndexType>& borderRegionIDs,
-            const std::vector<IndexType>& nodeWeights, 
+            const std::vector<ValueType>& nodeWeights, 
             std::pair<IndexType, IndexType> secondRoundMarkers,
             std::vector<bool>& assignedToSecondBlock,
             const std::pair<IndexType, 

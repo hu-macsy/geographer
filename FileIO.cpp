@@ -13,6 +13,7 @@
 #include <scai/lama/Scalar.hpp>
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/common/Math.hpp>
+#include <scai/common/Settings.hpp>
 #include <scai/lama/storage/MatrixStorage.hpp>
 #include <scai/tracing.hpp>
 
@@ -29,6 +30,7 @@
 #include <iterator>
 #include <map>
 #include <tuple>
+
 
 using scai::lama::CSRStorage;
 using scai::lama::Scalar;
@@ -136,6 +138,7 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
     const IndexType dimension = coords.size();
     const IndexType n = coords[0].size();
     scai::dmemo::DistributionPtr dist = coords[0].getDistributionPtr();
+    assert(dist->getGlobalSize() == n);
 	scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( n ));
 	scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 
@@ -165,7 +168,7 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
 		}
 		for (IndexType i = 0; i < n; i++) {
 			for (IndexType d = 0; d < dimension; d++) {
-				filehandle << coords[d].getLocalValues()[i] << " ";
+				filehandle << targetReference[d].getLocalValues()[i] << " ";
 			}
 			filehandle << std::endl;
 		}
@@ -243,19 +246,30 @@ void FileIO<IndexType, ValueType>::writePartition(const DenseVector<IndexType> &
 
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, Format format) {
+	std::vector<DenseVector<ValueType>> dummyWeightContainer;
+	return readGraph(filename, dummyWeightContainer, format);
+}
+
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights, Format format) {
 	SCAI_REGION("FileIO.readGraph");
 
+	if(format == Format::MATRIXMARKET){
+            return FileIO<IndexType, ValueType>::readGraphMatrixMarket(filename);
+        }
+        
 	if (!(format == Format::METIS or format == Format::AUTO)) {
 		throw std::logic_error("Format not yet implemented.");
 	}
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	std::ifstream file(filename);
 
 	if (file.fail()) {
 		throw std::runtime_error("Reading graph from " + filename + " failed.");
 	}
-
+        
+        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        
 	//define variables
 	std::string line;
 	IndexType globalN, globalM;
@@ -275,20 +289,17 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 		std::getline(ss, item, ' ');
 		globalM = std::stoi(item);
 
-		bool readWeightInfo = std::getline(ss, item, ' ');
+		bool readWeightInfo = !std::getline(ss, item, ' ').fail();
 		if (readWeightInfo && item.size() > 0) {
 			//three bits, describing presence of edge weights, vertex weights and vertex sizes
 			int bitmask = std::stoi(item);
 			hasEdgeWeights = bitmask % 10;
 			if ((bitmask / 10) % 10) {
-				bool readNodeWeightCount = std::getline(ss, item, ' ');
+				bool readNodeWeightCount = !std::getline(ss, item, ' ').fail();
 				if (readNodeWeightCount && item.size() > 0) {
 					numberNodeWeights = std::stoi(item);
 				} else {
 					numberNodeWeights = 1;
-				}
-				if (numberNodeWeights > 0 && comm->getRank() == 0) {
-					std::cout << "Warning: Node weights not yet supported, ignoring them" << std::endl;
 				}
 			}
 		}
@@ -296,16 +307,16 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 		if (comm->getRank() == 0) {
 			std::cout << "Expecting " << globalN << " nodes and " << globalM << " edges, ";
 			if (!hasEdgeWeights && numberNodeWeights == 0) {
-				std::cout << "with no edge or node weights.";
+				std::cout << "with no edge or node weights."<< std::endl;
 			}
 			else if (hasEdgeWeights && numberNodeWeights == 0) {
-				std::cout << "with edge weights, but no node weights.";
+				std::cout << "with edge weights, but no node weights."<< std::endl;
 			}
 			else if (!hasEdgeWeights && numberNodeWeights > 0) {
-				std::cout << "with no edge weights, but " << numberNodeWeights << " node weights.";
+				std::cout << "with no edge weights, but " << numberNodeWeights << " node weights."<< std::endl;
 			}
 			else {
-				std::cout << "with edge weights and " << numberNodeWeights << " weights per node.";
+				std::cout << "with edge weights and " << numberNodeWeights << " weights per node."<< std::endl;
 			}
 		}
 	}
@@ -328,13 +339,17 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     std::vector<IndexType> ia(localN+1, 0);
     std::vector<IndexType> ja;
     std::vector<ValueType> values;
+    std::vector<std::vector<ValueType> > nodeWeightStorage(numberNodeWeights);
+    for (IndexType i = 0; i < numberNodeWeights; i++) {
+    	nodeWeightStorage[i].resize(localN);
+    }
 
     //we don't know exactly how many edges we are going to have, but in a regular mesh the average degree times the local nodes is a good estimate.
     ja.reserve(localN*avgDegree*1.1);
 
     //now read in local edges
     for (IndexType i = 0; i < localN; i++) {
-    	bool read = std::getline(file, line).good();
+    	bool read = !std::getline(file, line).fail();
     	//remove leading and trailing whitespace, since these can confuse the string splitter
     	boost::algorithm::trim(line);
     	assert(read);//if we have read past the end of the file, the node count was incorrect
@@ -344,15 +359,15 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         std::vector<IndexType> weights;
 
         for (IndexType j = 0; j < numberNodeWeights; j++) {
-        	bool readWeight = std::getline(ss, item, ' ');
+        	bool readWeight = !std::getline(ss, item, ' ').fail();
         	if (readWeight && item.size() > 0) {
-        		weights.push_back(std::stoi(item));
+        		nodeWeightStorage[j][i] = std::stoi(item);
         	} else {
         		std::cout << "Could not parse " << item << std::endl;
         	}
         }
 
-        while (std::getline(ss, item, ' ')) {
+        while (!std::getline(ss, item, ' ').fail()) {
         	if (item.size() == 0) {
         		//probably some whitespace at end of line
         		continue;
@@ -363,7 +378,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         	}
 
         	if (hasEdgeWeights) {
-        		bool readEdgeWeight = std::getline(ss, item, ' ');
+        		bool readEdgeWeight = !std::getline(ss, item, ' ').fail();
         		if (!readEdgeWeight) {
         			throw std::runtime_error("Edge weight for " + std::to_string(neighbor) + " not found in line " + std::to_string(beginLocalRange + i) + ".");
         		}
@@ -382,6 +397,11 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         	assert(ja.size() == values.size());
         }
     }
+
+	nodeWeights.resize(numberNodeWeights);
+	for (IndexType i = 0; i < numberNodeWeights; i++) {
+		nodeWeights[i] = DenseVector<ValueType>(dist, scai::utilskernel::LArray<ValueType>(localN, nodeWeightStorage[i].data()));
+	}
 
     if (endLocalRange == globalN) {
 		bool eof = std::getline(file, line).eof();
@@ -411,7 +431,56 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
     return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
 }
+//-------------------------------------------------------------------------------------------------
 
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphMatrixMarket(const std::string filename){
+    SCAI_REGION( "FileIO.readGraphMatrixMarket" );
+    std::ifstream file(filename);
+    
+    scai::common::Settings::putEnvironment( "SCAI_IO_TYPE_DATA", "_Pattern" );
+    
+    if(file.fail())
+        throw std::runtime_error("Could not open file "+ filename + ".");
+    
+    //skip the first lines that have comments starting with '%'
+    std::string line;
+    std::getline(file, line);
+
+    while( line[0]== '%'){
+       std::getline(file, line);
+    }
+    std::stringstream ss;
+    ss.str( line );
+   
+    IndexType numRows;
+    IndexType numColumns;
+    IndexType numValues;
+    
+    ss >> numRows>> numColumns >> numValues;
+    
+    SCAI_ASSERT( numRows==numColumns , "Number of rows should be equal to number o columns");
+
+    scai::lama::CSRSparseMatrix<ValueType> graph;
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    /*
+    IndexType numRows, numColumns, numValues;
+    scai::common::scalar::ScalarType dataType;
+    bool isVector;
+    scai::lama::MatrixMarketIO::Symmetry sym;
+    
+    scai::lama::MatrixMarketIO::readMMHeader( filename, numRows, numColumns, numValues, dataType, isVector, sym);
+    */
+    const scai::dmemo::DistributionPtr rowDist(new scai::dmemo::BlockDistribution(numRows, comm));
+    
+    graph.readFromFile( filename, rowDist );
+    
+    //unsetenv( "SCAI_IO_TYPE_DATA" );
+    return graph;
+}
+//-------------------------------------------------------------------------------------------------
+  
+    
 template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOcean(std::string filename, IndexType dimension) {
 	SCAI_REGION( "FileIO.readCoords" );
@@ -421,14 +490,14 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 		throw std::runtime_error("Could not open file "+ filename + ".");
 
 	std::string line;
-	bool read = std::getline(file, line).good();
+	bool read = !std::getline(file, line).fail();
 	if (!read) {
 		throw std::runtime_error("Could not read first line of " + filename + ".");
 	}
 
 	std::stringstream ss( line );
 	std::string item;
-	bool readLine = std::getline(ss, item, ' ');
+	bool readLine = !std::getline(ss, item, ' ').fail();
 	if (!readLine or item.size() == 0) {
 		throw std::runtime_error("Unexpected end of first line.");
 	}
@@ -459,7 +528,7 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 
 	//read local range
 	for (IndexType i = 0; i < localN; i++) {
-		bool read = std::getline(file, line).good();
+		bool read = !std::getline(file, line).fail();
 		if (!read) {
 			throw std::runtime_error("Unexpected end of coordinate file. Was the number of nodes correct?");
 		}
@@ -467,7 +536,7 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 		std::string item;
 
 		//first column contains index
-		bool readIndex = std::getline(ss, item, ' ');
+		bool readIndex = !std::getline(ss, item, ' ').fail();
 		if (!readIndex or item.size() == 0) {
 			throw std::runtime_error("Could not read first element of line " + std::to_string(i+1));
 		}
@@ -480,7 +549,7 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 		//remaining columns contain coordinates
 		IndexType dim = 0;
 		while (dim < dimension) {
-			bool read = std::getline(ss, item, ' ');
+			bool read = !std::getline(ss, item, ' ').fail();
 			if (!read or item.size() == 0) {
 				throw std::runtime_error("Unexpected end of line. Was the number of dimensions correct?");
 			}
@@ -516,9 +585,9 @@ template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( std::string filename, IndexType numberOfPoints, IndexType dimension, Format format){
     SCAI_REGION( "FileIO.readCoords" );
 
-	if (format == Format::OCEAN) {
-		return readCoordsOcean(filename, dimension);
-	}
+    if (format == Format::OCEAN) {
+	return readCoordsOcean(filename, dimension);
+    }
 
     IndexType globalN= numberOfPoints;
     std::ifstream file(filename);
@@ -529,6 +598,15 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
 
+    if (format == Format::OCEAN) {
+        PRINT0("Reading coordinates in OCEAN format");
+        return readCoordsOcean(filename, dimension);
+    }
+    else if( format== Format::MATRIXMARKET){
+        PRINT0("Reading coordinates in MATRIXMARKET format");
+        return readCoordsMatrixMarket( filename );
+    }
+    
     IndexType beginLocalRange, endLocalRange;
     scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
     const IndexType localN = endLocalRange - beginLocalRange;
@@ -547,7 +625,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 
     //read local range
     for (IndexType i = 0; i < localN; i++) {
-		bool read = std::getline(file, line).good();
+		bool read = !std::getline(file, line).fail();
 		if (!read) {
 			throw std::runtime_error("Unexpected end of coordinate file. Was the number of nodes correct?");
 		}
@@ -556,7 +634,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 
 		IndexType dim = 0;
 		while (dim < dimension) {
-			bool read = std::getline(ss, item, ' ');
+			bool read = !std::getline(ss, item, ' ').fail();
 			if (!read or item.size() == 0) {
 				throw std::runtime_error("Unexpected end of line. Was the number of dimensions correct?");
 			}
@@ -584,6 +662,107 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 
     return result;
 }
+//-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsMatrixMarket ( const std::string filename){
+    std::ifstream file(filename);
+
+    if(file.fail())
+        throw std::runtime_error("File "+ filename+ " failed.");
+        
+    //skip the first lines that have comments starting with '%'
+    std::string line;
+    std::getline(file, line);
+
+    while( line[0]== '%'){
+       std::getline(file, line);
+    }
+    std::stringstream ss;
+    ss.str( line );
+    
+    IndexType numPoints ;
+    IndexType dimensions ;
+    
+    ss >> numPoints >> dimensions;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(numPoints, comm));
+
+    PRINT0( "numPoints= "<< numPoints << " , " << dimensions);
+    
+    IndexType beginLocalRange, endLocalRange;
+    scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, numPoints, comm->getRank(), comm->getSize());
+    
+    // the local ranges for the MatrixMarket format
+    const IndexType beginLocalRangeMM = beginLocalRange*dimensions;
+    const IndexType endLocalRangeMM = endLocalRange*dimensions;
+    const IndexType localN = endLocalRange - beginLocalRange;
+    const IndexType localNMM = endLocalRangeMM - beginLocalRangeMM;
+    
+    //PRINT( *comm << ": localN= "<< localNMM << ", numPoints= "<< numPoints << ", beginLocalRange= "<< beginLocalRangeMM << ", endLocalRange= " << endLocalRangeMM );
+    
+    //scroll forward to begin of local range
+    for (IndexType i = 0; i < beginLocalRangeMM; i++) {
+    	std::getline(file, line);
+    }
+    
+    //create result vector
+    std::vector<scai::utilskernel::LArray<ValueType> > coords(dimensions);
+    for (IndexType dim = 0; dim < dimensions; dim++) {
+    	coords[dim] = scai::utilskernel::LArray<ValueType>(localN, 0);
+    }
+    
+    //read local range
+    for (IndexType i = 0; i < localNMM; i++) {
+		bool read = !std::getline(file, line).fail();
+		
+                if (!read and i!=localNMM-1 ) {
+			throw std::runtime_error("In FileIO.cpp, line " + std::to_string(__LINE__) +"Unexpected end of coordinate file. Was the number of nodes correct?");
+		}
+		
+		std::stringstream ss;
+		ss.str( line );
+                         
+                ValueType c;
+                ss >> c;
+                coords[i%dimensions][int(i/dimensions)] = c;
+                
+//PRINT( *comm << ": " << i%dimensions << " , " << i/dimensions << " :: " << coords[i%dimensions][int(i/dimensions)]  );
+                /*
+		IndexType dim = 0;
+		while (dim < dimensions) {
+			bool read = std::getline(ss, item, ' ');
+			if (!read or item.size() == 0) {
+				throw std::runtime_error("Unexpected end of line. Was the number of dimensions correct?");
+			}
+			ValueType coord = std::stod(item);
+			coords[dim][i] = coord;
+			dim++;
+		}
+		
+		if (dim < dimensions) {
+			throw std::runtime_error("Only " + std::to_string(dim - 1)  + " values found, but " + std::to_string(dimensions) + " expected in line '" + line + "'");
+		}
+		*/
+    }
+
+    if (endLocalRange == numPoints) {
+    	bool eof = std::getline(file, line).eof();
+    	if (!eof) {
+    		throw std::runtime_error(std::to_string(numPoints) + " coordinates read, but file continues.");
+    	}
+    }
+
+    std::vector<DenseVector<ValueType> > result(dimensions);
+
+    for (IndexType i = 0; i < dimensions; i++) {
+        result[i] = DenseVector<ValueType>(dist, coords[i] );
+    }
+
+    return result;
+}
+
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::string filename) {
@@ -594,7 +773,7 @@ DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::st
 
 	std::vector<IndexType> part;
 	std::string line;
-	while (std::getline(file, line)) {
+	while (!std::getline(file, line).fail()) {
 		part.push_back(std::stoi(line));
 	}
 
@@ -637,7 +816,7 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
     IndexType duplicateNeighbors = 0;
 
     std::string line;
-    while (std::getline(file, line)) {
+    while (!std::getline(file, line).fail()) {
     	std::vector<ValueType> values;
     	std::stringstream ss( line );
 		std::string item;
@@ -651,7 +830,7 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
 
 		IndexType i = 0;
 
-		while (std::getline(ss, item, ' ')) {
+		while (!std::getline(ss, item, ' ').fail()) {
 			if (item.size() == 0) {
 				continue;
 			}
@@ -870,6 +1049,36 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
     return matrix;
 }
 
+
+template<typename IndexType, typename ValueType>
+std::pair<IndexType, IndexType> FileIO<IndexType, ValueType>::getMatrixMarketCoordsInfos(const std::string filename){
+        
+    std::ifstream file(filename);
+    
+    if(file.fail())
+        throw std::runtime_error("File "+ filename+ " failed.");
+        
+    //skip the first lines that have comments starting with '%'
+    std::string line;
+    std::getline(file, line);
+
+    while( line[0]== '%'){
+       std::getline(file, line);
+    }
+    std::stringstream ss;
+    ss.str( line );
+    
+    IndexType numPoints ;
+    IndexType dimensions ;
+    
+    ss >> numPoints >> dimensions;
+    
+    return std::make_pair( numPoints, dimensions);
+}
+
+
+
+
 template void FileIO<int, double>::writeGraph (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, const std::string filename);
@@ -878,6 +1087,7 @@ template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::strin
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension, Format format);
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsOcean( std::string filename, int dimension );
 template CSRSparseMatrix<double>  FileIO<int, double>::readQuadTree( std::string filename, std::vector<DenseVector<double>> &coords );
+template std::pair<int, int> FileIO<int, double>::getMatrixMarketCoordsInfos(const std::string filename);
 
 
 } /* namespace ITI */

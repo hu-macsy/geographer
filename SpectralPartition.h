@@ -24,10 +24,7 @@
 #include <tuple>
 #include <chrono>
 
-#include <eigen3/Eigen/Dense>
-
 #include "PrioQueue.h"
-#include "ParcoRepart.h"
 #include "HilbertCurve.h"
 #include "MultiLevel.h"
 
@@ -51,7 +48,7 @@ namespace ITI {
              * @param[in] adjM The adjacency matrix of the input graph to partition.
              * @param[in] coordinates Node positions
              */
-            static scai::lama::DenseVector<IndexType> getPartition(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+            static scai::lama::DenseVector<IndexType> getPartition(const CSRSparseMatrix<ValueType> &adjM, const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
             
             /**Main program to determine the Fiedler vector for a Laplacian matrix
              * 

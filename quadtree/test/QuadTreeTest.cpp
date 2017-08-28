@@ -15,6 +15,7 @@
 #include "QuadTreeTest.h"
 #include "../../ParcoRepart.h"
 #include "../../FileIO.h"
+#include "../../GraphUtils.h"
 
 #include "../QuadTreeCartesianEuclid.h"
 #include "../QuadTreePolarEuclid.h"
@@ -392,9 +393,10 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
         scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordsDV, Settings);
 
         ParcoRepart<IndexType, ValueType> repart;
-        EXPECT_LE(repart.computeImbalance(partition, k), epsilon);
+        const ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(partition, k);
+        EXPECT_LE(imbalance, epsilon);
 
-        const ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, partition, true);
+        const ValueType cut = GraphUtils::computeCut<IndexType, ValueType>(graph, partition, true);
 
         if (comm->getRank() == 0) {
             std::cout << "Commit " << version << ": Partitioned graph with " << N << " nodes into " << k << " blocks with a total cut of " << cut << std::endl;
@@ -546,6 +548,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         
 	PRINT("Num of leaves= N = "<< quad.countLeaves() );
 	index N= quad.countLeaves();
+	const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
 	// index the tree
 	index treeSize = quad.indexSubtree(0);
 
@@ -634,7 +637,6 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         settings.dimensions = dimension;
         settings.useGeometricTieBreaking = 1;
         
-        ParcoRepart<IndexType, ValueType> repart;
         ValueType cut , maxCut= N;
         ValueType imbalance;
         IndexType bestPixelCut=0;
@@ -646,22 +648,24 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         
         for(int detail= 0; detail<np; detail++){           
             settings.pixeledSideLen= std::pow( 2, detail + np );
-            pixelPartition = ITI::ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coordsDV, settings);
-            cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, pixelPartition, true);
+            pixelPartition = ITI::ParcoRepart<IndexType, ValueType>::pixelPartition(coordsDV, settings);
+            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( pixelPartition.getDistribution(), pixelPartition.getLocalValues() ) );
+            pixelPartition.redistribute(newDist);
+            graph.redistribute(newDist, noDist);
+            cut = GraphUtils::computeCut<IndexType, ValueType>(graph, pixelPartition, true);
             if (cut<maxCut){
                 maxCut = cut;
                 bestPixelCut = detail;
                 bestDist = pixelPartition.getDistributionPtr();
             }
         }
-        // TODO: must save best distibution and redistribute with the best distribution
         
-        settings.dimensions = bestPixelCut;
-        pixelPartition = ITI::ParcoRepart<IndexType, ValueType>::pixelPartition(graph, coordsDV, settings);
-        bestDist = pixelPartition.getDistributionPtr();
+        graph.redistribute(bestDist, noDist);
+
         for(int d=0; d<dimension; d++){
             coordsDV[d].redistribute(bestDist);
         }
+
         if(dimension==2){
             ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordsDV, N, destPath+"pixel");
         }
@@ -672,13 +676,17 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
             coordsDV[d].redistribute(dist);
         }
         
-        scai::lama::DenseVector<IndexType> hilbertPartition = ITI::ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coordsDV, settings);
+        scai::lama::DenseVector<IndexType> hilbertPartition = ITI::ParcoRepart<IndexType, ValueType>::hilbertPartition(coordsDV, settings);
+        scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( hilbertPartition.getDistribution(), hilbertPartition.getLocalValues() ) );
+        graph.redistribute(newDist, noDist);
+        hilbertPartition.redistribute(newDist);
+
         if(dimension==2){
             ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordsDV, N, destPath+"hilbert");
         }
         
-        cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, hilbertPartition, true);
-        imbalance = repart.computeImbalance(hilbertPartition, k);
+        cut = ITI::GraphUtils::computeCut(graph, hilbertPartition, true);
+        imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>(hilbertPartition, k);
         
         if( imbalance>epsilon ){
             PRINT0("WARNING, imbalance: "<< imbalance <<" more than epislon: "<< epsilon);

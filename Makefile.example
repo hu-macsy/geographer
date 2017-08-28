@@ -1,17 +1,22 @@
-CC=g++
+CC=mpicxx
 
 SRCS=$(wildcard *.cpp)
-OBJ_GOOGLETEST= test_main.o ParcoRepartTest.o ParcoRepart.o MultiLevelTest.o MultiLevel.o LocalRefinementTest.o LocalRefinement.o HilbertCurve.o HilbertCurveTest.o MeshGenerator.o FileIO.o FileIOTest.o PrioQueueForInts.o quadtree/test/QuadTreeTest.o SpectralPartition.o SpectralPartitionTest.o MultiSection.o MultiSectionTest.o auxTest.o
-OBJ_TEST_MAIN= mainTest.o ParcoRepart.o MultiLevel.o LocalRefinement.o HilbertCurve.o MeshGenerator.o MultiSection.o FileIO.o PrioQueueForInts.o
-OBJ_GRAPH_GEN=  ParcoRepart.o HilbertCurve.o MeshGenerator.o FileIO.o graphGeneratorFromQuad.o
-OBJ_TEST_INITIAL_SFC= testInitialSfc.o ParcoRepart.o MultiLevel.o LocalRefinement.o HilbertCurve.o SpectralPartition.o MultiSection.o MeshGenerator.o FileIO.o PrioQueueForInts.o
-OBJ_TEST_INITIAL_MS= testInitialMultiSection.o ParcoRepart.o MultiLevel.o LocalRefinement.o HilbertCurve.o SpectralPartition.o MultiSection.o MeshGenerator.o FileIO.o PrioQueueForInts.o
+OBJ_COMMON= ParcoRepart.o MultiLevel.o LocalRefinement.o HilbertCurve.o MeshGenerator.o FileIO.o PrioQueueForInts.o SpectralPartition.o Diffusion.o GraphUtils.o MultiSection.o KMeans.o
+OBJ_GOOGLETEST= $(OBJ_COMMON) test_main.o ParcoRepartTest.o MultiLevelTest.o LocalRefinementTest.o HilbertCurveTest.o FileIOTest.o MeshGeneratorTest.o quadtree/test/QuadTreeTest.o auxTest.o SpectralPartitionTest.o DiffusionTest.o KMeansTest.o
+OBJ_TEST_MAIN= $(OBJ_COMMON) main.o
+OBJ_GRAPH_GEN=  $(OBJ_COMMON) graphGeneratorFromQuad.o
+OBJ_CONVERTER = quadTreeConverter.o FileIO.o
+OBJ_DIFFUSIONCOORDS = FileIO.o Diffusion.o diffusionCoords.o
+OBJ_TEST_INITIAL= testInitial.o ParcoRepart.o MultiLevel.o LocalRefinement.o HilbertCurve.o SpectralPartition.o MultiSection.o MeshGenerator.o FileIO.o PrioQueueForInts.o KMeans.o Diffusion.o
+OBJ_WEAKSCALING= testWeakScaling.o MultiSection.o ParcoRepart.o MeshGenerator.o MultiLevel.o LocalRefinement.o HilbertCurve.o SpectralPartition.o KMeans.o Diffusion.o GraphUtils.o
 
 EXECUTABLE_GOOGLETEST=KatanomiTest
 EXECUTABLE_MAIN=Katanomi
 EXECUTABLE_GRAPH_GEN= graphGen
-EXECUTABLE_INITIAL_SFC= initTestSfc
-EXECUTABLE_INITIAL_MS= initTestMS
+EXECUTABLE_CONVERTER= converter
+EXECUTABLE_DIFFUSIONCOORDS=diffCoords
+EXECUTABLE_INITIAL= initTest
+EXECUTABLE_WEAKSCALING= weakScaling
 
 GIT_COMMIT=$(shell git rev-parse --short HEAD)
 SCAI_INCLUDE=
@@ -21,26 +26,41 @@ GTEST_LIB=
 BOOST_LIB=
 QUICKSORT_INCLUDE=schizoQuicksort/src
 QUICKSORT_LIB=schizoQuicksort/build
-LFLAGS= -L$(SCAI_LIB) -L$(GTEST_LIB) -L$(BOOST_LIB) -L$(QUICKSORT_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lscai_sparsekernel -lscai_solver -lgtest -lboost_program_options -lboost_filesystem -lboost_system -lquicksort
-CCFLAGS= --openmp --std=c++11 -g -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -I$(QUICKSORT_INCLUDE) -DSCAI_TRACE_ON  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR -DBUILD_COMMIT=$(GIT_COMMIT)
+MPI_INCLUDE=/usr/lib/openmpi/include/
+MPI_LIB=/usr/lib/openmpi/lib/
+LFLAGS= -Wl,-rpath=$(SCAI_LIB) -L$(SCAI_LIB) -L$(GTEST_LIB) -L$(QUICKSORT_LIB) -L$(MPI_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lscai_sparsekernel -lscai_solver -lboost_program_options -lboost_filesystem -lboost_system -lquicksort -lparmetis -lmetis
+CCFLAGS= --openmp --std=c++11 -g -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -I$(QUICKSORT_INCLUDE) -I$(MPI_INCLUDE) -DSCAI_TRACE_ON  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR -DBUILD_COMMIT=$(GIT_COMMIT)
 
-all: main tests testInitialMS testInitialSfc
+all: main tests metisWrapper lib converter diffusionCoords graphGen testInitial weakScaling
 .PHONY: all
 
 tests: $(OBJ_GOOGLETEST)
-	$(CC) $(CCFLAGS) $(OBJ_GOOGLETEST) -o $(EXECUTABLE_GOOGLETEST) $(LFLAGS)
+	$(CC) $(CCFLAGS) $(OBJ_GOOGLETEST) -o $(EXECUTABLE_GOOGLETEST) $(LFLAGS) -lgtest
 
 main: $(OBJ_TEST_MAIN)
 	$(CC) $(CCFLAGS) $(OBJ_TEST_MAIN) -o $(EXECUTABLE_MAIN) $(LFLAGS)
-	
+
 graphGen: $(OBJ_GRAPH_GEN)
 	$(CC) $(CCFLAGS) $(OBJ_GRAPH_GEN) -o $(EXECUTABLE_GRAPH_GEN) $(LFLAGS)
 
-testInitialSfc: $(OBJ_TEST_INITIAL_SFC)
-	$(CC) $(CCFLAGS) $(OBJ_TEST_INITIAL_SFC) -o $(EXECUTABLE_INITIAL_SFC) $(LFLAGS)
+metisWrapper: $(OBJ_COMMON) parMetisPart.cpp
+	$(CC) $(CCFLAGS) -I$(PARMETIS_INCLUDE) $(OBJ_COMMON) parMetisPart.cpp -o metisWrapper -L$(PARMETIS_LIB) -lparmetis $(LFLAGS)
 
-testInitialMS: $(OBJ_TEST_INITIAL_MS)
-	$(CC) $(CCFLAGS) $(OBJ_TEST_INITIAL_MS) -o $(EXECUTABLE_INITIAL_MS) $(LFLAGS)	
+testInitial: $(OBJ_TEST_INITIAL)
+	$(CC) $(CCFLAGS) $(OBJ_TEST_INITIAL) -o $(EXECUTABLE_INITIAL) $(LFLAGS)
+
+converter: $(OBJ_CONVERTER)
+	$(CC) $(CCFLAGS) $(OBJ_CONVERTER) -o $(EXECUTABLE_CONVERTER) $(LFLAGS)
+
+diffusionCoords: $(OBJ_DIFFUSIONCOORDS)
+	$(CC) $(CCFLAGS) $(OBJ_DIFFUSIONCOORDS) -o $(EXECUTABLE_DIFFUSIONCOORDS) $(LFLAGS)
+	
+weakScaling: $(OBJ_WEAKSCALING)
+	$(CC) $(CCFLAGS) $(OBJ_WEAKSCALING) -o $(EXECUTABLE_WEAKSCALING) $(LFLAGS)	
+
+lib: $(OBJ_COMMON)
+	ar rcs libparcorepart.a $(OBJ_COMMON)
+
 		
 .PHONY: clean
 clean:

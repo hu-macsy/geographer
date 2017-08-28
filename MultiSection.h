@@ -10,14 +10,6 @@
 
 #include "Settings.h"
 
-#define STRINGIZER(arg)     #arg
-#define STR_VALUE(arg)      STRINGIZER(arg)
-#define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
-#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-#define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-
-        
-
 namespace ITI {
 
     /* A d-dimensional rectangle represented by two points: the bottom and the top corner.
@@ -44,7 +36,8 @@ namespace ITI {
             for(int i=0; i<top.size(); i++){
                 std::cout<< top[i] << ", ";
             }
-            std::cout<< std::endl;
+            
+            std::cout<< "          weight: "<< weight << std::endl;
         }
         
         /** Checks if this rectangle resides entirely in the given rectangle:
@@ -73,14 +66,48 @@ namespace ITI {
             IndexType dim= point.size();
             SCAI_ASSERT( dim==this->top.size(), "Wrong dimensions: point.dim= " << dim << ", this->top.dim= "<< this->top.size() );
             
-            bool ret= true;
             for(int d=0; d<dim; d++){
-                if( point[d]<this->bottom[d] or point[d]>this->top[d]){
-                    ret= false;
-                    break;
+                if( point[d]<bottom[d] or point[d]>top[d]){
+                    return false;
                 }
             }
-            return ret;
+            return true;
+        }
+        
+        /*  Checks if two rectangles share a common border. In our case if top[d]=10 and bottom[d]=11
+         *  then the rectangles are adjacent: their difference must be more than 1 in order NOT to be
+         *  adjacent.
+        */
+        bool isAdjacent(const rectangle& other) const {
+            int dim = bottom.size();
+            // if 0 or 1 OK, if 2 cells share just an edge, if 3 they share a corner
+            int strictEqualities= 0;
+            for(int d=0; d<dim; d++){
+                // this ensures that share a face but not sure if edge or corner
+                if(top[d]-other.bottom[d]<1){
+                    return false;
+                }else if(bottom[d]-other.top[d]>1){
+                    return false;
+                }
+                
+                // this rules out if they share only an edge or a corner
+                if( top[d]== other.bottom[d] or bottom[d]== other.top[d]){
+                    ++strictEqualities;
+                }
+            }
+            
+            // for arbitrary dimension this can be >d-2 (?)
+            if(dim==2){
+                if( strictEqualities > 1){
+                    return false;
+                }
+            }else {
+                if( strictEqualities > dim-2){
+                    return false;
+                }
+            }
+            // if none of the above failed
+            return true;
         }
         
         bool operator()(rectangle& a, rectangle& b){
@@ -177,42 +204,28 @@ namespace ITI {
             
             // point should be inside this rectangle
             for(int d=0; d<dim; d++){
-                //TODO: just throw exception or insert assertion to ensure point is within bounds?
                 if(point[d]>myRect.top[d] or  point[d]<myRect.bottom[d]){
-                    //return NULL;
                     throw std::logic_error("Point out of bounds");
                 }
             }
-            //TODO: remove variable ret or not?
-            std::shared_ptr<rectCell> ret;
+            
             if( !this->isLeaf ){
-                bool foundOwnerChild = false;
                 for(int c=0; c<this->children.size(); c++){
                     if( children[c]->myRect.owns( point ) ){                    
-                        foundOwnerChild = true;
-                        //ret = children[c]->getContainingLeaf( point );
                         return children[c]->getContainingLeaf( point );
-                        break;  // if one node is found no need to search the rest of the children
                     }
                 }
-               
-                // this is not a leaf node and none of the childrens owns the point
-                if( !foundOwnerChild ){
-                    // check again if this rectangle owns the point
-                    //TODO: not need to check again
-                    if( myRect.owns( point ) ){
-                        ret = std::make_shared<rectCell>(*this);
-                    }else{
-                        //return NULL;
-                        throw std::logic_error("Null pointer");
-                    }
-                }
+                // this is not a leaf node but none of the childrens owns the point
+                //WARNING: in our case this should never happen, but it may happen in a more general
+                // case where the children rectangles do not cover the entire father rectangle
+                this->getRect().print();
+                throw std::logic_error("Null pointer");
             }else{
-                SCAI_ASSERT( this->myRect.owns(point), "Should not happen")    
-                //ret = std::make_shared<rectCell>(*this);
+                //TODO: possibly a bit expensive and not needed assertion
+                SCAI_ASSERT( myRect.owns(point), "Should not happen")    
                 return  std::make_shared<rectCell>(*this);
             }
-            return ret;
+    
         }
         
         IndexType getSubtreeSize(){
@@ -335,6 +348,10 @@ namespace ITI {
         IndexType getLeafID(){
             return leafID;
         }
+        
+        ValueType getLeafWeight(){
+            return myRect.weight;
+        }
 
     protected:
         rectangle myRect;
@@ -358,11 +375,14 @@ namespace ITI {
          */
         static scai::lama::DenseVector<IndexType> getPartitionNonUniform( const scai::lama::CSRSparseMatrix<ValueType> &input, const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, struct Settings settings );
         
+        static scai::lama::DenseVector<IndexType> setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr distPtr, const std::vector<std::vector<IndexType>>& localPoints);
+        
+        
         /** Get a tree of rectangles of a uniform grid with side length sideLen. The rectangles cover the whole grid and 
          * do not overlap.
          * 
          * @param[in] nodeWeights The weights for each point.
-         * @param[in] sideLen The length of the side of the whole uniform, square grid. The coordinates are from 0 to sideLen-1. Example: if sideLen=2, the poitns are (0,0),(0,1),(1,0),(1,1)
+         * @param[in] sideLen The length of the side of the whole uniform, square grid. The coordinates are from 0 to sideLen-1. Example: if sideLen=2, the points are (0,0),(0,1),(1,0),(1,1)
          * @param[in] setting A settigns struct passing various arguments.
          * 
          * @return A pointer to the root of the tree. number of leaves = settings.numBlocks.
@@ -400,7 +420,7 @@ namespace ITI {
         
         static std::shared_ptr<rectCell<IndexType,ValueType>> getRectanglesNonUniform( 
             const scai::lama::CSRSparseMatrix<ValueType> &input,
-            const std::vector<scai::lama::DenseVector<IndexType>> &coordinates,
+            const std::vector<std::vector<IndexType> > &coordinates,
             const scai::lama::DenseVector<ValueType>& nodeWeights,
             const std::vector<ValueType>& minCoords,
             const std::vector<ValueType>& maxCoords,
@@ -409,7 +429,7 @@ namespace ITI {
         /** Projection for the non-uniform grid case. Coordinates must be Indextype.
          */
         static std::vector<std::vector<ValueType>> projectionNonUniform( 
-            const std::vector<scai::lama::DenseVector<IndexType>>& coordinates,
+            const std::vector<std::vector<IndexType> >& coordinates,
             const scai::lama::DenseVector<ValueType>& nodeWeights,
             const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
             const std::vector<IndexType>& dimensionToProject,
@@ -431,7 +451,11 @@ namespace ITI {
         
         static std::pair<std::vector<IndexType>,std::vector<ValueType>> partition1DOptimal( const std::vector<ValueType>& array, const IndexType k, Settings settings);   
         
+        static std::pair<std::vector<IndexType>, std::vector<ValueType>> partition1DMine( const std::vector<ValueType>& nodeWeights, const IndexType k, Settings settings);
+
         static bool probe(const std::vector<ValueType>& prefixSum, const IndexType k, const ValueType target);
+
+        static std::pair<bool, std::vector<IndexType>> probeAndGetSplitters(const std::vector<ValueType>& prefixSum, const IndexType k, const ValueType target);
         
         /**Checks if the given index is in the given bounding box. Index corresponds to a uniform matrix given
          * as a 1D array/vector. 
@@ -440,7 +464,8 @@ namespace ITI {
          * @param[in] bBox The bounding box given as two vectors; one for the bottom point and one for the top point. For all dimensions i, should be: bBox.first(i)< bBox.second(i).
          * 
          */
-        static bool inBBox( const std::vector<IndexType>& coords, const struct rectangle& bBox);
+        template<typename T>
+        static bool inBBox( const std::vector<T>& coords, const struct rectangle& bBox);
         
         /** Calculates the weight of the rectangle.
          * 
@@ -457,6 +482,11 @@ namespace ITI {
         template<typename T>
         static ValueType getRectangleWeight( const std::vector<scai::lama::DenseVector<T>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
         
+        template<typename T>
+        static ValueType getRectangleWeight( const std::vector<std::vector<T>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
+        
+        
+        static scai::lama::CSRSparseMatrix<ValueType> getBlockGraphFromTree_local( const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot );
         /** Function to transform a 1D index to 2D or 3D given the side length of the cubical grid.
          * For example, in a 4x4 grid, indexTo2D(1)=(0,1), indexTo2D(4)=(1,0) and indexTo2D(13)=(3,1)
          * 

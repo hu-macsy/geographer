@@ -1,9 +1,15 @@
 #pragma once
 
-enum class InitialPartitioningMethods {SFC = 0, Pixel = 1, Spectral = 2, Multisection = 3};
+#define STRINGIZER(arg)     #arg
+#define STR_VALUE(arg)      STRINGIZER(arg)
+#define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
+#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
+#define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
+
+const std::string version = BUILD_COMMIT_STRING;
 
 struct Settings{
-    IndexType dimensions= 3;
+    IndexType dimensions= 2;
     IndexType numX = 32;
     IndexType numY = 32;
     IndexType numZ = 32;
@@ -17,17 +23,19 @@ struct Settings{
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
     IndexType pixeledSideLen = 10;
-    InitialPartitioningMethods initialPartition = InitialPartitioningMethods::SFC;
+    IndexType fileFormat = 1;   // 0 for METIS, 1 for MatrixMarket
+    IndexType initialPartition = 0;
+    bool bisect = 0;    // 0: works for square k, 1: bisect, for k=power of 2, 2: user defined cutsPerDim
     bool useDiffusionTieBreaking = false;
     bool useGeometricTieBreaking = false;
     bool useDiffusionCoordinates = false;
     bool gainOverBalance = false;
     bool skipNoGainColors = false;
     bool writeDebugCoordinates = false;
-    bool bisect = false;
     bool useExtent = false;
     double epsilon = 0.05;
     std::string fileName = "-";
+    std::vector<IndexType> cutsPerDim;
     
     void print(std::ostream& out){
         IndexType numPoints = numX* numY* numZ;
@@ -43,16 +51,31 @@ struct Settings{
         out<< "gainOverBalance: " << gainOverBalance << std::endl;
         out<< "skipNoGainColors: "<< skipNoGainColors << std::endl;
         out<< "pixeledSideLen: "<< pixeledSideLen << std::endl;
-        if (initialPartition==InitialPartitioningMethods::SFC) {
-            out<< "initial partition: hilbert curve" << std::endl;
-        } else if (initialPartition==InitialPartitioningMethods::Pixel) {
-            out<< "initial partition: pixels" << std::endl;
-        } else if (initialPartition==InitialPartitioningMethods::Spectral) {
-            out<< "initial partition: spectral" << std::endl;
-        } else if (initialPartition==InitialPartitioningMethods::Multisection) {
-        	out<< "initial partition: multisection" << std::endl;
-        } else {
-            out<< "initial partition undefined" << std::endl;
+        out<< "fileFormat: "<< fileFormat << std::endl;
+        switch( initialPartition){
+            case 0: {
+                out<< "initial partition: hilbert curve" << std::endl;  break;
+            } 
+            case 1:{
+                out<< "initial partition: pixels" << std::endl;     break;
+            }
+            case 2:{
+                out<< "initial partition: spectral" << std::endl;   break;
+            }
+            case 3:{
+                out<< "initial partition: k-means" << std::endl;   break;
+            }
+            case 4:{
+                if ( !bisect ){
+                    out<< "initial partition: multisection" << std::endl;
+                }else{
+                    out<< "initial partition: bisection" << std::endl;
+                }
+                break;
+            }
+            default:{
+                out<< "initial partition undefined" << std::endl;   break;
+            }
         }
     }
 };

@@ -31,6 +31,8 @@ for i in range(iterations):
         useDiffusionTieBreaking = int(tieBreakingStrategy == 1)
         useGeometricTieBreaking = int(tieBreakingStrategy == 2)
         multiLevelRounds = random.randint(0,7)
+        initialPartition = 1
+        coordFormat = 1
 
         if not os.path.exists(filename):
                 print(filename + " does not exist.")
@@ -43,8 +45,12 @@ for i in range(iterations):
             others += " --useDiffusionTieBreaking="+str(useDiffusionTieBreaking)
             others += " --useGeometricTieBreaking="+str(useGeometricTieBreaking)
             others += " --multiLevelRounds="+str(multiLevelRounds)
+            others += " --useDiffusionCoordinates 1"
+            others += " --initialPartition="+str(initialPartition)
+            others += " --dimensions="+str(dimensions)
+            others += " --coordFormat="+str(coordFormat)
             commandString = assembleCommandString("parco", filename, p, others)
-            submitfile = createMOABSubmitFile("msub-"+str(p)+"-"+str(i)+".cmd", commandString, "00:10:00", p, "4000mb")
+            submitfile = createMOABSubmitFile("msub-"+str(p)+"-"+str(i)+".cmd", commandString, "00:25:00", p, "4000mb")
             call(["msub", submitfile])
 
                 

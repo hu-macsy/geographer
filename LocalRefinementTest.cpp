@@ -21,6 +21,7 @@
 #include "MeshGenerator.h"
 #include "FileIO.h"
 #include "LocalRefinement.h"
+#include "GraphUtils.h"
 #include "gtest/gtest.h"
 
 typedef double ValueType;
@@ -34,64 +35,12 @@ class LocalRefinementTest : public ::testing::Test {
 
 };
 
-/*
-TEST_F(LocalRefinementTest, testFiducciaMattheysesLocal) {
-  std::string file = "Grid32x32";
-  const IndexType k = 10;
-  const ValueType epsilon = 0.05;
-  const IndexType iterations = 1;
-
-  //generate random matrix
-
-  CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
-  const IndexType n = graph.getRowDistributionPtr()->getGlobalSize();
-
-  //we want a replicated matrix
-  scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
-  graph.redistribute(noDistPointer, noDistPointer);
-
-  //generate random partition
-  scai::lama::DenseVector<IndexType> part(n, 0);
-  for (IndexType i = 0; i < n; i++) {
-    IndexType blockId = rand() % k;
-    part.setValue(i, blockId);
-  }
-
-  ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
-  for (IndexType i = 0; i < iterations; i++) {
-    ValueType gain = ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(graph, part, k, epsilon);
-
-    //check correct gain calculation
-    const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
-    EXPECT_EQ(cut - gain, newCut) << "Old cut " << cut << ", gain " << gain << " newCut " << newCut;
-    EXPECT_LE(newCut, cut);
-    cut = newCut;
-  }
-  
-  //generate balanced partition
-  for (IndexType i = 0; i < n; i++) {
-    IndexType blockId = i % k;
-    part.setValue(i, blockId);
-  }
-
-  //check correct cut with balanced partition
-  cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
-  ValueType gain = ParcoRepart<IndexType, ValueType>::replicatedMultiWayFM(graph, part, k, epsilon);
-  const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
-  EXPECT_EQ(cut - gain, newCut);
-  EXPECT_LE(newCut, cut);
-
-  //check for balance
-  ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k);
-  EXPECT_LE(imbalance, epsilon);
-}
-*/
 //--------------------------------------------------------------------------------------- 
  
 TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType k = comm->getSize();
-	const ValueType epsilon = 0.05;
+	const ValueType epsilon = 0.1;
 	const IndexType iterations = 1;
 
 	srand(time(NULL));
@@ -127,8 +76,8 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 		part.setValue(globalID, blockId);
 	}
 	//test initial partion for imbalance
-	DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
-        ValueType initialImbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k, uniformWeights);
+	DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1.0);
+        ValueType initialImbalance = GraphUtils::computeImbalance<IndexType, ValueType>(part, k, uniformWeights);
         
         // If initial partition is highly imbalanced local refinement cannot fix it.
         // TODO: should the final partion be balances no matter how imbalanced is the initial one???
@@ -153,7 +102,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 		coordinates[dim].redistribute(newDistribution);
 	}
 
-	std::vector<IndexType> localBorder = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(graph);
+	std::vector<IndexType> localBorder = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(graph);
 
 	Settings settings;
 	settings.numBlocks= k;
@@ -161,19 +110,19 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
         settings.epsilon = epsilon;
         
 	//get block graph
-	scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( graph, part, settings.numBlocks);
+	scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils::getBlockGraph<IndexType, ValueType>( graph, part, settings.numBlocks);
 
 	//color block graph and get a communication schedule
 	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
 
 	//get random node weights
-	DenseVector<IndexType> weights;
+	DenseVector<ValueType> weights;
         // setRandom creates too big numbers and weights.sum() < 0 because (probably) sum does not fit in int
 	//weights.setRandom(graph.getRowDistributionPtr(), 1);
         weights.setSequence(1, 1, graph.getRowDistributionPtr() );
-        IndexType totalWeight = n*(n+1)/2;
-	IndexType minNodeWeight = weights.min().Scalar::getValue<IndexType>();
-	IndexType maxNodeWeight = weights.max().Scalar::getValue<IndexType>();
+        ValueType totalWeight = n*(n+1)/2;
+	ValueType minNodeWeight = weights.min().Scalar::getValue<IndexType>();
+	ValueType maxNodeWeight = weights.max().Scalar::getValue<IndexType>();
 
         EXPECT_EQ(weights.sum(), totalWeight );
 	if (comm->getRank() == 0) {
@@ -183,18 +132,17 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	//DenseVector<IndexType> nonWeights = DenseVector<IndexType>(0, 1);
 
 	//get distances
-	std::vector<double> distances = ParcoRepart<IndexType,ValueType>::distancesFromBlockCenter(coordinates);
+	std::vector<double> distances = LocalRefinement<IndexType,ValueType>::distancesFromBlockCenter(coordinates);
 
-	ValueType cut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
+	ValueType cut = GraphUtils::computeCut(graph, part, true);
 	ASSERT_GE(cut, 0);
 	for (IndexType i = 0; i < iterations; i++) {
-		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights,
-				communicationScheme, coordinates, distances, settings);
+		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, communicationScheme, coordinates, distances, settings);
 		IndexType gain = 0;
 		for (IndexType roundGain : gainPerRound) gain += roundGain;
 
 		//check correct gain calculation
-		const ValueType newCut = ParcoRepart<IndexType, ValueType>::computeCut(graph, part, true);
+		const ValueType newCut = GraphUtils::computeCut(graph, part, true);
 		EXPECT_EQ(cut - gain, newCut) << "Old cut " << cut << ", gain " << gain << " newCut " << newCut;
 
 		EXPECT_LE(newCut, cut);
@@ -202,7 +150,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	}
 
 	//check for balance
-	ValueType imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance(part, k, weights);
+	ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(part, k, weights);
         PRINT0("final imbalance: " << imbalance);
         // TODO: I do not know, both assertion fail from time to time...
         // at least return a solution less imbalanced than the initial one
@@ -257,9 +205,9 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 	}
 
 	//std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::computeCommunicationPairings(a, part, mapping);
-        scai::lama::CSRSparseMatrix<ValueType> blockGraph = ParcoRepart<IndexType, ValueType>::getBlockGraph( a, part, k);
+        scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils::getBlockGraph<IndexType, ValueType>( a, part, k);
 	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
-	std::vector<IndexType> localBorder = ParcoRepart<IndexType, ValueType>::getNodesWithNonLocalNeighbors(a);
+	std::vector<IndexType> localBorder = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(a);
 
 	IndexType thisBlock = comm->getRank();
 
@@ -268,7 +216,7 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 		IndexType partner = commAccess[scheme[round].getDistributionPtr()->global2local(comm->getRank())];
 
 		if (partner == thisBlock) {
-			scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildNeighborHalo(a);
+			scai::dmemo::Halo partHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(a);
 			scai::utilskernel::LArray<IndexType> haloData;
 			comm->updateHalo( haloData, part.getLocalValues(), partHalo );
 
@@ -308,7 +256,7 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 			const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 			const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
-			scai::dmemo::Halo partHalo = ParcoRepart<IndexType, ValueType>::buildNeighborHalo(a);
+			scai::dmemo::Halo partHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(a);
 			scai::utilskernel::LArray<IndexType> haloData;
 			comm->updateHalo( haloData, localData, partHalo );
 
@@ -348,6 +296,43 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 	}
 }
 //----------------------------------------------------------
+
+TEST_F(LocalRefinementTest, testDistancesFromBlockCenter) {
+	const IndexType nroot = 16;
+	const IndexType n = nroot * nroot * nroot;
+	const IndexType dimensions = 3;
+
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+	scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+
+	scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
+	std::vector<ValueType> maxCoord(dimensions, nroot);
+	std::vector<IndexType> numPoints(dimensions, nroot);
+
+	scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
+
+	std::vector<DenseVector<ValueType>> coordinates(dimensions);
+	for(IndexType i=0; i<dimensions; i++){
+	  coordinates[i].allocate(coordDist);
+	  coordinates[i] = static_cast<ValueType>( 0 );
+	}
+
+	MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(a, coordinates, maxCoord, numPoints);
+
+	const IndexType localN = dist->getLocalSize();
+
+	std::vector<ValueType> distances = LocalRefinement<IndexType, ValueType>::distancesFromBlockCenter(coordinates);
+	EXPECT_EQ(localN, distances.size());
+	const ValueType maxPossibleDistance = pow(dimensions*(nroot*nroot),0.5);
+
+	for (IndexType i = 0; i < distances.size(); i++) {
+		EXPECT_LE(distances[i], maxPossibleDistance);
+	}
+}
+//---------------------------------------------------------------------------------------
+
 
 
 }// namespace ITI

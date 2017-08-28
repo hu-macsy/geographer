@@ -23,10 +23,13 @@
 #include "ParcoRepart.h"
 #include "LocalRefinement.h"
 #include "SpectralPartition.h"
+#include "GraphUtils.h"
+
 #include "gtest/gtest.h"
 
 #include <boost/filesystem.hpp>
 
+#include "GraphUtils.h"
 #include "AuxiliaryFunctions.h"
 
 typedef double ValueType;
@@ -43,7 +46,7 @@ class auxTest : public ::testing::Test {
 
 TEST_F (auxTest, testMultiLevelStep_dist) {
 
-    const IndexType N = 120;
+    const IndexType N = 200;
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -94,30 +97,40 @@ TEST_F (auxTest, testMultiLevelStep_dist) {
     
     //coordinates at random and redistribute
     std::vector<DenseVector<ValueType>> coords(settings.dimensions);
+    srand(time(NULL));
+    
     for(IndexType i=0; i<settings.dimensions; i++){
     	coords[i] = DenseVector<ValueType>(distPtr, 0);
         // set random coordinates
     	scai::hmemo::WriteOnlyAccess<ValueType> wCoords(coords[i].getLocalValues());
         for(IndexType j=0; j<localN; j++){
-            wCoords[i] = rand()%k;
+            wCoords[i] = rand()%100;      
         }
+        wCoords.release();
+        coords[i].redistribute( distPtr );
+        ValueType min = coords[i].min().Scalar::getValue<ValueType>();
+        ValueType max = coords[i].max().Scalar::getValue<ValueType>();
+        ASSERT_LT(min, max);
     }
     
-    DenseVector<IndexType> partition= ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coords, settings);
+    DenseVector<IndexType> partition= ParcoRepart<IndexType, ValueType>::hilbertPartition(coords, settings);
+    scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( partition.getDistribution(), partition.getLocalValues() ) );
+    partition.redistribute(newDist);
+    graph.redistribute(newDist, noDistPtr);
+    for (IndexType d = 0; d < settings.dimensions; d++) {
+    	coords[d].redistribute(newDist);
+    }
+
     // node weights = 1
-    DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(partition.getDistributionPtr(), 1);
+    DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(partition.getDistributionPtr(), 1);
     
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, settings);
-    //ITI::aux::multiLevelStep(graph, partition, uniformWeights, coords, Settings);
     
     EXPECT_EQ( graph.l1Norm() , beforel1Norm);
     EXPECT_EQ( graph.getNumValues() , beforeNumValues);
-    DenseVector<ValueType> newWeights(N,0);
+    DenseVector<ValueType> newWeights(uniformWeights, noDistPtr);
     assert(uniformWeights.size()==N);
-    for(int i=0; i<N; i++){
-        newWeights.setValue(i, uniformWeights.getValue(i) );
-    }
-    //PRINT(newWeights.l1Norm() );
+
     EXPECT_EQ( newWeights.l1Norm() , beforeSumWeights );
     
 }
@@ -173,7 +186,7 @@ TEST_F (auxTest, testInitialPartitions){
     settings.minBorderNodes = N*std::pow(0.6, settings.multiLevelRounds)/k * 0.05;
     settings.coarseningStepsBetweenRefinement =2;
     
-    DenseVector<IndexType> uniformWeights;
+    DenseVector<ValueType> uniformWeights;
     
     ValueType cut;
     ValueType imbalance;
@@ -194,26 +207,32 @@ TEST_F (auxTest, testInitialPartitions){
     if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
     PRINT0("Get a pixeled partition");
     // get a pixeledPartition
-    scai::lama::DenseVector<IndexType> pixeledPartition = ParcoRepart<IndexType, ValueType>::pixelPartition( graph, coordinates, settings);
+    scai::lama::DenseVector<IndexType> pixeledPartition = ParcoRepart<IndexType, ValueType>::pixelPartition(coordinates, settings);
     
-    //aux::print2DGrid( graph, pixeledPartition );
+    scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( pixeledPartition.getDistribution(), pixeledPartition.getLocalValues() ) );
+    pixeledPartition.redistribute(newDist);
+    graph.redistribute(newDist, noDistPointer);
+	for (IndexType d = 0; d < dimensions; d++) {
+		coordinates[d].redistribute(newDist);
+	}
+
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"pixelPart");
     }
     //cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, pixeledPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
+    cut = GraphUtils::computeCut( graph, pixeledPartition);
+    imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( pixeledPartition, k);
     if(comm->getRank()==0){
         logF<< "-- Initial Pixeled partition " << std::endl;
         logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
     }
-    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+    uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, settings);
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithPixel");
     }
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, pixeledPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
+    cut = GraphUtils::computeCut( graph, pixeledPartition);
+    imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( pixeledPartition, k);
     if(comm->getRank()==0){
         logF<< "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
         logF  << std::endl  << std::endl; 
@@ -231,25 +250,32 @@ TEST_F (auxTest, testInitialPartitions){
     if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
     PRINT0( "Get a hilbert/sfc partition");
     // get a hilbertPartition
-    scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition( graph, coordinates, settings);
+    scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
     
+    newDist = scai::dmemo::DistributionPtr( new scai::dmemo::GeneralDistribution ( hilbertPartition.getDistribution(), hilbertPartition.getLocalValues() ) );
+    hilbertPartition.redistribute(newDist);
+    graph.redistribute(newDist, noDistPointer);
+	for (IndexType d = 0; d < dimensions; d++) {
+		coordinates[d].redistribute(newDist);
+	}
+
     //aux::print2DGrid( graph, hilbertPartition );
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"hilbertPart");
     }
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, hilbertPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
+    cut = GraphUtils::computeCut( graph, hilbertPartition);
+    imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( hilbertPartition, k);
     if(comm->getRank()==0){
         logF<< "-- Initial Hilbert/sfc partition " << std::endl;
         logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
     }
-    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+    uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, settings);
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithHilbert");
     }
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, hilbertPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
+    cut = GraphUtils::computeCut( graph, hilbertPartition);
+    imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( hilbertPartition, k);
     if(comm->getRank()==0){
         logF<< "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
         logF  << std::endl  << std::endl; 
@@ -257,76 +283,116 @@ TEST_F (auxTest, testInitialPartitions){
         std::cout  << std::endl  << std::endl; 
     }
    
-    //------------------------------------------- spectral
-/*
-    settings.minGainForNextRound = 5;
-    
-    // the partitioning may redistribute the input graph
-    graph.redistribute(dist, noDistPointer);
-    for(int d=0; d<dimensions; d++){
-        coordinates[d].redistribute( dist );
-    }
-    if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
-    PRINT0("Get a spectral partition");
-
-    // get initial spectral partition
-    scai::lama::DenseVector<IndexType> spectralPartition = SpectralPartition<IndexType, ValueType>::getPartition( graph, coordinates, settings);
-    
-    //aux::print2DGrid( graph, spectralPartition );
-    if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"spectralPart");
-    }
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, spectralPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( spectralPartition, k);
-    logF<< "-- Initial Spectral partition " << std::endl;
-    logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
-    
-    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, spectralPartition, uniformWeights, coordinates, settings);
-    
-    if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithSpectral");
-    }
-    cut = ParcoRepart<IndexType, ValueType>::computeCut( graph, spectralPartition);
-    imbalance = ParcoRepart<IndexType, ValueType>::computeImbalance( spectralPartition, k);
-    if(comm->getRank()==0){
-        logF<< "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
-        logF  << std::endl  << std::endl; 
-        std::cout << "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
-        std::cout  << std::endl  << std::endl; 
-    }
-*/    
     if(comm->getRank()==0){
         std::cout<< "Output files written in " << destPath << std::endl;
     }
 
 }
+//-----------------------------------------------------------------
 
+TEST_F (auxTest,testGraphMaxDegree){
+    
+    const IndexType N = 1000;
+    const IndexType k = 10;
+
+    //define distributions
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+
+    //generate random complete matrix
+    scai::lama::CSRSparseMatrix<ValueType> graph(dist, noDistPointer);
+    
+    for( int i=0; i<10; i++){
+        scai::lama::MatrixCreator::fillRandom(graph, i/9.0);
+    
+        IndexType maxDegree;
+        maxDegree = GraphUtils::getGraphMaxDegree<IndexType, ValueType>(graph);
+        //PRINT0("maxDegree= " << maxDegree);
+        
+        EXPECT_LE( maxDegree, N);
+        EXPECT_LE( 0, maxDegree);
+        if ( i==0 ){
+            EXPECT_EQ( maxDegree, 0);
+        }else if( i==9 ){
+            EXPECT_EQ( maxDegree, N);
+        }
+    }
+}
+//-----------------------------------------------------------------
 
 TEST_F (auxTest, testPixelDistance) {
     
-    IndexType sideLen = 139;
+    IndexType sideLen = 100;
     
-    //for pixel=18 and an 8x8 grid max dist is with pixel 63 and is equal to 10
-    ValueType maxl2Dist = aux::pixell2Distance2D(0,sideLen*sideLen-1, sideLen);
-    std::cout<< maxl2Dist << std::endl;
+    ValueType maxl2Dist = aux::pixelL2Distance2D(0,sideLen*sideLen-1, sideLen);
+    PRINT( maxl2Dist );
     for(int i=0; i<sideLen*sideLen; i++){
         //std::cout << "dist1(" << 0<< ", "<< i << ")= "<< aux::pixelDistance2D( 0, i, sideLen) << std::endl;
-        EXPECT_LE(aux::pixelDistance2D( 0, i, sideLen), sideLen+sideLen-2);
-        EXPECT_LE(aux::pixell2Distance2D( 0, i, sideLen), maxl2Dist);
+        EXPECT_LE(aux::pixelL1Distance2D( 0, i, sideLen), sideLen+sideLen-2);
+        EXPECT_LE(aux::pixelL2Distance2D( 0, i, sideLen), maxl2Dist);
     }
     
     srand(time(NULL));
-    IndexType pixel= rand()/(sideLen*(sideLen-2)) +2*sideLen;
+    IndexType pixel;
+    std::tuple<IndexType, IndexType> coords2D;
+    std::vector<IndexType> maxPoints= {sideLen, sideLen};
+    do{
+        pixel= rand()%(sideLen*(sideLen-2)) +2*sideLen;
+        coords2D = aux::index2_2DPoint( pixel, maxPoints );
+    }while( (std::get<0>(coords2D)>sideLen-4 or std::get<0>(coords2D)<4) and ( std::get<1>(coords2D)>sideLen-4 or std::get<1>(coords2D)<4) );
     
-    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel, sideLen), 0);
-    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel+1, sideLen), 1);
-    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel+sideLen, sideLen), 1);
-    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel-sideLen, sideLen), 1);
-    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel+sideLen-3, sideLen), 4);
-    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel-sideLen-2, sideLen), 3);
-    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel-2*sideLen+3, sideLen), 5);
-    EXPECT_EQ(aux::pixelDistance2D( pixel, pixel-2*sideLen-3, sideLen), 5);
+    //PRINT( std::get<0>(coords2D) << " , " << std::get<1>(coords2D) );
+    
+    EXPECT_EQ(aux::pixelL1Distance2D( pixel, pixel, sideLen), 0);
+    EXPECT_EQ(aux::pixelL1Distance2D( pixel, pixel+1, sideLen), 1);
+    EXPECT_EQ(aux::pixelL1Distance2D( pixel, pixel+sideLen, sideLen), 1);
+    EXPECT_EQ(aux::pixelL1Distance2D( pixel, pixel-sideLen, sideLen), 1);
+    EXPECT_EQ(aux::pixelL1Distance2D( pixel, pixel+sideLen-3, sideLen), 4);
+    EXPECT_EQ(aux::pixelL1Distance2D( pixel, pixel-sideLen-2, sideLen), 3);
+    EXPECT_EQ(aux::pixelL1Distance2D( pixel, pixel-2*sideLen+3, sideLen), 5);
+    EXPECT_EQ(aux::pixelL1Distance2D( pixel, pixel-2*sideLen-3, sideLen), 5);
 }
+//-----------------------------------------------------------------
+
+TEST_F(auxTest, testIndex2_3DPoint){
+    std::vector<IndexType> numPoints(3);
+    
+    srand(time(NULL));
+    for(int i=0; i<3; i++){
+        numPoints[i] = (IndexType) (rand()%5 + 10);
+    }
+    IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
+    
+    for(IndexType i=0; i<N; i++){
+        std::tuple<IndexType, IndexType, IndexType> ind = aux::index2_3DPoint(i, numPoints);
+        EXPECT_LE(std::get<0>(ind) , numPoints[0]-1);
+        EXPECT_LE(std::get<1>(ind) , numPoints[1]-1);
+        EXPECT_LE(std::get<2>(ind) , numPoints[2]-1);
+        EXPECT_GE(std::get<0>(ind) , 0);
+        EXPECT_GE(std::get<1>(ind) , 0);
+        EXPECT_GE(std::get<2>(ind) , 0);
+    }
+}
+//-----------------------------------------------------------------
+
+TEST_F(auxTest, testIndex2_2DPoint){
+    std::vector<IndexType> numPoints= {9, 11};
+    
+    srand(time(NULL));
+    for(int i=0; i<2; i++){
+        numPoints[i] = (IndexType) (rand()%5 + 10);
+    }
+    IndexType N= numPoints[0]*numPoints[1];
+    
+    for(IndexType i=0; i<N; i++){
+        std::tuple<IndexType, IndexType> ind = aux::index2_2DPoint(i, numPoints);
+        EXPECT_LE(std::get<0>(ind) , numPoints[0]-1);
+        EXPECT_LE(std::get<1>(ind) , numPoints[1]-1);
+        EXPECT_GE(std::get<0>(ind) , 0);
+        EXPECT_GE(std::get<1>(ind) , 0);
+    }
+}
+
 
 }

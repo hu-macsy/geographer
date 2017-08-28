@@ -34,6 +34,7 @@
 #include "quadtree/SpatialTree.h"
 #include "quadtree/SpatialCell.h"
 #include "quadtree/QuadTreeCartesianEuclid.h" 
+#include "AuxiliaryFunctions.h"
  
 typedef double ValueType;
 typedef int IndexType;
@@ -67,13 +68,15 @@ namespace ITI {
                 /** Creates the adjacency matrix and the coordinate vector for a 3D mesh in a distributed way.
                  */
                 static void createStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
-
+                
+                static void createStructured2DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
+                
                 static void createRandomStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
                 
                 /*Creates points in a cube of side maxCoord in dimensions and adds them in a quad tree.
                  * Adds more points in specific areas at random. 
                  */
-                static void createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords,const int dimensions, const int numberOfAreas, const int pointsPerArea, const ValueType maxCoord);
+                static void createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords,const int dimensions, const int numberOfAreas, const long pointsPerArea, const ValueType maxCoord);
 
                 static void graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid &quad);
                     
@@ -90,7 +93,7 @@ namespace ITI {
                 /*  Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
                  *  of the index in 3D. The return value is not the coordinates of the point!
                  */
-                static std::tuple<IndexType, IndexType, IndexType> index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints);
+                //static std::tuple<IndexType, IndexType, IndexType> index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints);
         };//class MeshGenerator
         
 }//namespace ITI
