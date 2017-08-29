@@ -128,7 +128,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         } else if (settings.initialPartition == InitialPartitioningMethods::KMeans) {
         	PRINT0("Initial partition with K-Means");
         	//prepare coordinates for k-means
-        	if (settings.dimensions == 2 || settings.dimensions == 3) {
+        	if (comm->getSize() == k && (settings.dimensions == 2 || settings.dimensions == 3)) {
 				DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
 				nodeWeights.redistribute(tempResult.getDistributionPtr());
 				for (IndexType d = 0; d < dimensions; d++) {
@@ -159,42 +159,43 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             throw std::runtime_error("Initial Partitioning mode undefined.");
         }
 
-        /**
-         * redistribute to prepare for local refinement
-         */
-        scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( result.getDistribution(), result.getLocalValues() ) );
-        assert(newDist->getGlobalSize() == n);
-        result.redistribute(newDist);
-		input.redistribute(newDist, noDist);
-		if (settings.useGeometricTieBreaking) {
-			for (IndexType d = 0; d < dimensions; d++) {
-				coordinates[d].redistribute(newDist);
+        if (comm->getSize() == k) {
+			/**
+			 * redistribute to prepare for local refinement
+			 */
+			scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( result.getDistribution(), result.getLocalValues() ) );
+			assert(newDist->getGlobalSize() == n);
+			result.redistribute(newDist);
+			input.redistribute(newDist, noDist);
+			if (settings.useGeometricTieBreaking) {
+				for (IndexType d = 0; d < dimensions; d++) {
+					coordinates[d].redistribute(newDist);
+				}
 			}
-		}
-        nodeWeights.redistribute(input.getRowDistributionPtr());
+			nodeWeights.redistribute(input.getRowDistributionPtr());
 
-        SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
-        std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
-        ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
-        ValueType cut = comm->getSize() == 1 ? GraphUtils::computeCut(input, result, true) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;
-        ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k, nodeWeights);
+			SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
+			std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
+			ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
+			ValueType cut = comm->getSize() == 1 ? GraphUtils::computeCut(input, result, true) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;
+			ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k, nodeWeights);
 
-        if (comm->getRank() == 0) {
-        	std::cout << "Time for initial partition and redistribution:" << timeForInitPart << std::endl;
-        	std::cout << "Cut:" << cut << ", imbalance:" << imbalance << std::endl;
-        }
-        
-        IndexType numRefinementRounds = 0;
+			if (comm->getRank() == 0) {
+				std::cout << "Time for initial partition and redistribution:" << timeForInitPart << std::endl;
+				std::cout << "Cut:" << cut << ", imbalance:" << imbalance << std::endl;
+			}
 
-        SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
-	if (comm->getSize() == 1 || comm->getSize() == k) {
+			IndexType numRefinementRounds = 0;
 
-		ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, settings);
-
+			SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
+			ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, settings);
+			SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
 	} else {
-		std::cout << "Local refinement only implemented sequentially and for one block per process. Called with " << comm->getSize() << " processes and " << k << " blocks." << std::endl;
+		if (comm->getRank() == 0) {
+			std::cout << "Local refinement only implemented for one block per process. Called with " << comm->getSize() << " processes and " << k << " blocks." << std::endl;
+		}
 	}
-	SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
+
 	return result;
 }
 //--------------------------------------------------------------------------------------- 
@@ -215,6 +216,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     const IndexType localN = coordDist->getLocalSize();
     const IndexType globalN = coordDist->getGlobalSize();
     
+    if (k != comm->getSize() && comm->getRank() == 0) {
+    	throw std::logic_error("Hilbert curve partition only implemented for same number of blocks and processes.");
+    }
+
     std::vector<ValueType> minCoords(dimensions);
     std::vector<ValueType> maxCoords(dimensions);
     DenseVector<IndexType> result;
@@ -373,6 +378,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
     const IndexType localN = coordDist->getLocalSize();
     const IndexType globalN = coordDist->getGlobalSize();
     
+    if (k != comm->getSize() && comm->getRank() == 0) {
+    	throw std::logic_error("Pixel partition only implemented for same number of blocks and processes.");
+    }
+
     std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
     std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
     DenseVector<IndexType> result(coordDist, 0);

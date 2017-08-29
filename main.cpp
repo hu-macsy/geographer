@@ -123,6 +123,7 @@ int main(int argc, char** argv) {
 	options_description desc("Supported options");
 
 	struct Settings settings;
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	desc.add_options()
 				("help", "display options")
@@ -137,6 +138,7 @@ int main(int argc, char** argv) {
 				("numX", value<int>(&settings.numX)->default_value(settings.numX), "Number of points in x dimension of generated graph")
 				("numY", value<int>(&settings.numY)->default_value(settings.numY), "Number of points in y dimension of generated graph")
 				("numZ", value<int>(&settings.numZ)->default_value(settings.numZ), "Number of points in z dimension of generated graph")
+				("numBlocks", value<int>(&settings.numBlocks)->default_value(comm->getSize()), "Number of blocks, default is number of processes")
 				("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
 				("minBorderNodes", value<int>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
@@ -204,8 +206,6 @@ int main(int argc, char** argv) {
     std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
 
     DenseVector<ValueType> nodeWeights;
-
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
     /* timing information
      */
@@ -394,10 +394,6 @@ int main(int argc, char** argv) {
 
     assert(N > 0);
 
-    if (comm->getSize() > 0) {
-    	settings.numBlocks = comm->getSize();
-    }
-
     if( comm->getRank() ==0){
           settings.print(std::cout);
     }
@@ -424,7 +420,7 @@ int main(int argc, char** argv) {
     std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
     ValueType cut = ITI::GraphUtils::computeCut(graph, partition, true);
-    ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, comm->getSize(), nodeWeights );
+    ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
     
     std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
     

@@ -30,6 +30,10 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
     const IndexType localN = inputDist->getLocalSize();
     const IndexType globalN = inputDist->getGlobalSize();
 
+    if (k != comm->getSize() && comm->getRank() == 0) {
+    	throw std::logic_error("Spectral partition only implemented for same number of blocks and processes.");
+    }
+
     // get a pixeled-coarsen graph , this is replicated in every PE
     scai::lama::DenseVector<ValueType> pixelWeights;
     scai::lama::CSRSparseMatrix<ValueType> pixelGraph = MultiLevel<IndexType, ValueType>::pixeledCoarsen(adjM, coordinates, pixelWeights, settings);
