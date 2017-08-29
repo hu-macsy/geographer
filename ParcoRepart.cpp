@@ -128,17 +128,25 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         } else if (settings.initialPartition == InitialPartitioningMethods::KMeans) {
         	PRINT0("Initial partition with K-Means");
         	//prepare coordinates for k-means
-        	if (comm->getSize() == k && (settings.dimensions == 2 || settings.dimensions == 3)) {
-				DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
-				nodeWeights.redistribute(tempResult.getDistributionPtr());
+        	std::vector<DenseVector<ValueType> > coordinateCopy;
+        	DenseVector<ValueType> nodeWeightCopy;
+        	if (settings.dimensions == 2 || settings.dimensions == 3) {
+        		Settings sfcSettings = settings;
+        		sfcSettings.numBlocks = comm->getSize();
+				DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, sfcSettings);
+				nodeWeightCopy = DenseVector<ValueType>(nodeWeights, tempResult.getDistributionPtr());
+				coordinateCopy.resize(dimensions);
 				for (IndexType d = 0; d < dimensions; d++) {
-					coordinates[d].redistribute(tempResult.getDistributionPtr());
+					coordinateCopy[d] = DenseVector<ValueType>(coordinates[d], tempResult.getDistributionPtr());
 				}
+        	} else {
+        		coordinateCopy = coordinates;
+        		nodeWeightCopy = nodeWeights;
         	}
         	const IndexType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
             const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
             std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
-            result = ITI::KMeans::computePartition(coordinates, settings.numBlocks, nodeWeights, blockSizes, settings.epsilon);
+            result = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeightCopy, blockSizes, settings.epsilon);
             std::chrono::duration<double> kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
 			ValueType timeForInitPart = ValueType ( comm->max(kMeansTime.count() ));
             assert(result.getLocalValues().min() >= 0);
@@ -191,6 +199,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, settings);
 			SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
 	} else {
+		result.redistribute(inputDist);
 		if (comm->getRank() == 0) {
 			std::cout << "Local refinement only implemented for one block per process. Called with " << comm->getSize() << " processes and " << k << " blocks." << std::endl;
 		}
