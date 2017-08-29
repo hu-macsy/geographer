@@ -351,16 +351,19 @@ DenseVector<IndexType> assignBlocks(
 
 		std::vector<ValueType> oldInfluence = influence;
 
-		double minRatio = 1.05;
-		double maxRatio = 0.95;
+		const double influenceChangeUpperBound = 1.05;
+		const double influenceChangeLowerBound = 0.95;
+		double minRatio = influenceChangeUpperBound;
+		double maxRatio = influenceChangeLowerBound;
 		for (IndexType j = 0; j < k; j++) {
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.influence" );
 			double ratio = ValueType(blockWeights[j]) / targetBlockSizes[j];
-			influence[j] = std::max(influence[j]*0.95, std::min(influence[j] * std::pow(ratio, 0.5), influence[j]*1.05));
+			influence[j] = std::max(influence[j]*influenceChangeLowerBound, std::min(influence[j] * std::pow(ratio, 0.5), influence[j]*influenceChangeUpperBound));
+			assert(influence[j] > 0);
 
 			double influenceRatio = influence[j] / oldInfluence[j];
-			assert(influenceRatio <= 1.05 + 1e-10);
-			assert(influenceRatio >= 0.95 - 1e-10);
+			assert(influenceRatio <= influenceChangeUpperBound + 1e-10);
+			assert(influenceRatio >= influenceChangeLowerBound - 1e-10);
 			if (influenceRatio < minRatio) minRatio = influenceRatio;
 			if (influenceRatio > maxRatio) maxRatio = influenceRatio;
 		}
