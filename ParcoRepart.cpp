@@ -116,16 +116,16 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
         std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
 
-        if( settings.initialPartition==0 ){ //sfc
+        if( settings.initialPartition==InitialPartitioningMethods::SFC) { //sfc
             PRINT0("Initial partition with SFCs");
             result= ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
-        } else if ( settings.initialPartition==1 ){ // pixel
+        } else if ( settings.initialPartition==InitialPartitioningMethods::Pixel) { // pixel
             PRINT0("Initial partition with pixels.");
             result = ParcoRepart<IndexType, ValueType>::pixelPartition(coordinates, settings);
-        } else if ( settings.initialPartition == 2) {// spectral
+        } else if ( settings.initialPartition == InitialPartitioningMethods::Spectral) {// spectral
             PRINT0("Initial partition with spectral");
             result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
-        } else if (settings.initialPartition == 3) {// k-means
+        } else if (settings.initialPartition == InitialPartitioningMethods::Multisection) {// multisection
         	//prepare coordinates for k-means
         	if (settings.dimensions == 2 || settings.dimensions == 3) {
 				DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
@@ -149,13 +149,13 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
             assert(result.min().Scalar::getValue<IndexType>() == 0);
 
-        } else if (settings.initialPartition == 4) {// multisection
+        } else if (settings.initialPartition == InitialPartitioningMethods::Multisection) {// multisection
             PRINT0("Initial partition with multisection");
             DenseVector<ValueType> convertedWeights(nodeWeights);
             result = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, settings);
         }
         else {
-            throw std::runtime_error("No method implemented for " + std::to_string(settings.initialPartition) );
+            throw std::runtime_error("Initial Partitioning mode undefined.");
         }
 
         /**
