@@ -92,7 +92,7 @@ std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
     else if (token == "Spectral" or token == "2")
     	method = InitialPartitioningMethods::Spectral;
     else if (token == "KMeans" or token == "Kmeans" or token == "3")
-        	method = InitialPartitioningMethods::Multisection;
+        method = InitialPartitioningMethods::KMeans;
     else if (token == "Multisection" or token == "MultiSection" or token == "4")
     	method = InitialPartitioningMethods::Multisection;
     else

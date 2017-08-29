@@ -125,7 +125,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         } else if ( settings.initialPartition == InitialPartitioningMethods::Spectral) {// spectral
             PRINT0("Initial partition with spectral");
             result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
-        } else if (settings.initialPartition == InitialPartitioningMethods::Multisection) {// multisection
+        } else if (settings.initialPartition == InitialPartitioningMethods::KMeans) {// multisection
         	//prepare coordinates for k-means
         	if (settings.dimensions == 2 || settings.dimensions == 3) {
 				DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
