@@ -116,16 +116,17 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
         std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
 
-        if( settings.initialPartition==InitialPartitioningMethods::SFC) { //sfc
+        if( settings.initialPartition==InitialPartitioningMethods::SFC) {
             PRINT0("Initial partition with SFCs");
             result= ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
-        } else if ( settings.initialPartition==InitialPartitioningMethods::Pixel) { // pixel
+        } else if ( settings.initialPartition==InitialPartitioningMethods::Pixel) {
             PRINT0("Initial partition with pixels.");
             result = ParcoRepart<IndexType, ValueType>::pixelPartition(coordinates, settings);
-        } else if ( settings.initialPartition == InitialPartitioningMethods::Spectral) {// spectral
+        } else if ( settings.initialPartition == InitialPartitioningMethods::Spectral) {
             PRINT0("Initial partition with spectral");
             result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
-        } else if (settings.initialPartition == InitialPartitioningMethods::KMeans) {// multisection
+        } else if (settings.initialPartition == InitialPartitioningMethods::KMeans) {
+        	PRINT0("Initial partition with K-Means");
         	//prepare coordinates for k-means
         	if (settings.dimensions == 2 || settings.dimensions == 3) {
 				DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);

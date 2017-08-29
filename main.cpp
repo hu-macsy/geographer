@@ -91,7 +91,7 @@ std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
         method = InitialPartitioningMethods::Pixel;
     else if (token == "Spectral" or token == "2")
     	method = InitialPartitioningMethods::Spectral;
-    else if (token == "KMeans" or token == "Kmeans" or token == "3")
+    else if (token == "KMeans" or token == "Kmeans" or token == "K-Means" or token == "K-means" or token == "3")
         method = InitialPartitioningMethods::KMeans;
     else if (token == "Multisection" or token == "MultiSection" or token == "4")
     	method = InitialPartitioningMethods::Multisection;
@@ -142,7 +142,7 @@ int main(int argc, char** argv) {
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
 				("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
 				("cutsPerDim", value<std::vector<IndexType>>(&settings.cutsPerDim)->multitoken(), "If MultiSection is chosen, then provide d values that define the number of cuts per dimension.")
-				("initialPartition", value<InitialPartitioningMethods>(&settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for pixeled method, 2 for spectral partition, 3 for k-means, 4 for multisection")
+				("initialPartition", value<InitialPartitioningMethods>(&settings.initialPartition), "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means', 3) and multisection ('MultiSection', 4 ). SFC, Spectral and K-Means are most stable.")
 				("pixeledSideLen", value<int>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
 				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
