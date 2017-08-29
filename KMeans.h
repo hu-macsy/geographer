@@ -62,6 +62,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	assert(nodeWeights.getLocalValues().size() == coordinates[0].getLocalValues().size());
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
+	const IndexType p = comm->getSize();
+	const ValueType blocksPerProcess = ValueType(k)/p;
+
 	std::vector<ValueType> minCoords(dim);
 	std::vector<ValueType> maxCoords(dim);
 	std::vector<std::vector<ValueType> > convertedCoords(dim);
@@ -91,7 +94,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();;
 	std::iota(firstIndex, lastIndex, 0);
 
-	IndexType minNodes = 100;
+	IndexType minNodes = 100*blocksPerProcess;
 	IndexType samplingRounds = 0;
 	std::vector<IndexType> samples;
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
@@ -108,9 +111,12 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	}
 	assert(samples[samplingRounds-1] == localN);
 
+	scai::hmemo::ReadAccess<ValueType> rWeight(nodeWeights.getLocalValues());
+
 	IndexType iter = 0;
 	ValueType delta = 0;
-	ValueType threshold = 2;
+	bool balanced = false;
+	const ValueType threshold = 2;
 	do {
 
 		if (iter < samplingRounds) {
@@ -163,11 +169,29 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		}
 		centers = newCenters;
 
+		std::vector<IndexType> blockWeights(k,0);
+		for (auto it = firstIndex; it != lastIndex; it++) {
+			const IndexType i = *it;
+			IndexType cluster = rResult[i];
+			blockWeights[cluster] += rWeight[i];
+		}
+		{
+			SCAI_REGION( "KMeans.computePartition.blockWeightSum" );
+			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<IndexType>::stype);
+		}
+
+		balanced = true;
+		for (IndexType j = 0; j < k; j++) {
+			if (blockWeights[j] > blockSizes[j]*(1+epsilon)) {
+				balanced = false;
+			}
+		}
+
 		if (comm->getRank() == 0) {
 			std::cout << "i: " << iter << ", delta: " << delta << std::endl;
 		}
 		iter++;
-	} while (iter < samplingRounds || (iter < 50 && delta > threshold));
+	} while (iter < samplingRounds || (iter < 50 && (delta > threshold || !balanced)));
 	return result;
 }
 }
