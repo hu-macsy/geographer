@@ -186,11 +186,15 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     }
 
     //fill gaps in index list. This might be expensive.
-    scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(globalN, comm));
-    preserved.redistribute(blockDist);
-    fineToCoarse = computeGlobalPrefixSum(preserved, -1);
-    const IndexType newGlobalN = fineToCoarse.max().Scalar::getValue<IndexType>() + 1;
-    fineToCoarse.redistribute(distPtr);
+    IndexType newGlobalN;
+    {
+        SCAI_REGION("MultiLevel.coarsen.redistribute");
+        scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(globalN, comm));
+        preserved.redistribute(blockDist);
+        fineToCoarse = computeGlobalPrefixSum(preserved, -1);
+        newGlobalN = fineToCoarse.max().Scalar::getValue<IndexType>() + 1;
+        fineToCoarse.redistribute(distPtr);
+    }
 
     //set new indices for contracted nodes
     {
@@ -221,9 +225,11 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     assert(newGlobalN == comm->sum(newLocalN));
 
     //build halo of new global indices
+    SCAI_REGION_START("MultiLevel.coarsen.updateHalo");
     Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(adjM);
     scai::utilskernel::LArray<IndexType> haloData;
     comm->updateHalo(haloData, fineToCoarse.getLocalValues(), halo);
+    SCAI_REGION_END("MultiLevel.coarsen.updateHalo");
     
     scai::hmemo::ReadAccess<IndexType> localFineToCoarse(fineToCoarse.getLocalValues());
 
@@ -316,6 +322,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
         nnzValues = jaIndex;
     }
     
+    SCAI_REGION_START("MultiLevel.coarsen.returnBlock");
     //create distribution object for coarse graph
     scai::utilskernel::LArray<IndexType> myGlobalIndices(fineToCoarse.getLocalValues());
     scai::hmemo::WriteAccess<IndexType> wIndices(myGlobalIndices);
@@ -334,6 +341,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     storage.setCSRDataSwap(newLocalN, newGlobalN, nnzValues, newIA, newJA, newValues, scai::hmemo::ContextPtr());
     coarseGraph = CSRSparseMatrix<ValueType>(newDist, noDist);
     coarseGraph.swapLocalStorage(storage);
+    SCAI_REGION_END("MultiLevel.coarsen.returnBlock");
  }
 //---------------------------------------------------------------------------------------
  
