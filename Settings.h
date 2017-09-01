@@ -9,6 +9,7 @@
 const std::string version = BUILD_COMMIT_STRING;
 
 enum class InitialPartitioningMethods {SFC = 0, Pixel = 1, Spectral = 2, KMeans = 3, Multisection = 4};
+    
 
 struct Settings{
     IndexType dimensions= 2;

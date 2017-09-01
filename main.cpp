@@ -81,6 +81,7 @@ namespace ITI {
 	}
 }
 
+
 std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
 {
     std::string token;
@@ -117,6 +118,8 @@ std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods& method)
     out << token;
     return out;
 }
+
+
 
 int main(int argc, char** argv) {
 	using namespace boost::program_options;
