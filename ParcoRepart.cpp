@@ -167,6 +167,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             throw std::runtime_error("Initial Partitioning mode undefined.");
         }
 
+        SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
+
         if (comm->getSize() == k) {
 			/**
 			 * redistribute to prepare for local refinement
