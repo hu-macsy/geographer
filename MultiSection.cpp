@@ -467,19 +467,21 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             // from k get d numbers such that their product equals k
             // TODO: now k must be number such that k^(1/d) is an integer, drop this condition, generalize
             ValueType sqrtK = std::pow( k, 1.0/dim );
-            
+            IndexType intSqrtK = sqrtK;
             // TODO/check: sqrtK is not correct, it is -1 but not sure if always
-            //IndexType intSqrtK = sqrtK;
-            if( std::pow( sqrtK+1, dim ) == k){
-                sqrtK++;
-            }
-            SCAI_ASSERT( std::pow( sqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow( sqrtK, 1/d)= " << std::pow(sqrtK,dim));
             
+            if( std::pow( intSqrtK+1, dim ) == k){
+                intSqrtK++;
+            }
+            
+PRINT0(intSqrtK);            
+            SCAI_ASSERT( std::pow( intSqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow( sqrtK, 1/d)= " << std::pow(intSqrtK,dim));
+/*            
             if( !(std::floor(sqrtK)==sqrtK) ){
                 PRINT0("Input k= "<< k << " and sqrt(k)= "<< sqrtK  << " __ "<< std::pow( sqrtK, dim ));
                 throw std::logic_error("Number of blocks not a square number");
             }
-                        
+*/                        
             numCuts = std::vector<IndexType>( dim, sqrtK );
         }else{                                  // user-specific number of cuts per dimensions
             numCuts = settings.cutsPerDim;

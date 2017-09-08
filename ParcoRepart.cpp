@@ -167,9 +167,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             throw std::runtime_error("Initial Partitioning mode undefined.");
         }
 
-        //SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
+        SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
 
         if (comm->getSize() == k) {
+        	SCAI_REGION("ParcoRepart.partitionGraph.initialRedistribution")
 			/**
 			 * redistribute to prepare for local refinement
 			 */
@@ -184,10 +185,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			}
 			nodeWeights.redistribute(input.getRowDistributionPtr());
 
-			SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
 			std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
 			ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
-			ValueType cut = comm->getSize() == 1 ? GraphUtils::computeCut(input, result, true) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;
+			ValueType cut = comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;
 			ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k, nodeWeights);
 
 			if (comm->getRank() == 0) {
@@ -198,7 +198,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			IndexType numRefinementRounds = 0;
 
 			SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
-			ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, settings);
+			scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(input);
+			ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, halo, settings);
 			SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
 	} else {
 		result.redistribute(inputDist);

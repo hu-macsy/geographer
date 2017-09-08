@@ -22,17 +22,17 @@
 
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
+using scai::dmemo::Halo;
 
 namespace ITI{
     
     template <typename IndexType, typename ValueType>
     class MultiLevel{
     public:
-        			
-        static IndexType multiLevelStep(scai::lama::CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
-        
-        static void coarsen(const CSRSparseMatrix<ValueType>& inputGraph, const DenseVector<ValueType> &nodeWeights, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations = 1);
-        
+        static IndexType multiLevelStep(scai::lama::CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const Halo& halo, Settings settings);
+
+        static void coarsen(const CSRSparseMatrix<ValueType>& inputGraph, const DenseVector<ValueType> &nodeWeights, const Halo& halo, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations = 1);
+
         static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& graph, const DenseVector<ValueType> &nodeWeights);
         
         static DenseVector<ValueType> projectToCoarse(const DenseVector<ValueType>& input, const DenseVector<IndexType>& fineToCoarse);
