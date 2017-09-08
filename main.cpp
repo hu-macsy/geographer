@@ -143,6 +143,7 @@ int main(int argc, char** argv) {
 				("numZ", value<int>(&settings.numZ)->default_value(settings.numZ), "Number of points in z dimension of generated graph")
 				("numBlocks", value<int>(&settings.numBlocks)->default_value(comm->getSize()), "Number of blocks, default is number of processes")
 				("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
+				("seed", value<double>()->default_value(time(NULL)), "random seed, default is current time")
 				("minBorderNodes", value<int>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
 				("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
@@ -209,6 +210,8 @@ int main(int argc, char** argv) {
     std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
 
     DenseVector<ValueType> nodeWeights;
+
+    srand(vm["seed"].as<double>());
 
     /* timing information
      */
@@ -286,12 +289,6 @@ int main(int argc, char** argv) {
 
         	std::vector<IndexType> nodeIndices(N);
         	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
-
-        	//broadcast seed value from root to ensure equal pseudorandom numbers.
-        	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-        	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
-        	comm->bcast( seed, 1, 0 );
-        	srand(seed[0]);
 
         	ITI::GraphUtils::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), settings.dimensions);
 
