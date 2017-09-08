@@ -435,10 +435,10 @@ int main(int argc, char** argv) {
         }
         std::cout << std::endl;
         std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
-        std::cout<< " nodes:"<< N<< " dimensions:"<< settings.dimensions <<" k:" << settings.numBlocks;
-        std::cout<< " epsilon:" << settings.epsilon << " minBorderNodes:"<< settings.minBorderNodes;
-        std::cout<< " minGainForNextRound:" << settings.minGainForNextRound;
-        std::cout<< " stopAfterNoGainRounds:"<< settings.stopAfterNoGainRounds << std::endl;
+        std::cout << " p:"<< comm->getSize() << " k:"<< settings.numBlocks;
+        auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
+        std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
+        std::cout.precision(oldprecision);
         
         std::cout<< "cut:"<< cut<< " imbalance:"<< imbalance << std::endl;
         std::cout<<"inputTime:" << inputT << " partitionTime:" << partT <<" reportTime:"<< repT << std::endl;
