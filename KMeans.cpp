@@ -231,7 +231,7 @@ DenseVector<IndexType> assignBlocks(
 	for (IndexType i = 0; i < k; i++) {
 		IndexType c = clusterIndices[i];
 		ValueType effectiveDist = minDistance[c]*minDistance[c]*influence[c];
-		assert(effectiveMinDistance[i] == effectiveDist);
+		assert(std::abs(effectiveMinDistance[i]- effectiveDist) < 1e-8);
 	}
 
 	std::vector<ValueType> distThreshold(k);

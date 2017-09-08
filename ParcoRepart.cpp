@@ -136,8 +136,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         	const IndexType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
             const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
             std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
-            result = ITI::KMeans::computePartition(coordinates, settings.numBlocks, nodeWeights, blockSizes, settings.epsilon);
-            std::chrono::duration<double> kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
+            result = ITI::KMeans::computePartition(coordinates, settings.numBlocks, nodeWeights, blockSizes, std::max(0.05, settings.epsilon));
+            std::chrono::duration<double> kMeansTime =  std::chrono::system_clock::now() - beforeKMeans;
 			ValueType timeForInitPart = ValueType ( comm->max(kMeansTime.count() ));
 			if (comm->getRank() == 0) {
 				std::cout << "Time for kMeans:" << timeForInitPart << std::endl;

@@ -330,6 +330,9 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     IndexType beginLocalRange, endLocalRange;
     scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
     const IndexType localN = endLocalRange - beginLocalRange;
+    SCAI_ASSERT_LE_ERROR(localN, std::ceil(ValueType(globalN) / comm->getSize()), "localN: " << localN << ", optSize: " << std::ceil(globalN / comm->getSize()));
+
+    //std::cout << "Process " << comm->getRank() << " reading from " << beginLocalRange << " to " << endLocalRange << std::endl;
 
     //scroll to begin of local range. Neighbors of node i are in line i+1
     for (IndexType i = 0; i < beginLocalRange; i++) {
@@ -345,7 +348,11 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     }
 
     //we don't know exactly how many edges we are going to have, but in a regular mesh the average degree times the local nodes is a good estimate.
-    ja.reserve(localN*avgDegree*1.1);
+    IndexType edgeEstimate = IndexType(localN*avgDegree*1.1);
+    assert(edgeEstimate >= 0);
+    ja.reserve(edgeEstimate);
+    
+    //std::cout << "Process " << comm->getRank() << " reserved memory for  " <<  edgeEstimate << " edges." << std::endl;
 
     //now read in local edges
     for (IndexType i = 0; i < localN; i++) {
@@ -398,10 +405,16 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         }
     }
 
+    //std::cout << "Process " << comm->getRank() << " read " << ja.size() << " local edges. " << std::endl;
+
+
 	nodeWeights.resize(numberNodeWeights);
+    //std::cout << "Process " << comm->getRank() << " allocated memory for " << numberNodeWeights << " node weights. " << std::endl;
 	for (IndexType i = 0; i < numberNodeWeights; i++) {
 		nodeWeights[i] = DenseVector<IndexType>(dist, scai::utilskernel::LArray<IndexType>(localN, nodeWeightStorage[i].data()));
 	}
+
+    //std::cout << "Process " << comm->getRank() << " converted node weights. " << std::endl;
 
     if (endLocalRange == globalN) {
 		bool eof = std::getline(file, line).eof();
@@ -411,6 +424,9 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 	}
 
     file.close();
+
+    //std::cout << "Process " << comm->getRank() << " closed file. " << std::endl;
+
 
     if (!hasEdgeWeights) {
     	assert(values.size() == 0);
@@ -428,6 +444,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, ja.size(), scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
     		scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
     		scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
+
+    //std::cout << "Process " << comm->getRank() << " created local storage " << std::endl;
 
     return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
 }

@@ -206,9 +206,9 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
                 //TODO: why not just weightSum/k ?
                 // changed for now so that the test cases can agree
 		//optSize = std::ceil(weightSum / k + (maxWeight - minWeight));
-                optSize = std::ceil(weightSum / k );
+                optSize = std::ceil(ValueType(weightSum) / k );
 	} else {
-		optSize = std::ceil(globalN / k);
+		optSize = std::ceil(ValueType(globalN) / k);
 	}
 
 	if (!part.getDistribution().isReplicated()) {

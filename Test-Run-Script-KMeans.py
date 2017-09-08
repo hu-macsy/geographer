@@ -8,7 +8,7 @@ import random
 iterations = 7
 dimension = 2
 
-dirString = os.path.expanduser("~/WAVE/Giesse-Repart/mesh-sequences")
+dirString = os.path.expanduser("/gpfs/work/pr87si/di36sop")
 
 for i in range(iterations):
         graphNumber = i
@@ -36,8 +36,8 @@ for i in range(iterations):
             others += " --initialPartition 3"
             others += " --dimensions 2"
             commandString = assembleCommandString("parco", filename, p, others)
-            submitfile = createMOABSubmitFile("msub-"+str(p)+"-"+str(i)+".cmd", commandString, "00:25:00", p, "4000mb")
-            call(["msub", submitfile])
+            submitfile = createLLSubmitFile("llsub-"+str(p)+"-"+str(i)+".cmd", commandString, "00:25:00", p, "4000mb")
+            call(["llsubmit", submitfile])
 
                 
 
