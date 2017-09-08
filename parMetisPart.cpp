@@ -65,7 +65,8 @@ int main(int argc, char** argv) {
 	options_description desc("Supported options");
 
 	struct Settings settings;
-
+        bool parMetisGeom = true;
+        
 	desc.add_options()
 		("help", "display options")
 		("version", "show version")
@@ -74,6 +75,8 @@ int main(int argc, char** argv) {
 		("coordFormat", value<ITI::Format>(), "format of coordinate file")
 		("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 		("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
+                ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
+                ("geom", value<bool>(&parMetisGeom)->default_value(parMetisGeom), "0: use of parmetisKway (no coordinates), 1: use of ParMetisGeomKway. Default is 1.")
 		;
 
 	variables_map vm;
@@ -147,18 +150,17 @@ int main(int argc, char** argv) {
     } 
     
     scai::hmemo::ReadAccess<IndexType> recvPartRead( recvVtx );
-    // vtxDist is and array of size numPEs and is replicated in every processor
+    // vtxDist is an array of size numPEs and is replicated in every processor
     idx_t vtxDist[ comm->getSize()+1 ]; 
     vtxDist[0]= 0;
     for(int i=0; i<recvPartRead.size(); i++){
         vtxDist[i+1]= recvPartRead[i+1];
+        //vtxDist[i]= recvPartRead[i];
     }
-    
-/*
+
     for(IndexType i=0; i<recvPartRead.size(); i++){
         PRINT(*comm<< " , " << i <<": " << vtxDist[i]);
     }
-*/
   
     recvPartRead.release();
     
@@ -175,6 +177,7 @@ int main(int argc, char** argv) {
     for(int i=0; i<ja.size(); i++){
         adjncy[i]= ja[i];
         SCAI_ASSERT( adjncy[i] >=0, "negative value for i= "<< i << " , val= "<< adjncy[i]);
+        SCAI_ASSERT( adjncy[i] <N , "too large value for i= "<< i << " , val= "<< adjncy[i]);
     }
 
     //vwgt , adjwgt store the weigths of edges and vertices. Here we have
@@ -205,16 +208,21 @@ int main(int argc, char** argv) {
     scai::utilskernel::LArray<ValueType>& localPartOfCoords1 = coords[1].getLocalValues();
     
     for(unsigned int i=0; i<localN; i++){
+        SCAI_ASSERT( 2*i+1< sizeof(xyzLocal)/sizeof(xyzLocal[0]), "Too large index: " << 2*i+1);
         xyzLocal[2*i]= real_t(localPartOfCoords0[i]);
         xyzLocal[2*i+1]= real_t(localPartOfCoords1[i]);
-        //PRINT(*comm <<": "<< xyzLocal[i] << ", "<< xyzLocal[i+1]);
+        PRINT(*comm <<": "<< xyzLocal[2*i] << ", "<< xyzLocal[2*i+1]);
     }
   
     // ncon: the numbers of weigths each vertex has. Here 1;
     idx_t ncon = 1;
     
-    // nparts: the number of parts to partition (=k). Here, nparts=p
-    IndexType k = comm->getSize();
+    // nparts: the number of parts to partition (=k)
+    //IndexType k = comm->getSize();
+    if( !vm.count("numBlocks") ){
+        settings.numBlocks = comm->getSize();
+    }
+    IndexType k = settings.numBlocks;
     idx_t nparts= k;
   
     // tpwgts: array of size ncons*nparts, that is used to specify the fraction of 
@@ -224,7 +232,7 @@ int main(int argc, char** argv) {
     real_t total = 0;
     for(int i=0; i<sizeof(tpwgts)/sizeof(real_t) ; i++){
 	tpwgts[i] = real_t(1)/k;
-	//PRINT(i <<": "<< tpwgts[i]);
+        PRINT(*comm << ": " << i <<": "<< tpwgts[i]);
 	total += tpwgts[i];
     }
 
@@ -234,39 +242,49 @@ int main(int argc, char** argv) {
     
     // options: array of integers for passing arguments.
     // Here, options[0]=0 for the default values.
-    idx_t options[1];
-    options[0]= 0;
+    idx_t options[1]= {0};
     
+    //
     // OUTPUT parameters
+    //
     // edgecut: the size of cut
     idx_t edgecut;
     
     // partition array of size localN, contains the block every vertex belongs
-    //idx_t* part = (idx_t*) malloc(sizeof(idx_t)*localN);
+    //idx_t* partKway = (idx_t*) malloc(sizeof(idx_t)*localN);
     idx_t partKway[localN];
     
     // comm: the MPI comunicator
     MPI_Comm metisComm;
     MPI_Comm_dup(MPI_COMM_WORLD, &metisComm);
      
-    //PRINT(*comm<< ": xadj.size()= "<< sizeof(xadj) << "  adjncy.size=" <<sizeof(adjncy) ); 
+    PRINT(*comm<< ": xadj.size()= "<< sizeof(xadj) << "  adjncy.size=" <<sizeof(adjncy) ); 
+    PRINT(*comm << ": "<< sizeof(xyzLocal)/sizeof(real_t) << " ## "<< sizeof(partKway)/sizeof(idx_t) << " , localN= "<< localN);
+    
+    SCAI_ASSERT( sizeof(partKway)/sizeof(partKway[0])==localN , sizeof(partKway)/sizeof(partKway[0]) << " , " << localN);
     
     if(comm->getRank()==0){
 	    PRINT("dims=" << ndims << ", nparts= " << nparts<<", ubvec= "<< ubvec << ", options="<< *options << ", ncon= "<< ncon );
     }
     
-    //PRINT(*comm << ": "<< sizeof(xyzLocal)/sizeof(real_t) << " ## "<< sizeof(part)/sizeof(idx_t) );
-
-	//
-    // get the partiotions with parMetis
-	//
+    //
+    // get the partitions with parMetis
+    //
 
     std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
     int metisRet;
 
-    // parmetis with Kway
-    metisRet = ParMETIS_V3_PartGeomKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ndims, xyzLocal, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
+    //
+    // parmetis partition
+    //
+    if( parMetisGeom){
+        metisRet = ParMETIS_V3_PartGeomKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ndims, xyzLocal, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
+    }else{
+        metisRet = ParMETIS_V3_PartKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
+    }
     
+    // convert partition to a DenseVector
+    //
     DenseVector<IndexType> partitionKway(dist);
     for(unsigned int i=0; i<localN; i++){
         partitionKway.getLocalValues()[i] = partKway[i];
@@ -294,7 +312,7 @@ int main(int argc, char** argv) {
     if(comm->getRank()==0){
     	std::cout << std::endl << "machine:" << machine << " input:" << graphFile << " nodes:" << N << " epsilon:" << settings.epsilon;
         std::cout << std::endl << "ParMetisGeomKway cut= "<< cutKway <<" imbalance:" << imbalanceKway<<", time for partition: "<< partKwayTime << std::endl;
-        //td::cout<< std::endl << "ParMetisGeom cut= "<< cutGeom <<" and imbalance= " << imbalanceGeom<<", time for partition: "<< partGeomTime << std::endl;
+        //std::cout<< std::endl << "ParMetisGeom cut= "<< cutGeom <<" and imbalance= " << imbalanceGeom<<", time for partition: "<< partGeomTime << std::endl;
 
     }
     return 0;

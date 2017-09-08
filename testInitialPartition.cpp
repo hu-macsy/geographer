@@ -311,7 +311,7 @@ int main(int argc, char** argv) {
 
     assert(N > 0);
 
-    if( !vm.count("numBlocks") or !vm.count("cutsPerDim") ){
+    if( !(vm.count("numBlocks") or vm.count("cutsPerDim")) ){
         settings.numBlocks = comm->getSize();
     }
     
@@ -407,12 +407,12 @@ int main(int argc, char** argv) {
             // get a k-means partition
             //partition = ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, settings);
             
-            DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coordinates, settings);
+            //DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coordinates, settings);
             
             scai::hmemo::HArray<IndexType> localWeightsInt( rowDistPtr->getLocalSize(), 1 );
             scai::lama::DenseVector<IndexType> nodeWeightsInt;     // node weights
             nodeWeightsInt.swap( localWeightsInt, rowDistPtr );
-            nodeWeightsInt.redistribute(tempResult.getDistributionPtr());
+            //nodeWeightsInt.redistribute(tempResult.getDistributionPtr());
             
             const IndexType weightSum = nodeWeightsInt.sum().Scalar::getValue<IndexType>();
             const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
@@ -459,8 +459,7 @@ int main(int argc, char** argv) {
                 assert( coordinates[dim].size() == N);
                 assert( coordinates[dim].getLocalValues().size() == newDist->getLocalSize() );
             }
-            
-            
+                        
             if(dimensions==2){
                 ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"multisectPart");
             }
