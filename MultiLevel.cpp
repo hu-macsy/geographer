@@ -7,7 +7,7 @@ using scai::lama::Scalar;
 namespace ITI{
     
 template<typename IndexType, typename ValueType>
-IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<IndexType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, Settings settings) {
+IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const Halo& halo, Settings settings) {
 	
    SCAI_REGION( "MultiLevel.multiLevelStep" );
 	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
@@ -42,7 +42,7 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 		if (comm->getRank() == 0) {
 			std::cout << "Beginning coarsening, still " << settings.multiLevelRounds << " levels to go." << std::endl;
 		}
-		MultiLevel<IndexType, ValueType>::coarsen(input,nodeWeights, coarseGraph, fineToCoarseMap);
+		MultiLevel<IndexType, ValueType>::coarsen(input, nodeWeights, halo, coarseGraph, fineToCoarseMap);
 		if (comm->getRank() == 0) {
 			std::cout << "Coarse graph has " << coarseGraph.getNumRows() << " nodes." << std::endl;
 		}
@@ -57,14 +57,19 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 
 		DenseVector<IndexType> coarsePart = DenseVector<IndexType>(coarseGraph.getRowDistributionPtr(), comm->getRank());
 
-		DenseVector<IndexType> coarseWeights = sumToCoarse(nodeWeights, fineToCoarseMap);
+		DenseVector<ValueType> coarseWeights = sumToCoarse(nodeWeights, fineToCoarseMap);
 
-		assert(coarseWeights.sum().Scalar::getValue<IndexType>() == nodeWeights.sum().Scalar::getValue<IndexType>());
+		Halo coarseHalo;
+		scai::utilskernel::LArray<IndexType> haloData;
+		comm->updateHalo(haloData, fineToCoarseMap.getLocalValues(), halo);
+		scai::dmemo::HaloBuilder::coarsenHalo(coarseGraph.getRowDistribution(), halo, fineToCoarseMap.getLocalValues(), haloData, coarseHalo);
+
+		assert(coarseWeights.sum().Scalar::getValue<ValueType>() == nodeWeights.sum().Scalar::getValue<ValueType>());
 
 		Settings settingscopy(settings);
 		settingscopy.multiLevelRounds--;
 		// recursive call
-		multiLevelStep(coarseGraph, coarsePart, coarseWeights, coarseCoords, settingscopy);
+		multiLevelStep(coarseGraph, coarsePart, coarseWeights, coarseCoords, coarseHalo, settingscopy);
 
 		// uncoarsening/refinement
 		scai::dmemo::DistributionPtr projectedFineDist = projectToFine(coarseGraph.getRowDistributionPtr(), fineToCoarseMap);
@@ -118,24 +123,21 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 				}
 			}
 
-			ValueType cut = comm->getSize() == 1 ? GraphUtils::computeCut(input, part) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;
-			SCAI_ASSERT(comm->sum(cut) == comm->getSize()*cut, "Cut sum inconsistency.");
+
 			if (numRefinementRounds > 0) {
-				SCAI_ASSERT(gain == oldCut - cut, "Old cut is " << oldCut << ", new cut is " << cut << ", but gain is " << gain);
 				assert(gain >= 0);
 			}
 			if (comm->getRank() == 0) {
-				std::cout << "Multilevel round "<< settings.multiLevelRounds <<": After " << numRefinementRounds + 1 << " refinement rounds, cut is " << cut << std::endl;
+				std::cout << "Multilevel round "<< settings.multiLevelRounds <<": In refinement round " << numRefinementRounds << ", gain was " << gain << std::endl;
 			}
-			oldCut = cut;
 			numRefinementRounds++;
 		}
 	}
 }
-//--------------------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------------------
  
 template<typename IndexType, typename ValueType>
-void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, const DenseVector<IndexType> &nodeWeights,  CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations) {
+void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, const DenseVector<ValueType> &nodeWeights,  const Halo& halo, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations) {
 	SCAI_REGION("MultiLevel.coarsen");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -221,7 +223,6 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     assert(newGlobalN == comm->sum(newLocalN));
 
     //build halo of new global indices
-    Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(adjM);
     scai::utilskernel::LArray<IndexType> haloData;
     comm->updateHalo(haloData, fineToCoarse.getLocalValues(), halo);
     
@@ -515,7 +516,7 @@ DenseVector<ValueType> MultiLevel<IndexType, ValueType>::projectToCoarse(const D
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> MultiLevel<IndexType, ValueType>::sumToCoarse(const DenseVector<IndexType>& input, const DenseVector<IndexType>& fineToCoarse) {
+DenseVector<ValueType> MultiLevel<IndexType, ValueType>::sumToCoarse(const DenseVector<ValueType>& input, const DenseVector<IndexType>& fineToCoarse) {
 	SCAI_REGION("MultiLevel.sumToCoarse");
 	const scai::dmemo::DistributionPtr inputDist = input.getDistributionPtr();
 
@@ -525,10 +526,10 @@ DenseVector<IndexType> MultiLevel<IndexType, ValueType>::sumToCoarse(const Dense
 	IndexType coarseLocalN = coarseDist->getLocalSize();
 	assert(inputDist->getLocalSize() == fineLocalN);
 
-	DenseVector<IndexType> result(coarseDist, 0);
-	scai::hmemo::WriteAccess<IndexType> wResult(result.getLocalValues());
+	DenseVector<ValueType> result(coarseDist, 0);
+	scai::hmemo::WriteAccess<ValueType> wResult(result.getLocalValues());
 	{
-		scai::hmemo::ReadAccess<IndexType> rInput(input.getLocalValues());
+		scai::hmemo::ReadAccess<ValueType> rInput(input.getLocalValues());
 		scai::hmemo::ReadAccess<IndexType> rFineToCoarse(fineToCoarse.getLocalValues());
 		for (IndexType i = 0; i < fineLocalN; i++) {
 			const IndexType coarseTarget = coarseDist->global2local(rFineToCoarse[i]);
@@ -543,7 +544,7 @@ DenseVector<IndexType> MultiLevel<IndexType, ValueType>::sumToCoarse(const Dense
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& adjM, const DenseVector<IndexType> &nodeWeights){
+std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& adjM, const DenseVector<ValueType> &nodeWeights){
 	SCAI_REGION("MultiLevel.maxLocalMatching");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -571,8 +572,8 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
     std::vector<bool> matched(localN, false);
 
     // get local part of node weights
-    scai::utilskernel::LArray<IndexType> localNodeWeights = nodeWeights.getLocalValues();
-    scai::hmemo::ReadAccess<IndexType> rLocalNodeWeights( localNodeWeights );
+    scai::utilskernel::LArray<ValueType> localNodeWeights = nodeWeights.getLocalValues();
+    scai::hmemo::ReadAccess<ValueType> rLocalNodeWeights( localNodeWeights );
     
     // localNode is the local index of a node
     for(IndexType localNode=0; localNode<localN; localNode++){
@@ -623,8 +624,8 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeledCoarsen (
     const scai::lama::CSRSparseMatrix<ValueType>& adjM,
-    std::vector<DenseVector<ValueType>> &coordinates,
-    DenseVector<IndexType> &nodeWeights,
+    const std::vector<DenseVector<ValueType>> &coordinates,
+    DenseVector<ValueType> &nodeWeights,
     Settings settings){
     SCAI_REGION( "MultiLevel.pixeledCoarsen" )
 
@@ -647,7 +648,7 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
      */
     for (IndexType dim = 0; dim < dimensions; dim++) {
         //get local parts of coordinates
-        scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
+        const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
         for (IndexType i = 0; i < localN; i++) {
             ValueType coord = localPartOfCoords[i];
             if (coord > maxCoords[dim]) maxCoords[dim] = coord;
@@ -924,14 +925,14 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
 }
 //---------------------------------------------------------------------------------------
 
-template int MultiLevel<int, double>::multiLevelStep(CSRSparseMatrix<double> &input, DenseVector<int> &part, DenseVector<int> &nodeWeights, std::vector<DenseVector<double>> &coordinates, Settings settings);
+template int MultiLevel<int, double>::multiLevelStep(CSRSparseMatrix<double> &input, DenseVector<int> &part, DenseVector<double> &nodeWeights, std::vector<DenseVector<double>> &coordinates, const Halo& halo, Settings settings);
 
-template std::vector<std::pair<int,int>> MultiLevel<int, double>::maxLocalMatching(const scai::lama::CSRSparseMatrix<double>& graph, const DenseVector<int> &nodeWeights);
+template std::vector<std::pair<int,int>> MultiLevel<int, double>::maxLocalMatching(const scai::lama::CSRSparseMatrix<double>& graph, const DenseVector<double> &nodeWeights);
 
-template void MultiLevel<int, double>::coarsen(const CSRSparseMatrix<double>& inputGraph, const DenseVector<int> &nodeWeights, CSRSparseMatrix<double>& coarseGraph, DenseVector<int>& fineToCoarse, int iterations);
+template void MultiLevel<int, double>::coarsen(const CSRSparseMatrix<double>& inputGraph, const DenseVector<double> &nodeWeights, const Halo& halo, CSRSparseMatrix<double>& coarseGraph, DenseVector<int>& fineToCoarse, int iterations);
 
 template DenseVector<int> MultiLevel<int, double>::computeGlobalPrefixSum(const DenseVector<int> &input, int offset);
 
-template scai::lama::CSRSparseMatrix<double> MultiLevel<int, double>::pixeledCoarsen (const CSRSparseMatrix<double>& adjM, std::vector<DenseVector<double>> &coordinates, DenseVector<int> &nodeWeights, Settings settings);
+template scai::lama::CSRSparseMatrix<double> MultiLevel<int, double>::pixeledCoarsen (const CSRSparseMatrix<double>& adjM, const std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, Settings settings);
     
 } // namespace ITI

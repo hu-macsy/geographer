@@ -182,7 +182,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     ValueType averageWeight = totalWeight/k;
 
     bBox.weight = totalWeight;
-PRINT0( totalWeight );
+
     // create the root of the tree that contains the whole grid
     std::shared_ptr<rectCell<IndexType,ValueType>> root( new rectCell<IndexType,ValueType>(bBox) );
     
@@ -280,14 +280,7 @@ PRINT0( totalWeight );
             std::vector<IndexType> part1D;
             std::vector<ValueType> weightPerPart, thisProjection = projections[l];
             std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( thisProjection, *thisDimCuts, settings);
-/*            
-for(int i=0; i<thisProjection.size(); i++){
-    PRINT0(i << ": " << thisProjection[i]);
-}            
- for(int i=0; i<part1D.size(); i++){
-    PRINT(part1D[i] << " , " << weightPerPart[i]);
- }
- */
+
             // TODO: possibly expensive assertion
             SCAI_ASSERT_EQ_ERROR( std::accumulate(thisProjection.begin(), thisProjection.end(), 0.0), std::accumulate( weightPerPart.begin(), weightPerPart.end(), 0.0), "Weights are wrong." );
             
@@ -460,18 +453,6 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     //
     //decide the number of multisection for every dimension
     //
-
-    // from k get d numbers such that their product equals k
-    // TODO: now k must be number such that k^(1/d) is an integer, drop this condition, generalize
-    const ValueType sqrtK = std::pow( k,  1.0/dim );
-
-    if( !std::floor(sqrtK)==sqrtK ){
-        PRINT0("Input k= "<< k << " and sqrt(k)= "<< sqrtK );
-        throw std::logic_error("Number of blocks not a square number");
-    }
-    
-    // TODO/check: sqrtK is not correct, it is -1 but not sure if always
-    IndexType intSqrtK = sqrtK;
     
     //TODO: now for every dimension we have sqrtK cuts. This can be generalized so we have different number of cuts
     //  for each multisection but even more, different cuts for every block.
@@ -483,17 +464,27 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     // if the bisection option is chosen the algorithm performs a bisection
     if( settings.bisect==0 ){
         if( settings.cutsPerDim.empty() ){        // no user-specific number of cuts
-            IndexType intSqrtK = sqrtK;
-            if( std::pow( intSqrtK+1, dim ) == k){
-                intSqrtK++;
+            // from k get d numbers such that their product equals k
+            // TODO: now k must be number such that k^(1/d) is an integer, drop this condition, generalize
+            ValueType sqrtK = std::pow( k, 1.0/dim );
+            
+            // TODO/check: sqrtK is not correct, it is -1 but not sure if always
+            //IndexType intSqrtK = sqrtK;
+            if( std::pow( sqrtK+1, dim ) == k){
+                sqrtK++;
             }
-            SCAI_ASSERT( std::pow( intSqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow( sqrtK, 1/d)= " << std::pow(intSqrtK,dim));
-        
-            numCuts = std::vector<IndexType>( dim, intSqrtK );
+            SCAI_ASSERT( std::pow( sqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow( sqrtK, 1/d)= " << std::pow(sqrtK,dim));
+            
+            if( !(std::floor(sqrtK)==sqrtK) ){
+                PRINT0("Input k= "<< k << " and sqrt(k)= "<< sqrtK  << " __ "<< std::pow( sqrtK, dim ));
+                throw std::logic_error("Number of blocks not a square number");
+            }
+                        
+            numCuts = std::vector<IndexType>( dim, sqrtK );
         }else{                                  // user-specific number of cuts per dimensions
             numCuts = settings.cutsPerDim;
         }
-    }else if( settings.bisect==1 ){        
+    }else{        
         SCAI_ASSERT( k && !(k & (k-1)) , "k is not a power of 2 and this is required for now for bisection");  
         numCuts = std::vector<IndexType>( log2(k) , 2 );
     }
@@ -506,7 +497,6 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     struct rectangle bBox;
     
     // at first the bounding box is the whole space
-    // WARNING: because the max coordinate of a bounding box does belong in the box ( box=[min,manx) ) we must +1.
     for(int d=0; d<dim; d++){
         bBox.bottom.push_back( minCoords[d]);
         bBox.top.push_back( maxCoords[d] );
@@ -582,7 +572,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             //part1D.size() = *thisDimCuts , weightPerPart.size = *thisDimCuts 
             std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( thisProjection, *thisDimCuts, settings);
             
-            //for(int i=0; i<part1D.size(); i++) PRINT0( part1D[i] );
+//for(int i=0; i<part1D.size(); i++) PRINT0( part1D[i] << " ++ " << weightPerPart[i] );
             
             SCAI_ASSERT( part1D.size()== *thisDimCuts , "Wrong size of 1D partition")
             SCAI_ASSERT( weightPerPart.size()== *thisDimCuts , "Wrong size of 1D partition")
@@ -608,7 +598,7 @@ ValueType dbg_rectW=0;
                 newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h+1]-1;
                 newRect.weight = weightPerPart[h];
                 root->insert( newRect );
-                SCAI_ASSERT_GT_ERROR( newRect.weight, 0, "Aborting: found rectangle with 0 weight, maybe inappropriate input data or needs bigger scaling.");
+                SCAI_ASSERT_GT_ERROR( newRect.weight, 0, "Aborting: found rectangle with 0 weight, in leaf " << l << " , creating rectangle number " << h << " for hyperplane " <<part1D[h] << ". Maybe inappropriate input data or needs bigger scaling.");
                 if(newRect.weight>maxWeight){
                     maxWeight = newRect.weight;
                 }
@@ -635,7 +625,6 @@ SCAI_ASSERT_LE_ERROR( dbg_rectW-thisRectangle.weight, 0.0000001, "Rectangle weig
 
         }
         numLeaves = root->getNumLeaves();
-PRINT0( numLeaves );        
     }
     
     std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> ret = root->getAllLeaves();
@@ -772,36 +761,36 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
     partHyperplanes[0] = 0;
     IndexType part = 1;
     ValueType thisPartWeight = 0;
-    
+
     // greedy 1D partition (a 2-approx solution?)
     for(int i=0; i<projection.size(); i++){
-        if( part>k) break;
-        //SCAI_ASSERT( part<k , "Index " << part << " too big, must be < " << k << " and i= " << i );
+        if( part>=k) break;
         thisPartWeight += projection[i];
         if( thisPartWeight > averageWeight ){
-            SCAI_ASSERT(part < partHyperplanes.size(), "index: "<< part << " too big, must be < "<< partHyperplanes.size() )
+            SCAI_ASSERT(part <= partHyperplanes.size(), "index: "<< part << " too big, must be < "<< partHyperplanes.size() )
+            
             // choose between keeping the projection[i] in the sum, having something more than the average
             // or do not add projection[i] and get something below average
-            //if( 2*(averageWeight-thisPartWeight)+projection[i] < 0 ){
+            
+            if( thisPartWeight-averageWeight> averageWeight-(thisPartWeight-projection[i]) ){   //solution without projection[i]
                 partHyperplanes[part]= i;
-                // calculate new total weight left and new average weight
-                totalWeight = totalWeight - thisPartWeight + projection[i];
-                weightPerPart[part-1] = thisPartWeight - projection[i];                
+                // calculate new total weight left
+                totalWeight = totalWeight - (thisPartWeight-projection[i]);
+                weightPerPart[part-1] = thisPartWeight-projection[i];                
                 --i;
-            /*
-        }else{  // choose solution that is more than the average
-                partHyperplanes[part]= i;
-                // calculate new total weight left and new average weight
+            }else{  // choose solution that is more than the average
+                partHyperplanes[part]= i+1;
+                // calculate new total weight left
                 totalWeight = totalWeight - thisPartWeight;
-                weightPerPart[part] = thisPartWeight;
+                weightPerPart[part-1] = thisPartWeight;
             }
-            */
+            SCAI_ASSERT_UNEQUAL( k,part, "Division with 0");
             averageWeight = totalWeight/(k-part);
             thisPartWeight = 0;
             ++part;
         }
     }
-   
+
     weightPerPart[k-1] = totalWeight;
 
     return std::make_pair(partHyperplanes, weightPerPart);
@@ -837,14 +826,14 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
     partIndices[0]=0;
     
     for(IndexType p=1; p<k; p++){
-        //IndexType indexLow = p==0 ? 0 : partIndices[p-1];
         IndexType indexLow = partIndices[p-1];
         IndexType indexHigh = N;
         while( indexLow<indexHigh ){
+            
             IndexType indexMid = (indexLow+indexHigh)/2;
             ValueType tmpSum = prefixSum[indexMid] - prefixSum[std::max(partIndices[p-1],0)];
-         
-            if( lowerBound<=tmpSum and tmpSum<upperBound){
+            
+            if( lowerBound<=tmpSum and tmpSum<upperBound){                
                 if( probe(prefixSum, k, tmpSum) ){
                     indexHigh = indexMid;
                     upperBound = tmpSum;
@@ -856,19 +845,77 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
                 indexHigh = indexMid;
             }else{
                 indexLow=indexMid+1;
-            }
+            }   
+            
         }
-        
-        partIndices[p] = indexHigh;      
-        weightPerPart[p-1] = prefixSum[indexHigh] - prefixSum[std::max(partIndices[p-1],0)];
-//PRINT(p << " :: "<< partIndices[p] << " __ "<< weightPerPart[p-1] );  
+        partIndices[p] = indexHigh-1;        
+        weightPerPart[p-1] = prefixSum[indexHigh-1] - prefixSum[std::max(partIndices[p-1],0)];
     }
-//PRINT(prefixSum[ partIndices.back()-1 ]);    
+
     weightPerPart[k-1] = totalWeight - prefixSum[ partIndices.back() ];
     
     return std::make_pair(partIndices, weightPerPart);
 }
 //---------------------------------------------------------------------------------------
+// Based on algorithm Nicol found in Pinar, Aykanat, 2004, "Fast optimal load balancing algorithms for 1D partitioning"
+//TODO: In the same paper thers is a better, but more complicated, algorithm called Nicol+
+
+template<typename IndexType, typename ValueType>
+std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1DMine( const std::vector<ValueType>& nodeWeights, const IndexType k, Settings settings){
+/*    
+    const IndexType N = nodeWeights.size();
+
+    //
+    //create the prefix sum array
+    //
+    std::vector<ValueType> prefixSum( N+1 , 0);
+    
+    prefixSum[0] = 0;// nodeWeights[0];
+    
+    for(IndexType i=1; i<N+1; i++ ){
+        prefixSum[i] = prefixSum[i-1] + nodeWeights[i-1];
+    }
+    
+    const ValueType totalWeight = prefixSum.back();
+    //const ValueType  = totalWeight/k;
+
+    ValueType lowerBound, upperBound;
+    lowerBound = totalWeight/k;         // the optimal average weight
+    upperBound = lowerBound;
+    
+    bool existsPartition = probe(prefixSum, k, upperBound);
+    while( !existsPartition ){
+        lowerBound = upperBound;
+        upperBound *= 2;
+        existsPartition = probe(prefixSum, k, upperBound);
+    }
+        
+    std::vector<ValueType> allRollingSums;
+
+    for(typename std::vector<ValueType>::const_iterator windowBot= nodeWeights.begin(); windowBot!=nodeWeights.end(); windowBot++){
+        for(typename std::vector<ValueType>::const_iterator windowTop= windowBot; windowTop!=nodeWeights.end(); windowTop++){
+            ValueType thisSum = std::accumulate( windowBot, windowTop, 0.0);
+            if( thisSum>=lowerBound and thisSum<=upperBound ){
+                allRollingSums.push_back( thisSum );
+            }
+        }
+    }
+PRINT(lowerBound << " < " << upperBound );        
+    std::sort( allRollingSums.begin(), allRollingSums.end() );
+
+PRINT( allRollingSums.size() );    
+    
+    std::vector<IndexType> partIndices(k, -9);
+    std::vector<ValueType> weightPerPart(k, -9);
+    partIndices[0]=0;
+    
+    
+    return std::make_pair(partIndices, weightPerPart);
+    */
+}
+
+//---------------------------------------------------------------------------------------
+
 // Search if there is a partition of the weights array into k parts where the maximum weight of a part is <=target.
 
 //TODO: return also the splitters found
@@ -894,11 +941,12 @@ bool MultiSection<IndexType, ValueType>::probe(const std::vector<ValueType>& pre
                 step = std::min( step , N-1);
                 SCAI_ASSERT( step<N , "Variable step is too large: " << step);
             }
-
-            splitters[p-1] = std::lower_bound( prefixSum.begin()+(step-offset), prefixSum.begin()+step, sumOfPartition ) - prefixSum.begin();
+            IndexType spliter =std::lower_bound( prefixSum.begin()+(step-offset), prefixSum.begin()+step, sumOfPartition ) - prefixSum.begin()-1;
+            splitters[p-1] = spliter;
 
             sumOfPartition = prefixSum[splitters[p-1]] + target;
             ++p;
+            //PRINT( spliter << " __ "<< sumOfPartition );            
         }
 
         if( sumOfPartition>=totalWeight ){
@@ -907,6 +955,37 @@ bool MultiSection<IndexType, ValueType>::probe(const std::vector<ValueType>& pre
     }
     
     return ret;
+}
+//---------------------------------------------------------------------------------------
+// Search if there is a partition of the weights array into k parts where the maximum weight of a part is <=target.
+
+//TODO: return also the splitters found
+template<typename IndexType, typename ValueType>
+std::pair<bool,std::vector<IndexType>> MultiSection<IndexType, ValueType>::probeAndGetSplitters(const std::vector<ValueType>& prefixSum, const IndexType k, const ValueType target){
+
+    const IndexType N = prefixSum.size();
+    IndexType p = 1;
+    ValueType sumOfPartition = target;
+    
+    ValueType totalWeight = prefixSum.back();
+
+    bool ret = false;
+    std::vector<IndexType> spliters( k-1, 0);
+    
+    if(target*k >= totalWeight){
+        while( p<k and sumOfPartition<totalWeight){
+            IndexType spliter = std::lower_bound( prefixSum.begin(), prefixSum.end(), sumOfPartition ) - prefixSum.begin() -1;
+            spliters[p-1] = spliter;
+
+            sumOfPartition = prefixSum[spliter] + target;
+            ++p;
+        }
+
+        if( sumOfPartition>=totalWeight ){
+            ret = true;
+        }
+    }
+    return std::make_pair(ret,spliters);
 }
 //---------------------------------------------------------------------------------------
 
@@ -1138,6 +1217,8 @@ template  std::pair<std::vector<int>,std::vector<double>> MultiSection<int, doub
 
 template  std::pair<std::vector<int>,std::vector<double>> MultiSection<int, double>::partition1DOptimal( const std::vector<double>& array, const int k, Settings settings);
 
+template std::pair<std::vector<int>, std::vector<double>> MultiSection<int, double>::partition1DMine( const std::vector<double>& nodeWeights, const int k, Settings settings);
+
 template double MultiSection<int, double>::getRectangleWeight( const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const int sideLen, Settings settings);
 
 template double MultiSection<int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
@@ -1153,5 +1234,7 @@ template scai::lama::CSRSparseMatrix<double> MultiSection<int, double>::getBlock
 template std::vector<int> MultiSection<int, double>::indexToCoords( const int ind, const int sideLen, const int dim);
 
 template bool MultiSection<int, double>::probe(const std::vector<double>& prefixSum, const int k, const double target);
+
+template std::pair<bool,std::vector<int>> MultiSection<int, double>::probeAndGetSplitters(const std::vector<double>& prefixSum, const int k, const double target);
 
 };

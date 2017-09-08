@@ -28,7 +28,7 @@ using scai::hmemo::ReadAccess;
 using scai::hmemo::WriteAccess;
 
 template<typename IndexType, typename ValueType>
-DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSRSparseMatrix<ValueType> laplacian, DenseVector<IndexType> nodeWeights, IndexType source, ValueType eps) {
+DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSRSparseMatrix<ValueType> laplacian, DenseVector<ValueType> nodeWeights, IndexType source, ValueType eps) {
 	using scai::lama::NormPtr;
 	using scai::lama::L2Norm;
 	using namespace scai::solver;
@@ -46,7 +46,7 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSR
 	IndexType sourceSum = comm->sum(source);
 	assert(sourceSum == source*comm->getSize());
 
-	IndexType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
+	ValueType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
 
 	IndexType sourceWeight;
 
@@ -87,7 +87,7 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSR
 }
 
 template<typename IndexType, typename ValueType>
-DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(scai::lama::CSRSparseMatrix<ValueType> laplacian, scai::lama::DenseVector<IndexType> nodeWeights, std::vector<IndexType> sources, ValueType eps) {
+DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(scai::lama::CSRSparseMatrix<ValueType> laplacian, scai::lama::DenseVector<ValueType> nodeWeights, std::vector<IndexType> sources, ValueType eps) {
 	using scai::hmemo::HArray;
 
 	const IndexType l = sources.size();
@@ -237,8 +237,8 @@ DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructHadamardMatrix(
 
 template CSRSparseMatrix<double> Diffusion<int, double>::constructLaplacian(CSRSparseMatrix<double> graph);
 template CSRSparseMatrix<double> Diffusion<int, double>::constructFJLTMatrix(double epsilon, int n, int origDimension);
-template DenseVector<double> Diffusion<int, double>::potentialsFromSource(CSRSparseMatrix<double> laplacian, DenseVector<int> nodeWeights, int source, double eps);
-template DenseMatrix<double> Diffusion<int, double>::multiplePotentials(CSRSparseMatrix<double> laplacian, DenseVector<int> nodeWeights, std::vector<int> sources, double eps);
+template DenseVector<double> Diffusion<int, double>::potentialsFromSource(CSRSparseMatrix<double> laplacian, DenseVector<double> nodeWeights, int source, double eps);
+template DenseMatrix<double> Diffusion<int, double>::multiplePotentials(CSRSparseMatrix<double> laplacian, DenseVector<double> nodeWeights, std::vector<int> sources, double eps);
 
 
 

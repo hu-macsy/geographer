@@ -289,7 +289,7 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     settings.pixeledSideLen = 16;    // for a 16x16 coarsen graph
 
     // get a pixeled-coarsen graph , this is replicated in every PE
-    scai::lama::DenseVector<IndexType> pixelWeights;
+    scai::lama::DenseVector<ValueType> pixelWeights;
     scai::lama::CSRSparseMatrix<ValueType> pixelGraph = MultiLevel<IndexType, ValueType>::pixeledCoarsen(graph, coordinates, pixelWeights, settings);
     SCAI_ASSERT( pixelGraph.getRowDistributionPtr()->isReplicated() == 1, "Pixel graph should (?) be replicated.");
         

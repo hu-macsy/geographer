@@ -147,19 +147,19 @@ ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<IndexType> &nodeWeights) {
+ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<ValueType> &nodeWeights) {
 	SCAI_REGION( "ParcoRepart.computeImbalance" )
 	const IndexType globalN = part.getDistributionPtr()->getGlobalSize();
 	const IndexType localN = part.getDistributionPtr()->getLocalSize();
 	const IndexType weightsSize = nodeWeights.getDistributionPtr()->getGlobalSize();
 	const bool weighted = (weightsSize != 0);
 
-	IndexType minWeight, maxWeight;
+	ValueType minWeight, maxWeight;
 	if (weighted) {
 		assert(weightsSize == globalN);
 		assert(nodeWeights.getDistributionPtr()->getLocalSize() == localN);
-		minWeight = nodeWeights.min().Scalar::getValue<IndexType>();
-		maxWeight = nodeWeights.max().Scalar::getValue<IndexType>();
+		minWeight = nodeWeights.min().Scalar::getValue<ValueType>();
+		maxWeight = nodeWeights.max().Scalar::getValue<ValueType>();
 	} else {
 		minWeight = 1;
 		maxWeight = 1;
@@ -173,7 +173,7 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 		throw std::runtime_error("Negative node weights not supported.");
 	}
 
-	std::vector<IndexType> subsetSizes(k, 0);
+	std::vector<ValueType> subsetSizes(k, 0);
 	const IndexType minK = part.min().Scalar::getValue<IndexType>();
 	const IndexType maxK = part.max().Scalar::getValue<IndexType>();
 
@@ -186,39 +186,35 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 	}
 
 	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
-	scai::hmemo::ReadAccess<IndexType> localWeight(nodeWeights.getLocalValues());
+	scai::hmemo::ReadAccess<ValueType> localWeight(nodeWeights.getLocalValues());
 	assert(localPart.size() == localN);
 
-	IndexType weightSum = 0;
+	ValueType weightSum = 0.0;
 	for (IndexType i = 0; i < localN; i++) {
 		IndexType partID = localPart[i];
-		IndexType weight = weighted ? localWeight[i] : 1;
+		ValueType weight = weighted ? localWeight[i] : 1;
 		subsetSizes[partID] += weight;
 		weightSum += weight;
 	}
 
-	IndexType optSize;
+	ValueType optSize;
 	scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
 	if (weighted) {
 		//get global weight sum
 		weightSum = comm->sum(weightSum);
-                //PRINT(weightSum);
-                //TODO: why not just weightSum/k ?
-                // changed for now so that the test cases can agree
 		//optSize = std::ceil(weightSum / k + (maxWeight - minWeight));
                 optSize = std::ceil(ValueType(weightSum) / k );
 	} else {
 		optSize = std::ceil(ValueType(globalN) / k);
 	}
-
+        std::vector<ValueType> globalSubsetSizes(k);
 	if (!part.getDistribution().isReplicated()) {
-	  //sum block sizes over all processes
-	  for (IndexType partID = 0; partID < k; partID++) {
-	    subsetSizes[partID] = comm->sum(subsetSizes[partID]);
-	  }
+            //sum block sizes over all processes
+            comm->sumImpl( globalSubsetSizes.data() , subsetSizes.data(), k, scai::common::TypeTraits<ValueType>::stype);
 	}
 
-	IndexType maxBlockSize = *std::max_element(subsetSizes.begin(), subsetSizes.end());
+	ValueType maxBlockSize = *std::max_element(globalSubsetSizes.begin(), globalSubsetSizes.end());
+
 	if (!weighted) {
 		assert(maxBlockSize >= optSize);
 	}
@@ -235,13 +231,13 @@ scai::dmemo::Halo buildNeighborHalo(const CSRSparseMatrix<ValueType>& input) {
 
 	std::vector<IndexType> requiredHaloIndices = nonLocalNeighbors<IndexType, ValueType>(input);
 
-	scai::dmemo::Halo Halo;
+	scai::dmemo::Halo halo;
 	{
 		scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
-		scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, Halo );
+		scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, halo );
 	}
 
-	return Halo;
+	return halo;
 }
 //---------------------------------------------------------------------------------------
 
@@ -712,7 +708,7 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueTy
 
 template int getFarthestLocalNode(const CSRSparseMatrix<double> graph, std::vector<int> seedNodes);
 template double computeCut(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, bool weighted);
-template double computeImbalance(const DenseVector<int> &part, int k, const DenseVector<int> &nodeWeights);
+template double computeImbalance(const DenseVector<int> &part, int k, const DenseVector<double> &nodeWeights);
 template scai::dmemo::Halo buildNeighborHalo<int,double>(const CSRSparseMatrix<double> &input);
 template bool hasNonLocalNeighbors(const CSRSparseMatrix<double> &input, int globalID);
 template std::vector<int> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<double>& input);

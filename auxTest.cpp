@@ -43,96 +43,6 @@ class auxTest : public ::testing::Test {
 
 };
 
-
-TEST_F (auxTest, testMultiLevelStep_dist) {
-
-    const IndexType N = 200;
-    
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-    scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( N ));
-    const IndexType k = comm->getSize();
-    const IndexType localN = distPtr->getLocalSize();
-    
-    scai::lama::CSRSparseMatrix<ValueType> graph;
-    
-    // create random graph
-    scai::common::scoped_array<ValueType> adjArray( new ValueType[ N*N ] );
-    
-    //initialize matrix with zeros
-    for(int i=0; i<N; i++)
-        for(int j=0; j<N; j++)
-            adjArray[i*N+j]=0;
-        
-	//broadcast seed value from root to ensure equal pseudorandom numbers.
-	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
-	comm->bcast( seed, 1, 0 );
-	srand(seed[0]);
-
-    IndexType numEdges = int (4*N);
-    for(IndexType i=0; i<numEdges; i++){
-        // a random position in the matrix
-        IndexType x = rand()%N;
-        IndexType y = rand()%N;
-        adjArray[ x+y*N ]= 1;
-        adjArray[ x*N+y ]= 1;
-    }
-    graph.setRawDenseData( N, N, adjArray.get() );
-    EXPECT_TRUE( graph.isConsistent() );
-    EXPECT_TRUE( graph.checkSymmetry() );
-    ValueType beforel1Norm = graph.l1Norm().Scalar::getValue<ValueType>();
-    IndexType beforeNumValues = graph.getNumValues();
-    graph.redistribute( distPtr , noDistPtr);
-    
-    //ValueType beforeSumWeigths = uniformWeights.l1Norm().Scalar::getValue<ValueType>();
-    IndexType beforeSumWeights = N;
-
-    struct Settings settings;
-    settings.numBlocks= k;
-    settings.epsilon = 0.2;
-    settings.multiLevelRounds= 3;
-    settings.coarseningStepsBetweenRefinement = 3;
-    settings.useGeometricTieBreaking = true;
-    settings.dimensions= 2;
-    
-    //coordinates at random and redistribute
-    std::vector<DenseVector<ValueType>> coords(settings.dimensions);
-    srand(time(NULL));
-    
-    for(IndexType i=0; i<settings.dimensions; i++){
-    	coords[i] = DenseVector<ValueType>(distPtr, 0);
-        // set random coordinates
-    	scai::hmemo::WriteOnlyAccess<ValueType> wCoords(coords[i].getLocalValues());
-        for(IndexType j=0; j<localN; j++){
-            wCoords[i] = rand()%100;      
-        }
-        wCoords.release();
-        coords[i].redistribute( distPtr );
-        ValueType min = coords[i].min().Scalar::getValue<ValueType>();
-        ValueType max = coords[i].max().Scalar::getValue<ValueType>();
-        ASSERT_LT(min, max);
-    }
-    
-    DenseVector<IndexType> partition= ParcoRepart<IndexType, ValueType>::hilbertPartition(graph, coords, settings);
-    // node weights = 1
-    DenseVector<IndexType> uniformWeights = DenseVector<IndexType>(partition.getDistributionPtr(), 1);
-    
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, settings);
-    //ITI::aux::multiLevelStep(graph, partition, uniformWeights, coords, Settings);
-    
-    EXPECT_EQ( graph.l1Norm() , beforel1Norm);
-    EXPECT_EQ( graph.getNumValues() , beforeNumValues);
-    DenseVector<ValueType> newWeights(N,0);
-    assert(uniformWeights.size()==N);
-    for(int i=0; i<N; i++){
-        newWeights.setValue(i, uniformWeights.getValue(i) );
-    }
-    //PRINT(newWeights.l1Norm() );
-    EXPECT_EQ( newWeights.l1Norm() , beforeSumWeights );
-    
-}
-//-------------------------------------------------------------------------
-
 TEST_F (auxTest, testInitialPartitions){
 
     std::string path = "meshes/bigtrace/";
@@ -183,7 +93,7 @@ TEST_F (auxTest, testInitialPartitions){
     settings.minBorderNodes = N*std::pow(0.6, settings.multiLevelRounds)/k * 0.05;
     settings.coarseningStepsBetweenRefinement =2;
     
-    DenseVector<IndexType> uniformWeights;
+    DenseVector<ValueType> uniformWeights;
     
     ValueType cut;
     ValueType imbalance;
@@ -204,9 +114,15 @@ TEST_F (auxTest, testInitialPartitions){
     if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
     PRINT0("Get a pixeled partition");
     // get a pixeledPartition
-    scai::lama::DenseVector<IndexType> pixeledPartition = ParcoRepart<IndexType, ValueType>::pixelPartition( graph, coordinates, settings);
+    scai::lama::DenseVector<IndexType> pixeledPartition = ParcoRepart<IndexType, ValueType>::pixelPartition(coordinates, settings);
     
-    //aux::print2DGrid( graph, pixeledPartition );
+    scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( pixeledPartition.getDistribution(), pixeledPartition.getLocalValues() ) );
+    pixeledPartition.redistribute(newDist);
+    graph.redistribute(newDist, noDistPointer);
+	for (IndexType d = 0; d < dimensions; d++) {
+		coordinates[d].redistribute(newDist);
+	}
+
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"pixelPart");
     }
@@ -217,8 +133,9 @@ TEST_F (auxTest, testInitialPartitions){
         logF<< "-- Initial Pixeled partition " << std::endl;
         logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
     }
-    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, settings);
+    uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
+	scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, halo, settings);
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithPixel");
     }
@@ -241,8 +158,15 @@ TEST_F (auxTest, testInitialPartitions){
     if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
     PRINT0( "Get a hilbert/sfc partition");
     // get a hilbertPartition
-    scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition( graph, coordinates, settings);
+    scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
     
+    newDist = scai::dmemo::DistributionPtr( new scai::dmemo::GeneralDistribution ( hilbertPartition.getDistribution(), hilbertPartition.getLocalValues() ) );
+    hilbertPartition.redistribute(newDist);
+    graph.redistribute(newDist, noDistPointer);
+	for (IndexType d = 0; d < dimensions; d++) {
+		coordinates[d].redistribute(newDist);
+	}
+
     //aux::print2DGrid( graph, hilbertPartition );
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"hilbertPart");
@@ -253,8 +177,10 @@ TEST_F (auxTest, testInitialPartitions){
         logF<< "-- Initial Hilbert/sfc partition " << std::endl;
         logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
     }
-    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, settings);
+    uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
+	halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
+
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, halo, settings);
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithHilbert");
     }
@@ -267,45 +193,6 @@ TEST_F (auxTest, testInitialPartitions){
         std::cout  << std::endl  << std::endl; 
     }
    
-    //------------------------------------------- spectral
-/*
-    settings.minGainForNextRound = 5;
-    
-    // the partitioning may redistribute the input graph
-    graph.redistribute(dist, noDistPointer);
-    for(int d=0; d<dimensions; d++){
-        coordinates[d].redistribute( dist );
-    }
-    if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
-    PRINT0("Get a spectral partition");
-
-    // get initial spectral partition
-    scai::lama::DenseVector<IndexType> spectralPartition = SpectralPartition<IndexType, ValueType>::getPartition( graph, coordinates, settings);
-    
-    //aux::print2DGrid( graph, spectralPartition );
-    if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"spectralPart");
-    }
-    cut = GraphUtils::computeCut( graph, spectralPartition);
-    imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( spectralPartition, k);
-    logF<< "-- Initial Spectral partition " << std::endl;
-    logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
-    
-    uniformWeights = DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, spectralPartition, uniformWeights, coordinates, settings);
-    
-    if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithSpectral");
-    }
-    cut = GraphUtils::computeCut( graph, spectralPartition);
-    imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( spectralPartition, k);
-    if(comm->getRank()==0){
-        logF<< "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
-        logF  << std::endl  << std::endl; 
-        std::cout << "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
-        std::cout  << std::endl  << std::endl; 
-    }
-*/    
     if(comm->getRank()==0){
         std::cout<< "Output files written in " << destPath << std::endl;
     }

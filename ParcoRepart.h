@@ -34,7 +34,7 @@ namespace ITI {
                         *
 	 		* @return Distributed DenseVector	, at position i is the block node i is assigned to
 	 		*/
-			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<IndexType> &nodeWeights, struct Settings settings);
+			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, struct Settings settings);
 
 			/**
 			 * Wrapper without node weights.
@@ -44,12 +44,12 @@ namespace ITI {
 			/*
 			 * Get an initial partition using the hilbert curve.
 			 */
-			static DenseVector<IndexType> hilbertPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+			static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
 
 			/*
 			 * Get an initial partition using the morton curve and measuring density per square.
 			 */
-			static DenseVector<IndexType> pixelPartition(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+			static DenseVector<IndexType> pixelPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
 
 			/**
 			 * Iterates over the local part of the adjacency matrix and counts local edges.
@@ -89,8 +89,8 @@ namespace ITI {
 			static std::vector<IndexType> neighbourPixels(const IndexType thisPixel,const IndexType sideLen, const IndexType dimensions);
 
 			/**Returns a vector of size N (if adjM is of size NxN) with the degree for every node of
-			 * the inout graph.
-			 */
+			* the input graph.
+			*/
 			static scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType> adjM);
 	};
 }

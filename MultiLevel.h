@@ -22,22 +22,22 @@
 
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
+using scai::dmemo::Halo;
 
 namespace ITI{
     
     template <typename IndexType, typename ValueType>
     class MultiLevel{
     public:
-        			
-        static IndexType multiLevelStep(scai::lama::CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<IndexType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
-        
-        static void coarsen(const CSRSparseMatrix<ValueType>& inputGraph, const DenseVector<IndexType> &nodeWeights, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations = 1);
-        
-        static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& graph, const DenseVector<IndexType> &nodeWeights);
+        static IndexType multiLevelStep(scai::lama::CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const Halo& halo, Settings settings);
+
+        static void coarsen(const CSRSparseMatrix<ValueType>& inputGraph, const DenseVector<ValueType> &nodeWeights, const Halo& halo, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations = 1);
+
+        static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& graph, const DenseVector<ValueType> &nodeWeights);
         
         static DenseVector<ValueType> projectToCoarse(const DenseVector<ValueType>& input, const DenseVector<IndexType>& fineToCoarse);
         
-        static DenseVector<IndexType> sumToCoarse(const DenseVector<IndexType>& input, const DenseVector<IndexType>& fineToCoarse);
+        static DenseVector<ValueType> sumToCoarse(const DenseVector<ValueType>& input, const DenseVector<IndexType>& fineToCoarse);
         
         static scai::dmemo::DistributionPtr projectToCoarse(const DenseVector<IndexType>& fineToCoarse);
         
@@ -65,7 +65,7 @@ namespace ITI{
          * @param[in] settings Descibe different setting for the coarsening. Here we need settings.pixeledDetailLevel.
          * @return The adjacency matric of the coarsened/pixeled graph. This has side length 2^detailLevel and the whole size is dimension^sideLength.
          */
-        static scai::lama::CSRSparseMatrix<ValueType> pixeledCoarsen (const CSRSparseMatrix<ValueType>& adjM, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<IndexType> &nodeWeights, Settings settings);
+        static scai::lama::CSRSparseMatrix<ValueType> pixeledCoarsen (const CSRSparseMatrix<ValueType>& adjM, const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings);
     
     }; // class MultiLevel
 } // namespace ITI

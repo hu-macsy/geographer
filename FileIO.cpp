@@ -246,12 +246,12 @@ void FileIO<IndexType, ValueType>::writePartition(const DenseVector<IndexType> &
 
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, Format format) {
-	std::vector<DenseVector<IndexType>> dummyWeightContainer;
+	std::vector<DenseVector<ValueType>> dummyWeightContainer;
 	return readGraph(filename, dummyWeightContainer, format);
 }
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, std::vector<DenseVector<IndexType>>& nodeWeights, Format format) {
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights, Format format) {
 	SCAI_REGION("FileIO.readGraph");
 
 	if(format == Format::MATRIXMARKET){
@@ -342,7 +342,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     std::vector<IndexType> ia(localN+1, 0);
     std::vector<IndexType> ja;
     std::vector<ValueType> values;
-    std::vector<std::vector<IndexType> > nodeWeightStorage(numberNodeWeights);
+    std::vector<std::vector<ValueType> > nodeWeightStorage(numberNodeWeights);
     for (IndexType i = 0; i < numberNodeWeights; i++) {
     	nodeWeightStorage[i].resize(localN);
     }
@@ -411,7 +411,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 	nodeWeights.resize(numberNodeWeights);
     //std::cout << "Process " << comm->getRank() << " allocated memory for " << numberNodeWeights << " node weights. " << std::endl;
 	for (IndexType i = 0; i < numberNodeWeights; i++) {
-		nodeWeights[i] = DenseVector<IndexType>(dist, scai::utilskernel::LArray<IndexType>(localN, nodeWeightStorage[i].data()));
+		nodeWeights[i] = DenseVector<ValueType>(dist, scai::utilskernel::LArray<ValueType>(localN, nodeWeightStorage[i].data()));
 	}
 
     //std::cout << "Process " << comm->getRank() << " converted node weights. " << std::endl;
