@@ -63,8 +63,6 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 		scai::utilskernel::LArray<IndexType> haloData;
 		comm->updateHalo(haloData, fineToCoarseMap.getLocalValues(), halo);
 		scai::dmemo::HaloBuilder::coarsenHalo(coarseGraph.getRowDistribution(), halo, fineToCoarseMap.getLocalValues(), haloData, coarseHalo);
-		//scai::hmemo::ReadAccess<IndexType> rCoarse(coarseHalo.getProvidesIndexes());
-		//coarseHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(coarseGraph);
 
 		assert(coarseWeights.sum().Scalar::getValue<ValueType>() == nodeWeights.sum().Scalar::getValue<ValueType>());
 
