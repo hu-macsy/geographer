@@ -231,13 +231,13 @@ scai::dmemo::Halo buildNeighborHalo(const CSRSparseMatrix<ValueType>& input) {
 
 	std::vector<IndexType> requiredHaloIndices = nonLocalNeighbors<IndexType, ValueType>(input);
 
-	scai::dmemo::Halo Halo;
+	scai::dmemo::Halo halo;
 	{
 		scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
-		scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, Halo );
+		scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, halo );
 	}
 
-	return Halo;
+	return halo;
 }
 //---------------------------------------------------------------------------------------
 
