@@ -22,7 +22,6 @@ typedef uint64_t count; // more expressive name for an integer quantity
 
 /**
  *
- *
  * Points in any dimension of templated type.
  */
 template<class T>

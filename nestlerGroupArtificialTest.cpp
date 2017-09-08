@@ -34,6 +34,44 @@ typedef double ValueType;
 typedef int IndexType;
 
 
+std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
+{
+    std::string token;
+    in >> token;
+    if (token == "SFC" or token == "0")
+        method = InitialPartitioningMethods::SFC;
+    else if (token == "Pixel" or token == "1")
+        method = InitialPartitioningMethods::Pixel;
+    else if (token == "Spectral" or token == "2")
+    	method = InitialPartitioningMethods::Spectral;
+    else if (token == "KMeans" or token == "Kmeans" or token == "K-Means" or token == "K-means" or token == "3")
+        method = InitialPartitioningMethods::KMeans;
+    else if (token == "Multisection" or token == "MultiSection" or token == "4")
+    	method = InitialPartitioningMethods::Multisection;
+    else
+        in.setstate(std::ios_base::failbit);
+    return in;
+}
+
+std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods& method)
+{
+    std::string token;
+
+    if (method == InitialPartitioningMethods::SFC)
+        token = "SFC";
+    else if (method == InitialPartitioningMethods::Pixel)
+    	token = "Pixel";
+    else if (method == InitialPartitioningMethods::Spectral)
+    	token = "Spectral";
+    else if (method == InitialPartitioningMethods::KMeans)
+        token = "KMeans";
+    else if (method == InitialPartitioningMethods::Multisection)
+    	token = "Multisection";
+    out << token;
+    return out;
+}
+
+
 int main(int argc, char** argv) {
 	using namespace boost::program_options;
 	options_description desc("Supported options");
@@ -55,7 +93,7 @@ int main(int argc, char** argv) {
             ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
             ("minBorderNodes", value<int>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
             ("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
-            ("initialPartition",  value<int> (&settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition")
+            ("initialPartition",  value<InitialPartitioningMethods> (&settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition")
             ("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
              ("cutsPerDim", value<std::vector<IndexType>>(&settings.cutsPerDim)->multitoken(), "If msOption=2, then provide d values that define the number of cuts per dimension.")
             ("pixeledSideLen", value<int>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
@@ -108,7 +146,7 @@ int main(int argc, char** argv) {
     scai::lama::DenseVector<ValueType> nodeWeights( distPtr );               // node weights
     std::vector<ValueType> maxCoord(dim);                                       // the max coordinate in every dimensions
     
-    IndexType initialPartition = settings.initialPartition;
+    IndexType initialPartition = static_cast<int> (settings.initialPartition);
     
     IndexType bigR = 3*sideLen/4;       // radious of big circle
     IndexType bigRSq = bigR*bigR;

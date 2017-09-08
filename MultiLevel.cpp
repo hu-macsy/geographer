@@ -631,7 +631,7 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeledCoarsen (
     const scai::lama::CSRSparseMatrix<ValueType>& adjM,
-    std::vector<DenseVector<ValueType>> &coordinates,
+    const std::vector<DenseVector<ValueType>> &coordinates,
     DenseVector<ValueType> &nodeWeights,
     Settings settings){
     SCAI_REGION( "MultiLevel.pixeledCoarsen" )
@@ -655,7 +655,7 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
      */
     for (IndexType dim = 0; dim < dimensions; dim++) {
         //get local parts of coordinates
-        scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
+        const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
         for (IndexType i = 0; i < localN; i++) {
             ValueType coord = localPartOfCoords[i];
             if (coord > maxCoords[dim]) maxCoords[dim] = coord;
@@ -940,6 +940,6 @@ template void MultiLevel<int, double>::coarsen(const CSRSparseMatrix<double>& in
 
 template DenseVector<int> MultiLevel<int, double>::computeGlobalPrefixSum(const DenseVector<int> &input, int offset);
 
-template scai::lama::CSRSparseMatrix<double> MultiLevel<int, double>::pixeledCoarsen (const CSRSparseMatrix<double>& adjM, std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, Settings settings);
+template scai::lama::CSRSparseMatrix<double> MultiLevel<int, double>::pixeledCoarsen (const CSRSparseMatrix<double>& adjM, const std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, Settings settings);
     
 } // namespace ITI

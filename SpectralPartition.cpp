@@ -15,7 +15,7 @@ namespace ITI {
 
 
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getPartition(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coordinates, Settings settings){
+scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getPartition(const CSRSparseMatrix<ValueType> &adjM, const std::vector<DenseVector<ValueType>> &coordinates, Settings settings){
     SCAI_REGION( "SpectralPartition.getPartition" )
     	
     std::chrono::time_point<std::chrono::steady_clock> start, round;
@@ -29,6 +29,10 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
     const IndexType dimensions = coordinates.size();
     const IndexType localN = inputDist->getLocalSize();
     const IndexType globalN = inputDist->getGlobalSize();
+
+    if (k != comm->getSize() && comm->getRank() == 0) {
+    	throw std::logic_error("Spectral partition only implemented for same number of blocks and processes.");
+    }
 
     // get a pixeled-coarsen graph , this is replicated in every PE
     scai::lama::DenseVector<ValueType> pixelWeights;
@@ -124,7 +128,7 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
     // get local max
     for (IndexType dim = 0; dim < dimensions; dim++) {
         //get local parts of coordinates
-        scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
+        const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
         for (IndexType i = 0; i < localN; i++) {
             ValueType coord = localPartOfCoords[i];
             if (coord > maxCoords[dim]) maxCoords[dim] = coord;
@@ -163,31 +167,7 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
             wLocalPart[i] = rPixelPart[ thisPixel ];
         }
     }
-        
-    // redistribute based on the new partition
-    scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution( *inputDist, result.getLocalValues()) );
-    
-    result.redistribute( newDist);
-    adjM.redistribute(newDist, adjM.getColDistributionPtr());
-    
-    // redistibute coordinates
-    for (IndexType dim = 0; dim < dimensions; dim++) {
-          coordinates[dim].redistribute( newDist );
-    }    
-    // check coordinates size
-    for (IndexType dim = 0; dim < dimensions; dim++) {
-        assert( coordinates[dim].size() == globalN);
-        assert( coordinates[dim].getLocalValues().size() == newDist->getLocalSize() );
-    }
 
-    ValueType cut = comm->getSize() == 1 ? GraphUtils::computeCut(adjM, result) : comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(adjM, false)) / 2;
-    ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k);
-    if (comm->getRank() == 0) {
-        std::chrono::duration<double> elapsedSeconds = std::chrono::steady_clock::now() -start;
-        std::cout << "\033[1;32mSpectral partition"<<" (" << elapsedSeconds.count() << " seconds), cut is " << cut << std::endl;
-        std::cout<< "and imbalance= "<< imbalance << "\033[0m"  << std::endl;
-    }
-    
     return result;
 }
 //---------------------------------------------------------------------------------------
@@ -435,7 +415,7 @@ template scai::lama::DenseVector<int> SpectralPartition<int, double>::getDegreeV
 
 template scai::lama::CSRSparseMatrix<double> SpectralPartition<int, double>::getLaplacian( const scai::lama::CSRSparseMatrix<double>& adjM);
 
-template scai::lama::DenseVector<int> SpectralPartition<int, double>::getPartition(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coordinates, Settings settings);
+template scai::lama::DenseVector<int> SpectralPartition<int, double>::getPartition(const CSRSparseMatrix<double> &adjM, const std::vector<DenseVector<double>> &coordinates, Settings settings);
 
 template scai::lama::DenseVector<double> SpectralPartition<int, double>::getFiedlerVector(const scai::lama::CSRSparseMatrix<double>& adjM, double& eigenvalue );
 

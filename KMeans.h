@@ -40,12 +40,9 @@ template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &coordinates, const std::vector<std::vector<ValueType> > &centers,
 		const Iterator firstIndex, const Iterator lastIndex,
 		const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment,
-		const std::vector<IndexType> &blockSizes,  const SpatialCell &boundingBox, const ValueType epsilon,
+		const std::vector<IndexType> &blockSizes,  const SpatialCell &boundingBox, const ValueType epsilon, const IndexType maxIter,
 		std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter,
 		std::vector<ValueType> &influence);
-
-template<typename ValueType>
-ValueType biggestDelta(const std::vector<std::vector<ValueType>> &firstCoords, const std::vector<std::vector<ValueType>> &secondCoords);
 
 /**
  * Implementations
@@ -61,6 +58,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	const IndexType localN = nodeWeights.getLocalValues().size();
 	assert(nodeWeights.getLocalValues().size() == coordinates[0].getLocalValues().size());
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+	const IndexType p = comm->getSize();
+	const ValueType blocksPerProcess = ValueType(k)/p;
 
 	std::vector<ValueType> minCoords(dim);
 	std::vector<ValueType> maxCoords(dim);
@@ -91,7 +91,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();;
 	std::iota(firstIndex, lastIndex, 0);
 
-	IndexType minNodes = 100;
+	IndexType minNodes = 100*blocksPerProcess;
 	IndexType samplingRounds = 0;
 	std::vector<IndexType> samples;
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
@@ -108,9 +108,13 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	}
 	assert(samples[samplingRounds-1] == localN);
 
+	scai::hmemo::ReadAccess<ValueType> rWeight(nodeWeights.getLocalValues());
+
 	IndexType iter = 0;
 	ValueType delta = 0;
-	ValueType threshold = 2;
+	bool balanced = false;
+	const ValueType threshold = 2;
+	const IndexType maxIterations = 50;
 	do {
 
 		if (iter < samplingRounds) {
@@ -124,7 +128,8 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 			assert(lastIndex == localIndices.end());
 		}
 
-		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, epsilon, upperBoundOwnCenter, lowerBoundNextCenter, influence);
+		const IndexType balanceIterations = 20;
+		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, epsilon, balanceIterations, upperBoundOwnCenter, lowerBoundNextCenter, influence);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
 		std::vector<std::vector<ValueType> > newCenters = findCenters(coordinates, result, k, firstIndex, lastIndex, nodeWeights);
@@ -163,11 +168,29 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		}
 		centers = newCenters;
 
+		std::vector<IndexType> blockWeights(k,0);
+		for (auto it = firstIndex; it != lastIndex; it++) {
+			const IndexType i = *it;
+			IndexType cluster = rResult[i];
+			blockWeights[cluster] += rWeight[i];
+		}
+		{
+			SCAI_REGION( "KMeans.computePartition.blockWeightSum" );
+			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<IndexType>::stype);
+		}
+
+		balanced = true;
+		for (IndexType j = 0; j < k; j++) {
+			if (blockWeights[j] > blockSizes[j]*(1+epsilon)) {
+				balanced = false;
+			}
+		}
+
 		if (comm->getRank() == 0) {
 			std::cout << "i: " << iter << ", delta: " << delta << std::endl;
 		}
 		iter++;
-	} while (iter < samplingRounds || (iter < 50 && delta > threshold));
+	} while (iter < samplingRounds || (iter < maxIterations && (delta > threshold || !balanced)));
 	return result;
 }
 }

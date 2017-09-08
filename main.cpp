@@ -83,11 +83,52 @@ namespace ITI {
 	}
 }
 
+
+std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
+{
+    std::string token;
+    in >> token;
+    if (token == "SFC" or token == "0")
+        method = InitialPartitioningMethods::SFC;
+    else if (token == "Pixel" or token == "1")
+        method = InitialPartitioningMethods::Pixel;
+    else if (token == "Spectral" or token == "2")
+    	method = InitialPartitioningMethods::Spectral;
+    else if (token == "KMeans" or token == "Kmeans" or token == "K-Means" or token == "K-means" or token == "3")
+        method = InitialPartitioningMethods::KMeans;
+    else if (token == "Multisection" or token == "MultiSection" or token == "4")
+    	method = InitialPartitioningMethods::Multisection;
+    else
+        in.setstate(std::ios_base::failbit);
+    return in;
+}
+
+std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods& method)
+{
+    std::string token;
+
+    if (method == InitialPartitioningMethods::SFC)
+        token = "SFC";
+    else if (method == InitialPartitioningMethods::Pixel)
+    	token = "Pixel";
+    else if (method == InitialPartitioningMethods::Spectral)
+    	token = "Spectral";
+    else if (method == InitialPartitioningMethods::KMeans)
+        token = "KMeans";
+    else if (method == InitialPartitioningMethods::Multisection)
+    	token = "Multisection";
+    out << token;
+    return out;
+}
+
+
+
 int main(int argc, char** argv) {
 	using namespace boost::program_options;
 	options_description desc("Supported options");
 
 	struct Settings settings;
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	desc.add_options()
 				("help", "display options")
@@ -102,12 +143,13 @@ int main(int argc, char** argv) {
 				("numX", value<int>(&settings.numX)->default_value(settings.numX), "Number of points in x dimension of generated graph")
 				("numY", value<int>(&settings.numY)->default_value(settings.numY), "Number of points in y dimension of generated graph")
 				("numZ", value<int>(&settings.numZ)->default_value(settings.numZ), "Number of points in z dimension of generated graph")
+				("numBlocks", value<int>(&settings.numBlocks)->default_value(comm->getSize()), "Number of blocks, default is number of processes")
 				("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
 				("minBorderNodes", value<int>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
 				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
 				("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
 				("cutsPerDim", value<std::vector<IndexType>>(&settings.cutsPerDim)->multitoken(), "If MultiSection is chosen, then provide d values that define the number of cuts per dimension.")
-				("initialPartition", value<int>(&settings.initialPartition), "Parameter for different initial partition: 0 for the hilbert space filling curve, 1 for the pixeled method, 2 for spectral parition, 3 for k-means, 4 for multisection")
+				("initialPartition", value<InitialPartitioningMethods>(&settings.initialPartition), "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means' or 3) and multisection ('MultiSection' or 4). SFC, Spectral and K-Means are most stable.")
 				("pixeledSideLen", value<int>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
 				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
 				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
@@ -169,8 +211,6 @@ int main(int argc, char** argv) {
     std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
 
     DenseVector<ValueType> nodeWeights;
-
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
     /* timing information
      */
@@ -359,10 +399,6 @@ int main(int argc, char** argv) {
 
     assert(N > 0);
 
-    if (comm->getSize() > 0) {
-    	settings.numBlocks = comm->getSize();
-    }
-
     if( comm->getRank() ==0){
           settings.print(std::cout);
     }
@@ -389,7 +425,7 @@ int main(int argc, char** argv) {
     std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
     ValueType cut = ITI::GraphUtils::computeCut(graph, partition, true);
-    ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, comm->getSize(), nodeWeights );
+    ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
     
     std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
     
