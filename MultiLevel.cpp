@@ -4,6 +4,7 @@
 #include "GraphUtils.h"
 
 using scai::lama::Scalar;
+using scai::utilskernel::LArray;
 
 namespace ITI{
     
@@ -149,84 +150,157 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
     
-    // get local data of the adjacency matrix
-    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-    scai::hmemo::ReadAccess<IndexType> ia( localStorage.getIA() );
-    scai::hmemo::ReadAccess<IndexType> ja( localStorage.getJA() );
-    scai::hmemo::ReadAccess<ValueType> values( localStorage.getValues() );
-
     // localN= number of local nodes
     IndexType localN= adjM.getLocalNumRows();
     IndexType globalN = adjM.getNumColumns();
-    
-    // ia must have size localN+1
-    assert(ia.size()-1 == localN );
+
+    DenseVector<ValueType> localWeightCopy(nodeWeights);
+
+    scai::utilskernel::LArray<IndexType> preserved(localN, 1);
+
+    std::vector<IndexType> localFineToCoarse(localN);
+
+    scai::lama::CSRSparseMatrix<ValueType> graph = adjM;
      
-    //get a matching, the returned indices are from 0 to localN
-    std::vector<std::pair<IndexType,IndexType>> matching = MultiLevel<IndexType, ValueType>::maxLocalMatching( adjM, nodeWeights );
-    
-    std::vector<IndexType> localMatchingPartner(localN, -1);
+    for (IndexType i = 0; i < iterations; i++) {
+        // get local data of the adjacency matrix
+        const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
+        scai::hmemo::ReadAccess<IndexType> ia( localStorage.getIA() );
+        scai::hmemo::ReadAccess<IndexType> ja( localStorage.getJA() );
+        scai::hmemo::ReadAccess<ValueType> values( localStorage.getValues() );
 
-    // number of new local nodes
-    IndexType newLocalN = localN - matching.size();
+        // ia must have size localN+1
+        assert(ia.size()-1 == localN );
 
-    //sort the matching according to its first element
-    std::sort(matching.begin(), matching.end());
+        //get a matching, the returned indices are from 0 to localN
+        std::vector<std::pair<IndexType,IndexType>> matching = MultiLevel<IndexType, ValueType>::maxLocalMatching( graph, localWeightCopy );
 
-    //get new global indices by computing a prefix sum over the preserved nodes
-    DenseVector<IndexType> preserved(distPtr, 1);
-    {
-        scai::hmemo::WriteAccess<IndexType> localPreserved(preserved.getLocalValues());
+        std::vector<IndexType> localMatchingPartner(localN, -1);
+
+        //sort the matching according to its first element
+        std::sort(matching.begin(), matching.end());
+
+        //get new global indices by computing a prefix sum over the preserved nodes
         
-        for (IndexType i = 0; i < matching.size(); i++) {
-            assert(matching[i].first != matching[i].second);
-            assert(matching[i].first < localN);
-            assert(matching[i].second < localN);
-            assert(matching[i].first >= 0);
-            assert(matching[i].second >= 0);
+        {
+            scai::hmemo::WriteAccess<IndexType> localPreserved(preserved);
 
-            localMatchingPartner[matching[i].first] = matching[i].second;
-            localMatchingPartner[matching[i].second] = matching[i].first;
+            for (IndexType i = 0; i < matching.size(); i++) {
+                assert(matching[i].first != matching[i].second);
+                assert(matching[i].first < localN);
+                assert(matching[i].second < localN);
+                assert(matching[i].first >= 0);
+                assert(matching[i].second >= 0);
 
-            if (matching[i].first < matching[i].second) {
-                localPreserved[matching[i].second] = 0;
-            } else if (matching[i].second < matching[i].first) {
-                localPreserved[matching[i].first] = 0;
+                localMatchingPartner[matching[i].first] = matching[i].second;
+                localMatchingPartner[matching[i].second] = matching[i].first;
+
+                if (matching[i].first < matching[i].second) {
+                    localPreserved[matching[i].second] = 0;
+                } else if (matching[i].second < matching[i].first) {
+                    localPreserved[matching[i].first] = 0;
+                }
             }
+        }
+
+        //create edge list and fine to coarse mapping of locally coarsened graph
+        std::vector<std::map<IndexType, ValueType>> outgoingEdges(localN);
+        std::vector<IndexType> newLocalFineToCoarse(localN);
+        IndexType newLocalN = 0;
+        scai::hmemo::ReadAccess<IndexType> localPreserved(preserved);
+
+        scai::hmemo::WriteAccess<ValueType> wWeights(localWeightCopy.getLocalValues());
+
+        for (IndexType i = 0; i < localN; i++) {
+            IndexType coarseNode;
+
+            if (localPreserved[i]) {
+                coarseNode = i;
+                newLocalFineToCoarse[i] = i;
+                newLocalN++;
+            } else {
+                coarseNode = localMatchingPartner[i];
+                assert(coarseNode < i);
+                if (coarseNode == -1) {//node was already eliminated in previous round
+                    IndexType oldCoarseNode = localFineToCoarse[i];
+                    newLocalFineToCoarse[i] = newLocalFineToCoarse[oldCoarseNode];
+                } else {
+                    wWeights[coarseNode] += wWeights[i];
+                    newLocalFineToCoarse[i] = newLocalFineToCoarse[coarseNode];
+                }
+            }
+
+            if (coarseNode >= 0) {
+                for (IndexType j = ia[i]; j < ia[i+1]; j++) {
+                    IndexType edgeTarget = ja[j];
+                    IndexType localTarget = distPtr->global2local(edgeTarget);
+                    if (localTarget != nIndex && !localPreserved[localTarget]) {
+                        localTarget = localMatchingPartner[localTarget];
+                        edgeTarget = distPtr->local2global(localTarget);
+                    }
+                    if (outgoingEdges[coarseNode].count(edgeTarget) == 0) {
+                        outgoingEdges[coarseNode][edgeTarget] = 0;
+                    }
+                    outgoingEdges[coarseNode][edgeTarget] += values[j];
+                }
+            }
+        }
+
+        localFineToCoarse.swap(newLocalFineToCoarse);
+
+        {
+            //create CSR matrix out of edge list
+            scai::hmemo::HArray<IndexType> newIA(localN+1);
+            scai::hmemo::WriteAccess<IndexType> wIA(newIA);
+            std::vector<IndexType> newJA;
+            std::vector<ValueType> newValues;
+
+            wIA[0] = 0;
+
+            for (IndexType i = 0; i < localN; i++) {
+                assert(localPreserved[i] == outgoingEdges[i].size() > 0);
+                wIA[i+1] = wIA[i] + outgoingEdges[i].size();
+                IndexType jaIndex = wIA[i];
+                for (std::pair<IndexType, ValueType> edge : outgoingEdges[i]) {
+                    newJA.push_back(edge.first);
+                    newValues.push_back(edge.second);
+                    jaIndex++;
+                }
+                assert(jaIndex == wIA[i+1]);
+                assert(jaIndex == newJA.size());
+            }
+
+            wIA.release();
+            ia.release();
+            ja.release();
+            values.release();
+
+            //scai::lama::CSRStorage<ValueType> localStorage(1, comm->getSize(), numNeighbors, ia, ja, values);;
+            LArray<IndexType> lJA(newJA.size(), newJA.data());
+            LArray<ValueType> lValues(newValues.size(), newValues.data());
+            CSRStorage<ValueType> storage(localN, globalN, newValues.size(), newIA, lJA, lValues );
+            graph.swapLocalStorage(storage);
         }
     }
 
-    //fill gaps in index list. This might be expensive.
+    //fill gaps in index list. To avoid redistribution, we assign a block distribution and live with the implicit reindexing
     scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
-	DenseVector<IndexType> distPreserved(blockDist, preserved.getLocalValues());
-	DenseVector<IndexType> blockFineToCoarse = computeGlobalPrefixSum(distPreserved, -1);
-	const IndexType newGlobalN = blockFineToCoarse.max().Scalar::getValue<IndexType>() + 1;
-	fineToCoarse = DenseVector<IndexType>(distPtr, blockFineToCoarse.getLocalValues());
+    DenseVector<IndexType> distPreserved(blockDist, preserved);
+    DenseVector<IndexType> blockFineToCoarse = computeGlobalPrefixSum(distPreserved, -1);
+    const IndexType newGlobalN = blockFineToCoarse.max().Scalar::getValue<IndexType>() + 1;
+    fineToCoarse = DenseVector<IndexType>(distPtr, blockFineToCoarse.getLocalValues());
+    const IndexType newLocalN = preserved.sum();
 
     //set new indices for contracted nodes
     {
+        scai::hmemo::ReadAccess<IndexType> localPreserved(preserved);
         scai::hmemo::WriteAccess<IndexType> wFineToCoarse(fineToCoarse.getLocalValues());
-        assert(wFineToCoarse.size() == localN);
-        IndexType nonMatched = 0;
-        
         for (IndexType i = 0; i < localN; i++) {
-            if (localMatchingPartner[i] < 0) {
-                localMatchingPartner[i] = i;
-                nonMatched++;
-            }
-            
-            if (localMatchingPartner[i] < i) {
-                wFineToCoarse[i] = wFineToCoarse[localMatchingPartner[i]];
-            }
+            assert((localFineToCoarse[i] == i) == localPreserved[i]);
+            wFineToCoarse[i] = wFineToCoarse[localFineToCoarse[i]];
         }
-        
-        for (IndexType i = 0; i < localN; i++) {
-            //assert(distPtr->isLocal(wFineToCoarse[i]));
-            //assert(distPtr->global2local(wFineToCoarse[i]) < newLocalN);
-            assert(localMatchingPartner[i] < localN);
-        }
-        assert(nonMatched == localN - matching.size()*2);
     }
+
     assert(fineToCoarse.max().Scalar::getValue<IndexType>() + 1 == newGlobalN);
     assert(newGlobalN <= globalN);
     assert(newGlobalN == comm->sum(newLocalN));
@@ -234,98 +308,68 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     //build halo of new global indices
     scai::utilskernel::LArray<IndexType> haloData;
     comm->updateHalo(haloData, fineToCoarse.getLocalValues(), halo);
-    
-    scai::hmemo::ReadAccess<IndexType> localFineToCoarse(fineToCoarse.getLocalValues());
 
     //create new coarsened CSR matrix
-    scai::hmemo::HArray<IndexType> newIA;
-    scai::hmemo::HArray<IndexType> newJA;
-    scai::hmemo::HArray<ValueType> newValues;
+    scai::hmemo::HArray<IndexType> newIA(newLocalN + 1);
+    std::vector<IndexType> newJA;
+    std::vector<ValueType> newValues;
     
-    // this is larger, need to resize afterwards
-    IndexType nnzValues = values.size() - matching.size();
-
     {
         SCAI_REGION("MultiLevel.coarsen.getCSRMatrix");
-        // this is larger, need to resize afterwards
-        scai::hmemo::WriteOnlyAccess<IndexType> newIAWrite( newIA, newLocalN +1 );
-        scai::hmemo::WriteOnlyAccess<IndexType> newJAWrite( newJA, nnzValues);
-        scai::hmemo::WriteOnlyAccess<ValueType> newValuesWrite( newValues, nnzValues);
+        const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
+		scai::hmemo::ReadAccess<IndexType> ia( localStorage.getIA() );
+		scai::hmemo::ReadAccess<IndexType> ja( localStorage.getJA() );
+		scai::hmemo::ReadAccess<ValueType> values( localStorage.getValues() );
+
+        scai::hmemo::ReadAccess<IndexType> localPreserved(preserved);
+        scai::hmemo::ReadAccess<IndexType> rHalo(haloData);
+        scai::hmemo::ReadAccess<IndexType> rFineToCoarse(fineToCoarse.getLocalValues());
+
+        scai::hmemo::WriteAccess<IndexType> newIAWrite( newIA, newLocalN +1 );
+
         newIAWrite[0] = 0;
-        IndexType iaIndex = 1;
+        IndexType iaIndex = 0;
         IndexType jaIndex = 0;
         
         //for all fine rows
-        for(IndexType i=0; i<localN; i++){
-            IndexType matchingPartner = localMatchingPartner[i];
-            //duplicate code is evil. Maybe use a lambda instead?
-            if (matchingPartner >= i) {
-            	std::map<IndexType, ValueType> outgoingEdges;
+        for (IndexType i = 0; i < localN; i++) {
+            std::map<IndexType, ValueType> outgoingEdges;
 
-            	//add edges for this node
-            	for (IndexType j = ia[i]; j < ia[i+1]; j++) {
-            		IndexType oldNeighbor = ja[j];
-            		IndexType newGlobalNeighbor;
-            		IndexType localID = distPtr->global2local(oldNeighbor);
-            		if (localID == matchingPartner) {
-            			continue;//no self loops!
-            		}
-            		if (localID != nIndex) {
-            			newGlobalNeighbor = localFineToCoarse[localID];
-            		} else {
-            			IndexType haloID = halo.global2halo(oldNeighbor);
-            			assert(haloID != nIndex);
-            			newGlobalNeighbor = haloData[haloID];
-            		}
-            		//make sure entry exists
-            		if (outgoingEdges.count(newGlobalNeighbor) == 0) {
-            			outgoingEdges[newGlobalNeighbor] = 0;
-            		}
-            		outgoingEdges[newGlobalNeighbor] += values[j];
-            	}
+            if (localPreserved[i]) {
+            	assert(jaIndex == newIAWrite[iaIndex]);
+                for (IndexType j = ia[i]; j < ia[i+1]; j++) {
+                    //only need to reroute nonlocal edges
+                    IndexType localNeighbor = distPtr->global2local(ja[j]);
 
-            	//add edges for matching partner
-            	if (matchingPartner > i) {
-                    for (IndexType j = ia[matchingPartner]; j < ia[matchingPartner+1]; j++) {
-                        IndexType oldNeighbor = ja[j];
-                        IndexType localID = distPtr->global2local(oldNeighbor);
-                        IndexType newGlobalNeighbor;
-                        if (localID == i) {
-                            continue;//no self loops!
-                        }
-                        if (localID != nIndex) {
-                            newGlobalNeighbor = localFineToCoarse[localID];
-                        } else {
-                            IndexType haloID = halo.global2halo(oldNeighbor);
-                            assert(haloID != nIndex);
-                            newGlobalNeighbor = haloData[haloID];
-                        }
-                        //make sure entry exists
-                        if (outgoingEdges.count(newGlobalNeighbor) == 0) {
-                            outgoingEdges[newGlobalNeighbor] = 0;
-                        }
-                        outgoingEdges[newGlobalNeighbor] += values[j];
+                    if (localNeighbor != nIndex) {
+                        assert(outgoingEdges.count(rFineToCoarse[localNeighbor]) == 0);
+                        outgoingEdges[rFineToCoarse[localNeighbor]] = values[j];
+                    } else {
+                        IndexType haloIndex = halo.global2halo(ja[j]);
+                        assert(haloIndex != nIndex);
+                        if (outgoingEdges.count(rHalo[haloIndex]) == 0)  outgoingEdges[rHalo[haloIndex]] = 0;
+                        outgoingEdges[rHalo[haloIndex]] += values[j];
                     }
                 }
-                
-                //write new matrix entries. Since entries in std::map are sorted by their keys, we can just iterate over them
-                for (std::pair<IndexType, ValueType> entry : outgoingEdges) {
-                    assert(jaIndex < newJAWrite.size());
-                    newJAWrite[jaIndex] = entry.first;
-                    newValuesWrite[jaIndex] = entry.second;
+
+                newIAWrite[iaIndex+1] = newIAWrite[iaIndex] + outgoingEdges.size();
+
+                for (std::pair<IndexType, ValueType> edge : outgoingEdges) {
+                    newJA.push_back(edge.first);
+                    newValues.push_back(edge.second);
                     jaIndex++;
                 }
-                assert(iaIndex < newIAWrite.size());
-                newIAWrite[iaIndex] = jaIndex;
+
+                assert(jaIndex == newIAWrite[iaIndex+1]);
+                assert(jaIndex == newJA.size());
                 iaIndex++;
             }
         }
-        
-        newJA.resize(jaIndex);
-        newValues.resize(jaIndex);
-        nnzValues = jaIndex;
     }
     
+    scai::hmemo::HArray<IndexType> csrJA(newJA.size(), newJA.data());
+    scai::hmemo::HArray<ValueType> csrValues(newValues.size(), newValues.data());
+
     //create distribution object for coarse graph
     scai::utilskernel::LArray<IndexType> myGlobalIndices(fineToCoarse.getLocalValues());
     scai::hmemo::WriteAccess<IndexType> wIndices(myGlobalIndices);
@@ -336,16 +380,16 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     assert(wIndices.size() == newLocalN);
     wIndices.release();
 
+    const IndexType localEdgeCount = newJA.size();
 
     const scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(newGlobalN, myGlobalIndices, comm));
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(newGlobalN));
 
     CSRStorage<ValueType> storage;
-    storage.setCSRDataSwap(newLocalN, newGlobalN, nnzValues, newIA, newJA, newValues, scai::hmemo::ContextPtr());
+    storage.setCSRDataSwap(newLocalN, newGlobalN, localEdgeCount, newIA, csrJA, csrValues, scai::hmemo::ContextPtr());
     coarseGraph = CSRSparseMatrix<ValueType>(newDist, noDist);
     coarseGraph.swapLocalStorage(storage);
- }
-//---------------------------------------------------------------------------------------
+ }//---------------------------------------------------------------------------------------
  
 template<typename IndexType, typename ValueType>
 template<typename T>
