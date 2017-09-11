@@ -135,7 +135,7 @@ int main(int argc, char** argv) {
     IndexType lb, ub;
     scai::dmemo::BlockDistribution blockDist(N, comm);
     blockDist.getLocalRange(lb, ub, N, comm->getRank(), comm->getSize() );
-    PRINT(*comm<< ": "<< lb << " _ "<< ub);
+    //PRINT(*comm<< ": "<< lb << " _ "<< ub);
     
 
     for(IndexType round=0; round<comm->getSize(); round++){
@@ -157,11 +157,11 @@ int main(int argc, char** argv) {
         vtxDist[i+1]= recvPartRead[i+1];
         //vtxDist[i]= recvPartRead[i];
     }
-
+    /*
     for(IndexType i=0; i<recvPartRead.size(); i++){
         PRINT(*comm<< " , " << i <<": " << vtxDist[i]);
     }
-  
+    */
     recvPartRead.release();
     
     // setting xadj=ia and adjncy=ja values, these are the local values of every processor
@@ -211,7 +211,7 @@ int main(int argc, char** argv) {
         SCAI_ASSERT( 2*i+1< sizeof(xyzLocal)/sizeof(xyzLocal[0]), "Too large index: " << 2*i+1);
         xyzLocal[2*i]= real_t(localPartOfCoords0[i]);
         xyzLocal[2*i+1]= real_t(localPartOfCoords1[i]);
-        PRINT(*comm <<": "<< xyzLocal[2*i] << ", "<< xyzLocal[2*i+1]);
+        //PRINT(*comm <<": "<< xyzLocal[2*i] << ", "<< xyzLocal[2*i+1]);
     }
   
     // ncon: the numbers of weigths each vertex has. Here 1;
@@ -232,7 +232,7 @@ int main(int argc, char** argv) {
     real_t total = 0;
     for(int i=0; i<sizeof(tpwgts)/sizeof(real_t) ; i++){
 	tpwgts[i] = real_t(1)/k;
-        PRINT(*comm << ": " << i <<": "<< tpwgts[i]);
+        //PRINT(*comm << ": " << i <<": "<< tpwgts[i]);
 	total += tpwgts[i];
     }
 
@@ -258,8 +258,8 @@ int main(int argc, char** argv) {
     MPI_Comm metisComm;
     MPI_Comm_dup(MPI_COMM_WORLD, &metisComm);
      
-    PRINT(*comm<< ": xadj.size()= "<< sizeof(xadj) << "  adjncy.size=" <<sizeof(adjncy) ); 
-    PRINT(*comm << ": "<< sizeof(xyzLocal)/sizeof(real_t) << " ## "<< sizeof(partKway)/sizeof(idx_t) << " , localN= "<< localN);
+    //PRINT(*comm<< ": xadj.size()= "<< sizeof(xadj) << "  adjncy.size=" <<sizeof(adjncy) ); 
+    //PRINT(*comm << ": "<< sizeof(xyzLocal)/sizeof(real_t) << " ## "<< sizeof(partKway)/sizeof(idx_t) << " , localN= "<< localN);
     
     SCAI_ASSERT( sizeof(partKway)/sizeof(partKway[0])==localN , sizeof(partKway)/sizeof(partKway[0]) << " , " << localN);
     
@@ -283,6 +283,11 @@ int main(int argc, char** argv) {
         metisRet = ParMETIS_V3_PartKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
     }
     
+    std::chrono::duration<double> partitionKwayTime =  std::chrono::system_clock::now() - beforePartTime;
+
+    double partKwayTime= comm->max(partitionKwayTime.count() );
+
+    
     // convert partition to a DenseVector
     //
     DenseVector<IndexType> partitionKway(dist);
@@ -290,7 +295,7 @@ int main(int argc, char** argv) {
         partitionKway.getLocalValues()[i] = partKway[i];
     }
     ValueType cutKway = ITI::GraphUtils::computeCut(graph, partitionKway, true);
-    ValueType imbalanceKway = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partitionKway, comm->getSize() );
+    ValueType imbalanceKway = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partitionKway, nparts );
     assert(sizeof(xyzLocal)/sizeof(real_t) == 2*sizeof(partKway)/sizeof(idx_t) );
   
     // check correct transformation to DenseVector
@@ -298,9 +303,6 @@ int main(int argc, char** argv) {
         //PRINT(*comm << ": "<< part[i] << " _ "<< partition.getLocalValues()[i] );
         assert( partKway[i]== partitionKway.getLocalValues()[i]);
     }
-    std::chrono::duration<double> partitionKwayTime =  std::chrono::system_clock::now() - beforePartTime;
-
-    double partKwayTime= comm->max(partitionKwayTime.count() );
 
     char machineChar[255];
     std::string machine;

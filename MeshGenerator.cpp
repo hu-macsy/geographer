@@ -522,7 +522,6 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
     IndexType ngbUpperBound = std::min(12, (IndexType) neighbourGlobalIndices.size() ); // I do not know, just trying 12
     // TODO:  maybe treat nodes in the faces differently
     IndexType ngbLowerBound = 3;
-    srand(time(NULL));
                                 
     /*  We must the adjacency matrix symmetric and also we do not know how many edges the graph will
      *  have eventually and we cannot use ia, ja and values arrays to build the CSRSparseMatrix.
@@ -837,12 +836,6 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
 template<typename IndexType, typename ValueType>
 void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const int dimension, const int numberOfAreas, const long pointsPerArea, const ValueType maxVal) {
     SCAI_REGION("MeshGenerator.createQuadMesh")
-        
-    //broadcast seed value from root to ensure equal pseudorandom numbers.
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
-    comm->bcast( seed, 1, 0 );
-    srand(seed[0]);
     
     Point<ValueType> minCoord(dimension);
     Point<ValueType> maxCoord(dimension);
@@ -941,8 +934,6 @@ std::vector<DenseVector<ValueType>> MeshGenerator<IndexType, ValueType>::randomP
     std::vector<DenseVector<ValueType>> ret(dimensions);
     for (d=0; d<dimensions; d++)
         ret[d] = DenseVector<ValueType>(n, 0);
-    
-    srand(time(NULL));
 
     for(d=0; d<dimensions; d++){
         for(j=0; j<n; j++){

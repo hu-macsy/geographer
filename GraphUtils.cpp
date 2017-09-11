@@ -663,6 +663,36 @@ scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSpars
 //----------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::Halo& halo) {
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	scai::dmemo::DistributionPtr distPEs ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, comm->getSize()) );
+	assert(distPEs->getLocalSize() == 1);
+	scai::dmemo::DistributionPtr noDistPEs (new scai::dmemo::NoDistribution( comm->getSize() ));
+
+    const scai::dmemo::CommunicationPlan& plan = halo.getProvidesPlan();
+    std::vector<IndexType> neighbors;
+    std::vector<ValueType> edgeCount;
+    for (IndexType i = 0; i < plan.size(); i++) {
+    	if (plan[i].quantity > 0) {
+    		neighbors.push_back(plan[i].partitionId);
+    		edgeCount.push_back(plan[i].quantity);
+    	}
+    }
+    const IndexType numNeighbors = neighbors.size();
+
+    SCAI_REGION_START("ParcoRepart.getPEGraph.buildMatrix");
+	scai::utilskernel::LArray<IndexType> ia(2, 0, numNeighbors);
+	scai::utilskernel::LArray<IndexType> ja(numNeighbors, neighbors.data());
+	scai::utilskernel::LArray<ValueType> values(edgeCount.size(), edgeCount.data());
+	scai::lama::CSRStorage<ValueType> myStorage(1, comm->getSize(), numNeighbors, ia, ja, values);
+	SCAI_REGION_END("ParcoRepart.getPEGraph.buildMatrix");
+
+    scai::lama::CSRSparseMatrix<ValueType> PEgraph(myStorage, distPEs, noDistPEs);
+
+    return PEgraph;
+}
+
+template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueType> &adjM) {
     SCAI_REGION("ParcoRepart.getPEGraph");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();

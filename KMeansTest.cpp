@@ -64,7 +64,7 @@ TEST_F(KMeansTest, testFindInitialCenters) {
 	for (IndexType d = 0; d < dimensions; d++) {
 		ValueType coordSum = std::accumulate(centers[d].begin(), centers[d].end(), 0.0);
 		ValueType totalSum = comm->sum(coordSum);
-		SCAI_ASSERT_LT(std::abs(p*coordSum - totalSum) , 1e-5 ,  std::abs(p*coordSum - totalSum) );
+		EXPECT_LT(std::abs(p*coordSum - totalSum), 1e-5);
 	}
 }
 

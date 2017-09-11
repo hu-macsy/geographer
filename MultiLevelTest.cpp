@@ -283,7 +283,6 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     Settings.minGainForNextRound =3;
     
     scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
-
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, halo, Settings);
     
     EXPECT_EQ( graph.l1Norm() , beforel1Norm);

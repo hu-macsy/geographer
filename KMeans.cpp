@@ -230,7 +230,7 @@ DenseVector<IndexType> assignBlocks(
 	for (IndexType i = 0; i < k; i++) {
 		IndexType c = clusterIndices[i];
 		ValueType effectiveDist = minDistance[c]*minDistance[c]*influence[c];
-		assert(effectiveMinDistance[i] == effectiveDist);
+		SCAI_ASSERT_EQ_ERROR( effectiveMinDistance[i], effectiveDist, "effectiveMinDistance[" << i << "] = " << effectiveMinDistance[i] << " != " << effectiveDist << "effectiveDist");
 	}
 
 	std::vector<ValueType> distThreshold(k);
