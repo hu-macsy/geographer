@@ -473,8 +473,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             if( std::pow( intSqrtK+1, dim ) == k){
                 intSqrtK++;
             }
-            
-PRINT0(intSqrtK);            
+PRINT0(sqrtK << " __ "<< intSqrtK );            
             SCAI_ASSERT( std::pow( intSqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow( sqrtK, 1/d)= " << std::pow(intSqrtK,dim));
 /*            
             if( !(std::floor(sqrtK)==sqrtK) ){
@@ -482,7 +481,7 @@ PRINT0(intSqrtK);
                 throw std::logic_error("Number of blocks not a square number");
             }
 */                        
-            numCuts = std::vector<IndexType>( dim, sqrtK );
+            numCuts = std::vector<IndexType>( dim, intSqrtK );
         }else{                                  // user-specific number of cuts per dimensions
             numCuts = settings.cutsPerDim;
         }
@@ -620,7 +619,7 @@ dbg_rectW += newRect.weight;
             }        
 dbg_rectW += newRect.weight;    
             //if(comm->getRank()==0) newRect.print();            
-            PRINT0("this rect imbalance= " << (maxWeight-optWeight)/optWeight << "  (opt= " << optWeight << " , max= "<< maxWeight << ")" );
+            //PRINT0("this rect imbalance= " << (maxWeight-optWeight)/optWeight << "  (opt= " << optWeight << " , max= "<< maxWeight << ")" );
 
 //TODO: only for debuging, remove variable dbg_rectW
 SCAI_ASSERT_LE_ERROR( dbg_rectW-thisRectangle.weight, 0.0000001, "Rectangle weights not correct: dbg_rectW-this.weight= " << dbg_rectW - thisRectangle.weight);

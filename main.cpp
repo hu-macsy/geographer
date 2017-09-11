@@ -190,7 +190,7 @@ int main(int argc, char** argv) {
 		std::cout << "Cannot both load coordinates from file with --coordFile or generate them with --useDiffusionCoords." << std::endl;
 		return 126;
 	}
-	if( vm.count("cutsPerDim   ") ){
+	if( vm.count("cutsPerDim") ){
             SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
             SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
         }

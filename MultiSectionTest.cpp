@@ -133,7 +133,7 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
 TEST_F(MultiSectionTest, testGetRectangles){
  
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    IndexType sideLen= 50;
+    IndexType sideLen= 30;
     IndexType dim = 3;
     IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -358,11 +358,11 @@ TEST_F(MultiSectionTest, test1DPartitionOptimal){
     std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( nodeWeights, k, settings);
     
     //assertions - prints
-    
+/*    
 for(int i=0; i<part1D.size(); i++){
     PRINT0(i<< ": " << part1D[i] << " ++ " << weightPerPart[i] );
 }
-    
+  */  
     SCAI_ASSERT( part1D.size()==weightPerPart.size() , "Wrong size of returned vectors: part1D.size()= " << part1D.size() << " and weightPerPart.size()= "<< weightPerPart.size());
     
     //PRINT("0: from [0 to" << part1D[0] <<") with weight " <<  weightPerPart[0] );
@@ -393,7 +393,7 @@ TEST_F(MultiSectionTest, test1DPartitionOptimalRandomWeights){
     
     std::random_device rnd_dvc;
     std::mt19937 mersenne_engine(rnd_dvc());
-    std::uniform_real_distribution<ValueType> dist(10.0, 13.0);
+    std::uniform_real_distribution<ValueType> dist(7.0, 13.0);
     auto gen = std::bind(dist, mersenne_engine);
     
     std::vector<ValueType> nodeWeights(N);
@@ -402,33 +402,35 @@ TEST_F(MultiSectionTest, test1DPartitionOptimalRandomWeights){
     //
 //    std::vector<ValueType> nodeWeights= {10.2484 , 10.9272 , 10.5296 , 10.5115 , 10.039 , 10.1079 , 10.0137 , 10.4012 , 10.7798 , 10.8752 , 10.0367 , 10.5632 , 10.904 , 10.4084 , 10.7319 , 10.9817 , 10.3689 , 10.4523 , 10.8339};
     //
-    
+/*    
 for(int i=0; i<nodeWeights.size(); i++){
         std::cout << nodeWeights[i] << " , ";
 }
 std::cout << std::endl;
-
+*/
     
     const ValueType origTotalWeight = std::accumulate( nodeWeights.begin(), nodeWeights.end(), 0.0);
     const ValueType optimalWeight = origTotalWeight/k;
-PRINT0(origTotalWeight << " @@ " << optimalWeight);
+    //PRINT0(origTotalWeight << " @@ " << optimalWeight);
     
     std::vector<ValueType> weightPerPart, weightPerPartGreedy, weightPerPartMine;
     std::vector<IndexType> part1D, part1DGreedy, part1DMine;
     
     Settings settings;
     
-    //get optimal 1D partitioning
+    //get greedy 1D partitioning    
     std::tie( part1DGreedy, weightPerPartGreedy) = MultiSection<IndexType, ValueType>::partition1DGreedy( nodeWeights, k, settings);
 
+    //get optimal 1D partitioning
     std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( nodeWeights, k, settings);
     
+    //
     //assertions - prints
-    
+    // 
     ValueType maxWeightOpt = *std::max_element(weightPerPart.begin(), weightPerPart.end());
     ValueType maxWeightGrd = *std::max_element(weightPerPartGreedy.begin(), weightPerPartGreedy.end());
     
-    SCAI_ASSERT( maxWeightOpt- maxWeightGrd <0, "Greedy solution better than \"optimal\"... :( ");
+    SCAI_ASSERT( maxWeightOpt - maxWeightGrd < 0.00001, "Greedy solution better than \"optimal\"... :( ,  maxWeightOpt= " << maxWeightOpt << " , maxWeightGrd= " << maxWeightGrd );
     SCAI_ASSERT_EQ_ERROR( weightPerPartGreedy.size(), k , "Return vector has wrong size");
     SCAI_ASSERT_EQ_ERROR( part1DGreedy.size(), k , "Return vector has wrong size");
        
@@ -516,20 +518,18 @@ TEST_F(MultiSectionTest, testProbeFunction ){
     
     for(IndexType i=1; i<=nodeWeights2.size(); i++ ){
         prefixSum2[i] = prefixSum2[i-1] + nodeWeights2[i-1]; 
-        std::cout<< i << ": "<< prefixSum2[i] << " , " ;
     }
-    std::cout << std::endl;
     
     ValueType target2 = 30.0;
     bool existsPart = false;
     std::vector<IndexType> splitters;
     while( !existsPart ){
         std::tie(existsPart,splitters) = MultiSection<IndexType, ValueType>::probeAndGetSplitters( prefixSum2, 6, target2);
-        PRINT(" -- " << target2);
+        //PRINT(" -- " << target2);
         target2 += 1.0;
     }
-    PRINT(" ++ " << target2-1);
-    aux::printVector(splitters);
+    //PRINT(" ++ " << target2-1);
+    //aux::printVector(splitters);
     
 }
 //---------------------------------------------------------------------------------------
@@ -551,7 +551,7 @@ TEST_F(MultiSectionTest, testRectTree){
     r2.bottom = { 70, 90};
     r2.top = {100, 100};
     root->insert( r2 );
-    
+
     rectangle r3;
     r3.bottom = {10,20};
     r3.top = {20, 40};
@@ -610,7 +610,7 @@ TEST_F(MultiSectionTest, testRectTree){
         SCAI_ASSERT( retRect->getRect().bottom[1]<=points[p][1] and retRect->getRect().top[1]>=points[p][1] , "Wrong rectangle");
         
     }
-    
+
     std::vector<ValueType> point(2); 
     
     //random points
@@ -622,16 +622,18 @@ TEST_F(MultiSectionTest, testRectTree){
         try{
             retRect = root->getContainingLeaf( point );
         }catch( const std::logic_error& e ){
+            //PRINT("Null pointer for point ("<<point[0] << ", "<< point[1]<< ")" );
             continue;
         }
         SCAI_ASSERT( retRect->getRect().bottom[0]<=point[0] and retRect->getRect().top[0]>=point[0] , "Wrong rectangle");
         SCAI_ASSERT( retRect->getRect().bottom[1]<=point[1] and retRect->getRect().top[1]>=point[1] , "Wrong rectangle");
     }
-    
+
     //all the points
     int numOfPointsIn_r2 =0;
     int numOfPointsIn_r4 =0;
     int numOfPointsIn_r6 =0;
+    int numOfPointsNotInAnyRect = 0;
     for( int x=0; x<=100; x++){
         for(int y=0; y<=100; y++){
             point[0]=x;
@@ -640,6 +642,8 @@ TEST_F(MultiSectionTest, testRectTree){
             try{
                 retRect = root->getContainingLeaf( point );
             }catch( const std::logic_error& e ){
+                //PRINT("Null pointer for point ("<<point[0] << ", "<< point[1]<< ")" );
+                numOfPointsNotInAnyRect++;
                 continue;
             }
             
@@ -654,6 +658,7 @@ TEST_F(MultiSectionTest, testRectTree){
             }
         }
     }
+    
     int r2Vol, r4Vol, r6Vol;
     r2Vol = (r2.top[0]-r2.bottom[0]+1)*(r2.top[1]-r2.bottom[1]+1);
     r4Vol = (r4.top[0]-r4.bottom[0]+1)*(r4.top[1]-r4.bottom[1]+1);

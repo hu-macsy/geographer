@@ -2,6 +2,11 @@
  * Author Charilaos "Harry" Tzovas
  *
  *
+ * example of use: 
+ * mpirun -n #p parMetis --graphFile="meshes/hugetrace/hugetrace-00008.graph" --dimensions=2 --numBlocks=#k --geom=0
+ * 
+ * 
+ * where #p is the number of PEs that the graph is distributed to and #k the number of blocks to partition to
 */
 
 #include <cstdlib>
@@ -277,7 +282,7 @@ int main(int argc, char** argv) {
     //
     // parmetis partition
     //
-    if( parMetisGeom){
+    if( parMetisGeom ){
         metisRet = ParMETIS_V3_PartGeomKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ndims, xyzLocal, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
     }else{
         metisRet = ParMETIS_V3_PartKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
@@ -313,7 +318,13 @@ int main(int argc, char** argv) {
     
     if(comm->getRank()==0){
     	std::cout << std::endl << "machine:" << machine << " input:" << graphFile << " nodes:" << N << " epsilon:" << settings.epsilon;
-        std::cout << std::endl << "ParMetisGeomKway cut= "<< cutKway <<" imbalance:" << imbalanceKway<<", time for partition: "<< partKwayTime << std::endl;
+        if( parMetisGeom ){
+            std::cout << std::endl << "ParMETIS_V3_PartGeomKway cut= ";
+        }else{
+            std::cout << std::endl << "ParMETIS_V3_PartKway cut= ";
+        }
+        
+        std::cout<< cutKway <<" imbalance:" << imbalanceKway<<", time for partition: "<< partKwayTime << std::endl;
         //std::cout<< std::endl << "ParMetisGeom cut= "<< cutGeom <<" and imbalance= " << imbalanceGeom<<", time for partition: "<< partGeomTime << std::endl;
 
     }

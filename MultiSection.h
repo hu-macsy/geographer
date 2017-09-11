@@ -218,7 +218,7 @@ namespace ITI {
                 // this is not a leaf node but none of the childrens owns the point
                 //WARNING: in our case this should never happen, but it may happen in a more general
                 // case where the children rectangles do not cover the entire father rectangle
-                this->getRect().print();
+                //this->getRect().print();
                 throw std::logic_error("Null pointer");
             }else{
                 //TODO: possibly a bit expensive and not needed assertion
