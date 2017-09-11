@@ -36,9 +36,10 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 	}
         
 	if (settings.multiLevelRounds > 0) {
-		SCAI_REGION( "MultiLevel.multiLevelStep.recursiveCall" )
+		SCAI_REGION_START( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
 		CSRSparseMatrix<ValueType> coarseGraph;
 		DenseVector<IndexType> fineToCoarseMap;
+
 		if (comm->getRank() == 0) {
 			std::cout << "Beginning coarsening, still " << settings.multiLevelRounds << " levels to go." << std::endl;
 		}
@@ -68,23 +69,28 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 
 		Settings settingscopy(settings);
 		settingscopy.multiLevelRounds--;
+		SCAI_REGION_END( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
 		// recursive call
 		multiLevelStep(coarseGraph, coarsePart, coarseWeights, coarseCoords, coarseHalo, settingscopy);
 
-		// uncoarsening/refinement
-		scai::dmemo::DistributionPtr projectedFineDist = projectToFine(coarseGraph.getRowDistributionPtr(), fineToCoarseMap);
-		assert(projectedFineDist->getGlobalSize() == globalN);
-		part = DenseVector<IndexType>(projectedFineDist, comm->getRank());
+		{
+			SCAI_REGION( "MultiLevel.multiLevelStep.uncoarsen" )
+			// uncoarsening/refinement
+			scai::dmemo::DistributionPtr projectedFineDist = projectToFine(coarseGraph.getRowDistributionPtr(), fineToCoarseMap);
+			assert(projectedFineDist->getGlobalSize() == globalN);
+			part = DenseVector<IndexType>(projectedFineDist, comm->getRank());
+			scai::dmemo::Redistributor redistributor(projectedFineDist, input.getRowDistributionPtr());
 
-		if (settings.useGeometricTieBreaking) {
-			for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-				coordinates[dim].redistribute(projectedFineDist);
+			if (settings.useGeometricTieBreaking) {
+				for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+					coordinates[dim].redistribute(redistributor);
+				}
 			}
+
+			input.redistribute(projectedFineDist, input.getColDistributionPtr());
+
+			nodeWeights.redistribute(redistributor);
 		}
-
-		input.redistribute(projectedFineDist, input.getColDistributionPtr());
-
-		nodeWeights.redistribute(projectedFineDist);
 	}
  
         // do local refinement
