@@ -217,7 +217,9 @@ DenseVector<IndexType> assignBlocks(
 				center[d] = centers[d][j];
 			}
 			minDistance[j] = boundingBox.distances(center).first;
+			assert(std::isfinite(minDistance[j]));
 			effectiveMinDistance[j] = minDistance[j]*minDistance[j]*influence[j];
+			assert(std::isfinite(effectiveMinDistance[j]));
 		}
 	}
 
@@ -230,7 +232,7 @@ DenseVector<IndexType> assignBlocks(
 	for (IndexType i = 0; i < k; i++) {
 		IndexType c = clusterIndices[i];
 		ValueType effectiveDist = minDistance[c]*minDistance[c]*influence[c];
-		assert(std::abs(effectiveMinDistance[i]- effectiveDist) < 1e-8);
+		SCAI_ASSERT_LT_ERROR( std::abs(effectiveMinDistance[i] - effectiveDist), 1e-5, "effectiveMinDistance[" << i << "] = " << effectiveMinDistance[i] << " != " << effectiveDist << " = effectiveDist");
 	}
 
 	std::vector<ValueType> distThreshold(k);
