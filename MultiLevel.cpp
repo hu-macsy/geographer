@@ -1,3 +1,4 @@
+#include <scai/dmemo/GenBlockDistribution.hpp>
 
 #include "MultiLevel.h"
 #include "GraphUtils.h"
@@ -183,8 +184,10 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
             assert(matching[i].second < localN);
             assert(matching[i].first >= 0);
             assert(matching[i].second >= 0);
+
             localMatchingPartner[matching[i].first] = matching[i].second;
             localMatchingPartner[matching[i].second] = matching[i].first;
+
             if (matching[i].first < matching[i].second) {
                 localPreserved[matching[i].second] = 0;
             } else if (matching[i].second < matching[i].first) {
@@ -194,11 +197,11 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     }
 
     //fill gaps in index list. This might be expensive.
-    scai::dmemo::DistributionPtr blockDist(new scai::dmemo::BlockDistribution(globalN, comm));
-    preserved.redistribute(blockDist);
-    fineToCoarse = computeGlobalPrefixSum(preserved, -1);
-    const IndexType newGlobalN = fineToCoarse.max().Scalar::getValue<IndexType>() + 1;
-    fineToCoarse.redistribute(distPtr);
+    scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
+	DenseVector<IndexType> distPreserved(blockDist, preserved.getLocalValues());
+	DenseVector<IndexType> blockFineToCoarse = computeGlobalPrefixSum(distPreserved, -1);
+	const IndexType newGlobalN = blockFineToCoarse.max().Scalar::getValue<IndexType>() + 1;
+	fineToCoarse = DenseVector<IndexType>(distPtr, blockFineToCoarse.getLocalValues());
 
     //set new indices for contracted nodes
     {
@@ -252,7 +255,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
         IndexType iaIndex = 1;
         IndexType jaIndex = 0;
         
-        //for all rows before the coarsening
+        //for all fine rows
         for(IndexType i=0; i<localN; i++){
             IndexType matchingPartner = localMatchingPartner[i];
             //duplicate code is evil. Maybe use a lambda instead?
@@ -571,15 +574,14 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
     IndexType totalNbrs= 0;
     
     // the vector<vector> to return
-    // matching[0][i]-matching[1][i] are the endopoints of an edge that is matched
+    // matching[0][i]-matching[1][i] are the endpoints of an edge that is matched
     std::vector<std::pair<IndexType,IndexType>> matching;
     
     // keep track of which nodes are already matched
     std::vector<bool> matched(localN, false);
 
     // get local part of node weights
-    scai::utilskernel::LArray<ValueType> localNodeWeights = nodeWeights.getLocalValues();
-    scai::hmemo::ReadAccess<ValueType> rLocalNodeWeights( localNodeWeights );
+    scai::hmemo::ReadAccess<ValueType> rLocalNodeWeights( nodeWeights.getLocalValues() );
     
     // localNode is the local index of a node
     for(IndexType localNode=0; localNode<localN; localNode++){
@@ -589,17 +591,17 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
         }
         
         IndexType bestTarget = -1;
-	ValueType maxEdgeRating = -1;
+        ValueType maxEdgeRating = -1;
         const IndexType endCols = ia[localNode+1];
         for (IndexType j = ia[localNode]; j < endCols; j++) {
         	IndexType localNeighbor = distPtr->global2local(ja[j]);
         	if (localNeighbor != nIndex && localNeighbor != localNode && !matched[localNeighbor]) {
         		//neighbor is local and unmatched, possible partner
-			ValueType thisEdgeRating = values[j]*values[j]/(rLocalNodeWeights[localNode]*rLocalNodeWeights[localNeighbor]);
+        		ValueType thisEdgeRating = values[j]*values[j]/(rLocalNodeWeights[localNode]*rLocalNodeWeights[localNeighbor]);
         		if (bestTarget < 0 ||  thisEdgeRating > maxEdgeRating) {
         			//either we haven't found any target yet, or the current one is better
         			bestTarget = j;
-				maxEdgeRating = thisEdgeRating;
+        			maxEdgeRating = thisEdgeRating;
         		}
         	}
         }
@@ -610,9 +612,9 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
 			// at this point -globalNgbr- is the local node with the heaviest edge
 			// and should be matched with -localNode-.
 			// So, actually, globalNgbr is also local....
-			assert( distPtr->isLocal(globalNgbr));
 			IndexType localNgbr = distPtr->global2local(globalNgbr);
-                        //TODO: search neighbors for the heaviest edge
+			assert(localNgbr != nIndex);
+            //TODO: search neighbors for the heaviest edge
 			matching.push_back( std::pair<IndexType,IndexType> (localNode, localNgbr) );
 
 			// mark nodes as matched
