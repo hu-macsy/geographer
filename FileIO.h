@@ -116,6 +116,10 @@ public:
 	}
 
         static std::pair<IndexType, IndexType> getMatrixMarketCoordsInfos(const std::string filename);
+        
+        /** Read a file with numBLocks number o
+         */
+        static std::vector<IndexType> readBlockSizes(const std::string filename , const IndexType numBlocks);
 
 private:
 	/**
