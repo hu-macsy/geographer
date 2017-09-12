@@ -87,17 +87,17 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 			scai::dmemo::DistributionPtr projectedFineDist = projectToFine(coarseGraph.getRowDistributionPtr(), fineToCoarseMap);
 			assert(projectedFineDist->getGlobalSize() == globalN);
 			part = DenseVector<IndexType>(projectedFineDist, comm->getRank());
-			scai::dmemo::Redistributor redistributor(projectedFineDist, input.getRowDistributionPtr());
+			//scai::dmemo::Redistributor redistributor(projectedFineDist, input.getRowDistributionPtr());
 
 			if (settings.useGeometricTieBreaking) {
 				for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-					coordinates[dim].redistribute(redistributor);
+					coordinates[dim].redistribute(projectedFineDist);
 				}
 			}
 
 			input.redistribute(projectedFineDist, input.getColDistributionPtr());
 
-			nodeWeights.redistribute(redistributor);
+			nodeWeights.redistribute(projectedFineDist);
 		}
 	}
  
