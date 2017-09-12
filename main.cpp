@@ -423,6 +423,8 @@ int main(int argc, char** argv) {
     
     ValueType cut = ITI::GraphUtils::computeCut(graph, partition, true);
     ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
+    IndexType maxComm = ITI::GraphUtils::computeMaxComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
+    IndexType totalComm = ITI::GraphUtils::computeTotalComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
     
     std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
     
@@ -442,7 +444,7 @@ int main(int argc, char** argv) {
         std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
         std::cout.precision(oldprecision);
         
-        std::cout<< "cut:"<< cut<< " imbalance:"<< imbalance << std::endl;
-        std::cout<<"inputTime:" << inputT << " partitionTime:" << partT <<" reportTime:"<< repT << std::endl;
+        std::cout<< std::endl<< "\033[1;36mcut:"<< cut<< "   imbalance:"<< imbalance << "   maxComm= "<< maxComm << std::endl;
+        std::cout<<"inputTime:" << inputT << "   partitionTime:" << partT <<"   reportTime:"<< repT << " \033[0m" << std::endl;
     }
 }

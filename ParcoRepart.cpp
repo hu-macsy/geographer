@@ -119,6 +119,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         if( settings.initialPartition==InitialPartitioningMethods::SFC) {
             PRINT0("Initial partition with SFCs");
             result= ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
+            std::chrono::duration<double> sfcTime = std::chrono::system_clock::now() - beforeInitPart;
+            ValueType timeForSfcPart = ValueType ( comm->max(sfcTime.count() ));
+            if (comm->getRank() == 0) {
+                std::cout << "SFC Time:" << timeForSfcPart << std::endl;
+            }
         } else if ( settings.initialPartition==InitialPartitioningMethods::Pixel) {
             PRINT0("Initial partition with pixels.");
             result = ParcoRepart<IndexType, ValueType>::pixelPartition(coordinates, settings);
@@ -133,12 +138,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         	if (settings.dimensions == 2 || settings.dimensions == 3) {
         		Settings sfcSettings = settings;
         		sfcSettings.numBlocks = comm->getSize();
-				DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, sfcSettings);
-				nodeWeightCopy = DenseVector<ValueType>(nodeWeights, tempResult.getDistributionPtr());
-				coordinateCopy.resize(dimensions);
-				for (IndexType d = 0; d < dimensions; d++) {
-					coordinateCopy[d] = DenseVector<ValueType>(coordinates[d], tempResult.getDistributionPtr());
-				}
+                        DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, sfcSettings);
+			nodeWeightCopy = DenseVector<ValueType>(nodeWeights, tempResult.getDistributionPtr());
+			coordinateCopy.resize(dimensions);
+			for (IndexType d = 0; d < dimensions; d++) {
+				coordinateCopy[d] = DenseVector<ValueType>(coordinates[d], tempResult.getDistributionPtr());
+			}
         	} else {
         		coordinateCopy = coordinates;
         		nodeWeightCopy = nodeWeights;
@@ -148,12 +153,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
             result = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeightCopy, blockSizes, settings.epsilon);
             std::chrono::duration<double> kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
-			ValueType timeForInitPart = ValueType ( comm->max(kMeansTime.count() ));
+            ValueType timeForInitPart = ValueType ( comm->max(kMeansTime.count() ));
             assert(result.getLocalValues().min() >= 0);
             assert(result.getLocalValues().max() < k);
 
             if (comm->getRank() == 0) {
-				std::cout << "K-Means, Time:" << timeForInitPart << std::endl;
+                std::cout << "K-Means, Time:" << timeForInitPart << std::endl;
             }
             assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
             assert(result.min().Scalar::getValue<IndexType>() == 0);
@@ -162,6 +167,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             PRINT0("Initial partition with multisection");
             DenseVector<ValueType> convertedWeights(nodeWeights);
             result = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, settings);
+            std::chrono::duration<double> msTime = std::chrono::system_clock::now() - beforeInitPart;
+            ValueType timeForMsPart = ValueType ( comm->max(msTime.count() ));
+            if (comm->getRank() == 0) {
+                std::cout << "MS Time:" << timeForMsPart << std::endl;
+            }
         }
         else {
             throw std::runtime_error("Initial Partitioning mode undefined.");
@@ -191,8 +201,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k, nodeWeights);
 
 			if (comm->getRank() == 0) {
-				std::cout << "Time for initial partition and redistribution:" << timeForInitPart << std::endl;
-				std::cout << "Cut:" << cut << ", imbalance:" << imbalance << std::endl;
+				std::cout<< std::endl << "\033[1;31mTime for initial partition and redistribution:" << timeForInitPart << std::endl;
+				std::cout << "Cut:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
 			}
 
 			IndexType numRefinementRounds = 0;
