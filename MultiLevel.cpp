@@ -153,6 +153,8 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     IndexType localN= adjM.getLocalNumRows();
     IndexType globalN = adjM.getNumColumns();
 
+    SCAI_REGION_START("MultiLevel.coarsen.localCopy")
+
     DenseVector<ValueType> localWeightCopy(nodeWeights);
 
     scai::utilskernel::LArray<IndexType> preserved(localN, 1);
@@ -160,8 +162,10 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     std::vector<IndexType> localFineToCoarse(localN);
 
     scai::lama::CSRSparseMatrix<ValueType> graph = adjM;
+    SCAI_REGION_END("MultiLevel.coarsen.localCopy")
      
     for (IndexType i = 0; i < iterations; i++) {
+    	SCAI_REGION("MultiLevel.coarsen.localLoop");
         // get local data of the adjacency matrix
         const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
         scai::hmemo::ReadAccess<IndexType> ia( localStorage.getIA() );
@@ -178,8 +182,6 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
 
         //sort the matching according to its first element
         std::sort(matching.begin(), matching.end());
-
-        //get new global indices by computing a prefix sum over the preserved nodes
         
         {
             scai::hmemo::WriteAccess<IndexType> localPreserved(preserved);
@@ -248,6 +250,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
         localFineToCoarse.swap(newLocalFineToCoarse);
 
         {
+        	SCAI_REGION("MultiLevel.coarsen.getLocalCSRMatrix");
             //create CSR matrix out of edge list
             scai::hmemo::HArray<IndexType> newIA(localN+1);
             scai::hmemo::WriteAccess<IndexType> wIA(newIA);
@@ -282,6 +285,8 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
         }
     }
 
+    SCAI_REGION_START("MultiLevel.coarsen.newGlobalIndices")
+    //get new global indices by computing a prefix sum over the preserved nodes
     //fill gaps in index list. To avoid redistribution, we assign a block distribution and live with the implicit reindexing
     scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
     DenseVector<IndexType> distPreserved(blockDist, preserved);
@@ -303,6 +308,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     assert(fineToCoarse.max().Scalar::getValue<IndexType>() + 1 == newGlobalN);
     assert(newGlobalN <= globalN);
     assert(newGlobalN == comm->sum(newLocalN));
+    SCAI_REGION_END("MultiLevel.coarsen.newGlobalIndices")
 
     //build halo of new global indices
     scai::utilskernel::LArray<IndexType> haloData;
