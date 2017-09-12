@@ -41,6 +41,8 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 		SCAI_REGION_START( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
 		CSRSparseMatrix<ValueType> coarseGraph;
 		DenseVector<IndexType> fineToCoarseMap;
+        std::chrono::time_point<std::chrono::system_clock> beforeCoarse =  std::chrono::system_clock::now();
+
 		if (comm->getRank() == 0) {
 			std::cout << "Beginning coarsening, still " << settings.multiLevelRounds << " levels to go." << std::endl;
 		}
@@ -67,6 +69,11 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 		scai::dmemo::HaloBuilder::coarsenHalo(coarseGraph.getRowDistribution(), halo, fineToCoarseMap.getLocalValues(), haloData, coarseHalo);
 
 		assert(coarseWeights.sum().Scalar::getValue<ValueType>() == nodeWeights.sum().Scalar::getValue<ValueType>());
+
+		std::chrono::duration<double> coarseningTime =  std::chrono::system_clock::now() - beforeCoarse;
+		ValueType timeForCoarse = ValueType ( comm->max(coarseningTime.count() ));
+		if (comm->getRank() == 0) std::cout << "Time for coarsening:" << timeForCoarse << std::endl;
+
 
 		Settings settingscopy(settings);
 		settingscopy.multiLevelRounds -= settings.coarseningStepsBetweenRefinement;
