@@ -117,7 +117,13 @@ public:
 
         static std::pair<IndexType, IndexType> getMatrixMarketCoordsInfos(const std::string filename);
         
-        /** Read a file with numBLocks number o
+        /** Read a file with numBLocks number of blocks. The file should contain in its first row the number of blocks and
+         *  in each line contains a number that is the size of this block.
+         *  Example of a file with 3 blocks:
+         * 3
+         * 100
+         * 120
+         * 97
          */
         static std::vector<IndexType> readBlockSizes(const std::string filename , const IndexType numBlocks);
 
