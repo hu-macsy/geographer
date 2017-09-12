@@ -218,7 +218,7 @@ namespace ITI {
                 // this is not a leaf node but none of the childrens owns the point
                 //WARNING: in our case this should never happen, but it may happen in a more general
                 // case where the children rectangles do not cover the entire father rectangle
-                this->getRect().print();
+                //this->getRect().print();
                 throw std::logic_error("Null pointer");
             }else{
                 //TODO: possibly a bit expensive and not needed assertion
@@ -450,8 +450,6 @@ namespace ITI {
         static std::pair<std::vector<IndexType>,std::vector<ValueType>> partition1DGreedy( const std::vector<ValueType>& array, const IndexType k, Settings settings);
         
         static std::pair<std::vector<IndexType>,std::vector<ValueType>> partition1DOptimal( const std::vector<ValueType>& array, const IndexType k, Settings settings);   
-        
-        static std::pair<std::vector<IndexType>, std::vector<ValueType>> partition1DMine( const std::vector<ValueType>& nodeWeights, const IndexType k, Settings settings);
 
         static bool probe(const std::vector<ValueType>& prefixSum, const IndexType k, const ValueType target);
 

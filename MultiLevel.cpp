@@ -39,7 +39,6 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 		SCAI_REGION_START( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
 		CSRSparseMatrix<ValueType> coarseGraph;
 		DenseVector<IndexType> fineToCoarseMap;
-
 		if (comm->getRank() == 0) {
 			std::cout << "Beginning coarsening, still " << settings.multiLevelRounds << " levels to go." << std::endl;
 		}

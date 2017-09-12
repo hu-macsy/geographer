@@ -54,7 +54,7 @@ TEST_F(DiffusionTest, testConstructLaplacian) {
 
 TEST_F(DiffusionTest, benchConstructLaplacian) {
 	std::string path = "meshes/bubbles/";
-	std::string fileName = "hugetrace-00000.graph";
+	std::string fileName = "bubbles-00000.graph";
 	std::string file = path + fileName;
 	const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 

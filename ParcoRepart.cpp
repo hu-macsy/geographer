@@ -246,7 +246,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
 			maxCoords[dim] = coordinates[dim].max().Scalar::getValue<ValueType>();
 			assert(std::isfinite(minCoords[dim]));
 			assert(std::isfinite(maxCoords[dim]));
-			assert(maxCoords[dim] > minCoords[dim]);
+			SCAI_ASSERT(maxCoords[dim] > minCoords[dim], "Wrong coordinates.");
 		}
     }
     

@@ -55,7 +55,7 @@ namespace ITI{
          * grid has weight equal the number of points it contains and the edge between two coarse nodes/pixels is the
          * number of edges of the input graph that their endpoints belinf to different pixels.
          * 
-         * WARNING: can happen that pixels are empty, this would create isolated vertices in hte pixeled graph 
+         * WARNING: can happen that pixels are empty, this would create isolated vertices in the pixeled graph 
          *          which is not so good for spectral partitioning. To avoid that, we add every edge in the isolated
          *          vertices with a small weight of 0.001. This might cause other problems though, so have it in mind.
          * 

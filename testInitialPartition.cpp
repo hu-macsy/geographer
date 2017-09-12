@@ -214,6 +214,7 @@ int main(int argc, char** argv) {
         std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
         
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
         
         /* timing information
          */
@@ -351,7 +352,7 @@ int main(int argc, char** argv) {
 
     assert(N > 0);
 
-    if( !vm.count("numBlocks") or !vm.count("cutsPerDim") ){
+    if( !(vm.count("numBlocks") or vm.count("cutsPerDim")) ){
         settings.numBlocks = comm->getSize();
     }
     
