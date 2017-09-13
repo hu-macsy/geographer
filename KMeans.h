@@ -113,7 +113,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	IndexType iter = 0;
 	ValueType delta = 0;
 	bool balanced = false;
-	const ValueType threshold = 2;
+	const ValueType threshold = 5;
 	const IndexType maxIterations = 50;
 	do {
 
