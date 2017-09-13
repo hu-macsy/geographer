@@ -89,17 +89,17 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 			scai::dmemo::DistributionPtr projectedFineDist = projectToFine(coarseGraph.getRowDistributionPtr(), fineToCoarseMap);
 			assert(projectedFineDist->getGlobalSize() == globalN);
 			part = DenseVector<IndexType>(projectedFineDist, comm->getRank());
-			//scai::dmemo::Redistributor redistributor(projectedFineDist, input.getRowDistributionPtr());
+			scai::dmemo::Redistributor redistributor(projectedFineDist, input.getRowDistributionPtr());
 
 			if (settings.useGeometricTieBreaking) {
 				for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-					coordinates[dim].redistribute(projectedFineDist);
+					coordinates[dim].redistribute(redistributor);
 				}
 			}
 
-			input.redistribute(projectedFineDist, input.getColDistributionPtr());
+			input.redistribute(redistributor, input.getColDistributionPtr());
 
-			nodeWeights.redistribute(projectedFineDist);
+			nodeWeights.redistribute(redistributor);
 
 			std::chrono::duration<double> uncoarseningTime =  std::chrono::system_clock::now() - beforeUnCoarse;
 			ValueType time = ValueType ( comm->max(uncoarseningTime.count() ));

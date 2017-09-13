@@ -177,13 +177,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( result.getDistribution(), result.getLocalValues() ) );
 			assert(newDist->getGlobalSize() == n);
 			result.redistribute(newDist);
-			input.redistribute(newDist, noDist);
+
+			scai::dmemo::Redistributor redistributor(newDist, input.getRowDistributionPtr());
+			input.redistribute(redistributor, noDist);
 			if (settings.useGeometricTieBreaking) {
 				for (IndexType d = 0; d < dimensions; d++) {
-					coordinates[d].redistribute(newDist);
+					coordinates[d].redistribute(redistributor);
 				}
 			}
-			nodeWeights.redistribute(input.getRowDistributionPtr());
+			nodeWeights.redistribute(redistributor);
 
 			std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
 			ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
