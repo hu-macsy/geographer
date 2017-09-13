@@ -241,7 +241,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
             if (coarseNode >= 0) {
                 for (IndexType j = ia[i]; j < ia[i+1]; j++) {
                     IndexType edgeTarget = ja[j];
-                    IndexType localTarget = distPtr->global2local(edgeTarget);
+                    IndexType localTarget = distPtr->global2local(edgeTarget);//TODO: maybe optimize this
                     if (localTarget != nIndex && !localPreserved[localTarget]) {
                         localTarget = localMatchingPartner[localTarget];
                         edgeTarget = distPtr->local2global(localTarget);
