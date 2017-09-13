@@ -6,6 +6,7 @@
 #include <numeric>
 #include <iterator>
 #include <algorithm>
+#include <chrono>
 
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>

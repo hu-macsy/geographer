@@ -229,8 +229,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     for(typename std::vector<IndexType>::iterator thisDimCuts=numCuts.begin(); thisDimCuts!=numCuts.end(); ++thisDimCuts ){
         SCAI_REGION("MultiSection.getRectangles.forAllRectangles");
 
-        ValueType maxExtent = 0;
-        //std::vector<ValueType> minDifference ( numLeaves, LONG_MAX );        
+        ValueType maxExtent = 0;      
 
         std::vector<IndexType> chosenDim ( numLeaves, -1);
         
@@ -388,7 +387,6 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
                     std::cout<< coords[d] << ", ";
                 std::cout<< std::endl;
                 continue;   
-                //std::terminate();   // not allowed in our case
             }
             
             IndexType thisLeafID = thisRectCell->getLeafID();
@@ -473,14 +471,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             if( std::pow( intSqrtK+1, dim ) == k){
                 intSqrtK++;
             }
-
             SCAI_ASSERT( std::pow( intSqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow( sqrtK, 1/d)= " << std::pow(intSqrtK,dim));
-/*            
-            if( !(std::floor(sqrtK)==sqrtK) ){
-                PRINT0("Input k= "<< k << " and sqrt(k)= "<< sqrtK  << " __ "<< std::pow( sqrtK, dim ));
-                throw std::logic_error("Number of blocks not a square number");
-            }
-*/                        
             numCuts = std::vector<IndexType>( dim, intSqrtK );
         }else{                                  // user-specific number of cuts per dimensions
             numCuts = settings.cutsPerDim;
@@ -570,11 +561,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             std::vector<ValueType> weightPerPart, thisProjection = projections[l];
             IndexType thisChosenDim = chosenDim[l];            
 
-            //part1D.size() = *thisDimCuts , weightPerPart.size = *thisDimCuts 
             std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( thisProjection, *thisDimCuts, settings);
-            
-//for(int i=0; i<part1D.size(); i++) PRINT0( part1D[i] << " ++ " << weightPerPart[i] );
-            
             SCAI_ASSERT( part1D.size()== *thisDimCuts , "Wrong size of 1D partition")
             SCAI_ASSERT( weightPerPart.size()== *thisDimCuts , "Wrong size of 1D partition")
 
@@ -710,7 +697,6 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
                 PRINT0( "Owner rectangle for point is ");
                 thisRectCell->getRect().print();
                 PRINT0( thisRectCell->getLeafID() );
-                // terminate() ??
             }
             SCAI_ASSERT( thisLeafID!=-1, "leafID for containing rectCell must be >0 , for coords= "<< coordinates[i][0] << ", "<< coordinates[i][1] );
             SCAI_ASSERT( thisLeafID<projections.size(), "Index too big.");
@@ -860,10 +846,10 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
 //---------------------------------------------------------------------------------------
 // Based on algorithm Nicol found in Pinar, Aykanat, 2004, "Fast optimal load balancing algorithms for 1D partitioning"
 //TODO: In the same paper thers is a better, but more complicated, algorithm called Nicol+
-
+/*
 template<typename IndexType, typename ValueType>
 std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1DMine( const std::vector<ValueType>& nodeWeights, const IndexType k, Settings settings){
-/*    
+
     const IndexType N = nodeWeights.size();
 
     //
@@ -912,9 +898,9 @@ PRINT( allRollingSums.size() );
     
     
     return std::make_pair(partIndices, weightPerPart);
-    */
+    
 }
-
+*/
 //---------------------------------------------------------------------------------------
 
 // Search if there is a partition of the weights array into k parts where the maximum weight of a part is <=target.
@@ -947,7 +933,6 @@ bool MultiSection<IndexType, ValueType>::probe(const std::vector<ValueType>& pre
 
             sumOfPartition = prefixSum[splitters[p-1]] + target;
             ++p;
-            //PRINT( spliter << " __ "<< sumOfPartition );            
         }
 
         if( sumOfPartition>=totalWeight ){
@@ -1099,13 +1084,6 @@ ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vec
         
         for(int i=0; i<localN; i++){
             std::vector<T> coords= coordinates[i];
-            /*
-            for(int d=0; d<dimension; d++){
-                coords.push_back( coordinates[d].getLocalValues()[i] );
-                //TODO: remove assertion, probably not needed
-                SCAI_ASSERT( coords.back()<=maxCoords[d], "Coordinate too big, coords.back()= " << coords.back() << " , maxCoords[d]= "<< maxCoords[d] );
-            }
-            */
             if( inBBox(coords, bBox) ){ 
                 localWeight += localWeights[i];
             }
@@ -1218,7 +1196,7 @@ template  std::pair<std::vector<int>,std::vector<double>> MultiSection<int, doub
 
 template  std::pair<std::vector<int>,std::vector<double>> MultiSection<int, double>::partition1DOptimal( const std::vector<double>& array, const int k, Settings settings);
 
-template std::pair<std::vector<int>, std::vector<double>> MultiSection<int, double>::partition1DMine( const std::vector<double>& nodeWeights, const int k, Settings settings);
+//template std::pair<std::vector<int>, std::vector<double>> MultiSection<int, double>::partition1DMine( const std::vector<double>& nodeWeights, const int k, Settings settings);
 
 template double MultiSection<int, double>::getRectangleWeight( const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const int sideLen, Settings settings);
 

@@ -203,9 +203,9 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 		//get global weight sum
 		weightSum = comm->sum(weightSum);
 		//optSize = std::ceil(weightSum / k + (maxWeight - minWeight));
-                optSize = weightSum / k ;
+                optSize = std::ceil(ValueType(weightSum) / k );
 	} else {
-		optSize = std::ceil(globalN / k);
+		optSize = std::ceil(ValueType(globalN) / k);
 	}
         std::vector<ValueType> globalSubsetSizes(k);
 	if (!part.getDistribution().isReplicated()) {
@@ -689,7 +689,8 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::Halo& halo
 	scai::lama::CSRStorage<ValueType> myStorage(1, comm->getSize(), numNeighbors, ia, ja, values);
 	SCAI_REGION_END("ParcoRepart.getPEGraph.buildMatrix");
 
-    scai::lama::CSRSparseMatrix<ValueType> PEgraph(myStorage, distPEs, noDistPEs);
+    scai::lama::CSRSparseMatrix<ValueType> PEgraph(distPEs, noDistPEs);
+    PEgraph.swapLocalStorage(myStorage);
 
     return PEgraph;
 }
@@ -730,8 +731,8 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueTy
     scai::lama::CSRStorage<ValueType> myStorage(1, numPEs, neighborPEs.size(), ia, ja, values);
     SCAI_REGION_END("ParcoRepart.getPEGraph.buildMatrix");
     
-    //could be optimized with move semantics
-    scai::lama::CSRSparseMatrix<ValueType> PEgraph(myStorage, distPEs, noDistPEs);
+    scai::lama::CSRSparseMatrix<ValueType> PEgraph(distPEs, noDistPEs);
+    PEgraph.swapLocalStorage(myStorage);
 
     return PEgraph;
 }

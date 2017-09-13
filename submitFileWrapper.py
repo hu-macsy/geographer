@@ -2,6 +2,8 @@ SCAI_LIB="/home/kit/iti/cq6340/WAVE/scai_lama/install/lib/"
 BOOST_LIB="/home/kit/iti/cq6340/boost_1_61_0/stage/lib"
 JOB_DIR="/home/hpc/pr87si/di36sop/WAVE/ParcoRepart/Implementation"
 
+import math
+
 def createMOABSubmitFile(filename, commandString, walltime, processors, memory, otherPreparation=[]):
     classString = "singlenode" if processors <= 16 else "multinode"
     with open(filename, 'w') as f:
@@ -29,14 +31,14 @@ def createLLSubmitFile(filename, commandString, walltime, processors, memory):
         f.write("#@ job_type = parallel"+"\n")
         f.write("#@ initialdir="+JOB_DIR+"\n")
         f.write("#@ job_name = LLRUN"+"\n")
-        f.write("#@ class = general"+"\n")
+        f.write("#@ class = "+classstring +"\n")
         f.write("#@ node_usage = not_shared"+"\n")
         f.write("#@ wall_clock_limit = "+walltime+"\n")
         f.write("#@ network.MPI = sn_all,,us,,"+"\n")
         f.write("#@ notification = never"+"\n")
         f.write("#@ output = LLRUN.out.$(jobid)"+"\n")
         f.write("#@ error =  LLRUN.err.$(jobid)"+"\n")
-        f.write("#@ node = 1"+"\n")
+        f.write("#@ node = "+str(math.ceil(processors/16))+"\n")
         f.write("#@ island_count=1,1"+"\n")
         f.write("#@ total_tasks = "+str(processors)+"\n")
         f.write("#@ queue"+"\n")
