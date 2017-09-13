@@ -84,6 +84,8 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 		{
 			SCAI_REGION( "MultiLevel.multiLevelStep.uncoarsen" )
 			// uncoarsening/refinement
+            std::chrono::time_point<std::chrono::system_clock> beforeUnCoarse =  std::chrono::system_clock::now();
+
 			scai::dmemo::DistributionPtr projectedFineDist = projectToFine(coarseGraph.getRowDistributionPtr(), fineToCoarseMap);
 			assert(projectedFineDist->getGlobalSize() == globalN);
 			part = DenseVector<IndexType>(projectedFineDist, comm->getRank());
@@ -98,6 +100,10 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 			input.redistribute(projectedFineDist, input.getColDistributionPtr());
 
 			nodeWeights.redistribute(projectedFineDist);
+
+			std::chrono::duration<double> uncoarseningTime =  std::chrono::system_clock::now() - beforeUnCoarse;
+			ValueType time = ValueType ( comm->max(uncoarseningTime.count() ));
+			if (comm->getRank() == 0) std::cout << "Time for uncoarsening:" << time << std::endl;
 		}
 	}
  
@@ -219,45 +225,48 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
 
         scai::hmemo::WriteAccess<ValueType> wWeights(localWeightCopy.getLocalValues());
 
-        for (IndexType i = 0; i < localN; i++) {
-            IndexType coarseNode;
+        {
+        	SCAI_REGION("MultiLevel.coarsen.localLoop.rewireEdges");
+			for (IndexType i = 0; i < localN; i++) {
+				IndexType coarseNode;
 
-            if (localPreserved[i]) {
-                coarseNode = i;
-                newLocalFineToCoarse[i] = i;
-                newLocalN++;
-            } else {
-                coarseNode = localMatchingPartner[i];
-                assert(coarseNode < i);
-                if (coarseNode == -1) {//node was already eliminated in previous round
-                    IndexType oldCoarseNode = localFineToCoarse[i];
-                    newLocalFineToCoarse[i] = newLocalFineToCoarse[oldCoarseNode];
-                } else {
-                    wWeights[coarseNode] += wWeights[i];
-                    newLocalFineToCoarse[i] = newLocalFineToCoarse[coarseNode];
-                }
-            }
+				if (localPreserved[i]) {
+					coarseNode = i;
+					newLocalFineToCoarse[i] = i;
+					newLocalN++;
+				} else {
+					coarseNode = localMatchingPartner[i];
+					assert(coarseNode < i);
+					if (coarseNode == -1) {//node was already eliminated in previous round
+						IndexType oldCoarseNode = localFineToCoarse[i];
+						newLocalFineToCoarse[i] = newLocalFineToCoarse[oldCoarseNode];
+					} else {
+						wWeights[coarseNode] += wWeights[i];
+						newLocalFineToCoarse[i] = newLocalFineToCoarse[coarseNode];
+					}
+				}
 
-            if (coarseNode >= 0) {
-                for (IndexType j = ia[i]; j < ia[i+1]; j++) {
-                    IndexType edgeTarget = ja[j];
-                    IndexType localTarget = distPtr->global2local(edgeTarget);//TODO: maybe optimize this
-                    if (localTarget != nIndex && !localPreserved[localTarget]) {
-                        localTarget = localMatchingPartner[localTarget];
-                        edgeTarget = distPtr->local2global(localTarget);
-                    }
-                    if (outgoingEdges[coarseNode].count(edgeTarget) == 0) {
-                        outgoingEdges[coarseNode][edgeTarget] = 0;
-                    }
-                    outgoingEdges[coarseNode][edgeTarget] += values[j];
-                }
-            }
+				if (coarseNode >= 0) {
+					for (IndexType j = ia[i]; j < ia[i+1]; j++) {
+						IndexType edgeTarget = ja[j];
+						IndexType localTarget = distPtr->global2local(edgeTarget);//TODO: maybe optimize this
+						if (localTarget != nIndex && !localPreserved[localTarget]) {
+							localTarget = localMatchingPartner[localTarget];
+							edgeTarget = distPtr->local2global(localTarget);
+						}
+						if (outgoingEdges[coarseNode].count(edgeTarget) == 0) {
+							outgoingEdges[coarseNode][edgeTarget] = 0;
+						}
+						outgoingEdges[coarseNode][edgeTarget] += values[j];
+					}
+				}
+			}
         }
 
         localFineToCoarse.swap(newLocalFineToCoarse);
 
         {
-        	SCAI_REGION("MultiLevel.coarsen.getLocalCSRMatrix");
+        	SCAI_REGION("MultiLevel.coarsen.localLoop.getLocalCSRMatrix");
             //create CSR matrix out of edge list
             scai::hmemo::HArray<IndexType> newIA(localN+1);
             scai::hmemo::WriteAccess<IndexType> wIA(newIA);
