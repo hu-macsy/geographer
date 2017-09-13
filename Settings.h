@@ -37,8 +37,10 @@ struct Settings{
     bool writeDebugCoordinates = false;
     bool useExtent = false;
     double epsilon = 0.05;
+    std::string blockSizesFile = "-";
     std::string fileName = "-";
     std::vector<IndexType> cutsPerDim;
+    std::vector<IndexType> blockSizes;
     
     void print(std::ostream& out){
         IndexType numPoints = numX* numY* numZ;

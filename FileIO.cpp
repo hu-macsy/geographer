@@ -1112,7 +1112,7 @@ std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::s
             //blockSizes.push_back(bSize);
             blockSizes[i]= bSize;
         }
-        SCAI_ASSERT( blockSizes.size()==numBlocks , "Wrong number of blocks: "  <<blockSizes.size());
+        SCAI_ASSERT( blockSizes.size()==numBlocks , "Wrong number of blocks: "  <<blockSizes.size() << " for file " << filename);
         file.close();
         
         bool eof = std::getline(file, line).eof();

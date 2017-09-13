@@ -160,6 +160,7 @@ int main(int argc, char** argv) {
             ("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
             ("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
             ("multiLevelRounds", value<int>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
+            ("blockSizesFile", value<std::string>(&settings.blockSizesFile) , " file to read the block sizes for every block")
             ;
         
         variables_map vm;
@@ -346,6 +347,16 @@ int main(int argc, char** argv) {
     	std::cout << "Only input file as input. Call again with --graphFile" << std::endl;
     	return 0;
     }
+       
+    //
+    //  read block sizes from a file if it is passed as an argument
+    //
+    if( vm.count("blockSizesFile") ){
+        settings.blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( settings.blockSizesFile, settings.numBlocks );
+        IndexType blockSizesSum  = std::accumulate( settings.blockSizes.begin(), settings.blockSizes.end(), 0);
+        IndexType nodeWeightsSum = nodeWeights.sum().Scalar::getValue<IndexType>();
+        SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
+    }
     
     // time needed to get the input
     std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
@@ -392,13 +403,6 @@ int main(int argc, char** argv) {
     
     using namespace ITI;
     
-    //TODO: not needed to redistribute. Reading graph and coordinates already distributes the data.
-    /*
-    graph.redistribute( rowDistPtr, noDistPtr);
-    for(int d=0; d<dimensions; d++){
-        coordinates[d].redistribute( rowDistPtr );
-    } 
-    */
     
     if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
     
@@ -486,29 +490,6 @@ int main(int argc, char** argv) {
             
             assert( partition.size() == N);
             assert( coordinates[0].size() == N);
-            /*
-             //get new distribution
-            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *rowDistPtr, partition.getLocalValues() ) );
-    
-            partition.redistribute( newDist);
-            
-            graph.redistribute(newDist, graph.getColDistributionPtr());
-    
-            // redistibute coordinates
-            for (IndexType dim = 0; dim < dimensions; dim++) {
-                coordinates[dim].redistribute( newDist );
-            }
-            // check coordinates size
-            for (IndexType dim = 0; dim < dimensions; dim++) {
-                assert( coordinates[dim].size() == N);
-                assert( coordinates[dim].getLocalValues().size() == newDist->getLocalSize() );
-            }
-            
-            
-            if(dimensions==2){
-                ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"multisectPart");
-            }
-            */
             break;   
         }
         default:{
