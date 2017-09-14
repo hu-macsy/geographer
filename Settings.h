@@ -26,7 +26,7 @@ struct Settings{
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
     IndexType pixeledSideLen = 10;
-    IndexType fileFormat = 1;   // 0 for METIS, 1 for MatrixMarket
+    IndexType fileFormat = 1;   // 1 for METIS, 4 for MatrixMarket, see FileIO.h
     InitialPartitioningMethods initialPartition = InitialPartitioningMethods::SFC;
     bool bisect = 0;    // 0: works for square k, 1: bisect, for k=power of 2, 2: user defined cutsPerDim
     bool useDiffusionTieBreaking = false;

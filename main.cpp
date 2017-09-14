@@ -61,6 +61,8 @@ namespace ITI {
 			format = ITI::Format::ADCIRC;
 		else if (token == "OCEAN" or token == "3")
 			format = ITI::Format::OCEAN;
+                else if (token == "MATRIXMARKET" or token == "4")
+			format = ITI::Format::MATRIXMARKET;
 		else
 			in.setstate(std::ios_base::failbit);
 		return in;
@@ -78,6 +80,8 @@ namespace ITI {
 			token = "ADCIRC";
 		else if (method == ITI::Format::OCEAN)
 			token = "OCEAN";
+		else if (method == ITI::Format::MATRIXMARKET)
+			token = "MATRIXMARKET";                
 		out << token;
 		return out;
 	}
@@ -138,7 +142,7 @@ int main(int argc, char** argv) {
 				("quadTreeFile", value<std::string>(), "read QuadTree from file")
 				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
                                 ("fileFormat", value<int>(&ff)->default_value(ff), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
-				("coordFormat", value<ITI::Format>(), "format of coordinate file")
+				//("coordFormat", value<ITI::Format>(), "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ")
 				("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
@@ -240,6 +244,7 @@ int main(int argc, char** argv) {
     	std::string graphFile = vm["graphFile"].as<std::string>();
     	std::string coordFile;
     	if (vm.count("coordFile")) {
+                //std::cout<< "\033[1;36m WARNING: coordFile given but no coordFormat \033[0m"<< std::endl;
 	   	coordFile = vm["coordFile"].as<std::string>();
 	} else {
 		coordFile = graphFile + ".xyz";
@@ -257,9 +262,10 @@ int main(int argc, char** argv) {
             std::cout<< "Reading from file \""<< graphFile << "\" for the graph " << coordString << std::endl;
         }
 
+        //
         // read the adjacency matrix and the coordinates from a file
+        //
         std::vector<DenseVector<ValueType> > vectorOfNodeWeights;
-        //graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights );
         
         ITI::Format format = static_cast<ITI::Format>(ff);
         
@@ -317,9 +323,8 @@ int main(int argc, char** argv) {
 			}
 
         } else {
-        	ITI::Format format;
-        	if (vm.count("coordFormat")) {
-        		format = vm["coordFormat"].as<ITI::Format>();
+        	ITI::Format format = static_cast<ITI::Format>(ff);
+        	if (vm.count("fileFormat")) {
         		coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format);
         	} else {
         		coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
