@@ -194,11 +194,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			/**
 			 * redistribute to prepare for local refinement
 			 */
-			scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( result.getDistribution(), result.getLocalValues() ) );
-			assert(newDist->getGlobalSize() == n);
-			result.redistribute(newDist);
+			scai::dmemo::Redistributor resultRedist(result.getLocalValues(), result.getDistributionPtr());
+			result.redistribute(resultRedist);
 
-			scai::dmemo::Redistributor redistributor(newDist, input.getRowDistributionPtr());
+			scai::dmemo::Redistributor redistributor(resultRedist.getTargetDistributionPtr(), input.getRowDistributionPtr());
 			input.redistribute(redistributor, noDist);
 			if (settings.useGeometricTieBreaking) {
 				for (IndexType d = 0; d < dimensions; d++) {
