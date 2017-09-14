@@ -85,7 +85,7 @@ TEST_F (auxTest, testInitialPartitions){
     settings.dimensions = dimensions;
     settings.pixeledSideLen = 16;        //4 for a 16x16 coarsen graph in 2D, 16x16x16 in 3D
     settings.useGeometricTieBreaking =1;
-    settings.fileName = fileName;
+    //settings.fileName = fileName;
     settings.useGeometricTieBreaking =1;
     settings.multiLevelRounds = 6;
     settings.minGainForNextRound= 10;

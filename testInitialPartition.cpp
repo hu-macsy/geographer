@@ -132,15 +132,16 @@ int main(int argc, char** argv) {
         options_description desc("Supported options");
         
         struct Settings settings;
-        //ITI::Format ff = ITI::Format::METIS;
-        IndexType ff = 1;
+        ITI::Format ff = ITI::Format::METIS;
+        std::string blockSizesFile;
+        //IndexType ff = 1;
         
         desc.add_options()
             ("help", "display options")
             ("version", "show version")
             ("graphFile", value<std::string>(), "read graph from file")
             ("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
-            ("fileFormat", value<int>(&ff)->default_value(ff), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
+            //("fileFormat", value<ITI::Format>(&ff)->default_value(ff), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
             ("generate", "generate random graph. Currently, only uniform meshes are supported.")
             ("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
             ("numX", value<int>(&settings.numX)->default_value(settings.numX), "Number of points in x dimension of generated graph")
@@ -160,7 +161,7 @@ int main(int argc, char** argv) {
             ("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
             ("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
             ("multiLevelRounds", value<int>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
-            ("blockSizesFile", value<std::string>(&settings.blockSizesFile) , " file to read the block sizes for every block")
+            ("blockSizesFile", value<std::string>(&blockSizesFile) , " file to read the block sizes for every block")
             ;
         
         variables_map vm;
@@ -261,7 +262,7 @@ int main(int argc, char** argv) {
 
         // read the adjacency matrix and the coordinates from a file  
         
-        ITI::Format format = static_cast<ITI::Format>(ff);
+        ITI::Format format = settings.fileFormat;
         
         if (vm.count("fileFormat")) {
             graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, format );
@@ -352,7 +353,7 @@ int main(int argc, char** argv) {
     //  read block sizes from a file if it is passed as an argument
     //
     if( vm.count("blockSizesFile") ){
-        settings.blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( settings.blockSizesFile, settings.numBlocks );
+        settings.blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
         IndexType blockSizesSum  = std::accumulate( settings.blockSizes.begin(), settings.blockSizes.end(), 0);
         IndexType nodeWeightsSum = nodeWeights.sum().Scalar::getValue<IndexType>();
         SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );

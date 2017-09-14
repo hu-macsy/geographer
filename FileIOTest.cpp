@@ -257,6 +257,20 @@ TEST_F(FileIOTest, testReadQuadTree){
 }
 //-------------------------------------------------------------------------------------------------
 
+TEST_F(FileIOTest, testReadGraphBinary){
+    std::string path = "meshes/";
+    std::string file = "bigbubbles-10.gi";
+    std::string filename= path + file;
+    scai::lama::CSRSparseMatrix<ValueType> graph;
+    IndexType N;    //number of points
+    
+    std::vector<DenseVector<ValueType>> dummyWeightContainer;
+    graph =  FileIO<IndexType, ValueType>::readGraphBinary(filename, dummyWeightContainer);
+    
+    
+}
+//-------------------------------------------------------------------------------------------------
+
 TEST_F(FileIOTest, testReadMatrixMarketFormat){
     std::string path = "./meshes/whitaker3/";
     std::string graphFile = path + "whitaker3.mtx";

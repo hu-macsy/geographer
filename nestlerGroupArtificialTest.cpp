@@ -103,7 +103,7 @@ int main(int argc, char** argv) {
             ("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
             ("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
             ("multiLevelRounds", value<int>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
-            ("fileFormat", value<int>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for METIS format, 1 for MatrixMarket format. See FileIO for more details.")
+            //("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for METIS format, 1 for MatrixMarket format. See FileIO for more details.")
             ("outputFile", value<std::string>()->default_value("rectanglesNestler"), "The name of the output file to write the partition")
         ;
                                 

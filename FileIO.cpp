@@ -6,6 +6,7 @@
  */
 
 #include "FileIO.h"
+#include "AuxiliaryFunctions.h"
 
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>
@@ -450,13 +451,41 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
 }
 //-------------------------------------------------------------------------------------------------
-/*
-template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBinarySchamberger(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights){
 
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBinary(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights){
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+typedef long int LI;
+    // root PE reads header and broadcasts information to the other PEs
+    std::vector<LI> header(3, 0);
+    bool success=false;
+    
+    if( comm->getRank()==0 ){
+        std::cout <<  "Reading binary graph ..."  << std::endl;
+        std::ifstream file(filename, std::ios::binary | std::ios::in);
+        if(file) {
+            success = true;
+            file.read((char*)(&header[0]), 3*sizeof(LI));
+        }
+        file.close();
+        SCAI_ASSERT( success, "Error while opening the file " << filename);
+ITI::aux::printVector( header );        
+    }            
+        
+    
+    //broadcast the header info
+    comm->bcast( header.data(), 3, 0 );
+    
+    IndexType version = header[0];
+    IndexType N = header[1];
+    IndexType M = header[2];
+    
+    
+    PRINT( *comm << ": version= " << version << ", N= " << N << ", M= " << M );
     
 }
-*/
+
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
@@ -1159,6 +1188,8 @@ template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<
 template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, const std::string filename);
 template void FileIO<int, double>::writeCoordsDistributed_2D (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
 template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::string filename, Format format);
+template scai::lama::CSRSparseMatrix<double> FileIO<int, double>::readGraphBinary(const std::string filename, std::vector<DenseVector<double>>& nodeWeights);
+
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension, Format format);
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsOcean( std::string filename, int dimension );
 template CSRSparseMatrix<double>  FileIO<int, double>::readQuadTree( std::string filename, std::vector<DenseVector<double>> &coords );

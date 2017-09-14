@@ -47,7 +47,7 @@ typedef int IndexType;
  */
 
 //----------------------------------------------------------------------------
-//enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3};
+
 namespace ITI {
 	std::istream& operator>>(std::istream& in, Format& format)
 	{
@@ -132,7 +132,9 @@ int main(int argc, char** argv) {
 	options_description desc("Supported options");
 
 	struct Settings settings;
-        IndexType ff = 1;       //for the file format
+        
+        std::string blockSizesFile;
+        
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	desc.add_options()
@@ -141,8 +143,8 @@ int main(int argc, char** argv) {
 				("graphFile", value<std::string>(), "read graph from file")
 				("quadTreeFile", value<std::string>(), "read QuadTree from file")
 				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
-                                ("fileFormat", value<int>(&ff)->default_value(ff), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
-				//("coordFormat", value<ITI::Format>(), "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ")
+                              //  ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
+				("coordFormat", value<ITI::Format>(), "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ")
 				("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
@@ -166,7 +168,7 @@ int main(int argc, char** argv) {
 				("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 				("multiLevelRounds", value<int>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
-                                ("blockSizesFile", value<std::string>(&settings.blockSizesFile) , " file to read the block sizes for every block")
+                                ("blockSizesFile", value<std::string>(&blockSizesFile) , " file to read the block sizes for every block")
 				;
 
 	variables_map vm;
@@ -244,7 +246,6 @@ int main(int argc, char** argv) {
     	std::string graphFile = vm["graphFile"].as<std::string>();
     	std::string coordFile;
     	if (vm.count("coordFile")) {
-                //std::cout<< "\033[1;36m WARNING: coordFile given but no coordFormat \033[0m"<< std::endl;
 	   	coordFile = vm["coordFile"].as<std::string>();
 	} else {
 		coordFile = graphFile + ".xyz";
@@ -267,7 +268,7 @@ int main(int argc, char** argv) {
         //
         std::vector<DenseVector<ValueType> > vectorOfNodeWeights;
         
-        ITI::Format format = static_cast<ITI::Format>(ff);
+        ITI::Format format = settings.fileFormat;
         
         if (vm.count("fileFormat")) {
             graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights, format );
@@ -323,7 +324,7 @@ int main(int argc, char** argv) {
 			}
 
         } else {
-        	ITI::Format format = static_cast<ITI::Format>(ff);
+        	ITI::Format format = settings.fileFormat;
         	if (vm.count("fileFormat")) {
         		coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format);
         	} else {
@@ -407,7 +408,7 @@ int main(int argc, char** argv) {
     //  read block sizes from a file if it is passed as an argument
     //
     if( vm.count("blockSizesFile") ){
-        settings.blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( settings.blockSizesFile, settings.numBlocks );
+        settings.blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
         IndexType blockSizesSum  = std::accumulate( settings.blockSizes.begin(), settings.blockSizes.end(), 0);
         IndexType nodeWeightsSum = nodeWeights.sum().Scalar::getValue<IndexType>();
         SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );

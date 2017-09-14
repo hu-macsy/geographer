@@ -39,7 +39,9 @@ namespace ITI {
          *                            for the poitns: every d lines are the coordinates for a point.
         */
 	enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 };
-    
+	
+	
+        
 template <typename IndexType, typename ValueType>
 class FileIO {
 
@@ -82,11 +84,18 @@ public:
 
 	/** Reads a graph from filename in METIS format and returns the adjacency matrix.
 	 * @param[in] filename The file to read from.
-		 * @param[in] fileFormat The type of file to read from.
+         * @param[in] fileFormat The type of file to read from.
 	 * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
 	 */
 	static CSRSparseMatrix<ValueType> readGraph(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights, Format = Format::METIS);
 
+        /** Reads a graph in parallel that is stored in a binary file. Uses the same format as in ParHiP, the parallel version of KaHiP.
+         * @param[in] filename The file to read from.
+         * @param[in] fileFormat The type of file to read from.
+	 * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
+         */
+        static scai::lama::CSRSparseMatrix<ValueType> readGraphBinary(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights);
+        
 	/* Reads the 2D coordinates from file "filename" and returns then in a DenseVector where the coordinates
 	 * of point i are in [i*2][i*2+1].
 	 */
