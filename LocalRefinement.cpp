@@ -68,8 +68,11 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 	std::vector<IndexType> myGlobalIndices(input.getRowDistributionPtr()->getLocalSize());
 	{
 		const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+		scai::hmemo::HArray<IndexType> ownIndices;
+		inputDist->getOwnedIndexes(ownIndices);
+		scai::hmemo::ReadAccess<IndexType> rIndices(ownIndices);
 		for (IndexType j = 0; j < myGlobalIndices.size(); j++) {
-			myGlobalIndices[j] = inputDist->local2global(j);
+			myGlobalIndices[j] = rIndices[j];
 		}
 	}
 
@@ -872,17 +875,31 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(DenseVecto
 
 	scai::dmemo::DistributionPtr oldDist = input.getDistributionPtr();
 	const IndexType newLocalN = newDist->getLocalSize();
-	LArray<T> newLocalValues;
+	const IndexType oldLocalN = oldDist->getLocalSize();
+
+	scai::hmemo::HArray<IndexType> oldIndices;
+	oldDist->getOwnedIndexes(oldIndices);
+
+	scai::hmemo::HArray<IndexType> newIndices;
+	newDist->getOwnedIndexes(newIndices);
+
+	scai::hmemo::ReadAccess<IndexType> oldAcc(oldIndices);
+	scai::hmemo::ReadAccess<IndexType> newAcc(newIndices);
+
+	IndexType oldLocalI = 0;
+
+	LArray<T> newLocalValues(newLocalN);
 
 	{
 		scai::hmemo::ReadAccess<T> rOldLocalValues(input.getLocalValues());
 		scai::hmemo::ReadAccess<T> rHaloData(haloData);
 
-		scai::hmemo::WriteOnlyAccess<T> wNewLocalValues(newLocalValues, newLocalN);
+		scai::hmemo::WriteOnlyAccess<T> wNewLocalValues(newLocalValues);
 		for (IndexType i = 0; i < newLocalN; i++) {
-			const IndexType globalI = newDist->local2global(i);
-			const IndexType oldLocalI = oldDist->global2local(globalI);
-			if (oldLocalI != nIndex) {
+			const IndexType globalI = newAcc[i];
+			while(oldLocalI < oldLocalN && oldAcc[oldLocalI] < globalI) oldLocalI++;
+			//const IndexType oldLocalI = oldDist->global2local(globalI);
+			if (oldLocalI < oldLocalN && oldAcc[oldLocalI] == globalI) {
 				wNewLocalValues[i] = rOldLocalValues[oldLocalI];
 			} else {
 				const IndexType localI = halo.global2halo(globalI);
@@ -955,12 +972,16 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 		scai::hmemo::HArray<IndexType> oldIndices;
 		oldDist->getOwnedIndexes(oldIndices);
 
+		scai::hmemo::HArray<IndexType> newIndices;
+		newDist->getOwnedIndexes(newIndices);
+
 		scai::hmemo::ReadAccess<IndexType> oldAcc(oldIndices);
+		scai::hmemo::ReadAccess<IndexType> newAcc(newIndices);
 
 		IndexType oldLocalIndex = 0;
 
 		for (IndexType i = 0; i < targetNumRows; i++) {
-			IndexType newGlobalIndex = newDist->local2global(i);
+			IndexType newGlobalIndex = newAcc[i];
 			while(oldLocalIndex < sourceNumRows && oldAcc[oldLocalIndex] < newGlobalIndex) oldLocalIndex++;
 			IndexType size;
 			if (oldLocalIndex < sourceNumRows && oldAcc[oldLocalIndex] == newGlobalIndex) {

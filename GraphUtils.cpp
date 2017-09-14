@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <queue>
 #include <set>
+#include <unordered_set>
 
 #include <scai/hmemo/ReadAccess.hpp>
 #include <scai/hmemo/WriteAccess.hpp>
@@ -317,6 +318,11 @@ std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<Value
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 	const IndexType localN = inputDist->getLocalSize();
 
+	scai::hmemo::HArray<IndexType> ownIndices;
+	inputDist->getOwnedIndexes(ownIndices);
+	scai::hmemo::ReadAccess<IndexType> rIndices(ownIndices);
+	std::unordered_set<IndexType> localSet(rIndices.get(), rIndices.get()+localN);
+
 	//iterate over all nodes
 	for (IndexType localI = 0; localI < localN; localI++) {
 		const IndexType beginCols = ia[localI];
@@ -324,8 +330,8 @@ std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<Value
 
 		//over all edges
 		for (IndexType j = beginCols; j < endCols; j++) {
-			if (!inputDist->isLocal(ja[j])) {
-				IndexType globalI = inputDist->local2global(localI);
+			if (localSet.count(ja[j]) == 0) {
+				IndexType globalI = rIndices[localI];
 				result.push_back(globalI);
 				break;
 			}

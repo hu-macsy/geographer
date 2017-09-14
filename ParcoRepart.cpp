@@ -386,7 +386,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         //check size and sanity
         assert(newLocalN == newLocalIndices.size());
         assert( *std::max_element(newLocalIndices.begin(), newLocalIndices.end()) < globalN);
-	assert( comm->sum(newLocalIndices.size()) == globalN);
+        assert( comm->sum(newLocalIndices.size()) == globalN);
 
         //check checksum
         long indexSumAfter = 0;
