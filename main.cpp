@@ -128,7 +128,8 @@ int main(int argc, char** argv) {
 	options_description desc("Supported options");
 
 	struct Settings settings;
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        IndexType ff = 1;       //for the file format
+        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	desc.add_options()
 				("help", "display options")
@@ -136,6 +137,7 @@ int main(int argc, char** argv) {
 				("graphFile", value<std::string>(), "read graph from file")
 				("quadTreeFile", value<std::string>(), "read QuadTree from file")
 				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
+                                ("fileFormat", value<int>(&ff)->default_value(ff), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
 				("coordFormat", value<ITI::Format>(), "format of coordinate file")
 				("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
@@ -257,8 +259,15 @@ int main(int argc, char** argv) {
 
         // read the adjacency matrix and the coordinates from a file
         std::vector<DenseVector<ValueType> > vectorOfNodeWeights;
-        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights );
-
+        //graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights );
+        
+        ITI::Format format = static_cast<ITI::Format>(ff);
+        
+        if (vm.count("fileFormat")) {
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights, format );
+        } else{
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights );
+        }
         N = graph.getNumRows();
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
