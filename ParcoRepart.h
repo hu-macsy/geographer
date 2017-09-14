@@ -44,7 +44,9 @@ namespace ITI {
 			/*
 			 * Get an initial partition using the hilbert curve.
 			 */
-			static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+			static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings);
+
+                        static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
 
 			/*
 			 * Get an initial partition using the morton curve and measuring density per square.

@@ -131,25 +131,35 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             PRINT0("Initial partition with spectral");
             result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
         } else if (settings.initialPartition == InitialPartitioningMethods::KMeans) {
-        	PRINT0("Initial partition with K-Means");
-        	//prepare coordinates for k-means
-        	std::vector<DenseVector<ValueType> > coordinateCopy;
-        	DenseVector<ValueType> nodeWeightCopy;
-        	if (settings.dimensions == 2 || settings.dimensions == 3) {
-        		Settings sfcSettings = settings;
-        		sfcSettings.numBlocks = comm->getSize();
-                        DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, sfcSettings);
-			nodeWeightCopy = DenseVector<ValueType>(nodeWeights, tempResult.getDistributionPtr());
-			coordinateCopy.resize(dimensions);
-			for (IndexType d = 0; d < dimensions; d++) {
-				coordinateCopy[d] = DenseVector<ValueType>(coordinates[d], tempResult.getDistributionPtr());
-			}
-        	} else {
-        		coordinateCopy = coordinates;
-        		nodeWeightCopy = nodeWeights;
-        	}
-        	const IndexType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
-            const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
+            PRINT0("Initial partition with K-Means");
+            //prepare coordinates for k-means
+            std::vector<DenseVector<ValueType> > coordinateCopy;
+            DenseVector<ValueType> nodeWeightCopy;
+            if (settings.dimensions == 2 || settings.dimensions == 3) {
+                Settings sfcSettings = settings;
+                sfcSettings.numBlocks = comm->getSize();
+                DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, sfcSettings);
+                nodeWeightCopy = DenseVector<ValueType>(nodeWeights, tempResult.getDistributionPtr());
+                coordinateCopy.resize(dimensions);
+                for (IndexType d = 0; d < dimensions; d++) {
+                    coordinateCopy[d] = DenseVector<ValueType>(coordinates[d], tempResult.getDistributionPtr());
+                }
+            } else {
+                coordinateCopy = coordinates;
+                nodeWeightCopy = nodeWeights;
+            }
+            
+            const IndexType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
+            
+            // vector of size k, each element representsthe size of each block
+            std::vector<IndexType> blockSizes;
+            if( settings.blockSizes.empty() ){
+                blockSizes.assign( settings.numBlocks, weightSum/settings.numBlocks );
+            }else{
+                blockSizes = settings.blockSizes;
+            }
+            SCAI_ASSERT( blockSizes.size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
+            
             std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
             result = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeightCopy, blockSizes, settings.epsilon);
             std::chrono::duration<double> kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
@@ -219,6 +229,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	}
 
 	return result;
+}
+//--------------------------------------------------------------------------------------- 
+
+//TODO: take node weights into account
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings){
+    
+    DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(coordinates[0].getDistributionPtr(), 1);
+    return hilbertPartition( coordinates, settings);
 }
 //--------------------------------------------------------------------------------------- 
 
@@ -296,7 +315,21 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
             hilbertIndicesLocal[i] = globalHilbertIndex;
         }
     }
+
+    //
+    // vector of size k, each element represents the size of each block
+    //
+    std::vector<IndexType> blockSizes;
+    IndexType weightSum;// = nodeWeights.sum().Scalar::getValue<IndexType>();
+    if( settings.blockSizes.empty() ){
+        blockSizes.assign( settings.numBlocks, weightSum/settings.numBlocks );
+    }else{
+        blockSizes = settings.blockSizes;
+    }
+    SCAI_ASSERT( blockSizes.size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
     
+    //TODO: use the blockSizes vector
+    //TODO: take into account node weights: just sorting will create imbalanced blocks, not so much in number of node but in the total weight of each block
     
     /**
      * now sort the global indices by where they are on the space-filling curve.
@@ -304,11 +337,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     std::vector<IndexType> newLocalIndices;
     {
         SCAI_REGION( "ParcoRepart.hilbertPartition.sorting" );
-
+        
         int typesize;
         MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
         assert(typesize == sizeof(sort_pair));
-
+        
         const IndexType maxLocalN = comm->max(localN);
         sort_pair localPairs[maxLocalN];
 
@@ -975,6 +1008,8 @@ template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatr
 
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings);
 
+template DenseVector<int> ParcoRepart<int, double>::hilbertPartition(const std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, Settings settings);
+    
 template DenseVector<int> ParcoRepart<int, double>::pixelPartition(const std::vector<DenseVector<double>> &coordinates, Settings settings);
 
 template void ParcoRepart<int, double>::checkLocalDegreeSymmetry(const CSRSparseMatrix<double> &input);

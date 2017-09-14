@@ -11,7 +11,7 @@ namespace ITI{
 template<typename IndexType, typename ValueType>
 IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const Halo& halo, Settings settings) {
 	
-   SCAI_REGION( "MultiLevel.multiLevelStep" );
+   //SCAI_REGION( "MultiLevel.multiLevelStep" );
 	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
 	const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
 

@@ -72,7 +72,8 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     settings.dimensions = dimensions;
     
     //get sfc partition
-    DenseVector<IndexType> hilbertInitialPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition(coords, settings);
+    DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(coords[0].getDistributionPtr(), 1);
+    DenseVector<IndexType> hilbertInitialPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition(coords, uniformWeights, settings);
     ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords, N, "hilbertPartition");
     
     EXPECT_GE(k-1, hilbertInitialPartition.getLocalValues().max() );
@@ -425,6 +426,8 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
+    //settings.initialPartition = InitialPartitioningMethods::Multisection;
+    settings.initialPartition = InitialPartitioningMethods::KMeans;
     
     // get partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
@@ -483,6 +486,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
             std::cout<< std::endl;
         }
     }
+    comm->synchronize();
 }
 
 //------------------------------------------------------------------------------
