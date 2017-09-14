@@ -456,7 +456,9 @@ template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBinary(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights){
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
 typedef long int LI;
+
     // root PE reads header and broadcasts information to the other PEs
     std::vector<LI> header(3, 0);
     bool success=false;
@@ -473,16 +475,21 @@ typedef long int LI;
 ITI::aux::printVector( header );        
     }            
         
-    
     //broadcast the header info
     comm->bcast( header.data(), 3, 0 );
     
-    IndexType version = header[0];
-    IndexType N = header[1];
-    IndexType M = header[2];
+    LI version = header[0];
+    LI N = header[1];
+    LI M = header[2];
     
     
     PRINT( *comm << ": version= " << version << ", N= " << N << ", M= " << M );
+    
+    
+    
+    
+    scai::lama::CSRSparseMatrix<ValueType> ret;
+    return ret;
     
 }
 
