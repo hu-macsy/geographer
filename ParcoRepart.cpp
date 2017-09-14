@@ -212,7 +212,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k, nodeWeights);
 
 			if (comm->getRank() == 0) {
-				std::cout<< std::endl << "\033[1;31mTime for initial partition and redistribution:" << timeForInitPart << std::endl;
+				std::cout<< std::endl << "\033[1;32mTime for initial partition and redistribution:" << timeForInitPart << std::endl;
 				std::cout << "Cut:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
 			}
 

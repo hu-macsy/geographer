@@ -450,6 +450,14 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
 }
 //-------------------------------------------------------------------------------------------------
+/*
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBinarySchamberger(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights){
+
+    
+}
+*/
+//-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphMatrixMarket(const std::string filename){
