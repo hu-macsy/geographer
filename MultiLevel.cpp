@@ -41,7 +41,7 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 		SCAI_REGION_START( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
 		CSRSparseMatrix<ValueType> coarseGraph;
 		DenseVector<IndexType> fineToCoarseMap;
-        std::chrono::time_point<std::chrono::system_clock> beforeCoarse =  std::chrono::system_clock::now();
+                std::chrono::time_point<std::chrono::system_clock> beforeCoarse =  std::chrono::system_clock::now();
 
 		if (comm->getRank() == 0) {
 			std::cout << "Beginning coarsening, still " << settings.multiLevelRounds << " levels to go." << std::endl;
@@ -84,7 +84,7 @@ IndexType ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<
 		{
 			SCAI_REGION( "MultiLevel.multiLevelStep.uncoarsen" )
 			// uncoarsening/refinement
-            std::chrono::time_point<std::chrono::system_clock> beforeUnCoarse =  std::chrono::system_clock::now();
+                        std::chrono::time_point<std::chrono::system_clock> beforeUnCoarse =  std::chrono::system_clock::now();
 
 			scai::dmemo::DistributionPtr projectedFineDist = projectToFine(coarseGraph.getRowDistributionPtr(), fineToCoarseMap);
 			assert(projectedFineDist->getGlobalSize() == globalN);

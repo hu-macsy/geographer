@@ -160,6 +160,7 @@ int main(int argc, char** argv) {
 				("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 				("multiLevelRounds", value<int>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
+                                ("blockSizesFile", value<std::string>(&settings.blockSizesFile) , " file to read the block sizes for every block")
 				;
 
 	variables_map vm;
@@ -217,9 +218,7 @@ int main(int argc, char** argv) {
 
     /* timing information
      */
-    std::chrono::time_point<std::chrono::system_clock> startTime;
-     
-    startTime = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
     if (comm->getRank() == 0)
 	{
@@ -390,6 +389,16 @@ int main(int argc, char** argv) {
     	return 126;
     }
     
+    //
+    //  read block sizes from a file if it is passed as an argument
+    //
+    if( vm.count("blockSizesFile") ){
+        settings.blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( settings.blockSizesFile, settings.numBlocks );
+        IndexType blockSizesSum  = std::accumulate( settings.blockSizes.begin(), settings.blockSizes.end(), 0);
+        IndexType nodeWeightsSum = nodeWeights.sum().Scalar::getValue<IndexType>();
+        SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
+    }
+    
     // time needed to get the input. Synchronize first to make sure that all processes are finished.
     comm->synchronize();
     std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
@@ -423,6 +432,8 @@ int main(int argc, char** argv) {
     
     ValueType cut = ITI::GraphUtils::computeCut(graph, partition, true);
     ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
+    IndexType maxComm = ITI::GraphUtils::computeMaxComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
+    IndexType totalComm = ITI::GraphUtils::computeTotalComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
     
     std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
     
@@ -442,7 +453,7 @@ int main(int argc, char** argv) {
         std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
         std::cout.precision(oldprecision);
         
-        std::cout<< "cut:"<< cut<< " imbalance:"<< imbalance << std::endl;
-        std::cout<<"inputTime:" << inputT << " partitionTime:" << partT <<" reportTime:"<< repT << std::endl;
+        std::cout<< std::endl<< "\033[1;36mcut:"<< cut<< "   imbalance:"<< imbalance << "   maxComm= "<< maxComm << std::endl;
+        std::cout<<"inputTime:" << inputT << "   partitionTime:" << partT <<"   reportTime:"<< repT << " \033[0m" << std::endl;
     }
 }
