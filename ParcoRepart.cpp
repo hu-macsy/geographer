@@ -136,7 +136,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             std::vector<DenseVector<ValueType> > coordinateCopy;
             DenseVector<ValueType> nodeWeightCopy;
             if (settings.dimensions == 2 || settings.dimensions == 3) {
-                SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans")
+                SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans")
                 Settings sfcSettings = settings;
                 sfcSettings.numBlocks = comm->getSize();
                 DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, sfcSettings);
