@@ -146,28 +146,23 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
 			SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.prepareSets" )
 			//swap size of border region and total block size.
-			IndexType blockSize = localBlockSize(part, localBlockID);
-			if (blockSize != localN) {
-				throw std::runtime_error(std::to_string(localN) + " local nodes, but only " + std::to_string(blockSize) + " of them belong to block " + std::to_string(localBlockID) + ".");
-			}
+			IndexType blockSize = part.getDistributionPtr()->getLocalSize();
 
 			const ValueType blockWeightSum = nodeWeights.getLocalValues().sum();
 
-			IndexType swapField[6];
+			IndexType swapField[5];
 			swapField[0] = interfaceNodes.size();
 			swapField[1] = secondRoundMarker;
 			swapField[2] = lastRoundMarker;
 			swapField[3] = blockSize;
 			swapField[4] = blockWeightSum;
-			swapField[5] = getDegreeSum(input, interfaceNodes);
-			comm->swap(swapField, 6, partner);
+			comm->swap(swapField, 5, partner);
 			//want to isolate raw array accesses as much as possible, define named variables and only use these from now
 			const IndexType otherSize = swapField[0];
 			const IndexType otherSecondRoundMarker = swapField[1];
 			const IndexType otherLastRoundMarker = swapField[2];
 			const IndexType otherBlockSize = swapField[3];
 			const IndexType otherBlockWeightSum = swapField[4];
-			const IndexType otherDegreeSum = swapField[5];
 
 			if (interfaceNodes.size() == 0) {
 				if (otherSize != 0) {
@@ -232,8 +227,6 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			haloMatrix.exchangeHalo( graphHalo, input.getLocalStorage(), *comm );
 			//local part should stay unchanged, check edge number as proxy for that
 			assert(input.getLocalStorage().getValues().size() == numValues);
-			//halo matrix should have as many edges as the degree sum of the required halo indices
-			assert(haloMatrix.getValues().size() == otherDegreeSum);
 
 			//Here we only exchange one BFS-Round less than gathered, to make sure that all neighbors of the considered edges are still in the halo.
 			std::vector<IndexType> borderRegionIDs(interfaceNodes.begin(), interfaceNodes.begin()+lastRoundMarker);
