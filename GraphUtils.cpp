@@ -278,9 +278,7 @@ std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input
 template<typename IndexType, typename ValueType>
 inline bool hasNonLocalNeighbors(const CSRSparseMatrix<ValueType> &input, IndexType globalID) {
 	SCAI_REGION( "ParcoRepart.hasNonLocalNeighbors" )
-	/**
-	 * this could be inlined physically to reduce the overhead of creating read access locks
-	 */
+
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();

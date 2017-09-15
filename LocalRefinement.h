@@ -35,9 +35,10 @@ namespace ITI {
             DenseVector<IndexType> &part, 
             std::vector<IndexType>& nodesWithNonLocalNeighbors,
             DenseVector<ValueType> &nodeWeights, 
-            const std::vector<DenseVector<IndexType>>& communicationScheme, 
             std::vector<DenseVector<ValueType>> &coordinates,
-            std::vector<ValueType> &distances, 
+            std::vector<ValueType> &distances,
+            DenseVector<IndexType> &origin,
+            const std::vector<DenseVector<IndexType>>& communicationScheme,
             Settings settings
         );
 
@@ -62,7 +63,7 @@ namespace ITI {
         static void redistributeFromHalo(CSRSparseMatrix<ValueType>& matrix, scai::dmemo::DistributionPtr newDistribution, scai::dmemo::Halo& halo, CSRStorage<ValueType>& haloMatrix);
         
         template<typename T>
-        static void redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, scai::dmemo::Halo& halo, scai::utilskernel::LArray<T>& haloData);
+        static void redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, scai::dmemo::Halo& halo, scai::hmemo::HArray<T>& haloData);
         
 		static std::vector<ValueType> distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates);
 

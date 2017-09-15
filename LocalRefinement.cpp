@@ -14,9 +14,10 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     DenseVector<IndexType>& part,
     std::vector<IndexType>& nodesWithNonLocalNeighbors,
     DenseVector<ValueType> &nodeWeights, 
-    const std::vector<DenseVector<IndexType>>& communicationScheme, 
     std::vector<DenseVector<ValueType>> &coordinates, 
-    std::vector<ValueType> &distances, 
+    std::vector<ValueType> &distances,
+    DenseVector<IndexType> &origin,
+    const std::vector<DenseVector<IndexType>>& communicationScheme,
     Settings settings) {
     
     SCAI_REGION( "LocalRefinement.distributedFMStep" )
@@ -266,6 +267,10 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				}
 			}
 
+			//origin data, for redistribution in uncoarsening step
+			scai::hmemo::HArray<IndexType> originData;
+			comm->updateHalo(originData, origin.getLocalValues(), graphHalo);
+
 			//block sizes and capacities
 			std::pair<IndexType, IndexType> blockSizes = {blockWeightSum, otherBlockWeightSum};
 			std::pair<IndexType, IndexType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
@@ -388,6 +393,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 					if (nodesWeighted) {
 						redistributeFromHalo<ValueType>(nodeWeights, newDistribution, graphHalo, nodeWeightHaloData);
 					}
+					redistributeFromHalo(origin, newDistribution, graphHalo, originData);
 				}
 				assert(input.getRowDistributionPtr()->isEqual(*part.getDistributionPtr()));
 				SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.redistribute" )
@@ -868,7 +874,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalDi
 
 template<typename IndexType, typename ValueType>
 template<typename T>
-void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, scai::dmemo::Halo& halo, scai::utilskernel::LArray<T>& haloData) {
+void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, scai::dmemo::Halo& halo, scai::hmemo::HArray<T>& haloData) {
 	SCAI_REGION( "LocalRefinement.redistributeFromHalo.Vector" )
 
 	using scai::utilskernel::LArray;
@@ -1114,20 +1120,12 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 		SCAI_REGION( "LocalRefinement.getInterfaceNodes.getBorderToPartner" )
 		IndexType localI = inputDist->global2local(node);
 		assert(localI != nIndex);
-		bool hasNonLocal = false;
-		for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
-			if (!inputDist->isLocal(ja[j])) {
-				hasNonLocal = true;
-				if (foreignNodes.count(ja[j])> 0) {                              
-					interfaceNodes.push_back(node);
-					break;
-				}
-			}
-		}
 
-		//This shouldn't happen, the list of local border nodes was incorrect!
-		if (!hasNonLocal) {
-			throw std::runtime_error("Node " + std::to_string(node) + " has " + std::to_string(ia[localI+1] - ia[localI]) + " neighbors, but all of them are local.");
+		for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
+			if (foreignNodes.count(ja[j])> 0) {
+				interfaceNodes.push_back(node);
+				break;
+			}
 		}
 	}
 
@@ -1254,9 +1252,10 @@ template std::vector<int> ITI::LocalRefinement<int, double>::distributedFMStep(
     DenseVector<int>& part,
     std::vector<int>& nodesWithNonLocalNeighbors,
     DenseVector<double> &nodeWeights, 
-    const std::vector<DenseVector<int>>& communicationScheme, 
     std::vector<DenseVector<double>> &coordinates, 
-    std::vector<double> &distances, 
+    std::vector<double> &distances,
+    DenseVector<int> &origin,
+    const std::vector<DenseVector<int>>& communicationScheme,
     Settings settings);
 
 template std::pair<std::vector<int>, std::vector<int>> ITI::LocalRefinement<int, double>::getInterfaceNodes(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, const std::vector<int>& nodesWithNonLocalNeighbors, int otherBlock, int depth);
