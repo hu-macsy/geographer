@@ -62,6 +62,8 @@ namespace ITI {
 			format = ITI::Format::ADCIRC;
 		else if (token == "OCEAN" or token == "3")
 			format = ITI::Format::OCEAN;
+                else if (token == "MATRIXMARKET" or token == "4")
+			format = ITI::Format::MATRIXMARKET;                        
 		else
 			in.setstate(std::ios_base::failbit);
 		return in;
@@ -79,6 +81,8 @@ namespace ITI {
 			token = "ADCIRC";
 		else if (method == ITI::Format::OCEAN)
 			token = "OCEAN";
+		else if (method == ITI::Format::MATRIXMARKET)
+			token = "MATRIXMARKET";                 
 		out << token;
 		return out;
 	}
@@ -260,11 +264,13 @@ int main(int argc, char** argv) {
         }
 
         // read the adjacency matrix and the coordinates from a file  
+        
+        std::vector<DenseVector<ValueType> > vectorOfNodeWeights;
                
         if (vm.count("fileFormat")) {
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, settings.fileFormat );
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights, settings.fileFormat );
         } else{
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights );
         }
         N = graph.getNumRows();
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
@@ -499,8 +505,8 @@ int main(int argc, char** argv) {
     
     ValueType cut = GraphUtils::computeCut<IndexType, ValueType>( graph, partition);
     ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( partition, k);
-    IndexType maxComm = GraphUtils::computeMaxComm<IndexType, ValueType>( graph, partition, k);
-    IndexType totalComm = GraphUtils::computeTotalComm<IndexType, ValueType>( graph, partition, k);
+    IndexType maxComm, totalComm;
+    std::tie(maxComm, totalComm) = ITI::GraphUtils::computeComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
     
     std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
     
@@ -560,8 +566,6 @@ int main(int argc, char** argv) {
             assert( coordinates[d].size() == N);
             assert( coordinates[d].getLocalValues().size() == newDist->getLocalSize() );
         }
-
-        //nodeWeights.redistribute( rowDistPtr );
 
         std::string destPath = "partResults/testInitial_"+std::to_string(initialPartition) +"/blocks_" + std::to_string(settings.numBlocks) ;
         

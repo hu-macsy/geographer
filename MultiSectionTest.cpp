@@ -41,7 +41,7 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
     const IndexType dimensions = 2;
     const IndexType k = std::pow( 4, dimensions);
 
-    std::string path = "meshes/";
+    std::string path = "./";
     std::string fileName = "Grid64x64";
     //std::string fileName = "trace-00003.graph";
     std::string file = path + fileName;

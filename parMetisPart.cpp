@@ -140,7 +140,6 @@ int main(int argc, char** argv) {
     
     std::vector<DenseVector<ValueType>> coords;
 	if (vm.count("fileFormat")) {
-		//ITI::Format format = vm["coordFormat"].as<ITI::Format>();
 		coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
 	} else {
 		coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
@@ -324,7 +323,9 @@ PRINT0( "" );
     }
     ValueType cutKway = ITI::GraphUtils::computeCut(graph, partitionKway, true);
     ValueType imbalanceKway = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partitionKway, nparts );
-    IndexType maxComm = ITI::GraphUtils::computeMaxComm<IndexType, ValueType>( graph, partitionKway, nparts);
+    IndexType maxComm, totalComm;
+    std::tie(maxComm, totalComm) = ITI::GraphUtils::computeComm<IndexType, ValueType>( graph, partitionKway, nparts);
+    
     assert(sizeof(xyzLocal)/sizeof(real_t) == 2*sizeof(partKway)/sizeof(idx_t) );
   
     // check correct transformation to DenseVector
@@ -350,8 +351,6 @@ PRINT0( "" );
         }
         
         std::cout<< cutKway <<" imbalance:" << imbalanceKway<<", time for partition: "<< partKwayTime << " , maxComm=" << maxComm << " \033[0m" << std::endl;
-        
-        //std::cout<< std::endl << "ParMetisGeom cut= "<< cutGeom <<" and imbalance= " << imbalanceGeom<<", time for partition: "<< partGeomTime << std::endl;
 
     }
     return 0;

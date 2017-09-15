@@ -430,22 +430,14 @@ IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM)
 /** Compute maximum communication= max degree of the block graph.
  */
 template<typename IndexType, typename ValueType>
-IndexType computeMaxComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const int k){
+std::pair<IndexType,IndexType> computeComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const int k){
     
     scai::lama::CSRSparseMatrix<ValueType> blockGraph = getBlockGraph( adjM, part, k);
     
-    return getGraphMaxDegree<IndexType,ValueType>( blockGraph );
-}
-//------------------------------------------------------------------------------
-
-/** Compute total communication= sum of all edges of the block graph.
- */
-template<typename IndexType, typename ValueType>
-IndexType computeTotalComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const int k){
+    IndexType maxComm = getGraphMaxDegree<IndexType,ValueType>( blockGraph );
+    IndexType totalComm = blockGraph.getNumValues()/2;
     
-    scai::lama::CSRSparseMatrix<ValueType> blockGraph = getBlockGraph( adjM, part, k);
-    
-    return blockGraph.getNumValues()/2;
+    return std::make_pair(maxComm, totalComm);
 }
 //------------------------------------------------------------------------------
 
@@ -756,8 +748,7 @@ template DenseVector<int> getBorderNodes( const CSRSparseMatrix<double> &adjM, c
 template std::vector<std::vector<int>> getLocalBlockGraphEdges( const scai::lama::CSRSparseMatrix<double> &adjM, const scai::lama::DenseVector<int> &part);
 template scai::lama::CSRSparseMatrix<double> getBlockGraph( const scai::lama::CSRSparseMatrix<double> &adjM, const scai::lama::DenseVector<int> &part, const int k);
 template int getGraphMaxDegree( const scai::lama::CSRSparseMatrix<double>& adjM);
-template  int computeMaxComm( const scai::lama::CSRSparseMatrix<double>& adjM, const scai::lama::DenseVector<int> &part, const int k);
-template int computeTotalComm( const scai::lama::CSRSparseMatrix<double>& adjM, const scai::lama::DenseVector<int> &part, const int k);
+template  std::pair<int,int> computeComm( const scai::lama::CSRSparseMatrix<double>& adjM, const scai::lama::DenseVector<int> &part, const int k);
 template scai::lama::CSRSparseMatrix<double> getPEGraph<int,double>( const scai::lama::CSRSparseMatrix<double> &adjM);
 
 } /*namespace GraphUtils*/

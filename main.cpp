@@ -14,6 +14,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
 
 #include <memory>
 #include <cstdlib>
@@ -147,7 +148,7 @@ int main(int argc, char** argv) {
 				("quadTreeFile", value<std::string>(), "read QuadTree from file")
 				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
                                 ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
-				("coordFormat", value<ITI::Format>(&coordFormat)->default_value(ITI::Format::METIS), "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ")
+				("coordFormat", value<ITI::Format>(&coordFormat), "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ")
 				("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
@@ -270,11 +271,9 @@ int main(int argc, char** argv) {
         // read the adjacency matrix and the coordinates from a file
         //
         std::vector<DenseVector<ValueType> > vectorOfNodeWeights;
-        
-        ITI::Format format = settings.fileFormat;
-        
+               
         if (vm.count("fileFormat")) {
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights, format );
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights, settings.fileFormat );
         } else{
             graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights );
         }
@@ -331,7 +330,7 @@ int main(int argc, char** argv) {
                 coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
             }else if ( !vm.count("coordFormat") and vm.count("fileFormat") ) { 
                 // if no coordFormat was given but was given a fileFormat assume they are the same
-                coordFormat = settings.fileFormat
+                coordFormat = settings.fileFormat;
                 coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
             } else {
                 coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
@@ -439,21 +438,26 @@ int main(int argc, char** argv) {
     
     // the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================
-    /*
+    
+    settings.writeDebugCoordinates = true;
+    
     if (settings.writeDebugCoordinates) {
 		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
 			assert( coordinates[dim].size() == N);
 			coordinates[dim].redistribute(partition.getDistributionPtr());
 		}
-		ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, "debugResult");
+        //std::string destPath = "partResults/main_" + std::to_string( static_cast<int> (settings.initialPartition) ) +"/blocks_" + std::to_string(settings.numBlocks) ;
+        std::string destPath = "partResults/main/blocks_" + std::to_string(settings.numBlocks) ;
+        boost::filesystem::create_directories( destPath );   
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath + "/debugResult");
     }
-    */
+    
     std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
     ValueType cut = ITI::GraphUtils::computeCut(graph, partition, true);
     ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
-    IndexType maxComm = ITI::GraphUtils::computeMaxComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
-    IndexType totalComm = ITI::GraphUtils::computeTotalComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
+    IndexType maxComm, totalComm;
+    std::tie(maxComm, totalComm) = ITI::GraphUtils::computeComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
     
     std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
     

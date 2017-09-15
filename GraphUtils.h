@@ -99,20 +99,19 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const int k);
 
+
 /** Get the maximum degree of a graph.
  * */
 template<typename IndexType, typename ValueType>
 IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 
-/** Compute maximum communication = max degree of the block graph.
- */
-template<typename IndexType, typename ValueType>
-IndexType computeMaxComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const int k);
 
-/** Compute total communication = sum of all edges of the block graph.
+/** first = Compute maximum communication = max degree of the block graph.
+ *  second = Compute total communication = sum of all edges of the block graph.
  */
 template<typename IndexType, typename ValueType>
-IndexType computeTotalComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const int k);
+std::pair<IndexType, IndexType> computeComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const int k);
+
 
 /**Returns the processor graph. Every processor traverses its local part of adjM: and for every
  * edge (u,v) that one node, say u, is not local it gets the owner processor of u. The returned graph is distributed with a BLOCK distribution.
