@@ -68,7 +68,7 @@ namespace ITI {
 		return in;
 	}
 
-	std::ostream& operator<<(std::ostream& out, Format& method)
+	std::ostream& operator<<(std::ostream& out, Format method)
 	{
 		std::string token;
 
@@ -85,6 +85,7 @@ namespace ITI {
 		out << token;
 		return out;
 	}
+	
 }
 
 
@@ -135,6 +136,8 @@ int main(int argc, char** argv) {
         
         std::string blockSizesFile;
         
+        ITI::Format coordFormat;
+        
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	desc.add_options()
@@ -143,8 +146,8 @@ int main(int argc, char** argv) {
 				("graphFile", value<std::string>(), "read graph from file")
 				("quadTreeFile", value<std::string>(), "read QuadTree from file")
 				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
-                              //  ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
-				("coordFormat", value<ITI::Format>(), "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ")
+                                ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
+				("coordFormat", value<ITI::Format>(&coordFormat)->default_value(ITI::Format::METIS), "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ")
 				("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
@@ -324,13 +327,15 @@ int main(int argc, char** argv) {
 			}
 
         } else {
-        	ITI::Format format = settings.fileFormat;
-        	if (vm.count("fileFormat")) {
-        		coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format);
-        	} else {
-        		coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
-        	}
-
+            if( vm.count("coordFormat") ) { // coordFormat given
+                coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
+            }else if ( !vm.count("coordFormat") and vm.count("fileFormat") ) { 
+                // if no coordFormat was given but was given a fileFormat assume they are the same
+                coordFormat = settings.fileFormat
+                coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
+            } else {
+                coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
+            }
         }
 
         if (comm->getRank() == 0) {

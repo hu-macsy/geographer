@@ -67,7 +67,7 @@ namespace ITI {
 		return in;
 	}
 
-	std::ostream& operator<<(std::ostream& out, Format& method)
+	std::ostream& operator<<(std::ostream& out, Format method)
 	{
 		std::string token;
 
@@ -132,16 +132,15 @@ int main(int argc, char** argv) {
         options_description desc("Supported options");
         
         struct Settings settings;
-        ITI::Format ff = ITI::Format::METIS;
+        //ITI::Format ff = ITI::Format::METIS;
         std::string blockSizesFile;
-        //IndexType ff = 1;
         
         desc.add_options()
             ("help", "display options")
             ("version", "show version")
             ("graphFile", value<std::string>(), "read graph from file")
             ("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
-            //("fileFormat", value<ITI::Format>(&ff)->default_value(ff), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
+            ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
             ("generate", "generate random graph. Currently, only uniform meshes are supported.")
             ("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
             ("numX", value<int>(&settings.numX)->default_value(settings.numX), "Number of points in x dimension of generated graph")
@@ -257,15 +256,13 @@ int main(int argc, char** argv) {
         if (comm->getRank() == 0)
         {
             std::cout<< "Reading from file \""<< graphFile << "\" for the graph and \"" << coordFile << "\" for coordinates"<< std::endl;
-            std::cout<< "File format: " << ff << std::endl;
+            std::cout<< "File format: " << settings.fileFormat << std::endl;
         }
 
         // read the adjacency matrix and the coordinates from a file  
-        
-        ITI::Format format = settings.fileFormat;
-        
+               
         if (vm.count("fileFormat")) {
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, format );
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, settings.fileFormat );
         } else{
             graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
         }
@@ -281,7 +278,7 @@ int main(int argc, char** argv) {
         
         
         if (vm.count("fileFormat")) {
-            coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format);
+            coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
         } else {
             coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
         }
@@ -379,7 +376,6 @@ int main(int argc, char** argv) {
     settings.minBorderNodes = 10;
     settings.useGeometricTieBreaking = 1;
     settings.pixeledSideLen = int ( std::min(settings.numBlocks, 100) );
-    settings.fileFormat = ff;
     
     std::string destPath = "./partResults/testInitial/blocks_"+std::to_string(settings.numBlocks)+"/";
     boost::filesystem::create_directories( destPath );   

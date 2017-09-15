@@ -159,14 +159,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 blockSizes = settings.blockSizes;
             }
             SCAI_ASSERT( blockSizes.size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
-            
+PRINT0("before k-means");            
             std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
             result = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeightCopy, blockSizes, settings.epsilon);
             std::chrono::duration<double> kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
             ValueType timeForInitPart = ValueType ( comm->max(kMeansTime.count() ));
             assert(result.getLocalValues().min() >= 0);
             assert(result.getLocalValues().max() < k);
-
+PRINT0("after k-means");
             if (comm->getRank() == 0) {
                 std::cout << "K-Means, Time:" << timeForInitPart << std::endl;
             }

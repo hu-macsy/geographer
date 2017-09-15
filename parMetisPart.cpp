@@ -42,12 +42,14 @@ std::istream& operator>>(std::istream& in, Format& format)
 		format = ITI::Format::ADCIRC;
 	else if (token == "OCEAN" or token == "3")
 		format = ITI::Format::OCEAN;
+        else if (token == "MATRIXMARKET" or token == "4")
+		format = ITI::Format::MATRIXMARKET;
 	else
 		in.setstate(std::ios_base::failbit);
 	return in;
 }
 
-std::ostream& operator<<(std::ostream& out, Format& method)
+std::ostream& operator<<(std::ostream& out, Format method)
 {
 	std::string token;
 
@@ -59,6 +61,8 @@ std::ostream& operator<<(std::ostream& out, Format& method)
 		token = "ADCIRC";
 	else if (method == ITI::Format::OCEAN)
 		token = "OCEAN";
+        else if (method == ITI::Format::MATRIXMARKET)
+                token = "MATRIXMARKET";  
 	out << token;
 	return out;
 }
@@ -76,6 +80,7 @@ int main(int argc, char** argv) {
 		("help", "display options")
 		("version", "show version")
 		("graphFile", value<std::string>(), "read graph from file")
+                ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
 		("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
 		("coordFormat", value<ITI::Format>(), "format of coordinate file")
 		("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
@@ -113,23 +118,39 @@ int main(int argc, char** argv) {
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-    CSRSparseMatrix<ValueType> graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+    //
+    // read the input graph
+    //
+    
+    CSRSparseMatrix<ValueType> graph;
+    
+    if (vm.count("fileFormat")) {
+        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, settings.fileFormat );
+    }else{
+        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+    }
+    
     const IndexType N = graph.getNumRows();
     
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
     
     SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
-
+    SCAI_ASSERT( graph.isConsistent(), "Graph npt consistent");
+    
     std::vector<DenseVector<ValueType>> coords;
-	if (vm.count("coordFormat")) {
-		ITI::Format format = vm["coordFormat"].as<ITI::Format>();
-		coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, format);
+	if (vm.count("fileFormat")) {
+		//ITI::Format format = vm["coordFormat"].as<ITI::Format>();
+		coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
 	} else {
 		coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
 	}
 
     SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size() , coords[1].getLocalValues().size(), "coordinates not of same size" );
+
+    //
+    // convert to parMetis data types
+    //
     
     //get the vtx array
     
@@ -153,7 +174,7 @@ int main(int argc, char** argv) {
         comm->shiftArray(recvVtx , sendVtx, 1);
         sendVtx.swap(recvVtx);
     } 
-    
+
     scai::hmemo::ReadAccess<IndexType> recvPartRead( recvVtx );
     // vtxDist is an array of size numPEs and is replicated in every processor
     idx_t vtxDist[ comm->getSize()+1 ]; 
@@ -168,17 +189,19 @@ int main(int argc, char** argv) {
     }
     */
     recvPartRead.release();
-    
+
     // setting xadj=ia and adjncy=ja values, these are the local values of every processor
     scai::lama::CSRStorage<ValueType>& localMatrix= graph.getLocalStorage();
     scai::utilskernel::LArray<IndexType>& ia = localMatrix.getIA();
     scai::utilskernel::LArray<IndexType>& ja = localMatrix.getJA();
-    
+
     idx_t xadj[ia.size()], adjncy[ja.size()];
     for(int i=0; i<ia.size(); i++){
+        SCAI_ASSERT( i < sizeof(xadj)/sizeof(idx_t), "index " << i << " out of bounds");
         xadj[i]= ia[i];
         SCAI_ASSERT( xadj[i] >=0, "negative value for i= "<< i << " , val= "<< xadj[i]);
     }
+
     for(int i=0; i<ja.size(); i++){
         adjncy[i]= ja[i];
         SCAI_ASSERT( adjncy[i] >=0, "negative value for i= "<< i << " , val= "<< adjncy[i]);
@@ -218,7 +241,7 @@ int main(int argc, char** argv) {
         xyzLocal[2*i+1]= real_t(localPartOfCoords1[i]);
         //PRINT(*comm <<": "<< xyzLocal[2*i] << ", "<< xyzLocal[2*i+1]);
     }
-  
+
     // ncon: the numbers of weigths each vertex has. Here 1;
     idx_t ncon = 1;
     
@@ -271,7 +294,7 @@ int main(int argc, char** argv) {
     if(comm->getRank()==0){
 	    PRINT("dims=" << ndims << ", nparts= " << nparts<<", ubvec= "<< ubvec << ", options="<< *options << ", ncon= "<< ncon );
     }
-    
+PRINT0( "" );        
     //
     // get the partitions with parMetis
     //
