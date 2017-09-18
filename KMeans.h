@@ -41,9 +41,10 @@ template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &coordinates, const std::vector<std::vector<ValueType> > &centers,
 		const Iterator firstIndex, const Iterator lastIndex,
 		const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment,
-		const std::vector<IndexType> &blockSizes,  const SpatialCell &boundingBox, const ValueType epsilon, const IndexType maxIter,
+		const std::vector<IndexType> &blockSizes,  const SpatialCell &boundingBox,
 		std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter,
-		std::vector<ValueType> &influence);
+		std::vector<ValueType> &influence,
+		Settings settings);
 
 /**
  * Implementations
@@ -135,8 +136,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 			assert(lastIndex == localIndices.end());
 		}
 
-		const IndexType balanceIterations = 20;
-		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, settings.epsilon, settings.balanceIterations, upperBoundOwnCenter, lowerBoundNextCenter, influence);
+		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, settings);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
 		std::vector<std::vector<ValueType> > newCenters = findCenters(scaled, result, k, firstIndex, lastIndex, nodeWeights);
