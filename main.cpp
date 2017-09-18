@@ -295,6 +295,7 @@ int main(int argc, char** argv) {
         settings.numY = 1;
         settings.numZ = 1;
 
+        comm->synchronize();
         if (comm->getRank() == 0) {
         	std::cout<< "Read " << N << " points." << std::endl;
         }
@@ -333,6 +334,7 @@ int main(int argc, char** argv) {
             }
         }
 
+        comm->synchronize();
         if (comm->getRank() == 0) {
         	std::cout << "Read coordinates." << std::endl;
         }
