@@ -30,7 +30,9 @@ namespace ITI{
     template <typename IndexType, typename ValueType>
     class MultiLevel{
     public:
-        static IndexType multiLevelStep(scai::lama::CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const Halo& halo, Settings settings);
+        static DenseVector<IndexType> multiLevelStep(scai::lama::CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const Halo& halo, Settings settings);
+
+        static DenseVector<IndexType> getFineTargets(const DenseVector<IndexType> &coarseOrigin, const DenseVector<IndexType> &fineToCoarseMap);
 
         static void coarsen(const CSRSparseMatrix<ValueType>& inputGraph, const DenseVector<ValueType> &nodeWeights, const Halo& halo, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations = 1);
 

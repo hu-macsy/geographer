@@ -215,7 +215,15 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         SCAI_ASSERT( k && !(k & (k-1)) , "k is not a power of 2 and this is required for now for bisection");  
         numCuts = std::vector<IndexType>( log2(k) , 2 );
     }
-
+    /*
+     * else if( settings.msOptions==2 ){        
+        numCuts = settings.cutsPerDim;
+    }else{
+        std::cout << "Wrong value " << settings.msOptions << " for option msOptions" << std::endl;
+        std::terminate();
+    }
+    */
+    
     IndexType numLeaves = root->getNumLeaves();
 
     for(typename std::vector<IndexType>::iterator thisDimCuts=numCuts.begin(); thisDimCuts!=numCuts.end(); ++thisDimCuts ){
@@ -305,6 +313,7 @@ dbg_rectW += newRect.weight;
 
 //TODO: only for debuging, remove variable dbg_rectW
 SCAI_ASSERT_LE( dbg_rectW-thisRectangle.weight, 0.0000001, "Rectangle weights not correct, their difference is: " << dbg_rectW-thisRectangle.weight);
+//SCAI_ASSERT_EQ_ERROR( dbg_rectW, thisRectangle.weight, "Rectangle weights not correct, their difference is: " << dbg_rectW-thisRectangle.weight);
 
         }
         numLeaves = root->getNumLeaves();
@@ -463,7 +472,6 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
                 intSqrtK++;
             }
             SCAI_ASSERT( std::pow( intSqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow( sqrtK, 1/d)= " << std::pow(intSqrtK,dim));
-                       
             numCuts = std::vector<IndexType>( dim, intSqrtK );
         }else{                                  // user-specific number of cuts per dimensions
             numCuts = settings.cutsPerDim;
@@ -554,7 +562,6 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             IndexType thisChosenDim = chosenDim[l];            
 
             std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( thisProjection, *thisDimCuts, settings);
-                       
             SCAI_ASSERT( part1D.size()== *thisDimCuts , "Wrong size of 1D partition")
             SCAI_ASSERT( weightPerPart.size()== *thisDimCuts , "Wrong size of 1D partition")
 
@@ -598,6 +605,8 @@ dbg_rectW += newRect.weight;
                 maxWeight = newRect.weight;
             }        
 dbg_rectW += newRect.weight;    
+            //if(comm->getRank()==0) newRect.print();            
+            //PRINT0("this rect imbalance= " << (maxWeight-optWeight)/optWeight << "  (opt= " << optWeight << " , max= "<< maxWeight << ")" );
 
 //TODO: only for debuging, remove variable dbg_rectW
 SCAI_ASSERT_LE_ERROR( dbg_rectW-thisRectangle.weight, 0.0000001, "Rectangle weights not correct: dbg_rectW-this.weight= " << dbg_rectW - thisRectangle.weight);
@@ -834,6 +843,64 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
     
     return std::make_pair(partIndices, weightPerPart);
 }
+//---------------------------------------------------------------------------------------
+// Based on algorithm Nicol found in Pinar, Aykanat, 2004, "Fast optimal load balancing algorithms for 1D partitioning"
+//TODO: In the same paper thers is a better, but more complicated, algorithm called Nicol+
+/*
+template<typename IndexType, typename ValueType>
+std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1DMine( const std::vector<ValueType>& nodeWeights, const IndexType k, Settings settings){
+
+    const IndexType N = nodeWeights.size();
+
+    //
+    //create the prefix sum array
+    //
+    std::vector<ValueType> prefixSum( N+1 , 0);
+    
+    prefixSum[0] = 0;// nodeWeights[0];
+    
+    for(IndexType i=1; i<N+1; i++ ){
+        prefixSum[i] = prefixSum[i-1] + nodeWeights[i-1];
+    }
+    
+    const ValueType totalWeight = prefixSum.back();
+    //const ValueType  = totalWeight/k;
+
+    ValueType lowerBound, upperBound;
+    lowerBound = totalWeight/k;         // the optimal average weight
+    upperBound = lowerBound;
+    
+    bool existsPartition = probe(prefixSum, k, upperBound);
+    while( !existsPartition ){
+        lowerBound = upperBound;
+        upperBound *= 2;
+        existsPartition = probe(prefixSum, k, upperBound);
+    }
+        
+    std::vector<ValueType> allRollingSums;
+
+    for(typename std::vector<ValueType>::const_iterator windowBot= nodeWeights.begin(); windowBot!=nodeWeights.end(); windowBot++){
+        for(typename std::vector<ValueType>::const_iterator windowTop= windowBot; windowTop!=nodeWeights.end(); windowTop++){
+            ValueType thisSum = std::accumulate( windowBot, windowTop, 0.0);
+            if( thisSum>=lowerBound and thisSum<=upperBound ){
+                allRollingSums.push_back( thisSum );
+            }
+        }
+    }
+PRINT(lowerBound << " < " << upperBound );        
+    std::sort( allRollingSums.begin(), allRollingSums.end() );
+
+PRINT( allRollingSums.size() );    
+    
+    std::vector<IndexType> partIndices(k, -9);
+    std::vector<ValueType> weightPerPart(k, -9);
+    partIndices[0]=0;
+    
+    
+    return std::make_pair(partIndices, weightPerPart);
+    
+}
+*/
 //---------------------------------------------------------------------------------------
 
 // Search if there is a partition of the weights array into k parts where the maximum weight of a part is <=target.
@@ -1128,6 +1195,8 @@ template bool MultiSection<int, double>::inBBox( const std::vector<int>& coords,
 template  std::pair<std::vector<int>,std::vector<double>> MultiSection<int, double>::partition1DGreedy( const std::vector<double>& array, const int k, Settings settings);
 
 template  std::pair<std::vector<int>,std::vector<double>> MultiSection<int, double>::partition1DOptimal( const std::vector<double>& array, const int k, Settings settings);
+
+//template std::pair<std::vector<int>, std::vector<double>> MultiSection<int, double>::partition1DMine( const std::vector<double>& nodeWeights, const int k, Settings settings);
 
 template double MultiSection<int, double>::getRectangleWeight( const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const int sideLen, Settings settings);
 

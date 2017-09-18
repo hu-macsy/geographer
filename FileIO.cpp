@@ -321,9 +321,9 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 		}
 	}
 
-	const ValueType avgDegree = ValueType(2*globalM) / globalN;
+    const ValueType avgDegree = ValueType(2*globalM) / globalN;
 
-	//get distribution and local range
+    //get distribution and local range
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 
@@ -449,6 +449,14 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
     return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
 }
+//-------------------------------------------------------------------------------------------------
+/*
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBinarySchamberger(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights){
+
+    
+}
+*/
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
@@ -1067,7 +1075,7 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
     return matrix;
 }
 
-
+//-------------------------------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
 std::pair<IndexType, IndexType> FileIO<IndexType, ValueType>::getMatrixMarketCoordsInfos(const std::string filename){
         
@@ -1094,8 +1102,57 @@ std::pair<IndexType, IndexType> FileIO<IndexType, ValueType>::getMatrixMarketCoo
     return std::make_pair( numPoints, dimensions);
 }
 
+//-------------------------------------------------------------------------------------------------
+template<typename IndexType, typename ValueType>
+std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::string filename , const IndexType numBlocks){
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    
+    std::vector<IndexType> blockSizes(numBlocks, 0);
+    
+    if( comm->getRank()==0 ){
+        std::ifstream file(filename);
+        if(file.fail())
+            throw std::runtime_error("File "+ filename+ " failed.");
+        
+        //read first line, has the number of blocks
+        std::string line;
+        std::getline(file, line);
+        std::stringstream ss;
+        ss.str( line );
+        
+        IndexType fileNumBlocks;
+        ss >> fileNumBlocks;
+        SCAI_ASSERT_EQ_ERROR( numBlocks, fileNumBlocks, "Number of blocks mismatch, given "<< numBlocks << " but the file has "<< fileNumBlocks );
 
-
+        for(int i=0;i<numBlocks; i++){
+            bool read = !std::getline(file, line).fail();
+            
+            if (!read and i!=numBlocks-1 ) {
+                throw std::runtime_error("In FileIO.cpp, line " + std::to_string(__LINE__) +": Unexpected end of block sizes file " + filename + ". Was the number of blocks correct?");
+            }
+            std::stringstream ss;    
+            ss.str( line );
+            IndexType bSize;
+            ss >> bSize;
+            //blockSizes.push_back(bSize);
+            blockSizes[i]= bSize;
+        }
+        SCAI_ASSERT( blockSizes.size()==numBlocks , "Wrong number of blocks: "  <<blockSizes.size() << " for file " << filename);
+        file.close();
+        
+        bool eof = std::getline(file, line).eof();
+        if (!eof) {
+            throw std::runtime_error(std::to_string(numBlocks) + " blocks read, but file continues.");
+        }
+    }
+    
+    // this call causes a seg fault ??
+    //comm->bcastImpl( blockSizes.data(), blockSizes.size(), 0, scai::common::TypeTraits<ValueType>::stype);
+    comm->bcast( blockSizes.data(), numBlocks, 0);
+    
+    return blockSizes;
+}
 
 template void FileIO<int, double>::writeGraph (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<double> &adjM, const std::string filename);
@@ -1106,6 +1163,6 @@ template std::vector<DenseVector<double>> FileIO<int, double>::readCoords( std::
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsOcean( std::string filename, int dimension );
 template CSRSparseMatrix<double>  FileIO<int, double>::readQuadTree( std::string filename, std::vector<DenseVector<double>> &coords );
 template std::pair<int, int> FileIO<int, double>::getMatrixMarketCoordsInfos(const std::string filename);
-
+template std::vector<int> FileIO<int, double>::readBlockSizes(const std::string filename , const int numBlocks );
 
 } /* namespace ITI */

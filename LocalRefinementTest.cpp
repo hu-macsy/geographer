@@ -77,15 +77,15 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	}
 	//test initial partion for imbalance
 	DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1.0);
-        ValueType initialImbalance = GraphUtils::computeImbalance<IndexType, ValueType>(part, k, uniformWeights);
+	ValueType initialImbalance = GraphUtils::computeImbalance<IndexType, ValueType>(part, k, uniformWeights);
         
-        // If initial partition is highly imbalanced local refinement cannot fix it.
-        // TODO: should the final partion be balances no matter how imbalanced is the initial one???
-        // set as epsilon the initial imbalance
+	// If initial partition is highly imbalanced local refinement cannot fix it.
+	// TODO: should the final partion be balances no matter how imbalanced is the initial one???
+	// set as epsilon the initial imbalance
         
-        if(initialImbalance > epsilon){
-            PRINT0("Warning, initial random partition too imbalanced: "<< initialImbalance);
-        }
+	if(initialImbalance > epsilon){
+		PRINT0("Warning, initial random partition too imbalanced: "<< initialImbalance);
+	}
         
 	//redistribute according to partition
 	scai::utilskernel::LArray<IndexType> owners(n);
@@ -107,7 +107,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	Settings settings;
 	settings.numBlocks= k;
 	//settings.epsilon = initialImbalance;
-        settings.epsilon = epsilon;
+	settings.epsilon = epsilon;
         
 	//get block graph
 	scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils::getBlockGraph<IndexType, ValueType>( graph, part, settings.numBlocks);
@@ -117,14 +117,14 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 
 	//get random node weights
 	DenseVector<ValueType> weights;
-        // setRandom creates too big numbers and weights.sum() < 0 because (probably) sum does not fit in int
+	// setRandom creates too big numbers and weights.sum() < 0 because (probably) sum does not fit in int
 	//weights.setRandom(graph.getRowDistributionPtr(), 1);
-        weights.setSequence(1, 1, graph.getRowDistributionPtr() );
-        ValueType totalWeight = n*(n+1)/2;
+	weights.setSequence(1, 1, graph.getRowDistributionPtr() );
+	ValueType totalWeight = n*(n+1)/2;
 	ValueType minNodeWeight = weights.min().Scalar::getValue<IndexType>();
 	ValueType maxNodeWeight = weights.max().Scalar::getValue<IndexType>();
 
-        EXPECT_EQ(weights.sum(), totalWeight );
+	EXPECT_EQ(weights.sum(), totalWeight );
 	if (comm->getRank() == 0) {
 		std::cout << "Max node weight: " << maxNodeWeight << std::endl;
 		std::cout << "Min node weight: " << minNodeWeight << std::endl;
@@ -135,9 +135,10 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	std::vector<double> distances = LocalRefinement<IndexType,ValueType>::distancesFromBlockCenter(coordinates);
 
 	ValueType cut = GraphUtils::computeCut(graph, part, true);
+	DenseVector<IndexType> origin(graph.getRowDistributionPtr(), comm->getRank());
 	ASSERT_GE(cut, 0);
 	for (IndexType i = 0; i < iterations; i++) {
-		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, communicationScheme, coordinates, distances, settings);
+		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, coordinates, distances, origin, communicationScheme, settings);
 		IndexType gain = 0;
 		for (IndexType roundGain : gainPerRound) gain += roundGain;
 
@@ -151,12 +152,56 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 
 	//check for balance
 	ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(part, k, weights);
-        PRINT0("final imbalance: " << imbalance);
-        // TODO: I do not know, both assertion fail from time to time...
-        // at least return a solution less imbalanced than the initial one
+	PRINT0("final imbalance: " << imbalance);
+	// TODO: I do not know, both assertion fail from time to time...
+	// at least return a solution less imbalanced than the initial one
 	EXPECT_LE(imbalance, initialImbalance);
-        //EXPECT_LE( imbalance , settings.epsilon);
+	//EXPECT_LE( imbalance , settings.epsilon);
 }
+
+//---------------------------------------------------------------------------------------
+TEST_F(LocalRefinementTest, testOriginArray) {
+	std::string path = "meshes/bubbles/";
+	std::string fileName = "bubbles-00000.graph";
+	std::string file = path + fileName;
+
+	scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file);
+	std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords(std::string(file + ".xyz"), graph.getNumRows(), 2);
+
+	//prepare ancillary data structures
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+	DenseVector<IndexType> part(dist, comm->getRank());
+	std::vector<IndexType> localBorder = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(graph);
+	DenseVector<ValueType> weights(dist, 1);
+	std::vector<double> distances = LocalRefinement<IndexType,ValueType>::distancesFromBlockCenter(coordinates);
+	DenseVector<IndexType> origin(dist, comm->getRank());
+	Settings settings;
+	settings.numBlocks= comm->getSize();
+	scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils::getBlockGraph<IndexType, ValueType>( graph, part, settings.numBlocks);
+	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
+
+	ValueType gain = 0;
+	IndexType iter = 0;
+	do {
+		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, coordinates, distances, origin, communicationScheme, settings);
+		gain = std::accumulate(gainPerRound.begin(), gainPerRound.end(), 0);
+		if (comm->getRank() == 0) std::cout << "Found gain " << gain << " with " << gainPerRound.size() << " colors." << std::endl;
+		iter++;
+	} while(gain > 0);
+
+	//check for equality of redistributed values and origin
+	scai::dmemo::DistributionPtr newDist = graph.getRowDistributionPtr();
+
+	ASSERT_TRUE(graph.getRowDistribution().isEqual(origin.getDistribution()));
+	scai::hmemo::ReadAccess<IndexType> rOrigin(origin.getLocalValues());
+
+	for (IndexType i = 0; i < newDist->getLocalSize(); i++) {
+		IndexType origOwner = dist->getAnyOwner(newDist->local2global(i));
+		EXPECT_EQ(rOrigin[i], origOwner);
+	}
+}
+
 //--------------------------------------------------------------------------------------- 
  
 TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {

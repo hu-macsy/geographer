@@ -301,6 +301,7 @@ int main(int argc, char** argv) {
     }
     ValueType cutKway = ITI::GraphUtils::computeCut(graph, partitionKway, true);
     ValueType imbalanceKway = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partitionKway, nparts );
+    IndexType maxComm = ITI::GraphUtils::computeMaxComm<IndexType, ValueType>( graph, partitionKway, nparts);
     assert(sizeof(xyzLocal)/sizeof(real_t) == 2*sizeof(partKway)/sizeof(idx_t) );
   
     // check correct transformation to DenseVector
@@ -318,13 +319,15 @@ int main(int argc, char** argv) {
     
     if(comm->getRank()==0){
     	std::cout << std::endl << "machine:" << machine << " input:" << graphFile << " nodes:" << N << " epsilon:" << settings.epsilon;
+        std::cout << "\033[1;36m";
         if( parMetisGeom ){
             std::cout << std::endl << "ParMETIS_V3_PartGeomKway cut= ";
         }else{
             std::cout << std::endl << "ParMETIS_V3_PartKway cut= ";
         }
         
-        std::cout<< cutKway <<" imbalance:" << imbalanceKway<<", time for partition: "<< partKwayTime << std::endl;
+        std::cout<< cutKway <<" imbalance:" << imbalanceKway<<", time for partition: "<< partKwayTime << " , maxComm=" << maxComm << " \033[0m" << std::endl;
+        
         //std::cout<< std::endl << "ParMetisGeom cut= "<< cutGeom <<" and imbalance= " << imbalanceGeom<<", time for partition: "<< partGeomTime << std::endl;
 
     }
