@@ -13,6 +13,7 @@
 #include <scai/tracing.hpp>
 
 #include "quadtree/QuadNodeCartesianEuclid.h"
+#include "Settings.h"
 #include "GraphUtils.h"
 
 using scai::lama::DenseVector;
@@ -22,7 +23,7 @@ namespace KMeans {
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights,
-		const std::vector<IndexType> &blockSizes, const ValueType epsilon = 0.05);
+		const std::vector<IndexType> &blockSizes, const Settings settings);
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCenters(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights);
@@ -48,10 +49,15 @@ DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &c
  * Implementations
  */
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const ValueType epsilon) {
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const Settings settings) {
 	SCAI_REGION( "KMeans.computePartition" );
 
-	std::vector<std::vector<ValueType> > centers = findInitialCenters(coordinates, k, nodeWeights);
+	std::vector<DenseVector<ValueType> > scaled(coordinates.size());
+	for (IndexType d = 0; d < scaled.size(); d++) {
+		scaled[d] = DenseVector<ValueType>(coordinates[d]*8);
+	}
+
+	std::vector<std::vector<ValueType> > centers = findInitialCenters(scaled, k, nodeWeights);
 	std::vector<ValueType> influence(k,1);
 	const IndexType dim = coordinates.size();
 	assert(dim > 0);
@@ -66,7 +72,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<ValueType> maxCoords(dim);
 	std::vector<std::vector<ValueType> > convertedCoords(dim);
 	for (IndexType d = 0; d < dim; d++) {
-		scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
+		scai::hmemo::ReadAccess<ValueType> rAccess(scaled[d].getLocalValues());
 		assert(rAccess.size() == localN);
 		convertedCoords[d] = std::vector<ValueType>(rAccess.get(), rAccess.get()+localN);
 		assert(convertedCoords[d].size() == localN);
@@ -92,6 +98,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::iota(firstIndex, lastIndex, 0);
 
 	IndexType minNodes = 100*blocksPerProcess;
+	assert(minNodes > 0);
 	IndexType samplingRounds = 0;
 	std::vector<IndexType> samples;
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
@@ -114,7 +121,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	ValueType delta = 0;
 	bool balanced = false;
 	const ValueType threshold = 5;
-	const IndexType maxIterations = 50;
+	const IndexType maxIterations = settings.maxKMeansIterations;
 	do {
 
 		if (iter < samplingRounds) {
@@ -129,10 +136,10 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		}
 
 		const IndexType balanceIterations = 20;
-		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, epsilon, balanceIterations, upperBoundOwnCenter, lowerBoundNextCenter, influence);
+		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, settings.epsilon, settings.balanceIterations, upperBoundOwnCenter, lowerBoundNextCenter, influence);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
-		std::vector<std::vector<ValueType> > newCenters = findCenters(coordinates, result, k, firstIndex, lastIndex, nodeWeights);
+		std::vector<std::vector<ValueType> > newCenters = findCenters(scaled, result, k, firstIndex, lastIndex, nodeWeights);
 		std::vector<ValueType> squaredDeltas(k,0);
 		std::vector<ValueType> deltas(k,0);
 		for (IndexType j = 0; j < k; j++) {
@@ -181,7 +188,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 
 		balanced = true;
 		for (IndexType j = 0; j < k; j++) {
-			if (blockWeights[j] > blockSizes[j]*(1+epsilon)) {
+			if (blockWeights[j] > blockSizes[j]*(1+settings.epsilon)) {
 				balanced = false;
 			}
 		}
