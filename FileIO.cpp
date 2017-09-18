@@ -36,6 +36,8 @@
 using scai::lama::CSRStorage;
 using scai::lama::Scalar;
 
+const IndexType fileTypeVersionNumber= 3;
+
 namespace ITI {
 
 //-------------------------------------------------------------------------------------------------
@@ -485,7 +487,18 @@ ITI::aux::printVector( header );
     
     PRINT( *comm << ": version= " << version << ", N= " << N << ", M= " << M );
     
+    if( version != fileTypeVersionNumber ) {
+        PRINT0( "filetype version missmatch" );
+        //MPI_Finalize();
+        exit(0);
+    }
     
+    // set like in KaHiP/parallel/prallel_src/app/configuration.h in configuration::standard
+    IndexType binary_io_window_size = 64;   
+    
+    IndexType window_size = std::min( binary_io_window_size, comm->getSize() );
+    IndexType lowPE =0;
+    IndexType highPE = window_size;
     
     
     scai::lama::CSRSparseMatrix<ValueType> ret;

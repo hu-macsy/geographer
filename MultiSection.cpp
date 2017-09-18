@@ -68,6 +68,7 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
     
     //
     // scale the local coordinates so the projections are not too big and relative to the input size
+    // and copy to a std::vector<std::vector>
     //
     std::vector< std::vector<IndexType> > localPoints( localN, std::vector<IndexType>(dim,0) );
    

@@ -153,9 +153,9 @@ int main(int argc, char** argv) {
     
     //get the vtx array
     
-    IndexType size = comm->getSize()+1;
-    scai::hmemo::HArray<IndexType> sendVtx(size, static_cast<ValueType>( 0 ));
-    scai::hmemo::HArray<IndexType> recvVtx(size);
+    IndexType size = comm->getSize();
+    scai::hmemo::HArray<IndexType> sendVtx(size+1, static_cast<ValueType>( 0 ));
+    scai::hmemo::HArray<IndexType> recvVtx(size+1);
     
     IndexType lb, ub;
     scai::dmemo::BlockDistribution blockDist(N, comm);
@@ -175,12 +175,11 @@ int main(int argc, char** argv) {
     } 
 
     scai::hmemo::ReadAccess<IndexType> recvPartRead( recvVtx );
+
     // vtxDist is an array of size numPEs and is replicated in every processor
-    idx_t vtxDist[ comm->getSize()+1 ]; 
-    vtxDist[0]= 0;
+    idx_t vtxDist[ size ]; 
     for(int i=0; i<recvPartRead.size(); i++){
-        vtxDist[i+1]= recvPartRead[i+1];
-        //vtxDist[i]= recvPartRead[i];
+        vtxDist[i]= recvPartRead[i];
     }
     /*
     for(IndexType i=0; i<recvPartRead.size(); i++){
@@ -188,25 +187,30 @@ int main(int argc, char** argv) {
     }
     */
     recvPartRead.release();
-PRINT0( "" );   
+
     // setting xadj=ia and adjncy=ja values, these are the local values of every processor
     scai::lama::CSRStorage<ValueType>& localMatrix= graph.getLocalStorage();
-    scai::utilskernel::LArray<IndexType>& ia = localMatrix.getIA();
-    scai::utilskernel::LArray<IndexType>& ja = localMatrix.getJA();
-PRINT( sizeof(idx_t) << " _ " << sizeof(IndexType) );
-    idx_t xadj[ia.size()*2], adjncy[ja.size()];
+    scai::hmemo::ReadAccess<IndexType> ia( localMatrix.getIA() );
+    scai::hmemo::ReadAccess<IndexType> ja( localMatrix.getJA() );
+
+    idx_t xadj[ia.size()];
+    idx_t adjncy[ja.size()];
+    
     for(int i=0; i<ia.size(); i++){
         SCAI_ASSERT( i < sizeof(xadj)/sizeof(idx_t), "index " << i << " out of bounds");
         xadj[i]= ia[i];
         SCAI_ASSERT( xadj[i] >=0, "negative value for i= "<< i << " , val= "<< xadj[i]);
     }
-PRINT0( "" ); 
+
     for(int i=0; i<ja.size(); i++){
         adjncy[i]= ja[i];
         SCAI_ASSERT( adjncy[i] >=0, "negative value for i= "<< i << " , val= "<< adjncy[i]);
         SCAI_ASSERT( adjncy[i] <N , "too large value for i= "<< i << " , val= "<< adjncy[i]);
     }
-PRINT0( "" );   
+    ia.release();
+    ja.release();
+
+
     //vwgt , adjwgt store the weigths of edges and vertices. Here we have
     // no weight so are both NULL.
     idx_t* vwgt= NULL;
