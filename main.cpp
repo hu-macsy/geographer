@@ -14,7 +14,6 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
-#include <boost/filesystem.hpp>
 
 #include <memory>
 #include <cstdlib>
@@ -48,7 +47,6 @@ typedef int IndexType;
  */
 
 //----------------------------------------------------------------------------
-
 namespace ITI {
 	std::istream& operator>>(std::istream& in, Format& format)
 	{
@@ -86,7 +84,6 @@ namespace ITI {
 		out << token;
 		return out;
 	}
-	
 }
 
 
@@ -271,7 +268,6 @@ int main(int argc, char** argv) {
         // read the adjacency matrix and the coordinates from a file
         //
         std::vector<DenseVector<ValueType> > vectorOfNodeWeights;
-               
         if (vm.count("fileFormat")) {
             graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights, settings.fileFormat );
         } else{
@@ -438,20 +434,18 @@ int main(int argc, char** argv) {
     
     // the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================
-    
-    settings.writeDebugCoordinates = true;
-    
+    /*
     if (settings.writeDebugCoordinates) {
 		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
 			assert( coordinates[dim].size() == N);
 			coordinates[dim].redistribute(partition.getDistributionPtr());
 		}
-        //std::string destPath = "partResults/main_" + std::to_string( static_cast<int> (settings.initialPartition) ) +"/blocks_" + std::to_string(settings.numBlocks) ;
+
         std::string destPath = "partResults/main/blocks_" + std::to_string(settings.numBlocks) ;
         boost::filesystem::create_directories( destPath );   
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath + "/debugResult");
     }
-    
+    */
     std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
     ValueType cut = ITI::GraphUtils::computeCut(graph, partition, true);
