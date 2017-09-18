@@ -188,25 +188,25 @@ int main(int argc, char** argv) {
     }
     */
     recvPartRead.release();
-
+PRINT0( "" );   
     // setting xadj=ia and adjncy=ja values, these are the local values of every processor
     scai::lama::CSRStorage<ValueType>& localMatrix= graph.getLocalStorage();
     scai::utilskernel::LArray<IndexType>& ia = localMatrix.getIA();
     scai::utilskernel::LArray<IndexType>& ja = localMatrix.getJA();
-
-    idx_t xadj[ia.size()], adjncy[ja.size()];
+PRINT( sizeof(idx_t) << " _ " << sizeof(IndexType) );
+    idx_t xadj[ia.size()*2], adjncy[ja.size()];
     for(int i=0; i<ia.size(); i++){
         SCAI_ASSERT( i < sizeof(xadj)/sizeof(idx_t), "index " << i << " out of bounds");
         xadj[i]= ia[i];
         SCAI_ASSERT( xadj[i] >=0, "negative value for i= "<< i << " , val= "<< xadj[i]);
     }
-
+PRINT0( "" ); 
     for(int i=0; i<ja.size(); i++){
         adjncy[i]= ja[i];
         SCAI_ASSERT( adjncy[i] >=0, "negative value for i= "<< i << " , val= "<< adjncy[i]);
         SCAI_ASSERT( adjncy[i] <N , "too large value for i= "<< i << " , val= "<< adjncy[i]);
     }
-
+PRINT0( "" );   
     //vwgt , adjwgt store the weigths of edges and vertices. Here we have
     // no weight so are both NULL.
     idx_t* vwgt= NULL;
@@ -229,7 +229,7 @@ int main(int argc, char** argv) {
     if (ndims != 2) {
     	throw std::logic_error("Not yet implemented for dimensions != 2");
     }
-
+PRINT0( "" );   
     // TODO: only for 2D now
     scai::utilskernel::LArray<ValueType>& localPartOfCoords0 = coords[0].getLocalValues();
     scai::utilskernel::LArray<ValueType>& localPartOfCoords1 = coords[1].getLocalValues();
@@ -293,7 +293,7 @@ int main(int argc, char** argv) {
     if(comm->getRank()==0){
 	    PRINT("dims=" << ndims << ", nparts= " << nparts<<", ubvec= "<< ubvec << ", options="<< *options << ", ncon= "<< ncon );
     }
-PRINT0( "" );        
+     
     //
     // get the partitions with parMetis
     //
@@ -351,8 +351,19 @@ PRINT0( "" );
         }
         
         std::cout<< cutKway <<" imbalance:" << imbalanceKway<<", time for partition: "<< partKwayTime << " , maxComm=" << maxComm << " \033[0m" << std::endl;
-
     }
+    // the code below writes the output coordinates in one file per processor for visualization purposes.
+    //=================
+        
+    settings.writeDebugCoordinates =1;
+    if (settings.writeDebugCoordinates) {
+		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+			assert( coords[dim].size() == N);
+			coords[dim].redistribute( partitionKway.getDistributionPtr() );
+		}
+		ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords, N, "metisResult");
+    }
+
     return 0;
 }
 

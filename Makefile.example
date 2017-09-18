@@ -7,8 +7,8 @@ OBJ_TEST_MAIN= $(OBJ_COMMON) main.o
 OBJ_GRAPH_GEN=  $(OBJ_COMMON) graphGeneratorFromQuad.o
 OBJ_CONVERTER = quadTreeConverter.o FileIO.o
 OBJ_DIFFUSIONCOORDS = FileIO.o Diffusion.o diffusionCoords.o
-OBJ_TEST_INITIAL= testInitial.o ParcoRepart.o MultiLevel.o LocalRefinement.o HilbertCurve.o SpectralPartition.o MultiSection.o MeshGenerator.o FileIO.o PrioQueueForInts.o KMeans.o Diffusion.o
-OBJ_WEAKSCALING= testWeakScaling.o MultiSection.o ParcoRepart.o MeshGenerator.o MultiLevel.o LocalRefinement.o HilbertCurve.o SpectralPartition.o KMeans.o Diffusion.o GraphUtils.o
+OBJ_TEST_INITIAL= $(OBJ_COMMON) testInitial.o 
+OBJ_WEAKSCALING= $(OBJ_COMMON) testWeakScaling.o 
 
 EXECUTABLE_GOOGLETEST=KatanomiTest
 EXECUTABLE_MAIN=Katanomi
