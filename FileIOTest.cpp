@@ -259,15 +259,40 @@ TEST_F(FileIOTest, testReadQuadTree){
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadGraphBinary){
-    std::string path = "meshes/";
-    std::string file = "bigbubbles-10.gi";
+    std::string path = "./meshes/";
+    std::string file = "trace10.bfg";   // trace10: n=8699, m=25874
+    //std::string file = "Grid16x16.bfg";   // Grid16x16: n= 256, m=480
+    //std::string file = "Grid8x8.bfg";   // Grid16x16: n= 64, m=224
     std::string filename= path + file;
     scai::lama::CSRSparseMatrix<ValueType> graph;
-    IndexType N;    //number of points
     
-    std::vector<DenseVector<ValueType>> dummyWeightContainer;
-    graph =  FileIO<IndexType, ValueType>::readGraphBinary(filename, dummyWeightContainer);
+    //std::vector<DenseVector<ValueType>> dummyWeightContainer;
+    graph =  FileIO<IndexType, ValueType>::readGraphBinary(filename);
     
+    //assertions
+    
+    //std::string txtFile= file.substr(0, file.length()-4);
+    std::string txtFile= "./meshes/trace/trace-00010.graph";
+    std::fstream f(txtFile);
+    if (f.fail()) {
+        throw std::runtime_error("Reading graph from " + filename + " failed.");
+    }
+    IndexType nodes, edges;
+    f>> nodes>> edges;
+    f.close();
+    
+    IndexType N = graph.getNumRows();
+    
+    if( N<1000){
+        SCAI_ASSERT( graph.checkSymmetry(), "Matrix not symmetric" );
+    }
+    SCAI_ASSERT( graph.isConsistent(), "Matrix not consistent" );
+    
+    SCAI_ASSERT_EQ_ERROR( N, nodes, "Mismatch in number of nodes read." );
+    SCAI_ASSERT_EQ_ERROR( N, graph.getNumColumns(), "Wrong number of rows and columns" );
+    
+    IndexType M = graph.getNumValues();
+    SCAI_ASSERT_EQ_ERROR( M, edges*2, "Mismatch in number of edges read." );
     
 }
 //-------------------------------------------------------------------------------------------------

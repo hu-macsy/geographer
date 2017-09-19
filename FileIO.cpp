@@ -249,6 +249,13 @@ void FileIO<IndexType, ValueType>::writePartition(const DenseVector<IndexType> &
 
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, Format format) {
+    
+        std::string ending = filename.substr( filename.size()-3,  filename.size() );
+PRINT(ending);        
+        if( ending == "bfg" ){
+            return readGraphBinary( filename );
+        }
+        
 	std::vector<DenseVector<ValueType>> dummyWeightContainer;
 	return readGraph(filename, dummyWeightContainer, format);
 }
@@ -442,9 +449,10 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     if (comm->sum(ja.size()) != 2*globalM) {
     	throw std::runtime_error("Expected " + std::to_string(2*globalM) + " edges, got " + std::to_string(comm->sum(ja.size())));
     }
-
+    
     //assign matrix
-    scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, ja.size(), scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
+    scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, ja.size(), 
+                scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
     		scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
     		scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
 
@@ -455,14 +463,15 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBinary(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights){
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBinary(const std::string filename){
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-typedef long int LI;
+    typedef unsigned long int ULONG;
 
     // root PE reads header and broadcasts information to the other PEs
-    std::vector<LI> header(3, 0);
+    IndexType headerSize = 3;   // as used in KaHiP::parallel_graph_io.cpp
+    std::vector<ULONG> header(headerSize, 0);
     bool success=false;
     
     if( comm->getRank()==0 ){
@@ -470,40 +479,154 @@ typedef long int LI;
         std::ifstream file(filename, std::ios::binary | std::ios::in);
         if(file) {
             success = true;
-            file.read((char*)(&header[0]), 3*sizeof(LI));
+            file.read((char*)(&header[0]), headerSize*sizeof(ULONG));
         }
         file.close();
-        SCAI_ASSERT( success, "Error while opening the file " << filename);
-ITI::aux::printVector( header );        
+        SCAI_ASSERT( success, "Error while opening the file " << filename); 
     }            
         
     //broadcast the header info
     comm->bcast( header.data(), 3, 0 );
     
-    LI version = header[0];
-    LI N = header[1];
-    LI M = header[2];
+    ULONG version = header[0];
+    ULONG globalN = header[1];
+    ULONG M = header[2];
     
+    IndexType localN;   
     
-    PRINT( *comm << ": version= " << version << ", N= " << N << ", M= " << M );
+    PRINT0( "version= " << version << ", N= " << globalN << ", M= " << M );
     
     if( version != fileTypeVersionNumber ) {
         PRINT0( "filetype version missmatch" );
-        //MPI_Finalize();
         exit(0);
     }
     
     // set like in KaHiP/parallel/prallel_src/app/configuration.h in configuration::standard
     IndexType binary_io_window_size = 64;   
+        
+    IndexType numPEs = comm->getSize();
     
-    IndexType window_size = std::min( binary_io_window_size, comm->getSize() );
+    IndexType window_size = std::min( binary_io_window_size, numPEs );
     IndexType lowPE =0;
     IndexType highPE = window_size;
     
+    IndexType thisPE = comm->getRank();
     
-    scai::lama::CSRSparseMatrix<ValueType> ret;
-    return ret;
     
+    std::vector<IndexType> ia;//(localN+1, 0);  localN is not known yet
+    std::vector<IndexType> ja;
+    std::vector<ValueType> values;
+    
+    
+    while( lowPE<numPEs ){
+        if( thisPE>=lowPE and thisPE<highPE){
+            std::ifstream file;
+            file.open(filename.c_str(), std::ios::binary | std::ios::in);
+
+            //
+            // set local range
+            //
+            IndexType beginLocalRange, endLocalRange;
+            scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, thisPE, numPEs );
+            localN = endLocalRange - beginLocalRange;
+            SCAI_ASSERT_LE_ERROR(localN, std::ceil(ValueType(globalN) / numPEs), "localN: " << localN << ", optSize: " << std::ceil(globalN / numPEs));
+            
+             std::cout << "Process " << thisPE << " reading from " << beginLocalRange << " to " << endLocalRange << ", in total, localN= " << localN << " nodes/lines" << std::endl;
+            
+             ia.resize( localN +1);
+             
+             //
+             // read the vertices offsets
+             //
+            
+            ULONG startPos = (headerSize+beginLocalRange)*(sizeof(ULONG));         
+            ULONG* vertexOffsets = new ULONG[localN+1];
+            file.seekg(startPos);
+            file.read( (char *)(vertexOffsets), (localN+1)*sizeof(ULONG) );
+          
+            //
+            // read the edges
+            //
+            ULONG edgeStartPos = vertexOffsets[0];
+
+            ULONG numReads = vertexOffsets[localN]-vertexOffsets[0];
+            ULONG numEdges = numReads/sizeof(ULONG);
+            ULONG* edges = new ULONG[numEdges];
+            file.seekg( edgeStartPos );
+            file.read( (char *)(edges), (numEdges)*sizeof(ULONG) );     
+
+            //
+            // construct CSRSparseMatrix
+            //
+            
+            IndexType pos = 0;
+            
+            bool hasEdgeWeights = false;
+            
+            for( IndexType i=0; i<localN; i++){
+                ULONG nodeDegree = (vertexOffsets[i+1]-vertexOffsets[i])/sizeof(ULONG);
+                SCAI_ASSERT ( nodeDegree>0, "Node with degree zero not allowed");
+                std::vector<ULONG> neighbors;
+                
+                for(ULONG j=0; j<nodeDegree; j++, pos++){
+                    SCAI_ASSERT_LE_ERROR(pos, numEdges, "Number of local non-zero values is greater than the total number of edges read.");
+                    
+                    ULONG neighbor = edges[pos];
+                    if (neighbor >= globalN || neighbor < 0) {
+                        throw std::runtime_error(std::string(__FILE__) +", "+std::to_string(__LINE__) + ": Found illegal neighbor " + std::to_string(neighbor) + " in line " + std::to_string(i+beginLocalRange));
+                    }
+                    
+                    neighbors.push_back(neighbor);
+                }
+                
+                //set Ia array
+                ia[i+1] = ia[i] + neighbors.size();
+                //copy neighbors to Ja array
+                std::copy(neighbors.begin(), neighbors.end(), std::back_inserter(ja));
+                if (hasEdgeWeights) {
+                    assert(ja.size() == values.size());
+                }
+            }
+            
+            // if no edge weight values vector is just 1s
+            if (!hasEdgeWeights) {
+                assert(values.size() == 0);
+                values.resize(ja.size(), 1);//unweighted edges
+            }
+            
+            assert(ja.size() == ia[localN]);
+            SCAI_ASSERT(comm->sum(localN) == globalN, "Sum " << comm->sum(localN) << " should be " << globalN);
+            
+            if (comm->sum(ja.size()) != M) {
+                throw std::runtime_error("Expected " + std::to_string(M) + " edges, got " + std::to_string(comm->sum(ja.size())));
+            }
+            
+            
+            delete[] vertexOffsets;
+            delete[] edges;
+            file.close();            
+        }
+
+        lowPE  += window_size;
+        highPE += window_size;
+        comm->synchronize();
+    }
+    
+    //
+    //assign matrix
+    //
+    
+    scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, ja.size(),   
+                scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
+    		scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
+    		scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
+    
+    // block distribution for rows and no distribution for columns
+    const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
+    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
+
+    return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
+
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1208,7 +1331,7 @@ template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<
 template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, const std::string filename);
 template void FileIO<int, double>::writeCoordsDistributed_2D (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
 template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::string filename, Format format);
-template scai::lama::CSRSparseMatrix<double> FileIO<int, double>::readGraphBinary(const std::string filename, std::vector<DenseVector<double>>& nodeWeights);
+template scai::lama::CSRSparseMatrix<double> FileIO<int, double>::readGraphBinary(const std::string filename);
 
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension, Format format);
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsOcean( std::string filename, int dimension );
