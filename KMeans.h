@@ -53,12 +53,7 @@ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const Settings settings) {
 	SCAI_REGION( "KMeans.computePartition" );
 
-	std::vector<DenseVector<ValueType> > scaled(coordinates.size());
-	for (IndexType d = 0; d < scaled.size(); d++) {
-		scaled[d] = DenseVector<ValueType>(coordinates[d]*8);
-	}
-
-	std::vector<std::vector<ValueType> > centers = findInitialCenters(scaled, k, nodeWeights);
+	std::vector<std::vector<ValueType> > centers = findInitialCenters(coordinates, k, nodeWeights);
 	std::vector<ValueType> influence(k,1);
 	const IndexType dim = coordinates.size();
 	assert(dim > 0);
@@ -73,7 +68,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<ValueType> maxCoords(dim);
 	std::vector<std::vector<ValueType> > convertedCoords(dim);
 	for (IndexType d = 0; d < dim; d++) {
-		scai::hmemo::ReadAccess<ValueType> rAccess(scaled[d].getLocalValues());
+		scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
 		assert(rAccess.size() == localN);
 		convertedCoords[d] = std::vector<ValueType>(rAccess.get(), rAccess.get()+localN);
 		assert(convertedCoords[d].size() == localN);
@@ -139,7 +134,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, settings);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
-		std::vector<std::vector<ValueType> > newCenters = findCenters(scaled, result, k, firstIndex, lastIndex, nodeWeights);
+		std::vector<std::vector<ValueType> > newCenters = findCenters(coordinates, result, k, firstIndex, lastIndex, nodeWeights);
 		std::vector<ValueType> squaredDeltas(k,0);
 		std::vector<ValueType> deltas(k,0);
 		for (IndexType j = 0; j < k; j++) {

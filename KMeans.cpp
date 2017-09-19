@@ -264,7 +264,6 @@ DenseVector<IndexType> assignBlocks(
 
 	ValueType imbalance;
 	IndexType iter = 0;
-	IndexType skippedLoops = 0;
 	std::vector<bool> influenceGrew(k);
 	std::vector<ValueType> influenceChangeUpperBound(k,1+settings.influenceChangeCap);
 	std::vector<ValueType> influenceChangeLowerBound(k,1-settings.influenceChangeCap);
@@ -274,6 +273,8 @@ DenseVector<IndexType> assignBlocks(
 	{
 		SCAI_REGION( "KMeans.assignBlocks.balanceLoop" );
 		std::vector<IndexType> blockWeights(k,0);
+		IndexType totalComps = 0;
+		IndexType skippedLoops = 0;
 		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
 		scai::hmemo::WriteAccess<IndexType> wAssignment(assignment.getLocalValues());
 		{
@@ -306,6 +307,7 @@ DenseVector<IndexType> assignBlocks(
 
 						IndexType c = 0;
 						while(c < k && secondBestValue > effectiveMinDistance[c]) {
+							totalComps++;
 							IndexType j = clusterIndices[c];//maybe it would be useful to sort the whole centers array, aligning memory accesses.
 							ValueType sqDist = 0;
 							//TODO: restructure arrays to align memory accesses better in inner loop
@@ -419,13 +421,16 @@ DenseVector<IndexType> assignBlocks(
 					ValueType weightedDist = sqDist * influence[j]*influence[l] / (influence[j]+influence[l]+2*std::sqrt(influence[j]*influence[l]));
 					if (weightedDist < distThreshold[j]) distThreshold[j] = weightedDist;
 				}
-
 			}
 		}
 
 		iter++;
-
-		if (comm->getRank() == 0) std::cout << "Iter " << iter << ", imbalance : " << imbalance << std::endl;
+		const IndexType currentLocalN = std::distance(firstIndex, lastIndex);
+		const IndexType takenLoops = currentLocalN - skippedLoops;
+		const ValueType averageComps = ValueType(totalComps) / currentLocalN;
+		auto oldprecision = std::cout.precision(3);
+		if (comm->getRank() == 0) std::cout << "Iter " << iter << ", taken loops: " << ValueType(takenLoops) / currentLocalN << ", average comparisons: " << averageComps << ", imbalance : " << imbalance << std::endl;
+		std::cout.precision(oldprecision);
 	} while (imbalance > settings.epsilon && iter < settings.balanceIterations);
 	//std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
 
