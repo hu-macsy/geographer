@@ -139,6 +139,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans")
                 Settings migrationSettings = settings;
                 migrationSettings.numBlocks = comm->getSize();
+                migrationSettings.epsilon = settings.epsilon;
                 
                 DenseVector<IndexType> tempResult;
                 
@@ -150,7 +151,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 } else if ( settings.initialMigration == InitialPartitioningMethods::KMeans){
                     DenseVector<ValueType> convertedWeights(nodeWeights);
                     std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );;
-                    tempResult = ITI::KMeans::computePartition(coordinates, migrationSettings.numBlocks, convertedWeights, migrationBlockSizes, settings.epsilon);
+                    tempResult = ITI::KMeans::computePartition(coordinates, migrationSettings.numBlocks, convertedWeights, migrationBlockSizes, migrationSettings);
                 }
 
                 nodeWeightCopy = DenseVector<ValueType>(nodeWeights, tempResult.getDistributionPtr());

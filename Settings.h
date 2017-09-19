@@ -1,5 +1,7 @@
 #pragma once
 
+#include "FileIO.h"
+
 #define STRINGIZER(arg)     #arg
 #define STR_VALUE(arg)      STRINGIZER(arg)
 #define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
@@ -19,7 +21,7 @@ struct Settings{
     //input data
     IndexType dimensions= 2;
     std::string fileName = "-";
-    IndexType fileFormat = 1;   // 0 for METIS, 4 for MatrixMarket
+    ITI::Format fileFormat = ITI::Format::METIS;   // 0 for METIS, 4 for MatrixMarket
     bool useDiffusionCoordinates = false;
     IndexType diffusionRounds = 20;
     std::vector<IndexType> blockSizes;
@@ -31,6 +33,7 @@ struct Settings{
 
     //general tuning parameters
     InitialPartitioningMethods initialPartition = InitialPartitioningMethods::SFC;
+    InitialPartitioningMethods initialMigration = InitialPartitioningMethods::SFC;
 
     //tuning parameters for local refinement
     IndexType minBorderNodes = 1;

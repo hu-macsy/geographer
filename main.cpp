@@ -67,7 +67,7 @@ namespace ITI {
 		return in;
 	}
 
-	std::ostream& operator<<(std::ostream& out, Format& method)
+	std::ostream& operator<<(std::ostream& out, Format method)
 	{
 		std::string token;
 
@@ -106,7 +106,7 @@ std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
     return in;
 }
 
-std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods& method)
+std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method)
 {
     std::string token;
 
