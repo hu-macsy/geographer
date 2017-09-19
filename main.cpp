@@ -220,8 +220,8 @@ int main(int argc, char** argv) {
         
         if( vm.count("initialMigration") ){
             IndexType tmp = static_cast<IndexType> (settings.initialMigration);
-            if( tmp!=0 or tmp!=3 or tmp!=4 ){
-                PRINT0("Initial migration supported only for 1:SFCs, 3:k-means or 4:MultiSection, invalid option " << tmp << " was given");
+            if( !(tmp==0 or tmp==3 or tmp==4) ){
+                PRINT0("Initial migration supported only for 0:SFCs, 3:k-means or 4:MultiSection, invalid option " << tmp << " was given");
                 return 126;
             }
         }
