@@ -137,9 +137,22 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             DenseVector<ValueType> nodeWeightCopy;
             if (settings.dimensions == 2 || settings.dimensions == 3) {
                 SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans")
-                Settings sfcSettings = settings;
-                sfcSettings.numBlocks = comm->getSize();
-                DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, sfcSettings);
+                Settings migrationSettings = settings;
+                migrationSettings.numBlocks = comm->getSize();
+                
+                DenseVector<IndexType> tempResult;
+                
+                if( settings.initialMigration == InitialPartitioningMethods::SFC){
+                    tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, migrationSettings);
+                } else if ( settings.initialMigration == InitialPartitioningMethods::Multisection){
+                    DenseVector<ValueType> convertedWeights(nodeWeights);
+                    tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, migrationSettings);
+                } else if ( settings.initialMigration == InitialPartitioningMethods::KMeans){
+                    DenseVector<ValueType> convertedWeights(nodeWeights);
+                    std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );;
+                    tempResult = ITI::KMeans::computePartition(coordinates, migrationSettings.numBlocks, convertedWeights, migrationBlockSizes, settings.epsilon);
+                }
+
                 nodeWeightCopy = DenseVector<ValueType>(nodeWeights, tempResult.getDistributionPtr());
                 coordinateCopy.resize(dimensions);
                 for (IndexType d = 0; d < dimensions; d++) {

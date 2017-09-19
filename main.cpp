@@ -133,7 +133,6 @@ int main(int argc, char** argv) {
 	struct Settings settings;
         
         std::string blockSizesFile;
-        
         ITI::Format coordFormat;
         
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -170,6 +169,7 @@ int main(int argc, char** argv) {
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 				("multiLevelRounds", value<int>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
                                 ("blockSizesFile", value<std::string>(&blockSizesFile) , " file to read the block sizes for every block")
+                                ("initialMigration", value<InitialPartitioningMethods>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration, 0: SFCs, 3:k-means, 4:Multisection")
 				;
 
 	variables_map vm;
@@ -203,6 +203,14 @@ int main(int argc, char** argv) {
 	if( vm.count("cutsPerDim") ){
             SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
             SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
+        }
+        
+        if( vm.count("initialMigration") ){
+            IndexType tmp = static_cast<IndexType> (settings.initialMigration);
+            if( tmp!=0 or tmp!=3 or tmp!=4 ){
+                PRINT0("Initial migration supported only for 1:SFCs, 3:k-means or 4:MultiSection, invalid option " << tmp << " was given");
+                return 126;
+            }
         }
 
     IndexType N = -1; 		// total number of points
