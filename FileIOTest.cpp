@@ -197,13 +197,14 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
 
     SCAI_REGION_START("testPartitionFromFile_local_2D.partition");
 
-        struct Settings Settings;
-        Settings.numBlocks= k;
-        Settings.epsilon = epsilon;
-        Settings.dimensions = dim;
-
+        struct Settings settings;
+        settings.numBlocks= k;
+        settings.epsilon = epsilon;
+        settings.dimensions = dim;
+        settings.minGainForNextRound = 10;
+        
         //partition the graph
-        scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D, Settings );
+        scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D, settings );
         EXPECT_EQ(partition.size(), N);
     SCAI_REGION_END("testPartitionFromFile_local_2D.partition");
 

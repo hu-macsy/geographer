@@ -42,7 +42,7 @@ TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
     // for now local refinement requires k = P
     IndexType k = comm->getSize();
     //
-    IndexType N =60;
+    IndexType N = 40;
     //CSRSparseMatrix<ValueType> graph(N, N);
     scai::lama::SparseAssemblyStorage<ValueType> graphSt(N, N);
     

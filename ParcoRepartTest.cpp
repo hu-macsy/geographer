@@ -100,7 +100,7 @@ TEST_F(ParcoRepartTest, testInitialPartition){
 //--------------------------------------------------------------------------------------- 
 
 TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
-  IndexType nroot = 19;
+  IndexType nroot = 11;
   IndexType n = nroot * nroot * nroot;
   IndexType dimensions = 3;
   
@@ -128,7 +128,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   settings.numBlocks= k;
   settings.epsilon = epsilon;
   settings.dimensions = dimensions;
-  settings.minGainForNextRound = 4;
+  settings.minGainForNextRound = 10;
       
   scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, settings);
 

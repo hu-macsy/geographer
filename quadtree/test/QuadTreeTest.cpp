@@ -268,7 +268,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
 TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
 
 	count n = 500;
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	vector<Point<double> > positions(n);
 	vector<index> content(n);
@@ -381,16 +381,17 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
         EXPECT_EQ(coordsDV[0].getLocalValues().size() , graph.getLocalNumRows() ); 
         
         const ValueType epsilon = 0.05;        
-        struct Settings Settings;
-        Settings.numBlocks= k;
-        Settings.epsilon = epsilon;
-        Settings.dimensions = 3;
+        struct Settings settings;
+        settings.numBlocks= k;
+        settings.epsilon = epsilon;
+        settings.dimensions = dimension;
+        settings.minGainForNextRound = 5;
         
-        EXPECT_EQ(coords[0].size(), N);
+        EXPECT_EQ( coords[0].size(), N);
 	EXPECT_EQ( graph.getNumRows(), N);
 	EXPECT_EQ( graph.getNumColumns(), N);
         
-        scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordsDV, Settings);
+        scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordsDV, settings);
 
         ParcoRepart<IndexType, ValueType> repart;
         const ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(partition, k);
@@ -643,20 +644,19 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         
         IndexType np = 3;
         scai::dmemo::DistributionPtr bestDist = dist;
-        //std::vector<scai::lama::DenseVector<IndexType>> pixelPartition(np);
-        scai::lama::DenseVector<IndexType> pixelPartition;
+        scai::lama::DenseVector<IndexType> sfcPartition;
         
         for(int detail= 0; detail<np; detail++){           
             settings.pixeledSideLen= std::pow( 2, detail + np );
-            pixelPartition = ITI::ParcoRepart<IndexType, ValueType>::pixelPartition(coordsDV, settings);
-            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( pixelPartition.getDistribution(), pixelPartition.getLocalValues() ) );
-            pixelPartition.redistribute(newDist);
+            sfcPartition = ITI::ParcoRepart<IndexType, ValueType>::hilbertPartition(coordsDV, settings);
+            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( sfcPartition.getDistribution(), sfcPartition.getLocalValues() ) );
+            sfcPartition.redistribute(newDist);
             graph.redistribute(newDist, noDist);
-            cut = GraphUtils::computeCut<IndexType, ValueType>(graph, pixelPartition, true);
+            cut = GraphUtils::computeCut<IndexType, ValueType>(graph, sfcPartition, true);
             if (cut<maxCut){
                 maxCut = cut;
                 bestPixelCut = detail;
-                bestDist = pixelPartition.getDistributionPtr();
+                bestDist = sfcPartition.getDistributionPtr();
             }
         }
         

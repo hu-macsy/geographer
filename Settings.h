@@ -20,7 +20,7 @@ struct Settings{
     IndexType dimensions= 2;
     std::string blockSizesFile = "-";
     std::string fileName = "-";
-    IndexType fileFormat = 1;   // 0 for METIS, 1 for MatrixMarket
+    IndexType fileFormat = 1;   // 0 for METIS, 4 for MatrixMarket
     bool useDiffusionCoordinates = false;
     IndexType diffusionRounds = 20;
     std::vector<IndexType> blockSizes;
@@ -55,7 +55,7 @@ struct Settings{
     bool tightenBounds = false;
 
     //parameters for multisection
-    bool bisect = 0;    // 0: works for square k, 1: bisect, for k=power of 2, 2: user defined cutsPerDim
+    bool bisect = 0;    // 0: works for square k, 1: bisect, for k=power of 2
     bool useExtent = false;
     std::vector<IndexType> cutsPerDim;
 
