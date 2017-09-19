@@ -83,6 +83,21 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	for (auto coord : maxCoords) std::cout << coord << " ";
 	std::cout << ")" << std::endl;
 
+	std::vector<ValueType> globalMinCoords(dim);
+	std::vector<ValueType> globalMaxCoords(dim);
+	comm->minImpl(globalMinCoords.data(), minCoords.data(), dim, scai::common::TypeTraits<ValueType>::stype);
+	comm->maxImpl(globalMaxCoords.data(), maxCoords.data(), dim, scai::common::TypeTraits<ValueType>::stype);
+
+	ValueType diagonalLength = 0;
+	ValueType volume = 1;
+	for (IndexType d = 0; d < dim; d++) {
+		const ValueType diff = globalMaxCoords[d] - globalMinCoords[d];
+		diagonalLength += diff*diff;
+		volume *= diff;
+	}
+	diagonalLength = std::sqrt(diagonalLength);
+	const ValueType expectedBlockDiameter = pow(volume / k, 1.0/dim);
+
 	DenseVector<IndexType> result(coordinates[0].getDistributionPtr(), 0);
 	std::vector<ValueType> upperBoundOwnCenter(localN, std::numeric_limits<ValueType>::max());
 	std::vector<ValueType> lowerBoundNextCenter(localN, 0);
@@ -93,7 +108,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();;
 	std::iota(firstIndex, lastIndex, 0);
 
-	IndexType minNodes = 100*blocksPerProcess;
+	IndexType minNodes = settings.minSamplingNodes*blocksPerProcess;
 	assert(minNodes > 0);
 	IndexType samplingRounds = 0;
 	std::vector<IndexType> samples;
@@ -120,7 +135,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	IndexType iter = 0;
 	ValueType delta = 0;
 	bool balanced = false;
-	const ValueType threshold = 5;
+	const ValueType threshold = 0.003*diagonalLength;
 	const IndexType maxIterations = settings.maxKMeansIterations;
 	do {
 
@@ -152,7 +167,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 				squaredDeltas[j] += diff*diff;
 			}
 			deltas[j] = std::sqrt(squaredDeltas[j]);
-			const ValueType erosionFactor = 2/(1+exp(-std::max((deltas[j]-5)/25, 0.0))) - 1;
+			const ValueType erosionFactor = 2/(1+exp(-std::max(deltas[j]/expectedBlockDiameter-0.1, 0.0))) - 1;
 			influence[j] = exp((1-erosionFactor)*log(influence[j]));//TODO: will only work for uniform target block sizes
 			if (oldInfluence[j] / influence[j] < minRatio) minRatio = oldInfluence[j] / influence[j];
 		}
