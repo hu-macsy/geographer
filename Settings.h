@@ -1,7 +1,5 @@
 #pragma once
 
-#include "FileIO.h"
-
 #define STRINGIZER(arg)     #arg
 #define STR_VALUE(arg)      STRINGIZER(arg)
 #define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
@@ -12,41 +10,62 @@ const std::string version = BUILD_COMMIT_STRING;
 
 enum class InitialPartitioningMethods {SFC = 0, Pixel = 1, Spectral = 2, KMeans = 3, Multisection = 4};
     
-//enum class fileFormat {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 };
 
 struct Settings{
+	//partition settings
+	IndexType numBlocks = 2;
+	double epsilon = 0.05;
+
+    //input data
     IndexType dimensions= 2;
-    IndexType numX = 32;
-    IndexType numY = 32;
-    IndexType numZ = 32;
-    IndexType numBlocks = 2;
+    std::string fileName = "-";
+    IndexType fileFormat = 1;   // 0 for METIS, 4 for MatrixMarket
+    bool useDiffusionCoordinates = false;
+    IndexType diffusionRounds = 20;
+    std::vector<IndexType> blockSizes;
+
+    //mesh generation
+	IndexType numX = 32;
+	IndexType numY = 32;
+	IndexType numZ = 32;
+
+    //general tuning parameters
+    InitialPartitioningMethods initialPartition = InitialPartitioningMethods::SFC;
+
+    //tuning parameters for local refinement
     IndexType minBorderNodes = 1;
     IndexType stopAfterNoGainRounds = 0;
     IndexType minGainForNextRound = 1;
-    IndexType sfcResolution = 17;
     IndexType numberOfRestarts = 0;
-    IndexType diffusionRounds = 20;
+    bool useDiffusionTieBreaking = false;
+    bool useGeometricTieBreaking = false;
+    bool gainOverBalance = false;
+    bool skipNoGainColors = false;
+
+    //tuning parameters for SFC
+    IndexType sfcResolution = 17;
+
+    //tuning parameters balanced K-Means
+    IndexType minSamplingNodes = 100;
+    double influenceExponent = 0.5;
+    double influenceChangeCap = 0.1;
+    IndexType balanceIterations = 20;
+    IndexType maxKMeansIterations = 50;
+    bool tightenBounds = false;
+
+    //parameters for multisection
+    bool bisect = 0;    // 0: works for square k, 1: bisect, for k=power of 2
+    bool useExtent = false;
+    std::vector<IndexType> cutsPerDim;
+
+    //tuning parameters for multiLevel heuristic
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
     IndexType pixeledSideLen = 10;
-    
-    ITI::Format fileFormat = ITI::Format::METIS;   // 1 for METIS, 4 for MatrixMarket, see FileIO.h
-    InitialPartitioningMethods initialPartition = InitialPartitioningMethods::SFC;
-    
-    bool bisect = 0;    // 0: works for square k, 1: bisect, for k=power of 2, 2: user defined cutsPerDim
-    bool useDiffusionTieBreaking = false;
-    bool useGeometricTieBreaking = false;
-    bool useDiffusionCoordinates = false;
-    bool gainOverBalance = false;
-    bool skipNoGainColors = false;
+
+    //debug parameters
     bool writeDebugCoordinates = false;
-    bool useExtent = false;
-    double epsilon = 0.05;
-    
-    //std::string fileName = "-";
-    std::vector<IndexType> cutsPerDim;
-    std::vector<IndexType> blockSizes;
-    
+
     void print(std::ostream& out){
         IndexType numPoints = numX* numY* numZ;
         

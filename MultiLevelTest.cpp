@@ -280,7 +280,7 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     Settings.coarseningStepsBetweenRefinement = 3;
     Settings.useGeometricTieBreaking = true;
     Settings.dimensions= 2;
-    Settings.minGainForNextRound =3;
+    Settings.minGainForNextRound = 10;
     
     scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, halo, Settings);

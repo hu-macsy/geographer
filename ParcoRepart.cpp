@@ -135,7 +135,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             //prepare coordinates for k-means
             std::vector<DenseVector<ValueType> > coordinateCopy;
             DenseVector<ValueType> nodeWeightCopy;
-            if (settings.dimensions == 2 || settings.dimensions == 3) {
+            if (comm->getSize() > 1 && (settings.dimensions == 2 || settings.dimensions == 3)) {
                 SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans")
                 Settings migrationSettings = settings;
                 migrationSettings.numBlocks = comm->getSize();
@@ -175,7 +175,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             SCAI_ASSERT( blockSizes.size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
 PRINT0("before k-means");            
             std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
-            result = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeightCopy, blockSizes, settings.epsilon);
+            result = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeightCopy, blockSizes, settings);
             std::chrono::duration<double> kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
             ValueType timeForInitPart = ValueType ( comm->max(kMeansTime.count() ));
             assert(result.getLocalValues().min() >= 0);
@@ -362,7 +362,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
 
         //fill with local values
         long indexSum = 0;//for sanity checks
-        scai::hmemo::ReadAccess<ValueType> localIndices(hilbertIndices.getLocalValues());
+        scai::hmemo::ReadAccess<ValueType> localIndices(hilbertIndices.getLocalValues());//Segfault happening here, likely due to stack overflow. TODO: fix
         for (IndexType i = 0; i < localN; i++) {
         	localPairs[i].value = localIndices[i];
         	localPairs[i].index = coordDist->local2global(i);

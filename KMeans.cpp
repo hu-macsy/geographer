@@ -186,11 +186,10 @@ DenseVector<IndexType> assignBlocks(
 		const DenseVector<IndexType> &previousAssignment,
 		const std::vector<IndexType> &targetBlockSizes,
 		const SpatialCell &boundingBox,
-		const ValueType epsilon,
-		const IndexType maxIter,
 		std::vector<ValueType> &upperBoundOwnCenter,
 		std::vector<ValueType> &lowerBoundNextCenter,
-		std::vector<ValueType> &influence) {
+		std::vector<ValueType> &influence,
+		Settings settings) {
 	SCAI_REGION( "KMeans.assignBlocks" );
 
 	const IndexType dim = coordinates.size();
@@ -267,8 +266,8 @@ DenseVector<IndexType> assignBlocks(
 	IndexType iter = 0;
 	IndexType skippedLoops = 0;
 	std::vector<bool> influenceGrew(k);
-	std::vector<ValueType> influenceChangeUpperBound(k,1.1);
-	std::vector<ValueType> influenceChangeLowerBound(k,0.9);
+	std::vector<ValueType> influenceChangeUpperBound(k,1+settings.influenceChangeCap);
+	std::vector<ValueType> influenceChangeLowerBound(k,1-settings.influenceChangeCap);
 
 	//iterate if necessary to achieve balance
 	do
@@ -347,7 +346,7 @@ DenseVector<IndexType> assignBlocks(
 			comm->synchronize();
 		}
 
-		if (iter == maxIter) continue;
+		if (iter == settings.balanceIterations) continue;
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.blockWeightSum" );
 			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<IndexType>::stype);
@@ -362,7 +361,7 @@ DenseVector<IndexType> assignBlocks(
 		for (IndexType j = 0; j < k; j++) {
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.influence" );
 			double ratio = ValueType(blockWeights[j]) / targetBlockSizes[j];
-			influence[j] = std::max(influence[j]*influenceChangeLowerBound[j], std::min(influence[j] * std::pow(ratio, 0.5), influence[j]*influenceChangeUpperBound[j]));
+			influence[j] = std::max(influence[j]*influenceChangeLowerBound[j], std::min(influence[j] * std::pow(ratio, settings.influenceExponent), influence[j]*influenceChangeUpperBound[j]));
 			assert(influence[j] > 0);
 
 			double influenceRatio = influence[j] / oldInfluence[j];
@@ -371,10 +370,10 @@ DenseVector<IndexType> assignBlocks(
 			if (influenceRatio < minRatio) minRatio = influenceRatio;
 			if (influenceRatio > maxRatio) maxRatio = influenceRatio;
 
-			if (iter > 0 && (bool(ratio > 1) != influenceGrew[j])) {
+			if (settings.tightenBounds && iter > 0 && (bool(ratio > 1) != influenceGrew[j])) {
 				//influence change switched direction
-				//influenceChangeUpperBound[j] = 0.1 + 0.9*influenceChangeUpperBound[j];
-				//influenceChangeLowerBound[j] = 0.1 + 0.9*influenceChangeLowerBound[j];
+				influenceChangeUpperBound[j] = 0.1 + 0.9*influenceChangeUpperBound[j];
+				influenceChangeLowerBound[j] = 0.1 + 0.9*influenceChangeLowerBound[j];
 				//if (comm->getRank() == 0) std::cout << "Block " << j << ": reduced bounds to " << influenceChangeUpperBound[j] << " and " << influenceChangeLowerBound[j] << std::endl;
 				assert(influenceChangeUpperBound[j] > 1);
 				assert(influenceChangeLowerBound[j] < 1);
@@ -427,7 +426,7 @@ DenseVector<IndexType> assignBlocks(
 		iter++;
 
 		if (comm->getRank() == 0) std::cout << "Iter " << iter << ", imbalance : " << imbalance << std::endl;
-	} while (imbalance > epsilon && iter < maxIter);
+	} while (imbalance > settings.epsilon && iter < settings.balanceIterations);
 	//std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
 
 	return assignment;
@@ -439,7 +438,7 @@ template std::vector<std::vector<double> > findCenters(const std::vector<DenseVe
 template DenseVector<int> assignBlocks(const std::vector<std::vector<double>> &coordinates, const std::vector<std::vector<double> > &centers,
 		std::vector<int>::iterator firstIndex, std::vector<int>::iterator lastIndex,
 		const DenseVector<double> &nodeWeights, const DenseVector<int> &previousAssignment, const std::vector<int> &blockSizes, const SpatialCell &boundingBox,
-		const double epsilon, const int maxIter, std::vector<double> &upperBoundOwnCenter, std::vector<double> &lowerBoundNextCenter, std::vector<double> &influence);
+		std::vector<double> &upperBoundOwnCenter, std::vector<double> &lowerBoundNextCenter, std::vector<double> &influence, Settings settings);
 template DenseVector<int> assignBlocks(const std::vector<DenseVector<double> >& coordinates, const std::vector<std::vector<double> >& centers);
 
 }
