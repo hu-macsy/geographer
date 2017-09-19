@@ -149,7 +149,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                     DenseVector<ValueType> convertedWeights(nodeWeights);
                     tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, migrationSettings);
                 } else if ( settings.initialMigration == InitialPartitioningMethods::KMeans){
-                    DenseVector<ValueType> convertedWeights(nodeWeights);
+                    DenseVector<ValueType> convertedWeights(nodeWeights.size(), 1);
                     std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );;
                     tempResult = ITI::KMeans::computePartition(coordinates, migrationSettings.numBlocks, convertedWeights, migrationBlockSizes, migrationSettings);
                 }
