@@ -448,7 +448,7 @@ DenseVector<IndexType> assignBlocks(
 				<< averageComps << ", balanced blocks: " << 100*ValueType(balancedBlocks) / k << "%, influence spread: " << influenceSpread
 				<< ", imbalance : " << imbalance << std::endl;
 		std::cout.precision(oldprecision);
-	} while (imbalance > settings.epsilon && iter < settings.balanceIterations);
+	} while (imbalance > settings.epsilon - 1e-12 && iter < settings.balanceIterations);
 	//std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
 
 	return assignment;

@@ -106,6 +106,10 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		samples[0] = minNodes;
 	}
 
+	if (samplingRounds > 0) {
+		if (comm->getRank() == 0) std::cout << "Starting with " << samplingRounds << " sampling rounds." << std::endl;
+	}
+
 	for (IndexType i = 1; i < samplingRounds; i++) {
 		samples[i] = std::min(IndexType(samples[i-1]*2), localN);
 	}
@@ -148,8 +152,8 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 				squaredDeltas[j] += diff*diff;
 			}
 			deltas[j] = std::sqrt(squaredDeltas[j]);
-			const ValueType erosionFactor = 1/(1+exp(-deltas[j]/100));
-			influence[j] = (1-erosionFactor)*influence[j] + erosionFactor;//TODO: will only work for uniform target block sizes
+			const ValueType erosionFactor = 2/(1+exp(-std::max((deltas[j]-5)/25, 0.0))) - 1;
+			influence[j] = exp((1-erosionFactor)*log(influence[j]));//TODO: will only work for uniform target block sizes
 			if (oldInfluence[j] / influence[j] < minRatio) minRatio = oldInfluence[j] / influence[j];
 		}
 
