@@ -53,6 +53,7 @@ struct Settings{
     IndexType balanceIterations = 20;
     IndexType maxKMeansIterations = 50;
     bool tightenBounds = false;
+    bool freezeBalancedInfluence = false;
 
     //parameters for multisection
     bool bisect = 0;    // 0: works for square k, 1: bisect, for k=power of 2, 2: user defined cutsPerDim

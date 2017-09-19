@@ -361,14 +361,22 @@ DenseVector<IndexType> assignBlocks(
 
 		double minRatio = std::numeric_limits<double>::max();
 		double maxRatio = -std::numeric_limits<double>::min();
+
 		for (IndexType j = 0; j < k; j++) {
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.influence" );
 			double ratio = ValueType(blockWeights[j]) / targetBlockSizes[j];
-			influence[j] = std::max(influence[j]*influenceChangeLowerBound[j], std::min(influence[j] * std::pow(ratio, settings.influenceExponent), influence[j]*influenceChangeUpperBound[j]));
-			assert(influence[j] > 0);
+
 			if (std::abs(ratio - 1) < settings.epsilon) {
 				balancedBlocks++;
+				if (settings.freezeBalancedInfluence) {
+					if (1 < minRatio) minRatio = 1;
+					if (1 > maxRatio) maxRatio = 1;
+					continue;
+				}
 			}
+
+			influence[j] = std::max(influence[j]*influenceChangeLowerBound[j], std::min(influence[j] * std::pow(ratio, settings.influenceExponent), influence[j]*influenceChangeUpperBound[j]));
+			assert(influence[j] > 0);
 
 			double influenceRatio = influence[j] / oldInfluence[j];
 			assert(influenceRatio <= influenceChangeUpperBound[j] + 1e-10);
@@ -394,7 +402,7 @@ DenseVector<IndexType> assignBlocks(
 				const IndexType i = *it;
 				const IndexType cluster = wAssignment[i];
 				upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]) + 1e-12;
-				lowerBoundNextCenter[i] *= minRatio - 1e-12;
+				lowerBoundNextCenter[i] *= minRatio - 1e-12;//TODO: compute separate min ratio with respect to bounding box, only update that.
 			}
 		}
 
@@ -432,9 +440,13 @@ DenseVector<IndexType> assignBlocks(
 		const IndexType currentLocalN = std::distance(firstIndex, lastIndex);
 		const IndexType takenLoops = currentLocalN - skippedLoops;
 		const ValueType averageComps = ValueType(totalComps) / currentLocalN;
+		double minInfluence, maxInfluence;
+		auto pair = std::minmax_element(influence.begin(), influence.end());
+		const ValueType influenceSpread = *pair.second / *pair.first;
 		auto oldprecision = std::cout.precision(3);
 		if (comm->getRank() == 0) std::cout << "Iter " << iter << ", loop: " << 100*ValueType(takenLoops) / currentLocalN << "%, average comparisons: "
-				<< averageComps << ", balanced blocks: " << 100*ValueType(balancedBlocks) / k << "%, imbalance : " << imbalance << std::endl;
+				<< averageComps << ", balanced blocks: " << 100*ValueType(balancedBlocks) / k << "%, influence spread: " << influenceSpread
+				<< ", imbalance : " << imbalance << std::endl;
 		std::cout.precision(oldprecision);
 	} while (imbalance > settings.epsilon && iter < settings.balanceIterations);
 	//std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;

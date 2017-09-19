@@ -131,30 +131,43 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 			assert(lastIndex == localIndices.end());
 		}
 
-		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, settings);
+		Settings balanceSettings = settings;
+		//balanceSettings.balanceIterations = 0;//iter >= samplingRounds ? settings.balanceIterations : 0;
+		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, balanceSettings);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
 		std::vector<std::vector<ValueType> > newCenters = findCenters(coordinates, result, k, firstIndex, lastIndex, nodeWeights);
 		std::vector<ValueType> squaredDeltas(k,0);
 		std::vector<ValueType> deltas(k,0);
+		std::vector<ValueType> oldInfluence = influence;
+		ValueType minRatio = std::numeric_limits<double>::max();
+
 		for (IndexType j = 0; j < k; j++) {
 			for (int d = 0; d < dim; d++) {
 				ValueType diff = (centers[d][j] - newCenters[d][j]);
 				squaredDeltas[j] += diff*diff;
 			}
 			deltas[j] = std::sqrt(squaredDeltas[j]);
+			const ValueType erosionFactor = 1/(1+exp(-deltas[j]/100));
+			influence[j] = (1-erosionFactor)*influence[j] + erosionFactor;//TODO: will only work for uniform target block sizes
+			if (oldInfluence[j] / influence[j] < minRatio) minRatio = oldInfluence[j] / influence[j];
 		}
 
 		delta = *std::max_element(deltas.begin(), deltas.end());
 		const double deltaSq = delta*delta;
-		double maxInfluence = *std::max_element(influence.begin(), influence.end());
-		double minInfluence = *std::min_element(influence.begin(), influence.end());
+		const double maxInfluence = *std::max_element(influence.begin(), influence.end());
+		const double minInfluence = *std::min_element(influence.begin(), influence.end());
 
 		{
 			SCAI_REGION( "KMeans.computePartition.updateBounds" );
 			for (auto it = firstIndex; it != lastIndex; it++) {
 				const IndexType i = *it;
 				IndexType cluster = rResult[i];
+				//update due to erosion
+				upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]) + 1e-12;
+				lowerBoundNextCenter[i] *= minRatio - 1e-12;
+
+				//update due to delta
 				upperBoundOwnCenter[i] += (2*deltas[cluster]*std::sqrt(upperBoundOwnCenter[i]/influence[cluster]) + squaredDeltas[cluster])*(influence[cluster] + 1e-10);
 				ValueType pureSqrt(std::sqrt(lowerBoundNextCenter[i]/maxInfluence));
 				if (pureSqrt < delta) {
