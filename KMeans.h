@@ -134,7 +134,11 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	for (IndexType i = 1; i < samplingRounds; i++) {
 		samples[i] = std::min(IndexType(samples[i-1]*2), localN);
 	}
-	assert(samples[samplingRounds-1] == localN);
+
+	if (samplingRounds > 0) {
+		assert(samples[samplingRounds-1] == localN);
+	}
+
 
 	scai::hmemo::ReadAccess<ValueType> rWeight(nodeWeights.getLocalValues());
 
