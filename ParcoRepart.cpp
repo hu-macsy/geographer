@@ -133,8 +133,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         } else if (settings.initialPartition == InitialPartitioningMethods::KMeans) {
             PRINT0("Initial partition with K-Means");
             //prepare coordinates for k-means
-            std::vector<DenseVector<ValueType> > coordinateCopy;
-            DenseVector<ValueType> nodeWeightCopy;
+            std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
+            DenseVector<ValueType> nodeWeightCopy = nodeWeights;
             if (comm->getSize() > 1 && (settings.dimensions == 2 || settings.dimensions == 3)) {
                 SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans")
                 Settings migrationSettings = settings;
@@ -154,14 +154,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                     tempResult = ITI::KMeans::computePartition(coordinates, migrationSettings.numBlocks, convertedWeights, migrationBlockSizes, migrationSettings);
                 }
 
-                nodeWeightCopy = DenseVector<ValueType>(nodeWeights, tempResult.getDistributionPtr());
-                coordinateCopy.resize(dimensions);
+                scai::dmemo::Redistributor prepareRedist(tempResult.getDistributionPtr(), nodeWeights.getDistributionPtr());
+                nodeWeightCopy.redistribute(prepareRedist);
                 for (IndexType d = 0; d < dimensions; d++) {
-                    coordinateCopy[d] = DenseVector<ValueType>(coordinates[d], tempResult.getDistributionPtr());
+                    coordinateCopy[d].redistribute(prepareRedist);
                 }
-            } else {
-                coordinateCopy = coordinates;
-                nodeWeightCopy = nodeWeights;
             }
             
             const IndexType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
@@ -210,7 +207,7 @@ PRINT0("after k-means");
 			 * redistribute to prepare for local refinement
 			 */
 			scai::dmemo::Redistributor resultRedist(result.getLocalValues(), result.getDistributionPtr());
-			result.redistribute(resultRedist);
+			result = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
 
 			scai::dmemo::Redistributor redistributor(resultRedist.getTargetDistributionPtr(), input.getRowDistributionPtr());
 			input.redistribute(redistributor, noDist);
