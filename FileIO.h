@@ -70,7 +70,7 @@ public:
         
         static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
 
-    /**
+        /**
 	 * Writes a partition to file.
 	 * @param[in] part
 	 * @param[in] filename The file's name to write to
@@ -103,6 +103,12 @@ public:
 	 */
 	static std::vector<DenseVector<ValueType>> readCoords ( std::string filename, IndexType numberOfCoords, IndexType dimension, Format = Format::METIS);
 
+        /**
+         * 
+         */
+        static std::vector<DenseVector<ValueType>> readCoordsBinary( std::string filename, IndexType numberOfPoints, IndexType dimension);
+        
+        
 	/*
 	 *
 	 */

@@ -400,7 +400,7 @@ TEST_F(FileIOTest, testWriteCoordsParallel){
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     
-    std::string outFilename = std::string( file+"parallel.xyz");
+    std::string outFilename = std::string( file+"_parallel.xyz");
     
     FileIO<IndexType, ValueType>::writeCoordsParallel( coords, outFilename);
     

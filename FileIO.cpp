@@ -190,7 +190,7 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVe
     const IndexType globalN = coordDist->getGlobalSize();
     const IndexType localN = coordDist->getLocalSize();
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    const numPEs = comm->getSize();
+    const IndexType numPEs = comm->getSize();
     
     IndexType beginLocalRange, endLocalRange;
     scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
@@ -199,18 +199,18 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVe
     SCAI_ASSERT_EQ_ERROR( localN, endLocalRange-beginLocalRange, "Local ranges do not agree");
     
     // copy coords to a local vector<vector>
-    std::vector< std::vector<IndexType>> localPartOfCoords( localN, std::vector<IndexType>( dimensions, 0) );
+    std::vector< std::vector<IndexType>> localPartOfCoords( localN, std::vector<IndexType>( dimension, 0) );
     
     for(IndexType d=0; d<dimension; d++){
-        scai::hmemo::ReadAccess<ValueType> localCoords( coordinates[d].getLocalValues() );
+        scai::hmemo::ReadAccess<ValueType> localCoords( coords[d].getLocalValues() );
         for( IndexType i=0; i<localN; i++){
-            localPartOfCoords[i][d] localCoords[i];
+            localPartOfCoords[i][d] = localCoords[i];
         }
     }
     
     std::ofstream outfile;
     
-    for(IndexType p=0; p<numPes; p++){  // numPE rounds, in each round only one PE writes its part
+    for(IndexType p=0; p<numPEs; p++){  // numPE rounds, in each round only one PE writes its part
         if( comm->getRank()==p ){ 
             if( p==0 ){
                 outfile.open(outFilename.c_str(), std::ios::binary | std::ios::out);
@@ -226,7 +226,6 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVe
         }
         comm->synchronize();
     }
-    
     
 }
 //-------------------------------------------------------------------------------------------------
@@ -917,6 +916,78 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 
     return result;
 }
+
+//-------------------------------------------------------------------------------------------------
+/*File "filename" contains the coordinates of a graph. The function reads these coordinates and returns a vector of DenseVectors, one for each dimension
+ */
+template<typename IndexType, typename ValueType>
+std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBinary( std::string filename, IndexType numberOfPoints, IndexType dimension){
+    SCAI_REGION( "FileIO.readCoordsBinary" );
+
+    IndexType globalN= numberOfPoints;
+    std::ifstream file(filename);
+
+    if(file.fail())
+        throw std::runtime_error("File "+ filename+ " failed.");
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
+    
+    IndexType beginLocalRange, endLocalRange;
+    scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
+    const IndexType localN = endLocalRange - beginLocalRange;
+
+    //scroll forward to begin of local range
+    std::string line;
+    for (IndexType i = 0; i < beginLocalRange; i++) {
+    	std::getline(file, line);
+    }
+
+    //create result vector
+    std::vector<scai::utilskernel::LArray<ValueType> > coords(dimension);
+    for (IndexType dim = 0; dim < dimension; dim++) {
+    	coords[dim] = scai::utilskernel::LArray<ValueType>(localN, 0);
+    }
+
+    //read local range
+    for (IndexType i = 0; i < localN; i++) {
+		bool read = !std::getline(file, line).fail();
+		if (!read) {
+			throw std::runtime_error("Unexpected end of coordinate file. Was the number of nodes correct?");
+		}
+		std::stringstream ss( line );
+		std::string item;
+
+		IndexType dim = 0;
+		while (dim < dimension) {
+			bool read = !std::getline(ss, item, ' ').fail();
+			if (!read or item.size() == 0) {
+				throw std::runtime_error("Unexpected end of line. Was the number of dimensions correct?");
+			}
+			ValueType coord = std::stod(item);
+			coords[dim][i] = coord;
+			dim++;
+		}
+		if (dim < dimension) {
+			throw std::runtime_error("Only " + std::to_string(dim - 1)  + " values found, but " + std::to_string(dimension) + " expected in line '" + line + "'");
+		}
+    }
+
+    if (endLocalRange == globalN) {
+    	bool eof = std::getline(file, line).eof();
+    	if (!eof) {
+    		throw std::runtime_error(std::to_string(numberOfPoints) + " coordinates read, but file continues.");
+    	}
+    }
+
+    std::vector<DenseVector<ValueType> > result(dimension);
+
+    for (IndexType i = 0; i < dimension; i++) {
+        result[i] = DenseVector<ValueType>(dist, coords[i] );
+    }
+
+    return result;
+}
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
@@ -1392,6 +1463,7 @@ template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::strin
 template scai::lama::CSRSparseMatrix<double> FileIO<int, double>::readGraphBinary(const std::string filename);
 
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension, Format format);
+template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsBinary( std::string filename, int numberOfPoints, int dimension);
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsOcean( std::string filename, int dimension );
 template CSRSparseMatrix<double>  FileIO<int, double>::readQuadTree( std::string filename, std::vector<DenseVector<double>> &coords );
 template std::pair<int, int> FileIO<int, double>::getMatrixMarketCoordsInfos(const std::string filename);
