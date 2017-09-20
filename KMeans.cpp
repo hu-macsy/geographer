@@ -11,13 +11,91 @@
 #include <algorithm>
 
 #include <scai/dmemo/NoDistribution.hpp>
+#include <scai/dmemo/GenBlockDistribution.hpp>
 
 #include "KMeans.h"
+#include "HilbertCurve.h"
 
 namespace ITI {
 namespace KMeans {
 
 using scai::lama::Scalar;
+
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<ValueType> > findInitialCentersSFC(
+		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords,
+		const std::vector<ValueType> &maxCoords, Settings settings) {
+
+	SCAI_REGION( "KMeans.findInitialCentersSFC" );
+	const IndexType localN = coordinates[0].getLocalValues().size();
+	const IndexType globalN = coordinates[0].size();
+
+	//convert coordinates, switch inner and outer order
+	std::vector<std::vector<ValueType> > convertedCoords(localN);
+	for (IndexType i = 0; i < localN; i++) {
+		convertedCoords[i].resize(settings.dimensions);
+	}
+
+	for (IndexType d = 0; d < settings.dimensions; d++) {
+		scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
+		assert(rAccess.size() == localN);
+		for (IndexType i = 0; i < localN; i++) {
+			convertedCoords[i][d] = rAccess[i];
+		}
+	}
+
+	//get local hilbert indices
+	std::vector<ValueType> sfcIndices(localN);
+	for (IndexType i = 0; i < localN; i++) {
+		sfcIndices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(convertedCoords[i].data(), settings.dimensions, settings.sfcResolution, minCoords, maxCoords);
+	}
+
+	//prepare indices for sorting
+	std::vector<IndexType> localIndices(localN);
+	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
+	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();;
+	std::iota(firstIndex, lastIndex, 0);
+
+	//sort local indices according to SFC
+	std::sort(localIndices.begin(), localIndices.end(), [&sfcIndices](IndexType a, IndexType b){return sfcIndices[a] < sfcIndices[b];});
+
+	//compute wanted indices for initial centers
+	std::vector<IndexType> wantedIndices(k);
+
+	for (IndexType i = 0; i < k; i++) {
+		wantedIndices[i] = i * (globalN / k) + (globalN / k)/2;
+	}
+
+	//setup general block distribution to model the space-filling curve
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
+
+	//set local values in vector, leave non-local values with zero
+	std::vector<std::vector<ValueType> > result(settings.dimensions);
+	for (IndexType d = 0; d < settings.dimensions; d++) {
+		result[d].resize(k);
+	}
+
+	for (IndexType j = 0; j < k; j++) {
+		IndexType localIndex = blockDist->global2local(wantedIndices[j]);
+		if (localIndex != nIndex) {
+			assert(localIndex < localN);
+			IndexType permutedIndex = localIndices[localIndex];
+			assert(permutedIndex < localN);
+			assert(permutedIndex >= 0);
+			for (IndexType d = 0; d < settings.dimensions; d++) {
+				result[d][j] = convertedCoords[permutedIndex][d];
+			}
+		}
+	}
+
+	//global sum operation
+	for (IndexType d = 0; d < settings.dimensions; d++) {
+		comm->sumImpl(result[d].data(), result[d].data(), k, scai::common::TypeTraits<ValueType>::stype);
+	}
+
+	return result;
+}
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCenters(
@@ -454,6 +532,8 @@ DenseVector<IndexType> assignBlocks(
 	return assignment;
 }
 
+template std::vector<std::vector<double> > findInitialCentersSFC( const std::vector<DenseVector<double> >& coordinates, int k, const std::vector<double> &minCoords,
+	const std::vector<double> &maxCoords, Settings settings);
 template std::vector<std::vector<double> > findInitialCenters(const std::vector<DenseVector<double>> &coordinates, int k, const DenseVector<double> &nodeWeights);
 template std::vector<std::vector<double> > findCenters(const std::vector<DenseVector<double>> &coordinates, const DenseVector<int> &partition, const int k,
 		std::vector<int>::iterator firstIndex, std::vector<int>::iterator lastIndex, const DenseVector<double> &nodeWeights);

@@ -26,6 +26,11 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		const std::vector<IndexType> &blockSizes, const Settings settings);
 
 template<typename IndexType, typename ValueType>
+std::vector<std::vector<ValueType> >  findInitialCentersSFC(
+		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords,
+		const std::vector<ValueType> &maxCoords, Settings settings);
+
+template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCenters(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights);
 
 template<typename IndexType, typename ValueType, typename Iterator>
@@ -53,7 +58,6 @@ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const Settings settings) {
 	SCAI_REGION( "KMeans.computePartition" );
 
-	std::vector<std::vector<ValueType> > centers = findInitialCenters(coordinates, k, nodeWeights);
 	std::vector<ValueType> influence(k,1);
 	const IndexType dim = coordinates.size();
 	assert(dim > 0);
@@ -75,6 +79,8 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		minCoords[d] = *std::min_element(convertedCoords[d].begin(), convertedCoords[d].end());
 		maxCoords[d] = *std::max_element(convertedCoords[d].begin(), convertedCoords[d].end());
 	}
+
+	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
 
 	QuadNodeCartesianEuclid boundingBox(minCoords, maxCoords);
 	std::cout << "Process " << comm->getRank() << ": ( ";
@@ -167,9 +173,11 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 				squaredDeltas[j] += diff*diff;
 			}
 			deltas[j] = std::sqrt(squaredDeltas[j]);
-			const ValueType erosionFactor = 2/(1+exp(-std::max(deltas[j]/expectedBlockDiameter-0.1, 0.0))) - 1;
-			influence[j] = exp((1-erosionFactor)*log(influence[j]));//TODO: will only work for uniform target block sizes
-			if (oldInfluence[j] / influence[j] < minRatio) minRatio = oldInfluence[j] / influence[j];
+			if (settings.erodeInfluence) {
+				const ValueType erosionFactor = 2/(1+exp(-std::max(deltas[j]/expectedBlockDiameter-0.1, 0.0))) - 1;
+				influence[j] = exp((1-erosionFactor)*log(influence[j]));//TODO: will only work for uniform target block sizes
+				if (oldInfluence[j] / influence[j] < minRatio) minRatio = oldInfluence[j] / influence[j];
+			}
 		}
 
 		delta = *std::max_element(deltas.begin(), deltas.end());
@@ -182,9 +190,12 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 			for (auto it = firstIndex; it != lastIndex; it++) {
 				const IndexType i = *it;
 				IndexType cluster = rResult[i];
-				//update due to erosion
-				upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]) + 1e-12;
-				lowerBoundNextCenter[i] *= minRatio - 1e-12;
+
+				if (settings.erodeInfluence) {
+					//update due to erosion
+					upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]) + 1e-12;
+					lowerBoundNextCenter[i] *= minRatio - 1e-12;
+				}
 
 				//update due to delta
 				upperBoundOwnCenter[i] += (2*deltas[cluster]*std::sqrt(upperBoundOwnCenter[i]/influence[cluster]) + squaredDeltas[cluster])*(influence[cluster] + 1e-10);
