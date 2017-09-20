@@ -312,23 +312,6 @@ DenseVector<IndexType> assignBlocks(
 		SCAI_ASSERT_LT_ERROR( std::abs(effectiveMinDistance[i] - effectiveDist), 1e-5, "effectiveMinDistance[" << i << "] = " << effectiveMinDistance[i] << " != " << effectiveDist << " = effectiveDist");
 	}
 
-	std::vector<ValueType> distThreshold(k);
-	{
-		SCAI_REGION( "KMeans.assignBlocks.pairWise" );
-		for (IndexType j = 0; j < k; j++) {
-			distThreshold[j] = std::numeric_limits<ValueType>::max();
-			for (IndexType l = 0; l < k; l++) {
-				if (j == l) continue;
-				ValueType sqDist = 0;
-				for (IndexType d = 0; d < dim; d++) {
-					sqDist += std::pow(centers[d][j] - centers[d][l], 2);
-				}
-				ValueType weightedDist = sqDist * influence[j]*influence[l] / (influence[j]+influence[l]+2*std::sqrt(influence[j]*influence[l]));
-				if (weightedDist < distThreshold[j]) distThreshold[j] = weightedDist;
-			}
-		}
-	}
-
 	ValueType localSampleWeightSum = 0;
 	{
 		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
@@ -361,7 +344,7 @@ DenseVector<IndexType> assignBlocks(
 			for (Iterator it = firstIndex; it != lastIndex; it++) {
 				const IndexType i = *it;
 				const IndexType oldCluster = wAssignment[i];
-				if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i] || upperBoundOwnCenter[i] < distThreshold[oldCluster]) {
+				if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i]) {
 					//std::cout << upperBoundOwnCenter[i] << " " << lowerBoundNextCenter[i] << " " << distThreshold[oldCluster] << std::endl;
 					//cluster assignment cannot have changed.
 					//wAssignment[i] = wAssignment[i];
@@ -374,7 +357,7 @@ DenseVector<IndexType> assignBlocks(
 					ValueType newEffectiveDistance = sqDistToOwn*influence[oldCluster];
 					assert(upperBoundOwnCenter[i] >= newEffectiveDistance);
 					upperBoundOwnCenter[i] = newEffectiveDistance;
-					if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i] || upperBoundOwnCenter[i] < distThreshold[oldCluster]) {
+					if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i]) {
 						//cluster assignment cannot have changed.
 						//wAssignment[i] = wAssignment[i];
 						skippedLoops++;
@@ -495,23 +478,6 @@ DenseVector<IndexType> assignBlocks(
 						[&effectiveMinDistance](IndexType a, IndexType b){return effectiveMinDistance[a] < effectiveMinDistance[b] || (effectiveMinDistance[a] == effectiveMinDistance[b] && a < b);});
 			std::sort(effectiveMinDistance.begin(), effectiveMinDistance.end());
 
-		}
-
-		{
-			SCAI_REGION( "KMeans.assignBlocks.pairWise" );
-			for (IndexType j = 0; j < k; j++) {
-				distThreshold[j] = std::numeric_limits<ValueType>::max();
-
-				for (IndexType l = 0; l < k; l++) {
-					if (j == l) continue;
-					ValueType sqDist = 0;
-					for (IndexType d = 0; d < dim; d++) {
-						sqDist += std::pow(centers[d][j] - centers[d][l], 2);
-					}
-					ValueType weightedDist = sqDist * influence[j]*influence[l] / (influence[j]+influence[l]+2*std::sqrt(influence[j]*influence[l]));
-					if (weightedDist < distThreshold[j]) distThreshold[j] = weightedDist;
-				}
-			}
 		}
 
 		iter++;
