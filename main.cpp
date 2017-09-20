@@ -183,7 +183,8 @@ int main(int argc, char** argv) {
 				("influenceChangeCap", value<double>(&settings.influenceChangeCap)->default_value(settings.influenceChangeCap), "Tuning parameter for K-Means")
 				("balanceIterations", value<int>(&settings.balanceIterations)->default_value(settings.balanceIterations), "Tuning parameter for K-Means")
 				("maxKMeansIterations", value<int>(&settings.maxKMeansIterations)->default_value(settings.maxKMeansIterations), "Tuning parameter for K-Means")
-				("tightenBounds", value<bool>(&settings.tightenBounds)->default_value(settings.tightenBounds), "Tuning parameter for K-Means")
+				("tightenBounds", "Tuning parameter for K-Means")
+				("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
 				("initialMigration", value<InitialPartitioningMethods>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration, 0: SFCs, 3:k-means, 4:Multisection")
 				//debug
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
@@ -250,6 +251,8 @@ int main(int argc, char** argv) {
     }
 
     settings.verbose = vm.count("verbose");
+    settings.erodeInfluence = vm.count("erodeInfluence");
+    settings.tightenBounds = vm.count("tightenBounds");
 
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
