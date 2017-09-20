@@ -481,17 +481,19 @@ DenseVector<IndexType> assignBlocks(
 		}
 
 		iter++;
-		const IndexType currentLocalN = std::distance(firstIndex, lastIndex);
-		const IndexType takenLoops = currentLocalN - skippedLoops;
-		const ValueType averageComps = ValueType(totalComps) / currentLocalN;
-		double minInfluence, maxInfluence;
-		auto pair = std::minmax_element(influence.begin(), influence.end());
-		const ValueType influenceSpread = *pair.second / *pair.first;
-		auto oldprecision = std::cout.precision(3);
-		if (comm->getRank() == 0) std::cout << "Iter " << iter << ", loop: " << 100*ValueType(takenLoops) / currentLocalN << "%, average comparisons: "
-				<< averageComps << ", balanced blocks: " << 100*ValueType(balancedBlocks) / k << "%, influence spread: " << influenceSpread
-				<< ", imbalance : " << imbalance << std::endl;
-		std::cout.precision(oldprecision);
+		if (settings.verbose) {
+			const IndexType currentLocalN = std::distance(firstIndex, lastIndex);
+			const IndexType takenLoops = currentLocalN - skippedLoops;
+			const ValueType averageComps = ValueType(totalComps) / currentLocalN;
+			double minInfluence, maxInfluence;
+			auto pair = std::minmax_element(influence.begin(), influence.end());
+			const ValueType influenceSpread = *pair.second / *pair.first;
+			auto oldprecision = std::cout.precision(3);
+			if (comm->getRank() == 0) std::cout << "Iter " << iter << ", loop: " << 100*ValueType(takenLoops) / currentLocalN << "%, average comparisons: "
+					<< averageComps << ", balanced blocks: " << 100*ValueType(balancedBlocks) / k << "%, influence spread: " << influenceSpread
+					<< ", imbalance : " << imbalance << std::endl;
+			std::cout.precision(oldprecision);
+		}
 	} while (imbalance > settings.epsilon - 1e-12 && iter < settings.balanceIterations);
 	//std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
 

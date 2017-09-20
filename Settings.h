@@ -69,6 +69,7 @@ struct Settings{
     IndexType pixeledSideLen = 10;
 
     //debug parameters
+    bool verbose = false;
     bool writeDebugCoordinates = false;
 
     void print(std::ostream& out){

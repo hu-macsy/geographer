@@ -180,9 +180,10 @@ int main(int argc, char** argv) {
 				("balanceIterations", value<int>(&settings.balanceIterations)->default_value(settings.balanceIterations), "Tuning parameter for K-Means")
 				("maxKMeansIterations", value<int>(&settings.maxKMeansIterations)->default_value(settings.maxKMeansIterations), "Tuning parameter for K-Means")
 				("tightenBounds", value<bool>(&settings.tightenBounds)->default_value(settings.tightenBounds), "Tuning parameter for K-Means")
+				("initialMigration", value<InitialPartitioningMethods>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration, 0: SFCs, 3:k-means, 4:Multisection")
 				//debug
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
-				("initialMigration", value<InitialPartitioningMethods>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration, 0: SFCs, 3:k-means, 4:Multisection")
+				("verbose", value<bool>(&settings.verbose)->default_value(settings.verbose), "Increase output.")
 				;
 
 	variables_map vm;
@@ -443,7 +444,7 @@ int main(int argc, char** argv) {
 
     assert(N > 0);
 
-    if( comm->getRank() ==0){
+    if( comm->getRank() ==0 && settings.verbose){
           settings.print(std::cout);
     }
     

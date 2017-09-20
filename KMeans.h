@@ -83,11 +83,13 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
 
 	QuadNodeCartesianEuclid boundingBox(minCoords, maxCoords);
-	std::cout << "Process " << comm->getRank() << ": ( ";
-	for (auto coord : minCoords) std::cout << coord << " ";
-	std::cout << ") , ( ";
-	for (auto coord : maxCoords) std::cout << coord << " ";
-	std::cout << ")" << std::endl;
+	if (settings.verbose) {
+		std::cout << "Process " << comm->getRank() << ": ( ";
+		for (auto coord : minCoords) std::cout << coord << " ";
+		std::cout << ") , ( ";
+		for (auto coord : maxCoords) std::cout << coord << " ";
+		std::cout << ")" << std::endl;
+	}
 
 	std::vector<ValueType> globalMinCoords(dim);
 	std::vector<ValueType> globalMaxCoords(dim);
@@ -127,7 +129,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		samples[0] = minNodes;
 	}
 
-	if (samplingRounds > 0) {
+	if (samplingRounds > 0 && settings.verbose) {
 		if (comm->getRank() == 0) std::cout << "Starting with " << samplingRounds << " sampling rounds." << std::endl;
 	}
 
