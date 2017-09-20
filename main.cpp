@@ -132,10 +132,10 @@ int main(int argc, char** argv) {
 
 	struct Settings settings;
         
-        std::string blockSizesFile;
-        ITI::Format coordFormat;
+	std::string blockSizesFile;
+	ITI::Format coordFormat;
         
-        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	desc.add_options()
 				("help", "display options")
@@ -144,7 +144,7 @@ int main(int argc, char** argv) {
 				("graphFile", value<std::string>(), "read graph from file")
 				("quadTreeFile", value<std::string>(), "read QuadTree from file")
 				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
-                                ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
+				("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
 				("coordFormat", value<ITI::Format>(&coordFormat), "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ")
 				("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
 				("useDiffusionCoordinates", value<bool>(&settings.useDiffusionCoordinates)->default_value(settings.useDiffusionCoordinates), "Use coordinates based from diffusive systems instead of loading from file")
@@ -157,7 +157,7 @@ int main(int argc, char** argv) {
 				//general partitioning parameters
 				("numBlocks", value<int>(&settings.numBlocks)->default_value(comm->getSize()), "Number of blocks, default is number of processes")
 				("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
-                                ("blockSizesFile", value<std::string>(&blockSizesFile) , " file to read the block sizes for every block")
+				("blockSizesFile", value<std::string>(&blockSizesFile) , " file to read the block sizes for every block")
 				("seed", value<double>()->default_value(time(NULL)), "random seed, default is current time")
 				//multi-level and local refinement
 				("initialPartition", value<InitialPartitioningMethods>(&settings.initialPartition), "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means' or 3) and multisection ('MultiSection' or 4). SFC, Spectral and K-Means are most stable.")
@@ -182,7 +182,7 @@ int main(int argc, char** argv) {
 				("tightenBounds", value<bool>(&settings.tightenBounds)->default_value(settings.tightenBounds), "Tuning parameter for K-Means")
 				//debug
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
-                                ("initialMigration", value<InitialPartitioningMethods>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration, 0: SFCs, 3:k-means, 4:Multisection")
+				("initialMigration", value<InitialPartitioningMethods>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration, 0: SFCs, 3:k-means, 4:Multisection")
 				;
 
 	variables_map vm;
