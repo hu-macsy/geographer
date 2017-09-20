@@ -257,9 +257,11 @@ template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights, Format format) {
 	SCAI_REGION("FileIO.readGraph");
 
-	if(format == Format::MATRIXMARKET){
-            return FileIO<IndexType, ValueType>::readGraphMatrixMarket(filename);
-        }
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+	if (format == Format::MATRIXMARKET){
+		return FileIO<IndexType, ValueType>::readGraphMatrixMarket(filename);
+	}
         
 	if (!(format == Format::METIS or format == Format::AUTO)) {
 		throw std::logic_error("Format not yet implemented.");
@@ -271,7 +273,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 		throw std::runtime_error("Reading graph from " + filename + " failed.");
 	}
         
-        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
         
 	//define variables
 	std::string line;
@@ -457,9 +459,9 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBinary(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights){
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-typedef long int LI;
+    typedef long int LI;
 
     // root PE reads header and broadcasts information to the other PEs
     std::vector<LI> header(3, 0);
@@ -474,7 +476,7 @@ typedef long int LI;
         }
         file.close();
         SCAI_ASSERT( success, "Error while opening the file " << filename);
-ITI::aux::printVector( header );        
+        ITI::aux::printVector( header );
     }            
         
     //broadcast the header info
@@ -488,12 +490,12 @@ ITI::aux::printVector( header );
     PRINT( *comm << ": version= " << version << ", N= " << N << ", M= " << M );
     
     if( version != fileTypeVersionNumber ) {
-        PRINT0( "filetype version missmatch" );
+        PRINT0( "filetype version mismatch" );
         //MPI_Finalize();
         exit(0);
     }
     
-    // set like in KaHiP/parallel/prallel_src/app/configuration.h in configuration::standard
+    // set like in KaHiP/parallel/parallel_src/app/configuration.h in configuration::standard
     IndexType binary_io_window_size = 64;   
     
     IndexType window_size = std::min( binary_io_window_size, comm->getSize() );
@@ -554,7 +556,6 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphMa
     return graph;
 }
 //-------------------------------------------------------------------------------------------------
-  
     
 template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOcean(std::string filename, IndexType dimension) {
@@ -654,6 +655,20 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 }
 
 //-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsTEEC ( std::string filename, IndexType numberOfCoords, IndexType dimension, std::vector<DenseVector<ValueType>>& nodeWeights) {
+	SCAI_REGION( "FileIO.readCoordsTEEC" );
+
+	std::vector<DenseVector<ValueType> > tempResult = FileIO<IndexType, ValueType>::readCoords(filename, numberOfCoords, dimension+1, Format::METIS);
+
+	nodeWeights.resize(1);
+	nodeWeights[0] = tempResult[dimension];//last column is node weights
+	tempResult.resize(dimension);//omit last column from coordinates
+	return tempResult;
+}
+
+//-------------------------------------------------------------------------------------------------
 /*File "filename" contains the coordinates of a graph. The function reads these coordinates and returns a vector of DenseVectors, one for each dimension
  */
 template<typename IndexType, typename ValueType>
@@ -661,7 +676,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
     SCAI_REGION( "FileIO.readCoords" );
 
     if (format == Format::OCEAN) {
-	return readCoordsOcean(filename, dimension);
+        return readCoordsOcean(filename, dimension);
     }
 
     IndexType globalN= numberOfPoints;
@@ -709,9 +724,13 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 
 		IndexType dim = 0;
 		while (dim < dimension) {
-			bool read = !std::getline(ss, item, ' ').fail();
-			if (!read or item.size() == 0) {
-				throw std::runtime_error("Unexpected end of line. Was the number of dimensions correct?");
+			bool read;
+			do {//skip multiple whitespace
+				read = !std::getline(ss, item, ' ').fail();
+			} while (item.size() == 0);
+
+			if (!read) {
+				throw std::runtime_error("Unexpected end of line " + line +". Was the number of dimensions correct?");
 			}
 			ValueType coord = std::stod(item);
 			coords[dim][i] = coord;
@@ -1212,6 +1231,7 @@ template scai::lama::CSRSparseMatrix<double> FileIO<int, double>::readGraphBinar
 
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension, Format format);
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsOcean( std::string filename, int dimension );
+template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsTEEC( std::string filename, int numberOfCoords, int dimension, std::vector<DenseVector<double>>& nodeWeights);
 template CSRSparseMatrix<double>  FileIO<int, double>::readQuadTree( std::string filename, std::vector<DenseVector<double>> &coords );
 template std::pair<int, int> FileIO<int, double>::getMatrixMarketCoordsInfos(const std::string filename);
 template std::vector<int> FileIO<int, double>::readBlockSizes(const std::string filename , const int numBlocks );

@@ -60,8 +60,10 @@ namespace ITI {
 			format = ITI::Format::ADCIRC;
 		else if (token == "OCEAN" or token == "3")
 			format = ITI::Format::OCEAN;
-                else if (token == "MATRIXMARKET" or token == "4")
+		else if (token == "MATRIXMARKET" or token == "4")
 			format = ITI::Format::MATRIXMARKET;
+		else if (token == "TEEC" or token == "5")
+			format = ITI::Format::TEEC;
 		else
 			in.setstate(std::ios_base::failbit);
 		return in;
@@ -80,7 +82,9 @@ namespace ITI {
 		else if (method == ITI::Format::OCEAN)
 			token = "OCEAN";
 		else if (method == ITI::Format::MATRIXMARKET)
-			token = "MATRIXMARKET";                
+			token = "MATRIXMARKET";
+		else if (method == ITI::Format::TEEC)
+			token = "TEEC";
 		out << token;
 		return out;
 	}
@@ -151,9 +155,9 @@ int main(int argc, char** argv) {
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 				//mesh generation
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
-				("numX", value<int>(&settings.numX)->default_value(settings.numX), "Number of points in x dimension of generated graph")
-				("numY", value<int>(&settings.numY)->default_value(settings.numY), "Number of points in y dimension of generated graph")
-				("numZ", value<int>(&settings.numZ)->default_value(settings.numZ), "Number of points in z dimension of generated graph")
+				("numX", value<int>(&settings.numX), "Number of points in x dimension of generated graph")
+				("numY", value<int>(&settings.numY), "Number of points in y dimension of generated graph")
+				("numZ", value<int>(&settings.numZ), "Number of points in z dimension of generated graph")
 				//general partitioning parameters
 				("numBlocks", value<int>(&settings.numBlocks)->default_value(comm->getSize()), "Number of blocks, default is number of processes")
 				("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
@@ -183,7 +187,7 @@ int main(int argc, char** argv) {
 				("initialMigration", value<InitialPartitioningMethods>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration, 0: SFCs, 3:k-means, 4:Multisection")
 				//debug
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
-				("verbose", value<bool>(&settings.verbose)->default_value(settings.verbose), "Increase output.")
+				("verbose", "Increase output.")
 				;
 
 	variables_map vm;
@@ -219,13 +223,20 @@ int main(int argc, char** argv) {
             SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
         }
         
-        if( vm.count("initialMigration") ){
-            IndexType tmp = static_cast<IndexType> (settings.initialMigration);
-            if( !(tmp==0 or tmp==3 or tmp==4) ){
-                PRINT0("Initial migration supported only for 0:SFCs, 3:k-means or 4:MultiSection, invalid option " << tmp << " was given");
-                return 126;
-            }
-        }
+	if( vm.count("initialMigration") ){
+		IndexType tmp = static_cast<IndexType> (settings.initialMigration);
+		if( !(tmp==0 or tmp==3 or tmp==4) ){
+			PRINT0("Initial migration supported only for 0:SFCs, 3:k-means or 4:MultiSection, invalid option " << tmp << " was given");
+			return 126;
+		}
+	}
+
+	if (vm.count("fileFormat") && settings.fileFormat == ITI::Format::TEEC) {
+		if (!vm.count("numX")) {
+			std::cout << "TEEC file format does not specify graph size, please set with --numX" << std::endl;
+			return 126;
+		}
+	}
 
     IndexType N = -1; 		// total number of points
 
@@ -237,6 +248,8 @@ int main(int argc, char** argv) {
     } else {
     	std::cout << "machine char not valid" << std::endl;
     }
+
+    settings.verbose = vm.count("verbose");
 
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
@@ -278,7 +291,11 @@ int main(int argc, char** argv) {
     	if (settings.useDiffusionCoordinates) {
     		coordString = "and generating coordinates with diffusive distances.";
     	} else {
-    		coordString = "and \"" + coordFile + "\" for coordinates";
+    		if (vm.count("fileFormat") && vm["fileFormat"].as<ITI::Format>() == ITI::Format::TEEC) {
+    			coordString = "and coordinates.";
+    		} else {
+    			coordString = "and \"" + coordFile + "\" for coordinates";
+    		}
     	}
 
         if (comm->getRank() == 0)
@@ -291,7 +308,21 @@ int main(int argc, char** argv) {
         //
         std::vector<DenseVector<ValueType> > vectorOfNodeWeights;
         if (vm.count("fileFormat")) {
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights, settings.fileFormat );
+        	if (settings.fileFormat == ITI::Format::TEEC) {
+        		IndexType n = vm["numX"].as<IndexType>();
+				scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(n, comm));
+				scai::dmemo::DistributionPtr noDist( new scai::dmemo::NoDistribution(n));
+				graph = scai::lama::CSRSparseMatrix<ValueType>(dist, noDist);
+				ITI::FileIO<IndexType, ValueType>::readCoordsTEEC(graphFile, n, settings.dimensions, vectorOfNodeWeights);
+				if (settings.verbose) {
+					ValueType minWeight = vectorOfNodeWeights[0].min().Scalar::getValue<ValueType>();
+					ValueType maxWeight = vectorOfNodeWeights[0].max().Scalar::getValue<ValueType>();
+					if (comm->getRank() == 0) std::cout << "Min node weight:" << minWeight << ", max weight: " << maxWeight << std::endl;
+				}
+				coordFile = graphFile;
+			} else {
+				graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights, settings.fileFormat );
+			}
         } else{
             graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights );
         }
