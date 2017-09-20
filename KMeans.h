@@ -141,7 +141,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	IndexType iter = 0;
 	ValueType delta = 0;
 	bool balanced = false;
-	const ValueType threshold = 0.003*diagonalLength;
+	const ValueType threshold = 0.002*diagonalLength;
 	const IndexType maxIterations = settings.maxKMeansIterations;
 	do {
 
