@@ -177,7 +177,58 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
 		}
     }
 }
-
+//-------------------------------------------------------------------------------------------------
+/*
+ */
+template<typename IndexType, typename ValueType>
+void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVector<ValueType>> &coords, const std::string outFilename){
+    
+    typedef unsigned long int ULONG;
+    
+    const IndexType dimension = coords.size();
+    scai::dmemo::DistributionPtr coordDist = coords[0].getDistributionPtr();
+    const IndexType globalN = coordDist->getGlobalSize();
+    const IndexType localN = coordDist->getLocalSize();
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const numPEs = comm->getSize();
+    
+    IndexType beginLocalRange, endLocalRange;
+    scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
+    
+    PRINT( *comm << ": "<< beginLocalRange << " - " << endLocalRange );
+    SCAI_ASSERT_EQ_ERROR( localN, endLocalRange-beginLocalRange, "Local ranges do not agree");
+    
+    // copy coords to a local vector<vector>
+    std::vector< std::vector<IndexType>> localPartOfCoords( localN, std::vector<IndexType>( dimensions, 0) );
+    
+    for(IndexType d=0; d<dimension; d++){
+        scai::hmemo::ReadAccess<ValueType> localCoords( coordinates[d].getLocalValues() );
+        for( IndexType i=0; i<localN; i++){
+            localPartOfCoords[i][d] localCoords[i];
+        }
+    }
+    
+    std::ofstream outfile;
+    
+    for(IndexType p=0; p<numPes; p++){  // numPE rounds, in each round only one PE writes its part
+        if( comm->getRank()==p ){ 
+            if( p==0 ){
+                outfile.open(outFilename.c_str(), std::ios::binary | std::ios::out);
+            }else{
+                // if not the first PE the append to file
+                outfile.open(outFilename.c_str(), std::ios::binary | std::ios::app);
+            }
+            for( IndexType i=0; i<localN; i++){                    
+                for( IndexType d=0; d<dimension; d++){
+                    outfile.write( (char *)(&localPartOfCoords[i][d]), sizeof(ULONG) );
+                }
+            }
+        }
+        comm->synchronize();
+    }
+    
+    
+}
 //-------------------------------------------------------------------------------------------------
 /*Given the vector of the coordinates and their dimension, writes them in file "filename".
  */
@@ -571,7 +622,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             for( IndexType i=0; i<localN; i++){
                 ULONG nodeDegree = (vertexOffsets[i+1]-vertexOffsets[i])/sizeof(ULONG);
                 SCAI_ASSERT ( nodeDegree>0, "Node with degree zero not allowed");
-                std::vector<ULONG> neighbors;
+                std::vector<ULONG> neighbors(nodeDegree);
                 
                 for(ULONG j=0; j<nodeDegree; j++, pos++){
                     SCAI_ASSERT_LE_ERROR(pos, numEdges, "Number of local non-zero values is greater than the total number of edges read.");
@@ -581,7 +632,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
                         throw std::runtime_error(std::string(__FILE__) +", "+std::to_string(__LINE__) + ": Found illegal neighbor " + std::to_string(neighbor) + " in line " + std::to_string(i+beginLocalRange));
                     }
                     
-                    neighbors.push_back(neighbor);
+                    //neighbors.push_back(neighbor);
+                    neighbors[j] = neighbor;
                 }
                 
                 //set Ia array
@@ -1334,6 +1386,7 @@ std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::s
 template void FileIO<int, double>::writeGraph (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, const std::string filename);
+template void FileIO<int, double>::writeCoordsParallel(const std::vector<DenseVector<double>> &coords, const std::string filename);
 template void FileIO<int, double>::writeCoordsDistributed_2D (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
 template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::string filename, Format format);
 template scai::lama::CSRSparseMatrix<double> FileIO<int, double>::readGraphBinary(const std::string filename);

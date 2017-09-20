@@ -66,6 +66,8 @@ public:
 	*/
 	static void writeCoords (const std::vector<DenseVector<ValueType>> &coords, const std::string filename);
 
+        static void writeCoordsParallel(const std::vector<DenseVector<ValueType>> &coords, const std::string filename);
+        
         static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
 
     /**

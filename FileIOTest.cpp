@@ -187,6 +187,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
 
     EXPECT_EQ(coords2D.size(), dim);
     EXPECT_EQ(coords2D[0].size(), N);
+    
 
     // print
     /*
@@ -375,6 +376,34 @@ TEST_F(FileIOTest, testReadBlockSizes){
     
     //aux::printVector( blockSizes );
     SCAI_ASSERT( blockSizes.size()==16 , "Wrong number of blocks, should be 16 but is " << blockSizes.size() );
+
+}
+//-------------------------------------------------------------------------------------------------
+
+TEST_F(FileIOTest, testWriteCoordsParallel){
+
+    std::string file = "Grid32x32";
+    std::ifstream f(file);
+    IndexType dimensions= 2;
+    IndexType N, edges;
+    f >> N >> edges; 
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    // for now local refinement requires k = P
+    IndexType k = comm->getSize();
+    //
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+    graph.redistribute(dist, noDistPointer);
+    
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
+    
+    std::string outFilename = std::string( file+"parallel.xyz");
+    
+    FileIO<IndexType, ValueType>::writeCoordsParallel( coords, outFilename);
+    
     
 }
 
