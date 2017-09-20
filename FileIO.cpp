@@ -251,7 +251,6 @@ template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, Format format) {
     
         std::string ending = filename.substr( filename.size()-3,  filename.size() );
-PRINT( ending );  
         if( ending == "bfg" ){
             return readGraphBinary( filename );
         }
@@ -500,7 +499,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     
     IndexType localN;   
     
-    PRINT0( "version= " << version << ", N= " << globalN << ", M= " << M );
+    PRINT0( "Bianry read, version= " << version << ", N= " << globalN << ", M= " << M );
     
     if( version != fileTypeVersionNumber ) {
         PRINT0( "filetype version missmatch" );
@@ -537,13 +536,13 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             localN = endLocalRange - beginLocalRange;
             SCAI_ASSERT_LE_ERROR(localN, std::ceil(ValueType(globalN) / numPEs), "localN: " << localN << ", optSize: " << std::ceil(globalN / numPEs));
             
-             std::cout << "Process " << thisPE << " reading from " << beginLocalRange << " to " << endLocalRange << ", in total, localN= " << localN << " nodes/lines" << std::endl;
+            //std::cout << "Process " << thisPE << " reading from " << beginLocalRange << " to " << endLocalRange << ", in total, localN= " << localN << " nodes/lines" << std::endl;
             
-             ia.resize( localN +1);
+            ia.resize( localN +1);
              
-             //
-             // read the vertices offsets
-             //
+            //
+            // read the vertices offsets
+            //
             
             ULONG startPos = (headerSize+beginLocalRange)*(sizeof(ULONG));         
             ULONG* vertexOffsets = new ULONG[localN+1];
