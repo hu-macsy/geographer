@@ -133,8 +133,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         } else if (settings.initialPartition == InitialPartitioningMethods::KMeans) {
             PRINT0("Initial partition with K-Means");
             //prepare coordinates for k-means
-            std::vector<DenseVector<ValueType> > coordinateCopy;
-            DenseVector<ValueType> nodeWeightCopy;
+            std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
+            DenseVector<ValueType> nodeWeightCopy = nodeWeights;
             if (comm->getSize() > 1 && (settings.dimensions == 2 || settings.dimensions == 3)) {
                 SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans")
                 Settings migrationSettings = settings;
@@ -165,9 +165,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 for (IndexType d = 0; d < dimensions; d++) {
                     coordinateCopy[d] = DenseVector<ValueType>(coordinates[d], initMigrationPtr );
                 }
-            } else {
-                coordinateCopy = coordinates;
-                nodeWeightCopy = nodeWeights;
             }
             
             const IndexType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
@@ -222,7 +219,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			 * redistribute to prepare for local refinement
 			 */
 			scai::dmemo::Redistributor resultRedist(result.getLocalValues(), result.getDistributionPtr());
-			result.redistribute(resultRedist);
+			result = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
 
 			scai::dmemo::Redistributor redistributor(resultRedist.getTargetDistributionPtr(), input.getRowDistributionPtr());
 			input.redistribute(redistributor, noDist);
@@ -434,7 +431,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
 
         scai::utilskernel::LArray<IndexType> indexTransport(newLocalIndices.size(), newLocalIndices.data());
         assert(comm->sum(indexTransport.size()) == globalN);
-      
         scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
         
         if (comm->getRank() == 0) std::cout << "Created distribution." << std::endl;
