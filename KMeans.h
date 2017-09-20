@@ -88,7 +88,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		for (auto coord : minCoords) std::cout << coord << " ";
 		std::cout << ") , ( ";
 		for (auto coord : maxCoords) std::cout << coord << " ";
-		std::cout << ")" << std::endl;
+		std::cout << ")";
+		std::cout << ", " << localN << " nodes, " << nodeWeights.getLocalValues().sum() << " total weight";
+		std::cout << std::endl;
 	}
 
 	std::vector<ValueType> globalMinCoords(dim);
@@ -147,7 +149,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	IndexType iter = 0;
 	ValueType delta = 0;
 	bool balanced = false;
-	const ValueType threshold = 0.002*diagonalLength;
+	const ValueType threshold = 0.002*diagonalLength;//TODO: take global point density into account
 	const IndexType maxIterations = settings.maxKMeansIterations;
 	do {
 
