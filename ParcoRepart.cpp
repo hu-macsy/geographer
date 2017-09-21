@@ -167,9 +167,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 }
             }
             
-            const IndexType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
+            const ValueType weightSum = nodeWeights.sum().Scalar::getValue<ValueType>();
             
-            // vector of size k, each element representsthe size of each block
+            // vector of size k, each element represents the size of one block
             std::vector<IndexType> blockSizes;
             if( settings.blockSizes.empty() ){
                 blockSizes.assign( settings.numBlocks, weightSum/settings.numBlocks );

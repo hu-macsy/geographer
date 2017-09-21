@@ -38,7 +38,7 @@ namespace ITI {
          *                            the dimension d. Then next N*d lines contain the coordinates
          *                            for the poitns: every d lines are the coordinates for a point.
         */
-	enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 };
+	enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5 };
 	
 	
         
@@ -91,15 +91,14 @@ public:
 	 */
 	static CSRSparseMatrix<ValueType> readGraph(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights, Format = Format::METIS);
 
-        /** Reads a graph in parallel that is stored in a binary file. Uses the same format as in ParHiP, the parallel version of KaHiP.
-         * @param[in] filename The file to read from.
-         * @param[in] fileFormat The type of file to read from.
+	/** Reads a graph in parallel that is stored in a binary file. Uses the same format as in ParHiP, the parallel version of KaHiP.
+	 * @param[in] filename The file to read from.
+	 * @param[in] fileFormat The type of file to read from.
 	 * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
-         */
-        static scai::lama::CSRSparseMatrix<ValueType> readGraphBinary(const std::string filename);
+	 */
+	static scai::lama::CSRSparseMatrix<ValueType> readGraphBinary(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights);
         
-	/* Reads the 2D coordinates from file "filename" and returns then in a DenseVector where the coordinates
-	 * of point i are in [i*2][i*2+1].
+	/* Reads the coordinates from file "filename" and returns then in a vector of DenseVector
 	 */
 	static std::vector<DenseVector<ValueType>> readCoords ( std::string filename, IndexType numberOfCoords, IndexType dimension, Format = Format::METIS);
 
@@ -110,9 +109,14 @@ public:
         
         
 	/*
-	 *
+	 * Read Coordinates in Ocean format of Vadym Aizinger
 	 */
 	static std::vector<DenseVector<ValueType>> readCoordsOcean ( std::string filename, IndexType dimension);
+
+	/*
+	 * Read coordinates in TEEC format
+	 */
+	static std::vector<DenseVector<ValueType>> readCoordsTEEC ( std::string filename, IndexType numberOfCoords, IndexType dimension, std::vector<DenseVector<ValueType>>& nodeWeights);
 
 	/**
 	 * Reads a partition from file.

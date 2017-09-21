@@ -504,7 +504,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     if (comm->sum(ja.size()) != 2*globalM) {
     	throw std::runtime_error("Expected " + std::to_string(2*globalM) + " edges, got " + std::to_string(comm->sum(ja.size())));
     }
-    
+
     //assign matrix
     scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, ja.size(), 
                 scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
@@ -518,7 +518,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBinary(const std::string filename){
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBinary(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights){
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -549,10 +549,11 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     
     IndexType localN;   
     
-    PRINT0( "Bianry read, version= " << version << ", N= " << globalN << ", M= " << M );
+    PRINT0( "Binary read, version= " << version << ", N= " << globalN << ", M= " << M );
     
     if( version != fileTypeVersionNumber ) {
         PRINT0( "filetype version missmatch" );
+        //MPI_Finalize();
         exit(0);
     }
     
@@ -735,7 +736,6 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphMa
     return graph;
 }
 //-------------------------------------------------------------------------------------------------
-  
     
 template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOcean(std::string filename, IndexType dimension) {
@@ -835,6 +835,20 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 }
 
 //-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsTEEC ( std::string filename, IndexType numberOfCoords, IndexType dimension, std::vector<DenseVector<ValueType>>& nodeWeights) {
+	SCAI_REGION( "FileIO.readCoordsTEEC" );
+
+	std::vector<DenseVector<ValueType> > tempResult = FileIO<IndexType, ValueType>::readCoords(filename, numberOfCoords, dimension+1, Format::METIS);
+
+	nodeWeights.resize(1);
+	nodeWeights[0] = tempResult[dimension];//last column is node weights
+	tempResult.resize(dimension);//omit last column from coordinates
+	return tempResult;
+}
+
+//-------------------------------------------------------------------------------------------------
 /*File "filename" contains the coordinates of a graph. The function reads these coordinates and returns a vector of DenseVectors, one for each dimension
  */
 template<typename IndexType, typename ValueType>
@@ -890,9 +904,13 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 
 		IndexType dim = 0;
 		while (dim < dimension) {
-			bool read = !std::getline(ss, item, ' ').fail();
-			if (!read or item.size() == 0) {
-				throw std::runtime_error("Unexpected end of line. Was the number of dimensions correct?");
+			bool read;
+			do {//skip multiple whitespace
+				read = !std::getline(ss, item, ' ').fail();
+			} while (item.size() == 0);
+
+			if (!read) {
+				throw std::runtime_error("Unexpected end of line " + line +". Was the number of dimensions correct?");
 			}
 			ValueType coord = std::stod(item);
 			coords[dim][i] = coord;
@@ -1459,13 +1477,11 @@ std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::s
 template void FileIO<int, double>::writeGraph (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, const std::string filename);
-template void FileIO<int, double>::writeCoordsParallel(const std::vector<DenseVector<double>> &coords, const std::string filename);
 template void FileIO<int, double>::writeCoordsDistributed_2D (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
 template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::string filename, Format format);
-template scai::lama::CSRSparseMatrix<double> FileIO<int, double>::readGraphBinary(const std::string filename);
+template scai::lama::CSRSparseMatrix<double> FileIO<int, double>::readGraphBinary(const std::string filename, std::vector<DenseVector<double>>& nodeWeights);
 
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension, Format format);
-template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsBinary( std::string filename, int numberOfPoints, int dimension);
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsOcean( std::string filename, int dimension );
 template CSRSparseMatrix<double>  FileIO<int, double>::readQuadTree( std::string filename, std::vector<DenseVector<double>> &coords );
 template std::pair<int, int> FileIO<int, double>::getMatrixMarketCoordsInfos(const std::string filename);
