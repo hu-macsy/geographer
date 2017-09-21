@@ -134,7 +134,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             PRINT0("Initial partition with K-Means");
             //prepare coordinates for k-means
             std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
-            DenseVector<ValueType> nodeWeightCopy = nodeWeights;
+            scai::lama::DenseVector<ValueType> nodeWeightCopy;
+            
             if (comm->getSize() > 1 && (settings.dimensions == 2 || settings.dimensions == 3)) {
                 SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans")
                 Settings migrationSettings = settings;
@@ -158,7 +159,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                     DenseVector<IndexType> tempResult = ITI::KMeans::computePartition(coordinates, migrationSettings.numBlocks, convertedWeights, migrationBlockSizes, migrationSettings);
                     
                     initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
+                }else{  //use Spectral or pixel as dummy for the original block distribution
+                    initMigrationPtr = coordinates[0].getDistributionPtr();    
                 }
+                
 
                 nodeWeightCopy = DenseVector<ValueType>(nodeWeights, initMigrationPtr );
                 coordinateCopy.resize(dimensions);

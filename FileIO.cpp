@@ -558,7 +558,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     }
     
     // set like in KaHiP/parallel/prallel_src/app/configuration.h in configuration::standard
-    IndexType binary_io_window_size = 64;   
+    IndexType binary_io_window_size = 4;   
         
     IndexType numPEs = comm->getSize();
     
@@ -651,16 +651,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
                 assert(values.size() == 0);
                 values.resize(ja.size(), 1);//unweighted edges
             }
-            
             assert(ja.size() == ia[localN]);
-            // WARNING: commenting assertion as it can be expensive
-            //SCAI_ASSERT(comm->sum(localN) == globalN, "Sum " << comm->sum(localN) << " should be " << globalN);
-            
-            if (comm->sum(ja.size()) != M) {
-                throw std::runtime_error("Expected " + std::to_string(M) + " edges, got " + std::to_string(comm->sum(ja.size())));
-            }
-            
-            
+        
             delete[] vertexOffsets;
             delete[] edges;
             file.close();            
