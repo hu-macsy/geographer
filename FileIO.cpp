@@ -617,11 +617,12 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             IndexType pos = 0;
             
             bool hasEdgeWeights = false;
+            std::vector<ULONG> neighbors;
             
             for( IndexType i=0; i<localN; i++){
                 ULONG nodeDegree = (vertexOffsets[i+1]-vertexOffsets[i])/sizeof(ULONG);
                 SCAI_ASSERT ( nodeDegree>0, "Node with degree zero not allowed");
-                std::vector<ULONG> neighbors(nodeDegree);
+                neighbors.resize(nodeDegree);
                 
                 for(ULONG j=0; j<nodeDegree; j++, pos++){
                     SCAI_ASSERT_LE_ERROR(pos, numEdges, "Number of local non-zero values is greater than the total number of edges read.");
@@ -651,7 +652,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             }
             
             assert(ja.size() == ia[localN]);
-            SCAI_ASSERT(comm->sum(localN) == globalN, "Sum " << comm->sum(localN) << " should be " << globalN);
+            // WARNING: commenting assertion as it can be expensive
+            //SCAI_ASSERT(comm->sum(localN) == globalN, "Sum " << comm->sum(localN) << " should be " << globalN);
             
             if (comm->sum(ja.size()) != M) {
                 throw std::runtime_error("Expected " + std::to_string(M) + " edges, got " + std::to_string(comm->sum(ja.size())));

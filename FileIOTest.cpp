@@ -404,7 +404,6 @@ TEST_F(FileIOTest, testWriteCoordsParallel){
     
     FileIO<IndexType, ValueType>::writeCoordsParallel( coords, outFilename);
     
-    
 }
 
 } /* namespace ITI */
