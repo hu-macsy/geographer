@@ -518,7 +518,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBinary(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights){
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBinary(const std::string filename){
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -1477,10 +1477,11 @@ std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::s
 template void FileIO<int, double>::writeGraph (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, const std::string filename);
+template void FileIO<int, double>::writeCoordsParallel(const std::vector<DenseVector<double>> &coords, const std::string outFilename);
 template void FileIO<int, double>::writeCoordsDistributed_2D (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
 template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::string filename, Format format);
-template scai::lama::CSRSparseMatrix<double> FileIO<int, double>::readGraphBinary(const std::string filename, std::vector<DenseVector<double>>& nodeWeights);
-
+template scai::lama::CSRSparseMatrix<double> FileIO<int, double>::readGraphBinary(const std::string filename);
+template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsTEEC ( std::string filename, int numberOfCoords, int dimension, std::vector<DenseVector<double>>& nodeWeights);
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension, Format format);
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsOcean( std::string filename, int dimension );
 template CSRSparseMatrix<double>  FileIO<int, double>::readQuadTree( std::string filename, std::vector<DenseVector<double>> &coords );

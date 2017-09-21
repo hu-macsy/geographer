@@ -96,7 +96,7 @@ public:
 	 * @param[in] fileFormat The type of file to read from.
 	 * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
 	 */
-	static scai::lama::CSRSparseMatrix<ValueType> readGraphBinary(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights);
+	static scai::lama::CSRSparseMatrix<ValueType> readGraphBinary(const std::string filename);
         
 	/* Reads the coordinates from file "filename" and returns then in a vector of DenseVector
 	 */
