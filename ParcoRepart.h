@@ -34,7 +34,11 @@ namespace ITI {
                         *
 	 		* @return Distributed DenseVector	, at position i is the block node i is assigned to
 	 		*/
-			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, struct Settings settings);
+			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights,
+					struct Settings settings);
+
+			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights,
+					const DenseVector<IndexType>& previous, struct Settings settings);
 
 			/**
 			 * Wrapper without node weights.
@@ -46,7 +50,7 @@ namespace ITI {
 			 */
 			static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings);
 
-                        static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+			static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
 
 			/*
 			 * Get an initial partition using the morton curve and measuring density per square.

@@ -105,6 +105,8 @@ std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
         method = InitialPartitioningMethods::KMeans;
     else if (token == "Multisection" or token == "MultiSection" or token == "4")
     	method = InitialPartitioningMethods::Multisection;
+    else if (token == "None" or token == "5")
+        	method = InitialPartitioningMethods::None;
     else
         in.setstate(std::ios_base::failbit);
     return in;
@@ -124,6 +126,8 @@ std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method)
         token = "KMeans";
     else if (method == InitialPartitioningMethods::Multisection)
     	token = "Multisection";
+    else if (method == InitialPartitioningMethods::None)
+        token = "None";
     out << token;
     return out;
 }
@@ -153,6 +157,7 @@ int main(int argc, char** argv) {
 				("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
 				("useDiffusionCoordinates", value<bool>(&settings.useDiffusionCoordinates)->default_value(settings.useDiffusionCoordinates), "Use coordinates based from diffusive systems instead of loading from file")
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
+				("previousPartition", value<std::string>(), "file of previous partition, used for repartitioning")
 				//output
 				("outFile", value<std::string>(), "write result partition into file")
 				//mesh generation
@@ -221,15 +226,17 @@ int main(int argc, char** argv) {
 		std::cout << "Cannot both load coordinates from file with --coordFile or generate them with --useDiffusionCoords." << std::endl;
 		return 126;
 	}
-	if( vm.count("cutsPerDim") ){
+	if( vm.count("cutsPerDim") ) {
             SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
             SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
-        }
+    }
         
 	if( vm.count("initialMigration") ){
-		IndexType tmp = static_cast<IndexType> (settings.initialMigration);
-		if( !(tmp==0 or tmp==3 or tmp==4) ){
-			PRINT0("Initial migration supported only for 0:SFCs, 3:k-means or 4:MultiSection, invalid option " << tmp << " was given");
+
+		if( !(settings.initialMigration==InitialPartitioningMethods::SFC
+				or settings.initialMigration==InitialPartitioningMethods::KMeans
+				or settings.initialMigration==InitialPartitioningMethods::Multisection) ){
+			PRINT0("Initial migration supported only for 0:SFCs, 3:k-means or 4:MultiSection, invalid option " << settings.initialMigration << " was given");
 			return 126;
 		}
 	}
@@ -238,6 +245,19 @@ int main(int argc, char** argv) {
 		if (!vm.count("numX")) {
 			std::cout << "TEEC file format does not specify graph size, please set with --numX" << std::endl;
 			return 126;
+		}
+	}
+
+	if (vm.count("previousPartition")) {
+		settings.repartition = true;
+		if (vm.count("initialPartition") && !(settings.initialPartition == InitialPartitioningMethods::KMeans)) {
+			std::cout << "Method " << settings.initialPartition << " not supported for repartitioning, currently only kMeans." << std::endl;
+					return 126;
+		} else {
+			if (comm->getRank() == 0) {
+				std::cout << "Setting initial partitioning method to kMeans." << std::endl;
+			}
+			settings.initialPartition = InitialPartitioningMethods::KMeans;
 		}
 	}
 

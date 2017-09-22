@@ -47,7 +47,18 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 }
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings)
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates,
+		DenseVector<ValueType> &nodeWeights, Settings settings) {
+
+	DenseVector<IndexType> previous;
+	assert(!settings.repartition);
+	return partitionGraph(input, coordinates, nodeWeights, previous, settings);
+
+}
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates,
+		DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType>& previous, Settings settings)
 {
 	IndexType k = settings.numBlocks;
 	ValueType epsilon = settings.epsilon;
@@ -141,23 +152,25 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 migrationSettings.numBlocks = comm->getSize();
                 migrationSettings.epsilon = settings.epsilon;
                 
-                DenseVector<IndexType> tempResult;
-                
-                if( settings.initialMigration == InitialPartitioningMethods::SFC){
-                    tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, migrationSettings);
-                } else if ( settings.initialMigration == InitialPartitioningMethods::Multisection){
-                    DenseVector<ValueType> convertedWeights(nodeWeights);
-                    tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, migrationSettings);
-                } else if ( settings.initialMigration == InitialPartitioningMethods::KMeans){
-                    DenseVector<ValueType> convertedWeights(nodeWeights.getDistributionPtr(), 1);
-                    std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );;
-                    tempResult = ITI::KMeans::computePartition(coordinates, migrationSettings.numBlocks, convertedWeights, migrationBlockSizes, migrationSettings);
-                }
+                if (!settings.repartition || comm->getSize() != settings.numBlocks) {
+					DenseVector<IndexType> tempResult;
 
-                scai::dmemo::Redistributor prepareRedist(tempResult.getDistributionPtr(), nodeWeights.getDistributionPtr());
-                nodeWeightCopy.redistribute(prepareRedist);
-                for (IndexType d = 0; d < dimensions; d++) {
-                    coordinateCopy[d].redistribute(prepareRedist);
+					if( settings.initialMigration == InitialPartitioningMethods::SFC){
+						tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, migrationSettings);
+					} else if ( settings.initialMigration == InitialPartitioningMethods::Multisection){
+						DenseVector<ValueType> convertedWeights(nodeWeights);
+						tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, migrationSettings);
+					} else if ( settings.initialMigration == InitialPartitioningMethods::KMeans){
+						DenseVector<ValueType> convertedWeights(nodeWeights.getDistributionPtr(), 1);
+						std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );;
+						tempResult = ITI::KMeans::computePartition(coordinates, migrationSettings.numBlocks, convertedWeights, migrationBlockSizes, migrationSettings);
+					}
+
+					scai::dmemo::Redistributor prepareRedist(tempResult.getDistributionPtr(), nodeWeights.getDistributionPtr());
+					nodeWeightCopy.redistribute(prepareRedist);
+					for (IndexType d = 0; d < dimensions; d++) {
+						coordinateCopy[d].redistribute(prepareRedist);
+                }
                 }
             }
             
@@ -173,12 +186,17 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             SCAI_ASSERT( blockSizes.size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
 PRINT0("before k-means");            
             std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
-            result = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeightCopy, blockSizes, settings);
+            if (settings.repartition) {
+            	result = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeightCopy, blockSizes, previous, settings);
+            } else {
+            	result = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeightCopy, blockSizes, settings);
+            }
+
             std::chrono::duration<double> kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
             ValueType timeForInitPart = ValueType ( comm->max(kMeansTime.count() ));
             assert(result.getLocalValues().min() >= 0);
             assert(result.getLocalValues().max() < k);
-PRINT0("after k-means");
+
             if (comm->getRank() == 0) {
                 std::cout << "K-Means, Time:" << timeForInitPart << std::endl;
             }
@@ -194,6 +212,8 @@ PRINT0("after k-means");
             if (comm->getRank() == 0) {
                 std::cout << "MS Time:" << timeForMsPart << std::endl;
             }
+        } else if (settings.initialPartition == InitialPartitioningMethods::None) {
+        	result = DenseVector<IndexType>(input.getRowDistributionPtr(), comm->getRank());
         }
         else {
             throw std::runtime_error("Initial Partitioning mode undefined.");
