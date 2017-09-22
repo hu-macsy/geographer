@@ -105,7 +105,7 @@ public:
         /**
          * 
          */
-        static std::vector<DenseVector<ValueType>> readCoordsBinary( std::string filename, IndexType numberOfPoints, IndexType dimension);
+        static std::vector<DenseVector<ValueType>> readCoordsBinary( std::string filename, const IndexType numberOfPoints, const IndexType dimension);
         
         
 	/*

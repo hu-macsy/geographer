@@ -272,6 +272,8 @@ TEST_F(FileIOTest, testReadGraphBinary){
     
     //assertions
     
+    //TODO: read same graph with the original reader. Matrices must be identical
+    
     //std::string txtFile= file.substr(0, file.length()-4);
     std::string txtFile= "./meshes/trace/trace-00010.graph";
     std::fstream f(txtFile);
@@ -382,9 +384,10 @@ TEST_F(FileIOTest, testReadBlockSizes){
 
 TEST_F(FileIOTest, testWriteCoordsParallel){
 
-    std::string file = "Grid32x32";
+    std::string file = "Grid8x8";
     std::ifstream f(file);
-    IndexType dimensions= 2;
+    //WARNING: for this example we need dimension 3 because the Schamberger graphs have always 3 coordinates
+    IndexType dimensions= 3;
     IndexType N, edges;
     f >> N >> edges; 
     
@@ -397,12 +400,39 @@ TEST_F(FileIOTest, testWriteCoordsParallel){
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     graph.redistribute(dist, noDistPointer);
     
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
-    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
+    std::vector<DenseVector<ValueType>> coordsOrig = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    EXPECT_TRUE(coordsOrig[0].getDistributionPtr()->isEqual(*dist));
+
+    for(IndexType d=0; d<dimensions; d++){
+        scai::hmemo::ReadAccess<ValueType> localCoords( coordsOrig[d].getLocalValues() );
+        PRINT(*comm << ": dimension " << d );
+        for( IndexType i=0; i<localCoords.size(); i++){
+            std::cout<< localCoords[i] << ", ";
+        }
+        std::cout<< std::endl;
+    }
     
     std::string outFilename = std::string( file+"_parallel.xyz");
     
-    FileIO<IndexType, ValueType>::writeCoordsParallel( coords, outFilename);
+    FileIO<IndexType, ValueType>::writeCoordsParallel( coordsOrig, outFilename);
+    
+    //now read the coords
+    
+    std::vector<DenseVector<ValueType>> coordsBinary =  FileIO<IndexType, ValueType>::readCoordsBinary( outFilename, N, dimensions);
+    
+    
+    for( int d=0; d<dimensions; d++){
+        scai::hmemo::ReadAccess<ValueType> localCoordsBinary( coordsBinary[d].getLocalValues() );
+        scai::hmemo::ReadAccess<ValueType> localCoordsOrig( coordsOrig[d].getLocalValues() );
+        
+        SCAI_ASSERT_EQ_ERROR( localCoordsBinary.size(), localCoordsOrig.size(), "Size mismatch");
+        
+        PRINT(*comm << ": dimension: "<< d);
+        
+        for( IndexType i=0; i<localCoordsBinary.size(); i++){
+            SCAI_ASSERT_EQ_ERROR( localCoordsBinary[i], localCoordsOrig[i], "Not equal coordinates at index " << i);
+        }
+    }
     
 }
 

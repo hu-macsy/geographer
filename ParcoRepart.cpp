@@ -114,6 +114,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         
         assert(nodeWeights.getDistribution().isEqual(*inputDist));
 
+        //timing variables
+        ValueType timeToCalcInitMigration;
+        ValueType timeForFirstRedistribution;
+        ValueType timeForKmeans;
         std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
 
         if( settings.initialPartition==InitialPartitioningMethods::SFC) {
@@ -163,12 +167,18 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                     initMigrationPtr = coordinates[0].getDistributionPtr();    
                 }
                 
+                std::chrono::duration<double> migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
+                timeToCalcInitMigration = ValueType ( comm->max(migrationCalculation.count()) );             
 
+                std::chrono::time_point<std::chrono::system_clock> beforeMigration =  std::chrono::system_clock::now();
+                
                 nodeWeightCopy = DenseVector<ValueType>(nodeWeights, initMigrationPtr );
                 coordinateCopy.resize(dimensions);
                 for (IndexType d = 0; d < dimensions; d++) {
                     coordinateCopy[d] = DenseVector<ValueType>(coordinates[d], initMigrationPtr );
                 }
+                std::chrono::duration<double> migrationTime = std::chrono::system_clock::now() - beforeMigration;
+                timeForFirstRedistribution = ValueType ( comm->max(migrationTime.count()) );
             }
             
             const ValueType weightSum = nodeWeights.sum().Scalar::getValue<ValueType>();
@@ -182,22 +192,17 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             }
             SCAI_ASSERT( blockSizes.size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
             
-            std::chrono::duration<double> afterMigration = std::chrono::system_clock::now() - beforeInitPart;
-            ValueType timeForInitMigration = ValueType ( comm->max(afterMigration.count() ));
-            if (comm->getRank() == 0) {
-                std::cout << "coord copy migration, time:" << timeForInitMigration << std::endl<< std::endl;
-            }
-            
             std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
             result = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeightCopy, blockSizes, settings);
             std::chrono::duration<double> kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
-            ValueType timeForInitPart = ValueType ( comm->max(kMeansTime.count() ));
+            timeForKmeans = ValueType ( comm->max(kMeansTime.count() ));
             assert(result.getLocalValues().min() >= 0);
             assert(result.getLocalValues().max() < k);
-
+/*
             if (comm->getRank() == 0) {
                 std::cout << "K-Means, Time:" << timeForInitPart << std::endl;
             }
+*/
             assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
             assert(result.min().Scalar::getValue<IndexType>() == 0);
 
@@ -222,6 +227,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			/**
 			 * redistribute to prepare for local refinement
 			 */
+                        std::chrono::time_point<std::chrono::system_clock> beforeSecondRedistributiom =  std::chrono::system_clock::now();
+
 			scai::dmemo::Redistributor resultRedist(result.getLocalValues(), result.getDistributionPtr());
 			result = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
 
@@ -233,14 +240,17 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				}
 			}
 			nodeWeights.redistribute(redistributor);
-
+                        
+			std::chrono::duration<double> secondRedistributionTime =  std::chrono::system_clock::now() - beforeSecondRedistributiom;
+                        ValueType timeForSecondRedistr = ValueType ( comm->max(secondRedistributionTime.count() ));
+                        
 			std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
 			ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
 			ValueType cut = comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;
 			ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k, nodeWeights);
 
 			if (comm->getRank() == 0) {
-				std::cout<< std::endl << "\033[1;32mTime for initial partition and redistribution:" << timeForInitPart << std::endl;
+				std::cout<< std::endl << "\033[1;32mTiming: migration algo: "<< timeToCalcInitMigration << ", 1st redistr: " << timeForFirstRedistribution << ", only k-means: " << timeForKmeans <<", only 2nd redistr: "<< timeForSecondRedistr <<", total:" << timeForInitPart << std::endl;
 				std::cout << "Cut:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
 			}
 
