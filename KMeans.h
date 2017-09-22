@@ -91,9 +91,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	const IndexType localN = nodeWeights.getLocalValues().size();
 	std::vector<IndexType> indices(localN);
 	const typename std::vector<IndexType>::iterator firstIndex = indices.begin();
-	typename std::vector<IndexType>::iterator lastIndex = indices.end();;
+	typename std::vector<IndexType>::iterator lastIndex = indices.end();
 	std::iota(firstIndex, lastIndex, 0);
-	std::vector<std::vector<IndexType> > initialCenters = findCenters(coordinates, previous, k,	indices.begin(), indices.end(), nodeWeights);
+	std::vector<std::vector<ValueType> > initialCenters = findCenters(coordinates, previous, k,	indices.begin(), indices.end(), nodeWeights);
 	return computePartition(coordinates, k, nodeWeights, blockSizes, initialCenters, settings);
 }
 
