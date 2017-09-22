@@ -277,10 +277,10 @@ void FileIO<IndexType, ValueType>::writePartition(const DenseVector<IndexType> &
 	 * If it is not, we need to create a replicated copy.
 	 */
 	DenseVector<IndexType> maybeCopy;
-	DenseVector<IndexType> &targetReference = dist->isReplicated() ? part : maybeCopy;
 	if (!dist->isReplicated()) {
 		maybeCopy = DenseVector<IndexType>(part, noDist);
 	}
+	const DenseVector<IndexType> &targetReference = dist->isReplicated() ? part : maybeCopy;
 	assert(maybeCopy.getDistributionPtr()->isReplicated());
 	assert(maybeCopy.size() == part.size());
 
@@ -289,7 +289,7 @@ void FileIO<IndexType, ValueType>::writePartition(const DenseVector<IndexType> &
 		if (filehandle.fail()) {
 			throw std::runtime_error("Could not write to file " + filename);
 		}
-		scai::hmemo::ReadAccess<IndexType> access(maybeCopy);
+		scai::hmemo::ReadAccess<IndexType> access(maybeCopy.getLocalValues());
 		for (IndexType i = 0; i < access.size(); i++) {
 			filehandle << access[i] << std::endl;
 		}
@@ -1516,6 +1516,7 @@ template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<
 template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, const std::string filename);
 template void FileIO<int, double>::writeCoordsParallel(const std::vector<DenseVector<double>> &coords, const std::string outFilename);
 template void FileIO<int, double>::writeCoordsDistributed_2D (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
+template void FileIO<int, double>::writePartition(const DenseVector<int> &part, const std::string filename);
 template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::string filename, Format format);
 template scai::lama::CSRSparseMatrix<double> FileIO<int, double>::readGraphBinary(const std::string filename);
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsTEEC ( std::string filename, int numberOfCoords, int dimension, std::vector<DenseVector<double>>& nodeWeights);

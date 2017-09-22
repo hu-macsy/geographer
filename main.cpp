@@ -153,6 +153,8 @@ int main(int argc, char** argv) {
 				("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
 				("useDiffusionCoordinates", value<bool>(&settings.useDiffusionCoordinates)->default_value(settings.useDiffusionCoordinates), "Use coordinates based from diffusive systems instead of loading from file")
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
+				//output
+				("outFile", value<std::string>(), "write result partition into file")
 				//mesh generation
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
 				("numX", value<int>(&settings.numX), "Number of points in x dimension of generated graph")
@@ -509,6 +511,10 @@ int main(int argc, char** argv) {
     
     std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
     
+    if (vm.count("outFile")) {
+    	ITI::FileIO<IndexType, ValueType>::writePartition(partition, vm["outFile"].as<std::string>());
+    }
+
     // Reporting output to std::cout
     ValueType inputT = ValueType ( comm->max(inputTime.count() ));
     ValueType partT = ValueType (comm->max(partitionTime.count()));
