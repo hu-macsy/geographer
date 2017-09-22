@@ -26,6 +26,14 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		const std::vector<IndexType> &blockSizes, const Settings settings);
 
 template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights,
+		const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings);
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights,
+		const std::vector<IndexType> &blockSizes, std::vector<std::vector<ValueType> > centers, const Settings settings);
+
+template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> >  findInitialCentersSFC(
 		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords,
 		const std::vector<ValueType> &maxCoords, Settings settings);
@@ -54,8 +62,44 @@ DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &c
 /**
  * Implementations
  */
+template<typename ValueType>
+std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates) {
+	const int dim = coordinates.size();
+	std::vector<ValueType> minCoords(dim);
+	std::vector<ValueType> maxCoords(dim);
+	for (int d = 0; d < dim; d++) {
+		minCoords[d] = coordinates[d].getLocalValues().min();//.Scalar::getValue<ValueType>();
+		maxCoords[d] = coordinates[d].getLocalValues().max();//.Scalar::getValue<ValueType>();
+	}
+	return {minCoords, maxCoords};
+}
+
+//wrapper for initial partitioning
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const Settings settings) {
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights,
+		const std::vector<IndexType> &blockSizes, const Settings settings) {
+	std::vector<ValueType> minCoords, maxCoords;
+	std::tie(minCoords, maxCoords) = getLocalMinMaxCoords(coordinates);
+	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
+
+	return computePartition(coordinates, k, nodeWeights, blockSizes, centers, settings);
+}
+
+//wrapper for repartitioning
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings) {
+	const IndexType localN = nodeWeights.getLocalValues().size();
+	std::vector<IndexType> indices(localN);
+	const typename std::vector<IndexType>::iterator firstIndex = indices.begin();
+	typename std::vector<IndexType>::iterator lastIndex = indices.end();;
+	std::iota(firstIndex, lastIndex, 0);
+	std::vector<std::vector<IndexType> > initialCenters = findCenters(coordinates, previous, k,	indices.begin(), indices.end(), nodeWeights);
+	return computePartition(coordinates, k, nodeWeights, blockSizes, initialCenters, settings);
+}
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights,
+		const std::vector<IndexType> &blockSizes, std::vector<std::vector<ValueType> > centers, const Settings settings) {
 	SCAI_REGION( "KMeans.computePartition" );
 
 	std::vector<ValueType> influence(k,1);
@@ -80,7 +124,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		maxCoords[d] = *std::max_element(convertedCoords[d].begin(), convertedCoords[d].end());
 	}
 
-	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
+	//std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
 
 	QuadNodeCartesianEuclid boundingBox(minCoords, maxCoords);
 	if (settings.verbose) {
@@ -246,5 +290,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	} while (iter < samplingRounds || (iter < maxIterations && (delta > threshold || !balanced)));
 	return result;
 }
+
 }
 } /* namespace ITI */
