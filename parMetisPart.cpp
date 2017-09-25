@@ -139,11 +139,13 @@ int main(int argc, char** argv) {
     SCAI_ASSERT( graph.isConsistent(), "Graph npt consistent");
     
     std::vector<DenseVector<ValueType>> coords;
+    if(parMetisGeom){
 	if (vm.count("fileFormat")) {
 		coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
 	} else {
 		coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
 	}
+    }
 
     SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size() , coords[1].getLocalValues().size(), "coordinates not of same size" );
 
@@ -231,20 +233,21 @@ int main(int argc, char** argv) {
     real_t xyzLocal[ndims*localN];
 
     if (ndims != 2) {
-    	throw std::logic_error("Not yet implemented for dimensions != 2");
+        throw std::logic_error("Not yet implemented for dimensions != 2");
     }
-PRINT0( "" );   
-    // TODO: only for 2D now
-    scai::utilskernel::LArray<ValueType>& localPartOfCoords0 = coords[0].getLocalValues();
-    scai::utilskernel::LArray<ValueType>& localPartOfCoords1 = coords[1].getLocalValues();
     
-    for(unsigned int i=0; i<localN; i++){
-        SCAI_ASSERT( 2*i+1< sizeof(xyzLocal)/sizeof(xyzLocal[0]), "Too large index: " << 2*i+1);
-        xyzLocal[2*i]= real_t(localPartOfCoords0[i]);
-        xyzLocal[2*i+1]= real_t(localPartOfCoords1[i]);
-        //PRINT(*comm <<": "<< xyzLocal[2*i] << ", "<< xyzLocal[2*i+1]);
+    if( parMetisGeom ){
+        // TODO: only for 2D now
+        scai::utilskernel::LArray<ValueType>& localPartOfCoords0 = coords[0].getLocalValues();
+        scai::utilskernel::LArray<ValueType>& localPartOfCoords1 = coords[1].getLocalValues();
+        
+        for(unsigned int i=0; i<localN; i++){
+            SCAI_ASSERT( 2*i+1< sizeof(xyzLocal)/sizeof(xyzLocal[0]), "Too large index: " << 2*i+1);
+            xyzLocal[2*i]= real_t(localPartOfCoords0[i]);
+            xyzLocal[2*i+1]= real_t(localPartOfCoords1[i]);
+            //PRINT(*comm <<": "<< xyzLocal[2*i] << ", "<< xyzLocal[2*i+1]);
+        }
     }
-
     // ncon: the numbers of weigths each vertex has. Here 1;
     idx_t ncon = 1;
     
@@ -359,7 +362,7 @@ PRINT0( "" );
     // the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================
         
-    settings.writeDebugCoordinates =1;
+    settings.writeDebugCoordinates = 0;
     if (settings.writeDebugCoordinates) {
 		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
 			assert( coords[dim].size() == N);
