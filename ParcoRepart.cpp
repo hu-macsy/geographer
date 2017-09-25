@@ -58,7 +58,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates,
-		DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType>& previous, Settings settings)
+		DenseVector<ValueType> &nodeWeights, DenseVector<IndexType>& previous, Settings settings)
 {
 	IndexType k = settings.numBlocks;
 	ValueType epsilon = settings.epsilon;
@@ -170,7 +170,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 					nodeWeightCopy.redistribute(prepareRedist);
 					for (IndexType d = 0; d < dimensions; d++) {
 						coordinateCopy[d].redistribute(prepareRedist);
-                }
+					}
+					if (settings.repartition) {
+						previous.redistribute(prepareRedist);
+					}
                 }
             }
             
@@ -184,7 +187,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 blockSizes = settings.blockSizes;
             }
             SCAI_ASSERT( blockSizes.size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
-PRINT0("before k-means");            
+            PRINT0("before k-means");
             std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
             if (settings.repartition) {
             	result = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeightCopy, blockSizes, previous, settings);

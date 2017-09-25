@@ -38,7 +38,7 @@ namespace ITI {
 					struct Settings settings);
 
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights,
-					const DenseVector<IndexType>& previous, struct Settings settings);
+					DenseVector<IndexType>& previous, struct Settings settings);
 
 			/**
 			 * Wrapper without node weights.
