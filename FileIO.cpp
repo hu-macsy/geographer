@@ -577,9 +577,9 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     SCAI_ASSERT_LE_ERROR(localN, std::ceil(ValueType(globalN) / numPEs), "localN: " << localN << ", optSize: " << std::ceil(globalN / numPEs));
     
     // set like in KaHiP/parallel/prallel_src/app/configuration.h in configuration::standard
-    const IndexType binary_io_window_size = 64;   
+    //const IndexType binary_io_window_size = 64;   
     
-    const IndexType window_size = std::min( binary_io_window_size, numPEs );
+    const IndexType window_size = numPEs;// std::min( binary_io_window_size, numPEs );
     IndexType lowPE =0;
     IndexType highPE = window_size;
     
@@ -592,15 +592,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
         if( thisPE>=lowPE and thisPE<highPE){
             std::ifstream file;
             file.open(filename.c_str(), std::ios::binary | std::ios::in);
-/*
-            //
-            // set local range
-            //
-            IndexType beginLocalRange, endLocalRange;
-            scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, thisPE, numPEs );
-            const IndexType localN = endLocalRange - beginLocalRange;
-            SCAI_ASSERT_LE_ERROR(localN, std::ceil(ValueType(globalN) / numPEs), "localN: " << localN << ", optSize: " << std::ceil(globalN / numPEs));
-*/            
+          
             //std::cout << "Process " << thisPE << " reading from " << beginLocalRange << " to " << endLocalRange << ", in total, localN= " << localN << " nodes/lines" << std::endl;
             
             ia.resize( localN +1);
