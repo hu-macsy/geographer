@@ -150,7 +150,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans")
                 Settings migrationSettings = settings;
                 migrationSettings.numBlocks = comm->getSize();
-                migrationSettings.epsilon = settings.epsilon;
+                migrationSettings.epsilon = settings.epsilon;//TODO: choose a different one
                 
                 if (!settings.repartition || comm->getSize() != settings.numBlocks) {
 					DenseVector<IndexType> tempResult;

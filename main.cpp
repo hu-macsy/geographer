@@ -250,9 +250,11 @@ int main(int argc, char** argv) {
 
 	if (vm.count("previousPartition")) {
 		settings.repartition = true;
-		if (vm.count("initialPartition") && !(settings.initialPartition == InitialPartitioningMethods::KMeans)) {
-			std::cout << "Method " << settings.initialPartition << " not supported for repartitioning, currently only kMeans." << std::endl;
-					return 126;
+		if (vm.count("initialPartition")) {
+			if (!(settings.initialPartition == InitialPartitioningMethods::KMeans || settings.initialPartition == InitialPartitioningMethods::None)) {
+				std::cout << "Method " << settings.initialPartition << " not supported for repartitioning, currently only kMeans." << std::endl;
+				return 126;
+			}
 		} else {
 			if (comm->getRank() == 0) {
 				std::cout << "Setting initial partitioning method to kMeans." << std::endl;
@@ -494,11 +496,44 @@ int main(int argc, char** argv) {
         SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
     }
     
+    // get previous partition, if set
+    DenseVector<IndexType> previous;
+    if (vm.count("previousPartition")) {
+    	std::string filename = vm["previousPartition"].as<std::string>();
+    	previous = ITI::FileIO<IndexType, ValueType>::readPartition(filename, N);
+    	if (previous.size() != N) {
+    		throw std::runtime_error("Previous partition has wrong size.");
+    	}
+    	if (previous.max().Scalar::getValue<IndexType>() != settings.numBlocks-1) {
+    		throw std::runtime_error("Illegal maximum block ID in previous partition:" + std::to_string(previous.max().Scalar::getValue<IndexType>()));
+    	}
+    	if (previous.min().Scalar::getValue<IndexType>() != 0) {
+    		throw std::runtime_error("Illegal minimum block ID in previous partition:" + std::to_string(previous.min().Scalar::getValue<IndexType>()));
+    	}
+    	settings.repartition = true;
+    }
+
     // time needed to get the input. Synchronize first to make sure that all processes are finished.
     comm->synchronize();
     std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
 
     assert(N > 0);
+
+    if (settings.repartition && comm->getSize() == settings.numBlocks) {
+    	//redistribute according to previous partition now to simulate the setting in a dynamic repartitioning
+    	assert(previous.size() == N);
+    	scai::dmemo::Redistributor previousRedist(previous.getLocalValues(), previous.getDistributionPtr());
+    	graph.redistribute(previousRedist, graph.getColDistributionPtr());
+    	for (IndexType d = 0; d < settings.dimensions; d++) {
+    		coordinates[d].redistribute(previousRedist);
+    	}
+
+    	if (nodeWeights.size() > 0) {
+    		nodeWeights.redistribute(previousRedist);
+    	}
+    	previous = DenseVector<IndexType>(previousRedist.getTargetDistributionPtr(), comm->getRank());
+
+    }
 
     if( comm->getRank() ==0 && settings.verbose){
           settings.print(std::cout);
@@ -506,7 +541,7 @@ int main(int argc, char** argv) {
     
     std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
     
-    scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, settings );
+    scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, settings );
     assert( partition.size() == N);
     assert( coordinates[0].size() == N);
     
