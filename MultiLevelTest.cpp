@@ -301,7 +301,7 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
     std::string file = "meshes/hugetrace-08.bfg";
     std::string coordFile = "meshes/hugetrace/hugetrace-00008.graph.xyz";
     
-    // kept for furhter checking
+    // kept for further checking
     std::string txtFile = "meshes/hugetrace/hugetrace-00008.graph";
     std::ifstream f(txtFile);
     IndexType dimensions= 2, k=8;
@@ -337,7 +337,7 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
     //assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
 
     // coarsen the graph
-    for(IndexType i=4; i<10; i++){
+    for(IndexType i=2; i<7; i++){
         std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
         
         settings.pixeledSideLen = std::pow(i,2);

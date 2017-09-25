@@ -16,6 +16,7 @@
 #include "../../ParcoRepart.h"
 #include "../../FileIO.h"
 #include "../../GraphUtils.h"
+#include "../../Settings.h"
 
 #include "../QuadTreeCartesianEuclid.h"
 #include "../QuadTreePolarEuclid.h"
@@ -343,7 +344,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
             
             IndexType numEdges = 0;
             IndexType maxDegree = 0;
-            //std::cout<< "\t Num of nodes"<< std::endl;
+                //std::cout<< "\t Num of nodes"<< std::endl;
             for(int i=0; i<degreeCount.size(); i++){
                 if(  degreeCount[i] !=0 ){
                     //std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
@@ -386,7 +387,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
         settings.epsilon = epsilon;
         settings.dimensions = dimension;
         settings.minGainForNextRound = 5;
-        
+    
         EXPECT_EQ( coords[0].size(), N);
 	EXPECT_EQ( graph.getNumRows(), N);
 	EXPECT_EQ( graph.getNumColumns(), N);
