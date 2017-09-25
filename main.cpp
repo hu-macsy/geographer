@@ -235,8 +235,9 @@ int main(int argc, char** argv) {
 
 		if( !(settings.initialMigration==InitialPartitioningMethods::SFC
 				or settings.initialMigration==InitialPartitioningMethods::KMeans
-				or settings.initialMigration==InitialPartitioningMethods::Multisection) ){
-			PRINT0("Initial migration supported only for 0:SFCs, 3:k-means or 4:MultiSection, invalid option " << settings.initialMigration << " was given");
+				or settings.initialMigration==InitialPartitioningMethods::Multisection
+				or settings.initialMigration==InitialPartitioningMethods::None) ){
+			PRINT0("Initial migration supported only for 0:SFCs, 3:k-means, 4:MultiSection or 5:None, invalid option " << settings.initialMigration << " was given");
 			return 126;
 		}
 	}

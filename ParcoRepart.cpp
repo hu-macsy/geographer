@@ -176,6 +176,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 						initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
 					} else if (settings.initialMigration == InitialPartitioningMethods::None) {
 						//nothing to do
+						initMigrationPtr = inputDist;
 					} else {
 						throw std::logic_error("Method not yet supported for preparing for K-Means");
 					}
@@ -224,7 +225,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             assert(result.getLocalValues().max() < k);
 
             if (comm->getRank() == 0) {
-                std::cout << "K-Means, Time:" << timeForInitPart << std::endl;
+                std::cout << "K-Means, Time:" << timeForKmeans << std::endl;
             }
 
             assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
