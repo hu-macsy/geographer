@@ -183,9 +183,8 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
 template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVector<ValueType>> &coords, const std::string outFilename){
     
-    //typedef unsigned long long ULONG;
-    typedef long double LDOUBLE;
-    
+    //typedef unsigned long int UINT;  // maybe IndexType is not big enough for file position
+        
     const IndexType dimension = coords.size();
     scai::dmemo::DistributionPtr coordDist = coords[0].getDistributionPtr();
     const IndexType globalN = coordDist->getGlobalSize();
@@ -216,16 +215,23 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVe
             if( p==0 ){
                 outfile.open(outFilename.c_str(), std::ios::binary | std::ios::out);
             }else{
-                // if not the first PE the append to file
+                // if not the first PE then append to file
                 outfile.open(outFilename.c_str(), std::ios::binary | std::ios::app);
             }
+            
             for( IndexType i=0; i<localN; i++){                    
                 for( IndexType d=0; d<dimension; d++){
-                    outfile.write( (char *)(&localPartOfCoords[i][d]), sizeof(LDOUBLE) );
+                    outfile.write( (char *)(&localPartOfCoords[i][d]), sizeof(ValueType) );
                 }
             }
-            SCAI_ASSERT_EQ_ERROR( outfile.tellp(), localN*dimension*sizeof(LDOUBLE)*(comm->getRank()+1) , "While writing coordinates in parallel: Position in file " << outFilename << " is not correct." );
-            //PRINT( *comm << ": " << outfile.tellp()  << " _+_" << localN*dimension*sizeof(LDOUBLE)*(comm->getRank()+1) );
+            
+            // the last PE maybe has less local values
+            if( p==numPEs-1 ){
+                SCAI_ASSERT_EQ_ERROR( outfile.tellp(), globalN*dimension*sizeof(ValueType) , "While writing coordinates in parallel: Position in file " << outFilename << " is not correct." );
+            }else{
+                SCAI_ASSERT_EQ_ERROR( outfile.tellp(), localN*dimension*sizeof(ValueType)*(comm->getRank()+1) , "While writing coordinates in parallel: Position in file " << outFilename << " is not correct." );
+            }
+            
             outfile.close();
         }
         comm->synchronize();
@@ -946,20 +952,8 @@ template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBinary( std::string filename, const IndexType numberOfPoints, const IndexType dimension){
     SCAI_REGION( "FileIO.readCoordsBinary" );
 
-    typedef unsigned long long ULONG;
-    typedef unsigned long int UINT;
-    typedef long double LDOUBLE;
+    typedef unsigned long int UINT; // maybe IndexType is not big enough for file position
     
-    // WARNING: in the Schamberger graph the coordinate files contain 3 coords and the last is always 0
-    //   ^^^^ but!!, we read only files that was written using the FileIO::writeCoordsParallel
-    //const IndexType maxDimensions = 3;
-    //
-    /*
-    if( dimension<maxDimensions ){
-        PRINT0("Curently supports only 2 or 3 dimensions but was given " << dimension);
-        return 127;
-    }
-    */
     const IndexType globalN= numberOfPoints;
     std::ifstream file(filename);
 
@@ -1006,21 +1000,24 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
             std::ifstream file;
             file.open(filename.c_str(), std::ios::binary | std::ios::in);
             
-            std::cout << "Process " << thisPE << " reading from " << beginLocalCoords << " to " << endLocalCoords << ", in total, localN= " << localTotalNumOfCoords << " coordinates" << std::endl;
+            std::cout << "Process " << thisPE << " reading from " << beginLocalCoords << " to " << endLocalCoords << ", in total, localN= " << localTotalNumOfCoords << " coordinates and " << (localTotalNumOfCoords)*sizeof(ValueType) << " bytes." << std::endl;
             
-            const UINT startPos = beginLocalCoords*sizeof(LDOUBLE);   
-            LDOUBLE* localPartOfCoords = new LDOUBLE[localTotalNumOfCoords];
+            const UINT startPos = beginLocalCoords*sizeof(ValueType);   
+            ValueType* localPartOfCoords = new ValueType[localTotalNumOfCoords];
             file.seekg(startPos);
-            file.read( (char *)(localPartOfCoords), (localTotalNumOfCoords)*sizeof(LDOUBLE) );
+            file.read( (char *)(localPartOfCoords), (localTotalNumOfCoords)*sizeof(ValueType) );
             
             for(IndexType i=0; i<localN; i++){
                 for(IndexType dim=0; dim<dimension; dim++){
                     coords[dim][i] = localPartOfCoords[i*dimension+dim];
-PRINT(*comm << ": " << coords[dim][i]);                    
                 }
             }
-            SCAI_ASSERT_EQ_ERROR( file.tellg(), localN*dimension*sizeof(LDOUBLE)*(comm->getRank()+1) , "While reading coordinates in binary: Position in file " << filename << " is not correct." );            
-            //PRINT( *comm << ": " << file.tellg() << " +_+ " << localN*dimension*sizeof(LDOUBLE)*(comm->getRank()+1) );
+            
+            if( thisPE==numPEs-1) {
+                SCAI_ASSERT_EQ_ERROR( file.tellg(), globalN*dimension*sizeof(ValueType) , "While reading coordinates in binary: Position in file " << filename << " is not correct." );            
+            }else{
+                SCAI_ASSERT_EQ_ERROR( file.tellg(), localN*dimension*sizeof(ValueType)*(comm->getRank()+1) , "While reading coordinates in binary: Position in file " << filename << " is not correct." );            
+            }
             
             delete[] localPartOfCoords;
             file.close();

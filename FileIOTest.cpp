@@ -384,33 +384,23 @@ TEST_F(FileIOTest, testReadBlockSizes){
 
 TEST_F(FileIOTest, testWriteCoordsParallel){
 
-    std::string file = "Grid8x8";
+    std::string path = "./meshes/bubbles/";
+    std::string file = path + "bubbles-00010.graph";
     std::ifstream f(file);
+    
     //WARNING: for this example we need dimension 3 because the Schamberger graphs have always 3 coordinates
     IndexType dimensions= 3;
     IndexType N, edges;
     f >> N >> edges; 
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    // for now local refinement requires k = P
-    IndexType k = comm->getSize();
-    //
-    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
-    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
-    graph.redistribute(dist, noDistPointer);
+    scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     
     std::vector<DenseVector<ValueType>> coordsOrig = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
-    EXPECT_TRUE(coordsOrig[0].getDistributionPtr()->isEqual(*dist));
+    EXPECT_TRUE(coordsOrig[0].getDistributionPtr()->isEqual(*blockDist));
 
-    for(IndexType d=0; d<dimensions; d++){
-        scai::hmemo::ReadAccess<ValueType> localCoords( coordsOrig[d].getLocalValues() );
-        PRINT(*comm << ": dimension " << d );
-        for( IndexType i=0; i<localCoords.size(); i++){
-            std::cout<< localCoords[i] << ", ";
-        }
-        std::cout<< std::endl;
-    }
+    //
+    // write coords in parallel
     
     std::string outFilename = std::string( file+"_parallel.xyz");
     
@@ -427,10 +417,10 @@ TEST_F(FileIOTest, testWriteCoordsParallel){
         
         SCAI_ASSERT_EQ_ERROR( localCoordsBinary.size(), localCoordsOrig.size(), "Size mismatch");
         
-        PRINT(*comm << ": dimension: "<< d);
+       //PRINT(*comm << ": size= " << localCoordsOrig.size()<< ", dimension: "<< d);
         
         for( IndexType i=0; i<localCoordsBinary.size(); i++){
-            SCAI_ASSERT_EQ_ERROR( localCoordsBinary[i], localCoordsOrig[i], "Not equal coordinates at index " << i);
+            SCAI_ASSERT_EQ_ERROR( localCoordsBinary[i], localCoordsOrig[i], *comm << ": Not equal coordinates at index " << i);
         }
     }
     

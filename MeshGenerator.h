@@ -36,9 +36,6 @@
 #include "quadtree/QuadTreeCartesianEuclid.h" 
 #include "AuxiliaryFunctions.h"
  
-typedef double ValueType;
-typedef int IndexType;
-            
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
