@@ -164,16 +164,20 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 					if( settings.initialMigration == InitialPartitioningMethods::SFC){
 						tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, migrationSettings);
-                    initMigrationPtr = tempResult.getDistributionPtr();
+						initMigrationPtr = tempResult.getDistributionPtr();
 					} else if ( settings.initialMigration == InitialPartitioningMethods::Multisection){
 						DenseVector<ValueType> convertedWeights(nodeWeights);
 						tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, migrationSettings);
-                    initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
+						initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
 					} else if ( settings.initialMigration == InitialPartitioningMethods::KMeans){
 						DenseVector<ValueType> convertedWeights(nodeWeights.getDistributionPtr(), 1);
 						std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );;
 						tempResult = ITI::KMeans::computePartition(coordinates, migrationSettings.numBlocks, convertedWeights, migrationBlockSizes, migrationSettings);
-                    initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
+						initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
+					} else if (settings.initialMigration == InitialPartitioningMethods::None) {
+						//nothing to do
+					} else {
+						throw std::logic_error("Method not yet supported for preparing for K-Means");
 					}
 
 					std::chrono::duration<double> migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
@@ -218,11 +222,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             timeForKmeans = ValueType ( comm->max(kMeansTime.count() ));
             assert(result.getLocalValues().min() >= 0);
             assert(result.getLocalValues().max() < k);
-/*
+
             if (comm->getRank() == 0) {
                 std::cout << "K-Means, Time:" << timeForInitPart << std::endl;
             }
-*/
+
             assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
             assert(result.min().Scalar::getValue<IndexType>() == 0);
 
