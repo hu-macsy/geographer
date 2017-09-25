@@ -150,6 +150,8 @@ public:
         */
         static std::vector<IndexType> readBlockSizes(const std::string filename , const IndexType numBlocks);
 
+	static DenseVector<IndexType> readPartition(const std::string filename, IndexType n);
+
 private:
 	/**
 	 * given the central coordinates of a cell and its level, compute the bounding corners

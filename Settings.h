@@ -10,13 +10,14 @@
 
 const std::string version = BUILD_COMMIT_STRING;
 
-enum class InitialPartitioningMethods {SFC = 0, Pixel = 1, Spectral = 2, KMeans = 3, Multisection = 4};
+enum class InitialPartitioningMethods {SFC = 0, Pixel = 1, Spectral = 2, KMeans = 3, Multisection = 4, None = 5};
     
 
 struct Settings{
 	//partition settings
 	IndexType numBlocks = 2;
 	double epsilon = 0.05;
+	bool repartition = false;
 
     //input data
     IndexType dimensions= 2;

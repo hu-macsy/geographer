@@ -105,6 +105,8 @@ std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
         method = InitialPartitioningMethods::KMeans;
     else if (token == "Multisection" or token == "MultiSection" or token == "4")
     	method = InitialPartitioningMethods::Multisection;
+    else if (token == "None" or token == "5")
+        	method = InitialPartitioningMethods::None;
     else
         in.setstate(std::ios_base::failbit);
     return in;
@@ -124,6 +126,8 @@ std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method)
         token = "KMeans";
     else if (method == InitialPartitioningMethods::Multisection)
     	token = "Multisection";
+    else if (method == InitialPartitioningMethods::None)
+        token = "None";
     out << token;
     return out;
 }
@@ -153,6 +157,7 @@ int main(int argc, char** argv) {
 				("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
 				("useDiffusionCoordinates", value<bool>(&settings.useDiffusionCoordinates)->default_value(settings.useDiffusionCoordinates), "Use coordinates based from diffusive systems instead of loading from file")
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
+				("previousPartition", value<std::string>(), "file of previous partition, used for repartitioning")
 				//output
 				("outFile", value<std::string>(), "write result partition into file")
 				//mesh generation
@@ -221,15 +226,18 @@ int main(int argc, char** argv) {
 		std::cout << "Cannot both load coordinates from file with --coordFile or generate them with --useDiffusionCoords." << std::endl;
 		return 126;
 	}
-	if( vm.count("cutsPerDim") ){
+	if( vm.count("cutsPerDim") ) {
             SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
             SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
-        }
+    }
         
 	if( vm.count("initialMigration") ){
-		IndexType tmp = static_cast<IndexType> (settings.initialMigration);
-		if( !(tmp==0 or tmp==3 or tmp==4) ){
-			PRINT0("Initial migration supported only for 0:SFCs, 3:k-means or 4:MultiSection, invalid option " << tmp << " was given");
+
+		if( !(settings.initialMigration==InitialPartitioningMethods::SFC
+				or settings.initialMigration==InitialPartitioningMethods::KMeans
+				or settings.initialMigration==InitialPartitioningMethods::Multisection
+				or settings.initialMigration==InitialPartitioningMethods::None) ){
+			PRINT0("Initial migration supported only for 0:SFCs, 3:k-means, 4:MultiSection or 5:None, invalid option " << settings.initialMigration << " was given");
 			return 126;
 		}
 	}
@@ -238,6 +246,21 @@ int main(int argc, char** argv) {
 		if (!vm.count("numX")) {
 			std::cout << "TEEC file format does not specify graph size, please set with --numX" << std::endl;
 			return 126;
+		}
+	}
+
+	if (vm.count("previousPartition")) {
+		settings.repartition = true;
+		if (vm.count("initialPartition")) {
+			if (!(settings.initialPartition == InitialPartitioningMethods::KMeans || settings.initialPartition == InitialPartitioningMethods::None)) {
+				std::cout << "Method " << settings.initialPartition << " not supported for repartitioning, currently only kMeans." << std::endl;
+				return 126;
+			}
+		} else {
+			if (comm->getRank() == 0) {
+				std::cout << "Setting initial partitioning method to kMeans." << std::endl;
+			}
+			settings.initialPartition = InitialPartitioningMethods::KMeans;
 		}
 	}
 
@@ -470,11 +493,44 @@ int main(int argc, char** argv) {
         SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
     }
     
+    // get previous partition, if set
+    DenseVector<IndexType> previous;
+    if (vm.count("previousPartition")) {
+    	std::string filename = vm["previousPartition"].as<std::string>();
+    	previous = ITI::FileIO<IndexType, ValueType>::readPartition(filename, N);
+    	if (previous.size() != N) {
+    		throw std::runtime_error("Previous partition has wrong size.");
+    	}
+    	if (previous.max().Scalar::getValue<IndexType>() != settings.numBlocks-1) {
+    		throw std::runtime_error("Illegal maximum block ID in previous partition:" + std::to_string(previous.max().Scalar::getValue<IndexType>()));
+    	}
+    	if (previous.min().Scalar::getValue<IndexType>() != 0) {
+    		throw std::runtime_error("Illegal minimum block ID in previous partition:" + std::to_string(previous.min().Scalar::getValue<IndexType>()));
+    	}
+    	settings.repartition = true;
+    }
+
     // time needed to get the input. Synchronize first to make sure that all processes are finished.
     comm->synchronize();
     std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
 
     assert(N > 0);
+
+    if (settings.repartition && comm->getSize() == settings.numBlocks) {
+    	//redistribute according to previous partition now to simulate the setting in a dynamic repartitioning
+    	assert(previous.size() == N);
+    	scai::dmemo::Redistributor previousRedist(previous.getLocalValues(), previous.getDistributionPtr());
+    	graph.redistribute(previousRedist, graph.getColDistributionPtr());
+    	for (IndexType d = 0; d < settings.dimensions; d++) {
+    		coordinates[d].redistribute(previousRedist);
+    	}
+
+    	if (nodeWeights.size() > 0) {
+    		nodeWeights.redistribute(previousRedist);
+    	}
+    	previous = DenseVector<IndexType>(previousRedist.getTargetDistributionPtr(), comm->getRank());
+
+    }
 
     if( comm->getRank() ==0 && settings.verbose){
           settings.print(std::cout);
@@ -482,7 +538,7 @@ int main(int argc, char** argv) {
     
     std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
     
-    scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, settings );
+    scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, settings );
     assert( partition.size() == N);
     assert( coordinates[0].size() == N);
     
