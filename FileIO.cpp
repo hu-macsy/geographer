@@ -536,7 +536,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphMa
     
     ss >> numRows>> numColumns >> numValues;
     
-    SCAI_ASSERT( numRows==numColumns , "Number of rows should be equal to number o columns");
+    SCAI_ASSERT( numRows==numColumns , "Number of rows should be equal to number of columns");
 
     scai::lama::CSRSparseMatrix<ValueType> graph;
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -859,19 +859,38 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsMatr
 
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::string filename) {
+DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::string filename, IndexType globalN) {
 	std::ifstream file(filename);
 
 	if(file.fail())
 		throw std::runtime_error("File "+ filename+ " failed.");
 
-	std::vector<IndexType> part;
+	//get local range
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
+	IndexType beginLocalRange, endLocalRange;
+	scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
+	const IndexType localN = endLocalRange - beginLocalRange;
+
 	std::string line;
-	while (!std::getline(file, line).fail()) {
-		part.push_back(std::stoi(line));
+
+	//scroll to begin of local range.
+	for (IndexType i = 0; i < beginLocalRange; i++) {
+		std::getline(file, line);
 	}
 
-	DenseVector<IndexType> result(part.size(), part.data());
+	std::vector<IndexType> localPart;
+
+	for (IndexType i = 0; i < localN; i++) {
+		bool read = !std::getline(file, line).fail();
+		if (!read) {
+			throw std::runtime_error("In FileIO.cpp, line " + std::to_string(__LINE__) +": Unexpected end of file " + filename + ". Was the number of nodes correct?");
+	    }
+		localPart.push_back(std::stoi(line));
+	}
+
+	scai::hmemo::HArray<IndexType> hLocal(localPart.size(), localPart.data());
+	DenseVector<IndexType> result(dist, hLocal);
 
 	return result;
 }
@@ -1236,5 +1255,6 @@ template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsTEEC( s
 template CSRSparseMatrix<double>  FileIO<int, double>::readQuadTree( std::string filename, std::vector<DenseVector<double>> &coords );
 template std::pair<int, int> FileIO<int, double>::getMatrixMarketCoordsInfos(const std::string filename);
 template std::vector<int> FileIO<int, double>::readBlockSizes(const std::string filename , const int numBlocks );
+template DenseVector<int> FileIO<int, double>::readPartition(const std::string filename, int n );
 
 } /* namespace ITI */
