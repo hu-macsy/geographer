@@ -60,7 +60,7 @@ namespace ITI {
 			format = ITI::Format::ADCIRC;
 		else if (token == "OCEAN" or token == "3")
 			format = ITI::Format::OCEAN;
-		else if (token == "MATRIXMARKET" or token == "4")
+                else if (token == "MATRIXMARKET" or token == "4")
 			format = ITI::Format::MATRIXMARKET;
 		else if (token == "TEEC" or token == "5")
 			format = ITI::Format::TEEC;
@@ -318,11 +318,7 @@ int main(int argc, char** argv) {
     	if (settings.useDiffusionCoordinates) {
     		coordString = "and generating coordinates with diffusive distances.";
     	} else {
-    		if (vm.count("fileFormat") && vm["fileFormat"].as<ITI::Format>() == ITI::Format::TEEC) {
-    			coordString = "and coordinates.";
-    		} else {
-    			coordString = "and \"" + coordFile + "\" for coordinates";
-    		}
+    		coordString = "and \"" + coordFile + "\" for coordinates";
     	}
 
         if (comm->getRank() == 0)

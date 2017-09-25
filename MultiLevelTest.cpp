@@ -295,12 +295,19 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 
 TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
     //std::string file = "Grid16x16";
-    std::string file = "meshes/slowrot/slowrot-00009.graph";
-    //std::string file = "graphFromQuad2D/graphFromQuad2D_10";
-    std::ifstream f(file);
+    //std::string file = "meshes/hugetrace/hugetrace-00008.graph";
+    //std::string coordFile = std::string(file + ".xyz");
+    
+    std::string file = "meshes/hugetrace-08.bfg";
+    std::string coordFile = "meshes/hugetrace/hugetrace-00008.graph.xyz";
+    
+    // kept for furhter checking
+    std::string txtFile = "meshes/hugetrace/hugetrace-00008.graph";
+    std::ifstream f(txtFile);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;
     f >> N >> edges; 
+    f.close();
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     // for now local refinement requires k = P
@@ -310,7 +317,7 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     //distrubute graph
-    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
+    //graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
         
 
     //read the array locally and messed the distribution. Left as a remainder.
@@ -318,28 +325,28 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
     EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
     
     //distribution should be the same
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions);
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
     
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
 
     //check distributions
     //assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
 
     // coarsen the graph
-    for(IndexType i=2; i<7; i++){
+    for(IndexType i=4; i<10; i++){
         std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
         
-        Settings.pixeledSideLen = std::pow(i,2);
-        IndexType sideLen = Settings.pixeledSideLen;
+        settings.pixeledSideLen = std::pow(i,2);
+        IndexType sideLen = settings.pixeledSideLen;
         IndexType pixeledGraphSize =  std::pow( sideLen, dimensions);
         IndexType pixeledGraphAdjecencyMatrixSize = pixeledGraphSize*pixeledGraphSize;
         
                 
-        PRINT0("detail level="<< Settings.pixeledSideLen << " ,pixeledGraphSize= "<< pixeledGraphSize << " , pixeledGraphAdjecencyMatrixSize= " << pixeledGraphAdjecencyMatrixSize );
+        PRINT0("sideLen= "<< settings.pixeledSideLen << " ,pixeledGraphSize= "<< pixeledGraphSize << " , pixeledGraphAdjecencyMatrixSize= " << pixeledGraphAdjecencyMatrixSize );
         if( pixeledGraphSize > N ){
             std::cout<< " size of pixeledGraph (number of pixels)= "<< pixeledGraphSize << "  > input grap " << N <<" .Hmm, not really a coarsening... Breaking..." << std::endl;
             break;
@@ -347,13 +354,13 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
         
         DenseVector<ValueType> pixelWeights;
         
-        scai::lama::CSRSparseMatrix<ValueType> pixelGraph = MultiLevel<IndexType, ValueType>::pixeledCoarsen(graph, coords, pixelWeights, Settings);
+        scai::lama::CSRSparseMatrix<ValueType> pixelGraph = MultiLevel<IndexType, ValueType>::pixeledCoarsen(graph, coords, pixelWeights, settings);
         
         std::chrono::duration<double> elapsedSeconds = std::chrono::steady_clock::now() - start;
         double maxElapsedTime = comm->max( elapsedSeconds.count() );
         
         if(comm->getRank()==0 ){
-            std::cout<< "detail level= "<< i << " , max time: "<< maxElapsedTime << std::endl;
+            std::cout<< "sideLen= "<< sideLen << " , max time: "<< maxElapsedTime << std::endl;
         }
         
         EXPECT_TRUE(pixelGraph.isConsistent());

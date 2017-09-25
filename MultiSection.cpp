@@ -472,7 +472,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             if( std::pow( intSqrtK+1, dim ) == k){
                 intSqrtK++;
             }
-            SCAI_ASSERT( std::pow( intSqrtK, dim ) == k, "Wrong square root of k. k= "<< k << ", pow( sqrtK, 1/d)= " << std::pow(intSqrtK,dim));
+            SCAI_ASSERT_EQ_ERROR( std::pow( intSqrtK, dim ), k, "Wrong square root of k. k= "<< k << ", sqrtK= " << sqrtK << ", intSqrtK " << intSqrtK );
             numCuts = std::vector<IndexType>( dim, intSqrtK );
         }else{                                  // user-specific number of cuts per dimensions
             numCuts = settings.cutsPerDim;

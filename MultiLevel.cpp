@@ -980,7 +980,7 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
                         }
                     }
                     // somehow got a pixel as neighbour that is either far (not a mesh?) or share only
-                    // a corner with thisPixel, not a cube edge
+                    // a corner with thisPixel, not a cube facet
                     if( ngbrNotFound ){ 
                         ++notCountedPixelEdges;
                     }

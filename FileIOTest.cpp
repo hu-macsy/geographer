@@ -187,6 +187,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
 
     EXPECT_EQ(coords2D.size(), dim);
     EXPECT_EQ(coords2D[0].size(), N);
+    
 
     // print
     /*
@@ -259,15 +260,42 @@ TEST_F(FileIOTest, testReadQuadTree){
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadGraphBinary){
-    std::string path = "meshes/";
-    std::string file = "bigbubbles-10.gi";
+    std::string path = "./meshes/";
+    std::string file = "trace10.bfg";   // trace10: n=8699, m=25874
+    //std::string file = "Grid16x16.bfg";   // Grid16x16: n= 256, m=480
+    //std::string file = "Grid8x8.bfg";   // Grid16x16: n= 64, m=224
     std::string filename= path + file;
     scai::lama::CSRSparseMatrix<ValueType> graph;
-    IndexType N;    //number of points
     
-    std::vector<DenseVector<ValueType>> dummyWeightContainer;
-    graph =  FileIO<IndexType, ValueType>::readGraphBinary(filename, dummyWeightContainer);
+    //std::vector<DenseVector<ValueType>> dummyWeightContainer;
+    graph =  FileIO<IndexType, ValueType>::readGraphBinary(filename);
     
+    //assertions
+    
+    //TODO: read same graph with the original reader. Matrices must be identical
+    
+    //std::string txtFile= file.substr(0, file.length()-4);
+    std::string txtFile= "./meshes/trace/trace-00010.graph";
+    std::fstream f(txtFile);
+    if (f.fail()) {
+        throw std::runtime_error("Reading graph from " + filename + " failed.");
+    }
+    IndexType nodes, edges;
+    f>> nodes>> edges;
+    f.close();
+    
+    IndexType N = graph.getNumRows();
+    
+    if( N<1000){
+        SCAI_ASSERT( graph.checkSymmetry(), "Matrix not symmetric" );
+    }
+    SCAI_ASSERT( graph.isConsistent(), "Matrix not consistent" );
+    
+    SCAI_ASSERT_EQ_ERROR( N, nodes, "Mismatch in number of nodes read." );
+    SCAI_ASSERT_EQ_ERROR( N, graph.getNumColumns(), "Wrong number of rows and columns" );
+    
+    IndexType M = graph.getNumValues();
+    SCAI_ASSERT_EQ_ERROR( M, edges*2, "Mismatch in number of edges read." );
     
 }
 //-------------------------------------------------------------------------------------------------
@@ -350,6 +378,61 @@ TEST_F(FileIOTest, testReadBlockSizes){
     
     //aux::printVector( blockSizes );
     SCAI_ASSERT( blockSizes.size()==16 , "Wrong number of blocks, should be 16 but is " << blockSizes.size() );
+
+}
+//-------------------------------------------------------------------------------------------------
+
+TEST_F(FileIOTest, testWriteCoordsParallel){
+
+    std::string file = "Grid8x8";
+    std::ifstream f(file);
+    //WARNING: for this example we need dimension 3 because the Schamberger graphs have always 3 coordinates
+    IndexType dimensions= 3;
+    IndexType N, edges;
+    f >> N >> edges; 
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    // for now local refinement requires k = P
+    IndexType k = comm->getSize();
+    //
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+    graph.redistribute(dist, noDistPointer);
+    
+    std::vector<DenseVector<ValueType>> coordsOrig = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    EXPECT_TRUE(coordsOrig[0].getDistributionPtr()->isEqual(*dist));
+
+    for(IndexType d=0; d<dimensions; d++){
+        scai::hmemo::ReadAccess<ValueType> localCoords( coordsOrig[d].getLocalValues() );
+        PRINT(*comm << ": dimension " << d );
+        for( IndexType i=0; i<localCoords.size(); i++){
+            std::cout<< localCoords[i] << ", ";
+        }
+        std::cout<< std::endl;
+    }
+    
+    std::string outFilename = std::string( file+"_parallel.xyz");
+    
+    FileIO<IndexType, ValueType>::writeCoordsParallel( coordsOrig, outFilename);
+    
+    //now read the coords
+    
+    std::vector<DenseVector<ValueType>> coordsBinary =  FileIO<IndexType, ValueType>::readCoordsBinary( outFilename, N, dimensions);
+    
+    
+    for( int d=0; d<dimensions; d++){
+        scai::hmemo::ReadAccess<ValueType> localCoordsBinary( coordsBinary[d].getLocalValues() );
+        scai::hmemo::ReadAccess<ValueType> localCoordsOrig( coordsOrig[d].getLocalValues() );
+        
+        SCAI_ASSERT_EQ_ERROR( localCoordsBinary.size(), localCoordsOrig.size(), "Size mismatch");
+        
+        PRINT(*comm << ": dimension: "<< d);
+        
+        for( IndexType i=0; i<localCoordsBinary.size(); i++){
+            SCAI_ASSERT_EQ_ERROR( localCoordsBinary[i], localCoordsOrig[i], "Not equal coordinates at index " << i);
+        }
+    }
     
 }
 

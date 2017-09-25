@@ -66,9 +66,11 @@ public:
 	*/
 	static void writeCoords (const std::vector<DenseVector<ValueType>> &coords, const std::string filename);
 
-	static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
+        static void writeCoordsParallel(const std::vector<DenseVector<ValueType>> &coords, const std::string filename);
+        
+        static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
 
-    /**
+        /**
 	 * Writes a partition to file.
 	 * @param[in] part
 	 * @param[in] filename The file's name to write to
@@ -94,12 +96,18 @@ public:
 	 * @param[in] fileFormat The type of file to read from.
 	 * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
 	 */
-	static scai::lama::CSRSparseMatrix<ValueType> readGraphBinary(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights);
+	static scai::lama::CSRSparseMatrix<ValueType> readGraphBinary(const std::string filename);
         
 	/* Reads the coordinates from file "filename" and returns then in a vector of DenseVector
 	 */
 	static std::vector<DenseVector<ValueType>> readCoords ( std::string filename, IndexType numberOfCoords, IndexType dimension, Format = Format::METIS);
 
+        /**
+         * 
+         */
+        static std::vector<DenseVector<ValueType>> readCoordsBinary( std::string filename, const IndexType numberOfPoints, const IndexType dimension);
+        
+        
 	/*
 	 * Read Coordinates in Ocean format of Vadym Aizinger
 	 */
@@ -128,19 +136,19 @@ public:
 		return readQuadTree(filename, coords);
 	}
 
-	static std::pair<IndexType, IndexType> getMatrixMarketCoordsInfos(const std::string filename);
-
-	/** Read a file with numBLocks number of blocks. The file should contain in its first row the number of blocks and
-	 *  in each line contains a number that is the size of this block.
-	 *  Only PE 0 reads the given file, constructs the std::vector with the block sizes and then broadcasts the vector to
-	 *  the rest of the PEs.
-	 *  Example of a file with 3 blocks:
-	 * 3
-	 * 100
-	 * 120
-	 * 97
-	*/
-	static std::vector<IndexType> readBlockSizes(const std::string filename , const IndexType numBlocks);
+        static std::pair<IndexType, IndexType> getMatrixMarketCoordsInfos(const std::string filename);
+        
+        /** Read a file with numBLocks number of blocks. The file should contain in its first row the number of blocks and
+         *  in each line contains a number that is the size of this block.
+         *  Only PE 0 reads the given file, constructs the std::vector with the block sizes and then broadcasts the vector to
+         *  the rest of the PEs.
+         *  Example of a file with 3 blocks:
+         * 3
+         * 100
+         * 120
+         * 97
+        */
+        static std::vector<IndexType> readBlockSizes(const std::string filename , const IndexType numBlocks);
 
 	static DenseVector<IndexType> readPartition(const std::string filename, IndexType n);
 
