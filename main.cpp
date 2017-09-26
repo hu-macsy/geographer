@@ -64,6 +64,8 @@ namespace ITI {
 			format = ITI::Format::MATRIXMARKET;
 		else if (token == "TEEC" or token == "5")
 			format = ITI::Format::TEEC;
+                else if (token == "BINARY" or token == "6")
+			format = ITI::Format::BINARY;
 		else
 			in.setstate(std::ios_base::failbit);
 		return in;
@@ -85,6 +87,8 @@ namespace ITI {
 			token = "MATRIXMARKET";
 		else if (method == ITI::Format::TEEC)
 			token = "TEEC";
+                else if (method == ITI::Format::BINARY)
+                        token == "BINARY";
 		out << token;
 		return out;
 	}
@@ -229,15 +233,6 @@ int main(int argc, char** argv) {
 	if( vm.count("cutsPerDim") ) {
             SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
             SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
-        }
-        
-        
-        int i=2147483644;
-        int kl=0;
-        while( kl<10 ){
-            PRINT(i);
-            i++;
-            kl++;
         }
         
 	if( vm.count("initialMigration") ){

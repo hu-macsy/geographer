@@ -311,7 +311,7 @@ template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, Format format) {
     
         std::string ending = filename.substr( filename.size()-3,  filename.size() );
-        if( ending == "bfg" ){
+        if( ending == "bfg" or format==Format::BINARY ){
             return readGraphBinary( filename );
         }
         
@@ -347,58 +347,64 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         
 	//define variables
 	std::string line;
-	IndexType globalN, globalM;
+	//IndexType globalN, globalM;
+        unsigned long long int globalN, globalM;
 	IndexType numberNodeWeights = 0;
 	bool hasEdgeWeights = false;
 	std::vector<ValueType> edgeWeights;//possibly of size 0
 
 	//read first line to get header information
 	std::getline(file, line);
-	std::stringstream ss( line );
-	std::string item;
-
-	{
-		//node count and edge count are mandatory. If these fail, std::stoi will raise an error. TODO: maybe wrap into proper error message
-		std::getline(ss, item, ' ');
-		globalN = std::stoi(item);
-		std::getline(ss, item, ' ');
-		globalM = std::stoi(item);
-
-		bool readWeightInfo = !std::getline(ss, item, ' ').fail();
-		if (readWeightInfo && item.size() > 0) {
-			//three bits, describing presence of edge weights, vertex weights and vertex sizes
-			int bitmask = std::stoi(item);
-			hasEdgeWeights = bitmask % 10;
-			if ((bitmask / 10) % 10) {
-				bool readNodeWeightCount = !std::getline(ss, item, ' ').fail();
-				if (readNodeWeightCount && item.size() > 0) {
-					numberNodeWeights = std::stoi(item);
-				} else {
-					numberNodeWeights = 1;
-				}
-			}
-		}
-
-		if (comm->getRank() == 0) {
-			std::cout << "Expecting " << globalN << " nodes and " << globalM << " edges, ";
-			if (!hasEdgeWeights && numberNodeWeights == 0) {
-				std::cout << "with no edge or node weights."<< std::endl;
-			}
-			else if (hasEdgeWeights && numberNodeWeights == 0) {
-				std::cout << "with edge weights, but no node weights."<< std::endl;
-			}
-			else if (!hasEdgeWeights && numberNodeWeights > 0) {
-				std::cout << "with no edge weights, but " << numberNodeWeights << " node weights."<< std::endl;
-			}
-			else {
-				std::cout << "with edge weights and " << numberNodeWeights << " weights per node."<< std::endl;
-			}
-		}
-	}
-
-    const ValueType avgDegree = ValueType(2*globalM) / globalN;
-
-    //get distribution and local range
+        std::stringstream ss( line );
+        std::string item;
+        
+        {
+            //node count and edge count are mandatory. If these fail, std::stoi will raise an error. TODO: maybe wrap into proper error message
+            std::getline(ss, item, ' ');
+            globalN = std::stoll(item);
+            std::getline(ss, item, ' ');
+            globalM = std::stoll(item);
+            
+            if( globalN<=0 or globalM<=0 ){
+                PRINT0("Negative input, maybe int value is not big enough: globalN= " << globalN << " , globalM= "<< globalM);
+                exit(0);
+            }
+            
+            bool readWeightInfo = !std::getline(ss, item, ' ').fail();
+            if (readWeightInfo && item.size() > 0) {
+                //three bits, describing presence of edge weights, vertex weights and vertex sizes
+                int bitmask = std::stoi(item);
+                hasEdgeWeights = bitmask % 10;
+                if ((bitmask / 10) % 10) {
+                    bool readNodeWeightCount = !std::getline(ss, item, ' ').fail();
+                    if (readNodeWeightCount && item.size() > 0) {
+                        numberNodeWeights = std::stoi(item);
+                    } else {
+                        numberNodeWeights = 1;
+                    }
+                }
+            }
+            
+            if (comm->getRank() == 0) {
+                std::cout << "Expecting " << globalN << " nodes and " << globalM << " edges, ";
+                if (!hasEdgeWeights && numberNodeWeights == 0) {
+                    std::cout << "with no edge or node weights."<< std::endl;
+                }
+                else if (hasEdgeWeights && numberNodeWeights == 0) {
+                    std::cout << "with edge weights, but no node weights."<< std::endl;
+                }
+                else if (!hasEdgeWeights && numberNodeWeights > 0) {
+                    std::cout << "with no edge weights, but " << numberNodeWeights << " node weights."<< std::endl;
+                }
+                else {
+                    std::cout << "with edge weights and " << numberNodeWeights << " weights per node."<< std::endl;
+                }
+            }
+        }
+        
+        const ValueType avgDegree = ValueType(2*globalM) / globalN;
+        
+        //get distribution and local range
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 
@@ -529,7 +535,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBinary(const std::string filename){
-
+    SCAI_REGION("FileIO.readGraphBinary")
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
     typedef unsigned long int ULONG;
@@ -596,10 +602,12 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             //std::cout << "Process " << thisPE << " reading from " << beginLocalRange << " to " << endLocalRange << ", in total, localN= " << localN << " nodes/lines" << std::endl;
             
             ia.resize( localN +1);
-             
+
+            
             //
             // read the vertices offsets
             //
+            SCAI_REGION_START("FileIO.readGraphBinary.fileRead")
             
             const ULONG startPos = (headerSize+beginLocalRange)*(sizeof(ULONG));         
             ULONG* vertexOffsets = new ULONG[localN+1];
@@ -616,7 +624,9 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             ULONG* edges = new ULONG[numEdges];
             file.seekg( edgeStartPos );
             file.read( (char *)(edges), (numEdges)*sizeof(ULONG) );     
-
+            
+            SCAI_REGION_END("FileIO.readGraphBinary.fileRead")
+            
             //TODO: construct the matrix outside of the while loop
             // not sure if can be done since we need the vertexOffsets and edges arrays
             
@@ -630,6 +640,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             std::vector<ULONG> neighbors;
             
             for( IndexType i=0; i<localN; i++){
+                SCAI_REGION("FileIO.readGraphBinary.buildCSRmatrix")
                 ULONG nodeDegree = (vertexOffsets[i+1]-vertexOffsets[i])/sizeof(ULONG);
                 SCAI_ASSERT ( nodeDegree>0, "Node with degree zero not allowed");
                 neighbors.resize(nodeDegree);
@@ -857,6 +868,8 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 
     if (format == Format::OCEAN) {
 	return readCoordsOcean(filename, dimension);
+    }else if( format==Format::BINARY){
+        return  readCoordsBinary( filename, numberOfPoints,dimension);
     }
 
     IndexType globalN= numberOfPoints;
@@ -994,10 +1007,12 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
             
             std::cout << "Process " << thisPE << " reading from " << beginLocalCoords << " to " << endLocalCoords << ", in total, localN= " << localTotalNumOfCoords << " coordinates and " << (localTotalNumOfCoords)*sizeof(ValueType) << " bytes." << std::endl;
             
+            SCAI_REGION_START("FileIO.readCoordsBinary.fileRead" );
             const UINT startPos = beginLocalCoords*sizeof(ValueType);   
             ValueType* localPartOfCoords = new ValueType[localTotalNumOfCoords];
             file.seekg(startPos);
             file.read( (char *)(localPartOfCoords), (localTotalNumOfCoords)*sizeof(ValueType) );
+            SCAI_REGION_END("FileIO.readCoordsBinary.fileRead" );
             
             for(IndexType i=0; i<localN; i++){
                 for(IndexType dim=0; dim<dimension; dim++){

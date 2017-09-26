@@ -157,7 +157,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 
                 // the distribution for the initial migration   
                 scai::dmemo::DistributionPtr initMigrationPtr;
-                
+PRINT0("");                
                 if (!settings.repartition || comm->getSize() != settings.numBlocks) {
                     DenseVector<IndexType> tempResult;
                     
@@ -179,12 +179,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                     } else {
                         throw std::logic_error("Method not yet supported for preparing for K-Means");
                     }
-                    
+PRINT0("");                        
                     std::chrono::duration<double> migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
                     timeToCalcInitMigration = ValueType ( comm->max(migrationCalculation.count()) );             
                     
                     std::chrono::time_point<std::chrono::system_clock> beforeMigration =  std::chrono::system_clock::now();
-                    
+PRINT0("");                        
                     scai::dmemo::Redistributor prepareRedist(initMigrationPtr, nodeWeights.getDistributionPtr());
                     nodeWeightCopy.redistribute(prepareRedist);
                     for (IndexType d = 0; d < dimensions; d++) {
@@ -197,7 +197,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                     std::chrono::duration<double> migrationTime = std::chrono::system_clock::now() - beforeMigration;
                     timeForFirstRedistribution = ValueType ( comm->max(migrationTime.count()) );
                 }
-                
+ PRINT0("");               
             }
             
             const ValueType weightSum = nodeWeights.sum().Scalar::getValue<ValueType>();
@@ -210,14 +210,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 blockSizes = settings.blockSizes;
             }
             SCAI_ASSERT( blockSizes.size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
-            
+PRINT0("");            
             std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
             if (settings.repartition) {
             	result = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeightCopy, blockSizes, previous, settings);
             } else {
             	result = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeightCopy, blockSizes, settings);
             }
-
+PRINT0("");
             std::chrono::duration<double> kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
             timeForKmeans = ValueType ( comm->max(kMeansTime.count() ));
             assert(result.getLocalValues().min() >= 0);
@@ -300,7 +300,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 //TODO: take node weights into account
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings){
-    
+
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(coordinates[0].getDistributionPtr(), 1);
     return hilbertPartition( coordinates, settings);
 }
@@ -325,7 +325,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     if (k != comm->getSize() && comm->getRank() == 0) {
     	throw std::logic_error("Hilbert curve partition only implemented for same number of blocks and processes.");
     }
-
+PRINT0("");  
     std::vector<ValueType> minCoords(dimensions);
     std::vector<ValueType> maxCoords(dimensions);
     DenseVector<IndexType> result;
@@ -355,7 +355,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
      */
     
     scai::lama::DenseVector<ValueType> hilbertIndices(coordDist);
-    
+PRINT0("");      
     {
         SCAI_REGION("ParcoRepart.hilbertPartition.spaceFillingCurve");
         // get local part of hilbert indices
@@ -380,7 +380,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
             hilbertIndicesLocal[i] = globalHilbertIndex;
         }
     }
-
+PRINT0("");  
     //
     // vector of size k, each element represents the size of each block
     //
@@ -418,7 +418,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         	localPairs[i].index = coordDist->local2global(i);
         	indexSum += localPairs[i].index;
         }
-
+PRINT0("");  
         //create checksum
         const long checkSum = comm->sum(indexSum);
         assert(checkSum == (long(globalN)*(long(globalN)-1))/2);
