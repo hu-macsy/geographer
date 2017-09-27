@@ -345,10 +345,12 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
         
+typedef unsigned long long int ULLI;        
+        
 	//define variables
 	std::string line;
 	//IndexType globalN, globalM;
-        unsigned long long int globalN, globalM;
+        ULLI globalN, globalM;
 	IndexType numberNodeWeights = 0;
 	bool hasEdgeWeights = false;
 	std::vector<ValueType> edgeWeights;//possibly of size 0
@@ -416,9 +418,15 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     //std::cout << "Process " << comm->getRank() << " reading from " << beginLocalRange << " to " << endLocalRange << std::endl;
 
     //scroll to begin of local range. Neighbors of node i are in line i+1
-    for (IndexType i = 0; i < beginLocalRange; i++) {
+    IndexType ll;
+    for (ll = 0; ll < beginLocalRange; ll++) {
     	std::getline(file, line);
+        if( file.tellg()<0){
+            PRINT(*comm << " : "<<  ll);
+            exit(0);
+        }
     }
+PRINT( *comm << ": " << ll << " __ " << file.tellg() );
 
     std::vector<IndexType> ia(localN+1, 0);
     std::vector<IndexType> ja;
@@ -429,7 +437,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     }
 
     //we don't know exactly how many edges we are going to have, but in a regular mesh the average degree times the local nodes is a good estimate.
-    IndexType edgeEstimate = IndexType(localN*avgDegree*1.1);
+    ULLI edgeEstimate = ULLI(localN*avgDegree*1.1);
     assert(edgeEstimate >= 0);
     ja.reserve(edgeEstimate);
     
@@ -438,6 +446,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     //now read in local edges
     for (IndexType i = 0; i < localN; i++) {
     	bool read = !std::getline(file, line).fail();
+        
+if( !read) PRINT(*comm << ": " <<  i << " __ " << line << " || " << file.tellg() );        
     	//remove leading and trailing whitespace, since these can confuse the string splitter
     	boost::algorithm::trim(line);
     	assert(read);//if we have read past the end of the file, the node count was incorrect
@@ -927,6 +937,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 			}
 			ValueType coord = std::stod(item);
 			coords[dim][i] = coord;
+PRINT( *comm <<": ("<< dim << "." << i << ")= " << coord );                        
 			dim++;
 		}
 		if (dim < dimension) {

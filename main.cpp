@@ -202,6 +202,12 @@ int main(int argc, char** argv) {
 				("verbose", "Increase output.")
 				;
 
+                                
+std::vector<std::string> sv = { "10", "10.1", "1.12", "0.123"};
+for( std::string s:sv){
+	PRINT0(s << " > "<< std::stod(s) );
+}
+
 	variables_map vm;
 	store(command_line_parser(argc, argv).options(desc).run(), vm);
 	notify(vm);
@@ -376,9 +382,12 @@ int main(int argc, char** argv) {
         settings.numY = 1;
         settings.numZ = 1;
 
+        std::chrono::duration<double> readGraphTime = std::chrono::system_clock::now() - startTime;
+        ValueType timeToReadGraph = ValueType ( comm->max(readGraphTime.count()) );     
+        
         comm->synchronize();
         if (comm->getRank() == 0) {
-        	std::cout<< "Read " << N << " points." << std::endl;
+        	std::cout<< "Read " << N << " points in " << timeToReadGraph << " ms." << std::endl;
         }
         
         if (settings.useDiffusionCoordinates) {
@@ -414,11 +423,14 @@ int main(int argc, char** argv) {
                 coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
             }
         }
-
+        
+        std::chrono::duration<double> readCoordsTime = std::chrono::system_clock::now() - startTime;
+        ValueType timeToReadCoords = ValueType ( comm->max(readCoordsTime.count()) ) -timeToReadGraph ;     
+        
         comm->synchronize();
         if (comm->getRank() == 0) {
-        	std::cout << "Read coordinates." << std::endl;
-        }
+        	std::cout << "Read coordinates in "<< timeToReadCoords << " ms." << std::endl;
+        }       
 
     } else if(vm.count("generate")){
     	if (settings.dimensions == 2) {
