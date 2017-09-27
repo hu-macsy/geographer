@@ -256,6 +256,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 					lowerBoundNextCenter[i] = 0;
 				} else {
 					ValueType diff = (-2*delta*pureSqrt + deltaSq)*(maxInfluence + 1e-10);
+                                        //TODO: assertion fails for small graphs
 					assert(diff < 0);
 					lowerBoundNextCenter[i] += diff;
 					if (!(lowerBoundNextCenter[i] > 0)) lowerBoundNextCenter[i] = 0;
