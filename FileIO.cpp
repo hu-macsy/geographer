@@ -345,7 +345,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
         
-typedef unsigned long long int ULLI;        
+        typedef unsigned long long int ULLI;        
         
 	//define variables
 	std::string line;
@@ -426,7 +426,7 @@ typedef unsigned long long int ULLI;
             exit(0);
         }
     }
-PRINT( *comm << ": " << ll << " __ " << file.tellg() );
+    //PRINT( *comm << ": " << ll << " __ " << file.tellg() );
 
     std::vector<IndexType> ia(localN+1, 0);
     std::vector<IndexType> ja;
@@ -935,9 +935,11 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 			if (!read) {
 				throw std::runtime_error("Unexpected end of line " + line +". Was the number of dimensions correct?");
 			}
-			ValueType coord = std::stod(item);
+			// WARNING: in supermuc (with the gcc/5) the std::stod returns the int part !!
+			//ValueType coord = std::stod(item);
+			ValueType coord = boost::lexical_cast<ValueType>(item);
 			coords[dim][i] = coord;
-PRINT( *comm <<": ("<< dim << "." << i << ")= " << coord );                        
+                        //PRINT( *comm <<": ("<< dim << "," << i << ")= " << coord );                        
 			dim++;
 		}
 		if (dim < dimension) {

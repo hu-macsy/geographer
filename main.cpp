@@ -203,9 +203,13 @@ int main(int argc, char** argv) {
 				;
 
                                 
-std::vector<std::string> sv = { "10", "10.1", "1.12", "0.123"};
-for( std::string s:sv){
-	PRINT0(s << " > "<< std::stod(s) );
+std::vector<std::string> strings = { "10.1", "1.12", "0.123"};
+for( std::string s:strings ){
+    ValueType stdDouble = std::stod( s );
+    ValueType boostDouble = boost::lexical_cast<ValueType>(s);
+    if( stdDouble!=boostDouble ){
+	PRINT0( "\033[1;36mWARNING: std::stod and boost::lexical_cast do not agree \033[0m"  );
+    }
 }
 
 	variables_map vm;
@@ -604,6 +608,6 @@ for( std::string s:sv){
         std::cout.precision(oldprecision);
         
         std::cout<< std::endl<< "\033[1;36mcut:"<< cut<< "   imbalance:"<< imbalance << "   maxComm= "<< maxComm << std::endl;
-        std::cout<<"inputTime:" << inputT << "   partitionTime:" << partT <<"   reportTime:"<< repT << " \033[0m" << std::endl;
+        std::cout<<"inputTime:" << inputT << "   partitionTime:" << partT <<"   reportTime:"<< repT << " \033[0m" << std::endl; 
     }
 }

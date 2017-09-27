@@ -1,0 +1,70 @@
+
+#include <memory>
+#include <cstdlib>
+#include <chrono>
+#include <fstream>
+#include <unistd.h>
+
+#include "FileIO.h"
+//#include "Settings.h"
+
+
+typedef double ValueType;
+typedef int IndexType;
+
+
+int main(int argc, char** argv) {
+    
+    std::string filename =  "./meshes/largeNumbers.txt";
+    std::ifstream file( filename );
+
+    if (file.fail()) {
+        throw std::runtime_error("Reading graph from " + filename + " failed.");
+    }
+    std::string line;
+    //std::getline(file, line);
+    //std::stringstream ss( line );
+    std::string item;
+    std::vector<IndexType> neighbors;
+    
+    while( !file.eof() ){
+        //while (!std::getline(ss, item, ' ').fail()) {
+        std::getline(file, item, ' ');
+        IndexType neighbor = std::stoi(item);
+        std::cout << neighbor << std::endl;
+        //}
+    }
+    
+    std::cout << "program converts a coordinates file into a binary file. "  << std::endl;
+    std::cout << "usage: ./a.out dimensions numberOfPoints inputFile outputFile , eg: ./a.out 2 100 coords.xyz coords.bcf" << std::endl;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    IndexType thisPE = comm->getRank();
+    
+    
+    if( argc!=5 ){
+        if( thisPE==0 ){
+            std::cout<< "Wrong number of parameter given: " << argc << std::endl; 
+        }
+        return 0;
+    }
+    
+    //IndexType dimensions = std::strtol( argv[1] );
+    IndexType dimensions = std::stoi( argv[1] );
+    if( dimensions<=0 ){
+        PRINT0("wrong number of dimensions: " << dimensions);
+    }
+    
+    //IndexType globalN = std::strtol( argv[2] );
+    IndexType globalN = std::stoi( argv[2] );
+    SCAI_ASSERT_GT_ERROR( globalN, 0, "Number of points should be positive." );
+    
+    std::string inFilename = argv[3];
+    std::string outFilename = argv[4];
+    
+    std::vector<DenseVector<ValueType>> coordsOrig = ITI::FileIO<IndexType, ValueType>::readCoords( inFilename, globalN, dimensions);
+    
+    ITI::FileIO<IndexType, ValueType>::writeCoordsParallel( coordsOrig, outFilename);
+    
+}
+    

@@ -12,6 +12,8 @@
 #include <scai/lama/DenseVector.hpp>
 #include <scai/lama/io/MatrixMarketIO.hpp>
 
+#include <boost/lexical_cast.hpp>
+
 #include "quadtree/QuadTreeCartesianEuclid.h"
 
 using scai::lama::CSRSparseMatrix;
