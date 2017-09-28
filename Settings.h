@@ -61,7 +61,7 @@ struct Settings{
     bool erodeInfluence = false;
 
     //parameters for multisection
-    bool bisect = 0;    // 0: works for square k, 1: bisect, for k=power of 2
+    bool bisect = false;    // 0: works for square k, 1: bisect, for k=power of 2
     bool useExtent = false;
     std::vector<IndexType> cutsPerDim;
 
@@ -78,30 +78,49 @@ struct Settings{
     void print(std::ostream& out){
         IndexType numPoints = numX* numY* numZ;
         
-        out<< "Setting: number of points= " << numPoints<< ", dimensions= "<< dimensions << ", minBorderNodes= "\
-        << minBorderNodes << ", stopAfterNoGainRounds= "<< stopAfterNoGainRounds <<\
-        ", minGainForNextRound= " << minGainForNextRound << ", sfcResolution= "<<\
-        sfcResolution << ", epsilon= "<< epsilon << ", numBlocks= " << numBlocks << std::endl;
+        out<< "Setting: number of points= " << numPoints<< ", dimensions= "<< dimensions << "filename=" << fileName << std::endl;
+        if( outFile!="-" ){
+            out<< "outFile= " << outFile << std::endl;
+        }
+        out<< "minBorderNodes= " << minBorderNodes << std::endl;
+        out<< "stopAfterNoGainRounds= "<< stopAfterNoGainRounds << std::endl;
+        out<< "minGainForNextRound= " << minGainForNextRound << std::endl;
         out<< "multiLevelRounds: " << multiLevelRounds << std::endl;
         out<< "coarseningStepsBetweenRefinement: "<< coarseningStepsBetweenRefinement << std::endl;
-        out<< "useDiffusionTieBreaking: " << useDiffusionTieBreaking <<std::endl;
-        out<< "useGeometricTieBreaking: " << useGeometricTieBreaking <<std::endl;
-        out<< "gainOverBalance: " << gainOverBalance << std::endl;
-        out<< "skipNoGainColors: "<< skipNoGainColors << std::endl;
-        out<< "pixeledSideLen: "<< pixeledSideLen << std::endl;
+        out<< "parameters used:" <<std::endl;
+        if( useDiffusionTieBreaking ){
+            out<< "\tuseDiffusionTieBreaking"  <<std::endl;
+        }
+        if( useGeometricTieBreaking ){
+            out<< "\tuseGeometricTieBreaking" <<std::endl;
+        }
+        if( gainOverBalance ){
+            out<< "\tgainOverBalance"  << std::endl;
+        }
+        if( skipNoGainColors ){
+            out<< "\tskipNoGainColors" << std::endl;
+        }
+
         if (initialPartition==InitialPartitioningMethods::SFC) {
             out<< "initial partition: hilbert curve" << std::endl;
+            out<< "\tsfcResolution: " << sfcResolution << std::endl;
         } else if (initialPartition==InitialPartitioningMethods::Pixel) {
             out<< "initial partition: pixels" << std::endl;
+            out<< "\tpixeledSideLen: "<< pixeledSideLen << std::endl;
         } else if (initialPartition==InitialPartitioningMethods::Spectral) {
-        	out<< "initial partition: spectral" << std::endl;
+            out<< "initial partition: spectral" << std::endl;
         } else if (initialPartition==InitialPartitioningMethods::KMeans) {
             out<< "initial partition: K-Means" << std::endl;
+            out<< "\tminSamplingNodes: " << minSamplingNodes << std::endl;
+            out<< "\tinfluenceExponent: " << influenceExponent << std::endl;
         } else if (initialPartition==InitialPartitioningMethods::Multisection) {
-        	out<< "initial partition: MultiSection" << std::endl;
+            out<< "initial partition: MultiSection" << std::endl;
+            out<< "\tbisect: " << bisect << std::endl;
+            out<< "\tuseExtent: "<< useExtent << std::endl;
         } else {
             out<< "initial partition undefined" << std::endl;
         }
+        out<< "epsilon= "<< epsilon << ", numBlocks= " << numBlocks << std::endl;
     }
 };
 
