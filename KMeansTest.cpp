@@ -7,19 +7,23 @@
 typedef double ValueType;
 typedef int IndexType;
 
+
 namespace ITI {
 
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
 
+
 class KMeansTest : public ::testing::Test {
+protected:
+        // the directory of all the meshes used
+        std::string graphPath = "./meshes/";
 
 };
 
 TEST_F(KMeansTest, testFindInitialCenters) {
-	std::string path = "meshes/bubbles/";
 	std::string fileName = "bubbles-00010.graph";
-	std::string graphFile = path + fileName;
+	std::string graphFile = graphPath + fileName;
 	std::string coordFile = graphFile + ".xyz";
 	const IndexType dimensions = 2;
 	const IndexType k = 8;
@@ -69,9 +73,8 @@ TEST_F(KMeansTest, testFindInitialCenters) {
 }
 
 TEST_F(KMeansTest, testFindCenters) {
-	std::string path = "meshes/bubbles/";
 	std::string fileName = "bubbles-00010.graph";
-	std::string graphFile = path + fileName;
+	std::string graphFile = graphPath + fileName;
 	std::string coordFile = graphFile + ".xyz";
 	const IndexType dimensions = 2;
 

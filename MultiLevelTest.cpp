@@ -31,12 +31,15 @@ using namespace scai;
 namespace ITI {
 
 class MultiLevelTest : public ::testing::Test {
+protected:
+        // the directory of all the meshes used
+        std::string graphPath = "./meshes/";
 
 };
 
 
 TEST_F (MultiLevelTest, testCoarseningGrid_2D) {
-     std::string file = "Grid8x8";
+     std::string file = graphPath + "Grid8x8";
     std::ifstream f(file);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;
@@ -92,7 +95,7 @@ TEST_F (MultiLevelTest, testCoarseningGrid_2D) {
 
 TEST_F (MultiLevelTest, testGetMatchingGrid_2D) {
     //std::string file = "Grid8x8";                         // the easy case
-    std::string file = "./meshes/rotation/rotation-00000.graph";     // a harder instance
+    std::string file = graphPath+ "rotation-00000.graph";     // a harder instance
     std::ifstream f(file);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;
@@ -294,15 +297,11 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 //--------------------------------------------------------------------------------------- 
 
 TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
-    //std::string file = "Grid16x16";
-    //std::string file = "meshes/hugetrace/hugetrace-00008.graph";
-    //std::string coordFile = std::string(file + ".xyz");
-    
-    std::string file = "meshes/hugetrace-08.bfg";
-    std::string coordFile = "meshes/hugetrace/hugetrace-00008.graph.xyz";
+    std::string file = graphPath + "trace-00008.bfg";
+    std::string coordFile = graphPath + "trace-00008.graph.xyz";
     
     // kept for further checking
-    std::string txtFile = "meshes/hugetrace/hugetrace-00008.graph";
+    std::string txtFile = graphPath+ "trace-00008.graph";
     std::ifstream f(txtFile);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;

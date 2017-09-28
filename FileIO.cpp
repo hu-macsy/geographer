@@ -1019,7 +1019,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
     
     //TODO: remove one of the assertion (or both)
     SCAI_ASSERT_EQ_ERROR( globalN, comm->sum(localN), "Mismatch in total number of coordinates" );
-    SCAI_ASSERT_EQ_ERROR( globalN*dimension, comm->sum(localTotalNumOfCoords), "Mismatch in total number of coordinates" );
+    SCAI_ASSERT_EQ_ERROR( globalN*maxDimension, comm->sum(localTotalNumOfCoords), "Mismatch in total number of coordinates" );
     
     // set like in KaHiP/parallel/prallel_src/app/configuration.h in configuration::standard
     //const IndexType binary_io_window_size = 64;   

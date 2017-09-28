@@ -22,13 +22,15 @@ typedef double ValueType;
 typedef int IndexType;
 
 class DiffusionTest : public ::testing::Test {
+    protected:
+        // the directory of all the meshes used
+        std::string graphPath = "./meshes/";
 
 };
 
 TEST_F(DiffusionTest, testConstructLaplacian) {
-	std::string path = "meshes/bubbles/";
 	std::string fileName = "bubbles-00010.graph";
-	std::string file = path + fileName;
+	std::string file = graphPath + fileName;
 	const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 	const IndexType n = graph.getNumRows();
     scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
@@ -53,18 +55,16 @@ TEST_F(DiffusionTest, testConstructLaplacian) {
 }
 
 TEST_F(DiffusionTest, benchConstructLaplacian) {
-	std::string path = "meshes/bubbles/";
 	std::string fileName = "bubbles-00000.graph";
-	std::string file = path + fileName;
+	std::string file = graphPath + fileName;
 	const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 
 	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(graph);
 }
 
 TEST_F(DiffusionTest, testPotentials) {
-    std::string path = "meshes/bubbles/";
     std::string fileName = "bubbles-00010.graph";
-    std::string file = path + fileName;
+    std::string file = graphPath + fileName;
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     const IndexType n = graph.getNumRows();
     scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
@@ -79,9 +79,8 @@ TEST_F(DiffusionTest, testPotentials) {
 
 TEST_F(DiffusionTest, testMultiplePotentials) {
 	const IndexType numLandmarks = 2;
-	std::string path = "meshes/bubbles/";
 	std::string fileName = "bubbles-00010.graph";
-	std::string file = path + fileName;
+	std::string file = graphPath + fileName;
 	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 	const IndexType n = graph.getNumRows();
 	scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
