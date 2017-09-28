@@ -78,7 +78,7 @@ struct Settings{
     void print(std::ostream& out){
         IndexType numPoints = numX* numY* numZ;
         
-        out<< "Setting: number of points= " << numPoints<< ", dimensions= "<< dimensions << "filename=" << fileName << std::endl;
+        out<< "Setting: number of points= " << numPoints<< ", dimensions= "<< dimensions << ", filename=" << fileName << std::endl;
         if( outFile!="-" ){
             out<< "outFile= " << outFile << std::endl;
         }
