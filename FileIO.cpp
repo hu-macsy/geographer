@@ -891,12 +891,6 @@ template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( std::string filename, IndexType numberOfPoints, IndexType dimension, Format format){
     SCAI_REGION( "FileIO.readCoords" );
 
-    if (format == Format::OCEAN) {
-	return readCoordsOcean(filename, dimension);
-    }else if( format==Format::BINARY){
-        return  readCoordsBinary( filename, numberOfPoints,dimension);
-    }
-
     IndexType globalN= numberOfPoints;
     std::ifstream file(filename);
 
@@ -913,6 +907,9 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
     else if( format== Format::MATRIXMARKET){
         PRINT0("Reading coordinates in MATRIXMARKET format");
         return readCoordsMatrixMarket( filename );
+    }else if( format==Format::BINARY){
+        PRINT0("Reading coordinates in BINARY format");
+        return  readCoordsBinary( filename, numberOfPoints, dimension);
     }
     
     IndexType beginLocalRange, endLocalRange;

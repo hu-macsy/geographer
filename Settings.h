@@ -73,6 +73,7 @@ struct Settings{
     //debug parameters
     bool verbose = false;
     bool writeDebugCoordinates = false;
+    bool writeInFile = false;
 
     void print(std::ostream& out){
         IndexType numPoints = numX* numY* numZ;

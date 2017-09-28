@@ -18,7 +18,7 @@
 #include <memory>
 #include <cstdlib>
 #include <chrono>
-
+#include <iomanip> 
 #include <unistd.h>
 
 #include "Diffusion.h"
@@ -204,8 +204,11 @@ int main(int argc, char** argv) {
                                 ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
 				;
 
+        //------------------------------------------------
+        //
+        // checks
+        //
                                 
-        
         std::string s = "0.12345";
         ValueType stdDouble = std::stod( s );
         ValueType boostDouble = boost::lexical_cast<ValueType>(s);
@@ -213,7 +216,6 @@ int main(int argc, char** argv) {
             PRINT0( "\033[1;31mWARNING: std::stod and boost::lexical_cast do not agree \033[0m"  );
             PRINT0( "\033[1;31mWARNING: std::stod and boost::lexical_cast do not agree \033[0m"  );
         }
-        
 
 	variables_map vm;
 	store(command_line_parser(argc, argv).options(desc).run(), vm);
@@ -281,6 +283,11 @@ int main(int argc, char** argv) {
 		}
 	}
 
+    //--------------------------------------------------------
+    //
+    // initialize
+    //
+	
     IndexType N = -1; 		// total number of points
 
     char machineChar[255];
@@ -309,8 +316,7 @@ int main(int argc, char** argv) {
      */
     std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
-    if (comm->getRank() == 0)
-	{
+    if (comm->getRank() == 0){
     	std::string inputstring;
     	if (vm.count("graphFile")) {
     		inputstring = vm["graphFile"].as<std::string>();
@@ -321,10 +327,16 @@ int main(int argc, char** argv) {
     	}
 
         std::cout<< "commit:"<< version<< " input:"<< inputstring << std::endl;
-	}
+    }
 
+    //---------------------------------------------------------
+    //
+    // generate or read graph and coordinates
+    //
+    
     if (vm.count("graphFile")) {
     	std::string graphFile = vm["graphFile"].as<std::string>();
+        settings.fileName = graphFile;
     	std::string coordFile;
     	if (vm.count("coordFile")) {
 	   	coordFile = vm["coordFile"].as<std::string>();
@@ -479,20 +491,20 @@ int main(int argc, char** argv) {
         if(comm->getRank()==0){
             std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
         }
-
+        
         nodeWeights = scai::lama::DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
-
-	} else if (vm.count("quadTreeFile")) {
-		//if (comm->getRank() == 0) {
-			graph = ITI::FileIO<IndexType, ValueType>::readQuadTree(vm["quadTreeFile"].as<std::string>(), coordinates);
-			N = graph.getNumRows();
-		//}
-
-		//broadcast graph size from root to initialize distributions
-		//IndexType NTransport[1] = {static_cast<IndexType>(graph.getNumRows())};
-		//comm->bcast( NTransport, 1, 0 );
-		//N = NTransport[0];
-
+        
+    } else if (vm.count("quadTreeFile")) {
+        //if (comm->getRank() == 0) {
+        graph = ITI::FileIO<IndexType, ValueType>::readQuadTree(vm["quadTreeFile"].as<std::string>(), coordinates);
+        N = graph.getNumRows();
+        //}
+        
+        //broadcast graph size from root to initialize distributions
+        //IndexType NTransport[1] = {static_cast<IndexType>(graph.getNumRows())};
+        //comm->bcast( NTransport, 1, 0 );
+        //N = NTransport[0];
+        
         scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
         scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
         graph.redistribute(rowDistPtr, noDistPtr);
@@ -506,9 +518,11 @@ int main(int argc, char** argv) {
     	return 126;
     }
     
+    //---------------------------------------------------------------------
     //
     //  read block sizes from a file if it is passed as an argument
     //
+    
     if( vm.count("blockSizesFile") ){
         settings.blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
         IndexType blockSizesSum  = std::accumulate( settings.blockSizes.begin(), settings.blockSizes.end(), 0);
@@ -516,7 +530,11 @@ int main(int argc, char** argv) {
         SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
     }
     
+    //---------------------------------------------------------------
+    //
     // get previous partition, if set
+    //
+    
     DenseVector<IndexType> previous;
     if (vm.count("previousPartition")) {
     	std::string filename = vm["previousPartition"].as<std::string>();
@@ -533,7 +551,10 @@ int main(int argc, char** argv) {
     	settings.repartition = true;
     }
 
+    //
     // time needed to get the input. Synchronize first to make sure that all processes are finished.
+    //
+    
     comm->synchronize();
     std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
 
@@ -559,15 +580,29 @@ int main(int argc, char** argv) {
           settings.print(std::cout);
     }
     
+    //
+    //  if parameter "outFile" is given create the output file
+    //
+    
     if (vm.count("outFile")){
-        
+        settings.writeInFile = true;
+        std::ofstream outF( settings.outFile, std::ios::out );
+        settings.print( outF );
+        outF<< std::endl;
+        outF << "# times: migrAlgo | 1redistr | k-means | 2redistr | total     ##     cut | imbalance " << std::endl;
     }
     
     
+    //------------------------------------------------------------
     //
     // partition the graph
     //
     
+    
+    if(comm->getRank()==0){
+        settings.print(std::cout);
+    }
+
     if( repeatTimes>0 ){
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
         // SCAI_ASSERT_ERROR(rowDistPtr->isEqual( new scai::dmemo::BlockDistribution(N, comm) ) , "Graph row distribution should (?) be a block distribution." );
@@ -576,9 +611,11 @@ int main(int argc, char** argv) {
     }
     
     // vectors to store output data
+    std::vector<ValueType> inputTimeVec(repeatTimes);
     std::vector<ValueType> finalTime(repeatTimes);
     std::vector<ValueType> finalCut(repeatTimes);
     std::vector<ValueType> finalImbalance(repeatTimes);
+    std::vector<IndexType> maxCommVec(repeatTimes);
     
     //store distributions to use later
     const scai::dmemo::DistributionPtr rowDistPtr( new scai::dmemo::BlockDistribution(N, comm) );
@@ -632,12 +669,12 @@ int main(int argc, char** argv) {
         
         std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
         
-        /*
-        if (vm.count("outFile")) {
-            ITI::FileIO<IndexType, ValueType>::writePartition(partition, vm["outFile"].as<std::string>());
-        }
-        */
+        
+        //---------------------------------------------------------------
+        //
         // Reporting output to std::cout
+        //
+        
         ValueType inputT = ValueType ( comm->max(inputTime.count() ));
         ValueType partT = ValueType (comm->max(partitionTime.count()));
         ValueType repT = ValueType (comm->max(reportTime.count()));
@@ -655,19 +692,40 @@ int main(int argc, char** argv) {
             
             std::cout<< std::endl<< "\033[1;36mcut:"<< cut<< "   imbalance:"<< imbalance << "   maxComm= "<< maxComm << std::endl;
             std::cout<<"inputTime:" << inputT << "   partitionTime:" << partT <<"   reportTime:"<< repT << " \033[0m" << std::endl; 
+        
+            inputTimeVec[repeat] = inputT;
+            finalTime[repeat] = partT;
+            finalCut[repeat] =  cut;
+            finalImbalance[repeat] = imbalance;
+            maxCommVec[repeat] = maxComm;
         }
-        
-        finalTime[repeat] = partT;
-        finalCut[repeat] =  cut;
-        finalImbalance[repeat] = imbalance;
-        
-        //
-        // writing results in a file
-        //
-        
-        std::string resultsFilename = " ";
     }
     
-    //std::exit(0);   //this is needed for supermuc
+    
+    //
+    // writing results in a file
+    //
+    
+    /*
+    if (vm.count("outFile")) {
+        std::string partOutFile = settigns.outFile + ".partition";
+        ITI::FileIO<IndexType, ValueType>::writePartition(partition, partOutFile);
+    }
+    */
+    
+    if( comm->getRank()==0 and settings.outFile!="-" ){
+        std::ofstream outF( settings.outFile, std::ios::app);
+        outF << std::endl;
+        
+        outF << "# times:  input     partition    #####    quality:   cut    imbalance    maxComm" << std::endl;
+        outF << std::setprecision(3) << std::fixed;
+        for( int r=0; r<repeatTimes; r++){
+            outF << "         "<< inputTimeVec[r] << " ,  " << finalTime[r] << " ,  \t\t\t  " << finalCut[r] << " ,  "<< finalImbalance[r] << " ,  "<< maxCommVec[r] << std::endl;
+        }
+        std::cout<< "output info written in file " << settings.outFile << std::endl;
+    }
+    
+    
+    std::exit(0);   //this is needed for supermuc
     return 0;
 }

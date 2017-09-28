@@ -1,19 +1,23 @@
 #pragma once
 
 #include <scai/lama.hpp>
-
 #include <scai/lama/matrix/all.hpp>
-
 #include <scai/lama/Vector.hpp>
-#include <scai/dmemo/Halo.hpp>
 #include <scai/lama/storage/MatrixStorage.hpp>
+
+#include <scai/dmemo/Halo.hpp>
+#include <scai/dmemo/HaloBuilder.hpp>
+#include <scai/dmemo/Distribution.hpp>
+#include <scai/dmemo/BlockDistribution.hpp>
+#include <scai/dmemo/GenBlockDistribution.hpp>
+
+#include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
+
 
 #include <boost/config.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/edge_coloring.hpp>
 #include <boost/graph/properties.hpp>
-
-#include <set>
 
 #include "Settings.h"
 

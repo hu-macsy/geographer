@@ -5,11 +5,6 @@
  *      Author: moritzl
  */
 
-#include <scai/dmemo/HaloBuilder.hpp>
-#include <scai/dmemo/Distribution.hpp>
-#include <scai/dmemo/BlockDistribution.hpp>
-#include <scai/dmemo/GenBlockDistribution.hpp>
-#include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 #include <scai/tracing.hpp>
 
 #include <assert.h>
@@ -23,6 +18,9 @@
 #include <algorithm>
 #include <tuple>
 #include <chrono>
+#include <set>
+#include <iostream>
+#include <iomanip> 
 
 #include "PrioQueue.h"
 #include "ParcoRepart.h"
@@ -275,15 +273,24 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             ValueType cut = comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;
             ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k, nodeWeights);
             
+            
+            //-----------------------------------------------------------
+            //
+            // output: in std and file
+            //
+            
             if (comm->getRank() == 0) {
                 std::cout<< std::endl << "\033[1;32mTiming: migration algo: "<< timeToCalcInitMigration << ", 1st redistr: " << timeForFirstRedistribution << ", only k-means: " << timeForKmeans <<", only 2nd redistr: "<< timeForSecondRedistr <<", total:" << timeForInitPart << std::endl;
                 std::cout << "Cut:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
+            
+                if( settings.outFile!="-" and settings.writeInFile ){
+                    // the file should already exist, we just append
+                    std::ofstream outF( settings.outFile, std::ios::app);
+                    outF << std::setprecision(3) << std::fixed;
+                    outF << "        " << timeToCalcInitMigration << "  ,  " << timeForFirstRedistribution << "  ,  " << timeForKmeans << "  ,  "<< timeForSecondRedistr << "  ,  " << timeForInitPart << ",         "  << cut << " ,  "<< imbalance <<std::endl;
+                }
             }
             
-if( settings.outFile!="-"){
-                
-    
-}
             
             IndexType numRefinementRounds = 0;
             
