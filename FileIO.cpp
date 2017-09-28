@@ -50,8 +50,8 @@ namespace ITI {
 template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename){
     SCAI_REGION( "FileIO.writeGraph" )
+    
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    //PRINT(*comm << " In writeInFileMetisFormat");
     
     IndexType root =0;
     IndexType rank = comm->getRank();
@@ -99,7 +99,6 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
         fNew.close();
     }
 }
-
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
@@ -131,6 +130,22 @@ void FileIO<IndexType, ValueType>::writeGraphDistributed (const CSRSparseMatrix<
     }
     f.close();
 }
+//-------------------------------------------------------------------------------------------------
+/*
+template<typename IndexType, typename ValueType>
+void FileIO<IndexType, ValueType>::writeGraphSequencialBinary (const CSRSparseMatrix<ValueType> &adjM, const std::string filename){
+    SCAI_REGION( "FileIO.writeGraphBinary" )        
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();        scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
+
+    IndexType root =0;
+    IndexType thisPE = comm->getRank();
+    IndexType numPEs = comm->getSize();
+    
+    typedef unsigned long int ULONG;
+
+}
+*/
 //-------------------------------------------------------------------------------------------------
 /*Given the vector of the coordinates and their dimension, writes them in file "filename".
  */
@@ -563,7 +578,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             file.read((char*)(&header[0]), headerSize*sizeof(ULONG));
         }
         file.close();
-        SCAI_ASSERT( success, "Error while opening the file " << filename); 
+        SCAI_ASSERT_ERROR( success, "Error while opening the file " << filename); 
     }            
         
     //broadcast the header info
@@ -623,7 +638,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             ULONG* vertexOffsets = new ULONG[localN+1];
             file.seekg(startPos);
             file.read( (char *)(vertexOffsets), (localN+1)*sizeof(ULONG) );
-          
+
             //
             // read the edges
             //
@@ -633,7 +648,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             const ULONG numEdges = numReads/sizeof(ULONG);
             ULONG* edges = new ULONG[numEdges];
             file.seekg( edgeStartPos );
-            file.read( (char *)(edges), (numEdges)*sizeof(ULONG) );     
+            file.read( (char *)(edges), (numEdges)*sizeof(ULONG) );           
             
             SCAI_REGION_END("FileIO.readGraphBinary.fileRead")
             
@@ -652,7 +667,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             for( IndexType i=0; i<localN; i++){
                 SCAI_REGION("FileIO.readGraphBinary.buildCSRmatrix")
                 ULONG nodeDegree = (vertexOffsets[i+1]-vertexOffsets[i])/sizeof(ULONG);
-                SCAI_ASSERT ( nodeDegree>0, "Node with degree zero not allowed");
+                SCAI_ASSERT_GT_ERROR( nodeDegree, 0, "Node with degree zero not allowed, for node " << i*(thisPE+1) );
                 neighbors.resize(nodeDegree);
                 
                 for(ULONG j=0; j<nodeDegree; j++, pos++){
@@ -977,9 +992,11 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
 
     if(file.fail())
         throw std::runtime_error("File "+ filename+ " failed.");
-
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+    PRINT0("Reading binary coordinates...");
+
     const IndexType numPEs = comm->getSize();
     const IndexType thisPE = comm->getRank();
     
@@ -992,18 +1009,22 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
     scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, thisPE, numPEs);
     const IndexType localN = endLocalRange - beginLocalRange;
 
-    const UINT beginLocalCoords = beginLocalRange*dimension;
-    const UINT endLocalCoords = endLocalRange*dimension;
-    const UINT localTotalNumOfCoords = localN*dimension;
+    //WARNING: for the binary format files, in 2D cases the 3rd coordinate is 0 but we must always read
+    //         3 coordinates from the file and just not copy the 3rd
+    IndexType maxDimension = 3;
+    
+    const UINT beginLocalCoords = beginLocalRange*maxDimension;
+    const UINT endLocalCoords = endLocalRange*maxDimension;
+    const UINT localTotalNumOfCoords = localN*maxDimension;
     
     //TODO: remove one of the assertion (or both)
     SCAI_ASSERT_EQ_ERROR( globalN, comm->sum(localN), "Mismatch in total number of coordinates" );
     SCAI_ASSERT_EQ_ERROR( globalN*dimension, comm->sum(localTotalNumOfCoords), "Mismatch in total number of coordinates" );
     
     // set like in KaHiP/parallel/prallel_src/app/configuration.h in configuration::standard
-    const IndexType binary_io_window_size = 64;   
+    //const IndexType binary_io_window_size = 64;   
     
-    const IndexType window_size = std::min( binary_io_window_size, numPEs );
+    const IndexType window_size = numPEs;// std::min( binary_io_window_size, numPEs );
     IndexType lowPE =0;
     IndexType highPE = window_size;
 
@@ -1018,7 +1039,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
             std::ifstream file;
             file.open(filename.c_str(), std::ios::binary | std::ios::in);
             
-            std::cout << "Process " << thisPE << " reading from " << beginLocalCoords << " to " << endLocalCoords << ", in total, localN= " << localTotalNumOfCoords << " coordinates and " << (localTotalNumOfCoords)*sizeof(ValueType) << " bytes." << std::endl;
+            std::cout << "Process " << thisPE << " reading from " << beginLocalCoords << " to " << endLocalCoords << ", in total, localNumCoords= " << localTotalNumOfCoords << " coordinates and " << (localTotalNumOfCoords)*sizeof(ValueType) << " bytes." << std::endl;
             
             SCAI_REGION_START("FileIO.readCoordsBinary.fileRead" );
             const UINT startPos = beginLocalCoords*sizeof(ValueType);   
@@ -1029,14 +1050,16 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
             
             for(IndexType i=0; i<localN; i++){
                 for(IndexType dim=0; dim<dimension; dim++){
-                    coords[dim][i] = localPartOfCoords[i*dimension+dim];
+                    coords[dim][i] = localPartOfCoords[i*maxDimension+dim]; //always maxDimension coords per point
+//PRINT(*comm<< ":"  << coords[dim][i] << " , "); 
                 }
+//std::cout << std::endl;                
             }
             
             if( thisPE==numPEs-1) {
-                SCAI_ASSERT_EQ_ERROR( file.tellg(), globalN*dimension*sizeof(ValueType) , "While reading coordinates in binary: Position in file " << filename << " is not correct." );            
+                SCAI_ASSERT_EQ_ERROR( file.tellg(), globalN*maxDimension*sizeof(ValueType) , "While reading coordinates in binary: Position in file " << filename << " is not correct." );            
             }else{
-                SCAI_ASSERT_EQ_ERROR( file.tellg(), localN*dimension*sizeof(ValueType)*(comm->getRank()+1) , "While reading coordinates in binary: Position in file " << filename << " is not correct." );            
+                SCAI_ASSERT_EQ_ERROR( file.tellg(), localN*maxDimension*sizeof(ValueType)*(comm->getRank()+1) , "While reading coordinates in binary: Position in file " << filename << " is not correct." );            
             }
             
             delete[] localPartOfCoords;

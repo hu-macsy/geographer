@@ -164,7 +164,7 @@ int main(int argc, char** argv) {
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 				("previousPartition", value<std::string>(), "file of previous partition, used for repartitioning")
 				//output
-				("outFile", value<std::string>(), "write result partition into file")
+				("outFile", value<std::string>(&settings.outFile), "write result partition into file")
 				//mesh generation
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
 				("numX", value<int>(&settings.numX), "Number of points in x dimension of generated graph")
@@ -559,6 +559,11 @@ int main(int argc, char** argv) {
           settings.print(std::cout);
     }
     
+    if (vm.count("outFile")){
+        
+    }
+    
+    
     //
     // partition the graph
     //
@@ -569,6 +574,11 @@ int main(int argc, char** argv) {
         SCAI_ASSERT_ERROR( coordinates[0].getDistributionPtr()->isEqual( *rowDistPtr ) , "rowDistribution and coordinates distribution must be equal" ); 
         SCAI_ASSERT_ERROR( nodeWeights.getDistributionPtr()->isEqual( *rowDistPtr ) , "rowDistribution and nodeWeights distribution must be equal" ); 
     }
+    
+    // vectors to store output data
+    std::vector<ValueType> finalTime(repeatTimes);
+    std::vector<ValueType> finalCut(repeatTimes);
+    std::vector<ValueType> finalImbalance(repeatTimes);
     
     //store distributions to use later
     const scai::dmemo::DistributionPtr rowDistPtr( new scai::dmemo::BlockDistribution(N, comm) );
@@ -622,10 +632,11 @@ int main(int argc, char** argv) {
         
         std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
         
+        /*
         if (vm.count("outFile")) {
             ITI::FileIO<IndexType, ValueType>::writePartition(partition, vm["outFile"].as<std::string>());
         }
-
+        */
         // Reporting output to std::cout
         ValueType inputT = ValueType ( comm->max(inputTime.count() ));
         ValueType partT = ValueType (comm->max(partitionTime.count()));
@@ -645,6 +656,16 @@ int main(int argc, char** argv) {
             std::cout<< std::endl<< "\033[1;36mcut:"<< cut<< "   imbalance:"<< imbalance << "   maxComm= "<< maxComm << std::endl;
             std::cout<<"inputTime:" << inputT << "   partitionTime:" << partT <<"   reportTime:"<< repT << " \033[0m" << std::endl; 
         }
+        
+        finalTime[repeat] = partT;
+        finalCut[repeat] =  cut;
+        finalImbalance[repeat] = imbalance;
+        
+        //
+        // writing results in a file
+        //
+        
+        std::string resultsFilename = " ";
     }
     
     //std::exit(0);   //this is needed for supermuc

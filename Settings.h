@@ -11,31 +11,32 @@
 const std::string version = BUILD_COMMIT_STRING;
 
 enum class InitialPartitioningMethods {SFC = 0, Pixel = 1, Spectral = 2, KMeans = 3, Multisection = 4, None = 5};
-    
+
 
 struct Settings{
-	//partition settings
-	IndexType numBlocks = 2;
-	double epsilon = 0.05;
-	bool repartition = false;
-
+    //partition settings
+    IndexType numBlocks = 2;
+    double epsilon = 0.05;
+    bool repartition = false;
+    
     //input data
     IndexType dimensions= 2;
     std::string fileName = "-";
+    std::string outFile = "-";
     ITI::Format fileFormat = ITI::Format::METIS;   // 0 for METIS, 4 for MatrixMarket
     bool useDiffusionCoordinates = false;
     IndexType diffusionRounds = 20;
     std::vector<IndexType> blockSizes;
-
+    
     //mesh generation
-	IndexType numX = 32;
-	IndexType numY = 32;
-	IndexType numZ = 32;
-
+    IndexType numX = 32;
+    IndexType numY = 32;
+    IndexType numZ = 32;
+    
     //general tuning parameters
     InitialPartitioningMethods initialPartition = InitialPartitioningMethods::SFC;
     InitialPartitioningMethods initialMigration = InitialPartitioningMethods::SFC;
-
+    
     //tuning parameters for local refinement
     IndexType minBorderNodes = 1;
     IndexType stopAfterNoGainRounds = 0;

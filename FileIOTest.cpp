@@ -260,11 +260,12 @@ TEST_F(FileIOTest, testReadQuadTree){
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadGraphBinary){
-    std::string path = "./meshes/";
-    std::string file = "trace10.bfg";   // trace10: n=8699, m=25874
+    std::string path = "./meshes/trace/";
+    std::string file = "trace-00008.bfg";   // trace10: n=8699, m=25874
     //std::string file = "Grid16x16.bfg";   // Grid16x16: n= 256, m=480
     //std::string file = "Grid8x8.bfg";   // Grid16x16: n= 64, m=224
     std::string filename= path + file;
+        
     scai::lama::CSRSparseMatrix<ValueType> graph;
     
     //std::vector<DenseVector<ValueType>> dummyWeightContainer;
@@ -275,7 +276,7 @@ TEST_F(FileIOTest, testReadGraphBinary){
     //TODO: read same graph with the original reader. Matrices must be identical
     
     //std::string txtFile= file.substr(0, file.length()-4);
-    std::string txtFile= "./meshes/trace/trace-00010.graph";
+    std::string txtFile= "./meshes/trace/trace-00008.graph";
     std::fstream f(txtFile);
     if (f.fail()) {
         throw std::runtime_error("Reading graph from " + filename + " failed.");
@@ -384,8 +385,8 @@ TEST_F(FileIOTest, testReadBlockSizes){
 
 TEST_F(FileIOTest, testWriteCoordsParallel){
 
-    std::string path = "./meshes/bubbles/";
-    std::string file = path + "bubbles-00010.graph";
+    std::string path = "./meshes/deaunayGen/";
+    std::string file = path + "delBinTest.graph";
     std::ifstream f(file);
     
     //WARNING: for this example we need dimension 3 because the Schamberger graphs have always 3 coordinates
@@ -423,6 +424,84 @@ TEST_F(FileIOTest, testWriteCoordsParallel){
             SCAI_ASSERT_EQ_ERROR( localCoordsBinary[i], localCoordsOrig[i], *comm << ": Not equal coordinates at index " << i);
         }
     }
+    
+}
+//-------------------------------------------------------------------------------------------------
+
+TEST_F(FileIOTest, testReadGraphAndCoordsBinary){
+    std::string path = "./meshes/delaunayGen/";
+    std::string fileBin = path + "delaunayTest.bfg";
+    std::string coordFileBin = fileBin+".xyz";
+    std::string fileMetis = path + "delaunayTest.graph";
+    std::string coordFileMetis = fileMetis+".xyz";
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    
+    //
+    // check that graphs are identical
+    //
+    scai::lama::CSRSparseMatrix<ValueType> graphBin =  FileIO<IndexType, ValueType>::readGraphBinary(fileBin);
+    scai::lama::CSRSparseMatrix<ValueType> graphMetis =  FileIO<IndexType, ValueType>::readGraph(fileMetis);
+    
+    if( graphBin.getNumRows()< 500){
+        PRINT0("Checking matrix symmetry...");
+        SCAI_ASSERT_ERROR( graphBin.checkSymmetry(), "Graph not symmetric");
+        SCAI_ASSERT_ERROR( graphMetis.checkSymmetry(), "Graph not symmetric");
+    }
+    SCAI_ASSERT_ERROR( graphBin.isConsistent(), "Graph not consistent");
+    SCAI_ASSERT_ERROR( graphMetis.isConsistent(), "Graph not consistent");
+    
+    {
+        scai::hmemo::ReadAccess<ValueType> readBinGraphVal( graphBin.getLocalStorage().getValues() );
+        scai::hmemo::ReadAccess<ValueType> readMetisGraphVal( graphMetis.getLocalStorage().getValues() );
+        SCAI_ASSERT_EQ_ERROR( readBinGraphVal.size(), readMetisGraphVal.size(), "Matrix mismatch");
+        
+        for(int i=0; i<readBinGraphVal.size(); i++){
+            SCAI_ASSERT_EQ_ERROR(readBinGraphVal[i], readBinGraphVal[i], "Matrix value mismatch in position " << i);
+        }
+        
+        scai::hmemo::ReadAccess<IndexType> readBinGraphIA( graphBin.getLocalStorage().getIA() );
+        scai::hmemo::ReadAccess<IndexType> readMetisGraphIA( graphMetis.getLocalStorage().getIA() );
+        SCAI_ASSERT_EQ_ERROR( readBinGraphIA.size(), readMetisGraphIA.size(), "Matrix mismatch");
+        for(int i=0; i<readBinGraphIA.size(); i++){
+            SCAI_ASSERT_EQ_ERROR(readBinGraphIA[i], readMetisGraphIA[i], "Matrix value mismatch in position " << i);
+        }
+        
+        scai::hmemo::ReadAccess<IndexType> readBinGraphJA( graphBin.getLocalStorage().getJA() );
+        scai::hmemo::ReadAccess<IndexType> readMetisGraphJA( graphMetis.getLocalStorage().getJA() );
+        SCAI_ASSERT_EQ_ERROR( readBinGraphJA.size(), readMetisGraphJA.size(), "Matrix mismatch");
+        for(int i=0; i<readBinGraphJA.size(); i++){
+            SCAI_ASSERT_EQ_ERROR(readBinGraphJA[i], readMetisGraphJA[i], "Matrix value mismatch in position " << i);
+        }
+    }
+    
+    //
+    // check coordinates are identical
+    //
+    
+    IndexType dimensions = 2;               // need 3 even for 2D examples where if z=0
+    IndexType N = graphBin.getNumRows();
+    
+    std::vector<DenseVector<ValueType>> coordsBinary =  FileIO<IndexType, ValueType>::readCoordsBinary( coordFileBin, N, dimensions);
+    std::vector<DenseVector<ValueType>> coordsMetis =  FileIO<IndexType, ValueType>::readCoords( coordFileMetis, N, dimensions);
+    
+    SCAI_ASSERT_EQ_ERROR( coordsBinary.size(), coordsMetis.size(), "Wrong dimension");
+    
+    for(int d=0; d<coordsBinary.size(); d++){
+        scai::hmemo::ReadAccess<ValueType> localCoordsBin( coordsBinary[d].getLocalValues() );
+        scai::hmemo::ReadAccess<ValueType> localCoordsMetis( coordsMetis[d].getLocalValues() );
+        SCAI_ASSERT_EQ_ERROR( localCoordsBin.size(), localCoordsMetis.size(), "Local sizes do not agree.");
+        
+        for(int i=0; i<localCoordsBin.size(); i++){
+            if( std::abs(localCoordsBin[i] - localCoordsMetis[i]) > 1e-6){
+                std::cout<< localCoordsBin[i] << "-" << localCoordsMetis[i] << "  _  " << localCoordsBin[i]-localCoordsMetis[i];
+                std::cout << std::endl;
+            }
+            
+         SCAI_ASSERT_LT_ERROR( localCoordsBin[i]-localCoordsMetis[i], 1e-6, "Coordinates in position " << coordsBinary[0].getDistributionPtr()->local2global(i) << " in processor " << comm->getRank() << " do not agree for dimension " << d);
+        }      
+    }
+    
     
 }
 

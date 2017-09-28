@@ -280,6 +280,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 std::cout << "Cut:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
             }
             
+if( settings.outFile!="-"){
+                
+    
+}
+            
             IndexType numRefinementRounds = 0;
             
             SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
