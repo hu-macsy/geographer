@@ -30,7 +30,7 @@
 #include "GraphUtils.h"
 
 typedef double ValueType;
-typedef unsigned long int IndexType;
+typedef int IndexType;
 
 
 /**
@@ -617,6 +617,7 @@ int main(int argc, char** argv) {
     std::vector<ValueType> finalCut(repeatTimes);
     std::vector<ValueType> finalImbalance(repeatTimes);
     std::vector<IndexType> maxCommVec(repeatTimes);
+    std::vector<IndexType> totalCommVec(repeatTimes);
     
     //store distributions to use later
     const scai::dmemo::DistributionPtr rowDistPtr( new scai::dmemo::BlockDistribution(N, comm) );
@@ -699,6 +700,8 @@ int main(int argc, char** argv) {
             finalCut[repeat] =  cut;
             finalImbalance[repeat] = imbalance;
             maxCommVec[repeat] = maxComm;
+            totalCommVec[repeat] = totalComm;
+
         }
     }
     
@@ -718,15 +721,19 @@ int main(int argc, char** argv) {
         std::ofstream outF( settings.outFile, std::ios::app);
         outF << std::endl;
         
-        outF << "# times:  input     partition    #####    quality:   cut    imbalance    maxComm" << std::endl;
+        outF << "# times:  input     partition    #####    quality:   cut    imbalance    maxComm   totalComm" << std::endl;
         outF << std::setprecision(3) << std::fixed;
         for( int r=0; r<repeatTimes; r++){
-            outF << "         "<< inputTimeVec[r] << " ,  " << finalTime[r] << " ,  \t\t\t  " << finalCut[r] << " ,  "<< finalImbalance[r] << " ,  "<< maxCommVec[r] << std::endl;
+            outF << "         "<< inputTimeVec[r] << " ,  " << finalTime[r] << " ,  \t\t\t  " << finalCut[r] << " ,  "<< finalImbalance[r] << " ,  "<< maxCommVec[r] << " ,  "<< totalCommVec[r] << std::endl;
         }
         std::cout<< "output info written in file " << settings.outFile << std::endl;
     }
     
     
-    std::exit(0);   //this is needed for supermuc
+    //delete &rowDistPtr;
+    //delete noDistPtr;
+    
+
+    //std::exit(0);   //this is needed for supermuc
     return 0;
 }
