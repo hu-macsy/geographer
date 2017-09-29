@@ -30,7 +30,7 @@
 #include "GraphUtils.h"
 
 typedef double ValueType;
-typedef int IndexType;
+typedef unsigned long int IndexType;
 
 
 /**
