@@ -441,7 +441,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
             exit(0);
         }
     }
-    //PRINT( *comm << ": " << ll << " __ " << file.tellg() );
+//PRINT( *comm << ": " << ll << " __ " << file.tellg() );
 
     std::vector<IndexType> ia(localN+1, 0);
     std::vector<IndexType> ja;
@@ -756,14 +756,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphMa
 
     scai::lama::CSRSparseMatrix<ValueType> graph;
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    /*
-    IndexType numRows, numColumns, numValues;
-    scai::common::scalar::ScalarType dataType;
-    bool isVector;
-    scai::lama::MatrixMarketIO::Symmetry sym;
-    
-    scai::lama::MatrixMarketIO::readMMHeader( filename, numRows, numColumns, numValues, dataType, isVector, sym);
-    */
+  
     const scai::dmemo::DistributionPtr rowDist(new scai::dmemo::BlockDistribution(numRows, comm));
     
     graph.readFromFile( filename, rowDist );
@@ -950,8 +943,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 			// WARNING: in supermuc (with the gcc/5) the std::stod returns the int part !!
 			//ValueType coord = std::stod(item);
 			ValueType coord = boost::lexical_cast<ValueType>(item);
-			coords[dim][i] = coord;
-                        //PRINT( *comm <<": ("<< dim << "," << i << ")= " << coord );                        
+			coords[dim][i] = coord;         
 			dim++;
 		}
 		if (dim < dimension) {
@@ -1036,7 +1028,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
             std::ifstream file;
             file.open(filename.c_str(), std::ios::binary | std::ios::in);
             
-            std::cout << "Process " << thisPE << " reading from " << beginLocalCoords << " to " << endLocalCoords << ", in total, localNumCoords= " << localTotalNumOfCoords << " coordinates and " << (localTotalNumOfCoords)*sizeof(ValueType) << " bytes." << std::endl;
+            //std::cout << "Process " << thisPE << " reading from " << beginLocalCoords << " to " << endLocalCoords << ", in total, localNumCoords= " << localTotalNumOfCoords << " coordinates and " << (localTotalNumOfCoords)*sizeof(ValueType) << " bytes." << std::endl;
             
             SCAI_REGION_START("FileIO.readCoordsBinary.fileRead" );
             const UINT startPos = beginLocalCoords*sizeof(ValueType);   
@@ -1048,9 +1040,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
             for(IndexType i=0; i<localN; i++){
                 for(IndexType dim=0; dim<dimension; dim++){
                     coords[dim][i] = localPartOfCoords[i*maxDimension+dim]; //always maxDimension coords per point
-//PRINT(*comm<< ":"  << coords[dim][i] << " , "); 
-                }
-//std::cout << std::endl;                
+                }      
             }
             
             if( thisPE==numPEs-1) {

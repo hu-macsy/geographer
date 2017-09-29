@@ -587,6 +587,7 @@ int main(int argc, char** argv) {
     if (vm.count("outFile")){
         settings.writeInFile = true;
         std::ofstream outF( settings.outFile, std::ios::out );
+        outF << "commit:"<< version << " machine:" << machine <<std::endl;
         settings.print( outF );
         outF<< std::endl;
         outF << "# times: migrAlgo | 1redistr | k-means | 2redistr | total     ##     cut | imbalance " << std::endl;

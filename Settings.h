@@ -74,19 +74,19 @@ struct Settings{
     bool verbose = false;
     bool writeDebugCoordinates = false;
     bool writeInFile = false;
-
+    
     void print(std::ostream& out){
         IndexType numPoints = numX* numY* numZ;
         
-        out<< "Setting: number of points= " << numPoints<< ", dimensions= "<< dimensions << ", filename=" << fileName << std::endl;
+        out<< "Setting: number of points= " << numPoints<< ", dimensions= "<< dimensions << ", filename: " << fileName << std::endl;
         if( outFile!="-" ){
-            out<< "outFile= " << outFile << std::endl;
+            out<< "outFile: " << outFile << std::endl;
         }
         out<< "minBorderNodes= " << minBorderNodes << std::endl;
         out<< "stopAfterNoGainRounds= "<< stopAfterNoGainRounds << std::endl;
         out<< "minGainForNextRound= " << minGainForNextRound << std::endl;
-        out<< "multiLevelRounds: " << multiLevelRounds << std::endl;
-        out<< "coarseningStepsBetweenRefinement: "<< coarseningStepsBetweenRefinement << std::endl;
+        out<< "multiLevelRounds= " << multiLevelRounds << std::endl;
+        out<< "coarseningStepsBetweenRefinement= "<< coarseningStepsBetweenRefinement << std::endl;
         out<< "parameters used:" <<std::endl;
         if( useDiffusionTieBreaking ){
             out<< "\tuseDiffusionTieBreaking"  <<std::endl;
@@ -101,6 +101,8 @@ struct Settings{
             out<< "\tskipNoGainColors" << std::endl;
         }
 
+        out<< "initial migration: " << static_cast<int>(initialMigration) << std::endl;
+        
         if (initialPartition==InitialPartitioningMethods::SFC) {
             out<< "initial partition: hilbert curve" << std::endl;
             out<< "\tsfcResolution: " << sfcResolution << std::endl;
