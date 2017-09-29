@@ -77,7 +77,7 @@ public:
 	 * @param[in] part
 	 * @param[in] filename The file's name to write to
 	 */
-	static void writePartition(const DenseVector<IndexType> &part, const std::string filename);
+	static void writePartitionParallel(const DenseVector<IndexType> &part, const std::string filename);
         
 	/** Reads a graph from filename in METIS format and returns the adjacency matrix.
 	 * @param[in] filename The file to read from.

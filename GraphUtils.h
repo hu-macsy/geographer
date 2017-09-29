@@ -51,7 +51,7 @@ template<typename IndexType, typename ValueType>
 bool hasNonLocalNeighbors(const scai::lama::CSRSparseMatrix<ValueType> &input, IndexType globalID);
 
 /**
- * Returns a vector of global indices of nodes which are local on this process, but have neighbors that are node.
+ * Returns a vector of global indices of nodes which are local on this process, but have neighbors that are not local. They non local neighbors may or may not be in the same block.
  * No communication required, iterates once over the local adjacency matrix
  * @param[in] input Adjacency matrix of the input graph
  */
@@ -64,7 +64,7 @@ std::vector<IndexType> getNodesWithNonLocalNeighbors(const scai::lama::CSRSparse
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> nonLocalNeighbors(const scai::lama::CSRSparseMatrix<ValueType>& input);
 
-/** Get the borders nodes of each block.
+/** Get the borders nodes of each block. Border node: one that has at least one neighbor in different block.
 */
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> getBorderNodes( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part);
@@ -112,7 +112,12 @@ IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM)
 template<typename IndexType, typename ValueType>
 std::pair<IndexType, IndexType> computeComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const int k);
 
-
+/** Compute maximum and total communication volume= max and sum of number of border nodes
+ * WARNING: this works properly only when k=p and the nodes are redistributed so each PE owns nodes from one block.
+ */
+template<typename IndexType, typename ValueType>
+std::pair<IndexType,IndexType> computeCommVolume_p_equals_k( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part);
+    
 /**Returns the processor graph. Every processor traverses its local part of adjM: and for every
  * edge (u,v) that one node, say u, is not local it gets the owner processor of u. The returned graph is distributed with a BLOCK distribution.
  *

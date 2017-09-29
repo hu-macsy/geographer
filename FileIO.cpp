@@ -213,7 +213,10 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVe
     PRINT( *comm << ": "<< beginLocalRange << " - " << endLocalRange );
     SCAI_ASSERT_EQ_ERROR( localN, endLocalRange-beginLocalRange, "Local ranges do not agree");
     
+    //
     // copy coords to a local vector<vector>
+    //
+    
     std::vector< std::vector<ValueType>> localPartOfCoords( localN, std::vector<ValueType>( dimension, 0.0) );
     
     for(IndexType d=0; d<dimension; d++){
@@ -222,6 +225,10 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVe
             localPartOfCoords[i][d] = localCoords[i];
         }
     }
+    
+    //
+    //  one PE at a time, write to file
+    //
     
     std::ofstream outfile;
     
@@ -286,35 +293,48 @@ void FileIO<IndexType, ValueType>::writeCoordsDistributed_2D (const std::vector<
 }
 
 template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writePartition(const DenseVector<IndexType> &part, const std::string filename) {
-	SCAI_REGION( "FileIO.writePartition" );
+void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<IndexType> &part, const std::string filename) {
+	SCAI_REGION( "FileIO.writePartitionParallel" );
 
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	scai::dmemo::DistributionPtr dist = part.getDistributionPtr();
-	scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( part.size() ));
 
-	/**
-	 * If the input partition is replicated, we can write it directly from the root processor.
-	 * If it is not, we need to create a replicated copy.
-	 */
-	DenseVector<IndexType> maybeCopy;
-	if (!dist->isReplicated()) {
-		maybeCopy = DenseVector<IndexType>(part, noDist);
-	}
-	const DenseVector<IndexType> &targetReference = dist->isReplicated() ? part : maybeCopy;
-	assert(maybeCopy.getDistributionPtr()->isReplicated());
-	assert(maybeCopy.size() == part.size());
-
-	if (comm->getRank() == 0) {
-		std::ofstream filehandle(filename);
-		if (filehandle.fail()) {
-			throw std::runtime_error("Could not write to file " + filename);
-		}
-		scai::hmemo::ReadAccess<IndexType> access(maybeCopy.getLocalValues());
-		for (IndexType i = 0; i < access.size(); i++) {
-			filehandle << access[i] << std::endl;
-		}
-	}
+        const IndexType localN = dist->getLocalSize();
+        const IndexType globalN = dist->getGlobalSize();
+        const IndexType numPEs = comm->getSize();
+        
+	scai::hmemo::ReadAccess<IndexType> localPart( part.getLocalValues() );
+        SCAI_ASSERT_EQ_ERROR( localPart.size(), localN, "Local sizes do not agree");
+        
+        std::ofstream outfile;
+	   
+        for(IndexType p=0; p<numPEs; p++){  // numPE rounds, in each round only one PE writes its part
+            if( comm->getRank()==p ){ 
+                if( p==0 ){
+                    outfile.open(filename.c_str(), std::ios::binary | std::ios::out);
+                }else{
+                    // if not the first PE then append to file
+                    outfile.open(filename.c_str(), std::ios::binary | std::ios::app);
+                }
+                if( outfile.fail() ){
+                    throw std::runtime_error("Could not write to file " + filename);
+                }
+                            
+                for( IndexType i=0; i<localN; i++){                    
+                    outfile << dist->local2global(i) << " "<< localPart[i] << std::endl;
+                }
+/*                
+                // the last PE maybe has less local values
+                if( p==numPEs-1 ){
+                    SCAI_ASSERT_EQ_ERROR( outfile.tellp(), globalN , "While writing coordinates in parallel: Position in file " << filename << " is not correct." );
+                }else{
+                    SCAI_ASSERT_EQ_ERROR( outfile.tellp(), localN*(comm->getRank()+1) , "While writing coordinates in parallel: Position in file " << filename << " is not correct for processor " << comm->getRank() );
+                }
+  */              
+                outfile.close();
+            }
+            comm->synchronize();
+        }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1562,7 +1582,7 @@ template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<
 template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, const std::string filename);
 template void FileIO<int, double>::writeCoordsParallel(const std::vector<DenseVector<double>> &coords, const std::string outFilename);
 template void FileIO<int, double>::writeCoordsDistributed_2D (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
-template void FileIO<int, double>::writePartition(const DenseVector<int> &part, const std::string filename);
+template void FileIO<int, double>::writePartitionParallel(const DenseVector<int> &part, const std::string filename);
 template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::string filename, Format format);
 template scai::lama::CSRSparseMatrix<double> FileIO<int, double>::readGraphBinary(const std::string filename);
 template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsTEEC ( std::string filename, int numberOfCoords, int dimension, std::vector<DenseVector<double>>& nodeWeights);

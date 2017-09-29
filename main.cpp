@@ -623,6 +623,8 @@ int main(int argc, char** argv) {
     const scai::dmemo::DistributionPtr rowDistPtr( new scai::dmemo::BlockDistribution(N, comm) );
     const scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ) );
     
+    scai::lama::DenseVector<IndexType> partition;
+    
     for( IndexType repeat=0; repeat<repeatTimes; repeat++){
         
         // for the next runs the input is redistributed, se he must redistribute to the original distributions
@@ -642,7 +644,7 @@ int main(int argc, char** argv) {
             
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
         
-        scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, settings );
+        partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, settings );
         assert( partition.size() == N);
         assert( coordinates[0].size() == N);
         
@@ -709,8 +711,7 @@ int main(int argc, char** argv) {
     //
     // writing results in a file
     //
-    
-    
+        
     
     if( comm->getRank()==0 and settings.outFile!="-" ){
         std::ofstream outF( settings.outFile, std::ios::app);
@@ -722,17 +723,18 @@ int main(int argc, char** argv) {
             outF << "         "<< inputTimeVec[r] << " ,  " << finalTime[r] << " ,  \t\t\t  " << finalCut[r] << " ,  "<< finalImbalance[r] << " ,  "<< maxCommVec[r] << " ,  "<< totalCommVec[r] << std::endl;
         }
         
-        std::string partOutFile = settigns.outFile + ".partition";
-        ITI::FileIO<IndexType, ValueType>::writePartition(partition, partOutFile);
-        
-        std::cout<< "output info written in file " << settings.outFile << " and partition in file " << partOutFile << std::endl;
-        
+        std::cout<< "output info written in file " << settings.outFile  <<  std::endl;
     }
     
-    
-    //delete &rowDistPtr;
-    //delete noDistPtr;
-    
+    if(settings.outFile!="-" ){
+        std::string partOutFile = settings.outFile + ".partition";
+        ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+        if( comm->getRank()==0 ){
+            std::cout << " and last partition of the series in file " << partOutFile << std::endl;
+        }
+    }
+        
+
 
     //std::exit(0);   //this is needed for supermuc
     return 0;
