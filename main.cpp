@@ -710,12 +710,7 @@ int main(int argc, char** argv) {
     // writing results in a file
     //
     
-    /*
-    if (vm.count("outFile")) {
-        std::string partOutFile = settigns.outFile + ".partition";
-        ITI::FileIO<IndexType, ValueType>::writePartition(partition, partOutFile);
-    }
-    */
+    
     
     if( comm->getRank()==0 and settings.outFile!="-" ){
         std::ofstream outF( settings.outFile, std::ios::app);
@@ -726,7 +721,12 @@ int main(int argc, char** argv) {
         for( int r=0; r<repeatTimes; r++){
             outF << "         "<< inputTimeVec[r] << " ,  " << finalTime[r] << " ,  \t\t\t  " << finalCut[r] << " ,  "<< finalImbalance[r] << " ,  "<< maxCommVec[r] << " ,  "<< totalCommVec[r] << std::endl;
         }
-        std::cout<< "output info written in file " << settings.outFile << std::endl;
+        
+        std::string partOutFile = settigns.outFile + ".partition";
+        ITI::FileIO<IndexType, ValueType>::writePartition(partition, partOutFile);
+        
+        std::cout<< "output info written in file " << settings.outFile << " and partition in file " << partOutFile << std::endl;
+        
     }
     
     
