@@ -611,6 +611,7 @@ int main(int argc, char** argv) {
         SCAI_ASSERT_ERROR( nodeWeights.getDistributionPtr()->isEqual( *rowDistPtr ) , "rowDistribution and nodeWeights distribution must be equal" ); 
     }
     
+    //TODO: maybe use a struct??
     // vectors to store output data
     std::vector<ValueType> inputTimeVec(repeatTimes);
     std::vector<ValueType> finalTime(repeatTimes);
@@ -618,6 +619,8 @@ int main(int argc, char** argv) {
     std::vector<ValueType> finalImbalance(repeatTimes);
     std::vector<IndexType> maxCommVec(repeatTimes);
     std::vector<IndexType> totalCommVec(repeatTimes);
+    std::vector<IndexType> maxCommVolumeVec(repeatTimes);
+    std::vector<IndexType> totalCommVolumeVec(repeatTimes);
     
     //store distributions to use later
     const scai::dmemo::DistributionPtr rowDistPtr( new scai::dmemo::BlockDistribution(N, comm) );
@@ -670,6 +673,8 @@ int main(int argc, char** argv) {
         ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
         IndexType maxComm, totalComm;
         std::tie(maxComm, totalComm) = ITI::GraphUtils::computeComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
+        IndexType maxCommVol, totalCommVol;
+        std::tie( maxCommVol, totalCommVol ) =ITI::GraphUtils::computeCommVolume_p_equals_k( graph, partition);
         
         std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
         
@@ -703,6 +708,8 @@ int main(int argc, char** argv) {
             finalImbalance[repeat] = imbalance;
             maxCommVec[repeat] = maxComm;
             totalCommVec[repeat] = totalComm;
+            maxCommVolumeVec[repeat] = maxCommVol;
+            totalCommVolumeVec[repeat] = totalCommVol;
 
         }
     }
@@ -717,10 +724,10 @@ int main(int argc, char** argv) {
         std::ofstream outF( settings.outFile, std::ios::app);
         outF << std::endl;
         
-        outF << "# times:  input     partition    #####    quality:   cut    imbalance    maxComm   totalComm" << std::endl;
+        outF << "# times:  input     partition    #####    quality:   cut    imbalance  <|>  maxComm   totalComm  <|>  maxCommVolume  totalCommVolume" << std::endl;
         outF << std::setprecision(3) << std::fixed;
         for( int r=0; r<repeatTimes; r++){
-            outF << "         "<< inputTimeVec[r] << " ,  " << finalTime[r] << " ,  \t\t\t  " << finalCut[r] << " ,  "<< finalImbalance[r] << " ,  "<< maxCommVec[r] << " ,  "<< totalCommVec[r] << std::endl;
+            outF << "         "<< inputTimeVec[r] << " ,  " << finalTime[r] << " ,  \t\t\t  " << finalCut[r] << " ,  "<< finalImbalance[r] << " , \t\t   "<< maxCommVec[r] << " ,  "<< totalCommVec[r] << " , \t\t  "<< maxCommVolumeVec[r] << " ,  " << totalCommVolumeVec[r]  << std::endl;
         }
         
         std::cout<< "output info written in file " << settings.outFile  <<  std::endl;
@@ -734,8 +741,6 @@ int main(int argc, char** argv) {
         }
     }
         
-
-
-    //std::exit(0);   //this is needed for supermuc
+    std::exit(0);   //this is needed for supermuc
     return 0;
 }
