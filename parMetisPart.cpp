@@ -123,7 +123,10 @@ int main(int argc, char** argv) {
 	} else {
 		coordFile = graphFile + ".xyz";
 	}
-    
+
+	SCAI_ASSERT_EQUAL( sizeof(IndexType), sizeof(idx_t), "IndexType size and idx_t do not agree");
+                    
+	
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
     //
@@ -264,16 +267,15 @@ int main(int argc, char** argv) {
     if( !vm.count("numBlocks") ){
         settings.numBlocks = comm->getSize();
     }
-    IndexType k = settings.numBlocks;
-    idx_t nparts= k;
+    idx_t nparts= settings.numBlocks;;
   
     // tpwgts: array of size ncons*nparts, that is used to specify the fraction of 
     // vertex weight that should be distributed to each sub-domain for each balance
     // constraint. Here we want equal sizes, so every value is 1/nparts.
-    real_t tpwgts[ k];
+    real_t tpwgts[ nparts ];
     real_t total = 0;
     for(int i=0; i<sizeof(tpwgts)/sizeof(real_t) ; i++){
-	tpwgts[i] = real_t(1)/k;
+	tpwgts[i] = real_t(1)/nparts;
         //PRINT(*comm << ": " << i <<": "<< tpwgts[i]);
 	total += tpwgts[i];
     }
