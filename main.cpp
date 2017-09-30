@@ -590,7 +590,7 @@ int main(int argc, char** argv) {
         outF << "commit:"<< version << " machine:" << machine <<std::endl;
         settings.print( outF );
         outF<< std::endl;
-        outF << "# times: migrAlgo | 1redistr | k-means | 2redistr | total     ##     cut | imbalance " << std::endl;
+        outF << "# times: migrAlgo , 1redistr , k-means , 2redistr , total     ,     cut  ,  imbalance " << std::endl;
     }
     
     
@@ -615,7 +615,7 @@ int main(int argc, char** argv) {
     // vectors to store output data
     std::vector<ValueType> inputTimeVec(repeatTimes);
     std::vector<ValueType> finalTime(repeatTimes);
-    std::vector<ValueType> finalCut(repeatTimes);
+    std::vector<IndexType> finalCut(repeatTimes);       // cut of type ValueType, so decimical will be lost
     std::vector<ValueType> finalImbalance(repeatTimes);
     std::vector<IndexType> maxCommVec(repeatTimes);
     std::vector<IndexType> totalCommVec(repeatTimes);
@@ -712,6 +712,8 @@ int main(int argc, char** argv) {
             totalCommVolumeVec[repeat] = totalCommVol;
 
         }
+        
+        comm->synchronize();
     }
     
     
@@ -724,12 +726,22 @@ int main(int argc, char** argv) {
         std::ofstream outF( settings.outFile, std::ios::app);
         outF << std::endl;
         
-        outF << "# times:  input     partition    #####    quality:   cut    imbalance  <|>  maxComm   totalComm  <|>  maxCommVolume  totalCommVolume" << std::endl;
-        outF << std::setprecision(3) << std::fixed;
+        outF << "#       input  ,  partition     ,        cut  ,  imbalance   ,   maxComm  ,  totalComm   ,   maxCommVolume , totalCommVolume" << std::endl;
+        outF << std::setprecision(2) << std::fixed;
         for( int r=0; r<repeatTimes; r++){
-            outF << "         "<< inputTimeVec[r] << " ,  " << finalTime[r] << " ,  \t\t\t  " << finalCut[r] << " ,  "<< finalImbalance[r] << " , \t\t   "<< maxCommVec[r] << " ,  "<< totalCommVec[r] << " , \t\t  "<< maxCommVolumeVec[r] << " ,  " << totalCommVolumeVec[r]  << std::endl;
+            outF << r <<" \t    "<< inputTimeVec[r] << " ,  " << finalTime[r] << " ,\t\t\t" << finalCut[r] << " ,  "<< finalImbalance[r] << " , \t\t  "<< maxCommVec[r] << " ,  "<< totalCommVec[r] << " , \t\t\t"<< maxCommVolumeVec[r] << " ,  " << totalCommVolumeVec[r]  << std::endl;
         }
-        
+        //outF << std::setprecision(2) << std::fixed;
+        outF<< "average:    " << std::accumulate( inputTimeVec.begin(), inputTimeVec.end(), 0.0)/repeatTimes \
+            << " ,  "       << std::accumulate( finalTime.begin(), finalTime.end(), 0.0)/repeatTimes \
+            << " , \t\t"  << std::accumulate( finalCut.begin(), finalCut.end(), 0.0)/repeatTimes \
+            << " ,  "       << std::accumulate( finalImbalance.begin(), finalImbalance.end(), 0.0)/repeatTimes \
+            << " , \t\t "  << std::accumulate( maxCommVec.begin(), maxCommVec.end(), 0.0)/repeatTimes \
+            << " ,  "       << std::accumulate( totalCommVec.begin(), totalCommVec.end(), 0.0)/repeatTimes \
+            << " , \t\t\t"  << std::accumulate( maxCommVolumeVec.begin(), maxCommVolumeVec.end(), 0.0)/repeatTimes \
+            << " ,  "       << std::accumulate( totalCommVolumeVec.begin(), totalCommVolumeVec.end(), 0.0)/repeatTimes \
+            << std::endl;
+            
         std::cout<< "output info written in file " << settings.outFile  <<  std::endl;
     }
     

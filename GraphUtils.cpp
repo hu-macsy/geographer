@@ -440,6 +440,7 @@ std::pair<IndexType,IndexType> computeComm( const scai::lama::CSRSparseMatrix<Va
 //------------------------------------------------------------------------------
 
 /** Compute maximum and total communication volume.
+ *  TODO: generalize for any pand k, just add a local array of size k and a comm->sumArray()
  */
 template<typename IndexType, typename ValueType>
 std::pair<IndexType,IndexType> computeCommVolume_p_equals_k( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part){
@@ -448,7 +449,7 @@ std::pair<IndexType,IndexType> computeCommVolume_p_equals_k( const scai::lama::C
     
     scai::lama::DenseVector<IndexType> localBorder = getBorderNodes( adjM, part ) ;
     
-    IndexType numLocalBorder = localBorder.size();
+    IndexType numLocalBorder = localBorder.sum().Scalar::getValue<IndexType>();
     IndexType maxCommVol = comm->max( numLocalBorder );
     IndexType totalCommVol = comm->sum( numLocalBorder );
     
