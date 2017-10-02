@@ -26,11 +26,118 @@
 #include "FileIO.h"
 #include "ParcoRepart.h"
 #include "Settings.h"
+#include "Metrics.h"
 #include "SpectralPartition.h"
 #include "GraphUtils.h"
 
 typedef double ValueType;
 typedef int IndexType;
+
+
+
+
+void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
+
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    
+    IndexType numRuns = metricsVec.size();
+    
+    if( comm->getRank()==0 ){
+        out << "# times, input, migrAlgo, 1distr, kmeans, 2redis, prelim, total ,  prel cut, finalcut, imbalance ,  BlGr maxDeg, edges, CommVol max, total , BorNodes max, avg  " << std::endl;
+    }
+    
+    ValueType sumMigrAlgo = 0;
+    ValueType sumFirstDistr = 0;
+    ValueType sumKmeans = 0;
+    ValueType sumSecondDistr = 0;
+    ValueType sumPrelimanry = 0; 
+    ValueType sumFinalTime = 0;
+    
+    IndexType sumPreliminaryCut = 0;
+    IndexType sumFinalCut = 0;
+    IndexType sumImbalace = 0;
+    IndexType sumMaxBlGrDeg = 0;
+    IndexType sumBlGrEdges = 0;
+    IndexType sumMaxCommVol = 0;
+    IndexType sumtotCommVol = 0;
+    ValueType sumMaxBorderNodesPerc = 0;
+    ValueType sumAvgBorderNodesPerc = 0;
+    
+    for(IndexType run=0; run<numRuns; run++){
+        Metrics thisMetric = metricsVec[ run ];
+        
+        SCAI_ASSERT_EQ_ERROR(thisMetric.timeMigrationAlgo.size(), comm->getSize(), "Wrong vector size" );
+        
+        ValueType maxTimeMigrationAlgo = *std::max_element( thisMetric.timeMigrationAlgo.begin(), thisMetric.timeMigrationAlgo.end() );
+        ValueType maxTimeFirstDistribution = *std::max_element( thisMetric.timeFirstDistribution.begin(), thisMetric.timeFirstDistribution.end() );
+        ValueType maxTimeKmeans = *std::max_element( thisMetric.timeKmeans.begin(), thisMetric.timeKmeans.end() );
+        ValueType maxTimeSecondDistribution = *std::max_element( thisMetric.timeSecondDistribution.begin(), thisMetric.timeSecondDistribution.end() );
+        ValueType maxTimePreliminary = *std::max_element( thisMetric.timePreliminary.begin(), thisMetric.timePreliminary.end() );
+    
+        if( comm->getRank()==0 ){
+            out << std::setprecision(2) << std::fixed;
+            out<< run << " ,       "<< thisMetric.inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ", " << maxTimePreliminary << ",  "<< thisMetric.timeFinalPartition << " ,  \t   "\
+            << thisMetric.preliminaryCut << ", "<< thisMetric.finalCut << " ,  " << thisMetric.finalImbalance << ", \t\t "  \
+            << thisMetric.maxBlockGraphDegree << ", " << thisMetric.totalBlockGraphEdges << " ,\t\t "  \
+            << thisMetric.maxCommVolume << ", " << thisMetric.totalCommVolume << " , \t\t "  \
+            << thisMetric.maxBorderNodesPercent << ", " << thisMetric.avgBorderNodesPercent \
+            << std::endl;
+        }
+        
+        sumMigrAlgo += maxTimeMigrationAlgo;
+        sumFirstDistr += maxTimeFirstDistribution;
+        sumKmeans += maxTimeKmeans;
+        sumSecondDistr += maxTimeSecondDistribution;
+        sumPrelimanry += maxTimePreliminary;
+        sumFinalTime += thisMetric.timeFinalPartition;
+        
+        sumPreliminaryCut += thisMetric.preliminaryCut;
+        sumFinalCut += thisMetric.finalCut;
+        sumImbalace += thisMetric.finalImbalance;
+        sumMaxBlGrDeg += thisMetric.maxBlockGraphDegree  ;
+        sumBlGrEdges += thisMetric.totalBlockGraphEdges ;
+        sumMaxCommVol +=  thisMetric.maxCommVolume;
+        sumtotCommVol += thisMetric.totalCommVolume;
+        sumMaxBorderNodesPerc += thisMetric.maxBorderNodesPercent;
+        sumAvgBorderNodesPerc += thisMetric.avgBorderNodesPercent;
+    }
+    
+    if( comm->getRank()==0 ){
+        out << "average,  "\
+            <<  ValueType (metricsVec[0].inputTime)<< " , "\
+            <<  ValueType(sumMigrAlgo)/numRuns<< " , " \
+            <<  ValueType(sumFirstDistr)/numRuns<< ", " \
+            <<  ValueType(sumKmeans)/numRuns<< ", " \
+            <<  ValueType(sumSecondDistr)/numRuns<< ", " \
+            <<  ValueType(sumPrelimanry)/numRuns<< ", " \
+            <<  ValueType(sumFinalTime)/numRuns<< ", \t  " \
+            <<  ValueType(sumPreliminaryCut)/numRuns<< ", " \
+            <<  ValueType(sumFinalCut)/numRuns<< ", " \
+            <<  ValueType(sumImbalace)/numRuns<< " ,\t\t " \
+            <<  ValueType(sumMaxBlGrDeg)/numRuns<< ", " \
+            <<  ValueType(sumBlGrEdges)/numRuns<< " ,\t\t " \
+            <<  ValueType(sumMaxCommVol)/numRuns<< ", " \
+            <<  ValueType(sumtotCommVol)/numRuns<< " ,\t\t " \
+            <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
+            <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
+            << std::endl;
+    }
+    //outF <<"total time for " << numRuns << " runs: " << << std::endl;
+    
+    /*
+    for(IndexType run=0; run<numRuns; run++){
+        metrics thisMetric = metrcsVec[ run ];
+        
+        out << std::setprecision(2) << std::fixed;
+        
+        outF << run <<"     "<< thisMetric.inputTime << ", " << thisMetric.timeFinalPartition << " ,  " \
+        << thisMetric.finalCut << " ,  "<< thisMetric.finalImbalance[r]  \
+        << " ,  "<< thisMetric. maxCommVec[r] << " ,  "<< totalCommVec[r] << " , \t\t"<< maxCommVolumeVec[r] << " ,  " << totalCommVolumeVec[r]  << std::endl;
+    }
+    */
+}
+
+
 
 
 /**
@@ -202,6 +309,7 @@ int main(int argc, char** argv) {
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 				("verbose", "Increase output.")
                                 ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
+                                ("storeInfo", value<bool>(&settings.storeInfo), "Store timing and ohter metrics in file.")
 				;
 
         //------------------------------------------------
@@ -295,6 +403,7 @@ int main(int argc, char** argv) {
     gethostname(machineChar, 255);
     if (machineChar) {
     	machine = std::string(machineChar);
+        settings.machine = machine;
     } else {
     	std::cout << "machine char not valid" << std::endl;
     }
@@ -584,6 +693,7 @@ int main(int argc, char** argv) {
     //  if parameter "outFile" is given create the output file
     //
     
+    /*
     if (vm.count("outFile")){
         settings.writeInFile = true;
         std::ofstream outF( settings.outFile, std::ios::out );
@@ -592,7 +702,9 @@ int main(int argc, char** argv) {
         outF<< std::endl;
         outF << "# times: migrAlgo , 1redistr , k-means , 2redistr , total     ,     cut  ,  imbalance " << std::endl;
     }
+    */
     
+    std::vector<struct Metrics> metricsVec( repeatTimes );
     
     //------------------------------------------------------------
     //
@@ -611,6 +723,7 @@ int main(int argc, char** argv) {
         SCAI_ASSERT_ERROR( nodeWeights.getDistributionPtr()->isEqual( *rowDistPtr ) , "rowDistribution and nodeWeights distribution must be equal" ); 
     }
     
+/*    
     //TODO: maybe use a struct??
     // vectors to store output data
     std::vector<ValueType> inputTimeVec(repeatTimes);
@@ -621,21 +734,23 @@ int main(int argc, char** argv) {
     std::vector<IndexType> totalCommVec(repeatTimes);
     std::vector<IndexType> maxCommVolumeVec(repeatTimes);
     std::vector<IndexType> totalCommVolumeVec(repeatTimes);
-    
+    std::vector<ValueType> maxBorderNodesPercent(repeatTimes);
+    std::vector<ValueType> avgBorderNodesPercent(repeatTimes);
+*/    
     //store distributions to use later
     const scai::dmemo::DistributionPtr rowDistPtr( new scai::dmemo::BlockDistribution(N, comm) );
     const scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ) );
     
     scai::lama::DenseVector<IndexType> partition;
     
-    for( IndexType repeat=0; repeat<repeatTimes; repeat++){
-        
+    for( IndexType r=0; r<repeatTimes; r++){
+                
         // for the next runs the input is redistributed, se he must redistribute to the original distributions
         
         if(comm->getRank()==0) std::cout<< std::endl<< std::endl;
-        PRINT0("\t\t ----------- Starting run number " << repeat +1 << " -----------");
+        PRINT0("\t\t ----------- Starting run number " << r +1 << " -----------");
         
-        if(repeat>0){
+        if(r>0){
             PRINT0("Input redistribution: block distribution for graph rows, coordinates and nodeWeigts, no distribution for graph columns");
             
             graph.redistribute( rowDistPtr, noDistPtr );
@@ -645,9 +760,11 @@ int main(int argc, char** argv) {
             nodeWeights.redistribute( rowDistPtr );
         }
             
+        metricsVec[r].initialize( comm->getSize() );
+            
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
         
-        partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, settings );
+        partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, settings, metricsVec[r] );
         assert( partition.size() == N);
         assert( coordinates[0].size() == N);
         
@@ -667,14 +784,37 @@ int main(int argc, char** argv) {
             ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath + "/debugResult");
         }
         */
+        
+        //---------------------------------------------
+        //
+        // Get metrics
+        //
+        
+        
         std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
         
-        ValueType cut = ITI::GraphUtils::computeCut(graph, partition, true);
-        ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
-        IndexType maxComm, totalComm;
-        std::tie(maxComm, totalComm) = ITI::GraphUtils::computeComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
-        IndexType maxCommVol, totalCommVol;
-        std::tie( maxCommVol, totalCommVol ) =ITI::GraphUtils::computeCommVolume_p_equals_k( graph, partition);
+        metricsVec[r].finalCut = ITI::GraphUtils::computeCut(graph, partition, true);
+        metricsVec[r].finalImbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
+    
+        std::tie(metricsVec[r].maxBlockGraphDegree, metricsVec[r].totalBlockGraphEdges) = ITI::GraphUtils::computeBlockGraphComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
+        
+        // 2 vectors od size k
+        std::vector<IndexType> numBorderNodesPerBlock;  
+        std::vector<IndexType> numInnerNodesPerBlock;
+    
+        std::tie( numBorderNodesPerBlock, numInnerNodesPerBlock ) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition);
+        
+        metricsVec[r].maxCommVolume = *std::max_element( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end() );
+        metricsVec[r].totalCommVolume = std::accumulate( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end(), 0 );
+    
+        std::vector<ValueType> percentBorderNodesPerBlock( settings.numBlocks, 0);
+    
+        for(IndexType i=0; i<settings.numBlocks; i++){
+            percentBorderNodesPerBlock[i] = (ValueType (numBorderNodesPerBlock[i]))/(numBorderNodesPerBlock[i]+numInnerNodesPerBlock[i]);
+        }
+        
+        metricsVec[r].maxBorderNodesPercent = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
+        metricsVec[r].avgBorderNodesPercent = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(settings.numBlocks));
         
         std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
         
@@ -684,11 +824,12 @@ int main(int argc, char** argv) {
         // Reporting output to std::cout
         //
         
-        ValueType inputT = ValueType ( comm->max(inputTime.count() ));
-        ValueType partT = ValueType (comm->max(partitionTime.count()));
-        ValueType repT = ValueType (comm->max(reportTime.count()));
-
-        if (comm->getRank() == 0) {
+        metricsVec[r].inputTime = ValueType ( comm->max(inputTime.count() ));
+        metricsVec[r].timeFinalPartition = ValueType (comm->max(partitionTime.count()));
+        metricsVec[r].reportTime = ValueType (comm->max(reportTime.count()));
+        
+        
+        if (comm->getRank() == 0 and settings.verbose ) {
             for (IndexType i = 0; i < argc; i++) {
                 std::cout << std::string(argv[i]) << " ";
             }
@@ -699,9 +840,9 @@ int main(int argc, char** argv) {
             std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
             std::cout.precision(oldprecision);
             
-            std::cout<< std::endl<< "\033[1;36mcut:"<< cut<< "   imbalance:"<< imbalance << "   maxComm= "<< maxComm << std::endl;
-            std::cout<<"inputTime:" << inputT << "   partitionTime:" << partT <<"   reportTime:"<< repT << " \033[0m" << std::endl; 
-        
+            std::cout<< std::endl<< "\033[1;36mcut:"<< metricsVec[r].finalCut<< "   imbalance:"<< metricsVec[r].finalImbalance << std::endl;
+            std::cout<<"inputTime:" << metricsVec[r].inputTime << "   partitionTime:" << metricsVec[r].timeFinalPartition  <<"   reportTime:"<< metricsVec[r].reportTime << " \033[0m" << std::endl; 
+        /*
             inputTimeVec[repeat] = inputT;
             finalTime[repeat] = partT;
             finalCut[repeat] =  cut;
@@ -710,26 +851,38 @@ int main(int argc, char** argv) {
             totalCommVec[repeat] = totalComm;
             maxCommVolumeVec[repeat] = maxCommVol;
             totalCommVolumeVec[repeat] = totalCommVol;
-
+            maxBorderNodesPercent[repeat] = maxPercentBorderNodes;
+            avgBorderNodesPercent[repeat] = avgPercentBorderNodes;
+        */
         }
         
         comm->synchronize();
     }
-    
-    
+        
+        
     //
     // writing results in a file
     //
         
+    std::chrono::duration<double> totalTime =  std::chrono::system_clock::now() - startTime;
+    ValueType totalT = ValueType ( comm->max(totalTime.count() ));
     
+    if( settings.storeInfo) {
+        std::ofstream outF( settings.outFile, std::ios::out);
+        printVectorMetrics( metricsVec, outF ); 
+    }
+    
+
+    
+    /*
     if( comm->getRank()==0 and settings.outFile!="-" ){
         std::ofstream outF( settings.outFile, std::ios::app);
         outF << std::endl;
         
-        outF << "#       input  ,  partition     ,        cut  ,  imbalance   ,   maxComm  ,  totalComm   ,   maxCommVolume , totalCommVolume" << std::endl;
+        outF << "#       input ,  partition     ,       cut  ,  imbalance   ,  Comm:  max, total  ,   CommVolume:  max, total ,   PerBlockNodes: max , total  " << std::endl;
         outF << std::setprecision(2) << std::fixed;
         for( int r=0; r<repeatTimes; r++){
-            outF << r <<" \t    "<< inputTimeVec[r] << " ,  " << finalTime[r] << " ,\t\t\t" << finalCut[r] << " ,  "<< finalImbalance[r] << " , \t\t  "<< maxCommVec[r] << " ,  "<< totalCommVec[r] << " , \t\t\t"<< maxCommVolumeVec[r] << " ,  " << totalCommVolumeVec[r]  << std::endl;
+            outF << r <<" \t    "<< inputTimeVec[r] << " ,  " << finalTime[r] << " ,\t\t " << finalCut[r] << " ,  "<< finalImbalance[r] << " , \t\t  "<< maxCommVec[r] << " ,  "<< totalCommVec[r] << " , \t\t"<< maxCommVolumeVec[r] << " ,  " << totalCommVolumeVec[r]  << std::endl;
         }
         //outF << std::setprecision(2) << std::fixed;
         outF<< "average:    " << std::accumulate( inputTimeVec.begin(), inputTimeVec.end(), 0.0)/repeatTimes \
@@ -738,12 +891,15 @@ int main(int argc, char** argv) {
             << " ,  "       << std::accumulate( finalImbalance.begin(), finalImbalance.end(), 0.0)/repeatTimes \
             << " , \t\t "  << std::accumulate( maxCommVec.begin(), maxCommVec.end(), 0.0)/repeatTimes \
             << " ,  "       << std::accumulate( totalCommVec.begin(), totalCommVec.end(), 0.0)/repeatTimes \
-            << " , \t\t\t"  << std::accumulate( maxCommVolumeVec.begin(), maxCommVolumeVec.end(), 0.0)/repeatTimes \
+            << " , \t\t"  << std::accumulate( maxCommVolumeVec.begin(), maxCommVolumeVec.end(), 0.0)/repeatTimes \
             << " ,  "       << std::accumulate( totalCommVolumeVec.begin(), totalCommVolumeVec.end(), 0.0)/repeatTimes \
+            << " ,  "       <<  std::accumulate( maxBorderNodesPercent.begin(), maxBorderNodesPercent.end(), 0.0)/repeatTimes \
+            << " ,  "       << std::accumulate( avgBorderNodesPercent.begin(), avgBorderNodesPercent.end(), 0.0)/repeatTimes \
             << std::endl;
             
-        std::cout<< "output info written in file " << settings.outFile  <<  std::endl;
+        std::cout<< "output info written in file " << settings.outFile  << " and total time= " << totalT <<  std::endl;
     }
+    */
     
     if(settings.outFile!="-" ){
         std::string partOutFile = settings.outFile + ".partition";

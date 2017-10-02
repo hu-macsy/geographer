@@ -38,23 +38,23 @@ using scai::lama::Scalar;
 
 namespace ITI {
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings)
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings, struct Metrics& metrics)
 {
 	DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(input.getRowDistributionPtr(), 1);
-	return partitionGraph(input, coordinates, uniformWeights, settings);
+	return partitionGraph(input, coordinates, uniformWeights, settings, metrics);
 }
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings) {
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings, struct Metrics& metrics) {
 
 	DenseVector<IndexType> previous;
 	assert(!settings.repartition);
-	return partitionGraph(input, coordinates, nodeWeights, previous, settings);
+	return partitionGraph(input, coordinates, nodeWeights, previous, settings, metrics);
 
 }
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, DenseVector<IndexType>& previous, Settings settings)
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, DenseVector<IndexType>& previous, Settings settings,struct Metrics& metrics)
 {
 	IndexType k = settings.numBlocks;
 	ValueType epsilon = settings.epsilon;
@@ -120,20 +120,28 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         }
         
         assert(nodeWeights.getDistribution().isEqual(*inputDist));
-
-        //timing variables
-        ValueType timeToCalcInitMigration = 0;
-        ValueType timeForFirstRedistribution = 0;
-        ValueType timeForKmeans = 0;
+        
+        
+        //-------------------------
+        //
+        // timing info
+        
+        std::chrono::duration<double> kMeansTime = std::chrono::duration<double>(0.0);
+        std::chrono::duration<double> migrationCalculation = std::chrono::duration<double> (0.0);
+        std::chrono::duration<double> migrationTime= std::chrono::duration<double>(0.0);
+        std::chrono::duration<double> secondRedistributionTime = std::chrono::duration<double>(0.0) ;
+        std::chrono::duration<double> partitionTime= std::chrono::duration<double>(0.0);
+        
         std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
 
         if( settings.initialPartition==InitialPartitioningMethods::SFC) {
             PRINT0("Initial partition with SFCs");
             result= ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
             std::chrono::duration<double> sfcTime = std::chrono::system_clock::now() - beforeInitPart;
-            ValueType timeForSfcPart = ValueType ( comm->max(sfcTime.count() ));
-            if (comm->getRank() == 0) {
-                std::cout << "SFC Time:" << timeForSfcPart << std::endl;
+            if ( settings.verbose ) {
+                ValueType totSFCTime = ValueType(comm->max(sfcTime.count()) );
+                if(comm->getRank() == 0)
+                    std::cout << "SFC Time:" << totSFCTime << std::endl;
             }
         } else if ( settings.initialPartition==InitialPartitioningMethods::Pixel) {
             PRINT0("Initial partition with pixels.");
@@ -178,8 +186,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                         throw std::logic_error("Method not yet supported for preparing for K-Means");
                     }
                       
-                    std::chrono::duration<double> migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
-                    timeToCalcInitMigration = ValueType ( comm->max(migrationCalculation.count()) );             
+                    migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
+                    
                     
                     std::chrono::time_point<std::chrono::system_clock> beforeMigration =  std::chrono::system_clock::now();
                        
@@ -192,8 +200,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                         previous.redistribute(prepareRedist);
                     }
                     
-                    std::chrono::duration<double> migrationTime = std::chrono::system_clock::now() - beforeMigration;
-                    timeForFirstRedistribution = ValueType ( comm->max(migrationTime.count()) );
+                    migrationTime = std::chrono::system_clock::now() - beforeMigration;
+                    //timeForFirstRedistribution = ValueType ( comm->max(migrationTime.count()) );
                 }
             
             }
@@ -216,13 +224,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             	result = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeightCopy, blockSizes, settings);
             }
 
-            std::chrono::duration<double> kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
-            timeForKmeans = ValueType ( comm->max(kMeansTime.count() ));
+            kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
+            //timeForKmeans = ValueType ( comm->max(kMeansTime.count() ));
             assert(result.getLocalValues().min() >= 0);
             assert(result.getLocalValues().max() < k);
 
-            if (comm->getRank() == 0) {
-                std::cout << "K-Means, Time:" << timeForKmeans << std::endl;
+            if (settings.verbose) {
+                ValueType totKMeansTime = ValueType( comm->max(kMeansTime.count()) );
+                if(comm->getRank() == 0)
+                    std::cout << "K-Means, Time:" << totKMeansTime << std::endl;
             }
 
             assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
@@ -233,9 +243,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             DenseVector<ValueType> convertedWeights(nodeWeights);
             result = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, settings);
             std::chrono::duration<double> msTime = std::chrono::system_clock::now() - beforeInitPart;
-            ValueType timeForMsPart = ValueType ( comm->max(msTime.count() ));
-            if (comm->getRank() == 0) {
-                std::cout << "MS Time:" << timeForMsPart << std::endl;
+    
+            if ( settings.verbose ) {
+                ValueType totMsTime = ValueType ( comm->max(msTime.count()) );
+                if(comm->getRank() == 0)
+                    std::cout << "MS Time:" << totMsTime << std::endl;
             }
         } else if (settings.initialPartition == InitialPartitioningMethods::None) {
         	result = DenseVector<IndexType>(input.getRowDistributionPtr(), comm->getRank());
@@ -265,11 +277,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             }
             nodeWeights.redistribute(redistributor);
             
-            std::chrono::duration<double> secondRedistributionTime =  std::chrono::system_clock::now() - beforeSecondRedistributiom;
-            ValueType timeForSecondRedistr = ValueType ( comm->max(secondRedistributionTime.count() ));
+            secondRedistributionTime =  std::chrono::system_clock::now() - beforeSecondRedistributiom;
+            //ValueType timeForSecondRedistr = ValueType ( comm->max(secondRedistributionTime.count() ));
             
-            std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
-            ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
+            partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
+            //ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
             ValueType cut = comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;
             ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k, nodeWeights);
             
@@ -279,16 +291,41 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             // output: in std and file
             //
             
-            if (comm->getRank() == 0) {
+            
+            if (settings.verbose ) {
+                ValueType timeToCalcInitMigration = comm->max(migrationCalculation.count()) ;   
+                ValueType timeForFirstRedistribution = comm->max( migrationTime.count() );
+                ValueType timeForKmeans = comm->max( kMeansTime.count() );
+                ValueType timeForSecondRedistr = comm->max( secondRedistributionTime.count() );
+                ValueType timeForInitPart = comm->max( partitionTime.count() );
+                
+                if(comm->getRank() == 0 ){
                 std::cout<< std::endl << "\033[1;32mTiming: migration algo: "<< timeToCalcInitMigration << ", 1st redistr: " << timeForFirstRedistribution << ", only k-means: " << timeForKmeans <<", only 2nd redistr: "<< timeForSecondRedistr <<", total:" << timeForInitPart << std::endl;
                 std::cout << "Cut:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
+                }
             
+            
+            /*
                 if( settings.outFile!="-" and settings.writeInFile ){
                     // the file should already exist, we just append
                     std::ofstream outF( settings.outFile, std::ios::app);
                     outF << std::setprecision(3) << std::fixed;
                     outF << "        " << timeToCalcInitMigration << "  ,  " << timeForFirstRedistribution << "  ,  " << timeForKmeans << "  ,  "<< timeForSecondRedistr << "  ,  " << timeForInitPart << ",         "  << cut << " ,  "<< imbalance <<std::endl;
                 }
+            */
+            }
+            
+            
+            if( settings.storeInfo ){
+                IndexType rank = comm->getRank();
+                metrics.timeMigrationAlgo[rank]  = migrationCalculation.count();
+                metrics.timeFirstDistribution[rank]  = migrationTime.count();     
+                metrics.timeKmeans[rank] = kMeansTime.count();
+                metrics.timeSecondDistribution[rank] = secondRedistributionTime.count();
+                metrics.timePreliminary[rank] = partitionTime.count();
+                
+                metrics.preliminaryCut = cut;
+                metrics.preliminaryImbalance = imbalance;
             }
             
             
@@ -1081,9 +1118,9 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const 
 
 //to force instantiation
 
-template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, struct Settings);
+template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, struct Settings, struct Metrics& metrics);
 
-template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings);
+template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings, struct Metrics& metrics);
 
 template DenseVector<int> ParcoRepart<int, double>::hilbertPartition(const std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, Settings settings);
     

@@ -40,16 +40,15 @@ using namespace scai;
 namespace ITI {
 
 class auxTest : public ::testing::Test {
-
+protected:
+        // the directory of all the meshes used
+        std::string graphPath = "./meshes/";
 };
 
 TEST_F (auxTest, testInitialPartitions){
-
-    std::string path = "meshes/bigtrace/";
-    //std::string fileName = "bigtric-00016.graph";
-    std::string fileName = "bigtrace-00021.graph";
-    //std::string fileName = "slowrot-00014.graph";
-    std::string file = path + fileName;
+    
+    std::string fileName = "bigtrace-00000.graph";
+    std::string file = graphPath + fileName;
     std::ifstream f(file);
     IndexType dimensions= 2;
     IndexType N, edges;
@@ -197,6 +196,45 @@ TEST_F (auxTest, testInitialPartitions){
         std::cout<< "Output files written in " << destPath << std::endl;
     }
 
+}
+//-----------------------------------------------------------------
+
+TEST_F (auxTest,testGetBorderAndInnerNodes){
+ 
+    std::string file = graphPath + "Grid32x32";
+    IndexType dimensions = 2;
+    IndexType N;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    IndexType k =comm->getSize();
+
+    // read graph and coords
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    N= graph.getNumRows();
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+    settings.dimensions = dimensions;
+    settings.minGainForNextRound = 10;
+    
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
+    
+    std::vector<IndexType> numBorderNodes;
+    std::vector<IndexType> numInnerNodes;
+    
+    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition);
+    
+    //assertions
+    SCAI_ASSERT_EQ_ERROR( numBorderNodes.size(), k, "Size of numBorderNodes is wrong");
+    SCAI_ASSERT_EQ_ERROR( numInnerNodes.size(), k, "Size of numInnerNodes is wrong");
+    
+    IndexType totalBorderNodes = std::accumulate( numBorderNodes.begin(), numBorderNodes.end(), 0);
+    IndexType totalInnerNodes = std::accumulate( numInnerNodes.begin(), numInnerNodes.end(), 0);
+
+    SCAI_ASSERT_EQ_ERROR( totalBorderNodes+totalInnerNodes, N, "Sum of nodes not correct" );
+    
 }
 //-----------------------------------------------------------------
 

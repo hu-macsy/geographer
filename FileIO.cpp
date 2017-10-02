@@ -1028,7 +1028,9 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
     
     //TODO: remove one of the assertion (or both)
     SCAI_ASSERT_EQ_ERROR( globalN, comm->sum(localN), "Mismatch in total number of coordinates" );
-    SCAI_ASSERT_EQ_ERROR( globalN*maxDimension, comm->sum(localTotalNumOfCoords), "Mismatch in total number of coordinates" );
+    // replaced because globalN*3 can be >2^32
+    //SCAI_ASSERT_EQ_ERROR( globalN*maxDimension, comm->sum(localTotalNumOfCoords), "Mismatch in total number of coordinates" );
+    SCAI_ASSERT_EQ_ERROR( globalN, comm->sum(localTotalNumOfCoords)/maxDimension, "Mismatch in total number of coordinates" );
     
     // set like in KaHiP/parallel/prallel_src/app/configuration.h in configuration::standard
     //const IndexType binary_io_window_size = 64;   
@@ -1064,9 +1066,9 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
             }
             
             if( thisPE==numPEs-1) {
-                SCAI_ASSERT_EQ_ERROR( file.tellg(), globalN*maxDimension*sizeof(ValueType) , "While reading coordinates in binary: Position in file " << filename << " is not correct." );            
+                SCAI_ASSERT_EQ_ERROR( file.tellg(), globalN*maxDimension*sizeof(ValueType) , "While reading coordinates in binary: Position in file " << filename << " is not correct for process " << thisPE );            
             }else{
-                SCAI_ASSERT_EQ_ERROR( file.tellg(), localN*maxDimension*sizeof(ValueType)*(comm->getRank()+1) , "While reading coordinates in binary: Position in file " << filename << " is not correct." );            
+                SCAI_ASSERT_EQ_ERROR( file.tellg(), localN*maxDimension*sizeof(ValueType)*(comm->getRank()+1) , "While reading coordinates in binary: Position in file " << filename << " is not correct for process " << thisPE );            
             }
             
             delete[] localPartOfCoords;

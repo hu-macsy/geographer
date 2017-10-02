@@ -19,7 +19,7 @@ struct Settings{
     double epsilon = 0.05;
     bool repartition = false;
     
-    //input data
+    //input data and other info
     IndexType dimensions= 2;
     std::string fileName = "-";
     std::string outFile = "-";
@@ -27,6 +27,7 @@ struct Settings{
     bool useDiffusionCoordinates = false;
     IndexType diffusionRounds = 20;
     std::vector<IndexType> blockSizes;
+    std::string machine;
     
     //mesh generation
     IndexType numX = 32;
@@ -74,10 +75,16 @@ struct Settings{
     bool verbose = false;
     bool writeDebugCoordinates = false;
     bool writeInFile = false;
+    bool storeInfo = false;
+    
+    //
+    // print settings
+    //
     
     void print(std::ostream& out){
         IndexType numPoints = numX* numY* numZ;
         
+        out<< "Code git version: " << version << " and machine: "<< machine << std::endl;
         out<< "Setting: number of points= " << numPoints<< ", dimensions= "<< dimensions << ", filename: " << fileName << std::endl;
         if( outFile!="-" ){
             out<< "outFile: " << outFile << std::endl;

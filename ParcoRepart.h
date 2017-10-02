@@ -20,6 +20,7 @@
 #include <boost/graph/properties.hpp>
 
 #include "Settings.h"
+#include "Metrics.h"
 
 using namespace scai::lama;
 using scai::dmemo::Halo;
@@ -39,15 +40,15 @@ namespace ITI {
 	 		* @return Distributed DenseVector	, at position i is the block node i is assigned to
 	 		*/
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights,
-					struct Settings settings);
+					struct Settings settings, struct Metrics& metrics);
 
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights,
-					DenseVector<IndexType>& previous, struct Settings settings);
+					DenseVector<IndexType>& previous, struct Settings settings, struct Metrics& metrics);
 
 			/**
 			 * Wrapper without node weights.
 			 */
-			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings);
+			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings, struct Metrics& metrics);
 
 			/*
 			 * Get an initial partition using the hilbert curve.

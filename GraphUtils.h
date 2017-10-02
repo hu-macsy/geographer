@@ -69,6 +69,12 @@ std::vector<IndexType> nonLocalNeighbors(const scai::lama::CSRSparseMatrix<Value
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> getBorderNodes( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part);
 
+/* Returns two vectors each of size k: the first contains the number of border nodes per block and the second one the number of inner nodes per blocks.
+ *
+ */
+template<typename IndexType, typename ValueType>
+std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part);
+
 /** Returns the edges of the block graph only for the local part. Eg. if blocks 1 and 2 are local
  * in this processor it finds the edge (1,2) ( and the edge (2,1)).
  * Also if the other endpoint is in another processor it finds this edge: block 1 is local, it
@@ -110,7 +116,7 @@ IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM)
  *  second = Compute total communication = sum of all edges of the block graph.
  */
 template<typename IndexType, typename ValueType>
-std::pair<IndexType, IndexType> computeComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const int k);
+std::pair<IndexType, IndexType> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const int k);
 
 /** Compute maximum and total communication volume= max and sum of number of border nodes
  * WARNING: this works properly only when k=p and the nodes are redistributed so each PE owns nodes from one block.
