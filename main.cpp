@@ -53,13 +53,13 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
     ValueType sumPrelimanry = 0; 
     ValueType sumFinalTime = 0;
     
-    ValueType sumPreliminaryCut = 0;
-    ValueType sumFinalCut = 0;
+    IndexType sumPreliminaryCut = 0;
+    IndexType sumFinalCut = 0;
     ValueType sumImbalace = 0;
-    ValueType sumMaxBlGrDeg = 0;
-    ValueType sumBlGrEdges = 0;
-    ValueType sumMaxCommVol = 0;
-    ValueType sumtotCommVol = 0;
+    IndexType sumMaxBlGrDeg = 0;
+    IndexType sumBlGrEdges = 0;
+    IndexType sumMaxCommVol = 0;
+    IndexType sumtotCommVol = 0;
     ValueType sumMaxBorderNodesPerc = 0;
     ValueType sumAvgBorderNodesPerc = 0;
     

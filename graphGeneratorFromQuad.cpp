@@ -30,18 +30,30 @@ typedef int IndexType;
 
 int main(int argc, char** argv){
 
-    IndexType maxNumberOfAreas= 40;
-    const IndexType pointsPerArea= 500;
-    const IndexType dimension = 3;
-    const ValueType maxCoord = 1000;
-
-    for(int numberOfAreas=11; numberOfAreas<maxNumberOfAreas; numberOfAreas+=4){
+    using namespace boost::program_options;
+    options_description desc("Supported options");
+    
+    IndexType maxNumberOfAreas= 10;
+    IndexType pointsPerArea= 500;
+    IndexType dimension = 3;
+    ValueType maxCoord = 1000;
+    std::string outFile = "./graphFromQuad3D/graphFromQuad3D_"+std::to_string(numberOfAreas);
+    
+    desc.add_options()
+        ("numOfAreas", value<IndexType>(&maxNumberOfAreas), "The number of areas os interest where more points are gonna be inserted")
+        ("pointsPerArea", value<IndexType>(&pointsPerArea), "The number of points which every area of interest has.")
+        ("dimension", value<IndexType>(&dimension), "The dimension of the poits")
+        ("maxCoord", value<ValueType>(&maxCoord), "The maximum coordinate the points will have")
+        ("filename", valie<std::string>(&outFile), "The name of the output file to write graph and coordinates (coordinates will have the .xyz ending)")
+        ;
+    
+    for(int numberOfAreas=1; numberOfAreas<maxNumberOfAreas; numberOfAreas++){
         std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
         scai::lama::CSRSparseMatrix<ValueType> graph;
         std::vector<DenseVector<ValueType>> coords( dimension );
         
-        ITI::MeshGenerator<IndexType, ValueType>::createQuadMesh( graph, coords, dimension, numberOfAreas, pointsPerArea*pointsPerArea, maxCoord); 
+        ITI::MeshGenerator<IndexType, ValueType>::createQuadMesh( graph, coords, dimension, numberOfAreas, pointsPerArea, maxCoord); 
         
         std::chrono::duration<double> genTime = std::chrono::system_clock::now() - startTime;
         std::cout<< "time to create quadTree and get the graph: "<<genTime.count();
@@ -80,7 +92,6 @@ int main(int argc, char** argv){
         
         std::chrono::duration<double> degreeTime = std::chrono::system_clock::now() - startTime -genTime;
         
-        std::string outFile = "./graphFromQuad3D/graphFromQuad3D_"+std::to_string(numberOfAreas);
         ITI::FileIO<IndexType, ValueType>::writeGraph( graph, outFile);
         
         std::string outCoords = outFile + ".xyz";
