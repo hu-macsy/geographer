@@ -164,7 +164,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 
 //---------------------------------------------------------------------------------------
 TEST_F(LocalRefinementTest, testOriginArray) {
-	std::string fileName = "bubbles-00000.graph";
+	std::string fileName = "bubbles-00010.graph";
 	std::string file = graphPath + fileName;
 
 	scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file);
