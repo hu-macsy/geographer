@@ -53,13 +53,13 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
     ValueType sumPrelimanry = 0; 
     ValueType sumFinalTime = 0;
     
-    IndexType sumPreliminaryCut = 0;
-    IndexType sumFinalCut = 0;
-    IndexType sumImbalace = 0;
-    IndexType sumMaxBlGrDeg = 0;
-    IndexType sumBlGrEdges = 0;
-    IndexType sumMaxCommVol = 0;
-    IndexType sumtotCommVol = 0;
+    ValueType sumPreliminaryCut = 0;
+    ValueType sumFinalCut = 0;
+    ValueType sumImbalace = 0;
+    ValueType sumMaxBlGrDeg = 0;
+    ValueType sumBlGrEdges = 0;
+    ValueType sumMaxCommVol = 0;
+    ValueType sumtotCommVol = 0;
     ValueType sumMaxBorderNodesPerc = 0;
     ValueType sumAvgBorderNodesPerc = 0;
     
@@ -394,8 +394,8 @@ int main(int argc, char** argv) {
 	if( settings.storeInfo && settings.outFile=="-" ) {
             if (comm->getRank() == 0) {
                 std::cout<< "Option to store information used but no output file given to write to. Specify an output file using the option --outFile. Aborting." << std::endl;
-                return 126;
             }
+            return 126;
         }
 
     //--------------------------------------------------------
@@ -416,7 +416,7 @@ int main(int argc, char** argv) {
     }
 
     settings.verbose = vm.count("verbose");
-    settigns.storeInfo = vm.count("storeInfo");
+    settings.storeInfo = vm.count("storeInfo");
     settings.erodeInfluence = vm.count("erodeInfluence");
     settings.tightenBounds = vm.count("tightenBounds");
 
@@ -877,7 +877,24 @@ int main(int argc, char** argv) {
     
     if( settings.storeInfo && settings.outFile!="-" ) {
         std::ofstream outF( settings.outFile, std::ios::out);
-        printVectorMetrics( metricsVec, outF ); 
+        if(outF.is_open()){
+            settings.print( outF);
+            printVectorMetrics( metricsVec, outF ); 
+        }else{
+            if( comm->getRank()==0){
+                std::cout<< "Could not open file " << settings.outFile << " informations not stored"<< std::endl;
+            }            
+        }
+        
+        if( settings.verbose ){
+            settings.print( std::cout );
+            printVectorMetrics( metricsVec, std::cout ); 
+	}
+
+        if( comm->getRank()==0){
+            std::cout<< "Output information written to file " << settings.outFile << " in total time " << totalT << std::endl;
+        }
+        
     }
     
 
