@@ -309,7 +309,7 @@ int main(int argc, char** argv) {
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 				("verbose", "Increase output.")
                                 ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
-                                ("storeInfo", value<bool>(&settings.storeInfo), "Store timing and ohter metrics in file.")
+                                ("storeInfo", "Store timing and ohter metrics in file.")
 				;
 
         //------------------------------------------------
@@ -416,6 +416,7 @@ int main(int argc, char** argv) {
     }
 
     settings.verbose = vm.count("verbose");
+    settigns.storeInfo = vm.count("storeInfo");
     settings.erodeInfluence = vm.count("erodeInfluence");
     settings.tightenBounds = vm.count("tightenBounds");
 
