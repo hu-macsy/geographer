@@ -122,19 +122,7 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
             <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
             << std::endl;
     }
-    //outF <<"total time for " << numRuns << " runs: " << << std::endl;
     
-    /*
-    for(IndexType run=0; run<numRuns; run++){
-        metrics thisMetric = metrcsVec[ run ];
-        
-        out << std::setprecision(2) << std::fixed;
-        
-        outF << run <<"     "<< thisMetric.inputTime << ", " << thisMetric.timeFinalPartition << " ,  " \
-        << thisMetric.finalCut << " ,  "<< thisMetric.finalImbalance[r]  \
-        << " ,  "<< thisMetric. maxCommVec[r] << " ,  "<< totalCommVec[r] << " , \t\t"<< maxCommVolumeVec[r] << " ,  " << totalCommVolumeVec[r]  << std::endl;
-    }
-    */
 }
 
 
@@ -693,24 +681,9 @@ int main(int argc, char** argv) {
 
     }
 
-    if( comm->getRank() ==0 && settings.verbose){
-          settings.print(std::cout);
+    if( comm->getRank() ==0){
+          settings.print(std::cout, comm);
     }
-    
-    //
-    //  if parameter "outFile" is given create the output file
-    //
-    
-    /*
-    if (vm.count("outFile")){
-        settings.writeInFile = true;
-        std::ofstream outF( settings.outFile, std::ios::out );
-        outF << "commit:"<< version << " machine:" << machine <<std::endl;
-        settings.print( outF );
-        outF<< std::endl;
-        outF << "# times: migrAlgo , 1redistr , k-means , 2redistr , total     ,     cut  ,  imbalance " << std::endl;
-    }
-    */
     
     std::vector<struct Metrics> metricsVec( repeatTimes );
     
@@ -718,11 +691,6 @@ int main(int argc, char** argv) {
     //
     // partition the graph
     //
-    
-    
-    if(comm->getRank()==0){
-        settings.print(std::cout);
-    }
 
     if( repeatTimes>0 ){
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
@@ -731,20 +699,6 @@ int main(int argc, char** argv) {
         SCAI_ASSERT_ERROR( nodeWeights.getDistributionPtr()->isEqual( *rowDistPtr ) , "rowDistribution and nodeWeights distribution must be equal" ); 
     }
     
-/*    
-    //TODO: maybe use a struct??
-    // vectors to store output data
-    std::vector<ValueType> inputTimeVec(repeatTimes);
-    std::vector<ValueType> finalTime(repeatTimes);
-    std::vector<IndexType> finalCut(repeatTimes);       // cut of type ValueType, so decimical will be lost
-    std::vector<ValueType> finalImbalance(repeatTimes);
-    std::vector<IndexType> maxCommVec(repeatTimes);
-    std::vector<IndexType> totalCommVec(repeatTimes);
-    std::vector<IndexType> maxCommVolumeVec(repeatTimes);
-    std::vector<IndexType> totalCommVolumeVec(repeatTimes);
-    std::vector<ValueType> maxBorderNodesPercent(repeatTimes);
-    std::vector<ValueType> avgBorderNodesPercent(repeatTimes);
-*/    
     //store distributions to use later
     const scai::dmemo::DistributionPtr rowDistPtr( new scai::dmemo::BlockDistribution(N, comm) );
     const scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ) );
@@ -850,18 +804,6 @@ int main(int argc, char** argv) {
             
             std::cout<< std::endl<< "\033[1;36mcut:"<< metricsVec[r].finalCut<< "   imbalance:"<< metricsVec[r].finalImbalance << std::endl;
             std::cout<<"inputTime:" << metricsVec[r].inputTime << "   partitionTime:" << metricsVec[r].timeFinalPartition  <<"   reportTime:"<< metricsVec[r].reportTime << " \033[0m" << std::endl; 
-        /*
-            inputTimeVec[repeat] = inputT;
-            finalTime[repeat] = partT;
-            finalCut[repeat] =  cut;
-            finalImbalance[repeat] = imbalance;
-            maxCommVec[repeat] = maxComm;
-            totalCommVec[repeat] = totalComm;
-            maxCommVolumeVec[repeat] = maxCommVol;
-            totalCommVolumeVec[repeat] = totalCommVol;
-            maxBorderNodesPercent[repeat] = maxPercentBorderNodes;
-            avgBorderNodesPercent[repeat] = avgPercentBorderNodes;
-        */
         }
         
         comm->synchronize();
@@ -878,7 +820,7 @@ int main(int argc, char** argv) {
     if( settings.storeInfo && settings.outFile!="-" ) {
         std::ofstream outF( settings.outFile, std::ios::out);
         if(outF.is_open()){
-            settings.print( outF);
+            settings.print( outF, comm);
             printVectorMetrics( metricsVec, outF ); 
         }else{
             if( comm->getRank()==0){
@@ -887,7 +829,7 @@ int main(int argc, char** argv) {
         }
         
         if( settings.verbose ){
-            settings.print( std::cout );
+            settings.print( std::cout, comm );
             printVectorMetrics( metricsVec, std::cout ); 
 	}
 
@@ -896,36 +838,7 @@ int main(int argc, char** argv) {
         }
         
     }
-    
 
-    
-    /*
-    if( comm->getRank()==0 and settings.outFile!="-" ){
-        std::ofstream outF( settings.outFile, std::ios::app);
-        outF << std::endl;
-        
-        outF << "#       input ,  partition     ,       cut  ,  imbalance   ,  Comm:  max, total  ,   CommVolume:  max, total ,   PerBlockNodes: max , total  " << std::endl;
-        outF << std::setprecision(2) << std::fixed;
-        for( int r=0; r<repeatTimes; r++){
-            outF << r <<" \t    "<< inputTimeVec[r] << " ,  " << finalTime[r] << " ,\t\t " << finalCut[r] << " ,  "<< finalImbalance[r] << " , \t\t  "<< maxCommVec[r] << " ,  "<< totalCommVec[r] << " , \t\t"<< maxCommVolumeVec[r] << " ,  " << totalCommVolumeVec[r]  << std::endl;
-        }
-        //outF << std::setprecision(2) << std::fixed;
-        outF<< "average:    " << std::accumulate( inputTimeVec.begin(), inputTimeVec.end(), 0.0)/repeatTimes \
-            << " ,  "       << std::accumulate( finalTime.begin(), finalTime.end(), 0.0)/repeatTimes \
-            << " , \t\t"  << std::accumulate( finalCut.begin(), finalCut.end(), 0.0)/repeatTimes \
-            << " ,  "       << std::accumulate( finalImbalance.begin(), finalImbalance.end(), 0.0)/repeatTimes \
-            << " , \t\t "  << std::accumulate( maxCommVec.begin(), maxCommVec.end(), 0.0)/repeatTimes \
-            << " ,  "       << std::accumulate( totalCommVec.begin(), totalCommVec.end(), 0.0)/repeatTimes \
-            << " , \t\t"  << std::accumulate( maxCommVolumeVec.begin(), maxCommVolumeVec.end(), 0.0)/repeatTimes \
-            << " ,  "       << std::accumulate( totalCommVolumeVec.begin(), totalCommVolumeVec.end(), 0.0)/repeatTimes \
-            << " ,  "       <<  std::accumulate( maxBorderNodesPercent.begin(), maxBorderNodesPercent.end(), 0.0)/repeatTimes \
-            << " ,  "       << std::accumulate( avgBorderNodesPercent.begin(), avgBorderNodesPercent.end(), 0.0)/repeatTimes \
-            << std::endl;
-            
-        std::cout<< "output info written in file " << settings.outFile  << " and total time= " << totalT <<  std::endl;
-    }
-    */
-    
     if(settings.outFile!="-" ){
         std::string partOutFile = settings.outFile + ".partition";
         ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );

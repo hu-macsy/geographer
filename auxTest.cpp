@@ -103,8 +103,8 @@ TEST_F (auxTest, testInitialPartitions){
     if( comm->getRank()==0){
         logF<< "Results for file " << fileName << std::endl;
         logF<< "node= "<< N << " , edges= "<< edges << " , blocks= "<< k<< std::endl<< std::endl;
-        settings.print( logF );
-        settings.print( std::cout );
+        settings.print( logF, comm );
+        settings.print( std::cout, comm );
     }
     //logF<< std::endl<< std::endl << "Only initial partition, no MultiLevel or LocalRefinement"<< std::endl << std::endl;
     

@@ -81,7 +81,7 @@ struct Settings{
     // print settings
     //
     
-    void print(std::ostream& out){
+    void print(std::ostream& out, const scai::dmemo::CommunicatorPtr comm){
         
         if( comm->getRank()==0){
                 
