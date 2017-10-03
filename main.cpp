@@ -76,11 +76,11 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
     
         if( comm->getRank()==0 ){
             out << std::setprecision(2) << std::fixed;
-            out<< run << " ,       "<< thisMetric.inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ", " << maxTimePreliminary << ",  "<< thisMetric.timeFinalPartition << " ,  \t   "\
-            << thisMetric.preliminaryCut << ", "<< thisMetric.finalCut << " ,  " << thisMetric.finalImbalance << ", \t\t "  \
-            << thisMetric.maxBlockGraphDegree << ", " << thisMetric.totalBlockGraphEdges << " ,\t\t "  \
-            << thisMetric.maxCommVolume << ", " << thisMetric.totalCommVolume << " , \t\t "  \
-            << thisMetric.maxBorderNodesPercent << ", " << thisMetric.avgBorderNodesPercent \
+            out<< run << " ,       "<< thisMetric.inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  "<< thisMetric.timeFinalPartition << " ,  \t   "\
+            << thisMetric.preliminaryCut << ",  "<< thisMetric.finalCut << ",  " << thisMetric.finalImbalance << " , \t\t "  \
+            << thisMetric.maxBlockGraphDegree << ",  " << thisMetric.totalBlockGraphEdges << " ,\t\t "  \
+            << thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << " , \t\t "  \
+            << thisMetric.maxBorderNodesPercent << ",  " << thisMetric.avgBorderNodesPercent \
             << std::endl;
         }
         
@@ -104,19 +104,19 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
     
     if( comm->getRank()==0 ){
         out << "average,  "\
-            <<  ValueType (metricsVec[0].inputTime)<< " , "\
-            <<  ValueType(sumMigrAlgo)/numRuns<< " , " \
-            <<  ValueType(sumFirstDistr)/numRuns<< ", " \
-            <<  ValueType(sumKmeans)/numRuns<< ", " \
-            <<  ValueType(sumSecondDistr)/numRuns<< ", " \
-            <<  ValueType(sumPrelimanry)/numRuns<< ", " \
-            <<  ValueType(sumFinalTime)/numRuns<< ", \t  " \
-            <<  ValueType(sumPreliminaryCut)/numRuns<< ", " \
-            <<  ValueType(sumFinalCut)/numRuns<< ", " \
+            <<  ValueType (metricsVec[0].inputTime)<< ",  "\
+            <<  ValueType(sumMigrAlgo)/numRuns<< ",  " \
+            <<  ValueType(sumFirstDistr)/numRuns<< ",  " \
+            <<  ValueType(sumKmeans)/numRuns<< ",  " \
+            <<  ValueType(sumSecondDistr)/numRuns<< ",  " \
+            <<  ValueType(sumPrelimanry)/numRuns<< ",  " \
+            <<  ValueType(sumFinalTime)/numRuns<< " , \t  " \
+            <<  ValueType(sumPreliminaryCut)/numRuns<< ",  " \
+            <<  ValueType(sumFinalCut)/numRuns<< ",  " \
             <<  ValueType(sumImbalace)/numRuns<< " ,\t\t " \
-            <<  ValueType(sumMaxBlGrDeg)/numRuns<< ", " \
+            <<  ValueType(sumMaxBlGrDeg)/numRuns<< ",  " \
             <<  ValueType(sumBlGrEdges)/numRuns<< " ,\t\t " \
-            <<  ValueType(sumMaxCommVol)/numRuns<< ", " \
+            <<  ValueType(sumMaxCommVol)/numRuns<< ",  " \
             <<  ValueType(sumtotCommVol)/numRuns<< " ,\t\t " \
             <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
             <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
@@ -390,6 +390,13 @@ int main(int argc, char** argv) {
 			settings.initialPartition = InitialPartitioningMethods::KMeans;
 		}
 	}
+	
+	if( settings.storeInfo && settings.outFile=="-" ) {
+            if (comm->getRank() == 0) {
+                std::cout<< "Option to store information used but no output file given to write to. Specify an output file using the option --outFile. Aborting." << std::endl;
+                return 126;
+            }
+        }
 
     //--------------------------------------------------------
     //
@@ -798,7 +805,7 @@ int main(int argc, char** argv) {
     
         std::tie(metricsVec[r].maxBlockGraphDegree, metricsVec[r].totalBlockGraphEdges) = ITI::GraphUtils::computeBlockGraphComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
         
-        // 2 vectors od size k
+        // 2 vectors of size k
         std::vector<IndexType> numBorderNodesPerBlock;  
         std::vector<IndexType> numInnerNodesPerBlock;
     
@@ -806,7 +813,7 @@ int main(int argc, char** argv) {
         
         metricsVec[r].maxCommVolume = *std::max_element( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end() );
         metricsVec[r].totalCommVolume = std::accumulate( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end(), 0 );
-    
+        
         std::vector<ValueType> percentBorderNodesPerBlock( settings.numBlocks, 0);
     
         for(IndexType i=0; i<settings.numBlocks; i++){
@@ -867,7 +874,7 @@ int main(int argc, char** argv) {
     std::chrono::duration<double> totalTime =  std::chrono::system_clock::now() - startTime;
     ValueType totalT = ValueType ( comm->max(totalTime.count() ));
     
-    if( settings.storeInfo) {
+    if( settings.storeInfo && settings.outFile!="-" ) {
         std::ofstream outF( settings.outFile, std::ios::out);
         printVectorMetrics( metricsVec, outF ); 
     }

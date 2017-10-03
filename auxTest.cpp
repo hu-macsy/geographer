@@ -218,8 +218,11 @@ TEST_F (auxTest,testGetBorderAndInnerNodes){
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
     settings.minGainForNextRound = 10;
+    settings.storeInfo = false;
     
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
+    struct Metrics metrics;
+    
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
     
     std::vector<IndexType> numBorderNodes;
     std::vector<IndexType> numInnerNodes;

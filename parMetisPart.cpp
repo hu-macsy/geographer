@@ -331,26 +331,52 @@ int main(int argc, char** argv) {
 
     double partKwayTime= comm->max(partitionKwayTime.count() );
 
-    
-    // convert partition to a DenseVector
     //
+    // convert partition to a DenseVector
     DenseVector<IndexType> partitionKway(dist);
     for(unsigned int i=0; i<localN; i++){
         partitionKway.getLocalValues()[i] = partKway[i];
     }
-    ValueType cutKway = ITI::GraphUtils::computeCut(graph, partitionKway, true);
-    ValueType imbalanceKway = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partitionKway, nparts );
-    IndexType maxComm, totalComm;
-    std::tie(maxComm, totalComm) = ITI::GraphUtils::computeComm<IndexType, ValueType>( graph, partitionKway, nparts);
-    
     assert(sizeof(xyzLocal)/sizeof(real_t) == 2*sizeof(partKway)/sizeof(idx_t) );
-  
+    
     // check correct transformation to DenseVector
     for(int i=0; i<localN; i++){
         //PRINT(*comm << ": "<< part[i] << " _ "<< partition.getLocalValues()[i] );
         assert( partKway[i]== partitionKway.getLocalValues()[i]);
     }
-
+    
+    //---------------------------------------------
+    //
+    // Get metrics
+    //
+    
+    ValueType cutKway = ITI::GraphUtils::computeCut(graph, partitionKway, true);
+    ValueType imbalanceKway = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partitionKway, nparts );
+    IndexType maxComm, totalComm;
+    std::tie(maxComm, totalComm) = ITI::GraphUtils::computeBlockGraphComm<IndexType, ValueType>( graph, partitionKway, nparts);
+    // 2 vectors of size k
+    std::vector<IndexType> numBorderNodesPerBlock;  
+    std::vector<IndexType> numInnerNodesPerBlock;
+    
+    std::tie( numBorderNodesPerBlock, numInnerNodesPerBlock ) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partitionKway);
+    
+    IndexType maxCommVolume = *std::max_element( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end() );
+    IndexType totalCommVolume = std::accumulate( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end(), 0 );
+    
+    std::vector<ValueType> percentBorderNodesPerBlock( nparts, 0);
+    
+    for(IndexType i=0; i<nparts; i++){
+        percentBorderNodesPerBlock[i] = (ValueType (numBorderNodesPerBlock[i]))/(numBorderNodesPerBlock[i]+numInnerNodesPerBlock[i]);
+    }
+    
+    IndexType maxBorderNodesPercent = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
+    IndexType avgBorderNodesPercent = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(settings.numBlocks));
+    
+    //---------------------------------------------------------------
+    //
+    // Reporting output to std::cout
+    //
+    
     char machineChar[255];
     std::string machine;
     gethostname(machineChar, 255);
@@ -361,13 +387,14 @@ int main(int argc, char** argv) {
     if(comm->getRank()==0){
     	std::cout << std::endl << "machine:" << machine << " input:" << graphFile << " nodes:" << N << " epsilon:" << settings.epsilon;
         std::cout << "\033[1;36m";
-        if( parMetisGeom ){
-            std::cout << std::endl << "ParMETIS_V3_PartGeomKway cut= ";
-        }else{
-            std::cout << std::endl << "ParMETIS_V3_PartKway cut= ";
-        }
         
-        std::cout<< cutKway <<" imbalance:" << imbalanceKway<<", time for partition: "<< partKwayTime << " , maxComm=" << maxComm << " \033[0m" << std::endl;
+        
+        if( parMetisGeom ){
+            std::cout << std::endl << "ParMETIS_V3_PartGeomKway: "<< std::endl;
+        }else{
+            std::cout << std::endl << "ParMETIS_V3_PartKway: " << std::endl;
+        }
+        std::cout <<"time for partition: "<< partKwayTime << " , cut= "<< cutKway <<" imbalance=" << imbalanceKway<< " , maxBlGrDeg=" << maxComm << ", BlGrEdges= "<< totalComm << ", maxCommVol= "<< maxCommVolume << ", totalCommVolume= " << totalCommVolume << ", maxBorderNodesPercent= " << maxBorderNodesPercent << ", avgBorderNodesPercent= " << avgBorderNodesPercent  << " \033[0m" << std::endl;
     }
     // the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================

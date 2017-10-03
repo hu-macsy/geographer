@@ -45,14 +45,35 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 }
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings, struct Metrics& metrics) {
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings) {
+    
+    struct Metrics& metrics;
+    settings.storeInfo = false; // not store timing and metrics information
+    
+    DenseVector<IndexType> previous;
+    assert(!settings.repartition);
+    return partitionGraph(input, coordinates, nodeWeights, previous, settings, metrics);
+    
+}
 
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings){
+    struct Metrics metrics;
+    settings.storeInfo = false; // not store timing and metrics information
+    
+    DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(input.getRowDistributionPtr(), 1);
+    return partitionGraph(input, coordinates, uniformWeights, settings, metrics);
+}
+
+// overloaded version with metrics
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings, struct Metrics& metrics) {
+    
 	DenseVector<IndexType> previous;
 	assert(!settings.repartition);
 	return partitionGraph(input, coordinates, nodeWeights, previous, settings, metrics);
 
 }
-
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, DenseVector<IndexType>& previous, Settings settings,struct Metrics& metrics)
 {
