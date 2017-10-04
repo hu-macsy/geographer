@@ -791,7 +791,7 @@ int main(int argc, char** argv) {
         metricsVec[r].reportTime = ValueType (comm->max(reportTime.count()));
         
         
-        if (comm->getRank() == 0 and settings.verbose ) {
+        if (comm->getRank() == 0 ) {
             for (IndexType i = 0; i < argc; i++) {
                 std::cout << std::string(argv[i]) << " ";
             }
@@ -807,11 +807,11 @@ int main(int argc, char** argv) {
         }
         
         comm->synchronize();
-    }
+    }// repeat loop
         
         
     //
-    // writing results in a file
+    // writing results in a file and std::cout
     //
         
     std::chrono::duration<double> totalTime =  std::chrono::system_clock::now() - startTime;
@@ -828,15 +828,12 @@ int main(int argc, char** argv) {
             }            
         }
         
-        if( settings.verbose ){
-            settings.print( std::cout, comm );
-            printVectorMetrics( metricsVec, std::cout ); 
-	}
+        settings.print( std::cout, comm );
+        printVectorMetrics( metricsVec, std::cout ); 
 
         if( comm->getRank()==0){
             std::cout<< "Output information written to file " << settings.outFile << " in total time " << totalT << std::endl;
         }
-        
     }
 
     if(settings.outFile!="-" ){

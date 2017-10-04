@@ -369,8 +369,8 @@ int main(int argc, char** argv) {
         percentBorderNodesPerBlock[i] = (ValueType (numBorderNodesPerBlock[i]))/(numBorderNodesPerBlock[i]+numInnerNodesPerBlock[i]);
     }
     
-    IndexType maxBorderNodesPercent = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
-    IndexType avgBorderNodesPercent = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(settings.numBlocks));
+    ValueType maxBorderNodesPercent = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
+    ValueType avgBorderNodesPercent = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(nparts));
     
     //---------------------------------------------------------------
     //
@@ -388,13 +388,13 @@ int main(int argc, char** argv) {
     	std::cout << std::endl << "machine:" << machine << " input:" << graphFile << " nodes:" << N << " epsilon:" << settings.epsilon;
         std::cout << "\033[1;36m";
         
-        
         if( parMetisGeom ){
             std::cout << std::endl << "ParMETIS_V3_PartGeomKway: "<< std::endl;
         }else{
             std::cout << std::endl << "ParMETIS_V3_PartKway: " << std::endl;
         }
-        std::cout <<"time for partition: "<< partKwayTime << " , cut= "<< cutKway <<" imbalance=" << imbalanceKway<< " , maxBlGrDeg=" << maxComm << ", BlGrEdges= "<< totalComm << ", maxCommVol= "<< maxCommVolume << ", totalCommVolume= " << totalCommVolume << ", maxBorderNodesPercent= " << maxBorderNodesPercent << ", avgBorderNodesPercent= " << avgBorderNodesPercent  << " \033[0m" << std::endl;
+        std::cout <<"time ,  cut ,  imbalance ,  maxBlGrDeg ,  BlGrEdges ,  maxCommVol ,  totalCommVolume ,   maxBorderNodesPercent ,  avgBorderNodesPercent " << std::endl;
+        std::cout<< partKwayTime << " ,  " << cutKway << " ,  " << imbalanceKway << " ,  " << maxComm << " ,  " << totalComm << " ,  " << maxCommVolume << " ,  " << totalCommVolume  << " ,  " << maxBorderNodesPercent  << " ,  " <<  avgBorderNodesPercent <<  " \033[0m" << std::endl;
     }
     // the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================
