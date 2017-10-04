@@ -229,9 +229,15 @@ TEST_F (auxTest,testGetBorderAndInnerNodes){
     
     std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition);
     
-    //assertions
+    //assertions - prints
     SCAI_ASSERT_EQ_ERROR( numBorderNodes.size(), k, "Size of numBorderNodes is wrong");
     SCAI_ASSERT_EQ_ERROR( numInnerNodes.size(), k, "Size of numInnerNodes is wrong");
+    
+    if( comm->getRank()==0 ){
+        for(int i=0; i<k; i++){
+            std::cout<<"Block " << i << " has " << numBorderNodes[i] << " border nodes and " << numInnerNodes[i] << " inner nodes"<< std::endl;
+        }
+    }
     
     IndexType totalBorderNodes = std::accumulate( numBorderNodes.begin(), numBorderNodes.end(), 0);
     IndexType totalInnerNodes = std::accumulate( numInnerNodes.begin(), numInnerNodes.end(), 0);

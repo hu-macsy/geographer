@@ -440,8 +440,8 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes(
 			}
 			SCAI_ASSERT_LE_ERROR( neighborBlock , max , "Wrong block id." );
 			if (thisBlock != neighborBlock) {
-                                borderNodesPerBlock[thisBlock]++;   //increase number of border nodes found
-                                isBorderNode = true;
+                borderNodesPerBlock[thisBlock]++;   //increase number of border nodes found
+                isBorderNode = true;
 				break;
 			}
     	}
