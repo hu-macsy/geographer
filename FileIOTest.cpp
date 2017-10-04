@@ -37,9 +37,14 @@ typedef int IndexType;
 
 using scai::lama::CSRStorage;
 
+
 namespace ITI {
 
 class FileIOTest : public ::testing::Test {
+  
+protected:
+        // the directory of all the meshes used
+        std::string graphPath = "./meshes/";
 
 };
 
@@ -79,10 +84,9 @@ TEST_F(FileIOTest, testWriteMetis_Dist_3D){
  */
 
 TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
-    std::string path = "meshes/slowrot/";
     //std::string file = "Grid8x8";
     std::string file = "slowrot-00000.graph";
-    std::string filename= path + file;
+    std::string filename= graphPath + file;
     CSRSparseMatrix<ValueType> Graph;
     IndexType N;    //number of points
 
@@ -104,7 +108,7 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
     EXPECT_EQ(nodes, Graph.getNumColumns());
     EXPECT_EQ(edges, (Graph.getNumValues())/2 );
 
-    std::string fileTo= path + std::string("MY_") + file;
+    std::string fileTo= graphPath + std::string("MY_") + file;
 
     // write the graph you read in a new file
     FileIO<IndexType, ValueType>::writeGraph(Graph, fileTo );
@@ -148,10 +152,8 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     IndexType dim= 2, k= 8, i;
     ValueType epsilon= 0.1;
 
-    std::string path = "./meshes/slowrot/";
-    //std::string path = "";
     std::string file= "slowrot-00000.graph";
-    std::string grFile= path +file, coordFile= path +file +".xyz";  //graph file and coordinates file
+    std::string grFile= graphPath +file, coordFile= graphPath +file +".xyz";  //graph file and coordinates file
     std::fstream f(grFile);
     IndexType nodes, edges;
     f>> nodes>> edges;
@@ -203,9 +205,10 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
         settings.epsilon = epsilon;
         settings.dimensions = dim;
         settings.minGainForNextRound = 10;
+        struct Metrics metrics;
         
         //partition the graph
-        scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D, settings );
+        scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D, settings, metrics );
         EXPECT_EQ(partition.size(), N);
     SCAI_REGION_END("testPartitionFromFile_local_2D.partition");
 
@@ -214,10 +217,8 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
 
 TEST_F(FileIOTest, testWriteCoordsDistributed){
 
-    //std::string path = "./meshes/slowrot/";
-    std::string path = "";
     std::string file= "Grid8x8";
-    std::string grFile= path +file , coordFile= path +file +".xyz";  //graph file and coordinates file
+    std::string grFile= graphPath +file , coordFile= graphPath +file +".xyz";  //graph file and coordinates file
     std::fstream f(grFile);
     IndexType nodes, edges;
     f>> nodes>> edges;
@@ -236,10 +237,11 @@ TEST_F(FileIOTest, testWriteCoordsDistributed){
     FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords2D, nodes, "writeCoordsDist");
     //TODO: delete files after they have been written!
 }
+//-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadCoordsOcean) {
-	std::string graphFile = "fesom_core2.graph";
-	std::string coordFile = "nod2d_core2.out";
+	std::string graphFile = graphPath + "fesom_core2.graph";
+	std::string coordFile = graphPath + "nod2d_core2.out";
 
 	std::vector<DenseVector<ValueType> > coords = FileIO<IndexType, ValueType>::readCoordsOcean(coordFile, 2);
 	EXPECT_EQ(126858, coords[0].size());
@@ -248,7 +250,7 @@ TEST_F(FileIOTest, testReadCoordsOcean) {
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadQuadTree){
-	std::string filename = "cells.dat";
+	std::string filename = graphPath + "cells.dat";
 
 	scai::lama::CSRSparseMatrix<ValueType> matrix = FileIO<IndexType, ValueType>::readQuadTree(filename);
 
@@ -260,11 +262,11 @@ TEST_F(FileIOTest, testReadQuadTree){
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadGraphBinary){
-    std::string path = "./meshes/";
-    std::string file = "trace10.bfg";   // trace10: n=8699, m=25874
+    std::string file = "trace-00008.bfg";   // trace-08: n=8993, m=13370
     //std::string file = "Grid16x16.bfg";   // Grid16x16: n= 256, m=480
     //std::string file = "Grid8x8.bfg";   // Grid16x16: n= 64, m=224
-    std::string filename= path + file;
+    std::string filename= graphPath + file;
+        
     scai::lama::CSRSparseMatrix<ValueType> graph;
     
     //std::vector<DenseVector<ValueType>> dummyWeightContainer;
@@ -275,7 +277,7 @@ TEST_F(FileIOTest, testReadGraphBinary){
     //TODO: read same graph with the original reader. Matrices must be identical
     
     //std::string txtFile= file.substr(0, file.length()-4);
-    std::string txtFile= "./meshes/trace/trace-00010.graph";
+    std::string txtFile= "./meshes/trace/trace-00008.graph";
     std::fstream f(txtFile);
     if (f.fail()) {
         throw std::runtime_error("Reading graph from " + filename + " failed.");
@@ -301,9 +303,8 @@ TEST_F(FileIOTest, testReadGraphBinary){
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadMatrixMarketFormat){
-    std::string path = "./meshes/whitaker3/";
-    std::string graphFile = path + "whitaker3.mtx";
-    std::string coordFile = path + "whitaker3_coord.mtx";
+    std::string graphFile = graphPath + "whitaker3.mtx";
+    std::string coordFile = graphPath + "whitaker3_coord.mtx";
         
     std::ifstream coordF( coordFile );
     
@@ -323,13 +324,10 @@ TEST_F(FileIOTest, testReadMatrixMarketFormat){
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions, ff);
     
     std::chrono::duration<double> readTime =  std::chrono::system_clock::now() - startTime;
-    
     PRINT0("Read " << coords.size() << " coordinates in time " << readTime.count() );
     
     startTime = std::chrono::system_clock::now();
-    
     scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( graphFile, ff);
-    
     readTime =  std::chrono::system_clock::now() - startTime;
     
     PRINT0("Read  graph in time " << readTime.count() );
@@ -341,17 +339,7 @@ TEST_F(FileIOTest, testReadMatrixMarketFormat){
     
     SCAI_ASSERT( dimensions=coords.size() , "Dimensions " << dimensions << " do not agree with coordiantes size= " << coords.size() );
     SCAI_ASSERT( N=coords[0].size() , "N= "<< N << " does not agree with coords[0].size()= " << coords[0].size() );
-    
-    /*
-    for( int i=0; i<coords[0].getLocalValues().size(); i++){
-        std::cout << *comm << " ";
-        for(int d=0; d<dimensions; d++){
-            std::cout<< coords[d].getLocalValues()[i] << ", ";
-        }
-        std::cout << std::endl;
-    }
-    */
-    
+        
     PRINT(*comm << ": localCoords.size()= "<< coords[0].getLocalValues().size() );
     SCAI_ASSERT( coords[0].getLocalValues().size()>0 , "Coordinate vector is PE " << *comm << " is empty");
     for(int d=1; d<dimensions; d++){
@@ -360,7 +348,8 @@ TEST_F(FileIOTest, testReadMatrixMarketFormat){
     }
     
     {
-        const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();    	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+        const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();    
+        scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
         for(int i=0; i<10; i++){
             //PRINT0(ja[i]);
@@ -384,33 +373,22 @@ TEST_F(FileIOTest, testReadBlockSizes){
 
 TEST_F(FileIOTest, testWriteCoordsParallel){
 
-    std::string file = "Grid8x8";
+    std::string file = graphPath + "delaunayTest.graph";
     std::ifstream f(file);
+    
     //WARNING: for this example we need dimension 3 because the Schamberger graphs have always 3 coordinates
     IndexType dimensions= 3;
     IndexType N, edges;
     f >> N >> edges; 
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    // for now local refinement requires k = P
-    IndexType k = comm->getSize();
-    //
-    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
-    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
-    graph.redistribute(dist, noDistPointer);
+    scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     
     std::vector<DenseVector<ValueType>> coordsOrig = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
-    EXPECT_TRUE(coordsOrig[0].getDistributionPtr()->isEqual(*dist));
+    EXPECT_TRUE(coordsOrig[0].getDistributionPtr()->isEqual(*blockDist));
 
-    for(IndexType d=0; d<dimensions; d++){
-        scai::hmemo::ReadAccess<ValueType> localCoords( coordsOrig[d].getLocalValues() );
-        PRINT(*comm << ": dimension " << d );
-        for( IndexType i=0; i<localCoords.size(); i++){
-            std::cout<< localCoords[i] << ", ";
-        }
-        std::cout<< std::endl;
-    }
+    //
+    // write coords in parallel
     
     std::string outFilename = std::string( file+"_parallel.xyz");
     
@@ -427,13 +405,90 @@ TEST_F(FileIOTest, testWriteCoordsParallel){
         
         SCAI_ASSERT_EQ_ERROR( localCoordsBinary.size(), localCoordsOrig.size(), "Size mismatch");
         
-        PRINT(*comm << ": dimension: "<< d);
+       //PRINT(*comm << ": size= " << localCoordsOrig.size()<< ", dimension: "<< d);
         
         for( IndexType i=0; i<localCoordsBinary.size(); i++){
-            SCAI_ASSERT_EQ_ERROR( localCoordsBinary[i], localCoordsOrig[i], "Not equal coordinates at index " << i);
+            SCAI_ASSERT_EQ_ERROR( localCoordsBinary[i], localCoordsOrig[i], *comm << ": Not equal coordinates at index " << i);
         }
     }
     
+}
+//-------------------------------------------------------------------------------------------------
+
+TEST_F(FileIOTest, testReadGraphAndCoordsBinary){
+
+    std::string fileBin = graphPath + "delaunayTest.bfg";
+    std::string coordFileBin = fileBin+".xyz";
+    std::string fileMetis = graphPath + "delaunayTest.graph";
+    std::string coordFileMetis = fileMetis+".xyz";
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    
+    //
+    // check that graphs are identical
+    //
+    scai::lama::CSRSparseMatrix<ValueType> graphBin =  FileIO<IndexType, ValueType>::readGraphBinary(fileBin);
+    scai::lama::CSRSparseMatrix<ValueType> graphMetis =  FileIO<IndexType, ValueType>::readGraph(fileMetis);
+    
+    if( graphBin.getNumRows()< 500){
+        PRINT0("Checking matrix symmetry...");
+        SCAI_ASSERT_ERROR( graphBin.checkSymmetry(), "Graph not symmetric");
+        SCAI_ASSERT_ERROR( graphMetis.checkSymmetry(), "Graph not symmetric");
+    }
+    SCAI_ASSERT_ERROR( graphBin.isConsistent(), "Graph not consistent");
+    SCAI_ASSERT_ERROR( graphMetis.isConsistent(), "Graph not consistent");
+    
+    {
+        scai::hmemo::ReadAccess<ValueType> readBinGraphVal( graphBin.getLocalStorage().getValues() );
+        scai::hmemo::ReadAccess<ValueType> readMetisGraphVal( graphMetis.getLocalStorage().getValues() );
+        SCAI_ASSERT_EQ_ERROR( readBinGraphVal.size(), readMetisGraphVal.size(), "Matrix mismatch");
+        
+        for(int i=0; i<readBinGraphVal.size(); i++){
+            SCAI_ASSERT_EQ_ERROR(readBinGraphVal[i], readBinGraphVal[i], "Matrix value mismatch in position " << i);
+        }
+        
+        scai::hmemo::ReadAccess<IndexType> readBinGraphIA( graphBin.getLocalStorage().getIA() );
+        scai::hmemo::ReadAccess<IndexType> readMetisGraphIA( graphMetis.getLocalStorage().getIA() );
+        SCAI_ASSERT_EQ_ERROR( readBinGraphIA.size(), readMetisGraphIA.size(), "Matrix mismatch");
+        for(int i=0; i<readBinGraphIA.size(); i++){
+            SCAI_ASSERT_EQ_ERROR(readBinGraphIA[i], readMetisGraphIA[i], "Matrix value mismatch in position " << i);
+        }
+        
+        scai::hmemo::ReadAccess<IndexType> readBinGraphJA( graphBin.getLocalStorage().getJA() );
+        scai::hmemo::ReadAccess<IndexType> readMetisGraphJA( graphMetis.getLocalStorage().getJA() );
+        SCAI_ASSERT_EQ_ERROR( readBinGraphJA.size(), readMetisGraphJA.size(), "Matrix mismatch");
+        for(int i=0; i<readBinGraphJA.size(); i++){
+            SCAI_ASSERT_EQ_ERROR(readBinGraphJA[i], readMetisGraphJA[i], "Matrix value mismatch in position " << i);
+        }
+    }
+    
+    //
+    // check coordinates are identical
+    //
+    
+    IndexType dimensions = 2;               
+    IndexType N = graphBin.getNumRows();
+    
+    std::vector<DenseVector<ValueType>> coordsBinary =  FileIO<IndexType, ValueType>::readCoordsBinary( coordFileBin, N, dimensions);
+    std::vector<DenseVector<ValueType>> coordsMetis =  FileIO<IndexType, ValueType>::readCoords( coordFileMetis, N, dimensions);
+    
+    SCAI_ASSERT_EQ_ERROR( coordsBinary.size(), coordsMetis.size(), "Wrong dimension");
+    
+    for(int d=0; d<coordsBinary.size(); d++){
+        scai::hmemo::ReadAccess<ValueType> localCoordsBin( coordsBinary[d].getLocalValues() );
+        scai::hmemo::ReadAccess<ValueType> localCoordsMetis( coordsMetis[d].getLocalValues() );
+        SCAI_ASSERT_EQ_ERROR( localCoordsBin.size(), localCoordsMetis.size(), "Local sizes do not agree.");
+        
+        for(int i=0; i<localCoordsBin.size(); i++){
+            if( std::abs(localCoordsBin[i] - localCoordsMetis[i]) > 1e-6){
+                std::cout<< localCoordsBin[i] << "-" << localCoordsMetis[i] << "  _  " << localCoordsBin[i]-localCoordsMetis[i];
+                std::cout << std::endl;
+            }
+            
+         SCAI_ASSERT_LT_ERROR( localCoordsBin[i]-localCoordsMetis[i], 1e-6, "Coordinates in position " << coordsBinary[0].getDistributionPtr()->local2global(i) << " in processor " << comm->getRank() << " do not agree for dimension " << d);
+        }      
+    }
+        
 }
 
 } /* namespace ITI */

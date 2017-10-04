@@ -391,10 +391,9 @@ int main(int argc, char** argv) {
     std::ofstream logF(logFile);
     std::ifstream f(graphFile);
     
-    if( comm->getRank()==0){ 
-        settings.print( std::cout );
-        std::cout<< std::endl;
-    }
+    
+    settings.print( std::cout , comm );
+        
 
     IndexType dimensions = settings.dimensions;
     IndexType k = settings.numBlocks;
@@ -506,7 +505,7 @@ int main(int argc, char** argv) {
     ValueType cut = GraphUtils::computeCut<IndexType, ValueType>( graph, partition);
     ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( partition, k);
     IndexType maxComm, totalComm;
-    std::tie(maxComm, totalComm) = ITI::GraphUtils::computeComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
+    std::tie(maxComm, totalComm) = ITI::GraphUtils::computeBlockGraphComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
     
     std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
     
@@ -520,7 +519,7 @@ int main(int argc, char** argv) {
         
         logF<< "Results for file " << graphFile << std::endl;
         logF<< "nodes= "<< N << std::endl<< std::endl;
-        settings.print( logF );
+        settings.print( logF , comm);
         logF<< std::endl<< std::endl << "Only initial partition, no MultiLevel or LocalRefinement"<< std::endl << std::endl;
     }
     

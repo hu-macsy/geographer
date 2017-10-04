@@ -18,7 +18,7 @@
 #include <memory>
 #include <cstdlib>
 #include <chrono>
-
+#include <iomanip> 
 #include <unistd.h>
 
 #include "Diffusion.h"
@@ -26,11 +26,106 @@
 #include "FileIO.h"
 #include "ParcoRepart.h"
 #include "Settings.h"
+#include "Metrics.h"
 #include "SpectralPartition.h"
 #include "GraphUtils.h"
 
 typedef double ValueType;
 typedef int IndexType;
+
+
+
+
+void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
+
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    
+    IndexType numRuns = metricsVec.size();
+    
+    if( comm->getRank()==0 ){
+        out << "# times, input, migrAlgo, 1distr, kmeans, 2redis, prelim, total ,  prel cut, finalcut, imbalance ,  BlGr maxDeg, edges, CommVol max, total , BorNodes max, avg  " << std::endl;
+    }
+    
+    ValueType sumMigrAlgo = 0;
+    ValueType sumFirstDistr = 0;
+    ValueType sumKmeans = 0;
+    ValueType sumSecondDistr = 0;
+    ValueType sumPrelimanry = 0; 
+    ValueType sumFinalTime = 0;
+    
+    IndexType sumPreliminaryCut = 0;
+    IndexType sumFinalCut = 0;
+    ValueType sumImbalace = 0;
+    IndexType sumMaxBlGrDeg = 0;
+    IndexType sumBlGrEdges = 0;
+    IndexType sumMaxCommVol = 0;
+    IndexType sumtotCommVol = 0;
+    ValueType sumMaxBorderNodesPerc = 0;
+    ValueType sumAvgBorderNodesPerc = 0;
+    
+    for(IndexType run=0; run<numRuns; run++){
+        Metrics thisMetric = metricsVec[ run ];
+        
+        SCAI_ASSERT_EQ_ERROR(thisMetric.timeMigrationAlgo.size(), comm->getSize(), "Wrong vector size" );
+        
+        ValueType maxTimeMigrationAlgo = *std::max_element( thisMetric.timeMigrationAlgo.begin(), thisMetric.timeMigrationAlgo.end() );
+        ValueType maxTimeFirstDistribution = *std::max_element( thisMetric.timeFirstDistribution.begin(), thisMetric.timeFirstDistribution.end() );
+        ValueType maxTimeKmeans = *std::max_element( thisMetric.timeKmeans.begin(), thisMetric.timeKmeans.end() );
+        ValueType maxTimeSecondDistribution = *std::max_element( thisMetric.timeSecondDistribution.begin(), thisMetric.timeSecondDistribution.end() );
+        ValueType maxTimePreliminary = *std::max_element( thisMetric.timePreliminary.begin(), thisMetric.timePreliminary.end() );
+    
+        if( comm->getRank()==0 ){
+            out << std::setprecision(2) << std::fixed;
+            out<< run << " ,       "<< thisMetric.inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  "<< thisMetric.timeFinalPartition << " ,  \t   "\
+            << thisMetric.preliminaryCut << ",  "<< thisMetric.finalCut << ",  " << thisMetric.finalImbalance << " , \t\t "  \
+            << thisMetric.maxBlockGraphDegree << ",  " << thisMetric.totalBlockGraphEdges << " ,\t\t "  \
+            << thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << " , \t\t "  \
+            << thisMetric.maxBorderNodesPercent << ",  " << thisMetric.avgBorderNodesPercent \
+            << std::endl;
+        }
+        
+        sumMigrAlgo += maxTimeMigrationAlgo;
+        sumFirstDistr += maxTimeFirstDistribution;
+        sumKmeans += maxTimeKmeans;
+        sumSecondDistr += maxTimeSecondDistribution;
+        sumPrelimanry += maxTimePreliminary;
+        sumFinalTime += thisMetric.timeFinalPartition;
+        
+        sumPreliminaryCut += thisMetric.preliminaryCut;
+        sumFinalCut += thisMetric.finalCut;
+        sumImbalace += thisMetric.finalImbalance;
+        sumMaxBlGrDeg += thisMetric.maxBlockGraphDegree  ;
+        sumBlGrEdges += thisMetric.totalBlockGraphEdges ;
+        sumMaxCommVol +=  thisMetric.maxCommVolume;
+        sumtotCommVol += thisMetric.totalCommVolume;
+        sumMaxBorderNodesPerc += thisMetric.maxBorderNodesPercent;
+        sumAvgBorderNodesPerc += thisMetric.avgBorderNodesPercent;
+    }
+    
+    if( comm->getRank()==0 ){
+        out << "average,  "\
+            <<  ValueType (metricsVec[0].inputTime)<< ",  "\
+            <<  ValueType(sumMigrAlgo)/numRuns<< ",  " \
+            <<  ValueType(sumFirstDistr)/numRuns<< ",  " \
+            <<  ValueType(sumKmeans)/numRuns<< ",  " \
+            <<  ValueType(sumSecondDistr)/numRuns<< ",  " \
+            <<  ValueType(sumPrelimanry)/numRuns<< ",  " \
+            <<  ValueType(sumFinalTime)/numRuns<< " , \t  " \
+            <<  ValueType(sumPreliminaryCut)/numRuns<< ",  " \
+            <<  ValueType(sumFinalCut)/numRuns<< ",  " \
+            <<  ValueType(sumImbalace)/numRuns<< " ,\t\t " \
+            <<  ValueType(sumMaxBlGrDeg)/numRuns<< ",  " \
+            <<  ValueType(sumBlGrEdges)/numRuns<< " ,\t\t " \
+            <<  ValueType(sumMaxCommVol)/numRuns<< ",  " \
+            <<  ValueType(sumtotCommVol)/numRuns<< " ,\t\t " \
+            <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
+            <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
+            << std::endl;
+    }
+    
+}
+
+
 
 
 /**
@@ -64,6 +159,8 @@ namespace ITI {
 			format = ITI::Format::MATRIXMARKET;
 		else if (token == "TEEC" or token == "5")
 			format = ITI::Format::TEEC;
+                else if (token == "BINARY" or token == "6")
+			format = ITI::Format::BINARY;
 		else
 			in.setstate(std::ios_base::failbit);
 		return in;
@@ -85,6 +182,8 @@ namespace ITI {
 			token = "MATRIXMARKET";
 		else if (method == ITI::Format::TEEC)
 			token = "TEEC";
+                else if (method == ITI::Format::BINARY)
+                        token == "BINARY";
 		out << token;
 		return out;
 	}
@@ -142,6 +241,7 @@ int main(int argc, char** argv) {
         
 	std::string blockSizesFile;
 	ITI::Format coordFormat;
+        IndexType repeatTimes = 1;
         
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -159,7 +259,7 @@ int main(int argc, char** argv) {
 				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 				("previousPartition", value<std::string>(), "file of previous partition, used for repartitioning")
 				//output
-				("outFile", value<std::string>(), "write result partition into file")
+				("outFile", value<std::string>(&settings.outFile), "write result partition into file")
 				//mesh generation
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
 				("numX", value<int>(&settings.numX), "Number of points in x dimension of generated graph")
@@ -196,7 +296,22 @@ int main(int argc, char** argv) {
 				//debug
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 				("verbose", "Increase output.")
+                                ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
+                                ("storeInfo", "Store timing and ohter metrics in file.")
 				;
+
+        //------------------------------------------------
+        //
+        // checks
+        //
+                                
+        std::string s = "0.12345";
+        ValueType stdDouble = std::stod( s );
+        ValueType boostDouble = boost::lexical_cast<ValueType>(s);
+        if( stdDouble!=boostDouble ){
+            PRINT0( "\033[1;31mWARNING: std::stod and boost::lexical_cast do not agree \033[0m"  );
+            PRINT0( "\033[1;31mWARNING: std::stod and boost::lexical_cast do not agree \033[0m"  );
+        }
 
 	variables_map vm;
 	store(command_line_parser(argc, argv).options(desc).run(), vm);
@@ -229,7 +344,7 @@ int main(int argc, char** argv) {
 	if( vm.count("cutsPerDim") ) {
             SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
             SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
-    }
+        }
         
 	if( vm.count("initialMigration") ){
 
@@ -263,7 +378,19 @@ int main(int argc, char** argv) {
 			settings.initialPartition = InitialPartitioningMethods::KMeans;
 		}
 	}
+	
+	if( settings.storeInfo && settings.outFile=="-" ) {
+            if (comm->getRank() == 0) {
+                std::cout<< "Option to store information used but no output file given to write to. Specify an output file using the option --outFile. Aborting." << std::endl;
+            }
+            return 126;
+        }
 
+    //--------------------------------------------------------
+    //
+    // initialize
+    //
+	
     IndexType N = -1; 		// total number of points
 
     char machineChar[255];
@@ -271,11 +398,13 @@ int main(int argc, char** argv) {
     gethostname(machineChar, 255);
     if (machineChar) {
     	machine = std::string(machineChar);
+        settings.machine = machine;
     } else {
     	std::cout << "machine char not valid" << std::endl;
     }
 
     settings.verbose = vm.count("verbose");
+    settings.storeInfo = vm.count("storeInfo");
     settings.erodeInfluence = vm.count("erodeInfluence");
     settings.tightenBounds = vm.count("tightenBounds");
 
@@ -292,8 +421,7 @@ int main(int argc, char** argv) {
      */
     std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
-    if (comm->getRank() == 0)
-	{
+    if (comm->getRank() == 0){
     	std::string inputstring;
     	if (vm.count("graphFile")) {
     		inputstring = vm["graphFile"].as<std::string>();
@@ -304,10 +432,16 @@ int main(int argc, char** argv) {
     	}
 
         std::cout<< "commit:"<< version<< " input:"<< inputstring << std::endl;
-	}
+    }
 
+    //---------------------------------------------------------
+    //
+    // generate or read graph and coordinates
+    //
+    
     if (vm.count("graphFile")) {
     	std::string graphFile = vm["graphFile"].as<std::string>();
+        settings.fileName = graphFile;
     	std::string coordFile;
     	if (vm.count("coordFile")) {
 	   	coordFile = vm["coordFile"].as<std::string>();
@@ -372,9 +506,12 @@ int main(int argc, char** argv) {
         settings.numY = 1;
         settings.numZ = 1;
 
+        std::chrono::duration<double> readGraphTime = std::chrono::system_clock::now() - startTime;
+        ValueType timeToReadGraph = ValueType ( comm->max(readGraphTime.count()) );     
+        
         comm->synchronize();
         if (comm->getRank() == 0) {
-        	std::cout<< "Read " << N << " points." << std::endl;
+        	std::cout<< "Read " << N << " points in " << timeToReadGraph << " ms." << std::endl;
         }
         
         if (settings.useDiffusionCoordinates) {
@@ -410,11 +547,14 @@ int main(int argc, char** argv) {
                 coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
             }
         }
-
+        
+        std::chrono::duration<double> readCoordsTime = std::chrono::system_clock::now() - startTime;
+        ValueType timeToReadCoords = ValueType ( comm->max(readCoordsTime.count()) ) -timeToReadGraph ;     
+        
         comm->synchronize();
         if (comm->getRank() == 0) {
-        	std::cout << "Read coordinates." << std::endl;
-        }
+        	std::cout << "Read coordinates in "<< timeToReadCoords << " ms." << std::endl;
+        }       
 
     } else if(vm.count("generate")){
     	if (settings.dimensions == 2) {
@@ -456,20 +596,20 @@ int main(int argc, char** argv) {
         if(comm->getRank()==0){
             std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
         }
-
+        
         nodeWeights = scai::lama::DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
-
-	} else if (vm.count("quadTreeFile")) {
-		//if (comm->getRank() == 0) {
-			graph = ITI::FileIO<IndexType, ValueType>::readQuadTree(vm["quadTreeFile"].as<std::string>(), coordinates);
-			N = graph.getNumRows();
-		//}
-
-		//broadcast graph size from root to initialize distributions
-		//IndexType NTransport[1] = {static_cast<IndexType>(graph.getNumRows())};
-		//comm->bcast( NTransport, 1, 0 );
-		//N = NTransport[0];
-
+        
+    } else if (vm.count("quadTreeFile")) {
+        //if (comm->getRank() == 0) {
+        graph = ITI::FileIO<IndexType, ValueType>::readQuadTree(vm["quadTreeFile"].as<std::string>(), coordinates);
+        N = graph.getNumRows();
+        //}
+        
+        //broadcast graph size from root to initialize distributions
+        //IndexType NTransport[1] = {static_cast<IndexType>(graph.getNumRows())};
+        //comm->bcast( NTransport, 1, 0 );
+        //N = NTransport[0];
+        
         scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
         scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
         graph.redistribute(rowDistPtr, noDistPtr);
@@ -483,9 +623,11 @@ int main(int argc, char** argv) {
     	return 126;
     }
     
+    //---------------------------------------------------------------------
     //
     //  read block sizes from a file if it is passed as an argument
     //
+    
     if( vm.count("blockSizesFile") ){
         settings.blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
         IndexType blockSizesSum  = std::accumulate( settings.blockSizes.begin(), settings.blockSizes.end(), 0);
@@ -493,7 +635,11 @@ int main(int argc, char** argv) {
         SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
     }
     
+    //---------------------------------------------------------------
+    //
     // get previous partition, if set
+    //
+    
     DenseVector<IndexType> previous;
     if (vm.count("previousPartition")) {
     	std::string filename = vm["previousPartition"].as<std::string>();
@@ -510,7 +656,10 @@ int main(int argc, char** argv) {
     	settings.repartition = true;
     }
 
+    //
     // time needed to get the input. Synchronize first to make sure that all processes are finished.
+    //
+    
     comm->synchronize();
     std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
 
@@ -532,62 +681,169 @@ int main(int argc, char** argv) {
 
     }
 
-    if( comm->getRank() ==0 && settings.verbose){
-          settings.print(std::cout);
+    if( comm->getRank() ==0){
+          settings.print(std::cout, comm);
     }
     
-    std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
+    std::vector<struct Metrics> metricsVec( repeatTimes );
     
-    scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, settings );
-    assert( partition.size() == N);
-    assert( coordinates[0].size() == N);
-    
-    std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
-    
-    // the code below writes the output coordinates in one file per processor for visualization purposes.
-    //=================
-    /*
-    if (settings.writeDebugCoordinates) {
-		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-			assert( coordinates[dim].size() == N);
-			coordinates[dim].redistribute(partition.getDistributionPtr());
-		}
+    //------------------------------------------------------------
+    //
+    // partition the graph
+    //
 
-        std::string destPath = "partResults/main/blocks_" + std::to_string(settings.numBlocks) ;
-        boost::filesystem::create_directories( destPath );   
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath + "/debugResult");
+    if( repeatTimes>0 ){
+        scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
+        // SCAI_ASSERT_ERROR(rowDistPtr->isEqual( new scai::dmemo::BlockDistribution(N, comm) ) , "Graph row distribution should (?) be a block distribution." );
+        SCAI_ASSERT_ERROR( coordinates[0].getDistributionPtr()->isEqual( *rowDistPtr ) , "rowDistribution and coordinates distribution must be equal" ); 
+        SCAI_ASSERT_ERROR( nodeWeights.getDistributionPtr()->isEqual( *rowDistPtr ) , "rowDistribution and nodeWeights distribution must be equal" ); 
     }
-    */
-    std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
-    ValueType cut = ITI::GraphUtils::computeCut(graph, partition, true);
-    ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
-    IndexType maxComm, totalComm;
-    std::tie(maxComm, totalComm) = ITI::GraphUtils::computeComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
+    //store distributions to use later
+    const scai::dmemo::DistributionPtr rowDistPtr( new scai::dmemo::BlockDistribution(N, comm) );
+    const scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ) );
     
-    std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
+    scai::lama::DenseVector<IndexType> partition;
     
-    if (vm.count("outFile")) {
-    	ITI::FileIO<IndexType, ValueType>::writePartition(partition, vm["outFile"].as<std::string>());
-    }
-
-    // Reporting output to std::cout
-    ValueType inputT = ValueType ( comm->max(inputTime.count() ));
-    ValueType partT = ValueType (comm->max(partitionTime.count()));
-    ValueType repT = ValueType (comm->max(reportTime.count()));
-
-    if (comm->getRank() == 0) {
-        for (IndexType i = 0; i < argc; i++) {
-            std::cout << std::string(argv[i]) << " ";
-        }
-        std::cout << std::endl;
-        std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
-        std::cout << " p:"<< comm->getSize() << " k:"<< settings.numBlocks;
-        auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
-        std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
-        std::cout.precision(oldprecision);
+    for( IndexType r=0; r<repeatTimes; r++){
+                
+        // for the next runs the input is redistributed, se he must redistribute to the original distributions
         
-        std::cout<< std::endl<< "\033[1;36mcut:"<< cut<< "   imbalance:"<< imbalance << "   maxComm= "<< maxComm << std::endl;
-        std::cout<<"inputTime:" << inputT << "   partitionTime:" << partT <<"   reportTime:"<< repT << " \033[0m" << std::endl;
+        if(comm->getRank()==0) std::cout<< std::endl<< std::endl;
+        PRINT0("\t\t ----------- Starting run number " << r +1 << " -----------");
+        
+        if(r>0){
+            PRINT0("Input redistribution: block distribution for graph rows, coordinates and nodeWeigts, no distribution for graph columns");
+            
+            graph.redistribute( rowDistPtr, noDistPtr );
+            for(int d=0; d<settings.dimensions; d++){
+                coordinates[d].redistribute( rowDistPtr );
+            }
+            nodeWeights.redistribute( rowDistPtr );
+        }
+            
+        metricsVec[r].initialize( comm->getSize() );
+            
+        std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
+        
+        partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, settings, metricsVec[r] );
+        assert( partition.size() == N);
+        assert( coordinates[0].size() == N);
+        
+        std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
+        
+        // the code below writes the output coordinates in one file per processor for visualization purposes.
+        //=================
+        /*
+        if (settings.writeDebugCoordinates) {
+                    for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+                            assert( coordinates[dim].size() == N);
+                            coordinates[dim].redistribute(partition.getDistributionPtr());
+                    }
+
+            std::string destPath = "partResults/main/blocks_" + std::to_string(settings.numBlocks) ;
+            boost::filesystem::create_directories( destPath );   
+            ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath + "/debugResult");
+        }
+        */
+        
+        //---------------------------------------------
+        //
+        // Get metrics
+        //
+        
+        
+        std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
+        
+        metricsVec[r].finalCut = ITI::GraphUtils::computeCut(graph, partition, true);
+        metricsVec[r].finalImbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
+    
+        std::tie(metricsVec[r].maxBlockGraphDegree, metricsVec[r].totalBlockGraphEdges) = ITI::GraphUtils::computeBlockGraphComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
+        
+        // 2 vectors of size k
+        std::vector<IndexType> numBorderNodesPerBlock;  
+        std::vector<IndexType> numInnerNodesPerBlock;
+    
+        std::tie( numBorderNodesPerBlock, numInnerNodesPerBlock ) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition);
+        
+        metricsVec[r].maxCommVolume = *std::max_element( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end() );
+        metricsVec[r].totalCommVolume = std::accumulate( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end(), 0 );
+        
+        std::vector<ValueType> percentBorderNodesPerBlock( settings.numBlocks, 0);
+    
+        for(IndexType i=0; i<settings.numBlocks; i++){
+            percentBorderNodesPerBlock[i] = (ValueType (numBorderNodesPerBlock[i]))/(numBorderNodesPerBlock[i]+numInnerNodesPerBlock[i]);
+        }
+        
+        metricsVec[r].maxBorderNodesPercent = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
+        metricsVec[r].avgBorderNodesPercent = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(settings.numBlocks));
+        
+        std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
+        
+        
+        //---------------------------------------------------------------
+        //
+        // Reporting output to std::cout
+        //
+        
+        metricsVec[r].inputTime = ValueType ( comm->max(inputTime.count() ));
+        metricsVec[r].timeFinalPartition = ValueType (comm->max(partitionTime.count()));
+        metricsVec[r].reportTime = ValueType (comm->max(reportTime.count()));
+        
+        
+        if (comm->getRank() == 0 ) {
+            for (IndexType i = 0; i < argc; i++) {
+                std::cout << std::string(argv[i]) << " ";
+            }
+            std::cout << std::endl;
+            std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
+            std::cout << " p:"<< comm->getSize() << " k:"<< settings.numBlocks;
+            auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
+            std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
+            std::cout.precision(oldprecision);
+            
+            std::cout<< std::endl<< "\033[1;36mcut:"<< metricsVec[r].finalCut<< "   imbalance:"<< metricsVec[r].finalImbalance << std::endl;
+            std::cout<<"inputTime:" << metricsVec[r].inputTime << "   partitionTime:" << metricsVec[r].timeFinalPartition  <<"   reportTime:"<< metricsVec[r].reportTime << " \033[0m" << std::endl; 
+        }
+        
+        comm->synchronize();
+    }// repeat loop
+        
+        
+    //
+    // writing results in a file and std::cout
+    //
+        
+    std::chrono::duration<double> totalTime =  std::chrono::system_clock::now() - startTime;
+    ValueType totalT = ValueType ( comm->max(totalTime.count() ));
+    
+    if( settings.storeInfo && settings.outFile!="-" ) {
+        std::ofstream outF( settings.outFile, std::ios::out);
+        if(outF.is_open()){
+            settings.print( outF, comm);
+            printVectorMetrics( metricsVec, outF ); 
+        }else{
+            if( comm->getRank()==0){
+                std::cout<< "Could not open file " << settings.outFile << " informations not stored"<< std::endl;
+            }            
+        }
+        
+        settings.print( std::cout, comm );
+        printVectorMetrics( metricsVec, std::cout ); 
+
+        if( comm->getRank()==0){
+            std::cout<< "Output information written to file " << settings.outFile << " in total time " << totalT << std::endl;
+        }
     }
+
+    if(settings.outFile!="-" ){
+        std::string partOutFile = settings.outFile + ".partition";
+        ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+        if( comm->getRank()==0 ){
+            std::cout << " and last partition of the series in file " << partOutFile << std::endl;
+        }
+    }
+        
+    std::exit(0);   //this is needed for supermuc
+    return 0;
 }

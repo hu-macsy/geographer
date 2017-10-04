@@ -29,11 +29,15 @@
 #include "SpectralPartition.h"
 #include "AuxiliaryFunctions.h"
 
+typedef double ValueType;
+typedef int IndexType;
 
 namespace ITI {
 
 class SpectralPartitionTest : public ::testing::Test {
-
+protected:
+        // the directory of all the meshes used
+        std::string graphPath = "./meshes/";
 };
 
 TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
@@ -125,7 +129,7 @@ TEST_F(SpectralPartitionTest, benchConstructLaplacian) {
 
 TEST_F(SpectralPartitionTest, testSpectralPartition){
     //std::string file = "Grid8x8";
-    std::string file = "graphFromQuad3D/graphFromQuad3D_1";
+    std::string file = graphPath + "rotation-00000.graph";
     std::ifstream f(file);
     IndexType dimensions= 2, k=16;
     IndexType N, edges;
@@ -160,22 +164,10 @@ TEST_F(SpectralPartitionTest, testSpectralPartition){
     scai::lama::DenseVector<IndexType> degreeVector = SpectralPartition<IndexType, ValueType>::getDegreeVector( graph);
     SCAI_ASSERT_EQ_ERROR( degreeVector.sum() , 2*edges , "Wrong degree vector sum.");
     
-    /*
-    for(int i=0; i<localN; i++){
-        PRINT(*comm << ": " << degreeVector.getLocalValues()[i]);
-    }
-    */
     
     scai::lama::CSRSparseMatrix<ValueType> laplacian = SpectralPartition<IndexType, ValueType>::getLaplacian( graph );
     
-    /*
-    for(int i=0; i<laplacian.getLocalNumRows(); i++){
-        for(int j=0; j<laplacian.getLocalNumColumns(); j++){
-            std::cout << "("<<i << ","<< j << ")-"<< laplacian.getLocalStorage().getValue(i,j) <<"  ";
-        }
-        std::cout<< std::endl;
-    }
-    */
+
     if(laplacian.getNumRows() < 4000 ){
         EXPECT_TRUE( laplacian.checkSymmetry() );
     }
@@ -261,7 +253,7 @@ TEST_F(SpectralPartitionTest, testGetPartition){
 
 TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     //std::string file = "Grid32x32";
-    std::string file ="meshes/trace/trace-00001.graph";
+    std::string file = graphPath + "trace-00008.graph";
     std::ifstream f(file);
     IndexType dimensions= 2;
     IndexType N, edges;

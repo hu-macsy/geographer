@@ -1,21 +1,26 @@
 #pragma once
 
 #include <scai/lama.hpp>
-
 #include <scai/lama/matrix/all.hpp>
-
 #include <scai/lama/Vector.hpp>
-#include <scai/dmemo/Halo.hpp>
 #include <scai/lama/storage/MatrixStorage.hpp>
+
+#include <scai/dmemo/Halo.hpp>
+#include <scai/dmemo/HaloBuilder.hpp>
+#include <scai/dmemo/Distribution.hpp>
+#include <scai/dmemo/BlockDistribution.hpp>
+#include <scai/dmemo/GenBlockDistribution.hpp>
+
+#include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
+
 
 #include <boost/config.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/edge_coloring.hpp>
 #include <boost/graph/properties.hpp>
 
-#include <set>
-
 #include "Settings.h"
+#include "Metrics.h"
 
 using namespace scai::lama;
 using scai::dmemo::Halo;
@@ -35,16 +40,33 @@ namespace ITI {
 	 		* @return Distributed DenseVector	, at position i is the block node i is assigned to
 	 		*/
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights,
-					struct Settings settings);
+					struct Settings settings, struct Metrics& metrics);
 
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights,
-					DenseVector<IndexType>& previous, struct Settings settings);
+					DenseVector<IndexType>& previous, struct Settings settings, struct Metrics& metrics);
 
 			/**
 			 * Wrapper without node weights.
 			 */
+			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings, struct Metrics& metrics);
+			
+                        /**
+			 * Wrapper without node weights and no metrics
+			 */
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings);
-
+                        /*{
+                            struct Metrics metrics;
+                            settings.storeInfo = false; // not store timing and metrics information
+                            
+                            DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(input.getRowDistributionPtr(), 1);
+                            return partitionGraph(input, coordinates, uniformWeights, settings, metrics);
+                        }
+                        */
+                        /**
+			 * Wrapper without metrics struct.
+			 */
+			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, struct Settings settings);
+                        
 			/*
 			 * Get an initial partition using the hilbert curve.
 			 */

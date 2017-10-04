@@ -865,7 +865,7 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
             randPoint[d] = dist(generator);
             // create a distribution for every dimension
             //TODO: maybe also pick deviation in random
-            ValueType deviation = (ValueType) rand()/RAND_MAX + 1;
+            ValueType deviation = ((ValueType) rand()/RAND_MAX +1)*3;
             distForDim[d] = std::normal_distribution<ValueType> (randPoint[d], deviation);
         }
         

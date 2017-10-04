@@ -32,6 +32,9 @@ using namespace scai;
 namespace ITI {
 
 class LocalRefinementTest : public ::testing::Test {
+protected:
+        // the directory of all the meshes used
+        std::string graphPath = "./meshes/";
 
 };
 
@@ -161,9 +164,8 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 
 //---------------------------------------------------------------------------------------
 TEST_F(LocalRefinementTest, testOriginArray) {
-	std::string path = "meshes/bubbles/";
-	std::string fileName = "bubbles-00000.graph";
-	std::string file = path + fileName;
+	std::string fileName = "bubbles-00010.graph";
+	std::string file = graphPath + fileName;
 
 	scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file);
 	std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords(std::string(file + ".xyz"), graph.getNumRows(), 2);

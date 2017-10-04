@@ -44,6 +44,10 @@ std::istream& operator>>(std::istream& in, Format& format)
 		format = ITI::Format::OCEAN;
         else if (token == "MATRIXMARKET" or token == "4")
 		format = ITI::Format::MATRIXMARKET;
+        else if (token == "TEEC" or token == "5")
+                format = ITI::Format::TEEC;
+        else if (token == "BINARY" or token == "6")
+                format = ITI::Format::BINARY;                
 	else
 		in.setstate(std::ios_base::failbit);
 	return in;
@@ -63,6 +67,10 @@ std::ostream& operator<<(std::ostream& out, Format method)
 		token = "OCEAN";
         else if (method == ITI::Format::MATRIXMARKET)
                 token = "MATRIXMARKET";  
+        else if (method == ITI::Format::TEEC)
+                token = "TEEC";
+        else if (method == ITI::Format::BINARY)
+                token == "BINARY";
 	out << token;
 	return out;
 }
@@ -115,7 +123,10 @@ int main(int argc, char** argv) {
 	} else {
 		coordFile = graphFile + ".xyz";
 	}
-    
+
+	SCAI_ASSERT_EQUAL( sizeof(IndexType), sizeof(idx_t), "IndexType size and idx_t do not agree");
+                    
+	
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
     //
@@ -139,11 +150,13 @@ int main(int argc, char** argv) {
     SCAI_ASSERT( graph.isConsistent(), "Graph npt consistent");
     
     std::vector<DenseVector<ValueType>> coords;
+    if(parMetisGeom){
 	if (vm.count("fileFormat")) {
 		coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
 	} else {
 		coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
 	}
+    }
 
     SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size() , coords[1].getLocalValues().size(), "coordinates not of same size" );
 
@@ -231,20 +244,21 @@ int main(int argc, char** argv) {
     real_t xyzLocal[ndims*localN];
 
     if (ndims != 2) {
-    	throw std::logic_error("Not yet implemented for dimensions != 2");
+        throw std::logic_error("Not yet implemented for dimensions != 2");
     }
-PRINT0( "" );   
-    // TODO: only for 2D now
-    scai::utilskernel::LArray<ValueType>& localPartOfCoords0 = coords[0].getLocalValues();
-    scai::utilskernel::LArray<ValueType>& localPartOfCoords1 = coords[1].getLocalValues();
     
-    for(unsigned int i=0; i<localN; i++){
-        SCAI_ASSERT( 2*i+1< sizeof(xyzLocal)/sizeof(xyzLocal[0]), "Too large index: " << 2*i+1);
-        xyzLocal[2*i]= real_t(localPartOfCoords0[i]);
-        xyzLocal[2*i+1]= real_t(localPartOfCoords1[i]);
-        //PRINT(*comm <<": "<< xyzLocal[2*i] << ", "<< xyzLocal[2*i+1]);
+    if( parMetisGeom ){
+        // TODO: only for 2D now
+        scai::utilskernel::LArray<ValueType>& localPartOfCoords0 = coords[0].getLocalValues();
+        scai::utilskernel::LArray<ValueType>& localPartOfCoords1 = coords[1].getLocalValues();
+        
+        for(unsigned int i=0; i<localN; i++){
+            SCAI_ASSERT( 2*i+1< sizeof(xyzLocal)/sizeof(xyzLocal[0]), "Too large index: " << 2*i+1);
+            xyzLocal[2*i]= real_t(localPartOfCoords0[i]);
+            xyzLocal[2*i+1]= real_t(localPartOfCoords1[i]);
+            //PRINT(*comm <<": "<< xyzLocal[2*i] << ", "<< xyzLocal[2*i+1]);
+        }
     }
-
     // ncon: the numbers of weigths each vertex has. Here 1;
     idx_t ncon = 1;
     
@@ -253,16 +267,15 @@ PRINT0( "" );
     if( !vm.count("numBlocks") ){
         settings.numBlocks = comm->getSize();
     }
-    IndexType k = settings.numBlocks;
-    idx_t nparts= k;
+    idx_t nparts= settings.numBlocks;;
   
     // tpwgts: array of size ncons*nparts, that is used to specify the fraction of 
     // vertex weight that should be distributed to each sub-domain for each balance
     // constraint. Here we want equal sizes, so every value is 1/nparts.
-    real_t tpwgts[ k];
+    real_t tpwgts[ nparts ];
     real_t total = 0;
     for(int i=0; i<sizeof(tpwgts)/sizeof(real_t) ; i++){
-	tpwgts[i] = real_t(1)/k;
+	tpwgts[i] = real_t(1)/nparts;
         //PRINT(*comm << ": " << i <<": "<< tpwgts[i]);
 	total += tpwgts[i];
     }
@@ -318,26 +331,52 @@ PRINT0( "" );
 
     double partKwayTime= comm->max(partitionKwayTime.count() );
 
-    
-    // convert partition to a DenseVector
     //
+    // convert partition to a DenseVector
     DenseVector<IndexType> partitionKway(dist);
     for(unsigned int i=0; i<localN; i++){
         partitionKway.getLocalValues()[i] = partKway[i];
     }
-    ValueType cutKway = ITI::GraphUtils::computeCut(graph, partitionKway, true);
-    ValueType imbalanceKway = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partitionKway, nparts );
-    IndexType maxComm, totalComm;
-    std::tie(maxComm, totalComm) = ITI::GraphUtils::computeComm<IndexType, ValueType>( graph, partitionKway, nparts);
-    
     assert(sizeof(xyzLocal)/sizeof(real_t) == 2*sizeof(partKway)/sizeof(idx_t) );
-  
+    
     // check correct transformation to DenseVector
     for(int i=0; i<localN; i++){
         //PRINT(*comm << ": "<< part[i] << " _ "<< partition.getLocalValues()[i] );
         assert( partKway[i]== partitionKway.getLocalValues()[i]);
     }
-
+    
+    //---------------------------------------------
+    //
+    // Get metrics
+    //
+    
+    ValueType cutKway = ITI::GraphUtils::computeCut(graph, partitionKway, true);
+    ValueType imbalanceKway = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partitionKway, nparts );
+    IndexType maxComm, totalComm;
+    std::tie(maxComm, totalComm) = ITI::GraphUtils::computeBlockGraphComm<IndexType, ValueType>( graph, partitionKway, nparts);
+    // 2 vectors of size k
+    std::vector<IndexType> numBorderNodesPerBlock;  
+    std::vector<IndexType> numInnerNodesPerBlock;
+    
+    std::tie( numBorderNodesPerBlock, numInnerNodesPerBlock ) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partitionKway);
+    
+    IndexType maxCommVolume = *std::max_element( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end() );
+    IndexType totalCommVolume = std::accumulate( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end(), 0 );
+    
+    std::vector<ValueType> percentBorderNodesPerBlock( nparts, 0);
+    
+    for(IndexType i=0; i<nparts; i++){
+        percentBorderNodesPerBlock[i] = (ValueType (numBorderNodesPerBlock[i]))/(numBorderNodesPerBlock[i]+numInnerNodesPerBlock[i]);
+    }
+    
+    ValueType maxBorderNodesPercent = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
+    ValueType avgBorderNodesPercent = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(nparts));
+    
+    //---------------------------------------------------------------
+    //
+    // Reporting output to std::cout
+    //
+    
     char machineChar[255];
     std::string machine;
     gethostname(machineChar, 255);
@@ -348,18 +387,19 @@ PRINT0( "" );
     if(comm->getRank()==0){
     	std::cout << std::endl << "machine:" << machine << " input:" << graphFile << " nodes:" << N << " epsilon:" << settings.epsilon;
         std::cout << "\033[1;36m";
-        if( parMetisGeom ){
-            std::cout << std::endl << "ParMETIS_V3_PartGeomKway cut= ";
-        }else{
-            std::cout << std::endl << "ParMETIS_V3_PartKway cut= ";
-        }
         
-        std::cout<< cutKway <<" imbalance:" << imbalanceKway<<", time for partition: "<< partKwayTime << " , maxComm=" << maxComm << " \033[0m" << std::endl;
+        if( parMetisGeom ){
+            std::cout << std::endl << "ParMETIS_V3_PartGeomKway: "<< std::endl;
+        }else{
+            std::cout << std::endl << "ParMETIS_V3_PartKway: " << std::endl;
+        }
+        std::cout <<"time ,  cut ,  imbalance ,  maxBlGrDeg ,  BlGrEdges ,  maxCommVol ,  totalCommVolume ,   maxBorderNodesPercent ,  avgBorderNodesPercent " << std::endl;
+        std::cout<< partKwayTime << " ,  " << cutKway << " ,  " << imbalanceKway << " ,  " << maxComm << " ,  " << totalComm << " ,  " << maxCommVolume << " ,  " << totalCommVolume  << " ,  " << maxBorderNodesPercent  << " ,  " <<  avgBorderNodesPercent <<  " \033[0m" << std::endl;
     }
     // the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================
         
-    settings.writeDebugCoordinates =1;
+    settings.writeDebugCoordinates = 0;
     if (settings.writeDebugCoordinates) {
 		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
 			assert( coords[dim].size() == N);

@@ -12,6 +12,8 @@
 #include <scai/lama/DenseVector.hpp>
 #include <scai/lama/io/MatrixMarketIO.hpp>
 
+#include <boost/lexical_cast.hpp>
+
 #include "quadtree/QuadTreeCartesianEuclid.h"
 
 using scai::lama::CSRSparseMatrix;
@@ -38,7 +40,7 @@ namespace ITI {
          *                            the dimension d. Then next N*d lines contain the coordinates
          *                            for the poitns: every d lines are the coordinates for a point.
         */
-	enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5 };
+	enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5, BINARY = 6};
 	
 	
         
@@ -75,7 +77,7 @@ public:
 	 * @param[in] part
 	 * @param[in] filename The file's name to write to
 	 */
-	static void writePartition(const DenseVector<IndexType> &part, const std::string filename);
+	static void writePartitionParallel(const DenseVector<IndexType> &part, const std::string filename);
         
 	/** Reads a graph from filename in METIS format and returns the adjacency matrix.
 	 * @param[in] filename The file to read from.

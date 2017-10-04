@@ -33,6 +33,9 @@ using namespace std; //should be avoided, but better here than in header file
 namespace ITI {
 
 class HilbertCurveTest : public ::testing::Test {
+protected:
+        // the directory of all the meshes used
+        std::string graphPath = "./meshes/";
 
 };
 
@@ -44,10 +47,12 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
   const IndexType dimensions = 2;
   const IndexType recursionDepth = 7;
   IndexType N=16*16;
+
+  std::string coordFile = graphPath + "Grid16x16.xyz";
   
   std::vector<ValueType> maxCoords({0,0});
 
-  std::vector<DenseVector<ValueType>> coords =  FileIO<IndexType, ValueType>::readCoords("./Grid16x16.xyz", N, dimensions);
+  std::vector<DenseVector<ValueType>> coords =  FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions);
   const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( N ));
 
   for(IndexType j=0; j<dimensions; j++){
@@ -110,7 +115,7 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
 
   IndexType N, edges;
   
-  std::string fileName = "meshes/trace/trace-00000.graph";
+  std::string fileName = graphPath + "trace-00008.graph";
   std::ifstream f(fileName);
   if(f.fail()) 
     throw std::runtime_error("File "+ fileName+ " failed.");
@@ -378,8 +383,9 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
       EXPECT_GE( hilbertIndex.getLocalValues()[i] , hilbertIndex.getLocalValues()[i-1]); 
   }
 
+  /*
   std::ofstream f;
-  std::string fileName = std::string("meshes/my_meshes/hilbert3D_" + std::to_string(comm->getRank()) + ".plt");
+  std::string fileName = std::string(graphPath+ "/my_meshes/hilbert3D_" + std::to_string(comm->getRank()) + ".plt");
   f.open(fileName);
 
   for(int i=0; i<N; i++){
@@ -392,6 +398,7 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
  }
  std::cout<< "Coordinates written in file: "<< fileName << " for processor #"<< comm->getRank()<< std::endl;
   f.close();
+  */
 }
 	
 //-----------------------------------------------------------------

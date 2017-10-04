@@ -36,6 +36,9 @@ using scai::lama::CSRStorage;
 namespace ITI {
 
 class MeshGeneratorTest : public ::testing::Test {
+protected:
+        // the directory of all the meshes used
+        std::string graphPath = "./meshes/";
 
 };
 
@@ -365,10 +368,8 @@ TEST_F(MeshGeneratorTest, testMeshFromQuadTree_local){
 
     const IndexType numberOfAreas= 4;
     const IndexType pointsPerArea= 1000;
-    const IndexType dimension = 2;
+    const IndexType dimension = 3;
     const ValueType maxCoord = 100;
-    
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
     scai::lama::CSRSparseMatrix<ValueType> graph;
     std::vector<DenseVector<ValueType>> coords( dimension );
@@ -403,11 +404,13 @@ TEST_F(MeshGeneratorTest, testMeshFromQuadTree_local){
         }
     }
     
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    
     ValueType averageDegree = ValueType( numEdges)/ia.size();
     PRINT0("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
-        
+    
     if(comm->getRank()==0){
-        std::string outFile = "quadTreeGraph2D_11";
+        std::string outFile = graphPath + "quadTreeGraph3D_"+std::to_string(numberOfAreas)+".graph";
         ITI::FileIO<IndexType, ValueType>::writeGraph( graph, outFile);
         
         std::string outCoords = outFile + ".xyz";
@@ -418,17 +421,17 @@ TEST_F(MeshGeneratorTest, testMeshFromQuadTree_local){
 
 TEST_F(MeshGeneratorTest, testSimpleMeshFromQuadTree_2D){
 
-    const IndexType numberOfAreas= 1;
+    const IndexType numberOfAreas= 3;
     const IndexType dimension = 2;
-    const IndexType pointsPerArea= 10*dimension;
+    const IndexType pointsPerArea= 100*dimension;
     const ValueType maxCoord = 100;
-
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
     scai::lama::CSRSparseMatrix<ValueType> graph;
     std::vector<DenseVector<ValueType>> coords( dimension );
     
     ITI::MeshGenerator<IndexType, ValueType>::createQuadMesh( graph, coords, dimension, numberOfAreas, pointsPerArea, maxCoord); 
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
     PRINT0("edges: "<< graph.getNumValues() << " , nodes: " << coords[0].size() );    
     graph.isConsistent();
@@ -462,7 +465,7 @@ TEST_F(MeshGeneratorTest, testSimpleMeshFromQuadTree_2D){
     PRINT0("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
         
     if(comm->getRank()==0){
-        std::string outFile = "lalal";
+        std::string outFile = graphPath+ "graphFromQuad_2D.graph";
         ITI::FileIO<IndexType, ValueType>::writeGraph( graph, outFile);
         
         std::string outCoords = outFile + ".xyz";

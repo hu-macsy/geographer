@@ -32,6 +32,9 @@ using namespace scai;
 namespace ITI {
 
 class MultiSectionTest : public ::testing::Test {
+protected:
+        // the directory of all the meshes used
+        std::string graphPath = "./meshes/";
 
 };
 
@@ -41,10 +44,9 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
     const IndexType dimensions = 2;
     const IndexType k = std::pow( 4, dimensions);
 
-    std::string path = "./";
     std::string fileName = "Grid64x64";
     //std::string fileName = "trace-00003.graph";
-    std::string file = path + fileName;
+    std::string file = graphPath + fileName;
     std::ifstream f(file);
     IndexType N, edges;
     f >> N >> edges; 
@@ -400,14 +402,14 @@ TEST_F(MultiSectionTest, test1DPartitionOptimalRandomWeights){
     std::generate( begin(nodeWeights), end(nodeWeights), gen);
 
     //
-//    std::vector<ValueType> nodeWeights= {10.2484 , 10.9272 , 10.5296 , 10.5115 , 10.039 , 10.1079 , 10.0137 , 10.4012 , 10.7798 , 10.8752 , 10.0367 , 10.5632 , 10.904 , 10.4084 , 10.7319 , 10.9817 , 10.3689 , 10.4523 , 10.8339};
+    //    std::vector<ValueType> nodeWeights= {10.2484 , 10.9272 , 10.5296 , 10.5115 , 10.039 , 10.1079 , 10.0137 , 10.4012 , 10.7798 , 10.8752 , 10.0367 , 10.5632 , 10.904 , 10.4084 , 10.7319 , 10.9817 , 10.3689 , 10.4523 , 10.8339};
     //
-/*    
-for(int i=0; i<nodeWeights.size(); i++){
-        std::cout << nodeWeights[i] << " , ";
-}
-std::cout << std::endl;
-*/
+    /*    
+    for(int i=0; i<nodeWeights.size(); i++){
+            std::cout << nodeWeights[i] << " , ";
+    }
+    std::cout << std::endl;
+    */
     
     const ValueType origTotalWeight = std::accumulate( nodeWeights.begin(), nodeWeights.end(), 0.0);
     const ValueType optimalWeight = origTotalWeight/k;
@@ -994,9 +996,8 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
     const IndexType dimensions = 2;
     const IndexType k = std::pow( 4, dimensions);
 
-    std::string path = "meshes/trace/";
-    std::string fileName = "trace-00010.graph";
-    std::string file = path + fileName;
+    std::string fileName = "trace-00008.graph";
+    std::string file = graphPath + fileName;
     std::ifstream f(file);
     IndexType N, edges;
     f >> N >> edges; 
