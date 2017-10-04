@@ -69,17 +69,20 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
         
         SCAI_ASSERT_EQ_ERROR(thisMetric.timeMigrationAlgo.size(), comm->getSize(), "Wrong vector size" );
         
+        // for these time we have one measurement per PE and must make a max
         ValueType maxTimeMigrationAlgo = *std::max_element( thisMetric.timeMigrationAlgo.begin(), thisMetric.timeMigrationAlgo.end() );
         ValueType maxTimeFirstDistribution = *std::max_element( thisMetric.timeFirstDistribution.begin(), thisMetric.timeFirstDistribution.end() );
         ValueType maxTimeKmeans = *std::max_element( thisMetric.timeKmeans.begin(), thisMetric.timeKmeans.end() );
         ValueType maxTimeSecondDistribution = *std::max_element( thisMetric.timeSecondDistribution.begin(), thisMetric.timeSecondDistribution.end() );
         ValueType maxTimePreliminary = *std::max_element( thisMetric.timePreliminary.begin(), thisMetric.timePreliminary.end() );
-        ValueType maxTimeFinal = *std::max_element( thisMetric.timeFinalPartition.begin(), thisMetric.timeFinalPartition.end() );
-        ValueType timeLocalRef = maxTimeFinal - maxTimePreliminary;
+        
+        // these times are global, no need to max
+        ValueType timeFinal = thisMetric.timeFinalPartition;
+        ValueType timeLocalRef = timeFinal - maxTimePreliminary;
         
         if( comm->getRank()==0 ){
             out << std::setprecision(2) << std::fixed;
-            out<< run << " ,       "<< thisMetric.inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << " ,  "<< maxTimeFinal << " ,  \t   "\
+            out<< run << " ,       "<< thisMetric.inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << " ,  "<< timeFinal << " ,  \t   "\
             << thisMetric.preliminaryCut << ",  "<< thisMetric.finalCut << ",  " << thisMetric.finalImbalance << " , \t "  \
             << thisMetric.maxBlockGraphDegree << ",  " << thisMetric.totalBlockGraphEdges << " ,\t "  \
             << thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << " , \t ";
@@ -94,7 +97,7 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
         sumSecondDistr += maxTimeSecondDistribution;
         sumPrelimanry += maxTimePreliminary;
         sumLocalRef += timeLocalRef;
-        sumFinalTime += thisMetric.timeFinalPartition;
+        sumFinalTime += timeFinal;
         
         sumPreliminaryCut += thisMetric.preliminaryCut;
         sumFinalCut += thisMetric.finalCut;

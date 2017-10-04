@@ -303,7 +303,7 @@ void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<Inde
         const IndexType globalN = dist->getGlobalSize();
         const IndexType numPEs = comm->getSize();
         
-	scai::hmemo::ReadAccess<IndexType> localPart( part.getLocalValues() );
+        scai::hmemo::ReadAccess<IndexType> localPart( part.getLocalValues() );
         SCAI_ASSERT_EQ_ERROR( localPart.size(), localN, "Local sizes do not agree");
         
         std::ofstream outfile;
