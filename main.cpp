@@ -37,7 +37,7 @@ typedef int IndexType;
 
 
 void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
-
+    
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
     IndexType numRuns = metricsVec.size();
@@ -45,7 +45,7 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
     if( comm->getRank()==0 ){
         out << "# times, input, migrAlgo, 1distr, kmeans, 2redis, prelim, total ,  prel cut, finalcut, imbalance ,  BlGr maxDeg, edges, CommVol max, total , BorNodes max, avg  " << std::endl;
     }
-    
+
     ValueType sumMigrAlgo = 0;
     ValueType sumFirstDistr = 0;
     ValueType sumKmeans = 0;
@@ -62,7 +62,7 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
     IndexType sumtotCommVol = 0;
     ValueType sumMaxBorderNodesPerc = 0;
     ValueType sumAvgBorderNodesPerc = 0;
-    
+                
     for(IndexType run=0; run<numRuns; run++){
         Metrics thisMetric = metricsVec[ run ];
         
@@ -73,14 +73,15 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
         ValueType maxTimeKmeans = *std::max_element( thisMetric.timeKmeans.begin(), thisMetric.timeKmeans.end() );
         ValueType maxTimeSecondDistribution = *std::max_element( thisMetric.timeSecondDistribution.begin(), thisMetric.timeSecondDistribution.end() );
         ValueType maxTimePreliminary = *std::max_element( thisMetric.timePreliminary.begin(), thisMetric.timePreliminary.end() );
-    
+        
         if( comm->getRank()==0 ){
             out << std::setprecision(2) << std::fixed;
             out<< run << " ,       "<< thisMetric.inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  "<< thisMetric.timeFinalPartition << " ,  \t   "\
             << thisMetric.preliminaryCut << ",  "<< thisMetric.finalCut << ",  " << thisMetric.finalImbalance << " , \t\t "  \
             << thisMetric.maxBlockGraphDegree << ",  " << thisMetric.totalBlockGraphEdges << " ,\t\t "  \
-            << thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << " , \t\t "  \
-            << thisMetric.maxBorderNodesPercent << ",  " << thisMetric.avgBorderNodesPercent \
+            << thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << " , \t\t ";
+            out << std::setprecision(4) << std::fixed;
+            out << thisMetric.maxBorderNodesPercent << ",  " << thisMetric.avgBorderNodesPercent \
             << std::endl;
         }
         
@@ -117,8 +118,9 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
             <<  ValueType(sumMaxBlGrDeg)/numRuns<< ",  " \
             <<  ValueType(sumBlGrEdges)/numRuns<< " ,\t\t " \
             <<  ValueType(sumMaxCommVol)/numRuns<< ",  " \
-            <<  ValueType(sumtotCommVol)/numRuns<< " ,\t\t " \
-            <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
+            <<  ValueType(sumtotCommVol)/numRuns<< " ,\t\t ";
+            out << std::setprecision(4) << std::fixed;
+            out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
             <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
             << std::endl;
     }
@@ -818,23 +820,20 @@ int main(int argc, char** argv) {
     ValueType totalT = ValueType ( comm->max(totalTime.count() ));
     
     if( settings.storeInfo && settings.outFile!="-" ) {
-        std::ofstream outF( settings.outFile, std::ios::out);
-        if(outF.is_open()){
-            settings.print( outF, comm);
-            printVectorMetrics( metricsVec, outF ); 
-        }else{
-            if( comm->getRank()==0){
+        if( comm->getRank()==0){
+            std::ofstream outF( settings.outFile, std::ios::out);
+            if(outF.is_open()){
+                settings.print( outF, comm);
+                printVectorMetrics( metricsVec, outF ); 
+                std::cout<< "Output information written to file " << settings.outFile << " in total time " << totalT << std::endl;
+            }else{
                 std::cout<< "Could not open file " << settings.outFile << " informations not stored"<< std::endl;
             }            
         }
-        
-        settings.print( std::cout, comm );
-        printVectorMetrics( metricsVec, std::cout ); 
-
-        if( comm->getRank()==0){
-            std::cout<< "Output information written to file " << settings.outFile << " in total time " << totalT << std::endl;
-        }
-    }
+    }    
+    
+    settings.print( std::cout, comm );
+    printVectorMetrics( metricsVec, std::cout ); 
 
     if(settings.outFile!="-" ){
         std::string partOutFile = settings.outFile + ".partition";
@@ -844,6 +843,6 @@ int main(int argc, char** argv) {
         }
     }
         
-    std::exit(0);   //this is needed for supermuc
+    //std::exit(0);   //this is needed for supermuc
     return 0;
 }
