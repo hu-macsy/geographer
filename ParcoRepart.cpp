@@ -241,6 +241,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 std::cout << "MS Time:" << timeForMsPart << std::endl;
             }
         } else if (settings.initialPartition == InitialPartitioningMethods::None) {
+        	//no need to explicitly check for repartitioning mode or not.
+        	assert(comm->getSize() == settings.numBlocks);
         	result = DenseVector<IndexType>(input.getRowDistributionPtr(), comm->getRank());
         }
         else {
