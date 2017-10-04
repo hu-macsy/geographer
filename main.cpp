@@ -35,7 +35,6 @@ typedef int IndexType;
 
 
 
-
 void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
     
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -307,8 +306,8 @@ int main(int argc, char** argv) {
 				//debug
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 				("verbose", "Increase output.")
-                                ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
-                                ("storeInfo", "Store timing and ohter metrics in file.")
+                ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
+                ("storeInfo", "Store timing and ohter metrics in file.")
 				;
 
         //------------------------------------------------
@@ -820,13 +819,15 @@ int main(int argc, char** argv) {
         comm->synchronize();
     }// repeat loop
         
-        
+    std::chrono::duration<double> totalTime =  std::chrono::system_clock::now() - startTime;
+    ValueType totalT = ValueType ( comm->max(totalTime.count() ));
+            
     //
     // writing results in a file and std::cout
     //
-        
-    std::chrono::duration<double> totalTime =  std::chrono::system_clock::now() - startTime;
-    ValueType totalT = ValueType ( comm->max(totalTime.count() ));
+    
+    settings.print( std::cout, comm );
+    printVectorMetrics( metricsVec, std::cout ); 
     
     if( settings.storeInfo && settings.outFile!="-" ) {
         if( comm->getRank()==0){
@@ -841,9 +842,6 @@ int main(int argc, char** argv) {
         }
     }    
     
-    settings.print( std::cout, comm );
-    printVectorMetrics( metricsVec, std::cout ); 
-
     if(settings.outFile!="-" ){
         std::string partOutFile = settings.outFile + ".partition";
         ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );

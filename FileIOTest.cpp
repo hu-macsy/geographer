@@ -277,10 +277,10 @@ TEST_F(FileIOTest, testReadGraphBinary){
     //TODO: read same graph with the original reader. Matrices must be identical
     
     //std::string txtFile= file.substr(0, file.length()-4);
-    std::string txtFile= "./meshes/trace/trace-00008.graph";
+    std::string txtFile= "./meshes/trace-00008.graph";
     std::fstream f(txtFile);
     if (f.fail()) {
-        throw std::runtime_error("Reading graph from " + filename + " failed.");
+        throw std::runtime_error("Reading graph from " + txtFile + " failed.");
     }
     IndexType nodes, edges;
     f>> nodes>> edges;
