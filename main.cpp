@@ -420,8 +420,7 @@ int main(int argc, char** argv) {
 
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
-
-    std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
+    
 
     DenseVector<ValueType> nodeWeights;
 
@@ -573,6 +572,7 @@ int main(int argc, char** argv) {
 
         N = settings.numX * settings.numY * settings.numZ;
             
+        std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
         maxCoord[0] = settings.numX;
         maxCoord[1] = settings.numY;
         maxCoord[2] = settings.numZ;

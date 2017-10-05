@@ -1572,9 +1572,6 @@ std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::s
             throw std::runtime_error(std::to_string(numBlocks) + " blocks read, but file continues.");
         }
     }
-    
-    // this call causes a seg fault ??
-    //comm->bcastImpl( blockSizes.data(), blockSizes.size(), 0, scai::common::TypeTraits<ValueType>::stype);
     comm->bcast( blockSizes.data(), numBlocks, 0);
     
     return blockSizes;

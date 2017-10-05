@@ -853,7 +853,7 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
     std::default_random_engine generator( seed );
     std::vector<std::normal_distribution<ValueType>> distForDim(dimension);
     
-    std::cout<< "Creating graph for " << numberOfAreas << " areas."<<std::endl;
+    std::cout<< "Creating graph for " << numberOfAreas << " areas and " << pointsPerArea << " points per area." <<std::endl;
 
     for(int n=0; n<numberOfAreas; n++){
         SCAI_REGION("MeshGenerator.createQuadMesh.addPointsInQuadtree")

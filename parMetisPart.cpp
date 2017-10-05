@@ -22,6 +22,7 @@
 #include "FileIO.h"
 #include "GraphUtils.h"
 #include "Settings.h"
+#include "MeshGenerator.h"
 
 #include <parmetis.h>
 
@@ -88,13 +89,13 @@ int main(int argc, char** argv) {
 		("help", "display options")
 		("version", "show version")
 		("graphFile", value<std::string>(), "read graph from file")
-                ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
+        ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
 		("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
 		("coordFormat", value<ITI::Format>(), "format of coordinate file")
 		("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 		("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
-                ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
-                ("geom", value<bool>(&parMetisGeom)->default_value(parMetisGeom), "0: use of parmetisKway (no coordinates), 1: use of ParMetisGeomKway. Default is 1.")
+        ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
+        ("geom", value<bool>(&parMetisGeom)->default_value(parMetisGeom), "0: use of parmetisKway (no coordinates), 1: use of ParMetisGeomKway. Default is 1.")
 		;
 
 	variables_map vm;
@@ -124,42 +125,99 @@ int main(int argc, char** argv) {
 		coordFile = graphFile + ".xyz";
 	}
 
-	SCAI_ASSERT_EQUAL( sizeof(IndexType), sizeof(idx_t), "IndexType size and idx_t do not agree");
+	//SCAI_ASSERT_EQUAL( sizeof(IndexType), sizeof(idx_t), "IndexType size and idx_t do not agree");
                     
 	
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-
+    IndexType N;
+    
+    //-----------------------------------------
     //
     // read the input graph
     //
     
     CSRSparseMatrix<ValueType> graph;
+    std::vector<DenseVector<ValueType>> coords;
     
-    if (vm.count("fileFormat")) {
-        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, settings.fileFormat );
+    if (vm.count("graphFile")) {
+        if (vm.count("fileFormat")) {
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, settings.fileFormat );
+        }else{
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+        }
+        
+        N = graph.getNumRows();
+                
+        SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
+        SCAI_ASSERT( graph.isConsistent(), "Graph npt consistent");
+        
+        if(parMetisGeom){
+            if (vm.count("fileFormat")) {
+                coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
+            } else {
+                coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
+            }
+            SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size() , coords[1].getLocalValues().size(), "coordinates not of same size" );
+        }
+
+        
+    } else if(vm.count("generate")){
+        if (settings.dimensions == 2) {
+    		settings.numZ = 1;
+    	}else if(settings.dimensions>3){
+            if(comm->getRank() == 0) {
+                std::cout << "Graph generation supported only fot 2 or 3 dimensions, not " << settings.dimensions << std::endl;
+                return 127;
+            }
+        }
+        
+        N = settings.numX * settings.numY * settings.numZ;
+        
+        std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
+            
+        maxCoord[0] = settings.numX;
+        maxCoord[1] = settings.numY;
+        maxCoord[2] = settings.numZ;        
+        
+        std::vector<IndexType> numPoints(3); // number of points in each dimension, used only for 3D
+        
+        for (IndexType i = 0; i < 3; i++) {
+        	numPoints[i] = maxCoord[i];
+        }
+
+        if( comm->getRank()== 0){
+            std::cout<< "Generating for dim= "<< settings.dimensions << " and numPoints= "<< settings.numX << ", " << settings.numY << ", "<< settings.numZ << ", in total "<< N << " number of points" << std::endl;
+            std::cout<< "\t\t and maxCoord= "<< maxCoord[0] << ", "<< maxCoord[1] << ", " << maxCoord[2]<< std::endl;
+        }        
+
+        scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+        scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
+        graph = scai::lama::CSRSparseMatrix<ValueType>( rowDistPtr , noDistPtr );
+                
+        scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+        for(IndexType i=0; i<settings.dimensions; i++){
+            coords[i].allocate(coordDist);
+            coords[i] = static_cast<ValueType>( 0 );
+        }
+        
+        // create the adjacency matrix and the coordinates
+        ITI::MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist( graph, coords, maxCoord, numPoints);
+        
+        IndexType nodes= graph.getNumRows();
+        IndexType edges= graph.getNumValues()/2;
+        if(comm->getRank()==0){
+            std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
+        }
+        
+        //nodeWeights = scai::lama::DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
     }else{
-        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+    	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;
+    	return 126;
     }
-    
-    const IndexType N = graph.getNumRows();
     
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    
-    SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
-    SCAI_ASSERT( graph.isConsistent(), "Graph npt consistent");
-    
-    std::vector<DenseVector<ValueType>> coords;
-    if(parMetisGeom){
-	if (vm.count("fileFormat")) {
-		coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
-	} else {
-		coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
-	}
-    }
 
-    SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size() , coords[1].getLocalValues().size(), "coordinates not of same size" );
-
+    
     //
     // convert to parMetis data types
     //
@@ -201,15 +259,22 @@ int main(int argc, char** argv) {
     */
     recvPartRead.release();
 
+    //
     // setting xadj=ia and adjncy=ja values, these are the local values of every processor
+    //
+    
     scai::lama::CSRStorage<ValueType>& localMatrix= graph.getLocalStorage();
+    
+    IndexType iaSize = localMatrix.getIA().size();
+    IndexType jaSize = localMatrix.getJA().size();
+    
     scai::hmemo::ReadAccess<IndexType> ia( localMatrix.getIA() );
     scai::hmemo::ReadAccess<IndexType> ja( localMatrix.getJA() );
 
-    idx_t xadj[ia.size()];
-    idx_t adjncy[ja.size()];
+    idx_t xadj[ iaSize ];
+    idx_t adjncy[ jaSize ];
     
-    for(int i=0; i<ia.size(); i++){
+    for(int i=0; i<iaSize; i++){
         SCAI_ASSERT( i < sizeof(xadj)/sizeof(idx_t), "index " << i << " out of bounds");
         xadj[i]= ia[i];
         SCAI_ASSERT( xadj[i] >=0, "negative value for i= "<< i << " , val= "<< xadj[i]);

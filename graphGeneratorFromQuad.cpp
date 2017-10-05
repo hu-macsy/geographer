@@ -32,6 +32,10 @@ typedef int IndexType;
 
 
 /* Generates points around some areas of interest, inserts them in a quad tree and gets a graph from the quad tree.
+ * The number od nodes of the graph is not guaranteed. 
+ * 
+ * example of use:
+ * > ./graphGen --numOfAreas=5 --pointsPerArea=10 --dimension=2 --maxCoord=100 --filename="graphFromQuad2D/test2.graph"
  * 
  */
 
