@@ -85,7 +85,7 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
             << thisMetric.preliminaryCut << ",  "<< thisMetric.finalCut << ",  " << thisMetric.finalImbalance << " , \t "  \
             << thisMetric.maxBlockGraphDegree << ",  " << thisMetric.totalBlockGraphEdges << " ,\t "  \
             << thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << " , \t ";
-            out << std::setprecision(5) << std::fixed;
+            out << std::setprecision(6) << std::fixed;
             out << thisMetric.maxBorderNodesPercent << ",  " << thisMetric.avgBorderNodesPercent \
             << std::endl;
         }
@@ -127,7 +127,7 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
             <<  ValueType(sumBlGrEdges)/numRuns<< " ,\t " \
             <<  ValueType(sumMaxCommVol)/numRuns<< ",  " \
             <<  ValueType(sumtotCommVol)/numRuns<< " ,\t ";
-            out << std::setprecision(5) << std::fixed;
+            out << std::setprecision(6) << std::fixed;
             out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
             <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
             << std::endl;
@@ -811,9 +811,10 @@ int main(int argc, char** argv) {
             auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
             std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
             std::cout.precision(oldprecision);
-            
+            /*
             std::cout<< std::endl<< "\033[1;36mcut:"<< metricsVec[r].finalCut<< "   imbalance:"<< metricsVec[r].finalImbalance << std::endl;
             std::cout<<"inputTime:" << metricsVec[r].inputTime << "   partitionTime:" << metricsVec[r].timeFinalPartition  <<"   reportTime:"<< metricsVec[r].reportTime << " \033[0m" << std::endl; 
+            */
         }
         
         comm->synchronize();
@@ -827,7 +828,9 @@ int main(int argc, char** argv) {
     //
     
     settings.print( std::cout, comm );
+    std::cout<<  "\033[1;36m";
     printVectorMetrics( metricsVec, std::cout ); 
+    std::cout << " \033[0m";
     
     if( settings.storeInfo && settings.outFile!="-" ) {
         if( comm->getRank()==0){
