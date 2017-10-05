@@ -20,6 +20,9 @@
 #include <iostream>
 #include <chrono>
 
+#include <boost/algorithm/string.hpp>
+#include <boost/program_options.hpp>
+
 #include "MeshGenerator.h"
 #include "Settings.h"
 #include "FileIO.h"
@@ -28,35 +31,54 @@ typedef double ValueType;
 typedef int IndexType;
 
 
+/* Generates points around some areas of interest, inserts them in a quad tree and gets a graph from the quad tree.
+ * The number od nodes of the graph is not guaranteed. 
+ * 
+ * example of use:
+ * > ./graphGen --numOfAreas=5 --pointsPerArea=10 --dimension=2 --maxCoord=100 --filename="graphFromQuad2D/test2.graph"
+ * 
+ */
+
+
 int main(int argc, char** argv){
 
     using namespace boost::program_options;
     options_description desc("Supported options");
     
-    IndexType maxNumberOfAreas= 10;
+    IndexType numberOfAreas= 10;
     IndexType pointsPerArea= 500;
     IndexType dimension = 3;
     ValueType maxCoord = 1000;
-    std::string outFile = "./graphFromQuad3D/graphFromQuad3D_"+std::to_string(numberOfAreas);
+    IndexType seed = 1;
+    std::string outFile;
     
     desc.add_options()
-        ("numOfAreas", value<IndexType>(&maxNumberOfAreas), "The number of areas os interest where more points are gonna be inserted")
+        ("numOfAreas", value<IndexType>(&numberOfAreas), "The number of areas os interest where more points are gonna be inserted")
         ("pointsPerArea", value<IndexType>(&pointsPerArea), "The number of points which every area of interest has.")
         ("dimension", value<IndexType>(&dimension), "The dimension of the poits")
         ("maxCoord", value<ValueType>(&maxCoord), "The maximum coordinate the points will have")
-        ("filename", valie<std::string>(&outFile), "The name of the output file to write graph and coordinates (coordinates will have the .xyz ending)")
+        ("seed", value<IndexType>(&seed), "The random seed, if non given then it is 1" )
+        ("filename", value<std::string>(&outFile), "The name of the output file to write graph and coordinates (coordinates will have the .xyz ending)")
         ;
+        
+        variables_map vm;
+        store(command_line_parser(argc, argv).options(desc).run(), vm);
+        notify(vm);
     
-    for(int numberOfAreas=1; numberOfAreas<maxNumberOfAreas; numberOfAreas++){
+        if( !vm.count("filename") ){
+            outFile = "./graphFromQuad3D/graphFromQuad3D_"+std::to_string(numberOfAreas);
+        }
+    
+    //for(int numberOfAreas=1; numberOfAreas<maxNumberOfAreas; numberOfAreas++){
         std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
         scai::lama::CSRSparseMatrix<ValueType> graph;
         std::vector<DenseVector<ValueType>> coords( dimension );
         
-        ITI::MeshGenerator<IndexType, ValueType>::createQuadMesh( graph, coords, dimension, numberOfAreas, pointsPerArea, maxCoord); 
+        ITI::MeshGenerator<IndexType, ValueType>::createQuadMesh( graph, coords, dimension, numberOfAreas, pointsPerArea, maxCoord, seed); 
         
         std::chrono::duration<double> genTime = std::chrono::system_clock::now() - startTime;
-        std::cout<< "time to create quadTree and get the graph: "<<genTime.count();
+        std::cout<< "time to create quadTree and get the graph: "<<genTime.count() << std::endl;
         
         //PRINT("edges: "<< graph.getNumValues() << " , nodes: " << coords[0].size() );    
         graph.isConsistent();
@@ -90,14 +112,14 @@ int main(int argc, char** argv){
             PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
         }
         
-        std::chrono::duration<double> degreeTime = std::chrono::system_clock::now() - startTime -genTime;
-        
         ITI::FileIO<IndexType, ValueType>::writeGraph( graph, outFile);
         
         std::string outCoords = outFile + ".xyz";
         ITI::FileIO<IndexType, ValueType>::writeCoords(coords, outCoords);
         
+        std::chrono::duration<double> degreeTime = std::chrono::system_clock::now() - startTime -genTime;
+        
         std::cout<< "Output written in files \""<< outFile << "\" and .xyz  in time: "<< degreeTime.count()<< std::endl;
-    }
+    //}
     
 }
