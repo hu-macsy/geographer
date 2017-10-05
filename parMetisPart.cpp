@@ -129,7 +129,7 @@ int main(int argc, char** argv) {
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     IndexType N;
 
-	if( !( sizeof(IndexType), sizeof(idx_t)) ){
+	if( sizeof(IndexType)!=sizeof(idx_t) ){
         if( comm->getRank()==0 ){
             std::cout<< "\033[1;31mWARNING: IndexType size= " << sizeof(IndexType) << " and idx_t size=" << sizeof(idx_t) << "  do not agree, this may cause problems \033[0m" << std::endl;
         }
