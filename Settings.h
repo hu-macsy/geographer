@@ -101,6 +101,7 @@ struct Settings{
             if( outFile!="-" ){
                 out<< "outFile: " << outFile << std::endl;
             }
+    
             out<< "minBorderNodes= " << minBorderNodes << std::endl;
             out<< "stopAfterNoGainRounds= "<< stopAfterNoGainRounds << std::endl;
             out<< "minGainForNextRound= " << minGainForNextRound << std::endl;

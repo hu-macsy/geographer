@@ -386,11 +386,11 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
         settings.minGainForNextRound = 5;
         settings.storeInfo = false;
         
-        struct Metrics metrics;
+        struct Metrics metrics(settings.numBlocks);
     
         EXPECT_EQ( coords[0].size(), N);
-	EXPECT_EQ( graph.getNumRows(), N);
-	EXPECT_EQ( graph.getNumColumns(), N);
+        EXPECT_EQ( graph.getNumRows(), N);
+        EXPECT_EQ( graph.getNumColumns(), N);
         
         scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordsDV, settings, metrics);
 
