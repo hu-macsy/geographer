@@ -206,6 +206,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
     
+
     // localN= number of local nodes
     IndexType localN= adjM.getLocalNumRows();
     IndexType globalN = adjM.getNumColumns();
@@ -217,6 +218,10 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     scai::utilskernel::LArray<IndexType> preserved(localN, 1);
 
     std::vector<IndexType> localFineToCoarse(localN);
+
+    scai::utilskernel::LArray<IndexType> globalIndices;
+    distPtr->getOwnedIndexes(globalIndices);
+    scai::hmemo::ReadAccess<IndexType> rIndex(globalIndices);
 
     scai::lama::CSRSparseMatrix<ValueType> graph = adjM;
     SCAI_REGION_END("MultiLevel.coarsen.localCopy")
@@ -296,7 +301,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
 						IndexType localTarget = distPtr->global2local(edgeTarget);//TODO: maybe optimize this
 						if (localTarget != nIndex && !localPreserved[localTarget]) {
 							localTarget = localMatchingPartner[localTarget];
-							edgeTarget = distPtr->local2global(localTarget);
+							edgeTarget = rIndex[localTarget];
 						}
 						if (outgoingEdges[coarseNode].count(edgeTarget) == 0) {
 							outgoingEdges[coarseNode][edgeTarget] = 0;
