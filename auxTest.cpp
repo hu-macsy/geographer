@@ -218,7 +218,7 @@ TEST_F (auxTest,testGetBorderAndInnerNodes){
     settings.minGainForNextRound = 10;
     settings.storeInfo = false;
     
-    struct Metrics metrics;
+    struct Metrics metrics(settings.numBlocks);
     
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
     

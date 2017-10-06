@@ -127,7 +127,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   settings.epsilon = epsilon;
   settings.dimensions = dimensions;
   settings.minGainForNextRound = 10;
-  struct Metrics metrics;
+  struct Metrics metrics(settings.numBlocks);
 
   scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, settings, metrics);
 
@@ -427,7 +427,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     settings.dimensions = dimensions;
     //settings.initialPartition = InitialPartitioningMethods::Multisection;
     settings.initialPartition = InitialPartitioningMethods::KMeans;
-    struct Metrics metrics;
+    struct Metrics metrics(settings.numBlocks);
     
     // get partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
@@ -520,7 +520,7 @@ TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    struct Metrics metrics;
+    struct Metrics metrics(settings.numBlocks);
      
     scai::lama::DenseVector<IndexType> partition(dist, -1);
     partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
@@ -577,7 +577,7 @@ TEST_F (ParcoRepartTest, testPEGraphBlockGraph_k_equal_p_Distributed) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    struct Metrics metrics;
+    struct Metrics metrics(settings.numBlocks);
     
     scai::lama::DenseVector<IndexType> partition(dist, -1);
     partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
@@ -655,7 +655,7 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_2D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    struct Metrics metrics;
+    struct Metrics metrics(settings.numBlocks);
     
     // get partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics );
@@ -708,7 +708,7 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_3D) {
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
     settings.minBorderNodes =1;
-    struct Metrics metrics;
+    struct Metrics metrics(settings.numBlocks);
     
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
 
@@ -763,7 +763,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    struct Metrics metrics;
+    struct Metrics metrics(settings.numBlocks);
     
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
     
@@ -820,7 +820,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = 3;
-    struct Metrics metrics;
+    struct Metrics metrics(settings.numBlocks);
     
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(adjM, coords, settings, metrics);
     
@@ -893,7 +893,7 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    struct Metrics metrics;
+    struct Metrics metrics(settings.numBlocks);
     
     //get the partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);

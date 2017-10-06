@@ -203,7 +203,7 @@ TEST_F(SpectralPartitionTest, testSpectralPartition){
 
 TEST_F(SpectralPartitionTest, testGetPartition){
     //std::string file = "Grid32x32";
-    std::string file ="meshes/trace/trace-00001.graph";
+    std::string file = graphPath + "trace-00001.graph";
     std::ifstream f(file);
     IndexType dimensions= 2;
     IndexType N, edges;

@@ -47,8 +47,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings) {
     
-    struct Metrics metrics;
-    settings.storeInfo = false; // not store timing and metrics information
+    struct Metrics metrics(settings.numBlocks);
+    
+    assert(settings.storeInfo == false); // Cannot return timing information. Better throw an error than silently drop it.
     
     DenseVector<IndexType> previous;
     assert(!settings.repartition);
@@ -58,8 +59,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings){
-    struct Metrics metrics;
-    settings.storeInfo = false; // not store timing and metrics information
+    
+    struct Metrics metrics(settings.numBlocks);
+    assert(settings.storeInfo == false); // Cannot return timing information. Better throw an error than silently drop it.
     
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(input.getRowDistributionPtr(), 1);
     return partitionGraph(input, coordinates, uniformWeights, settings, metrics);
@@ -68,10 +70,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 // overloaded version with metrics
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings, struct Metrics& metrics) {
-    
+        
 	DenseVector<IndexType> previous;
 	assert(!settings.repartition);
-	return partitionGraph(input, coordinates, nodeWeights, previous, settings, metrics);
+	
+    return partitionGraph(input, coordinates, nodeWeights, previous, settings, metrics);
 
 }
 template<typename IndexType, typename ValueType>
@@ -305,7 +308,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             
             partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
             //ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
-            ValueType cut = comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;
+            ValueType cut = comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;//TODO: this assumes that the graph is unweighted
             ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k, nodeWeights);
             
             
@@ -324,7 +327,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 
                 if(comm->getRank() == 0 ){
                 std::cout<< std::endl << "\033[1;32mTiming: migration algo: "<< timeToCalcInitMigration << ", 1st redistr: " << timeForFirstRedistribution << ", only k-means: " << timeForKmeans <<", only 2nd redistr: "<< timeForSecondRedistr <<", total:" << timeForInitPart << std::endl;
-                std::cout << "Cut:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
+                std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
                 }
             
             
@@ -338,19 +341,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             */
             }
             
-            
-            if( settings.storeInfo ){
-                IndexType rank = comm->getRank();
-                metrics.timeMigrationAlgo[rank]  = migrationCalculation.count();
-                metrics.timeFirstDistribution[rank]  = migrationTime.count();     
-                metrics.timeKmeans[rank] = kMeansTime.count();
-                metrics.timeSecondDistribution[rank] = secondRedistributionTime.count();
-                metrics.timePreliminary[rank] = partitionTime.count();
-                
-                metrics.preliminaryCut = cut;
-                metrics.preliminaryImbalance = imbalance;
-            }
-            
+            IndexType rank = comm->getRank();
+            metrics.timeMigrationAlgo[rank]  = migrationCalculation.count();
+            metrics.timeFirstDistribution[rank]  = migrationTime.count();
+            metrics.timeKmeans[rank] = kMeansTime.count();
+            metrics.timeSecondDistribution[rank] = secondRedistributionTime.count();
+            metrics.timePreliminary[rank] = partitionTime.count();
+
+            metrics.preliminaryCut = cut;
+            metrics.preliminaryImbalance = imbalance;
             
             IndexType numRefinementRounds = 0;
             
@@ -1141,8 +1140,9 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const 
 
 //to force instantiation
 
-//template class ParcoRepart<int, double>;
+
 template class ParcoRepart<long int, double>;
+
 /*
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph( CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, struct Settings, struct Metrics& metrics);
 template DenseVector<long int> ParcoRepart<long int, double>::partitionGraph( CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, struct Settings, struct Metrics& metrics);

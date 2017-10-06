@@ -49,19 +49,12 @@ namespace ITI {
 			 */
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings, struct Metrics& metrics);
 			
-                        /**
+            /**
 			 * Wrapper without node weights and no metrics
 			 */
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings);
-                        /*{
-                            struct Metrics metrics;
-                            settings.storeInfo = false; // not store timing and metrics information
-                            
-                            DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(input.getRowDistributionPtr(), 1);
-                            return partitionGraph(input, coordinates, uniformWeights, settings, metrics);
-                        }
-                        */
-                        /**
+
+            /**
 			 * Wrapper without metrics struct.
 			 */
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, struct Settings settings);

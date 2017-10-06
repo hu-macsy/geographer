@@ -202,7 +202,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
         settings.epsilon = epsilon;
         settings.dimensions = dim;
         settings.minGainForNextRound = 10;
-        struct Metrics metrics;
+        struct Metrics metrics(settings.numBlocks);
         
         //partition the graph
         scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D, settings, metrics );

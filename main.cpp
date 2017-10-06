@@ -30,10 +30,6 @@
 #include "SpectralPartition.h"
 #include "GraphUtils.h"
 
-/*
-typedef double ValueType;
-typedef int IndexType;
-*/
 
 
 void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
@@ -135,9 +131,6 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
     }
     
 }
-
-
-
 
 /**
  *  Examples of use:
@@ -696,7 +689,7 @@ int main(int argc, char** argv) {
           settings.print(std::cout, comm);
     }
     
-    std::vector<struct Metrics> metricsVec( repeatTimes );
+    std::vector<struct Metrics> metricsVec;
     
     //------------------------------------------------------------
     //
@@ -732,8 +725,8 @@ int main(int argc, char** argv) {
             }
             nodeWeights.redistribute( rowDistPtr );
         }
-            
-        metricsVec[r].initialize( comm->getSize() );
+          
+        metricsVec.push_back( Metrics( comm->getSize()) );
             
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
         

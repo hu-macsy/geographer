@@ -79,7 +79,7 @@ struct Settings{
     IndexType coarseningStepsBetweenRefinement = 3;
     IndexType pixeledSideLen = 10;
 
-    //debug parameters
+    //debug and profiling parameters
     bool verbose = false;
     bool writeDebugCoordinates = false;
     bool writeInFile = false;

@@ -34,9 +34,9 @@ struct Metrics{
     
     //constructor
     //
-    Metrics(){}
+    //Metrics(){}
     
-    Metrics( IndexType k , IndexType repeatTimes) {
+    Metrics( IndexType k) {
         timeMigrationAlgo.resize(k);
         timeFirstDistribution.resize(k);
         timeKmeans.resize(k);
