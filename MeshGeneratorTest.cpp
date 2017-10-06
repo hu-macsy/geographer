@@ -373,8 +373,10 @@ TEST_F(MeshGeneratorTest, testMeshFromQuadTree_local){
 
     scai::lama::CSRSparseMatrix<ValueType> graph;
     std::vector<DenseVector<ValueType>> coords( dimension );
+    srand(time(NULL));
+    int seed = rand()%10;
     
-    ITI::MeshGenerator<IndexType, ValueType>::createQuadMesh( graph, coords, dimension, numberOfAreas, pointsPerArea, maxCoord); 
+    ITI::MeshGenerator<IndexType, ValueType>::createQuadMesh( graph, coords, dimension, numberOfAreas, pointsPerArea, maxCoord, seed); 
     
     PRINT("edges: "<< graph.getNumValues() << " , nodes: " << coords[0].size() );    
     graph.isConsistent();
@@ -428,8 +430,10 @@ TEST_F(MeshGeneratorTest, testSimpleMeshFromQuadTree_2D){
     
     scai::lama::CSRSparseMatrix<ValueType> graph;
     std::vector<DenseVector<ValueType>> coords( dimension );
+    srand(time(NULL));
+    int seed = rand()%10;
     
-    ITI::MeshGenerator<IndexType, ValueType>::createQuadMesh( graph, coords, dimension, numberOfAreas, pointsPerArea, maxCoord); 
+    ITI::MeshGenerator<IndexType, ValueType>::createQuadMesh( graph, coords, dimension, numberOfAreas, pointsPerArea, maxCoord, seed); 
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     

@@ -35,7 +35,6 @@ typedef int IndexType;
 
 
 
-
 void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
     
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -86,7 +85,7 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
             << thisMetric.preliminaryCut << ",  "<< thisMetric.finalCut << ",  " << thisMetric.finalImbalance << " , \t "  \
             << thisMetric.maxBlockGraphDegree << ",  " << thisMetric.totalBlockGraphEdges << " ,\t "  \
             << thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << " , \t ";
-            out << std::setprecision(5) << std::fixed;
+            out << std::setprecision(6) << std::fixed;
             out << thisMetric.maxBorderNodesPercent << ",  " << thisMetric.avgBorderNodesPercent \
             << std::endl;
         }
@@ -128,7 +127,7 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
             <<  ValueType(sumBlGrEdges)/numRuns<< " ,\t " \
             <<  ValueType(sumMaxCommVol)/numRuns<< ",  " \
             <<  ValueType(sumtotCommVol)/numRuns<< " ,\t ";
-            out << std::setprecision(5) << std::fixed;
+            out << std::setprecision(6) << std::fixed;
             out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
             <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
             << std::endl;
@@ -252,79 +251,79 @@ int main(int argc, char** argv) {
         
 	std::string blockSizesFile;
 	ITI::Format coordFormat;
-	IndexType repeatTimes = 1;
+        IndexType repeatTimes = 1;
         
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	desc.add_options()
-        ("help", "display options")
-        ("version", "show version")
-        //input and coordinates
-        ("graphFile", value<std::string>(), "read graph from file")
-        ("quadTreeFile", value<std::string>(), "read QuadTree from file")
-        ("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
-        ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
-        ("coordFormat", value<ITI::Format>(&coordFormat), "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ")
-        ("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
-        ("useDiffusionCoordinates", value<bool>(&settings.useDiffusionCoordinates)->default_value(settings.useDiffusionCoordinates), "Use coordinates based from diffusive systems instead of loading from file")
-        ("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
-        ("previousPartition", value<std::string>(), "file of previous partition, used for repartitioning")
-        //output
-        ("outFile", value<std::string>(&settings.outFile), "write result partition into file")
-        //mesh generation
-        ("generate", "generate random graph. Currently, only uniform meshes are supported.")
-        ("numX", value<int>(&settings.numX), "Number of points in x dimension of generated graph")
-        ("numY", value<int>(&settings.numY), "Number of points in y dimension of generated graph")
-        ("numZ", value<int>(&settings.numZ), "Number of points in z dimension of generated graph")
-        //general partitioning parameters
-        ("numBlocks", value<int>(&settings.numBlocks)->default_value(comm->getSize()), "Number of blocks, default is number of processes")
-        ("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
-        ("blockSizesFile", value<std::string>(&blockSizesFile) , " file to read the block sizes for every block")
-        ("seed", value<double>()->default_value(time(NULL)), "random seed, default is current time")
-        //multi-level and local refinement
-        ("initialPartition", value<InitialPartitioningMethods>(&settings.initialPartition), "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means' or 3) and multisection ('MultiSection' or 4). SFC, Spectral and K-Means are most stable.")
-        ("multiLevelRounds", value<int>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
-        ("minBorderNodes", value<int>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
-        ("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
-        ("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
-        ("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
-        ("useDiffusionTieBreaking", value<bool>(&settings.useDiffusionTieBreaking)->default_value(settings.useDiffusionTieBreaking), "Tuning Parameter: Use diffusion to break ties in Fiduccia-Mattheyes algorithm")
-        ("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
-        ("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
-        //multisection
-        ("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
-        ("cutsPerDim", value<std::vector<IndexType>>(&settings.cutsPerDim)->multitoken(), "If MultiSection is chosen, then provide d values that define the number of cuts per dimension.")
-        ("pixeledSideLen", value<int>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
-        // K-Means
-        ("minSamplingNodes", value<int>(&settings.minSamplingNodes)->default_value(settings.minSamplingNodes), "Tuning parameter for K-Means")
-        ("influenceExponent", value<double>(&settings.influenceExponent)->default_value(settings.influenceExponent), "Tuning parameter for K-Means")
-        ("influenceChangeCap", value<double>(&settings.influenceChangeCap)->default_value(settings.influenceChangeCap), "Tuning parameter for K-Means")
-        ("balanceIterations", value<int>(&settings.balanceIterations)->default_value(settings.balanceIterations), "Tuning parameter for K-Means")
-        ("maxKMeansIterations", value<int>(&settings.maxKMeansIterations)->default_value(settings.maxKMeansIterations), "Tuning parameter for K-Means")
-        ("tightenBounds", "Tuning parameter for K-Means")
-        ("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
-        ("initialMigration", value<InitialPartitioningMethods>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration, 0: SFCs, 3:k-means, 4:Multisection")
-        //debug
-        ("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
-        ("verbose", "Increase output.")
-        ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
-        ("storeInfo", "Store timing and other metrics in file.")
-        ;
+				("help", "display options")
+				("version", "show version")
+				//input and coordinates
+				("graphFile", value<std::string>(), "read graph from file")
+				("quadTreeFile", value<std::string>(), "read QuadTree from file")
+				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
+				("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
+				("coordFormat", value<ITI::Format>(&coordFormat), "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ")
+				("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
+				("useDiffusionCoordinates", value<bool>(&settings.useDiffusionCoordinates)->default_value(settings.useDiffusionCoordinates), "Use coordinates based from diffusive systems instead of loading from file")
+				("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
+				("previousPartition", value<std::string>(), "file of previous partition, used for repartitioning")
+				//output
+				("outFile", value<std::string>(&settings.outFile), "write result partition into file")
+				//mesh generation
+				("generate", "generate random graph. Currently, only uniform meshes are supported.")
+				("numX", value<int>(&settings.numX), "Number of points in x dimension of generated graph")
+				("numY", value<int>(&settings.numY), "Number of points in y dimension of generated graph")
+				("numZ", value<int>(&settings.numZ), "Number of points in z dimension of generated graph")
+				//general partitioning parameters
+				("numBlocks", value<int>(&settings.numBlocks)->default_value(comm->getSize()), "Number of blocks, default is number of processes")
+				("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
+				("blockSizesFile", value<std::string>(&blockSizesFile) , " file to read the block sizes for every block")
+				("seed", value<double>()->default_value(time(NULL)), "random seed, default is current time")
+				//multi-level and local refinement
+				("initialPartition", value<InitialPartitioningMethods>(&settings.initialPartition), "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means' or 3) and multisection ('MultiSection' or 4). SFC, Spectral and K-Means are most stable.")
+				("multiLevelRounds", value<int>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
+				("minBorderNodes", value<int>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
+				("stopAfterNoGainRounds", value<int>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
+				("minGainForNextGlobalRound", value<int>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
+				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
+				("useDiffusionTieBreaking", value<bool>(&settings.useDiffusionTieBreaking)->default_value(settings.useDiffusionTieBreaking), "Tuning Parameter: Use diffusion to break ties in Fiduccia-Mattheyes algorithm")
+				("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
+				("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
+				//multisection
+				("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
+				("cutsPerDim", value<std::vector<IndexType>>(&settings.cutsPerDim)->multitoken(), "If MultiSection is chosen, then provide d values that define the number of cuts per dimension.")
+				("pixeledSideLen", value<int>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
+				// K-Means
+				("minSamplingNodes", value<int>(&settings.minSamplingNodes)->default_value(settings.minSamplingNodes), "Tuning parameter for K-Means")
+				("influenceExponent", value<double>(&settings.influenceExponent)->default_value(settings.influenceExponent), "Tuning parameter for K-Means")
+				("influenceChangeCap", value<double>(&settings.influenceChangeCap)->default_value(settings.influenceChangeCap), "Tuning parameter for K-Means")
+				("balanceIterations", value<int>(&settings.balanceIterations)->default_value(settings.balanceIterations), "Tuning parameter for K-Means")
+				("maxKMeansIterations", value<int>(&settings.maxKMeansIterations)->default_value(settings.maxKMeansIterations), "Tuning parameter for K-Means")
+				("tightenBounds", "Tuning parameter for K-Means")
+				("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
+				("initialMigration", value<InitialPartitioningMethods>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration, 0: SFCs, 3:k-means, 4:Multisection")
+				//debug
+				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
+				("verbose", "Increase output.")
+                ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
+                ("storeInfo", "Store timing and ohter metrics in file.")
+				;
 
-    //------------------------------------------------
-    //
-    // checks
-    //
+        //------------------------------------------------
+        //
+        // checks
+        //
+                                
+        std::string s = "0.12345";
+        ValueType stdDouble = std::stod( s );
+        ValueType boostDouble = boost::lexical_cast<ValueType>(s);
+        if( stdDouble!=boostDouble ){
+            PRINT0( "\033[1;31mWARNING: std::stod and boost::lexical_cast do not agree \033[0m"  );
+            PRINT0( "\033[1;31mWARNING: std::stod and boost::lexical_cast do not agree \033[0m"  );
+        }
 
-    std::string s = "0.12345";
-    ValueType stdDouble = std::stod( s );
-    ValueType boostDouble = boost::lexical_cast<ValueType>(s);
-    if( stdDouble!=boostDouble ){
-        PRINT0( "\033[1;31mWARNING: std::stod and boost::lexical_cast do not agree \033[0m"  );
-        PRINT0( "\033[1;31mWARNING: std::stod and boost::lexical_cast do not agree \033[0m"  );
-    }
-
-    variables_map vm;
+	variables_map vm;
 	store(command_line_parser(argc, argv).options(desc).run(), vm);
 	notify(vm);
 
@@ -421,8 +420,7 @@ int main(int argc, char** argv) {
 
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
-
-    std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
+    
 
     DenseVector<ValueType> nodeWeights;
 
@@ -574,6 +572,7 @@ int main(int argc, char** argv) {
 
         N = settings.numX * settings.numY * settings.numZ;
             
+        std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
         maxCoord[0] = settings.numX;
         maxCoord[1] = settings.numY;
         maxCoord[2] = settings.numZ;
@@ -747,10 +746,10 @@ int main(int argc, char** argv) {
         //=================
         /*
         if (settings.writeDebugCoordinates) {
-            for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-                    assert( coordinates[dim].size() == N);
-                    coordinates[dim].redistribute(partition.getDistributionPtr());
-            }
+                    for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+                            assert( coordinates[dim].size() == N);
+                            coordinates[dim].redistribute(partition.getDistributionPtr());
+                    }
 
             std::string destPath = "partResults/main/blocks_" + std::to_string(settings.numBlocks) ;
             boost::filesystem::create_directories( destPath );   
@@ -812,21 +811,26 @@ int main(int argc, char** argv) {
             auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
             std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
             std::cout.precision(oldprecision);
-            
+            /*
             std::cout<< std::endl<< "\033[1;36mcut:"<< metricsVec[r].finalCut<< "   imbalance:"<< metricsVec[r].finalImbalance << std::endl;
             std::cout<<"inputTime:" << metricsVec[r].inputTime << "   partitionTime:" << metricsVec[r].timeFinalPartition  <<"   reportTime:"<< metricsVec[r].reportTime << " \033[0m" << std::endl; 
+            */
         }
         
         comm->synchronize();
     }// repeat loop
         
-        
+    std::chrono::duration<double> totalTime =  std::chrono::system_clock::now() - startTime;
+    ValueType totalT = ValueType ( comm->max(totalTime.count() ));
+            
     //
     // writing results in a file and std::cout
     //
-        
-    std::chrono::duration<double> totalTime =  std::chrono::system_clock::now() - startTime;
-    ValueType totalT = ValueType ( comm->max(totalTime.count() ));
+    
+    settings.print( std::cout, comm );
+    std::cout<<  "\033[1;36m";
+    printVectorMetrics( metricsVec, std::cout ); 
+    std::cout << " \033[0m";
     
     if( settings.storeInfo && settings.outFile!="-" ) {
         if( comm->getRank()==0){
@@ -841,9 +845,6 @@ int main(int argc, char** argv) {
         }
     }    
     
-    settings.print( std::cout, comm );
-    printVectorMetrics( metricsVec, std::cout ); 
-
     if(settings.outFile!="-" ){
         std::string partOutFile = settings.outFile + ".partition";
         ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );

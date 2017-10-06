@@ -22,6 +22,7 @@
 #include "FileIO.h"
 #include "GraphUtils.h"
 #include "Settings.h"
+#include "MeshGenerator.h"
 
 #include <parmetis.h>
 
@@ -82,25 +83,33 @@ int main(int argc, char** argv) {
 	options_description desc("Supported options");
 
 	struct Settings settings;
-        bool parMetisGeom = true;
+    bool parMetisGeom = false;
         
 	desc.add_options()
 		("help", "display options")
 		("version", "show version")
 		("graphFile", value<std::string>(), "read graph from file")
-                ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
+        ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
 		("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
 		("coordFormat", value<ITI::Format>(), "format of coordinate file")
+        
+        ("generate", "generate random graph. Currently, only uniform meshes are supported.")
+        ("numX", value<IndexType>(&settings.numX), "Number of points in x dimension of generated graph")
+		("numY", value<IndexType>(&settings.numY), "Number of points in y dimension of generated graph")
+		("numZ", value<IndexType>(&settings.numZ), "Number of points in z dimension of generated graph")        
+        
 		("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 		("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
-                ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
-                ("geom", value<bool>(&parMetisGeom)->default_value(parMetisGeom), "0: use of parmetisKway (no coordinates), 1: use of ParMetisGeomKway. Default is 1.")
+        ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
+        ("geom", "0: use of parmetisKway (no coordinates), 1: use of ParMetisGeomKway. Default is 1.")
 		;
-
+        
 	variables_map vm;
 	store(command_line_parser(argc, argv).
 			  options(desc).run(), vm);
 	notify(vm);
+
+    parMetisGeom = vm.count("geom");
 
 	if (vm.count("help")) {
 		std::cout << desc << "\n";
@@ -112,54 +121,113 @@ int main(int argc, char** argv) {
 		return 0;
 	}
 
-	if (!vm.count("graphFile")) {
-		std::cout << "Input file needed, specify with --graphFile" << std::endl; //TODO: change into positional argument
+	if (! (vm.count("graphFile") or vm.count("generate")) ) {
+		std::cout << "Specify input file with --graphFile or mesh generation with --generate and number of points per dimension." << std::endl; //TODO: change into positional argument
 	}
-
-	std::string graphFile = vm["graphFile"].as<std::string>();
-	std::string coordFile;
-	if (vm.count("coordFile")) {
-		coordFile = vm["coordFile"].as<std::string>();
-	} else {
-		coordFile = graphFile + ".xyz";
-	}
-
-	SCAI_ASSERT_EQUAL( sizeof(IndexType), sizeof(idx_t), "IndexType size and idx_t do not agree");
-                    
+           
 	
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    IndexType N;
 
+	if( sizeof(IndexType)!=sizeof(idx_t) ){
+        if( comm->getRank()==0 ){
+            std::cout<< "\033[1;31mWARNING: IndexType size= " << sizeof(IndexType) << " and idx_t size=" << sizeof(idx_t) << "  do not agree, this may cause problems \033[0m" << std::endl;
+        }
+    }
+             
+    //-----------------------------------------
     //
-    // read the input graph
+    // read the input graph or generate
     //
     
     CSRSparseMatrix<ValueType> graph;
+    std::vector<DenseVector<ValueType>> coords(settings.dimensions);
     
-    if (vm.count("fileFormat")) {
-        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, settings.fileFormat );
+    if (vm.count("graphFile")) {
+        
+        std::string graphFile = vm["graphFile"].as<std::string>();
+        std::string coordFile;
+        if (vm.count("coordFile")) {
+            coordFile = vm["coordFile"].as<std::string>();
+        } else {
+            coordFile = graphFile + ".xyz";
+        }
+        
+        if (vm.count("fileFormat")) {
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, settings.fileFormat );
+        }else{
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+        }
+        
+        N = graph.getNumRows();
+                
+        SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
+        SCAI_ASSERT( graph.isConsistent(), "Graph npt consistent");
+        
+        if(parMetisGeom){
+            if (vm.count("fileFormat")) {
+                coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
+            } else {
+                coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
+            }
+            SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size() , coords[1].getLocalValues().size(), "coordinates not of same size" );
+        }
+        
+    } else if(vm.count("generate")){
+        if (settings.dimensions != 3) {
+            if(comm->getRank() == 0) {
+                std::cout << "Graph generation supported only fot 2 or 3 dimensions, not " << settings.dimensions << std::endl;
+                return 127;
+            }
+        }
+        
+        N = settings.numX * settings.numY * settings.numZ;
+        
+        std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
+            
+        maxCoord[0] = settings.numX;
+        maxCoord[1] = settings.numY;
+        maxCoord[2] = settings.numZ;        
+        
+        std::vector<IndexType> numPoints(3); // number of points in each dimension, used only for 3D
+        
+        for (IndexType i = 0; i < 3; i++) {
+        	numPoints[i] = maxCoord[i];
+        }
+
+        if( comm->getRank()== 0){
+            std::cout<< "Generating for dim= "<< settings.dimensions << " and numPoints= "<< settings.numX << ", " << settings.numY << ", "<< settings.numZ << ", in total "<< N << " number of points" << std::endl;
+            std::cout<< "\t\t and maxCoord= "<< maxCoord[0] << ", "<< maxCoord[1] << ", " << maxCoord[2]<< std::endl;
+        }        
+
+        scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+        scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
+        graph = scai::lama::CSRSparseMatrix<ValueType>( rowDistPtr , noDistPtr );
+                
+        scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+        for(IndexType i=0; i<settings.dimensions; i++){
+            coords[i].allocate(coordDist);
+            coords[i] = static_cast<ValueType>( 0 );
+        }
+        
+        // create the adjacency matrix and the coordinates
+        ITI::MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist( graph, coords, maxCoord, numPoints);
+        
+        IndexType nodes= graph.getNumRows();
+        IndexType edges= graph.getNumValues()/2;
+        if(comm->getRank()==0){
+            std::cout<< "Generated structured 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
+        }
+        
+        //nodeWeights = scai::lama::DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
     }else{
-        graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+    	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;
+    	return 126;
     }
-    
-    const IndexType N = graph.getNumRows();
     
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    
-    SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
-    SCAI_ASSERT( graph.isConsistent(), "Graph npt consistent");
-    
-    std::vector<DenseVector<ValueType>> coords;
-    if(parMetisGeom){
-	if (vm.count("fileFormat")) {
-		coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
-	} else {
-		coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
-	}
-    }
 
-    SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size() , coords[1].getLocalValues().size(), "coordinates not of same size" );
-
+    //-----------------------------------------------------
     //
     // convert to parMetis data types
     //
@@ -201,16 +269,20 @@ int main(int argc, char** argv) {
     */
     recvPartRead.release();
 
+    //
     // setting xadj=ia and adjncy=ja values, these are the local values of every processor
+    //
+    
     scai::lama::CSRStorage<ValueType>& localMatrix= graph.getLocalStorage();
+    
     scai::hmemo::ReadAccess<IndexType> ia( localMatrix.getIA() );
     scai::hmemo::ReadAccess<IndexType> ja( localMatrix.getJA() );
-
-    idx_t xadj[ia.size()];
-    idx_t adjncy[ja.size()];
+    IndexType iaSize= ia.size();
     
-    for(int i=0; i<ia.size(); i++){
-        SCAI_ASSERT( i < sizeof(xadj)/sizeof(idx_t), "index " << i << " out of bounds");
+    idx_t* xadj = new idx_t[ iaSize ];
+    idx_t* adjncy = new idx_t[ ja.size() ];
+    
+    for(int i=0; i<iaSize ; i++){
         xadj[i]= ia[i];
         SCAI_ASSERT( xadj[i] >=0, "negative value for i= "<< i << " , val= "<< xadj[i]);
     }
@@ -241,29 +313,27 @@ int main(int argc, char** argv) {
     // the xyz array for coordinates of size dim*localN contains the local coords
     // convert the vector<DenseVector> to idx_t*
     IndexType localN= dist->getLocalSize();
-    real_t xyzLocal[ndims*localN];
+    real_t *xyzLocal;
 
-    if (ndims != 2) {
-        throw std::logic_error("Not yet implemented for dimensions != 2");
-    }
-    
     if( parMetisGeom ){
-        // TODO: only for 2D now
-        scai::utilskernel::LArray<ValueType>& localPartOfCoords0 = coords[0].getLocalValues();
-        scai::utilskernel::LArray<ValueType>& localPartOfCoords1 = coords[1].getLocalValues();
+        xyzLocal = new real_t[ ndims*localN ];
         
-        for(unsigned int i=0; i<localN; i++){
-            SCAI_ASSERT( 2*i+1< sizeof(xyzLocal)/sizeof(xyzLocal[0]), "Too large index: " << 2*i+1);
-            xyzLocal[2*i]= real_t(localPartOfCoords0[i]);
-            xyzLocal[2*i+1]= real_t(localPartOfCoords1[i]);
-            //PRINT(*comm <<": "<< xyzLocal[2*i] << ", "<< xyzLocal[2*i+1]);
+        std::vector<scai::utilskernel::LArray<ValueType>> localPartOfCoords( ndims );
+        for(int d=0; d<ndims; d++){
+            localPartOfCoords[d] = coords[d].getLocalValues();
         }
+        for(unsigned int i=0; i<localN; i++){
+            SCAI_ASSERT_LE_ERROR( ndims*(i+1), ndims*localN, "Too large index, localN= " << localN );
+            for(int d=0; d<ndims; d++){
+                xyzLocal[ndims*i+d] = real_t(localPartOfCoords[d][i]);
+            }
+        }
+        
     }
     // ncon: the numbers of weigths each vertex has. Here 1;
     idx_t ncon = 1;
     
     // nparts: the number of parts to partition (=k)
-    //IndexType k = comm->getSize();
     if( !vm.count("numBlocks") ){
         settings.numBlocks = comm->getSize();
     }
@@ -276,7 +346,7 @@ int main(int argc, char** argv) {
     real_t total = 0;
     for(int i=0; i<sizeof(tpwgts)/sizeof(real_t) ; i++){
 	tpwgts[i] = real_t(1)/nparts;
-        //PRINT(*comm << ": " << i <<": "<< tpwgts[i]);
+    //PRINT(*comm << ": " << i <<": "<< tpwgts[i]);
 	total += tpwgts[i];
     }
 
@@ -295,8 +365,7 @@ int main(int argc, char** argv) {
     idx_t edgecut;
     
     // partition array of size localN, contains the block every vertex belongs
-    //idx_t* partKway = (idx_t*) malloc(sizeof(idx_t)*localN);
-    idx_t partKway[localN];
+    idx_t *partKway = new idx_t[ localN ];
     
     // comm: the MPI comunicator
     MPI_Comm metisComm;
@@ -304,8 +373,6 @@ int main(int argc, char** argv) {
      
     //PRINT(*comm<< ": xadj.size()= "<< sizeof(xadj) << "  adjncy.size=" <<sizeof(adjncy) ); 
     //PRINT(*comm << ": "<< sizeof(xyzLocal)/sizeof(real_t) << " ## "<< sizeof(partKway)/sizeof(idx_t) << " , localN= "<< localN);
-    
-    SCAI_ASSERT( sizeof(partKway)/sizeof(partKway[0])==localN , sizeof(partKway)/sizeof(partKway[0]) << " , " << localN);
     
     if(comm->getRank()==0){
 	    PRINT("dims=" << ndims << ", nparts= " << nparts<<", ubvec= "<< ubvec << ", options="<< *options << ", ncon= "<< ncon );
@@ -332,12 +399,21 @@ int main(int argc, char** argv) {
     double partKwayTime= comm->max(partitionKwayTime.count() );
 
     //
+    // free arrays
+    //
+    delete[] xadj;
+    delete[] adjncy;
+    if( parMetisGeom ){
+        delete[] xyzLocal;
+    }
+    
+    //
     // convert partition to a DenseVector
+    //
     DenseVector<IndexType> partitionKway(dist);
     for(unsigned int i=0; i<localN; i++){
         partitionKway.getLocalValues()[i] = partKway[i];
     }
-    assert(sizeof(xyzLocal)/sizeof(real_t) == 2*sizeof(partKway)/sizeof(idx_t) );
     
     // check correct transformation to DenseVector
     for(int i=0; i<localN; i++){
@@ -345,12 +421,14 @@ int main(int argc, char** argv) {
         assert( partKway[i]== partitionKway.getLocalValues()[i]);
     }
     
+    delete[] partKway;
+    
     //---------------------------------------------
     //
     // Get metrics
     //
     
-    ValueType cutKway = ITI::GraphUtils::computeCut(graph, partitionKway, true);
+    IndexType cutKway = ITI::GraphUtils::computeCut(graph, partitionKway, true);
     ValueType imbalanceKway = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partitionKway, nparts );
     IndexType maxComm, totalComm;
     std::tie(maxComm, totalComm) = ITI::GraphUtils::computeBlockGraphComm<IndexType, ValueType>( graph, partitionKway, nparts);
@@ -385,7 +463,11 @@ int main(int argc, char** argv) {
     }
     
     if(comm->getRank()==0){
-    	std::cout << std::endl << "machine:" << machine << " input:" << graphFile << " nodes:" << N << " epsilon:" << settings.epsilon;
+        if( vm.count("generate") ){
+            std::cout << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon;
+        }else{
+            std::cout << std::endl << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon;
+        }
         std::cout << "\033[1;36m";
         
         if( parMetisGeom ){
@@ -393,9 +475,13 @@ int main(int argc, char** argv) {
         }else{
             std::cout << std::endl << "ParMETIS_V3_PartKway: " << std::endl;
         }
-        std::cout <<"time ,  cut ,  imbalance ,  maxBlGrDeg ,  BlGrEdges ,  maxCommVol ,  totalCommVolume ,   maxBorderNodesPercent ,  avgBorderNodesPercent " << std::endl;
-        std::cout<< partKwayTime << " ,  " << cutKway << " ,  " << imbalanceKway << " ,  " << maxComm << " ,  " << totalComm << " ,  " << maxCommVolume << " ,  " << totalCommVolume  << " ,  " << maxBorderNodesPercent  << " ,  " <<  avgBorderNodesPercent <<  " \033[0m" << std::endl;
+        std::cout <<"time ,  cut, imbalance , \t maxBlGrDeg, BlGrEdges, \t maxCommVol, totalCommVolume, \t  maxBorderNodesPercent, avgBorderNodesPercent " << std::endl;
+        std::cout << std::setprecision(3) << std::fixed;
+        std::cout<< partKwayTime << " ,  " << cutKway << " ,  " << imbalanceKway << " ,\t\t  " << maxComm << " ,  " << totalComm << " , \t\t" << maxCommVolume << " ,  " << totalCommVolume  << " , \t\t ";
+        std::cout << std::setprecision(6) << std::fixed;
+        std::cout << maxBorderNodesPercent  << " ,  " <<  avgBorderNodesPercent <<  " \033[0m" << std::endl;
     }
+    
     // the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================
         
