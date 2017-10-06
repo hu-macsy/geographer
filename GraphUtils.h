@@ -9,6 +9,7 @@
 #define GRAPHUTILS_H_
 
 #include <scai/lama/matrix/CSRSparseMatrix.hpp>
+#include "Settings.h"
 
 namespace ITI {
 

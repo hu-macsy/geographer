@@ -6,7 +6,6 @@
  */
 
 #include "FileIO.h"
-#include "AuxiliaryFunctions.h"
 
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>

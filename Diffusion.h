@@ -12,6 +12,7 @@
 #include <scai/lama/Vector.hpp>
 #include <scai/lama/matrix/CSRSparseMatrix.hpp>
 #include <scai/lama/matrix/DenseMatrix.hpp>
+#include "Settings.h"
 
 namespace ITI {
 

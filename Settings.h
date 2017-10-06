@@ -1,7 +1,5 @@
 #pragma once
 
-#include "FileIO.h"
-
 #define STRINGIZER(arg)     #arg
 #define STR_VALUE(arg)      STRINGIZER(arg)
 #define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
@@ -10,7 +8,17 @@
 
 const std::string version = BUILD_COMMIT_STRING;
 
+
+typedef long int IndexType;
+typedef double ValueType;
+
+
+namespace ITI{
+    enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5, BINARY = 6};
+}
+
 enum class InitialPartitioningMethods {SFC = 0, Pixel = 1, Spectral = 2, KMeans = 3, Multisection = 4, None = 5};
+
 
 
 struct Settings{

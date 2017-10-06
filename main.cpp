@@ -801,6 +801,9 @@ int main(int argc, char** argv) {
             std::cout<< std::endl<< "\033[1;36mcut:"<< metricsVec[r].finalCut<< "   imbalance:"<< metricsVec[r].finalImbalance << std::endl;
             std::cout<<"inputTime:" << metricsVec[r].inputTime << "   partitionTime:" << metricsVec[r].timeFinalPartition  <<"   reportTime:"<< metricsVec[r].reportTime << " \033[0m" << std::endl; 
             */
+            
+            metricsVec[r].print( std::cout );            
+            
         }
         
         comm->synchronize();
@@ -853,6 +856,8 @@ int main(int argc, char** argv) {
         }
         */
         
-    //std::exit(0);   //this is needed for supermuc
+    //this is needed for supermuc
+    //std::exit(0);   
+    
     return 0;
 }

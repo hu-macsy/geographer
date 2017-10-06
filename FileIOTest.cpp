@@ -32,9 +32,6 @@
 #include "Settings.h"
 #include "quadtree/SpatialTree.h"
 
-typedef double ValueType;
-typedef int IndexType;
-
 using scai::lama::CSRStorage;
 
 

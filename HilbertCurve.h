@@ -12,10 +12,14 @@
 #include <scai/lama/Vector.hpp>
 #include <scai/dmemo/Distribution.hpp>
 
+#include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
+
 #include <assert.h>
 #include <cmath>
 #include <climits>
 #include <queue>
+
+#include "Settings.h"
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 

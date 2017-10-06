@@ -9,6 +9,8 @@
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 
 #include "GraphUtils.h"
+#include "Settings.h"
+
 
 namespace ITI{
 
@@ -81,13 +83,13 @@ static void print2DGrid(scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama
         
     //get the border nodes
     scai::lama::DenseVector<IndexType> border(adjM.getColDistributionPtr(), 0);
-    border = GraphUtils::getBorderNodes( adjM , partition);
+    border = ITI::GraphUtils::getBorderNodes( adjM , partition);
     
     IndexType partViz[numX][numY];   
     IndexType bordViz[numX][numY]; 
     for(int i=0; i<numX; i++)
         for(int j=0; j<numY; j++){
-            partViz[i][j]=partition.getValue(i*numX+j).scai::lama::Scalar::getValue();
+            partViz[i][j]=partition.getValue(i*numX+j).scai::lama::Scalar::getValue<IndexType>();
             bordViz[i][j]=border.getValue(i*numX+j).scai::lama::Scalar::getValue<IndexType>();
         }
 
@@ -197,5 +199,5 @@ static std::tuple<IndexType, IndexType> index2_2DPoint(IndexType index,  std::ve
  
 }; //class aux
 
-//template class
+template class aux<long int, double>;
 }// namespace ITI

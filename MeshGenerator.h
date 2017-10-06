@@ -35,7 +35,7 @@
 #include "quadtree/SpatialCell.h"
 #include "quadtree/QuadTreeCartesianEuclid.h" 
 #include "AuxiliaryFunctions.h"
- 
+#include "Settings.h"
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 

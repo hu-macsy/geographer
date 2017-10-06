@@ -18,9 +18,6 @@ using scai::lama::DenseVector;
 using scai::lama::DenseMatrix;
 using scai::dmemo::DistributionPtr;
 
-typedef double ValueType;
-typedef int IndexType;
-
 class DiffusionTest : public ::testing::Test {
     protected:
         // the directory of all the meshes used

@@ -32,8 +32,6 @@
 #include "GraphUtils.h"
 #include "AuxiliaryFunctions.h"
 
-typedef double ValueType;
-typedef int IndexType;
 
 using namespace scai;
 
@@ -280,6 +278,8 @@ TEST_F (auxTest,testGraphMaxDegree){
 
 TEST_F (auxTest, testPixelDistance) {
     
+    typedef aux<IndexType,ValueType> aux;
+    
     IndexType sideLen = 100;
     
     ValueType maxl2Dist = aux::pixelL2Distance2D(0,sideLen*sideLen-1, sideLen);
@@ -322,7 +322,7 @@ TEST_F(auxTest, testIndex2_3DPoint){
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
     
     for(IndexType i=0; i<N; i++){
-        std::tuple<IndexType, IndexType, IndexType> ind = aux::index2_3DPoint(i, numPoints);
+        std::tuple<IndexType, IndexType, IndexType> ind = aux<IndexType,ValueType>::index2_3DPoint(i, numPoints);
         EXPECT_LE(std::get<0>(ind) , numPoints[0]-1);
         EXPECT_LE(std::get<1>(ind) , numPoints[1]-1);
         EXPECT_LE(std::get<2>(ind) , numPoints[2]-1);
@@ -343,7 +343,7 @@ TEST_F(auxTest, testIndex2_2DPoint){
     IndexType N= numPoints[0]*numPoints[1];
     
     for(IndexType i=0; i<N; i++){
-        std::tuple<IndexType, IndexType> ind = aux::index2_2DPoint(i, numPoints);
+        std::tuple<IndexType, IndexType> ind = aux<IndexType,ValueType>::index2_2DPoint(i, numPoints);
         EXPECT_LE(std::get<0>(ind) , numPoints[0]-1);
         EXPECT_LE(std::get<1>(ind) , numPoints[1]-1);
         EXPECT_GE(std::get<0>(ind) , 0);

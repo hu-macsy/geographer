@@ -1,7 +1,6 @@
 #pragma once
 
-typedef  long int IndexType;
-typedef  double ValueType;
+#include <scai/lama.hpp>
 
 struct Metrics{
     
@@ -56,8 +55,28 @@ struct Metrics{
     //print metrics
     //
     void print( std::ostream& out){
-
-        out << "# times: migrAlgo , 1redistr , k-means , 2redistr , total  , metrics:  cut, imbalance  ,  BlGr maxDeg, edges  ,  CommVol max, total  ,  BorNodes max, avg  " << std::endl;        
+        
+        // for these time we have one measurement per PE and must make a max
+        ValueType maxTimeMigrationAlgo = *std::max_element( timeMigrationAlgo.begin(), timeMigrationAlgo.end() );
+        ValueType maxTimeFirstDistribution = *std::max_element( timeFirstDistribution.begin(), timeFirstDistribution.end() );
+        ValueType maxTimeKmeans = *std::max_element( timeKmeans.begin(), timeKmeans.end() );
+        ValueType maxTimeSecondDistribution = *std::max_element( timeSecondDistribution.begin(), timeSecondDistribution.end() );
+        ValueType maxTimePreliminary = *std::max_element( timePreliminary.begin(), timePreliminary.end() );
+            
+        ValueType timeLocalRef = timeFinalPartition - maxTimePreliminary;
+        
+//        if( comm->getRank()==0 ){
+            out << "# times: migrAlgo , 1redistr , k-means , 2redistr , total  , metrics:  cut, imbalance  ,  BlGr maxDeg, edges  ,  CommVol max, total  ,  BorNodes max, avg  " << std::endl;        
+        
+            out << std::setprecision(2) << std::fixed;
+            out<<  "           "<< inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << " ,  "<< timeFinalPartition << " ,  \t   "\
+            << preliminaryCut << ",  "<< finalCut << ",  " << finalImbalance << " , \t "  \
+            << maxBlockGraphDegree << ",  " << totalBlockGraphEdges << " ,\t "  \
+            << maxCommVolume << ",  " << totalCommVolume << " , \t ";
+            out << std::setprecision(6) << std::fixed;
+            out << maxBorderNodesPercent << ",  " << avgBorderNodesPercent \
+            << std::endl;
+//        }
         
     }
 };
