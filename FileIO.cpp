@@ -201,6 +201,9 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVe
     //typedef unsigned long int UINT;  // maybe IndexType is not big enough for file position
         
     const IndexType dimension = coords.size();
+    if (dimension != 3) {
+        std::cout << "Warning: Binary coordinate reader expects three dimensions." << std::endl;
+    }
     scai::dmemo::DistributionPtr coordDist = coords[0].getDistributionPtr();
     const IndexType globalN = coordDist->getGlobalSize();
     const IndexType localN = coordDist->getLocalSize();
@@ -227,7 +230,7 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVe
     }
     
     //
-    //  one PE at a time, write to file
+    //  one PE at a time, write to file TODO: would seekp work?
     //
     
     std::ofstream outfile;
@@ -247,12 +250,7 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVe
                 }
             }
             
-            // the last PE maybe has less local values
-            if( p==numPEs-1 ){
-                SCAI_ASSERT_EQ_ERROR( outfile.tellp(), globalN*dimension*sizeof(ValueType) , "While writing coordinates in parallel: Position in file " << outFilename << " is not correct." );
-            }else{
-                SCAI_ASSERT_EQ_ERROR( outfile.tellp(), localN*dimension*sizeof(ValueType)*(comm->getRank()+1) , "While writing coordinates in parallel: Position in file " << outFilename << " is not correct." );
-            }
+            SCAI_ASSERT_EQ_ERROR( outfile.tellp(), endLocalRange*dimension*sizeof(ValueType) , "While writing coordinates in parallel: Position in file " << outFilename << " is not correct." );
             
             outfile.close();
         }
@@ -1060,7 +1058,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
             SCAI_REGION_END("FileIO.readCoordsBinary.fileRead" );
             
             for(IndexType i=0; i<localN; i++){
-                for(IndexType dim=0; dim<dimension; dim++){
+                for(IndexType dim=0; dim<dimension; dim++){//this is expensive, since a writeAccess is created for each loop iteration
                     coords[dim][i] = localPartOfCoords[i*maxDimension+dim]; //always maxDimension coords per point
                 }      
             }
