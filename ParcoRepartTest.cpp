@@ -24,11 +24,8 @@
 #include "gtest/gtest.h"
 #include "AuxiliaryFunctions.h"
 
-typedef double ValueType;
-typedef int IndexType;
 
 using namespace scai;
-
 
 namespace ITI {
 

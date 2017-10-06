@@ -103,7 +103,7 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
  * with size k*k and [i,j]= i*k+j.
  */
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const int k);
+scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 
 
 /** Get the maximum degree of a graph.
@@ -116,7 +116,7 @@ IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM)
  *  second = Compute total communication = sum of all edges of the block graph.
  */
 template<typename IndexType, typename ValueType>
-std::pair<IndexType, IndexType> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const int k);
+std::pair<IndexType, IndexType> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 
 /** Compute maximum and total communication volume= max and sum of number of border nodes
  * WARNING: this works properly only when k=p and the nodes are redistributed so each PE owns nodes from one block.

@@ -176,7 +176,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			}
 
 			//the two border regions might have different sizes. Swapping array is sized for the maximum of the two.
-			const IndexType swapLength = std::max(otherSize, int(interfaceNodes.size()));
+			const IndexType swapLength = std::max(otherSize, IndexType (interfaceNodes.size()));
 			IndexType swapNodes[swapLength];
 			for (IndexType i = 0; i < swapLength; i++) {
 				if (i < interfaceNodes.size()) {
@@ -1240,6 +1240,9 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distancesFrom
 
 //---------------------------------------------------------------------------------------
 
+template class LocalRefinement<long int, double>;
+
+/*
 template std::vector<int> ITI::LocalRefinement<int, double>::distributedFMStep(
     CSRSparseMatrix<double>& input, 
     DenseVector<int>& part,
@@ -1252,6 +1255,6 @@ template std::vector<int> ITI::LocalRefinement<int, double>::distributedFMStep(
     Settings settings);
 
 template std::pair<std::vector<int>, std::vector<int>> ITI::LocalRefinement<int, double>::getInterfaceNodes(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, const std::vector<int>& nodesWithNonLocalNeighbors, int otherBlock, int depth);
-
+*/
 
 } // namespace ITI

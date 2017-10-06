@@ -24,8 +24,6 @@
 #include "GraphUtils.h"
 #include "gtest/gtest.h"
 
-typedef double ValueType;
-typedef int IndexType;
 
 using namespace scai;
 

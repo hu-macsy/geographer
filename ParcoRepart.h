@@ -13,7 +13,6 @@
 
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 
-
 #include <boost/config.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/edge_coloring.hpp>

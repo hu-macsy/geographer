@@ -24,8 +24,6 @@
 #include "AuxiliaryFunctions.h"
 #include "MultiSection.h"
 
-typedef double ValueType;
-typedef int IndexType;
 
 using namespace scai;
 

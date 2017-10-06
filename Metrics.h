@@ -1,8 +1,7 @@
 #pragma once
 
-typedef double ValueType;
-typedef int IndexType;
-
+typedef  long int IndexType;
+typedef  double ValueType;
 
 struct Metrics{
     

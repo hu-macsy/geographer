@@ -49,9 +49,9 @@ namespace ITI {
 	class MeshGenerator{
             public:
                 
-                static void createOctaTreeMesh( scai::lama::CSRSparseMatrix<ValueType> &adjM,  std::vector<DenseVector<ValueType>> &coords, const int numberOfPoints, const ValueType maxCoord);
+                static void createOctaTreeMesh( scai::lama::CSRSparseMatrix<ValueType> &adjM,  std::vector<DenseVector<ValueType>> &coords, const IndexType numberOfPoints, const ValueType maxCoord);
 
-                static void createOctaTreeMesh_2( scai::lama::CSRSparseMatrix<ValueType> &adjM,  std::vector<DenseVector<ValueType>> &coords, const int numberOfPoints, const ValueType maxCoord);
+                static void createOctaTreeMesh_2( scai::lama::CSRSparseMatrix<ValueType> &adjM,  std::vector<DenseVector<ValueType>> &coords, const IndexType numberOfPoints, const ValueType maxCoord);
                 
                 /** Creates a structed 3D mesh, both the adjacency matrix and the coordinates vectors.
                  * 
@@ -73,13 +73,13 @@ namespace ITI {
                 /*Creates points in a cube of side maxCoord in dimensions and adds them in a quad tree.
                  * Adds more points in specific areas at random. 
                  */
-                static void createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords,const int dimensions, const int numberOfAreas, const long pointsPerArea, const ValueType maxCoord, IndexType seed);
+                static void createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords,const int dimensions, const IndexType numberOfAreas, const IndexType pointsPerArea, const ValueType maxCoord, IndexType seed);
 
                 static void graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid &quad);
                     
                 /* Creates random points in the cube for the given dimension, points in [0,maxCoord]^dim.
                  */
-                static std::vector<DenseVector<ValueType>> randomPoints(int numberOfPoints, int dimensions, ValueType maxCoord);
+                static std::vector<DenseVector<ValueType>> randomPoints(IndexType numberOfPoints, int dimensions, ValueType maxCoord);
                 
                 /* Calculates the 3D distance between two points.
                  */

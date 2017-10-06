@@ -795,9 +795,9 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
     //
     //create the prefix sum array
     //
-    std::vector<ValueType> prefixSum( N+1 , 0);
+    std::vector<ValueType> prefixSum( N+1 , 0.0);
     
-    prefixSum[0] = 0;// nodeWeights[0];
+    prefixSum[0] = IndexType(0);// nodeWeights[0];
     
     for(IndexType i=1; i<N+1; i++ ){
         prefixSum[i] = prefixSum[i-1] + nodeWeights[i-1];
@@ -809,8 +809,8 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
     lowerBound = totalWeight/k;         // the optimal average weight
     upperBound = totalWeight;
   
-    std::vector<IndexType> partIndices(k, -9);
-    std::vector<ValueType> weightPerPart(k, -9);
+    std::vector<IndexType> partIndices(k, IndexType(-9));
+    std::vector<ValueType> weightPerPart(k, IndexType(-9) );
     partIndices[0]=0;
     
     for(IndexType p=1; p<k; p++){
@@ -819,7 +819,7 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
         while( indexLow<indexHigh ){
             
             IndexType indexMid = (indexLow+indexHigh)/2;
-            ValueType tmpSum = prefixSum[indexMid] - prefixSum[std::max(partIndices[p-1],0)];
+            ValueType tmpSum = prefixSum[indexMid] - prefixSum[std::max(partIndices[p-1], IndexType(0) )];
             
             if( lowerBound<=tmpSum and tmpSum<upperBound){                
                 if( probe(prefixSum, k, tmpSum) ){
@@ -837,7 +837,7 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
             
         }
         partIndices[p] = indexHigh-1;        
-        weightPerPart[p-1] = prefixSum[indexHigh-1] - prefixSum[std::max(partIndices[p-1],0)];
+        weightPerPart[p-1] = prefixSum[indexHigh-1] - prefixSum[std::max(partIndices[p-1], IndexType(0) )];
     }
 
     weightPerPart[k-1] = totalWeight - prefixSum[ partIndices.back() ];
@@ -1179,6 +1179,9 @@ std::vector<T> MultiSection<IndexType, ValueType>::indexTo3D(IndexType ind, Inde
 }
 //---------------------------------------------------------------------------------------
 
+template class MultiSection<long int , double>;
+
+/*
 template scai::lama::DenseVector<int> MultiSection<int, double>::getPartitionNonUniform(const scai::lama::CSRSparseMatrix<double> &input, const std::vector<scai::lama::DenseVector<double>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, struct Settings Settings );
 
 template scai::lama::DenseVector<int> MultiSection<int, double>::setPartition( std::shared_ptr<rectCell<int,double>> root, const scai::dmemo::DistributionPtr distPtr, const std::vector<std::vector<int>>& localPoints);
@@ -1216,5 +1219,5 @@ template std::vector<int> MultiSection<int, double>::indexToCoords( const int in
 template bool MultiSection<int, double>::probe(const std::vector<double>& prefixSum, const int k, const double target);
 
 template std::pair<bool,std::vector<int>> MultiSection<int, double>::probeAndGetSplitters(const std::vector<double>& prefixSum, const int k, const double target);
-
+*/
 };

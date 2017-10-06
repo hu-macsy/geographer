@@ -29,8 +29,6 @@
 #include "SpectralPartition.h"
 #include "AuxiliaryFunctions.h"
 
-typedef double ValueType;
-typedef int IndexType;
 
 namespace ITI {
 
