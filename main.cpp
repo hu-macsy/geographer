@@ -862,7 +862,7 @@ int main(int argc, char** argv) {
         */
         
     //this is needed for supermuc
-    //std::exit(0);   
+    std::exit(0);   
     
     return 0;
 }
