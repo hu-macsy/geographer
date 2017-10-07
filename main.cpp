@@ -814,9 +814,13 @@ int main(int argc, char** argv) {
     //
     
     settings.print( std::cout, comm );
-    std::cout<<  "\033[1;36m";
-    printVectorMetrics( metricsVec, std::cout ); 
-    std::cout << " \033[0m";
+    if (comm->getRank() == 0) {
+        std::cout<<  "\033[1;36m";
+    }
+    printVectorMetrics( metricsVec, std::cout );
+    if (comm->getRank() == 0) {
+        std::cout << " \033[0m";
+    }
     
     if( settings.storeInfo && settings.outFile!="-" ) {
         if( comm->getRank()==0){
