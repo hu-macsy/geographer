@@ -243,6 +243,8 @@ int main(int argc, char** argv) {
 
 	struct Settings settings;
         
+    bool writePartition = false;
+    
 	std::string blockSizesFile;
 	ITI::Format coordFormat;
         IndexType repeatTimes = 1;
@@ -302,6 +304,7 @@ int main(int argc, char** argv) {
 				("verbose", "Increase output.")
                 ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
                 ("storeInfo", "Store timing and ohter metrics in file.")
+                ("writePartition", "Writes the partition in the outFile.partition file");
 				;
 
         //------------------------------------------------
@@ -411,7 +414,8 @@ int main(int argc, char** argv) {
     settings.storeInfo = vm.count("storeInfo");
     settings.erodeInfluence = vm.count("erodeInfluence");
     settings.tightenBounds = vm.count("tightenBounds");
-
+    writePartition = vm.count("writePartition");
+    
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
     
@@ -827,13 +831,17 @@ int main(int argc, char** argv) {
         }
     }    
     
-    if(settings.outFile!="-" ){
+    if( settings.outFile!="-" and writePartition ){
+        std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
         std::string partOutFile = settings.outFile + ".partition";
         ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+        std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
         if( comm->getRank()==0 ){
-            std::cout << " and last partition of the series in file " << partOutFile << std::endl;
+            std::cout << " and last partition of the series in file." << partOutFile << std::endl;
+            std::cout<< " Time needed to write .partition file: " << writePartTime <<  std::endl;
         }
     }
+    
     // the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================
     /*

@@ -289,6 +289,8 @@ void FileIO<IndexType, ValueType>::writeCoordsDistributed_2D (const std::vector<
     
 }
 
+
+
 template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<IndexType> &part, const std::string filename) {
 	SCAI_REGION( "FileIO.writePartitionParallel" );
@@ -330,7 +332,7 @@ void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<Inde
   */              
                 outfile.close();
             }
-            comm->synchronize();
+            comm->synchronize();    //TODO: takes huge time here
         }
 }
 
