@@ -14,8 +14,6 @@ using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
 using scai::lama::DenseMatrix;
 
-typedef double ValueType;
-typedef int IndexType;
 
 int main(int argc, char *argv[])
 {

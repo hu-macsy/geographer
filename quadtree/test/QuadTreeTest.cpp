@@ -27,10 +27,6 @@
 
 namespace ITI {
 
-typedef double ValueType;
-typedef int IndexType;
-  
-
 TEST_F(QuadTreeTest, testGetGraphFromForestRandom_2D){
     
     // every forest[i] is a pointer to the root of a tree
@@ -187,83 +183,83 @@ TEST_F(QuadTreeTest, testGetGraphFromForestByHand_2D){
 
 
 TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
-	count n = 3500;
-
-	vector<Point<double> > positions(n);
-	vector<index> content(n);
-
-        Point<double> min(0.0, 0.0, 0.0);
-        Point<double> max(1.0, 1.0, 1.0);
-        index capacity = 1;
-        
-	QuadTreeCartesianEuclid quad(min, max, true, capacity);
-        index i=0;
-        srand(time(NULL));
+    count n = 3500;
     
-        for (i = 0; i < n; i++) {
-		Point<double> pos = Point<double>({double(rand()) / RAND_MAX, double(rand()) / RAND_MAX, double(rand()) / RAND_MAX});
-		positions[i] = pos;
-		content[i] = i;
-		quad.addContent(i, pos);
-	}
-	
-	//PRINT("Num of leaves= N = "<< quad.countLeaves() );
-	index N= quad.countLeaves();
-        
-        // index the tree
-        index treeSize = quad.indexSubtree(0);
-        
-        // A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
-        // of -i- in the output graph, not the quad tree.
-        std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsCells( treeSize );
-        int dimension = 3;
-        std::vector<std::vector<ValueType>> coords( dimension );
-        
-	scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>( graphNgbrsCells, coords );
-
-        // checkSymmetry is really expensive for big graphs, used only for small instances
-        //graph.checkSymmetry();
-	graph.isConsistent();
-        
-        //EXPECT_EQ( graph.getNumRows(), graph.getNumColumns() );
-	ASSERT_EQ( graph.getNumRows(), N);
-	ASSERT_EQ( graph.getNumColumns(), N);
-
-	const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
-	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-        
-        // 50 is too large upper bound (is it?). Should be around 24 for 3D and 8 (or 10) for 2D
-        //TODO: maybe 30 is not so large... find another way to do it or skip it entirely
-        IndexType upBound= 50;
-        std::vector<IndexType> degreeCount( upBound*2, 0 );
-        
-        for(IndexType i=0; i<N; i++){
-            IndexType nodeDegree = ia[i+1] -ia[i];
-            if( nodeDegree > upBound){
-               //throw std::warning( "Node with large degree, degree= "+  std::to_string(nodeDegree) + " > current upper bound= " + std::to_string(upBound) );
-                // throw as a warning for now
-                PRINT("WARNING: degree too high= "<< nodeDegree);
-            }
-            ++degreeCount[nodeDegree];
+    vector<Point<double> > positions(n);
+    vector<index> content(n);
+    
+    Point<double> min(0.0, 0.0, 0.0);
+    Point<double> max(1.0, 1.0, 1.0);
+    index capacity = 1;
+    
+    QuadTreeCartesianEuclid quad(min, max, true, capacity);
+    index i=0;
+    srand(time(NULL));
+    
+    for (i = 0; i < n; i++) {
+        Point<double> pos = Point<double>({double(rand()) / RAND_MAX, double(rand()) / RAND_MAX, double(rand()) / RAND_MAX});
+        positions[i] = pos;
+        content[i] = i;
+        quad.addContent(i, pos);
+    }
+    
+    //PRINT("Num of leaves= N = "<< quad.countLeaves() );
+    index N= quad.countLeaves();
+    
+    // index the tree
+    index treeSize = quad.indexSubtree(0);
+    
+    // A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
+    // of -i- in the output graph, not the quad tree.
+    std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsCells( treeSize );
+    int dimension = 3;
+    std::vector<std::vector<ValueType>> coords( dimension );
+    
+    scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coords );
+    
+    // checkSymmetry is really expensive for big graphs, used only for small instances
+    //graph.checkSymmetry();
+    graph.isConsistent();
+    
+    //EXPECT_EQ( graph.getNumRows(), graph.getNumColumns() );
+    ASSERT_EQ( graph.getNumRows(), N);
+    ASSERT_EQ( graph.getNumColumns(), N);
+    
+    const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
+    const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+    const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+    
+    // 50 is too large upper bound (is it?). Should be around 24 for 3D and 8 (or 10) for 2D
+    //TODO: maybe 30 is not so large... find another way to do it or skip it entirely
+    IndexType upBound= 50;
+    std::vector<IndexType> degreeCount( upBound*2, 0 );
+    
+    for(IndexType i=0; i<N; i++){
+        IndexType nodeDegree = ia[i+1] -ia[i];
+        if( nodeDegree > upBound){
+            //throw std::warning( "Node with large degree, degree= "+  std::to_string(nodeDegree) + " > current upper bound= " + std::to_string(upBound) );
+            // throw as a warning for now
+            PRINT("WARNING: degree too high= "<< nodeDegree);
         }
-        
-        IndexType numEdges = 0;
-        IndexType maxDegree = 0;
-        std::cout<< "\t Num of nodes"<< std::endl;
-        for(int i=0; i<degreeCount.size(); i++){
-            if(  degreeCount[i] !=0 ){
-                //PRINT("degree " << i << ":   "<< degreeCount[i]);
-                numEdges += i*degreeCount[i];
-                maxDegree = i;
-            }
+        ++degreeCount[nodeDegree];
+    }
+    
+    IndexType numEdges = 0;
+    IndexType maxDegree = 0;
+    std::cout<< "\t Num of nodes"<< std::endl;
+    for(int i=0; i<degreeCount.size(); i++){
+        if(  degreeCount[i] !=0 ){
+            //PRINT("degree " << i << ":   "<< degreeCount[i]);
+            numEdges += i*degreeCount[i];
+            maxDegree = i;
         }
-        EXPECT_EQ(numEdges, graph.getNumValues() );
-        
-        ValueType averageDegree = ValueType( numEdges)/N;
-        
-        PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
-        
+    }
+    EXPECT_EQ(numEdges, graph.getNumValues() );
+    
+    ValueType averageDegree = ValueType( numEdges)/N;
+    
+    PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
+    
 }
 //-------------------------------------------------------------------------------------------------    
 
@@ -306,7 +302,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
 	int dimension = 3;
 	std::vector<std::vector<ValueType>> coords( dimension );
         
-	scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>(graphNgbrsCells, coords);
+	scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<IndexType,ValueType>(graphNgbrsCells, coords);
         /*
         //print graph
         for(int i=0; i<graph.getNumRows(); i++){
@@ -390,11 +386,11 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
         settings.minGainForNextRound = 5;
         settings.storeInfo = false;
         
-        struct Metrics metrics;
+        struct Metrics metrics(settings.numBlocks);
     
         EXPECT_EQ( coords[0].size(), N);
-	EXPECT_EQ( graph.getNumRows(), N);
-	EXPECT_EQ( graph.getNumColumns(), N);
+        EXPECT_EQ( graph.getNumRows(), N);
+        EXPECT_EQ( graph.getNumColumns(), N);
         
         scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordsDV, settings, metrics);
 
@@ -448,7 +444,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_2D) {
     int dimension = 2;
     std::vector<std::vector<ValueType>> coords( dimension );
         
-    scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>(graphNgbrsCells, coords);
+    scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<IndexType, ValueType>(graphNgbrsCells, coords);
     
     /*
     //print graph
@@ -564,7 +560,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
 	int dimension = 2;
 	std::vector<std::vector<ValueType>> coords( dimension );
         
-	scai::lama::CSRSparseMatrix<double> graph= quad.getTreeAsGraph<int, double>(graphNgbrsCells, coords);
+	scai::lama::CSRSparseMatrix<ValueType> graph= quad.getTreeAsGraph<IndexType, ValueType>(graphNgbrsCells, coords);
         
 	// checkSymmetry is really expensive for big graphs, use only for small instances
 	if(N<3000){

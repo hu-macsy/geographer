@@ -3,18 +3,27 @@
 #include <chrono>
 #include <fstream>
 
+#include <scai/lama.hpp>
 #include <scai/lama/DenseVector.hpp>
+#include <scai/lama/Vector.hpp>
+#include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
+
 #include "GraphUtils.h"
+#include "Settings.h"
+
 
 namespace ITI{
 
+template <typename IndexType, typename ValueType>
 class aux{
 public:
+    /*
     typedef int IndexType;
     typedef double ValueType;
-    
+    */
 //------------------------------------------------------------------------------   
-    
+
+
 static void writeHeatLike_local_2D(std::vector<IndexType> input,IndexType sideLen, IndexType dim, const std::string filename){
     std::ofstream f(filename);
     if(f.fail())
@@ -35,6 +44,7 @@ static void writeHeatLike_local_2D(std::vector<IndexType> input,IndexType sideLe
     f << "plot '$map2' using 2:1:3 with image" << std::endl;
 }    
 //------------------------------------------------------------------------------
+
 
 static void writeHeatLike_local_2D(scai::hmemo::HArray<IndexType> input,IndexType sideLen, IndexType dim, const std::string filename){
     std::ofstream f(filename);
@@ -57,6 +67,7 @@ static void writeHeatLike_local_2D(scai::hmemo::HArray<IndexType> input,IndexTyp
 }    
 //------------------------------------------------------------------------------
 
+
 static void print2DGrid(scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama::DenseVector<IndexType>& partition  ){
     
     IndexType N= adjM.getNumRows();
@@ -72,14 +83,14 @@ static void print2DGrid(scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama
         
     //get the border nodes
     scai::lama::DenseVector<IndexType> border(adjM.getColDistributionPtr(), 0);
-    border = GraphUtils::getBorderNodes( adjM , partition);
+    border = ITI::GraphUtils::getBorderNodes( adjM , partition);
     
     IndexType partViz[numX][numY];   
     IndexType bordViz[numX][numY]; 
     for(int i=0; i<numX; i++)
         for(int j=0; j<numY; j++){
-            partViz[i][j]=partition.getValue(i*numX+j).getValue<IndexType>();
-            bordViz[i][j]=border.getValue(i*numX+j).getValue<IndexType>();
+            partViz[i][j]=partition.getValue(i*numX+j).scai::lama::Scalar::getValue<IndexType>();
+            bordViz[i][j]=border.getValue(i*numX+j).scai::lama::Scalar::getValue<IndexType>();
         }
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -124,6 +135,7 @@ static void printVector( std::vector<T> v){
   * 
   * @return The l1 distance of the pixels.
   */
+
 static IndexType pixelL1Distance2D(IndexType pixel1, IndexType pixel2, IndexType sideLen){
      
      IndexType col1 = pixel1/sideLen;
@@ -134,6 +146,7 @@ static IndexType pixelL1Distance2D(IndexType pixel1, IndexType pixel2, IndexType
      
      return std::abs(col1-col2) + std::abs(row1-row2);;
 }
+
 
 static ValueType pixelL2Distance2D(IndexType pixel1, IndexType pixel2, IndexType sideLen){
      
@@ -150,6 +163,7 @@ static ValueType pixelL2Distance2D(IndexType pixel1, IndexType pixel2, IndexType
 /* Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
  * of the index in 3D. The return value is not the coordinates of the point!
  * */
+
 static std::tuple<IndexType, IndexType, IndexType> index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints){
     // a YxZ plane
     SCAI_ASSERT( numPoints.size()==3 , "Wrong dimensions, should be 3");
@@ -167,6 +181,7 @@ static std::tuple<IndexType, IndexType, IndexType> index2_3DPoint(IndexType inde
     return std::make_tuple(xIndex, yIndex, zIndex);
 }
 
+
 static std::tuple<IndexType, IndexType> index2_2DPoint(IndexType index,  std::vector<IndexType> numPoints){
     SCAI_ASSERT( numPoints.size()==2 , "Wrong dimensions, should be 2");
     
@@ -183,4 +198,6 @@ static std::tuple<IndexType, IndexType> index2_2DPoint(IndexType index,  std::ve
 } 
  
 }; //class aux
+
+template class aux<long int, double>;
 }// namespace ITI

@@ -28,7 +28,7 @@ using scai::hmemo::ReadAccess;
 using scai::hmemo::WriteAccess;
 
 template<typename IndexType, typename ValueType>
-DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(CSRSparseMatrix<ValueType> laplacian, DenseVector<ValueType> nodeWeights, IndexType source, ValueType eps) {
+DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource( CSRSparseMatrix<ValueType> laplacian, DenseVector<ValueType> nodeWeights, IndexType source, ValueType eps) {
 	using scai::lama::NormPtr;
 	using scai::lama::L2Norm;
 	using namespace scai::solver;
@@ -177,7 +177,7 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructFJLTMatrix(
 	if (origDimension <= targetDimension) {
 		//better to just return the identity
 		std::cout << "Target dimension " << targetDimension << " is higher than original dimension " << origDimension << ". Returning identity instead." << std::endl;
-		DIASparseMatrix<ValueType> D(DIAStorage<ValueType>(origDimension, origDimension, 1, HArray<IndexType>(1,0), HArray<ValueType>(origDimension, 1)));
+		DIASparseMatrix<ValueType> D(DIAStorage<ValueType>(origDimension, origDimension, IndexType(1), HArray<IndexType>(IndexType(1), IndexType(0) ), HArray<ValueType>(origDimension, IndexType(1) )));
 		return CSRSparseMatrix<ValueType>(D);
 	}
 
@@ -211,7 +211,7 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructFJLTMatrix(
 			wDiagonal[i] = 1-2*(rand() ^ 1);
 		}
 	}
-	DIAStorage<ValueType> dstor(origDimension, origDimension, 1, HArray<IndexType>(1,0), randomDiagonal );
+	DIAStorage<ValueType> dstor(origDimension, origDimension, IndexType(1), HArray<IndexType>(IndexType(1), IndexType(0) ), randomDiagonal );
 	D.swapLocalStorage(dstor);
 	DenseMatrix<ValueType> Ddense(D);
 
@@ -235,11 +235,14 @@ DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructHadamardMatrix(
 	return result;
 }
 
+template class Diffusion<long int, double>;
+
+/*
 template CSRSparseMatrix<double> Diffusion<int, double>::constructLaplacian(CSRSparseMatrix<double> graph);
 template CSRSparseMatrix<double> Diffusion<int, double>::constructFJLTMatrix(double epsilon, int n, int origDimension);
 template DenseVector<double> Diffusion<int, double>::potentialsFromSource(CSRSparseMatrix<double> laplacian, DenseVector<double> nodeWeights, int source, double eps);
 template DenseMatrix<double> Diffusion<int, double>::multiplePotentials(CSRSparseMatrix<double> laplacian, DenseVector<double> nodeWeights, std::vector<int> sources, double eps);
-
+*/
 
 
 } /* namespace ITI */

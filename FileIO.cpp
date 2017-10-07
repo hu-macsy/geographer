@@ -6,7 +6,6 @@
  */
 
 #include "FileIO.h"
-#include "AuxiliaryFunctions.h"
 
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>
@@ -1574,7 +1573,11 @@ std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::s
     
     return blockSizes;
 }
+//-------------------------------------------------------------------------------------------------
+ 
+ template class FileIO<long int, double>;
 
+/*
 template void FileIO<int, double>::writeGraph (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<double> &adjM, const std::string filename);
 template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, const std::string filename);
@@ -1591,5 +1594,5 @@ template CSRSparseMatrix<double>  FileIO<int, double>::readQuadTree( std::string
 template std::pair<int, int> FileIO<int, double>::getMatrixMarketCoordsInfos(const std::string filename);
 template std::vector<int> FileIO<int, double>::readBlockSizes(const std::string filename , const int numBlocks );
 template DenseVector<int> FileIO<int, double>::readPartition(const std::string filename, int n );
-
+*/
 } /* namespace ITI */

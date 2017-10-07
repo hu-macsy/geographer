@@ -47,7 +47,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings) {
     
-    struct Metrics& metrics;
+    struct Metrics metrics(settings.numBlocks);
+    
     assert(settings.storeInfo == false); // Cannot return timing information. Better throw an error than silently drop it.
     
     DenseVector<IndexType> previous;
@@ -58,7 +59,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings){
-    struct Metrics metrics;
+    
+    struct Metrics metrics(settings.numBlocks);
     assert(settings.storeInfo == false); // Cannot return timing information. Better throw an error than silently drop it.
     
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(input.getRowDistributionPtr(), 1);
@@ -68,10 +70,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 // overloaded version with metrics
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings, struct Metrics& metrics) {
-    
+        
 	DenseVector<IndexType> previous;
 	assert(!settings.repartition);
-	return partitionGraph(input, coordinates, nodeWeights, previous, settings, metrics);
+	
+    return partitionGraph(input, coordinates, nodeWeights, previous, settings, metrics);
 
 }
 template<typename IndexType, typename ValueType>
@@ -610,7 +613,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
     // [i][j][k] is in: i*sideLen*sideLen + j*sideLen + k
     
     //std::vector<IndexType> density( cubeSize ,0);
-    scai::hmemo::HArray<IndexType> density( cubeSize, 0);
+    scai::hmemo::HArray<IndexType> density( cubeSize, IndexType(0) );
     scai::hmemo::WriteAccess<IndexType> wDensity(density);
 
     SCAI_REGION_END("ParcoRepart.pixelPartition.initialise")
@@ -736,7 +739,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
                 geomSpread = 1 + 1/std::log2(sideLen)*( std::abs(sideLen/2 - neighbours[j]/sideLen)/(0.8*sideLen/2) + std::abs(sideLen/2 - neighbours[j]%sideLen)/(0.8*sideLen/2) );
                 //PRINT0( geomSpread );            
                 // value to pick a border node
-                pixelDistance = aux::pixelL2Distance2D( maxDensityPixel, neighbours[j], sideLen);
+                pixelDistance = aux<IndexType, ValueType>::pixelL2Distance2D( maxDensityPixel, neighbours[j], sideLen);
                 toInsert.second = (1/pixelDistance)* geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[maxDensityPixel], 0.5) );
                 border.push_back(toInsert);
             }
@@ -811,7 +814,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
                     for(IndexType l=0; l<border.size(); l++){                        
                         if( border[l].first == neighbours[j]){ // its already in border, update value
                             //border[l].second = 1.3*border[l].second + geomSpread * (spreadFactor*(std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5) );
-                            pixelDistance = aux::pixelL2Distance2D( maxDensityPixel, neighbours[j], sideLen);    
+                            pixelDistance = aux<IndexType, ValueType>::pixelL2Distance2D( maxDensityPixel, neighbours[j], sideLen);    
                             border[l].second += geomSpread*  (1/(pixelDistance*pixelDistance))* ( spreadFactor *std::pow(localSumDens[neighbours[j]], 0.5) + std::pow(localSumDens[bestIndex], 0.5) );
                             inBorder= true;
                         }
@@ -820,7 +823,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
                         std::pair<IndexType, ValueType> toInsert;
                         toInsert.first = neighbours[j];
                         //toInsert.second = geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5));
-                        pixelDistance = aux::pixelL2Distance2D( maxDensityPixel, neighbours[j], sideLen);    
+                        pixelDistance = aux<IndexType, ValueType>::pixelL2Distance2D( maxDensityPixel, neighbours[j], sideLen);    
                         //toInsert.second = (1/(pixelDistance*pixelDistance))* geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5));
                         toInsert.second = geomSpread*  (1/(pixelDistance*pixelDistance))* ( spreadFactor *(std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5) );
                         //toInsert.second = geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5))/(std::pow( std::abs( localSumDens[bestIndex] - localSumDens[neighbours[j]]),0.5));
@@ -1137,8 +1140,14 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const 
 
 //to force instantiation
 
-template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, struct Settings, struct Metrics& metrics);
 
+template class ParcoRepart<long int, double>;
+
+/*
+template DenseVector<int> ParcoRepart<int, double>::partitionGraph( CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, struct Settings, struct Metrics& metrics);
+template DenseVector<long int> ParcoRepart<long int, double>::partitionGraph( CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, struct Settings, struct Metrics& metrics);
+
+template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings, struct Metrics& metrics);
 template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings, struct Metrics& metrics);
 
 template DenseVector<int> ParcoRepart<int, double>::hilbertPartition(const std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, Settings settings);
@@ -1152,5 +1161,5 @@ template std::vector< std::vector<int>>  ParcoRepart<int, double>::getGraphEdgeC
 template std::vector<DenseVector<int>> ParcoRepart<int, double>::getCommunicationPairs_local( CSRSparseMatrix<double> &adjM);
 
 template std::vector<int> ParcoRepart<int, double>::neighbourPixels(const int thisPixel, const int sideLen, const int dimension);
-
+*/
 }

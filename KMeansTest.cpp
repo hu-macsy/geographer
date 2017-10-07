@@ -4,9 +4,6 @@
 
 #include "gtest/gtest.h"
 
-typedef double ValueType;
-typedef int IndexType;
-
 
 namespace ITI {
 
