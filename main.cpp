@@ -247,7 +247,7 @@ int main(int argc, char** argv) {
     
 	std::string blockSizesFile;
 	ITI::Format coordFormat;
-        IndexType repeatTimes = 1;
+    IndexType repeatTimes = 1;
         
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 

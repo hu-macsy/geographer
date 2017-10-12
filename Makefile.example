@@ -57,6 +57,10 @@ diffusionCoords: $(OBJ_DIFFUSIONCOORDS)
 	
 weakScaling: $(OBJ_WEAKSCALING)
 	$(CC) $(CCFLAGS) $(OBJ_WEAKSCALING) -o $(EXECUTABLE_WEAKSCALING) $(LFLAGS)	
+	
+getMetrics: FileIO.o GraphUtils.o
+	$(CC) $(CCFLAGS) getMetrics.cpp FileIO.o GraphUtils.o -o getMetrics $(LFLAGS)
+	
 
 lib: $(OBJ_COMMON)
 	ar rcs libparcorepart.a $(OBJ_COMMON)
