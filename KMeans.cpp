@@ -500,16 +500,18 @@ DenseVector<IndexType> assignBlocks(
 	return assignment;
 }
 
-template std::vector<std::vector<double> > findInitialCentersSFC( const std::vector<DenseVector<double> >& coordinates, int k, const std::vector<double> &minCoords,
+
+template std::vector<std::vector<double> > findInitialCentersSFC( const std::vector<DenseVector<double> >& coordinates, long int k, const std::vector<double> &minCoords,
 	const std::vector<double> &maxCoords, Settings settings);
-template std::vector<std::vector<double> > findInitialCenters(const std::vector<DenseVector<double>> &coordinates, int k, const DenseVector<double> &nodeWeights);
-template std::vector<std::vector<double> > findCenters(const std::vector<DenseVector<double>> &coordinates, const DenseVector<int> &partition, const int k,
-		std::vector<int>::iterator firstIndex, std::vector<int>::iterator lastIndex, const DenseVector<double> &nodeWeights);
-template DenseVector<int> assignBlocks(const std::vector<std::vector<double>> &coordinates, const std::vector<std::vector<double> > &centers,
-		std::vector<int>::iterator firstIndex, std::vector<int>::iterator lastIndex,
-		const DenseVector<double> &nodeWeights, const DenseVector<int> &previousAssignment, const std::vector<int> &blockSizes, const SpatialCell &boundingBox,
+template std::vector<std::vector<double> > findInitialCenters(const std::vector<DenseVector<double>> &coordinates, long int k, const DenseVector<double> &nodeWeights);
+template std::vector<std::vector<double> > findCenters(const std::vector<DenseVector<double>> &coordinates, const DenseVector<long int> &partition, const long int k,
+		std::vector<long int>::iterator firstIndex, std::vector<long int>::iterator lastIndex, const DenseVector<double> &nodeWeights);
+template DenseVector<long int> assignBlocks(const std::vector<std::vector<double>> &coordinates, const std::vector<std::vector<double> > &centers,
+		std::vector<long int>::iterator firstIndex, std::vector<long int>::iterator lastIndex,
+		const DenseVector<double> &nodeWeights, const DenseVector<long int> &previousAssignment, const std::vector<long int> &blockSizes, const SpatialCell &boundingBox,
 		std::vector<double> &upperBoundOwnCenter, std::vector<double> &lowerBoundNextCenter, std::vector<double> &influence, Settings settings);
-template DenseVector<int> assignBlocks(const std::vector<DenseVector<double> >& coordinates, const std::vector<std::vector<double> >& centers);
+template DenseVector<long int> assignBlocks(const std::vector<DenseVector<double> >& coordinates, const std::vector<std::vector<double> >& centers);
 
 }
+
 } /* namespace ITI */

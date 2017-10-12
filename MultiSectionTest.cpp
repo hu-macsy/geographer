@@ -24,8 +24,6 @@
 #include "AuxiliaryFunctions.h"
 #include "MultiSection.h"
 
-typedef double ValueType;
-typedef int IndexType;
 
 using namespace scai;
 
@@ -252,7 +250,7 @@ TEST_F(MultiSectionTest, test1DPartitionGreedy){
     {
         scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
         srand(time(NULL));
-        for(int i=0; i<localN; i++){
+        for(IndexType i=0; i<localN; i++){
             //localPart[i] = 1;
             localPart[i] = rand()%4*comm->getRank()+2;
             origTotalWeight += localPart[i];
@@ -273,13 +271,13 @@ TEST_F(MultiSectionTest, test1DPartitionGreedy){
     std::shared_ptr<rectCell<IndexType,ValueType>> root( new rectCell<IndexType,ValueType>(bBox) );
 
     // the 1D partition for all dimensions
-    for( int dimensionToPartition=0; dimensionToPartition<dim; dimensionToPartition++){
+    for( IndexType dimensionToPartition=0; dimensionToPartition<dim; dimensionToPartition++){
         std::vector<IndexType> dim2proj = {dimensionToPartition};
         
         // get the projection in one dimension
         std::vector<std::vector<ValueType>> projection = MultiSection<IndexType, ValueType>::projection( nodeWeights, root, dim2proj, sideLen, settings);
 
-        for( int proj=0; proj<projection.size(); proj++){
+        for( IndexType proj=0; proj<projection.size(); proj++){
             std::vector<ValueType> weightPerPart;
             std::vector<IndexType> part1D;
             std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DGreedy( projection[proj],  k, settings);
@@ -636,8 +634,8 @@ TEST_F(MultiSectionTest, testRectTree){
     int numOfPointsIn_r4 =0;
     int numOfPointsIn_r6 =0;
     int numOfPointsNotInAnyRect = 0;
-    for( int x=0; x<=100; x++){
-        for(int y=0; y<=100; y++){
+    for( IndexType x=0; x<=100; x++){
+        for(IndexType y=0; y<=100; y++){
             point[0]=x;
             point[1]=y;
             
@@ -877,9 +875,9 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
     }
     
     int p=0;
-    for(int x=0; x<=maxCoords[0]; x=x+1){
-        for(int y=0; y<=maxCoords[1]; y=y+1){
-            for(int z=0; z<=maxCoords[2]; z=z+1){
+    for(IndexType x=0; x<=maxCoords[0]; x=x+1){
+        for(IndexType y=0; y<=maxCoords[1]; y=y+1){
+            for(IndexType z=0; z<=maxCoords[2]; z=z+1){
                 coordinates[0][p] = x;
                 coordinates[1][p] = y;
                 coordinates[2][p] = z;
@@ -1127,7 +1125,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
     for(int r=0; r<settings.numBlocks; r++){
         struct rectangle thisRectangle = rectangles[r]->getRect();
         
-        ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( scaledCoords, nodeWeights, thisRectangle, scaledMax, settings);
+        ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight<IndexType>( scaledCoords, nodeWeights, thisRectangle, scaledMax, settings);
         /*
         //re-scale rectangle
         for (IndexType d=0; d<dimensions; d++) {
@@ -1212,8 +1210,8 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
         coordinates[i] = static_cast<ValueType>( 0 );
     }
     int p=0;
-    for(int i=0; i<=maxCoord[0]; i++){
-        for(int j=0; j<=maxCoord[1]; j++){  
+    for(IndexType i=0; i<=maxCoord[0]; i++){
+        for(IndexType j=0; j<=maxCoord[1]; j++){  
             coordinates[0][p] = i;
             coordinates[1][p] = j;
             ++p;
@@ -1378,9 +1376,9 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
         coordinates[i] = static_cast<ValueType>( 0 );
     }
     int p=0;
-    for(int x=0; x<=maxCoord[0]; x++){
-        for(int y=0; y<=maxCoord[1]; y++){
-            for(int z=0; z<=maxCoord[2]; z++){
+    for(IndexType x=0; x<=maxCoord[0]; x++){
+        for(IndexType y=0; y<=maxCoord[1]; y++){
+            for(IndexType z=0; z<=maxCoord[2]; z++){
                 coordinates[0][p] = x;
                 coordinates[1][p] = y;
                 coordinates[2][p] = z;

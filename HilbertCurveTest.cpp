@@ -23,8 +23,6 @@
 #include "MeshGenerator.h"
 #include "FileIO.h"
 
-typedef double ValueType;
-typedef int IndexType;
 
 using namespace scai;
 

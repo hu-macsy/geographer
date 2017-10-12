@@ -499,7 +499,7 @@ IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM)
 /** Compute maximum communication= max degree of the block graph, and total communication= sum of all edges
  */
 template<typename IndexType, typename ValueType>
-std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const int k){
+std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k){
     
     scai::lama::CSRSparseMatrix<ValueType> blockGraph = getBlockGraph( adjM, part, k);
     
@@ -673,7 +673,7 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
  * with size k*k and [i,j]= i*k+j.
  */
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const int k) {
+scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k) {
     SCAI_REGION("ParcoRepart.getBlockGraph");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -837,20 +837,20 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueTy
 //-----------------------------------------------------------------------------------
 
 
-template int getFarthestLocalNode(const CSRSparseMatrix<double> graph, std::vector<int> seedNodes);
-template double computeCut(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, bool weighted);
-template double computeImbalance(const DenseVector<int> &part, int k, const DenseVector<double> &nodeWeights);
-template scai::dmemo::Halo buildNeighborHalo<int,double>(const CSRSparseMatrix<double> &input);
-template bool hasNonLocalNeighbors(const CSRSparseMatrix<double> &input, int globalID);
-template std::vector<int> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<double>& input);
-template std::vector<int> nonLocalNeighbors(const CSRSparseMatrix<double>& input);
-template DenseVector<int> getBorderNodes( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part);
-template std::pair<std::vector<int>,std::vector<int>> getNumBorderInnerNodes( const CSRSparseMatrix<double> &adjM, const DenseVector<int> &part);
-template std::vector<std::vector<int>> getLocalBlockGraphEdges( const scai::lama::CSRSparseMatrix<double> &adjM, const scai::lama::DenseVector<int> &part);
-template scai::lama::CSRSparseMatrix<double> getBlockGraph( const scai::lama::CSRSparseMatrix<double> &adjM, const scai::lama::DenseVector<int> &part, const int k);
-template int getGraphMaxDegree( const scai::lama::CSRSparseMatrix<double>& adjM);
-template  std::pair<int,int> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<double>& adjM, const scai::lama::DenseVector<int> &part, const int k);
-template scai::lama::CSRSparseMatrix<double> getPEGraph<int,double>( const scai::lama::CSRSparseMatrix<double> &adjM);
+template long int getFarthestLocalNode(const CSRSparseMatrix<double> graph, std::vector<long int> seedNodes);
+template double computeCut(const CSRSparseMatrix<double> &input, const DenseVector<long int> &part, bool weighted);
+template double computeImbalance(const DenseVector<long int> &part, long int k, const DenseVector<double> &nodeWeights);
+template scai::dmemo::Halo buildNeighborHalo<long int,double>(const CSRSparseMatrix<double> &input);
+template bool hasNonLocalNeighbors(const CSRSparseMatrix<double> &input, long int globalID);
+template std::vector<long int> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<double>& input);
+template std::vector<long int> nonLocalNeighbors(const CSRSparseMatrix<double>& input);
+template DenseVector<long int> getBorderNodes( const CSRSparseMatrix<double> &adjM, const DenseVector<long int> &part);
+template std::pair<std::vector<long int>,std::vector<long int>> getNumBorderInnerNodes( const CSRSparseMatrix<double> &adjM, const DenseVector<long int> &part);
+template std::vector<std::vector<long int>> getLocalBlockGraphEdges( const scai::lama::CSRSparseMatrix<double> &adjM, const scai::lama::DenseVector<long int> &part);
+template scai::lama::CSRSparseMatrix<double> getBlockGraph( const scai::lama::CSRSparseMatrix<double> &adjM, const scai::lama::DenseVector<long int> &part, const long int k);
+template long int getGraphMaxDegree( const scai::lama::CSRSparseMatrix<double>& adjM);
+template  std::pair<long int,long int> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<double>& adjM, const scai::lama::DenseVector<long int> &part, const long int k);
+template scai::lama::CSRSparseMatrix<double> getPEGraph<long int,double>( const scai::lama::CSRSparseMatrix<double> &adjM);
 
 } /*namespace GraphUtils*/
 

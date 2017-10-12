@@ -355,7 +355,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     //fill gaps in index list. To avoid redistribution, we assign a block distribution and live with the implicit reindexing
     scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
     DenseVector<IndexType> distPreserved(blockDist, preserved);
-    DenseVector<IndexType> blockFineToCoarse = computeGlobalPrefixSum(distPreserved, -1);
+    DenseVector<IndexType> blockFineToCoarse = computeGlobalPrefixSum(distPreserved, IndexType(-1) );
     const IndexType newGlobalN = blockFineToCoarse.max().Scalar::getValue<IndexType>() + 1;
     fineToCoarse = DenseVector<IndexType>(distPtr, blockFineToCoarse.getLocalValues());
     const IndexType newLocalN = preserved.sum();
@@ -800,7 +800,7 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
     // [i][j] is in position: i*sideLen + j
     // [i][j][k] is in: i*sideLen*sideLen + j*sideLen + k
     
-    scai::hmemo::HArray<IndexType> density( cubeSize, 0);
+    scai::hmemo::HArray<IndexType> density( cubeSize, IndexType(0) );
 
     // initialize pixelGraph
     scai::hmemo::HArray<IndexType> pixelIA;
@@ -1047,6 +1047,9 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
 }
 //---------------------------------------------------------------------------------------
 
+template class MultiLevel<long int, double>;
+
+/*
 template DenseVector<IndexType> MultiLevel<int, double>::multiLevelStep(CSRSparseMatrix<double> &input, DenseVector<int> &part, DenseVector<double> &nodeWeights, std::vector<DenseVector<double>> &coordinates, const Halo& halo, Settings settings);
 
 template std::vector<std::pair<int,int>> MultiLevel<int, double>::maxLocalMatching(const scai::lama::CSRSparseMatrix<double>& graph, const DenseVector<double> &nodeWeights);
@@ -1056,5 +1059,5 @@ template void MultiLevel<int, double>::coarsen(const CSRSparseMatrix<double>& in
 template DenseVector<int> MultiLevel<int, double>::computeGlobalPrefixSum(const DenseVector<int> &input, int offset);
 
 template scai::lama::CSRSparseMatrix<double> MultiLevel<int, double>::pixeledCoarsen (const CSRSparseMatrix<double>& adjM, const std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, Settings settings);
-    
+*/
 } // namespace ITI

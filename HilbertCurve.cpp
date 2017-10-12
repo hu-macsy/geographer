@@ -7,13 +7,6 @@
 
 #include "HilbertCurve.h"
 
-
-/* 22.01.17
- * adding new version of getHilbertIndex.
- * keep the older versions for a while mainly for testing speed
- */
-
-
 namespace ITI{
 
 template<typename IndexType, typename ValueType>
@@ -263,6 +256,9 @@ DenseVector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point(
 
 //-------------------------------------------------------------------------------------------------
 
+template class HilbertCurve<long int, double>;
+
+/*
 template double HilbertCurve<int, double>::getHilbertIndex(double const * point, int dimensions, int recursionDepth, const std::vector<double> &minCoords, const std::vector<double> &maxCoords);
 
 
@@ -270,9 +266,9 @@ template double HilbertCurve<int, double>::getHilbertIndex2D(double const * poin
 
 template double HilbertCurve<int, double>::getHilbertIndex3D(double const * point, int dimensions, int recursionDepth, const std::vector<double> &minCoords, const std::vector<double> &maxCoords);
 
-
 template DenseVector<double> HilbertCurve<int, double>::Hilbert2DIndex2Point(double index, int level);
 
 template DenseVector<double> HilbertCurve<int, double>::Hilbert3DIndex2Point(double index, int level);
+*/
 
 } //namespace ITI

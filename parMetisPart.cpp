@@ -27,9 +27,6 @@
 #include <parmetis.h>
 
 
-typedef double ValueType;
-typedef int IndexType;
-
 namespace ITI {
 std::istream& operator>>(std::istream& in, Format& format)
 {
@@ -98,7 +95,7 @@ int main(int argc, char** argv) {
 		("numY", value<IndexType>(&settings.numY), "Number of points in y dimension of generated graph")
 		("numZ", value<IndexType>(&settings.numZ), "Number of points in z dimension of generated graph")        
         
-		("dimensions", value<int>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
+		("dimensions", value<IndexType>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 		("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
         ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
         ("geom", "0: use of parmetisKway (no coordinates), 1: use of ParMetisGeomKway. Default is 1.")

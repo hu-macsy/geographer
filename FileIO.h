@@ -15,9 +15,7 @@
 #include <boost/lexical_cast.hpp>
 
 #include "quadtree/QuadTreeCartesianEuclid.h"
-
-using scai::lama::CSRSparseMatrix;
-using scai::lama::DenseVector;
+#include "Settings.h"
 
 #include <vector>
 #include <set>
@@ -25,6 +23,10 @@ using scai::lama::DenseVector;
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 #define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
+
+
+using scai::lama::CSRSparseMatrix;
+using scai::lama::DenseVector;
 
 namespace ITI {
     
@@ -40,9 +42,7 @@ namespace ITI {
          *                            the dimension d. Then next N*d lines contain the coordinates
          *                            for the poitns: every d lines are the coordinates for a point.
         */
-	enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5, BINARY = 6};
-	
-	
+
         
 template <typename IndexType, typename ValueType>
 class FileIO {
