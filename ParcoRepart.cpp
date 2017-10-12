@@ -1139,27 +1139,6 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const 
 //---------------------------------------------------------------------------------------
 
 //to force instantiation
+template class ParcoRepart<IndexType, ValueType>;
 
-
-template class ParcoRepart<long int, double>;
-
-/*
-template DenseVector<int> ParcoRepart<int, double>::partitionGraph( CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, struct Settings, struct Metrics& metrics);
-template DenseVector<long int> ParcoRepart<long int, double>::partitionGraph( CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, struct Settings, struct Metrics& metrics);
-
-template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings, struct Metrics& metrics);
-template DenseVector<int> ParcoRepart<int, double>::partitionGraph(CSRSparseMatrix<double> &input, std::vector<DenseVector<double>> &coordinates, struct Settings, struct Metrics& metrics);
-
-template DenseVector<int> ParcoRepart<int, double>::hilbertPartition(const std::vector<DenseVector<double>> &coordinates, DenseVector<double> &nodeWeights, Settings settings);
-    
-template DenseVector<int> ParcoRepart<int, double>::pixelPartition(const std::vector<DenseVector<double>> &coordinates, Settings settings);
-
-template void ParcoRepart<int, double>::checkLocalDegreeSymmetry(const CSRSparseMatrix<double> &input);
-
-template std::vector< std::vector<int>>  ParcoRepart<int, double>::getGraphEdgeColoring_local( CSRSparseMatrix<double> &adjM, int& colors);
-
-template std::vector<DenseVector<int>> ParcoRepart<int, double>::getCommunicationPairs_local( CSRSparseMatrix<double> &adjM);
-
-template std::vector<int> ParcoRepart<int, double>::neighbourPixels(const int thisPixel, const int sideLen, const int dimension);
-*/
 }

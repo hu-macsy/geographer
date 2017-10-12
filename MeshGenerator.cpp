@@ -917,8 +917,9 @@ void MeshGenerator<IndexType, ValueType>::graphFromQuadtree(CSRSparseMatrix<Valu
 
 	// copy from vector to DenseVector
 	for(int d=0; d<dimension; d++){
-		SCAI_REGION("MeshGenerator.createQuadMesh.copyToDenseVector")
-		coords[d] = DenseVector<ValueType>(n, coordsV[d].data());
+		SCAI_REGION("MeshGenerator.createQuadMesh.copyToDenseVector");
+		scai::utilskernel::LArray<ValueType> localValues(n, coordsV[d].data());
+		coords[d] = DenseVector<ValueType>(localValues);
 	}
 }
 
@@ -995,25 +996,6 @@ std::tuple<IndexType, IndexType, IndexType> MeshGenerator<IndexType, ValueType>:
 */
 //-------------------------------------------------------------------------------------------------
 
-template class MeshGenerator<long int, double>;
+template class MeshGenerator<IndexType, ValueType>;
 
-/*
-template void MeshGenerator<int, double>::createStructured3DMesh(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
-
-template void MeshGenerator<int, double>::createStructured3DMesh_dist(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
-
-template void MeshGenerator<int, double>::createStructured2DMesh_dist(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
-
-template void MeshGenerator<int, double>::createRandomStructured3DMesh_dist(CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords, std::vector<double> maxCoord, std::vector<int> numPoints);
-
-template void MeshGenerator<int, double>::createQuadMesh( CSRSparseMatrix<double> &adjM, std::vector<DenseVector<double>> &coords,const int dimensions, const int numberOfPoints,  const long pointsPerArea, const double maxCoord, const int);
-
-template std::vector<DenseVector<double>> MeshGenerator<int, double>::randomPoints(int numberOfPoints, int dimensions, double maxCoord);
-
-template Scalar MeshGenerator<int, double>::dist3D(DenseVector<double> p1, DenseVector<double> p2);
-
-template double MeshGenerator<int, double>::dist3DSquared(std::tuple<int, int, int> p1, std::tuple<int, int, int> p2);
-
-//template std::tuple<IndexType, IndexType, IndexType> MeshGenerator<int, double>::index2_3DPoint(int index,  std::vector<int> numPoints);
-*/
 } //namespace ITI

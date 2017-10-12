@@ -235,14 +235,6 @@ DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructHadamardMatrix(
 	return result;
 }
 
-template class Diffusion<long int, double>;
-
-/*
-template CSRSparseMatrix<double> Diffusion<int, double>::constructLaplacian(CSRSparseMatrix<double> graph);
-template CSRSparseMatrix<double> Diffusion<int, double>::constructFJLTMatrix(double epsilon, int n, int origDimension);
-template DenseVector<double> Diffusion<int, double>::potentialsFromSource(CSRSparseMatrix<double> laplacian, DenseVector<double> nodeWeights, int source, double eps);
-template DenseMatrix<double> Diffusion<int, double>::multiplePotentials(CSRSparseMatrix<double> laplacian, DenseVector<double> nodeWeights, std::vector<int> sources, double eps);
-*/
-
+template class Diffusion<IndexType, ValueType>;
 
 } /* namespace ITI */

@@ -410,15 +410,6 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getD
 
 //---------------------------------------------------------------------------------------
 
-template class SpectralPartition<long int, double>;
+template class SpectralPartition<IndexType, ValueType>;
 
-/*
-template scai::lama::DenseVector<int> SpectralPartition<int, double>::getDegreeVector( const scai::lama::CSRSparseMatrix<double>& adjM);
-
-template scai::lama::CSRSparseMatrix<double> SpectralPartition<int, double>::getLaplacian( const scai::lama::CSRSparseMatrix<double>& adjM);
-
-template scai::lama::DenseVector<int> SpectralPartition<int, double>::getPartition(const CSRSparseMatrix<double> &adjM, const std::vector<DenseVector<double>> &coordinates, Settings settings);
-
-template scai::lama::DenseVector<double> SpectralPartition<int, double>::getFiedlerVector(const scai::lama::CSRSparseMatrix<double>& adjM, double& eigenvalue );
-*/
 };
