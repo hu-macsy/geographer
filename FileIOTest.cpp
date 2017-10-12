@@ -259,9 +259,9 @@ TEST_F(FileIOTest, testReadQuadTree){
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadGraphBinary){
-    std::string file = "trace-00008.bfg";   // trace-08: n=8993, m=13370
-    //std::string file = "Grid16x16.bfg";   // Grid16x16: n= 256, m=480
-    //std::string file = "Grid8x8.bfg";   // Grid16x16: n= 64, m=224
+    std::string file = "trace-00008.bgf";   // trace-08: n=8993, m=13370
+    //std::string file = "Grid16x16.bgf";   // Grid16x16: n= 256, m=480
+    //std::string file = "Grid8x8.bgf";   // Grid16x16: n= 64, m=224
     std::string filename= graphPath + file;
         
     scai::lama::CSRSparseMatrix<ValueType> graph;
@@ -414,7 +414,7 @@ TEST_F(FileIOTest, testWriteCoordsParallel){
 
 TEST_F(FileIOTest, testReadGraphAndCoordsBinary){
 
-    std::string fileBin = graphPath + "delaunayTest.bfg";
+    std::string fileBin = graphPath + "delaunayTest.bgf";
     std::string coordFileBin = fileBin+".xyz";
     std::string fileMetis = graphPath + "delaunayTest.graph";
     std::string coordFileMetis = fileMetis+".xyz";

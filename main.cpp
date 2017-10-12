@@ -247,7 +247,7 @@ int main(int argc, char** argv) {
     
 	std::string blockSizesFile;
 	ITI::Format coordFormat;
-        IndexType repeatTimes = 1;
+    IndexType repeatTimes = 1;
         
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -747,29 +747,8 @@ int main(int argc, char** argv) {
         
         
         std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
-        
-        metricsVec[r].finalCut = ITI::GraphUtils::computeCut(graph, partition, true);
-        metricsVec[r].finalImbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
     
-        std::tie(metricsVec[r].maxBlockGraphDegree, metricsVec[r].totalBlockGraphEdges) = ITI::GraphUtils::computeBlockGraphComm<IndexType, ValueType>( graph, partition, settings.numBlocks );
-        
-        // 2 vectors of size k
-        std::vector<IndexType> numBorderNodesPerBlock;  
-        std::vector<IndexType> numInnerNodesPerBlock;
-    
-        std::tie( numBorderNodesPerBlock, numInnerNodesPerBlock ) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition);
-        
-        metricsVec[r].maxCommVolume = *std::max_element( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end() );
-        metricsVec[r].totalCommVolume = std::accumulate( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end(), 0 );
-        
-        std::vector<ValueType> percentBorderNodesPerBlock( settings.numBlocks, 0);
-    
-        for(IndexType i=0; i<settings.numBlocks; i++){
-            percentBorderNodesPerBlock[i] = (ValueType (numBorderNodesPerBlock[i]))/(numBorderNodesPerBlock[i]+numInnerNodesPerBlock[i]);
-        }
-        
-        metricsVec[r].maxBorderNodesPercent = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
-        metricsVec[r].avgBorderNodesPercent = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(settings.numBlocks));
+        metricsVec[r].getMetrics( graph, partition, nodeWeights, settings );
         
         std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
         

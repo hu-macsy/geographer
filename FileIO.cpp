@@ -345,7 +345,7 @@ template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, Format format) {
     
         std::string ending = filename.substr( filename.size()-3,  filename.size() );
-        if( ending == "bfg" or format==Format::BINARY ){
+        if( ending == "bgf" or format==Format::BINARY ){
             return readGraphBinary( filename );
         }
         
@@ -361,9 +361,9 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
             return FileIO<IndexType, ValueType>::readGraphMatrixMarket(filename);
         }
         
-        // if file has a .bfg ending then is a binary file
+        // if file has a .bgf ending then is a binary file
         std::string ending = filename.substr( filename.size()-3,  filename.size() );
-        if( ending == "bfg" ){
+        if( ending == "bgf" ){
             return readGraphBinary( filename );
         }
         

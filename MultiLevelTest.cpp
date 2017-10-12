@@ -295,7 +295,7 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 //--------------------------------------------------------------------------------------- 
 
 TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
-    std::string file = graphPath + "trace-00008.bfg";
+    std::string file = graphPath + "trace-00008.bgf";
     std::string coordFile = graphPath + "trace-00008.graph.xyz";
     
     // kept for further checking
