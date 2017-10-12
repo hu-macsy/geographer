@@ -35,7 +35,7 @@ struct Metrics{
     
     //constructor
     //
-    //Metrics(){}
+    Metrics(){}
     
     Metrics( IndexType k) {
         timeMigrationAlgo.resize(k);
