@@ -261,9 +261,11 @@ int main(int argc, char** argv) {
     scai::hmemo::ReadAccess<IndexType> recvPartRead( recvVtx );
 
     // vtxDist is an array of size numPEs and is replicated in every processor
-    idx_t vtxDist[ size ]; 
-    for(int i=0; i<recvPartRead.size(); i++){
-        vtxDist[i]= recvPartRead[i];
+    idx_t vtxDist[ size+1 ];
+    vtxDist[0]= 0;
+ 
+    for(int i=0; i<recvPartRead.size()-1; i++){
+        vtxDist[i+1]= recvPartRead[i+1];
     }
     /*
     for(IndexType i=0; i<recvPartRead.size(); i++){
