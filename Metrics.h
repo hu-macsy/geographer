@@ -1,6 +1,7 @@
 #pragma once
 
 #include <scai/lama.hpp>
+#include "GraphUtils.h"
 
 struct Metrics{
     
@@ -107,13 +108,3 @@ struct Metrics{
         
     }
 };
-
-
-
-
-
-
-
-
-
-
