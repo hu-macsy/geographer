@@ -416,7 +416,7 @@ int main(int argc, char** argv) {
     
     //
     // convert partition to a DenseVector
-    //44
+    //
     DenseVector<IndexType> partitionKway(dist);
     for(unsigned int i=0; i<localN; i++){
         partitionKway.getLocalValues()[i] = partKway[i];
