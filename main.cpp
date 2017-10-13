@@ -741,6 +741,8 @@ int main(int argc, char** argv) {
         std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
         metricsVec[r].finalCut = ITI::GraphUtils::computeCut(graph, partition, true);
         metricsVec[r].finalImbalance = ITI::GraphUtils::computeImbalance<IndexType,ValueType>(partition, settings.numBlocks ,nodeWeights);
+        metricsVec[r].inputTime = ValueType ( comm->max(inputTime.count() ));
+        metricsVec[r].timeFinalPartition = ValueType (comm->max(partitionTime.count()));
 
         //---------------------------------------------
         //
@@ -780,8 +782,6 @@ int main(int argc, char** argv) {
         // Reporting output to std::cout
         //
         
-        metricsVec[r].inputTime = ValueType ( comm->max(inputTime.count() ));
-        metricsVec[r].timeFinalPartition = ValueType (comm->max(partitionTime.count()));
         metricsVec[r].reportTime = ValueType (comm->max(reportTime.count()));
         
         
