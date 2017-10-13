@@ -78,10 +78,10 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
         
         if( comm->getRank()==0 ){
             out << std::setprecision(2) << std::fixed;
-            out<< run << " ,       "<< thisMetric.inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << " ,  "<< timeFinal << " ,  \t   "\
-            << thisMetric.preliminaryCut << ",  "<< thisMetric.finalCut << ",  " << thisMetric.finalImbalance << " , \t "  \
-            << thisMetric.maxBlockGraphDegree << ",  " << thisMetric.totalBlockGraphEdges << " ,\t "  \
-            << thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << " , \t ";
+            out<< run << " ,       "<< thisMetric.inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << " ,  "<< timeFinal << " ,    "\
+            << thisMetric.preliminaryCut << ",  "<< thisMetric.finalCut << ",  " << thisMetric.finalImbalance << " , "  \
+            << thisMetric.maxBlockGraphDegree << ",  " << thisMetric.totalBlockGraphEdges << " ,"  \
+            << thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << " , ";
             out << std::setprecision(6) << std::fixed;
             out << thisMetric.maxBorderNodesPercent << ",  " << thisMetric.avgBorderNodesPercent \
             << std::endl;
@@ -116,14 +116,14 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
             <<  ValueType(sumSecondDistr)/numRuns<< ",  " \
             <<  ValueType(sumPrelimanry)/numRuns<< ",  " \
             <<  ValueType(sumLocalRef)/numRuns<< ",  " \
-            <<  ValueType(sumFinalTime)/numRuns<< " , \t  " \
+            <<  ValueType(sumFinalTime)/numRuns<< " ,  " \
             <<  ValueType(sumPreliminaryCut)/numRuns<< ",  " \
             <<  ValueType(sumFinalCut)/numRuns<< ",  " \
-            <<  ValueType(sumImbalace)/numRuns<< " ,\t " \
+            <<  ValueType(sumImbalace)/numRuns<< " , " \
             <<  ValueType(sumMaxBlGrDeg)/numRuns<< ",  " \
-            <<  ValueType(sumBlGrEdges)/numRuns<< " ,\t " \
+            <<  ValueType(sumBlGrEdges)/numRuns<< " , " \
             <<  ValueType(sumMaxCommVol)/numRuns<< ",  " \
-            <<  ValueType(sumtotCommVol)/numRuns<< " ,\t ";
+            <<  ValueType(sumtotCommVol)/numRuns<< " , ";
             out << std::setprecision(6) << std::fixed;
             out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
             <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
