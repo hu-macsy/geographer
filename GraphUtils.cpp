@@ -319,7 +319,6 @@ std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<Value
 	scai::hmemo::HArray<IndexType> ownIndices;
 	inputDist->getOwnedIndexes(ownIndices);
 	scai::hmemo::ReadAccess<IndexType> rIndices(ownIndices);
-	std::unordered_set<IndexType> localSet(rIndices.get(), rIndices.get()+localN);
 
 	//iterate over all nodes
 	for (IndexType localI = 0; localI < localN; localI++) {
@@ -328,7 +327,7 @@ std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<Value
 
 		//over all edges
 		for (IndexType j = beginCols; j < endCols; j++) {
-			if (localSet.count(ja[j]) == 0) {
+			if (!inputDist->isLocal(ja[j])) {
 				IndexType globalI = rIndices[localI];
 				result.push_back(globalI);
 				break;
