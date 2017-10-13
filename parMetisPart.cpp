@@ -40,12 +40,12 @@ std::istream& operator>>(std::istream& in, Format& format)
 		format = ITI::Format::ADCIRC;
 	else if (token == "OCEAN" or token == "3")
 		format = ITI::Format::OCEAN;
-        else if (token == "MATRIXMARKET" or token == "4")
+    else if (token == "MATRIXMARKET" or token == "4")
 		format = ITI::Format::MATRIXMARKET;
-        else if (token == "TEEC" or token == "5")
-                format = ITI::Format::TEEC;
-        else if (token == "BINARY" or token == "6")
-                format = ITI::Format::BINARY;                
+    else if (token == "TEEC" or token == "5")
+        format = ITI::Format::TEEC;
+    else if (token == "BINARY" or token == "6")
+        format = ITI::Format::BINARY;
 	else
 		in.setstate(std::ios_base::failbit);
 	return in;
@@ -63,12 +63,12 @@ std::ostream& operator<<(std::ostream& out, Format method)
 		token = "ADCIRC";
 	else if (method == ITI::Format::OCEAN)
 		token = "OCEAN";
-        else if (method == ITI::Format::MATRIXMARKET)
-                token = "MATRIXMARKET";  
-        else if (method == ITI::Format::TEEC)
-                token = "TEEC";
-        else if (method == ITI::Format::BINARY)
-                token == "BINARY";
+    else if (method == ITI::Format::MATRIXMARKET)
+        token = "MATRIXMARKET";
+    else if (method == ITI::Format::TEEC)
+        token = "TEEC";
+    else if (method == ITI::Format::BINARY)
+        token == "BINARY";
 	out << token;
 	return out;
 }
