@@ -1495,7 +1495,8 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
 
 	for (IndexType d = 0; d < dimension; d++) {
 		assert(vCoords[d].size() == numLeaves);
-		coords[d] = DenseVector<ValueType>(vCoords[d].size(), vCoords[d].data());
+		scai::utilskernel::LArray<ValueType> localValues(vCoords[d].size(), vCoords[d].data());
+		coords[d] = DenseVector<ValueType>(localValues);
 	}
     return matrix;
 }
@@ -1577,24 +1578,6 @@ std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::s
 }
 //-------------------------------------------------------------------------------------------------
  
- template class FileIO<long int, double>;
+ template class FileIO<IndexType, ValueType>;
 
-/*
-template void FileIO<int, double>::writeGraph (const CSRSparseMatrix<double> &adjM, const std::string filename);
-template void FileIO<int, double>::writeGraphDistributed (const CSRSparseMatrix<double> &adjM, const std::string filename);
-template void FileIO<int, double>::writeCoords (const std::vector<DenseVector<double>> &coords, const std::string filename);
-template void FileIO<int, double>::writeCoordsParallel(const std::vector<DenseVector<double>> &coords, const std::string outFilename);
-template void FileIO<int, double>::writeCoordsDistributed_2D (const std::vector<DenseVector<double>> &coords, int numPoints, const std::string filename);
-template void FileIO<int, double>::writePartitionParallel(const DenseVector<int> &part, const std::string filename);
-template CSRSparseMatrix<double> FileIO<int, double>::readGraph(const std::string filename, Format format);
-template scai::lama::CSRSparseMatrix<double> FileIO<int, double>::readGraphBinary(const std::string filename);
-template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsTEEC ( std::string filename, int numberOfCoords, int dimension, std::vector<DenseVector<double>>& nodeWeights);
-template std::vector<DenseVector<double>> FileIO<int, double>::readCoords( std::string filename, int numberOfCoords, int dimension, Format format);
-template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsBinary( std::string filename, const int numberOfPoints, const int dimension);
-template std::vector<DenseVector<double>> FileIO<int, double>::readCoordsOcean( std::string filename, int dimension );
-template CSRSparseMatrix<double>  FileIO<int, double>::readQuadTree( std::string filename, std::vector<DenseVector<double>> &coords );
-template std::pair<int, int> FileIO<int, double>::getMatrixMarketCoordsInfos(const std::string filename);
-template std::vector<int> FileIO<int, double>::readBlockSizes(const std::string filename , const int numBlocks );
-template DenseVector<int> FileIO<int, double>::readPartition(const std::string filename, int n );
-*/
 } /* namespace ITI */

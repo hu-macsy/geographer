@@ -1180,52 +1180,12 @@ std::vector<T> MultiSection<IndexType, ValueType>::indexTo3D(IndexType ind, Inde
 }
 //---------------------------------------------------------------------------------------
 
-template class MultiSection<long int , double>;
+template class MultiSection<IndexType, ValueType>;
 
-template double MultiSection<long int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<long int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
+//template double MultiSection<int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
 
-template double MultiSection<long int, double>::getRectangleWeight( const std::vector<std::vector<long int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
+//template double MultiSection<int, double>::getRectangleWeight( const std::vector<std::vector<int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
 
-template double MultiSection<long int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<double>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
+//template double MultiSection<int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<double>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
 
-
-/*
-template scai::lama::DenseVector<int> MultiSection<int, double>::getPartitionNonUniform(const scai::lama::CSRSparseMatrix<double> &input, const std::vector<scai::lama::DenseVector<double>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, struct Settings Settings );
-
-template scai::lama::DenseVector<int> MultiSection<int, double>::setPartition( std::shared_ptr<rectCell<int,double>> root, const scai::dmemo::DistributionPtr distPtr, const std::vector<std::vector<int>>& localPoints);
-
-template std::shared_ptr<rectCell<int,double>> MultiSection<int, double>::getRectangles( const scai::lama::DenseVector<double>& nodeWeights, const IndexType sideLen, Settings settings);
-
-template std::vector<std::vector<double>> MultiSection<int, double>::projection( const scai::lama::DenseVector<double>& nodeWeights, const std::shared_ptr<rectCell<int,double>> treeRoot, const std::vector<int>& dimensionToProject, const int sideLen, Settings settings);
-
-template std::shared_ptr<rectCell<int,double>> MultiSection<int, double>::getRectanglesNonUniform( const scai::lama::CSRSparseMatrix<double> &input, const std::vector<std::vector<int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const std::vector<double>& minCoords, const std::vector<double>& maxCoords, Settings settings);
-
-template std::vector<std::vector<double>> MultiSection<int, double>::projectionNonUniform( const std::vector<std::vector<int>>& coordinates, const scai::lama::DenseVector<double>& nodeWeights, const std::shared_ptr<rectCell<int,double>> treeRoot, const std::vector<int>& dimensionToProject, Settings settings);
-    
-template bool MultiSection<int, double>::inBBox( const std::vector<int>& coords, const struct rectangle& bBox);
-    
-template  std::pair<std::vector<int>,std::vector<double>> MultiSection<int, double>::partition1DGreedy( const std::vector<double>& array, const int k, Settings settings);
-
-template  std::pair<std::vector<int>,std::vector<double>> MultiSection<int, double>::partition1DOptimal( const std::vector<double>& array, const int k, Settings settings);
-
-//template std::pair<std::vector<int>, std::vector<double>> MultiSection<int, double>::partition1DMine( const std::vector<double>& nodeWeights, const int k, Settings settings);
-
-template double MultiSection<int, double>::getRectangleWeight( const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const int sideLen, Settings settings);
-
-template double MultiSection<int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
-
-template double MultiSection<int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<double>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
-
-template double MultiSection<int, double>::getRectangleWeight( const std::vector<std::vector<double>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
-
-template double MultiSection<int, double>::getRectangleWeight( const std::vector<std::vector<int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
-
-template scai::lama::CSRSparseMatrix<double> MultiSection<int, double>::getBlockGraphFromTree_local( const std::shared_ptr<rectCell<int,double>> treeRoot );
-
-template std::vector<int> MultiSection<int, double>::indexToCoords( const int ind, const int sideLen, const int dim);
-
-template bool MultiSection<int, double>::probe(const std::vector<double>& prefixSum, const int k, const double target);
-
-template std::pair<bool,std::vector<int>> MultiSection<int, double>::probeAndGetSplitters(const std::vector<double>& prefixSum, const int k, const double target);
-*/
 };

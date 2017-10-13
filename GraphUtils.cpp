@@ -836,21 +836,20 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueTy
 }
 //-----------------------------------------------------------------------------------
 
-
-template long int getFarthestLocalNode(const CSRSparseMatrix<double> graph, std::vector<long int> seedNodes);
-template double computeCut(const CSRSparseMatrix<double> &input, const DenseVector<long int> &part, bool weighted);
-template double computeImbalance(const DenseVector<long int> &part, long int k, const DenseVector<double> &nodeWeights);
-template scai::dmemo::Halo buildNeighborHalo<long int,double>(const CSRSparseMatrix<double> &input);
-template bool hasNonLocalNeighbors(const CSRSparseMatrix<double> &input, long int globalID);
-template std::vector<long int> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<double>& input);
-template std::vector<long int> nonLocalNeighbors(const CSRSparseMatrix<double>& input);
-template DenseVector<long int> getBorderNodes( const CSRSparseMatrix<double> &adjM, const DenseVector<long int> &part);
-template std::pair<std::vector<long int>,std::vector<long int>> getNumBorderInnerNodes( const CSRSparseMatrix<double> &adjM, const DenseVector<long int> &part);
-template std::vector<std::vector<long int>> getLocalBlockGraphEdges( const scai::lama::CSRSparseMatrix<double> &adjM, const scai::lama::DenseVector<long int> &part);
-template scai::lama::CSRSparseMatrix<double> getBlockGraph( const scai::lama::CSRSparseMatrix<double> &adjM, const scai::lama::DenseVector<long int> &part, const long int k);
-template long int getGraphMaxDegree( const scai::lama::CSRSparseMatrix<double>& adjM);
-template  std::pair<long int,long int> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<double>& adjM, const scai::lama::DenseVector<long int> &part, const long int k);
-template scai::lama::CSRSparseMatrix<double> getPEGraph<long int,double>( const scai::lama::CSRSparseMatrix<double> &adjM);
+template IndexType getFarthestLocalNode(const CSRSparseMatrix<ValueType> graph, std::vector<IndexType> seedNodes);
+template ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool weighted);
+template ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<ValueType> &nodeWeights);
+template scai::dmemo::Halo buildNeighborHalo<IndexType,ValueType>(const CSRSparseMatrix<ValueType> &input);
+template bool hasNonLocalNeighbors(const CSRSparseMatrix<ValueType> &input, IndexType globalID);
+template std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
+template std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
+template DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
+template std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
+template std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part);
+template scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
+template IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
+template  std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
+template scai::lama::CSRSparseMatrix<ValueType> getPEGraph<IndexType,ValueType>( const scai::lama::CSRSparseMatrix<ValueType> &adjM);
 
 } /*namespace GraphUtils*/
 

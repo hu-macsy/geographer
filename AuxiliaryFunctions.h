@@ -199,5 +199,5 @@ static std::tuple<IndexType, IndexType> index2_2DPoint(IndexType index,  std::ve
  
 }; //class aux
 
-template class aux<long int, double>;
+template class aux<IndexType, ValueType>;
 }// namespace ITI

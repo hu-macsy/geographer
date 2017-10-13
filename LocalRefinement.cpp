@@ -1240,21 +1240,6 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distancesFrom
 
 //---------------------------------------------------------------------------------------
 
-template class LocalRefinement<long int, double>;
-
-/*
-template std::vector<int> ITI::LocalRefinement<int, double>::distributedFMStep(
-    CSRSparseMatrix<double>& input, 
-    DenseVector<int>& part,
-    std::vector<int>& nodesWithNonLocalNeighbors,
-    DenseVector<double> &nodeWeights, 
-    std::vector<DenseVector<double>> &coordinates, 
-    std::vector<double> &distances,
-    DenseVector<int> &origin,
-    const std::vector<DenseVector<int>>& communicationScheme,
-    Settings settings);
-
-template std::pair<std::vector<int>, std::vector<int>> ITI::LocalRefinement<int, double>::getInterfaceNodes(const CSRSparseMatrix<double> &input, const DenseVector<int> &part, const std::vector<int>& nodesWithNonLocalNeighbors, int otherBlock, int depth);
-*/
+template class LocalRefinement<IndexType, ValueType>;
 
 } // namespace ITI

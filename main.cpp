@@ -59,7 +59,7 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
     IndexType sumtotCommVol = 0;
     ValueType sumMaxBorderNodesPerc = 0;
     ValueType sumAvgBorderNodesPerc = 0;
-                
+
     for(IndexType run=0; run<numRuns; run++){
         Metrics thisMetric = metricsVec[ run ];
         
@@ -739,6 +739,30 @@ int main(int argc, char** argv) {
         assert( coordinates[0].size() == N);
         
         std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
+        metricsVec[r].finalCut = ITI::GraphUtils::computeCut(graph, partition, true);
+        metricsVec[r].finalImbalance = ITI::GraphUtils::computeImbalance<IndexType,ValueType>(partition, settings.numBlocks ,nodeWeights);
+        metricsVec[r].inputTime = ValueType ( comm->max(inputTime.count() ));
+        metricsVec[r].timeFinalPartition = ValueType (comm->max(partitionTime.count()));
+
+        //---------------------------------------------
+        //
+        // Print some output
+        //
+        if (comm->getRank() == 0 ) {
+            for (IndexType i = 0; i < argc; i++) {
+                std::cout << std::string(argv[i]) << " ";
+            }
+            std::cout << std::endl;
+            std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
+            std::cout << " p:"<< comm->getSize() << " k:"<< settings.numBlocks;
+            auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
+            std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
+            std::cout.precision(oldprecision);
+            std::cout<< std::endl<< "\033[1;36mcut:"<< metricsVec[r].finalCut<< "   imbalance:"<< metricsVec[r].finalImbalance << std::endl;
+            std::cout<<"inputTime:" << metricsVec[r].inputTime << "   partitionTime:" << metricsVec[r].timeFinalPartition << " \033[0m" << std::endl;
+
+            metricsVec[r].print( std::cout );
+        }
                 
         //---------------------------------------------
         //
@@ -758,28 +782,11 @@ int main(int argc, char** argv) {
         // Reporting output to std::cout
         //
         
-        metricsVec[r].inputTime = ValueType ( comm->max(inputTime.count() ));
-        metricsVec[r].timeFinalPartition = ValueType (comm->max(partitionTime.count()));
         metricsVec[r].reportTime = ValueType (comm->max(reportTime.count()));
         
         
         if (comm->getRank() == 0 ) {
-            for (IndexType i = 0; i < argc; i++) {
-                std::cout << std::string(argv[i]) << " ";
-            }
-            std::cout << std::endl;
-            std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
-            std::cout << " p:"<< comm->getSize() << " k:"<< settings.numBlocks;
-            auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
-            std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
-            std::cout.precision(oldprecision);
-            /*
-            std::cout<< std::endl<< "\033[1;36mcut:"<< metricsVec[r].finalCut<< "   imbalance:"<< metricsVec[r].finalImbalance << std::endl;
-            std::cout<<"inputTime:" << metricsVec[r].inputTime << "   partitionTime:" << metricsVec[r].timeFinalPartition  <<"   reportTime:"<< metricsVec[r].reportTime << " \033[0m" << std::endl; 
-            */
-            
             metricsVec[r].print( std::cout );            
-            
         }
         
         comm->synchronize();

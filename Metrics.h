@@ -67,7 +67,7 @@ struct Metrics{
         ValueType timeLocalRef = timeFinalPartition - maxTimePreliminary;
         
 //        if( comm->getRank()==0 ){
-            out << "# times: migrAlgo , 1redistr , k-means , 2redistr , total  , metrics:  cut, imbalance  ,  BlGr maxDeg, edges  ,  CommVol max, total  ,  BorNodes max, avg  " << std::endl;        
+            out << "# times: input, migrAlgo , 1redistr , k-means , 2redistr , prelim, localRef, total  , metrics:  prel cut, cut, imbalance  ,  BlGr maxDeg, edges  ,  CommVol max, total  ,  BorNodes max, avg  " << std::endl;
         
             out << std::setprecision(3) << std::fixed;
             out<<  "           "<< inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << " ,  "<< timeFinalPartition << " ,  \t   "\
