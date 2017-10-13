@@ -759,7 +759,7 @@ int main(int argc, char** argv) {
             std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
             std::cout.precision(oldprecision);
             std::cout<< std::endl<< "\033[1;36mcut:"<< metricsVec[r].finalCut<< "   imbalance:"<< metricsVec[r].finalImbalance << std::endl;
-            std::cout<<"inputTime:" << metricsVec[r].inputTime << "   partitionTime:" << metricsVec[r].timeFinalPartition  <<"   reportTime:"<< metricsVec[r].reportTime << " \033[0m" << std::endl;
+            std::cout<<"inputTime:" << metricsVec[r].inputTime << "   partitionTime:" << metricsVec[r].timeFinalPartition << " \033[0m" << std::endl;
 
             metricsVec[r].print( std::cout );
         }
