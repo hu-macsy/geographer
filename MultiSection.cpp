@@ -1182,10 +1182,10 @@ std::vector<T> MultiSection<IndexType, ValueType>::indexTo3D(IndexType ind, Inde
 
 template class MultiSection<IndexType, ValueType>;
 
-template double MultiSection<int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
+template double MultiSection<long int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<long int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
 
-template double MultiSection<int, double>::getRectangleWeight( const std::vector<std::vector<int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
+template double MultiSection<long int, double>::getRectangleWeight( const std::vector<std::vector<long int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
 
-template double MultiSection<int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<double>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
+template double MultiSection<long int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<double>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
 
 };
