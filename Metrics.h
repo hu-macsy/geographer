@@ -97,15 +97,22 @@ struct Metrics{
         maxBlockGraphDegree = -1;
         totalBlockGraphEdges = -1;
 
+        // communication volume
+        std::vector<IndexType> commVolume = ITI::GraphUtils::computeCommVolume( graph, partition );
+        
+        maxCommVolume = *std::max_element( commVolume.begin(), commVolume.end() );
+        totalCommVolume = std::accumulate( commVolume.begin(), commVolume.end(), 0 );
+        
         // 2 vectors of size k
         std::vector<IndexType> numBorderNodesPerBlock;  
         std::vector<IndexType> numInnerNodesPerBlock;
         
         std::tie( numBorderNodesPerBlock, numInnerNodesPerBlock ) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition);
         
-        maxCommVolume = *std::max_element( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end() );
-        totalCommVolume = std::accumulate( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end(), 0 );
-                
+        //TODO: are num of boundary nodes needed ????         
+        //maxBoundaryNodes = *std::max_element( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end() );
+        //totalBoundaryNodes = std::accumulate( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end(), 0 );
+        
         std::vector<ValueType> percentBorderNodesPerBlock( settings.numBlocks, 0);
     
         for(IndexType i=0; i<settings.numBlocks; i++){
