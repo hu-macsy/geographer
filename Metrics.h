@@ -29,6 +29,8 @@ struct Metrics{
     IndexType totalBlockGraphEdges= 0;
     IndexType maxCommVolume= 0;
     IndexType totalCommVolume= 0;
+    IndexType maxBoundaryNodes= 0;
+    IndexType totalBoundaryNodes= 0;
     ValueType maxBorderNodesPercent= 0;
     ValueType avgBorderNodesPercent= 0;
 
@@ -71,12 +73,12 @@ struct Metrics{
         }else if (maxBlockGraphDegree==0 ){
             out << " ### WARNING: possibly not all metrics calculated ###" << std::endl;
         }
-        out << "# times: input, migrAlgo , 1redistr , k-means , 2redistr , prelim, localRef, total  , metrics:  prel cut, cut, imbalance  ,  BlGr maxDeg, edges  ,  CommVol max, total  ,  BorNodes max, avg  " << std::endl;
+        out << "# times: input, migrAlgo , 1redistr , k-means , 2redistr , prelim, localRef, total  , metrics:  prel cut, cut, imbalance  ,  maxBnd, totalBnd  ,  maxCommVol , totalCommVol  ,  BorNodes max, avg  " << std::endl;
         
         out << std::setprecision(3) << std::fixed;
-        out<<  "           "<< inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << " ,  "<< timeFinalPartition << " ,   "\
+        out<<  "         "<< inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << " ,  "<< timeFinalPartition << " ,  \t "\
         << preliminaryCut << ",  "<< finalCut << ",  " << finalImbalance << " , "  \
-        << maxBlockGraphDegree << ",  " << totalBlockGraphEdges << " , "  \
+        << maxBoundaryNodes << ",  " << totalBoundaryNodes << " , "  \
         << maxCommVolume << ",  " << totalCommVolume << " , ";
         out << std::setprecision(6) << std::fixed;
         out << maxBorderNodesPercent << ",  " << avgBorderNodesPercent \
@@ -110,8 +112,8 @@ struct Metrics{
         std::tie( numBorderNodesPerBlock, numInnerNodesPerBlock ) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition);
         
         //TODO: are num of boundary nodes needed ????         
-        //maxBoundaryNodes = *std::max_element( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end() );
-        //totalBoundaryNodes = std::accumulate( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end(), 0 );
+        maxBoundaryNodes = *std::max_element( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end() );
+        totalBoundaryNodes = std::accumulate( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end(), 0 );
         
         std::vector<ValueType> percentBorderNodesPerBlock( settings.numBlocks, 0);
     
