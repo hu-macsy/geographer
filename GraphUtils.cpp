@@ -88,10 +88,17 @@ ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<
 	const Scalar maxBlockScalar = part.max();
 	const IndexType maxBlockID = maxBlockScalar.getValue<IndexType>();
 
+    scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
+    
+     
+	if( comm->getRank()==0 ){
+        std::cout<<"Computing the cut..." << std::endl;
+    }
+    
 	if (partDist->getLocalSize() != localN) {
 		throw std::runtime_error("partition has " + std::to_string(partDist->getLocalSize()) + " local values, but matrix has " + std::to_string(localN));
 	}
-
+	
 	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
 	scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
@@ -153,7 +160,12 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 	const IndexType localN = part.getDistributionPtr()->getLocalSize();
 	const IndexType weightsSize = nodeWeights.getDistributionPtr()->getGlobalSize();
 	const bool weighted = (weightsSize != 0);
-
+    scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
+    
+    if( comm->getRank()==0 ){
+        std::cout<<"Computing the imbalance..." << std::endl;
+    }
+    
 	ValueType minWeight, maxWeight;
 	if (weighted) {
 		assert(weightsSize == globalN);
@@ -198,7 +210,7 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 	}
 
 	ValueType optSize;
-	scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
+	
 	if (weighted) {
 		//get global weight sum
 		weightSum = comm->sum(weightSum);
@@ -430,6 +442,11 @@ template<typename IndexType, typename ValueType>
 std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    
+    if( comm->getRank()==0 ){
+        std::cout<<"Computing the border and inner nodes..." << std::endl;
+    }
+    
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
     const IndexType localN = dist->getLocalSize();
     const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
@@ -492,6 +509,79 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes(
     
     return std::make_pair( borderNodesPerBlock, innerNodesPerBlock );
 }
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part) {
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    
+    if( comm->getRank()==0 ){
+        std::cout<<"Computing the communication volume ..." << std::endl;
+    }
+    
+    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const IndexType localN = dist->getLocalSize();
+    const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
+
+    IndexType globalN = dist->getGlobalSize();
+    IndexType max = part.max().Scalar::getValue<IndexType>();
+    
+    // the communication volume per block for this PE
+    std::vector<IndexType> commVolumePerBlock( max+1, 0 );
+    
+    
+    if( !dist->isEqual( part.getDistribution() ) ){
+        std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and partition dist: "<< part.getDistribution() << std::endl;
+        throw std::runtime_error( "Distributions: should (?) be equal.");
+    }
+
+    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
+
+	scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
+	scai::utilskernel::LArray<IndexType> haloData;
+	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
+
+    for(IndexType i=0; i<localN; i++){    // for all local nodes
+    	IndexType thisBlock = localPart[i];
+        SCAI_ASSERT_LE_ERROR( thisBlock , max , "Wrong block id." );
+        bool isBorderNode = false;
+        std::set<IndexType> allNeighborBlocks;
+        
+    	for(IndexType j=ia[i]; j<ia[i+1]; j++){                   // for all the edges of a node
+    		IndexType neighbor = ja[j];
+    		IndexType neighborBlock;
+			if (dist->isLocal(neighbor)) {
+				neighborBlock = partAccess[dist->global2local(neighbor)];
+			} else {
+				neighborBlock = haloData[partHalo.global2halo(neighbor)];
+			}
+			SCAI_ASSERT_LE_ERROR( neighborBlock , max , "Wrong block id." );
+            
+            // found a neighbor that belongs to a different block
+			if (thisBlock != neighborBlock) {
+                
+                typename std::set<IndexType>::iterator it = allNeighborBlocks.find( neighborBlock );
+                
+                if( it==allNeighborBlocks.end() ){   // this block has not been encountered before
+                    allNeighborBlocks.insert( neighborBlock );
+                    commVolumePerBlock[thisBlock]++;   //increase volume
+                }else{
+                    // if neighnor belongs to a different block but we have already found another neighbor 
+                    //  from that block, then do not increase volume
+                }
+			}
+    	}
+    }
+
+    // sum local volume
+    comm->sumImpl( commVolumePerBlock.data(), commVolumePerBlock.data(), max+1, scai::common::TypeTraits<IndexType>::stype); 
+    
+    return commVolumePerBlock;
+}
 
 //---------------------------------------------------------------------------------------
 
@@ -532,7 +622,13 @@ IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM)
  */
 template<typename IndexType, typename ValueType>
 std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k){
+
+    scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
     
+    if( comm->getRank()==0 ){
+        std::cout<<"Computing the block graph communication..." << std::endl;
+    }
+    //TODO: getting the block graph probably fails for p>5000, 
     scai::lama::CSRSparseMatrix<ValueType> blockGraph = getBlockGraph( adjM, part, k);
     
     IndexType maxComm = getGraphMaxDegree<IndexType,ValueType>( blockGraph );
@@ -878,6 +974,7 @@ template std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMat
 template std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
 template DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
 template std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
+template std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
 template std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part);
 template scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 template IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM);

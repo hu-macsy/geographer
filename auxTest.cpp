@@ -245,6 +245,50 @@ TEST_F (auxTest,testGetBorderAndInnerNodes){
 }
 //-----------------------------------------------------------------
 
+TEST_F (auxTest,testComputeCommVolume){
+ 
+    std::string file = graphPath + "Grid32x32";
+    IndexType dimensions = 2;
+    IndexType N;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    IndexType k =comm->getSize();
+
+    // read graph and coords
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    N= graph.getNumRows();
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+    settings.dimensions = dimensions;
+    settings.minGainForNextRound = 10;
+    settings.storeInfo = false;
+    
+    struct Metrics metrics(settings.numBlocks);
+    
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
+    
+    std::vector<IndexType> commVolume = ITI::GraphUtils::computeCommVolume( graph, partition );
+        
+    std::vector<IndexType> numBorderNodes;
+    std::vector<IndexType> numInnerNodes;
+    
+    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition);
+    
+    SCAI_ASSERT_EQ_ERROR( commVolume.size(), numBorderNodes.size(), "size mismatch");
+    
+    for(int i=0; i< commVolume.size(); i++){
+        if( k<20){
+            PRINT0("block " << i << ": commVol= " << commVolume[i] << " , boundaryNodes= "<< numBorderNodes[i]);
+        }
+        SCAI_ASSERT_LE_ERROR( numBorderNodes[i], commVolume[i], "Communication volume must be less than boundary nodes")
+    }
+    
+}
+//-----------------------------------------------------------------
+ 
 TEST_F (auxTest,testGraphMaxDegree){
     
     const IndexType N = 1000;

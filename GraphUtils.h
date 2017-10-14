@@ -86,6 +86,13 @@ scai::lama::DenseVector<IndexType> getBorderNodes( const scai::lama::CSRSparseMa
 template<typename IndexType, typename ValueType>
 std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part);
 
+/* Computes the communication volume for every block. 
+ * TODO: Should the result is gathered in the root PE and not be replicated?
+ * */
+template<typename IndexType, typename ValueType>
+std::vector<IndexType> computeCommVolume( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part /*, const IndexType root*/ );
+
+
 /** Returns the edges of the block graph only for the local part. Eg. if blocks 1 and 2 are local
  * in this processor it finds the edge (1,2) ( and the edge (2,1)).
  * Also if the other endpoint is in another processor it finds this edge: block 1 is local, it

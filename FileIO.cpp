@@ -363,7 +363,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         
         // if file has a .bgf ending then is a binary file
         std::string ending = filename.substr( filename.size()-3,  filename.size() );
-        if( ending == "bgf" ){
+        if( ending == "bgf" or format==Format::BINARY){
             return readGraphBinary( filename );
         }
         

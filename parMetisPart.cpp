@@ -22,6 +22,7 @@
 #include "FileIO.h"
 #include "GraphUtils.h"
 #include "Settings.h"
+#include "Metrics.h"
 #include "MeshGenerator.h"
 
 #include <parmetis.h>
@@ -99,6 +100,7 @@ int main(int argc, char** argv) {
 		("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
         ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
         ("geom", "0: use of parmetisKway (no coordinates), 1: use of ParMetisGeomKway. Default is 1.")
+        ("outFile", value<std::string>(&settings.outFile), "write result partition into file")
 		;
         
 	variables_map vm;
@@ -342,7 +344,7 @@ int main(int argc, char** argv) {
     if( !vm.count("numBlocks") ){
         settings.numBlocks = comm->getSize();
     }
-    idx_t nparts= settings.numBlocks;;
+    idx_t nparts= settings.numBlocks;
   
     // tpwgts: array of size ncons*nparts, that is used to specify the fraction of 
     // vertex weight that should be distributed to each sub-domain for each balance
@@ -433,28 +435,16 @@ int main(int argc, char** argv) {
     // Get metrics
     //
     
-    IndexType cutKway = ITI::GraphUtils::computeCut(graph, partitionKway, true);
-    ValueType imbalanceKway = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partitionKway, nparts );
-    IndexType maxComm, totalComm;
-    std::tie(maxComm, totalComm) = ITI::GraphUtils::computeBlockGraphComm<IndexType, ValueType>( graph, partitionKway, nparts);
-    // 2 vectors of size k
-    std::vector<IndexType> numBorderNodesPerBlock;  
-    std::vector<IndexType> numInnerNodesPerBlock;
+    // the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
+    struct Metrics metrics(1);
     
-    std::tie( numBorderNodesPerBlock, numInnerNodesPerBlock ) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partitionKway);
+    metrics.timeFinalPartition = partKwayTime;
     
-    IndexType maxCommVolume = *std::max_element( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end() );
-    IndexType totalCommVolume = std::accumulate( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end(), 0 );
+    // uniform node weights
+    scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
+    metrics.getMetrics( graph, partitionKway, nodeWeights, settings );
     
-    std::vector<ValueType> percentBorderNodesPerBlock( nparts, 0);
-    
-    for(IndexType i=0; i<nparts; i++){
-        percentBorderNodesPerBlock[i] = (ValueType (numBorderNodesPerBlock[i]))/(numBorderNodesPerBlock[i]+numInnerNodesPerBlock[i]);
-    }
-    
-    ValueType maxBorderNodesPercent = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
-    ValueType avgBorderNodesPercent = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(nparts));
-    
+        
     //---------------------------------------------------------------
     //
     // Reporting output to std::cout
@@ -480,11 +470,26 @@ int main(int argc, char** argv) {
         }else{
             std::cout << std::endl << "ParMETIS_V3_PartKway: " << std::endl;
         }
-        std::cout <<"time ,  cut, imbalance , \t maxBlGrDeg, BlGrEdges, \t maxCommVol, totalCommVolume, \t  maxBorderNodesPercent, avgBorderNodesPercent " << std::endl;
-        std::cout << std::setprecision(3) << std::fixed;
-        std::cout<< partKwayTime << " ,  " << cutKway << " ,  " << imbalanceKway << " ,\t\t  " << maxComm << " ,  " << totalComm << " , \t\t" << maxCommVolume << " ,  " << totalCommVolume  << " , \t\t ";
-        std::cout << std::setprecision(6) << std::fixed;
-        std::cout << maxBorderNodesPercent  << " ,  " <<  avgBorderNodesPercent <<  " \033[0m" << std::endl;
+        std::cout<<  " \033[0m" << std::endl;
+
+        metrics.print( std::cout );
+        
+        // write in a file
+        if( settings.outFile!="-" ){
+            std::ofstream outF( settings.outFile, std::ios::out);
+            if(outF.is_open()){
+                if( vm.count("generate") ){
+                    outF << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
+                }else{
+                    outF << std::endl << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
+                }
+                
+                metrics.print( outF ); 
+                std::cout<< "Output information written to file " << settings.outFile << std::endl;
+            }else{
+                std::cout<< "Could not open file " << settings.outFile << " informations not stored"<< std::endl;
+            }       
+        }
     }
     
     // the code below writes the output coordinates in one file per processor for visualization purposes.
