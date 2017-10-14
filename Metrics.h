@@ -67,6 +67,7 @@ struct Metrics{
         ValueType timeLocalRef = timeFinalPartition - maxTimePreliminary;
         
 //        if( comm->getRank()==0 ){
+            out << " ### WARNING: setting dummy value -1 for expensive (and not used) metrics max and total blockGraphDegree ###" << std::endl;
             out << "# times: input, migrAlgo , 1redistr , k-means , 2redistr , prelim, localRef, total  , metrics:  prel cut, cut, imbalance  ,  BlGr maxDeg, edges  ,  CommVol max, total  ,  BorNodes max, avg  " << std::endl;
         
             out << std::setprecision(3) << std::fixed;
@@ -86,8 +87,13 @@ struct Metrics{
         finalCut = ITI::GraphUtils::computeCut(graph, partition, true);
         finalImbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
         
-        std::tie(maxBlockGraphDegree, totalBlockGraphEdges) = ITI::GraphUtils::computeBlockGraphComm<IndexType, ValueType>( graph, partition, settings.numBlocks );
+        //TODO: getting the block graph probably fails for p>5000, removed this metric since we do not use it so much
+        //std::tie(maxBlockGraphDegree, totalBlockGraphEdges) = ITI::GraphUtils::computeBlockGraphComm<IndexType, ValueType>( graph, partition, settings.numBlocks );
         
+        //set to dummy value -1
+        maxBlockGraphDegree = -1;
+        totalBlockGraphEdges = -1;
+
         // 2 vectors of size k
         std::vector<IndexType> numBorderNodesPerBlock;  
         std::vector<IndexType> numInnerNodesPerBlock;
