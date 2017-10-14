@@ -7,7 +7,6 @@
 
 #include <assert.h>
 #include <queue>
-#include <set>
 #include <unordered_set>
 
 #include <scai/hmemo/ReadAccess.hpp>
@@ -299,6 +298,40 @@ inline bool hasNonLocalNeighbors(const CSRSparseMatrix<ValueType> &input, IndexT
 	return false;
 }
 //---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input, const std::set<IndexType>& candidates) {
+    SCAI_REGION( "ParcoRepart.getNodesWithNonLocalNeighbors_cache" );
+    std::vector<IndexType> result;
+    const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+
+    const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
+    const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+    const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+    const IndexType localN = inputDist->getLocalSize();
+
+    for (IndexType globalI : candidates) {
+        const IndexType localI = inputDist->global2local(globalI);
+        if (localI == nIndex) {
+            continue;
+        }
+        const IndexType beginCols = ia[localI];
+        const IndexType endCols = ia[localI+1];
+
+        //over all edges
+        for (IndexType j = beginCols; j < endCols; j++) {
+            if (inputDist->isLocal(ja[j]) == 0) {
+                result.push_back(globalI);
+                break;
+            }
+        }
+    }
+
+    //nodes should have been sorted to begin with, so a subset of them will be sorted as well
+    std::sort(result.begin(), result.end());
+    return result;
+}
+
 
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input) {
@@ -841,6 +874,7 @@ template ValueType computeImbalance(const DenseVector<IndexType> &part, IndexTyp
 template scai::dmemo::Halo buildNeighborHalo<IndexType,ValueType>(const CSRSparseMatrix<ValueType> &input);
 template bool hasNonLocalNeighbors(const CSRSparseMatrix<ValueType> &input, IndexType globalID);
 template std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
+template std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input, const std::set<IndexType>& candidates);
 template std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
 template DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
 template std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
