@@ -347,6 +347,9 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 					}
 				}
 
+				std::set<IndexType> borderCandidates(nodesWithNonLocalNeighbors.begin(), nodesWithNonLocalNeighbors.end());
+				std::vector<IndexType> deletedNodes;
+
 				/**
 				 * remove nodes
 				 */
@@ -355,6 +358,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 						auto deleteIterator = std::lower_bound(myGlobalIndices.begin(), myGlobalIndices.end(), interfaceNodes[i]);
 						assert(*deleteIterator == interfaceNodes[i]);
 						myGlobalIndices.erase(deleteIterator);
+						deletedNodes.push_back(interfaceNodes[i]);
 					}
 				}
 
@@ -365,7 +369,21 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 					if (!assignedToSecondBlock[lastRoundMarker + i]) {
 						assert(requiredHaloIndices[i] == borderRegionIDs[lastRoundMarker + i]);
 						myGlobalIndices.push_back(requiredHaloIndices[i]);
+						borderCandidates.insert(requiredHaloIndices[i]);
 					}
+				}
+
+				{
+				    //add neighbors of removed node to borderCandidates
+				    const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
+                    const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+                    const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+                    for (IndexType globalI : deletedNodes) {
+                        IndexType localI = inputDist->global2local(globalI);
+                        for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
+                            borderCandidates.insert(ja[j]);
+                        }
+                    }
 				}
 
 				//sort indices
@@ -396,7 +414,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				 */
 				{
 					SCAI_REGION( "LocalRefinement.distributedFMStep.loop.updateLocalBorder" )
-					nodesWithNonLocalNeighbors = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(input);
+					nodesWithNonLocalNeighbors = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(input, borderCandidates);
 				}
 
 				/**

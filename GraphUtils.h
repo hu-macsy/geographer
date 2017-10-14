@@ -8,6 +8,8 @@
 #ifndef GRAPHUTILS_H_
 #define GRAPHUTILS_H_
 
+#include <set>
+
 #include <scai/lama/matrix/CSRSparseMatrix.hpp>
 #include "Settings.h"
 
@@ -58,6 +60,14 @@ bool hasNonLocalNeighbors(const scai::lama::CSRSparseMatrix<ValueType> &input, I
  */
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> getNodesWithNonLocalNeighbors(const scai::lama::CSRSparseMatrix<ValueType>& input);
+
+/**
+ * Returns a vector of global indices of nodes which are local on this process, but have neighbors that are not local. They non local neighbors may or may not be in the same block.
+ * No communication required, iterates once over the local adjacency matrix
+ * @param[in] input Adjacency matrix of the input graph
+ */
+template<typename IndexType, typename ValueType>
+std::vector<IndexType> getNodesWithNonLocalNeighbors(const scai::lama::CSRSparseMatrix<ValueType>& input, const std::set<IndexType>& candidates);
 
 /**
  * Computes a list of global IDs of nodes which are adjacent to nodes local on this processor, but are themselves not local.
