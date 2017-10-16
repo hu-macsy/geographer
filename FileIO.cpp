@@ -391,8 +391,11 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
 	//read first line to get header information
 	std::getline(file, line);
-        std::stringstream ss( line );
-        std::string item;
+    while( line[0]== '%'){
+       std::getline(file, line);
+    }
+    std::stringstream ss( line );
+    std::string item;
         
         {
             //node count and edge count are mandatory. If these fail, std::stoi will raise an error. TODO: maybe wrap into proper error message
@@ -928,9 +931,23 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
     scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
     const IndexType localN = endLocalRange - beginLocalRange;
 
+    IndexType numCommentLines = 0;
+    
+    std::string line;    
+    std::getline(file, line);    
+    while( line[0]== '%'){
+       std::getline(file, line);
+       ++numCommentLines;
+    }
+
+    // rewind stream to beggining of file
+    file.clear();
+    file.seekg(0);
+
+    SCAI_ASSERT_LE_ERROR( beginLocalRange+localN+numCommentLines, globalN+numCommentLines, "Wrong total number or rows to read");
+
     //scroll forward to begin of local range
-    std::string line;
-    for (IndexType i = 0; i < beginLocalRange; i++) {
+    for (IndexType i = 0; i < beginLocalRange+numCommentLines; i++) {
     	std::getline(file, line);
     }
 
@@ -944,6 +961,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
     for (IndexType i = 0; i < localN; i++) {
 		bool read = !std::getline(file, line).fail();
 		if (!read) {
+            PRINT(*comm << ": "<<  beginLocalRange+numCommentLines+i );            
 			throw std::runtime_error("Unexpected end of coordinate file. Was the number of nodes correct?");
 		}
 		std::stringstream ss( line );
