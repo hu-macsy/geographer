@@ -325,7 +325,8 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
             wIA[0] = 0;
 
             for (IndexType i = 0; i < localN; i++) {
-                assert(localPreserved[i] == outgoingEdges[i].size() > 0);
+                //assert(localPreserved[i] == outgoingEdges[i].size() > 0 );
+                //SCAI_ASSERT_EQ_ERROR(localPreserved[i], outgoingEdges[i].size(), "Outgoing edges mismatch");
                 wIA[i+1] = wIA[i] + outgoingEdges[i].size();
                 IndexType jaIndex = wIA[i];
                 for (std::pair<IndexType, ValueType> edge : outgoingEdges[i]) {

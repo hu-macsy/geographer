@@ -389,21 +389,32 @@ int main(int argc, char** argv) {
     // get the partitions with parMetis
     //
 
-    std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
+    double sumKwayTime = 0.0;
+    int repeatTimes = 10;
+    
     int metisRet;
-
+    
     //
     // parmetis partition
     //
-    if( parMetisGeom ){
-        metisRet = ParMETIS_V3_PartGeomKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ndims, xyzLocal, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
-    }else{
-        metisRet = ParMETIS_V3_PartKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
+    for( int i=0; i<repeatTimes; i++){
+        
+        std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
+        if( parMetisGeom ){
+            metisRet = ParMETIS_V3_PartGeomKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ndims, xyzLocal, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
+        }else{
+            metisRet = ParMETIS_V3_PartKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
+        }
+        std::chrono::duration<double> partitionKwayTime =  std::chrono::system_clock::now() - beforePartTime;
+        double partKwayTime= comm->max(partitionKwayTime.count() );
+        sumKwayTime += partKwayTime;
+        
+        if( comm->getRank()==0 ){
+            std::cout<< "Running time for run number " << i << " is " << partKwayTime << std::endl;
+        }
     }
     
-    std::chrono::duration<double> partitionKwayTime =  std::chrono::system_clock::now() - beforePartTime;
-
-    double partKwayTime= comm->max(partitionKwayTime.count() );
+    double avgKwayTime = sumKwayTime/repeatTimes;
 
     //
     // free arrays
@@ -438,7 +449,7 @@ int main(int argc, char** argv) {
     // the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
     struct Metrics metrics(1);
     
-    metrics.timeFinalPartition = partKwayTime;
+    metrics.timeFinalPartition = avgKwayTime;
     
     // uniform node weights
     scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
