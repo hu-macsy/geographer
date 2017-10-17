@@ -390,7 +390,7 @@ int main(int argc, char** argv) {
     //
 
     double sumKwayTime = 0.0;
-    int repeatTimes = 10;
+    int repeatTimes = 5;
     
     int metisRet;
     
@@ -402,6 +402,10 @@ int main(int argc, char** argv) {
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
         if( parMetisGeom ){
             metisRet = ParMETIS_V3_PartGeomKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ndims, xyzLocal, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
+/*            
+        else if (parMetisMesh){
+            metisRet = ParMETIS_V3_PartMeshKway( vtxDist,  );
+*/            
         }else{
             metisRet = ParMETIS_V3_PartKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
         }
@@ -411,6 +415,10 @@ int main(int argc, char** argv) {
         
         if( comm->getRank()==0 ){
             std::cout<< "Running time for run number " << i << " is " << partKwayTime << std::endl;
+        }
+        
+        if( sumKwayTime>500){
+            break;
         }
     }
     
