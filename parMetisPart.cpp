@@ -397,7 +397,8 @@ int main(int argc, char** argv) {
     //
     // parmetis partition
     //
-    for( int i=0; i<repeatTimes; i++){
+    int r;
+    for( r=0; r<repeatTimes; r++){
         
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
         if( parMetisGeom ){
@@ -414,14 +415,19 @@ int main(int argc, char** argv) {
         sumKwayTime += partKwayTime;
         
         if( comm->getRank()==0 ){
-            std::cout<< "Running time for run number " << i << " is " << partKwayTime << std::endl;
+            std::cout<< "Running time for run number " << r << " is " << partKwayTime << std::endl;
         }
         
         if( sumKwayTime>500){
             break;
         }
     }
-    
+
+    if(comm->getRank()==0 ){
+        std::cout<<"Number of runs: " << r+1 << std::endl;	
+    }
+
+    repeatTimes = r+1;
     double avgKwayTime = sumKwayTime/repeatTimes;
 
     //
