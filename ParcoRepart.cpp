@@ -319,7 +319,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             // output: in std and file
             //
             
-            
             if (settings.verbose ) {
                 ValueType timeToCalcInitMigration = comm->max(migrationCalculation.count()) ;   
                 ValueType timeForFirstRedistribution = comm->max( migrationTime.count() );
