@@ -23,7 +23,11 @@ def createMOABSubmitFile(filename, commandString, walltime, processors, memory, 
     return filename
 
 def createLLSubmitFile(filename, commandString, walltime, processors, memory):
-    classstring = "general" if int(processors) > 512 else "test"
+    classstring = "test"
+    if int(processors) > 512:
+        classstring = "general"
+    if int(processors) > 8192:
+        classstring = "large"
     
     with open(filename, 'w') as f:
         f.write("#! /usr/bin/ksh"+"\n")

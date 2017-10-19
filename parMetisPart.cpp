@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
 		("dimensions", value<IndexType>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 		("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
         ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
-        ("geom", "0: use of parmetisKway (no coordinates), 1: use of ParMetisGeomKway. Default is 1.")
+        ("geom", "use ParMetisGeomKway, with coordinates. Default is parmetisKway (no coordinates)")
         ("outFile", value<std::string>(&settings.outFile), "write result partition into file")
 		;
         
@@ -167,7 +167,7 @@ int main(int argc, char** argv) {
         N = graph.getNumRows();
                 
         SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
-        SCAI_ASSERT( graph.isConsistent(), "Graph npt consistent");
+        SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
         
         if(parMetisGeom){
             if (vm.count("fileFormat")) {
