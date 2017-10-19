@@ -120,6 +120,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
 	const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
+	const IndexType rank = comm->getRank();
 
 	const IndexType localN = inputDist->getLocalSize();
 	const IndexType globalN = inputDist->getGlobalSize();
@@ -341,9 +342,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 }
             */
             }
-            
-            IndexType rank = comm->getRank();
-
 
             metrics.timeSecondDistribution[rank] = secondRedistributionTime.count();
             metrics.timePreliminary[rank] = partitionTime.count();
