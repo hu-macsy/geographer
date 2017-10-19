@@ -492,7 +492,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
 
         //create checksum
         const long checkSum = comm->sum(indexSum);
-        assert(checkSum == (long(globalN)*(long(globalN)-1))/2);
+        //TODO: int overflow?
+        SCAI_ASSERT_EQ_ERROR(checkSum , (long(globalN)*(long(globalN)-1))/2, "Sorting checksum is wrong (possible IndexType overflow?).");
 
         //fill up with dummy values to ensure equal size
         for (IndexType i = localN; i < maxLocalN; i++) {
@@ -521,7 +522,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
 
         //check size and sanity
         assert(newLocalN == newLocalIndices.size());
-        assert( *std::max_element(newLocalIndices.begin(), newLocalIndices.end()) < globalN);
+        SCAI_ASSERT_LT_ERROR( *std::max_element(newLocalIndices.begin(), newLocalIndices.end()) , globalN, "Too large index (possible IndexType overflow?).");
         assert( comm->sum(newLocalIndices.size()) == globalN);
 
         //check checksum

@@ -598,7 +598,7 @@ int main(int argc, char** argv) {
             coordinates[i].allocate(coordDist);
             coordinates[i] = static_cast<ValueType>( 0 );
         }
-
+       
         // create the adjacency matrix and the coordinates
         ITI::MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist( graph, coordinates, maxCoord, numPoints);
         
@@ -848,7 +848,7 @@ int main(int argc, char** argv) {
         boost::filesystem::create_directories( destPath );   
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath + "/debugResult");
         }
-        */
+    */
         
     //this is needed for supermuc
     std::exit(0);   
