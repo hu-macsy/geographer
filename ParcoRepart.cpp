@@ -211,7 +211,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                     }
                       
                     migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
-                    
+                    metrics.timeMigrationAlgo[rank]  = migrationCalculation.count();
                     
                     std::chrono::time_point<std::chrono::system_clock> beforeMigration =  std::chrono::system_clock::now();
                        
@@ -225,7 +225,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                     }
                     
                     migrationTime = std::chrono::system_clock::now() - beforeMigration;
-                    //timeForFirstRedistribution = ValueType ( comm->max(migrationTime.count()) );
+                    metrics.timeFirstDistribution[rank]  = migrationTime.count();
                 }
             
             }
@@ -249,6 +249,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             }
 
             kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
+            metrics.timeKmeans[rank] = kMeansTime.count();
             //timeForKmeans = ValueType ( comm->max(kMeansTime.count() ));
             assert(result.getLocalValues().min() >= 0);
             assert(result.getLocalValues().max() < k);
@@ -342,9 +343,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             }
             
             IndexType rank = comm->getRank();
-            metrics.timeMigrationAlgo[rank]  = migrationCalculation.count();
-            metrics.timeFirstDistribution[rank]  = migrationTime.count();
-            metrics.timeKmeans[rank] = kMeansTime.count();
+
+
             metrics.timeSecondDistribution[rank] = secondRedistributionTime.count();
             metrics.timePreliminary[rank] = partitionTime.count();
 
