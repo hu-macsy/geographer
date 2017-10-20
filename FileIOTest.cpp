@@ -487,5 +487,58 @@ TEST_F(FileIOTest, testReadGraphAndCoordsBinary){
     }
         
 }
+//-------------------------------------------------------------------------------------------------
+
+TEST_F (FileIOTest, testWritePartitionCentral){
+    std::string file= "Grid8x8";
+    std::string grFile= graphPath +file , coordFile= graphPath +file +".xyz";  //graph file and coordinates file
+    IndexType dimensions = 2;
+    std::fstream f(grFile);
+    IndexType N;
+    f>> N;
+    f.close();
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+    IndexType k = comm->getSize();
+    
+        
+    //scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    //scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( grFile );
+    
+    //graph.redistribute(dist, noDistPointer);
+    
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions);
+    
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.5;
+    settings.dimensions = dimensions;
+    settings.initialPartition = InitialPartitioningMethods::SFC;
+/*    
+    settings.pixeledSideLen = 16;        //4 for a 16x16 coarsen graph in 2D, 16x16x16 in 3D
+    settings.useGeometricTieBreaking = 0;
+    //settings.fileName = fileName;
+    settings.multiLevelRounds = 0;
+    settings.minGainForNextRound= 10;
+    // 5% of (approximetely, if at every round you get a 60% reduction in nodes) the nodes of the coarsest graph
+    settings.minBorderNodes = N*std::pow(0.6, settings.multiLevelRounds)/k * 0.05;
+    settings.coarseningStepsBetweenRefinement = 3;
+*/       
+    struct Metrics metrics(settings.numBlocks);
+    
+    
+    
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
+    
+    
+    
+    FileIO<IndexType, ValueType>::writePartitionCentral( partition, file+".part");
+    
+}
+
+
 
 } /* namespace ITI */

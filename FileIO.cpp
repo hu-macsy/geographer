@@ -336,6 +336,38 @@ void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<Inde
         }
 }
 
+template<typename IndexType, typename ValueType>
+void FileIO<IndexType, ValueType>::writePartitionCentral(DenseVector<IndexType> &part, const std::string filename) {
+
+    
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	scai::dmemo::DistributionPtr dist = part.getDistributionPtr();
+
+    const IndexType localN = dist->getLocalSize();
+    const IndexType globalN = dist->getGlobalSize();
+    const IndexType numPEs = comm->getSize();
+    
+    //TODO: change to gather as this way part is replicated in all PEs
+    //comm->gatherImpl( localPart.get(), 
+    
+    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
+    part.redistribute( noDist );
+    SCAI_ASSERT_EQ_ERROR( part.getLocalValues().size(), globalN, "Partition must be replicated");
+    
+    if( comm->getRank() ){
+    
+        std::ofstream f( filename );  
+        
+        const scai::hmemo::ReadAccess<IndexType> rPart( part.getLocalValues() );
+        for( IndexType i=0; i<globalN; i++){
+            f << rPart[i]<< std::endl;
+        }
+        
+    }    
+    
+}
+
+
 //-------------------------------------------------------------------------------------------------
 /*File "filename" contains a graph in the METIS format. The function reads that graph and transforms
  * it to the adjacency matrix as a CSRSparseMatrix.

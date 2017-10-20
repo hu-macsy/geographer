@@ -153,6 +153,9 @@ public:
         static std::vector<IndexType> readBlockSizes(const std::string filename , const IndexType numBlocks);
 
 	static DenseVector<IndexType> readPartition(const std::string filename, IndexType n);
+    
+    
+    static void writePartitionCentral(DenseVector<IndexType> &part, const std::string filename);
 
 private:
 	/**
