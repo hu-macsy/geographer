@@ -474,7 +474,16 @@ TEST_F(MeshGeneratorTest, testSimpleMeshFromQuadTree_2D){
         ITI::FileIO<IndexType, ValueType>::writeCoords(coords, outCoords);
     }
 }
+//-----------------------------------------------------------------
 
+//dummy/temp test, better be removed
+TEST_F(MeshGeneratorTest, testWriteGridInFile){
+
+    std::vector<IndexType> numPoints (3, 4);
+    
+    ITI::MeshGenerator<IndexType, ValueType>::writeGraphStructured3DMesh( numPoints, "Grid_3D_"+std::to_string(numPoints[0]));
+    
+}
 //-----------------------------------------------------------------
     
 }//namespace ITI

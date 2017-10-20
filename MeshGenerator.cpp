@@ -82,7 +82,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix
             // connect the point with its 6 (in 3D) neighbours
             // neighbour_node: the index of a neighbour of i, can take negative values
             // but in that case we do not add it
-            float ngb_node = 0;      
+            IndexType ngb_node = 0;      
             // the number of neighbours for each node. Can be less that 6.
             IndexType numRowElems= 0;
             ValueType max_offset =  *max_element(offset.begin(),offset.end());
@@ -122,6 +122,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix
             }
             }
             ia[i+1] = ia[i] +static_cast<IndexType>(numRowElems);
+            SCAI_ASSERT_GT_ERROR(ia[i+1], ia[i], "Probably IndexType overflow");
         }//for
         SCAI_ASSERT_EQUAL_ERROR(numEdges*2 , ia[ia.size()-1] )
     }
@@ -130,6 +131,78 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix
     
     localMatrix.swap( csrIA, csrJA, csrValues );
     adjM.assign(localMatrix);
+}
+//-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+void MeshGenerator<IndexType, ValueType>::writeGraphStructured3DMesh( std::vector<IndexType> numPoints, const std::string filename) {
+    SCAI_REGION( "MeshGenerator.writeStructured3DMesh" )
+    
+    if (numPoints.size() != 3) {
+        throw std::runtime_error("Needs three point counts, one for each dimension");
+    }
+    
+    std::ofstream f(filename);
+    if(f.fail())
+        throw std::runtime_error("File "+ filename+ " failed.");
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    
+    if( comm->getSize()>1 ){
+        std::cout<< "Not distributed, call again with one PE. Aborting..." << std::endl;
+        std::terminate();
+    }
+    
+    IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
+    
+    IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
+                                -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
+    
+    // write number of vertices and edges                                    
+    f<< N << " " << numEdges << std::endl;
+    
+    {
+        IndexType nnzCounter = 0; // count non-zero elements
+        // for every node= for every line of adjM
+        for(IndexType i=0; i<N; i++){
+            IndexType ngbIndex = 0;      
+     
+            
+            std::tuple<IndexType, IndexType, IndexType> thisPoint = aux<IndexType,ValueType>::index2_3DPoint( i, numPoints);
+            
+            {
+            SCAI_REGION("writeStructured3DMesh.setAdjacencyMatrix");
+            // for all 6 possible neighbours
+            for(IndexType m=0; m<6; m++){
+                switch(m){
+                    case 0: ngbIndex= i+1; break;
+                    case 1: ngbIndex= i-1; break;
+                    case 2: ngbIndex = i + numPoints[2]; break;
+                    case 3: ngbIndex = i - numPoints[2]; break;
+                    case 4: ngbIndex = i + numPoints[2]*numPoints[1]; break;
+                    case 5: ngbIndex = i - numPoints[2]*numPoints[1]; break;
+                }
+                
+                if(ngbIndex>=0 && ngbIndex<N){
+                	std::tuple<IndexType, IndexType, IndexType> ngbPoint = aux<IndexType,ValueType>::index2_3DPoint( ngbIndex, numPoints);
+                    
+                    // we need to check distance for the nodes at the outer borders of the grid: eg:
+                    // in a 4x4 grid with 16 nodes {0, 1, 2, ...} , for p1= node 3 there is an edge with
+                    // p2= node 4 that we should not add (node 3 has coords (0,3) and node 4 has coords (1,0)).
+                    // A way to avoid that is check if thery are close enough.
+                    // TODO: maybe find another, faster way to avoid adding that kind of edges
+                    
+                    if(dist3DSquared( thisPoint, ngbPoint) <= 1)
+                    {
+                        f << ngbIndex +1<< " ";
+                        ++nnzCounter;
+                    }
+                }
+            }
+            }
+            f << std::endl;
+        }//for
+    }
 }
 
 //-------------------------------------------------------------------------------------------------

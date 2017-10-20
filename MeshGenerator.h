@@ -53,6 +53,7 @@ namespace ITI {
 
                 static void createOctaTreeMesh_2( scai::lama::CSRSparseMatrix<ValueType> &adjM,  std::vector<DenseVector<ValueType>> &coords, const IndexType numberOfPoints, const ValueType maxCoord);
                 
+                static void writeGraphStructured3DMesh( std::vector<IndexType> numPoints, const std::string filename);
                 /** Creates a structed 3D mesh, both the adjacency matrix and the coordinates vectors.
                  * 
                  * @param[out] adjM The adjacency matrix of the output graph. Dimensions are [numPoints[0] x numPoints[1] x numPoints[2]].
