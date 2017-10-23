@@ -64,6 +64,7 @@ struct Settings{
     bool tightenBounds = false;
     bool freezeBalancedInfluence = false;
     bool erodeInfluence = false;
+    bool manhattanDistance = false;
 
     //parameters for multisection
     bool bisect = false;    // 0: works for square k, 1: bisect, for k=power of 2

@@ -302,6 +302,7 @@ int main(int argc, char** argv) {
 				("tightenBounds", "Tuning parameter for K-Means")
 				("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
 				("initialMigration", value<InitialPartitioningMethods>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration, 0: SFCs, 3:k-means, 4:Multisection")
+				("manhattanDistance", "Tuning parameter for K-Means")
 				//debug
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 				("verbose", "Increase output.")
@@ -421,6 +422,7 @@ int main(int argc, char** argv) {
     settings.storeInfo = vm.count("storeInfo");
     settings.erodeInfluence = vm.count("erodeInfluence");
     settings.tightenBounds = vm.count("tightenBounds");
+    settings.manhattanDistance = vm.count("manhattanDistance");
     writePartition = vm.count("writePartition");
     
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
