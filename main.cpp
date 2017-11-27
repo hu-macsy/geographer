@@ -162,11 +162,11 @@ namespace ITI {
 			format = ITI::Format::ADCIRC;
 		else if (token == "OCEAN" or token == "3")
 			format = ITI::Format::OCEAN;
-                else if (token == "MATRIXMARKET" or token == "4")
+        else if (token == "MATRIXMARKET" or token == "4")
 			format = ITI::Format::MATRIXMARKET;
 		else if (token == "TEEC" or token == "5")
 			format = ITI::Format::TEEC;
-                else if (token == "BINARY" or token == "6")
+        else if (token == "BINARY" or token == "6")
 			format = ITI::Format::BINARY;
 		else
 			in.setstate(std::ios_base::failbit);
@@ -189,8 +189,8 @@ namespace ITI {
 			token = "MATRIXMARKET";
 		else if (method == ITI::Format::TEEC)
 			token = "TEEC";
-                else if (method == ITI::Format::BINARY)
-                        token == "BINARY";
+        else if (method == ITI::Format::BINARY)
+            token == "BINARY";
 		out << token;
 		return out;
 	}
@@ -458,10 +458,10 @@ int main(int argc, char** argv) {
         settings.fileName = graphFile;
     	std::string coordFile;
     	if (vm.count("coordFile")) {
-	   	coordFile = vm["coordFile"].as<std::string>();
-	} else {
-		coordFile = graphFile + ".xyz";
-	}
+            coordFile = vm["coordFile"].as<std::string>();
+        } else {
+            coordFile = graphFile + ".xyz";
+        }
 
     	std::string coordString;
     	if (settings.useDiffusionCoordinates) {
@@ -492,7 +492,7 @@ int main(int argc, char** argv) {
 					if (comm->getRank() == 0) std::cout << "Min node weight:" << minWeight << ", max weight: " << maxWeight << std::endl;
 				}
 				coordFile = graphFile;
-			} else {
+            }else {
 				graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights, settings.fileFormat );
 			}
         } else{
@@ -557,7 +557,7 @@ int main(int argc, char** argv) {
                 // if no coordFormat was given but was given a fileFormat assume they are the same
                 coordFormat = settings.fileFormat;
                 coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
-            } else {
+            }else {
                 coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
             }
         }

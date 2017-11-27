@@ -25,19 +25,19 @@ namespace ITI {
         std::vector<double> bottom;
         std::vector<double> top;
         
-        void print(){
+        void print(std::ostream& out){
             std::cout<< "rectangle bottom: ";
-            for(int i=0; i<bottom.size(); i++){
-                std::cout<< bottom[i] << ", ";
+            for(unsigned int i=0; i<bottom.size(); i++){
+                out<< bottom[i] << ", ";
             }
-            std::cout<< std::endl;
+            out<< std::endl;
             
-            std::cout<< "             top: ";
-            for(int i=0; i<top.size(); i++){
-                std::cout<< top[i] << ", ";
+            out<< "             top: ";
+            for(unsigned int i=0; i<top.size(); i++){
+                out<< top[i] << ", ";
             }
             
-            std::cout<< "          weight: "<< weight << std::endl;
+            out<< "          weight: "<< weight << std::endl;
         }
         
         /** Checks if this rectangle resides entirely in the given rectangle:
@@ -48,7 +48,7 @@ namespace ITI {
             SCAI_REGION("rectangle.isInside");
             
             bool ret = true;
-            for(int d=0; d<bottom.size(); d++){
+            for(unsigned int d=0; d<bottom.size(); d++){
                 if( this->bottom[d]<outer.bottom[d] or this->top[d]>outer.top[d]){
                     ret= false;
                     break;
@@ -115,7 +115,7 @@ namespace ITI {
         }
         
         bool operator==(rectangle& r){
-            for(int d=0; d<this->top.size(); d++){
+            for(unsigned int d=0; d<this->top.size(); d++){
                 if( this->top[d]!=r.top[d] ){
                     return false;
                 }
@@ -162,9 +162,9 @@ namespace ITI {
             // check if coordinates of the rectangle are wrong
             if( !rect.isInside(this->myRect) ){
                 PRINT("Input rectangle:");
-                rect.print();
+                rect.print(std::cout);
                 PRINT("Should be inside this:");
-                myRect.print();
+                myRect.print(std::cout);
                 throw std::runtime_error("Wrong rectangle size: too big or wrong coordinates.");
             }
             
@@ -336,7 +336,31 @@ namespace ITI {
                 f<< std::endl;
             }
         }
+        
+        void printLeavesInFileNestler( const std::string filename, IndexType dimension ){
+            std::ofstream f(filename);
+            if(f.fail())
+                throw std::runtime_error("File "+ filename+ " failed.");
+            
+            std::vector<std::shared_ptr<rectCell>> allLeaves = getAllLeaves();
+            
+            const IndexType numLeaves = allLeaves.size();
+            
+            for(int l=0; l<numLeaves; l++){
+                std::shared_ptr<rectCell> thisLeaf = allLeaves[l];
+                rectangle thisRect = thisLeaf->getRect();
                 
+                for(int d=0; d<dimension; d++){
+                    f<< thisRect.bottom[d] << " ";
+                }
+
+                for(int d=0; d<dimension; d++){
+                    f<< thisRect.top[d] - thisRect.bottom[d] << " ";
+                }
+                f<< std::endl;
+            }
+        }
+        
         rectangle getRect(){
             return myRect;
         }

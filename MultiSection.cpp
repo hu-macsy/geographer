@@ -687,7 +687,7 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
                 for( int d=0; d<dimension; d++)
                     std::cout<< coordinates[i][d] << ", ";
                 std::cout<< std::endl << " and root:"<< std::endl;
-                treeRoot->getRect().print();
+                treeRoot->getRect().print(std::cout);
                 std::terminate();   // not allowed in our case
             }
             SCAI_REGION_END("MultiSection.projectionNonUniform.localProjection.getContainingLeaf");
@@ -696,7 +696,7 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
             
             if( thisLeafID==-1 and comm->getRank()==0 ){
                 PRINT0( "Owner rectangle for point is ");
-                thisRectCell->getRect().print();
+                thisRectCell->getRect().print(std::cout);
                 PRINT0( thisRectCell->getLeafID() );
             }
             SCAI_ASSERT( thisLeafID!=-1, "leafID for containing rectCell must be >0 , for coords= "<< coordinates[i][0] << ", "<< coordinates[i][1] );

@@ -490,8 +490,8 @@ TEST_F(FileIOTest, testReadGraphAndCoordsBinary){
 //-------------------------------------------------------------------------------------------------
 
 TEST_F (FileIOTest, testWritePartitionCentral){
-    std::string file= "Grid8x8";
-    std::string grFile= graphPath +file , coordFile= graphPath +file +".xyz";  //graph file and coordinates file
+    std::string file= "biplane9.graph";
+    std::string grFile= "./localMeshes/" +file , coordFile= "./localMeshes/" +file +".xyz";  //graph file and coordinates file
     IndexType dimensions = 2;
     std::fstream f(grFile);
     IndexType N;
@@ -501,14 +501,9 @@ TEST_F (FileIOTest, testWritePartitionCentral){
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
     IndexType k = comm->getSize();
-    
-        
-    //scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
-    //scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    
+       
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( grFile );
-    
-    //graph.redistribute(dist, noDistPointer);
+
     
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions);
     
@@ -516,29 +511,84 @@ TEST_F (FileIOTest, testWritePartitionCentral){
     settings.numBlocks= k;
     settings.epsilon = 0.5;
     settings.dimensions = dimensions;
-    settings.initialPartition = InitialPartitioningMethods::SFC;
-/*    
-    settings.pixeledSideLen = 16;        //4 for a 16x16 coarsen graph in 2D, 16x16x16 in 3D
-    settings.useGeometricTieBreaking = 0;
+    settings.initialPartition = InitialPartitioningMethods::KMeans;
+   
+   
     //settings.fileName = fileName;
-    settings.multiLevelRounds = 0;
-    settings.minGainForNextRound= 10;
+    settings.multiLevelRounds = 12;
+    settings.minGainForNextRound= int(k/4);
     // 5% of (approximetely, if at every round you get a 60% reduction in nodes) the nodes of the coarsest graph
-    settings.minBorderNodes = N*std::pow(0.6, settings.multiLevelRounds)/k * 0.05;
+    //settings.minBorderNodes = N*std::pow(0.6, settings.multiLevelRounds)/k * 0.05;
+    settings.minBorderNodes = 4*std::sqrt((ValueType(N))/k);
     settings.coarseningStepsBetweenRefinement = 3;
-*/       
+    settings.stopAfterNoGainRounds = 200;
+
     struct Metrics metrics(settings.numBlocks);
     
+    settings.print(std::cout, comm);
+  
+    DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(coords[0].getDistributionPtr(), 1);
     
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, uniformWeights, settings, metrics);
     
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
+
+    metrics.getMetrics( graph, partition, uniformWeights, settings);
+    metrics.print( std::cout );
     
-    
-    
-    FileIO<IndexType, ValueType>::writePartitionCentral( partition, file+".part");
+    FileIO<IndexType, ValueType>::writePartitionCentral( partition, file+"_k_"+std::to_string(k)+".part");
     
 }
 
+//-------------------------------------------------------------------------------------------------
 
+TEST_F (FileIOTest, testreadOFFCentral){
+    std::string file = graphPath+ "2.off";
+    
+    // open file and read number of ndoes and edges
+    //
+    
+    IndexType numVertices, numEdges;
+    {
+        std::ifstream f(file);
+        if(f.fail())
+            throw std::runtime_error("File "+ file + " failed.");
+        
+        std::string line;
+        std::getline(f, line);   // first line should have the string OFF
+        std::getline(f, line);
+        std::stringstream ss;
+        ss.str( line );
+    
+        IndexType numFaces;
+        ss >> numVertices >> numFaces >> numEdges;
+    }
+        
+    scai::lama::CSRSparseMatrix<ValueType> graph;
+    std::vector<DenseVector<ValueType>> coords;
+    
+    FileIO<IndexType, ValueType>::readOFFCentral( graph, coords, file );
+    
+    IndexType N = coords[0].size();
+    
+    SCAI_ASSERT_EQ_ERROR( N, numVertices, "Number of vertices do not agree.");
+    SCAI_ASSERT_EQ_ERROR( graph.getNumValues()/2, numEdges, "Number of edges do not agree.");
+    
+    /*
+    for(IndexType i=0; i<10; i++){
+        for(int dim=0; dim<3; dim++){
+            std::cout<< coords[dim].getValue(N-i-1) << " ";
+        }
+        std::cout << std::endl;
+    }
+    */
+    
+    if( N<5000 ){
+        SCAI_ASSERT_EQ_ERROR( true, graph.checkSymmetry(), "Matrix not symmetric");
+    }
+    SCAI_ASSERT_EQ_ERROR( true, graph.isConsistent(), "Matrix not consistent");
+    
+    PRINT( graph.getNumValues() << " _ " << graph.getNumRows() << " @ " << graph.getNumColumns() );
+}
+    
 
 } /* namespace ITI */

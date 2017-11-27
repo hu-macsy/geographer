@@ -196,9 +196,7 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
  */
 template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVector<ValueType>> &coords, const std::string outFilename){
-    
-    //typedef unsigned long int UINT;  // maybe IndexType is not big enough for file position
-        
+            
     const IndexType dimension = coords.size();
     if (dimension != 3) {
         std::cout << "Warning: Binary coordinate reader expects three dimensions." << std::endl;
@@ -257,8 +255,9 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVe
     }
     
 }
+
 //-------------------------------------------------------------------------------------------------
-/*Given the vector of the coordinates and their dimension, writes them in file "filename".
+/*Given the vector of the coordinates each PE writes its own part in file "filename".
  */
 template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename){
@@ -288,8 +287,71 @@ void FileIO<IndexType, ValueType>::writeCoordsDistributed_2D (const std::vector<
     }
     
 }
+//-------------------------------------------------------------------------------------------------
+/*Given the vector of the coordinates and the nodeWeights writes them both in a file in the form:
+ *
+ *   cood1 coord2 ... coordD weight
+ * 
+ * for D dimensions. Each line coresponds to one point/vertex.
+ */
 
+template<typename IndexType, typename ValueType>
+void FileIO<IndexType, ValueType>::writeInputParallel (const std::vector<DenseVector<ValueType>> &coords,const scai::lama::DenseVector<ValueType> nodeWeights, const std::string filename){
+    SCAI_REGION( "FileIO.writeCoordsDistributed" )
 
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr coordDistPtr = coords[0].getDistributionPtr();
+    const IndexType globalN = coordDistPtr->getGlobalSize();
+    const IndexType localN = coordDistPtr->getLocalSize();
+    const IndexType dimension = coords.size();
+    const IndexType numPEs = comm->getSize();
+    
+    //
+    // copy coords to a local vector<vector>
+    //
+    
+    std::vector< std::vector<ValueType>> localPartOfCoords( localN, std::vector<ValueType>( dimension, 0.0) );
+    
+    for(IndexType d=0; d<dimension; d++){
+        scai::hmemo::ReadAccess<ValueType> localCoords( coords[d].getLocalValues() );
+        for( IndexType i=0; i<localN; i++){
+            localPartOfCoords[i][d] = localCoords[i];
+        }
+    }    
+    
+    scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights.getLocalValues() );
+    
+    std::ofstream outfile;
+    
+    comm->synchronize();
+    
+    for(IndexType p=0; p<numPEs; p++){  // numPE rounds, in each round only one PE writes its part
+        if( comm->getRank()==p ){ 
+            if( p==0 ){
+                outfile.open(filename.c_str(), std::ios::binary | std::ios::out);
+            }else{
+                // if not the first PE then append to file
+                outfile.open(filename.c_str(), std::ios::binary | std::ios::app);
+            }
+            if( outfile.fail() ){
+                throw std::runtime_error("Could not write to file " + filename);
+            }
+            
+            for( IndexType i=0; i<localN; i++){ 
+                for(IndexType d=0; d<dimension; d++){
+                    outfile << localPartOfCoords[i][d]<< " ";   // write coords
+                }
+                //outfile << localWeights[i] << std::endl;        //write node weight
+            }
+            
+            outfile.close();
+        }
+        comm->synchronize();    //TODO: takes huge time here
+    }
+    
+}
+
+//-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<IndexType> &part, const std::string filename) {
@@ -335,6 +397,61 @@ void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<Inde
             comm->synchronize();    //TODO: takes huge time here
         }
 }
+//-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+template<typename T>
+void FileIO<IndexType, ValueType>::writeDenseVectorParallel(const DenseVector<T> &dv, const std::string filename) {
+    SCAI_REGION( "FileIO.writePartitionParallel" );
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+    const IndexType globalN =dv.size();
+    const IndexType numPEs = comm->getSize();
+    
+    const scai::dmemo::Distribution blockDist( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, globalN) );
+    
+    // create a copy of the input and distribute with a block distribution
+    const scai::lama::DenseVector<T> dvBlock( dv, blockDist);
+
+    const IndexType localN = blockDist.getLocalSize();
+    
+    scai::hmemo::ReadAccess<IndexType> localPart( dvBlock.getLocalValues() );
+    SCAI_ASSERT_EQ_ERROR( localPart.size(), localN, "Local sizes do not agree");
+    
+    std::ofstream outfile;
+    
+    comm->synchronize();
+    
+    for(IndexType p=0; p<numPEs; p++){  // numPE rounds, in each round only one PE writes its part
+        if( comm->getRank()==p ){ 
+            if( p==0 ){
+                outfile.open(filename.c_str(), std::ios::binary | std::ios::out);
+            }else{
+                // if not the first PE then append to file
+                outfile.open(filename.c_str(), std::ios::binary | std::ios::app);
+            }
+            if( outfile.fail() ){
+                throw std::runtime_error("Could not write to file " + filename);
+            }
+            
+            for( IndexType i=0; i<localN; i++){                    
+                outfile << localPart[i] << std::endl;
+            }
+                          
+            // the last PE maybe has less local values
+            if( p==numPEs-1 ){
+                SCAI_ASSERT_EQ_ERROR( outfile.tellp(), globalN , "While writing DenseVector in parallel: Position in file " << filename << " is not correct." );
+            }else{
+                SCAI_ASSERT_EQ_ERROR( outfile.tellp(), localN*(comm->getRank()+1) , "While writing DenseVector in parallel: Position in file " << filename << " is not correct for processor " << comm->getRank() );
+            }
+                
+            outfile.close();
+        }
+        comm->synchronize();    //TODO: takes huge time here
+    }
+}
+//-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writePartitionCentral(DenseVector<IndexType> &part, const std::string filename) {
@@ -774,7 +891,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 
-    return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
+    scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
 
 }
 
@@ -1244,6 +1361,131 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsMatr
 
     return result;
 }
+
+
+/** Read graph and coordinates from a OFF file. Coordinates are (usually) in 3D.
+ */
+
+template<typename IndexType, typename ValueType>
+void  FileIO<IndexType, ValueType>::readOFFCentral( scai::lama::CSRSparseMatrix<ValueType>& graph, std::vector<DenseVector<ValueType>>& coords, const std::string filename ){
+    
+    std::ifstream file(filename);
+    if(file.fail())
+        throw std::runtime_error("File "+ filename+ " failed.");
+    
+    std::string line;
+    std::getline(file, line);
+    
+    if( line!="OFF" ){
+        PRINT("The OFF file" << filename << " should start with the word OFF in the first line. Aborting.");
+        throw std::runtime_error("Reading from an OFF file");
+    }
+    
+    std::getline(file, line);
+    std::stringstream ss;
+    ss.str( line );
+    
+    IndexType N, numFaces, numEdges;
+    
+    ss >> N >> numFaces >> numEdges;
+    
+PRINT( N << " _ " << numFaces << ", numEdges= " << numEdges );
+
+    //
+    // first, read the N 3D coordinates
+    //
+
+    IndexType dimension = 3;
+    
+    std::vector<scai::utilskernel::LArray<ValueType> > coordsLA(dimension);
+	for (IndexType dim = 0; dim < dimension; dim++) {
+		coordsLA[dim] = scai::utilskernel::LArray<ValueType>(N, 0);
+	}
+	
+	for(IndexType i=0; i<N; i++){
+		bool read = !std::getline(file, line).fail();
+		if (!read) {
+            //PRINT();            
+			throw std::runtime_error("Unexpected end of coordinates part in OFF file. Was the number of nodes correct?");
+		}
+		std::stringstream ss( line );
+		std::string item;
+
+		IndexType dim = 0;
+		while (dim < dimension) {
+			bool read;
+			do {//skip multiple whitespace
+				read = !std::getline(ss, item, ' ').fail();
+			} while (item.size() == 0);
+
+			if (!read) {
+				throw std::runtime_error("Unexpected end of line " + line +". Was the number of dimensions correct?");
+			}
+			// WARNING: in supermuc (with gcc/5) the std::stod returns the int part !!
+			//ValueType coord = std::stod(item);
+			ValueType coord = boost::lexical_cast<ValueType>(item);
+			coordsLA[dim][i] = coord;         
+			dim++;
+		}
+		if (dim < dimension) {
+			throw std::runtime_error("Only " + std::to_string(dim - 1)  + " values found, but " + std::to_string(dimension) + " expected in line '" + line + "'");
+		}		
+    }
+
+    coords.resize( dimension );
+
+    for (IndexType i = 0; i < dimension; i++) {
+        coords[i] = DenseVector<ValueType>( coordsLA[i] );
+    }    
+
+    //
+    // now, read the faces. Create the graph as an adjacency list to prevent N^2 space and convert to CSR later
+    // each line contains the info for one face:
+    // example: 4 20 7 4 12
+    // first is the number of vertices for that face, 4 here, and then the vertices that define the face (20, 7, 4, 12)
+    //
+    
+    std::vector<std::set<IndexType>> adjList( N );
+    IndexType edgeCnt =0;
+    
+    for(IndexType i=0; i<numFaces; i++){
+		bool read = !std::getline(file, line).fail();
+		if (!read) {
+            //PRINT();            
+			throw std::runtime_error("Unexpected end of faces part in OFF file. Was the number of nodes correct?");
+		}
+		std::stringstream ss( line );
+		std::string item;        
+        
+        IndexType numVertices;  // number of vertices of this face
+        ss >> numVertices;
+        
+        std::vector<IndexType> face( numVertices );
+        
+        for(IndexType f=0; f<numVertices; f++){
+            ss >> face[f];
+//PRINT(face[f]);            
+        }
+//std::cout<<std::endl;        
+        for(IndexType v1=0; v1<numVertices; v1++){
+            SCAI_ASSERT_LE_ERROR( v1, N, "Found vertex with too big index.");
+            for(IndexType v2=v1+1; v2<numVertices; v2++){
+                adjList[face[v1]].insert(face[v2]);
+                adjList[face[v2]].insert(face[v1]);
+                ++edgeCnt;            
+            }
+        }
+    }
+    SCAI_ASSERT_EQ_ERROR( numEdges, edgeCnt/2, "Possibly wrong number of edges");
+    
+    //
+    // convert adjacency list to CSR matrix
+    //
+    
+    graph = GraphUtils::getCSRmatrixNoEgdeWeights<IndexType, ValueType>( adjList );
+}
+
+
 
 
 template<typename IndexType, typename ValueType>

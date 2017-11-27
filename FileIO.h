@@ -16,6 +16,7 @@
 
 #include "quadtree/QuadTreeCartesianEuclid.h"
 #include "Settings.h"
+#include "GraphUtils.h"
 
 #include <vector>
 #include <set>
@@ -68,11 +69,26 @@ public:
 	*/
 	static void writeCoords (const std::vector<DenseVector<ValueType>> &coords, const std::string filename);
 
-        static void writeCoordsParallel(const std::vector<DenseVector<ValueType>> &coords, const std::string filename);
-        
-        static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
+    static void writeCoordsParallel(const std::vector<DenseVector<ValueType>> &coords, const std::string filename);
+    
+    /* Each PE writes its own part of the coordinates in a separate file.
+     * */
+    static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
 
-        /**
+    /*Given the vector of the coordinates and the nodeWeights writes them both in a file in the form:
+    *
+    *   cood1 coord2 ... coordD weight
+    * 
+    * for D dimensions. Each line coresponds to one point/vertex. Each PE, one after another, writes each own part.
+    * */
+    static void writeInputParallel (const std::vector<DenseVector<ValueType>> &coords,const scai::lama::DenseVector<ValueType> nodeWeights, const std::string filename);
+    
+    /* Write a DenseVector in parallel in the filename. Each PE, one after another, write its own part.
+     * */
+    template<typename T>
+    void writeDenseVectorParallel(const DenseVector<T> &dv, const std::string filename);
+    
+    /**
 	 * Writes a partition to file.
 	 * @param[in] part
 	 * @param[in] filename The file's name to write to
@@ -155,7 +171,12 @@ public:
 	static DenseVector<IndexType> readPartition(const std::string filename, IndexType n);
     
     
-    static void writePartitionCentral(DenseVector<IndexType> &part, const std::string filename);
+    static void writePartitionCentral( DenseVector<IndexType> &part, const std::string filename);
+    
+    
+    /** Read graph and coordinates from a OFF file. Coordinates are (usually) in 3D.
+    */
+    static void readOFFCentral( scai::lama::CSRSparseMatrix<ValueType>& graph, std::vector<DenseVector<ValueType>>& coords, const std::string filename);
 
 private:
 	/**

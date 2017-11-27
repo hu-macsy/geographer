@@ -154,6 +154,10 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::lama::CSRSparseMa
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::Halo& halo);
 
+
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vector<std::set<IndexType>> adjList);
+
 //taken from https://stackoverflow.com/a/9345144/494085
 template<class BidiIter >
 static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_random) {

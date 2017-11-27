@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
             ("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
             ("multiLevelRounds", value<IndexType>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
             //("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for METIS format, 1 for MatrixMarket format. See FileIO for more details.")
-            ("outputFile", value<std::string>()->default_value("rectanglesNestler"), "The name of the output file to write the partition")
+            ("outFile", value<std::string>()->default_value("rectanglesNestler"), "The name of the output file to write the partition")
         ;
                                 
                      
@@ -152,36 +152,39 @@ int main(int argc, char** argv) {
     
     std::vector<IndexType> maxPoints= {sideLen, sideLen};
     ValueType totalLocalWeight = 0, totalGlobalWeight = 0;
+    
     //
     // create random local weights   
     //
     {
         scai::hmemo::WriteOnlyAccess<ValueType> wLocalWeights( nodeWeights.getLocalValues() );
-      
-        std::ofstream fNew;
-        std::string newFile = "meshes/nestler200.weights";
-        fNew.open(newFile);
-        
-        fNew << sideLen << " " << 2 << std::endl;
-        
+              
         std::random_device rd;
         std::default_random_engine gen(rd());
         
-        // points in the heavy zone have weight w: 5<w<10 and on the light zone: 0.5<w<2
-        std::uniform_real_distribution<ValueType> distHeavy(4.0, 6.0);
+        std::ofstream fNew;
+        std::string newFile = "nestlerMeshes/nestler200.weights";
+        {
+            fNew.open(newFile);
+            fNew << sideLen << " " << 2 << std::endl;
+        }
+        
+        
+        // points in the heavy zone have weight w: 2<w<5 and on the light zone: 0.5<w<2
+        std::uniform_real_distribution<ValueType> distHeavy(2.0, 5.0);
         std::uniform_real_distribution<ValueType> distLight(0.5, 2.0);
 PRINT0( localN );        
-srand(time(NULL));
+
         for(IndexType i=0; i<localN; i++){  
             IndexType globalIndex = distPtr->local2global(i);
             
             std::tuple<IndexType, IndexType> point = ITI::aux<IndexType,ValueType>::index2_2DPoint( i , maxPoints );
             IndexType pointNormSq = std::pow(std::get<0>(point), 2) + std::pow(std::get<1>(point), 2);  //x^2 + y^2
             
-            if( pointNormSq-bigRSq<0 and pointNormSq-smallRSq>0 ){     //point is in the big circle but NOT in the small circle
+            if( pointNormSq-bigRSq<0 and pointNormSq-smallRSq>0 ){     //point is in the heavy zone, between circles
                 wLocalWeights[i] = std::round(distHeavy(gen)*1000.0)/1000.0;
                 //wLocalWeights[i] = std::round(((ValueType)rand()/RAND_MAX+1)*5 *1000.0)/1000.0;
-            }else{                                          //point is either in the small circle or not even in the big one
+            }else{                                          //point is in the light zone
                 wLocalWeights[i] = std::round(distLight(gen)*1000.0)/1000.0 ;
                 //wLocalWeights[i] = std::round(((ValueType)rand()/RAND_MAX+1)*2 *1000.0)/1000.0;
             }
@@ -190,6 +193,7 @@ srand(time(NULL));
         }
     }
     totalGlobalWeight = comm->sum( totalLocalWeight );
+    
     
     PRINT0("Created local part of weights");
     
@@ -209,13 +213,15 @@ srand(time(NULL));
     //
     // get information for the rectangles
     //
-    root->printLeavesInFile( vm["outputFile"].as<std::string>(), dim );
+    if( comm->getRank()==0 ){
+        root->printLeavesInFileNestler( vm["outFile"].as<std::string>(), dim );
+    }
     
     std::vector<std::shared_ptr<ITI::rectCell<IndexType, ValueType>>> allLeaves = root->getAllLeaves();
     std::shared_ptr<ITI::rectCell<IndexType, ValueType>> thisLeaf;
-    ValueType thisLeafWeight;
     
-    ValueType totalLeafWeight=0, maxLeafWeight=0, minLeafWeight=totalGlobalWeight;
+    ValueType thisLeafWeight;
+        ValueType totalLeafWeight=0, maxLeafWeight=0, minLeafWeight=totalGlobalWeight;
     struct ITI::rectangle maxRect, minRect;
     
     for(int l=0; l<allLeaves.size(); l++){
@@ -241,9 +247,9 @@ srand(time(NULL));
     
     PRINT0("maxWeight= " << maxLeafWeight << ", optWeight= "<< optWeight << " , minWeight= "<< minLeafWeight );
     std::cout<< "max rectangle is"<< std::endl;
-    maxRect.print();
+    maxRect.print(std::cout);
     std::cout<< "min rectangle is"<< std::endl;
-    minRect.print();
+    minRect.print(std::cout);
     
     PRINT0("\nGot rectangles in time: " << partitionTime.count() << " - imbalance is " << (maxLeafWeight - optWeight)/optWeight);
 }

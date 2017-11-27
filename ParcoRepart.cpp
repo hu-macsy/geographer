@@ -348,7 +348,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             metrics.preliminaryCut = cut;
             metrics.preliminaryImbalance = imbalance;
             
-            IndexType numRefinementRounds = 0;
+            //IndexType numRefinementRounds = 0;
             
             SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
             scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(input);
@@ -836,7 +836,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
     } // for(IndexType block=0; block<k; block++)
     
     // assign all orphan pixels to last block
-    for(int pp=0; pp<pixeledPartition.size(); pp++){  
+    for(unsigned long int pp=0; pp<pixeledPartition.size(); pp++){  
         scai::hmemo::ReadAccess<IndexType> localSumDens( sumDensity.getLocalValues() );
         if(pixeledPartition[pp] == -1){
             pixeledPartition[pp] = k-1;     

@@ -178,7 +178,7 @@ TEST_F(MultiSectionTest, testGetRectangles){
         struct rectangle thisRectangle = rectangles[r]->getRect();
         
         if( comm->getRank()==0 and settings.numBlocks<20){
-            thisRectangle.print();
+            thisRectangle.print(std::cout);
         }
         
         // the sum of all the volumes must be equal the volume of the grid: sideLen^dim
@@ -217,8 +217,8 @@ TEST_F(MultiSectionTest, testGetRectangles){
             
             if( comm->getRank()==0 and overlap ){
                 //PRINT0("Found overlapping rectangles:");
-                thisRectangle.print();
-                otherRectangle.print();
+                thisRectangle.print(std::cout);
+                otherRectangle.print(std::cout);
                 throw std::runtime_error("The rectangles above overlap.");
             }
         }
@@ -931,7 +931,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
         struct rectangle thisRectangle = rectangles[r]->getRect();
         
         if( comm->getRank()==0 and settings.numBlocks<20){
-            thisRectangle.print();
+            thisRectangle.print(std::cout);
         }
         
         // the sum of all the volumes must be equal the volume of the grid
@@ -971,8 +971,8 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
             
             if( comm->getRank()==0 and overlap ){
                 //PRINT0("Found overlapping rectangles:");
-                thisRectangle.print();
-                otherRectangle.print();
+                thisRectangle.print(std::cout);
+                otherRectangle.print(std::cout);
                 throw std::runtime_error("The rectangles above overlap.");
             }
         }
@@ -1161,8 +1161,8 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
             
             if( comm->getRank()==0 and overlap ){
                 //PRINT0("Found overlapping rectangles:");
-                thisRectangle.print();
-                otherRectangle.print();
+                thisRectangle.print(std::cout);
+                otherRectangle.print(std::cout);
                 throw std::runtime_error("The rectangles above overlap.");
             }
         }

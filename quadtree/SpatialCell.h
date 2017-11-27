@@ -496,7 +496,7 @@ public:
 
 	index indexSubtree(index nextID) {
 		index result = nextID;
-		for (int i = 0; i < this->children.size(); i++) {
+		for (unsigned int i = 0; i < this->children.size(); i++) {
 			result = this->children[i]->indexSubtree(result);
 		}
                 this->ID = result;
@@ -512,7 +512,7 @@ public:
 		if (!this->responsible(query)) return none;
 		if (this->isLeaf) return getID();
 		else {
-			for (int i = 0; i < children.size(); i++) {
+			for (unsigned int i = 0; i < children.size(); i++) {
 				index childresult = this->children[i]->getCellID(query);
 				if (childresult != none) return childresult;
 			}
@@ -524,7 +524,7 @@ public:
 		if (this->isLeaf) return getID();
 		else {
 			index result = -1;
-			for (int i = 0; i < children.size(); i++) {
+			for (unsigned int i = 0; i < children.size(); i++) {
 				result = std::max(this->children[i]->getMaxIDInSubtree(), result);
 			}
 			return std::max(result, getID());
@@ -541,7 +541,7 @@ public:
 			}
 			offset += this->size();
 		} else {
-			for (int i = 0; i < children.size(); i++) {
+			for (unsigned int i = 0; i < children.size(); i++) {
 				offset = this->children[i]->reindexContent(offset);
 			}
 		}
@@ -787,7 +787,7 @@ public:
         
         static int getVSsize(std::vector< std::set<std::shared_ptr<SpatialCell>>> input){
             int size= 0;
-            for(int i=0; i<input.size(); i++){
+            for(unsigned int i=0; i<input.size(); i++){
                 for(typename std::set<std::shared_ptr<SpatialCell>>::iterator graphNgb= input[i].begin(); graphNgb!=input[i].end(); graphNgb++){
                     ++size;
                     //PRINT(graphNgb->get()->getID());
@@ -848,7 +848,7 @@ public:
             int dim = minCoords.getDimensions();
             std::vector<Point<double>> corners(pow(2,dim));
             assert(corners.size() % 2 == 0);//if this assert fails, we had some floating point bug in the exponentiation
-            for(int i=0; i<corners.size(); i++){
+            for(unsigned int i=0; i<corners.size(); i++){
                 int bitCopy= i;
                 std::vector<double> point(dim, 0.0);
                 for(int d=0; d<dim; d++){

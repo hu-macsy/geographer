@@ -148,9 +148,11 @@ int main(int argc, char** argv) {
     CSRSparseMatrix<ValueType> graph;
     std::vector<DenseVector<ValueType>> coords(settings.dimensions);
     
+    std::string graphFile;
+    
     if (vm.count("graphFile")) {
         
-        std::string graphFile = vm["graphFile"].as<std::string>();
+        graphFile = vm["graphFile"].as<std::string>();
         std::string coordFile;
         if (vm.count("coordFile")) {
             coordFile = vm["coordFile"].as<std::string>();
@@ -519,7 +521,14 @@ int main(int argc, char** argv) {
     
     // the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================
-        
+
+if( parMetisGeom ){    
+    ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partitionKway, graphFile+"_parMetisGeom_k_"+std::to_string(nparts)+".part");    
+}else{
+    std::cout<<" wrrite partition" << std::endl;
+    ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partitionKway, graphFile+"_parMetisGraph_k_"+std::to_string(nparts)+".part");    
+}
+
     settings.writeDebugCoordinates = 0;
     if (settings.writeDebugCoordinates) {
 		for (IndexType dim = 0; dim < settings.dimensions; dim++) {

@@ -349,9 +349,9 @@ int main(int argc, char** argv) {
         PRINT0("maxWeight= " << maxLeafWeight << ", optWeight= "<< optWeight << " , minWeight= "<< minLeafWeight );
         if( comm->getRank()==0){
             std::cout<< "max rectangle is"<< std::endl;
-            maxRect.print();
+            maxRect.print(std::cout);
             std::cout<< "min rectangle is"<< std::endl;
-            minRect.print();
+            minRect.print(std::cout);
         }
         
         //ValueType cut = ITI::ParcoRepart<IndexType, ValueType>::computeCut( graph, multiSectionPartition);

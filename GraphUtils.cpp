@@ -920,6 +920,7 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::Halo& halo
 
     return PEgraph;
 }
+//-----------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueType> &adjM) {
@@ -964,6 +965,40 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueTy
 }
 //-----------------------------------------------------------------------------------
 
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vector<std::set<IndexType>> adjList) {
+    
+    IndexType N = adjList.size();
+PRINT( N );    
+    // the CSRSparseMatrix vectors
+    std::vector<IndexType> ia(N+1);
+    ia[0] = 0;
+    std::vector<IndexType> ja;
+        
+    for(IndexType i=0; i<N; i++){
+        std::set<IndexType> neighbors = adjList[i]; // the neighbors of this vertex
+        for( typename std::set<IndexType>::iterator it=neighbors.begin(); it!=neighbors.end(); it++){
+            ja.push_back( *it );
+//PRINT( *it );            
+        }
+        ia[i+1] = ia[i]+neighbors.size();
+    }
+    
+PRINT( ja.size() );    
+    std::vector<IndexType> values(ja.size(), 1);
+    
+    scai::lama::CSRStorage<ValueType> myStorage( N, N, ja.size(), 
+            scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
+            scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
+            scai::utilskernel::LArray<ValueType>(values.size(), values.data())
+    );
+    
+    return scai::lama::CSRSparseMatrix<ValueType>(myStorage);
+}
+
+//-----------------------------------------------------------------------------------
+
+
 template IndexType getFarthestLocalNode(const CSRSparseMatrix<ValueType> graph, std::vector<IndexType> seedNodes);
 template ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool weighted);
 template ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<ValueType> &nodeWeights);
@@ -980,6 +1015,7 @@ template scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama:
 template IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 template  std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 template scai::lama::CSRSparseMatrix<ValueType> getPEGraph<IndexType,ValueType>( const scai::lama::CSRSparseMatrix<ValueType> &adjM);
+template scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vector<std::set<IndexType>> adjList);
 
 } /*namespace GraphUtils*/
 

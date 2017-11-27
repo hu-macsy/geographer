@@ -60,6 +60,9 @@ weakScaling: $(OBJ_WEAKSCALING)
 	
 getMetrics: FileIO.o GraphUtils.o
 	$(CC) $(CCFLAGS) getMetrics.cpp FileIO.o GraphUtils.o -o getMetrics $(LFLAGS)
+
+offConverter: FileIO.o	
+	$(CC) $(CCFLAGS) off2metis.cpp FileIO.o GraphUtils.o -o off2metis $(LFLAGS)
 	
 
 lib: $(OBJ_COMMON)
