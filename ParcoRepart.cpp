@@ -32,7 +32,7 @@
 #include "MultiSection.h"
 #include "GraphUtils.h"
 
-#include "schizoQuicksort/src/sort/SchizoQS.hpp"
+#include "RBC/Sort/SQuick.hpp"
 
 using scai::lama::Scalar;
 
@@ -476,7 +476,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         assert(typesize == sizeof(sort_pair));
         
         const IndexType maxLocalN = comm->max(localN);
-        sort_pair localPairs[maxLocalN];
+        std::vector<sort_pair> localPairs(maxLocalN);
 
         //fill with local values
         long indexSum = 0;//for sanity checks
@@ -499,7 +499,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         }
 
         //call distributed sort
-        SchizoQS::sort<sort_pair>(localPairs, maxLocalN);
+        //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
+        MPI_Comm mpi_comm = MPI_COMM_WORLD;
+        SQuick::sort<sort_pair>(mpi_comm, localPairs, globalN);
 
         //copy indices into array
         IndexType newLocalN = 0;
