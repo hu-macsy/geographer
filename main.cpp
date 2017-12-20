@@ -14,6 +14,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
 
 #include <memory>
 #include <cstdlib>
@@ -308,7 +309,7 @@ int main(int argc, char** argv) {
 				("verbose", "Increase output.")
                 ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
                 ("storeInfo", "Store timing and ohter metrics in file.")
-                ("writePartition", "Writes the partition in the outFile.partition file");
+                ("writePartition", "Writes the partition in the outFile.partition file")
 				;
 
         //------------------------------------------------
@@ -424,6 +425,9 @@ int main(int argc, char** argv) {
     settings.tightenBounds = vm.count("tightenBounds");
     settings.manhattanDistance = vm.count("manhattanDistance");
     writePartition = vm.count("writePartition");
+    if( writePartition ){
+        settings.writeInFile = true;
+    }
     
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
@@ -582,17 +586,23 @@ int main(int argc, char** argv) {
         std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
         maxCoord[0] = settings.numX;
         maxCoord[1] = settings.numY;
-        maxCoord[2] = settings.numZ;
+        if(settings.dimensions==3){
+            maxCoord[2] = settings.numZ;
+        }
 
         std::vector<IndexType> numPoints(3); // number of points in each dimension, used only for 3D
 
-        for (IndexType i = 0; i < 3; i++) {
+        for (IndexType i = 0; i < settings.dimensions; i++) {
         	numPoints[i] = maxCoord[i];
         }
 
         if( comm->getRank()== 0){
             std::cout<< "Generating for dim= "<< settings.dimensions << " and numPoints= "<< settings.numX << ", " << settings.numY << ", "<< settings.numZ << ", in total "<< N << " number of points" << std::endl;
-            std::cout<< "\t\t and maxCoord= "<< maxCoord[0] << ", "<< maxCoord[1] << ", " << maxCoord[2]<< std::endl;
+            std::cout<< "\t\t and maxCoord= "; //<< maxCoord[0] << ", "<< maxCoord[1] << ", " << maxCoord[2]<< std::endl;
+            for (IndexType i = 0; i < settings.dimensions; i++) {
+                std::cout << maxCoord[i] << ", ";
+            }
+            std::cout << std::endl;
         }
         
         scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -724,7 +734,7 @@ int main(int argc, char** argv) {
     
     for( IndexType r=0; r<repeatTimes; r++){
                 
-        // for the next runs the input is redistributed, se he must redistribute to the original distributions
+        // for the next runs the input is redistributed, so we must redistribute to the original distributions
         
         if(comm->getRank()==0) std::cout<< std::endl<< std::endl;
         PRINT0("\t\t ----------- Starting run number " << r +1 << " -----------");
@@ -819,7 +829,7 @@ int main(int argc, char** argv) {
     
     if( settings.storeInfo && settings.outFile!="-" ) {
         if( comm->getRank()==0){
-            std::ofstream outF( settings.outFile, std::ios::out);
+            std::ofstream outF( settings.outFile+".info", std::ios::out);
             if(outF.is_open()){
                 settings.print( outF, comm);
                 printVectorMetrics( metricsVec, outF ); 
@@ -830,34 +840,64 @@ int main(int argc, char** argv) {
         }
     }    
     
+    
     if( settings.outFile!="-" and writePartition ){
         std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
         std::string partOutFile = settings.outFile + ".partition";
         ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+        //ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partition, partOutFile );
         std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
         if( comm->getRank()==0 ){
             std::cout << " and last partition of the series in file." << partOutFile << std::endl;
             std::cout<< " Time needed to write .partition file: " << writePartTime.count() <<  std::endl;
         }
-    }
+    }    
     
     // the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================
-    /*
-        if (settings.writeDebugCoordinates) {
-                    for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-                            assert( coordinates[dim].size() == N);
-                            coordinates[dim].redistribute(partition.getDistributionPtr());
+    
+    if (settings.writeDebugCoordinates) {
+        for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+            assert( coordinates[dim].size() == N);
+            coordinates[dim].redistribute(partition.getDistributionPtr());
         }
-
+        
         std::string destPath = "partResults/main/blocks_" + std::to_string(settings.numBlocks) ;
         boost::filesystem::create_directories( destPath );   
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath + "/debugResult");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, settings.dimensions, destPath + "/debugResult");
+        comm->synchronize();
+        
+        //TODO: use something like the code below instead of a NoDistribution
+        //std::vector<IndexType> gatheredPart;
+        //comm->gatherImpl( gatheredPart.data(), N, 0, partition.getLocalValues(), scai::common::TypeTraits<IndexType>::stype );
+        
+        scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
+        graph.redistribute( noDistPtr, noDistPtr );
+        partition.redistribute( noDistPtr );
+        for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+            coordinates[dim].redistribute( noDistPtr );
         }
-    */
+        
+        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();     
+        
+        //TODO: change that in later version, where data are gathered in one PE and are not replicated
+        SCAI_ASSERT_ERROR( graph.getRowDistributionPtr()->isReplicated()==1, "Adjacency should be replicated. Aborting...");
+        SCAI_ASSERT_ERROR( partition.getDistributionPtr()->isReplicated()==1, "Partition should be replicated. Aborting...");
+        SCAI_ASSERT_ERROR( coordinates[0].getDistributionPtr()->isReplicated()==1, "Coordinates should be replicated. Aborting...");
+        
+        if( comm->getRank()==0 ){
+            if( settings.outFile != "-" ){
+                ITI::FileIO<IndexType,ValueType>::writeVTKCentral_ver2( graph, coordinates, partition, settings.outFile+".vtk" );
+            }else{
+                ITI::FileIO<IndexType,ValueType>::writeVTKCentral_ver2( graph, coordinates, partition, destPath + "/debugResult.vtk" );
+            }
+        }
+        
+    }
+      
         
     //this is needed for supermuc
-    std::exit(0);   
+//    std::exit(0);   
     
     return 0;
 }

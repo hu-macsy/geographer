@@ -20,6 +20,7 @@
 
 #include "Settings.h"
 #include "Metrics.h"
+#include "FileIO.h"
 
 using namespace scai::lama;
 using scai::dmemo::Halo;

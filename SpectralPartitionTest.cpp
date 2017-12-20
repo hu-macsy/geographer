@@ -235,7 +235,7 @@ TEST_F(SpectralPartitionTest, testGetPartition){
     scai::lama::DenseVector<IndexType> spectralPartition = SpectralPartition<IndexType, ValueType>::getPartition( graph, coordinates, settings);
     
     if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, "SpectralPartition_+trace01");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, "SpectralPartition_+trace01");
     }
     //aux::print2DGrid( graph, spectralPartition );
     

@@ -276,15 +276,29 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                     std::cout << "MS Time:" << totMsTime << std::endl;
             }
         } else if (settings.initialPartition == InitialPartitioningMethods::None) {
-        	//no need to explicitly check for repartitioning mode or not.
-        	assert(comm->getSize() == settings.numBlocks);
-        	result = DenseVector<IndexType>(input.getRowDistributionPtr(), comm->getRank());
+            //no need to explicitly check for repartitioning mode or not.
+            assert(comm->getSize() == settings.numBlocks);
+            result = DenseVector<IndexType>(input.getRowDistributionPtr(), comm->getRank());
         }
         else {
             throw std::runtime_error("Initial Partitioning mode undefined.");
         }
         
         SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
+        
+        
+        if( settings.outFile!="-" and settings.writeInFile ){
+            
+            FileIO<IndexType, ValueType>::writePartitionParallel( result, settings.outFile+"_initPart.partition" );
+
+            /*
+            // the file should already exist, we just append
+            std::ofstream outF( settings.outFile, std::ios::app);
+            outF << std::setprecision(3) << std::fixed;
+            outF << "        " << timeToCalcInitMigration << "  ,  " << timeForFirstRedistribution << "  ,  " << timeForKmeans << "  ,  "<< timeForSecondRedistr << "  ,  " << timeForInitPart << ",         "  << cut << " ,  "<< imbalance <<std::endl;
+            */
+        }
+        
         
         if (comm->getSize() == k) {
             SCAI_REGION("ParcoRepart.partitionGraph.initialRedistribution")
@@ -330,16 +344,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 std::cout<< std::endl << "\033[1;32mTiming: migration algo: "<< timeToCalcInitMigration << ", 1st redistr: " << timeForFirstRedistribution << ", only k-means: " << timeForKmeans <<", only 2nd redistr: "<< timeForSecondRedistr <<", total:" << timeForInitPart << std::endl;
                 std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
                 }
-            
-            
-            /*
-                if( settings.outFile!="-" and settings.writeInFile ){
-                    // the file should already exist, we just append
-                    std::ofstream outF( settings.outFile, std::ios::app);
-                    outF << std::setprecision(3) << std::fixed;
-                    outF << "        " << timeToCalcInitMigration << "  ,  " << timeForFirstRedistribution << "  ,  " << timeForKmeans << "  ,  "<< timeForSecondRedistr << "  ,  " << timeForInitPart << ",         "  << cut << " ,  "<< imbalance <<std::endl;
-                }
-            */
             }
 
             metrics.timeSecondDistribution[rank] = secondRedistributionTime.count();

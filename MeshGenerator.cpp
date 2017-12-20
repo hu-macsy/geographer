@@ -359,11 +359,11 @@ void MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(CSRSparseM
     SCAI_REGION( "MeshGenerator.createStructured3DMesh_dist" )
     
     if (coords.size() != 2) {
-        throw std::runtime_error("Needs three coordinate vectors, one for each dimension");
+        throw std::runtime_error("Needs two coordinate vectors, one for each dimension");
     }
     
     if (numPoints.size() != 2) {
-        throw std::runtime_error("Needs three point counts, one for each dimension");
+        throw std::runtime_error("Needs two point counts, one for each dimension");
     }
         
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();

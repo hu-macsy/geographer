@@ -756,8 +756,8 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
         nonLocalDV.setValue(i, nonLocalInd[i]);
     }
     SCAI_REGION_START("ParcoRepart.getLocalBlockGraphEdges.gatherNonLocal")
-        //gather all non-local indexes
-        gatheredPart.gather(part, nonLocalDV , scai::common::binary::COPY );
+    //gather all non-local indexes
+    gatheredPart.gather(part, nonLocalDV , scai::common::binary::COPY );
     SCAI_REGION_END("ParcoRepart.getLocalBlockGraphEdges.gatherNonLocal")
     
     assert( gatheredPart.size() == nonLocalInd.size() );
@@ -969,7 +969,7 @@ template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vector<std::set<IndexType>> adjList) {
     
     IndexType N = adjList.size();
-PRINT( N );    
+
     // the CSRSparseMatrix vectors
     std::vector<IndexType> ia(N+1);
     ia[0] = 0;
@@ -979,12 +979,11 @@ PRINT( N );
         std::set<IndexType> neighbors = adjList[i]; // the neighbors of this vertex
         for( typename std::set<IndexType>::iterator it=neighbors.begin(); it!=neighbors.end(); it++){
             ja.push_back( *it );
-//PRINT( *it );            
+//PRINT(i << " -- "<< *it);
         }
         ia[i+1] = ia[i]+neighbors.size();
     }
     
-PRINT( ja.size() );    
     std::vector<IndexType> values(ja.size(), 1);
     
     scai::lama::CSRStorage<ValueType> myStorage( N, N, ja.size(), 

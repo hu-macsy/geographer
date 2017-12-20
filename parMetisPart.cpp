@@ -14,8 +14,9 @@
 #include <fstream>
 #include <chrono>
 #include <numeric>
-
+ 
 #include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
 
 #include <scai/dmemo/BlockDistribution.hpp>
 
@@ -82,7 +83,8 @@ int main(int argc, char** argv) {
 
 	struct Settings settings;
     bool parMetisGeom = false;
-        
+    bool writePartition = false;
+    
 	desc.add_options()
 		("help", "display options")
 		("version", "show version")
@@ -100,7 +102,10 @@ int main(int argc, char** argv) {
 		("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
         ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
         ("geom", "use ParMetisGeomKway, with coordinates. Default is parmetisKway (no coordinates)")
+        
+        ("writePartition", "Writes the partition in the outFile.partition file")
         ("outFile", value<std::string>(&settings.outFile), "write result partition into file")
+        ("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 		;
         
 	variables_map vm;
@@ -109,6 +114,7 @@ int main(int argc, char** argv) {
 	notify(vm);
 
     parMetisGeom = vm.count("geom");
+    writePartition = vm.count("writePartition");
 
 	if (vm.count("help")) {
 		std::cout << desc << "\n";
@@ -171,7 +177,7 @@ int main(int argc, char** argv) {
         SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
         SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
         
-        if(parMetisGeom){
+        if(parMetisGeom or writeDebugCoordinates ){
             if (vm.count("fileFormat")) {
                 coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
             } else {
@@ -324,7 +330,7 @@ int main(int argc, char** argv) {
     IndexType localN= dist->getLocalSize();
     real_t *xyzLocal;
 
-    if( parMetisGeom ){
+    if( parMetisGeom or writeDebugCoordinates ){
         xyzLocal = new real_t[ ndims*localN ];
         
         std::vector<scai::utilskernel::LArray<ValueType>> localPartOfCoords( ndims );
@@ -404,11 +410,7 @@ int main(int argc, char** argv) {
         
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
         if( parMetisGeom ){
-            metisRet = ParMETIS_V3_PartGeomKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ndims, xyzLocal, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
-/*            
-        else if (parMetisMesh){
-            metisRet = ParMETIS_V3_PartMeshKway( vtxDist,  );
-*/            
+            metisRet = ParMETIS_V3_PartGeomKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ndims, xyzLocal, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );  
         }else{
             metisRet = ParMETIS_V3_PartKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
         }
@@ -437,7 +439,7 @@ int main(int argc, char** argv) {
     //
     delete[] xadj;
     delete[] adjncy;
-    if( parMetisGeom ){
+    if( parMetisGeom or writeDebugCoordinates ){
         delete[] xyzLocal;
     }
     
@@ -503,7 +505,7 @@ int main(int argc, char** argv) {
         
         // write in a file
         if( settings.outFile!="-" ){
-            std::ofstream outF( settings.outFile, std::ios::out);
+            std::ofstream outF( settings.outFile+".info", std::ios::out);
             if(outF.is_open()){
                 if( vm.count("generate") ){
                     outF << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
@@ -512,9 +514,9 @@ int main(int argc, char** argv) {
                 }
                 
                 metrics.print( outF ); 
-                std::cout<< "Output information written to file " << settings.outFile << std::endl;
+                std::cout<< "Output information written to file " << settings.outFile+".info" << std::endl;
             }else{
-                std::cout<< "Could not open file " << settings.outFile << " informations not stored"<< std::endl;
+                std::cout<< "Could not open file " << settings.outFile+".info" << " informations not stored"<< std::endl;
             }       
         }
     }
@@ -522,20 +524,35 @@ int main(int argc, char** argv) {
     // the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================
 
-if( parMetisGeom ){    
-    ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partitionKway, graphFile+"_parMetisGeom_k_"+std::to_string(nparts)+".part");    
-}else{
-    std::cout<<" wrrite partition" << std::endl;
-    ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partitionKway, graphFile+"_parMetisGraph_k_"+std::to_string(nparts)+".part");    
-}
+    // WARNING: the function writePartitionCentral redistributes the coordinates
+    if( writePartition ){
+        if( parMetisGeom ){    
+            std::cout<<" write partition" << std::endl;
+            ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partitionKway, settings.outFile+"_parMetisGeom_k_"+std::to_string(nparts)+".partition");    
+        }else{
+            std::cout<<" write partition" << std::endl;
+            ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partitionKway, settings.outFile+"_parMetisGraph_k_"+std::to_string(nparts)+".partition");    
+        }
+    }
 
-    settings.writeDebugCoordinates = 0;
-    if (settings.writeDebugCoordinates) {
+    //settings.writeDebugCoordinates = 0;
+    if (settings.writeDebugCoordinates or parMetisGeom) {
+        scai::dmemo::DistributionPtr metisDistributionPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partitionKway.getDistribution(), partitionKway.getLocalValues() ) );
+        scai::dmemo::Redistributor prepareRedist(metisDistributionPtr, coords[0].getDistributionPtr());
+        
 		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-			assert( coords[dim].size() == N);
-			coords[dim].redistribute( partitionKway.getDistributionPtr() );
+			SCAI_ASSERT_EQ_ERROR( coords[dim].size(), N, "Wrong coordinates size for coord "<< dim);
+			coords[dim].redistribute( prepareRedist );
 		}
-		ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords, N, "metisResult");
+        
+        std::string destPath;
+        if( parMetisGeom){
+            destPath = "partResults/parMetisGeom/blocks_" + std::to_string(settings.numBlocks) ;
+        }else{
+            destPath = "partResults/parMetis/blocks_" + std::to_string(settings.numBlocks) ;
+        }
+        boost::filesystem::create_directories( destPath );   		
+		ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coords, N, settings.dimensions, destPath + "/metisResult");
     }
 
     return 0;

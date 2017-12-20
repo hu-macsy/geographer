@@ -64,6 +64,12 @@ public:
 	 */
 	static void writeGraphDistributed (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
 
+    /* Write graph and partition into a .vtk file. This can be opened by paraview.
+     */
+    static void writeVTKCentral (const CSRSparseMatrix<ValueType> &adjM, const std::vector<DenseVector<ValueType>> &coords, const DenseVector<IndexType> &part, const std::string filename);
+    
+    static void writeVTKCentral_ver2 (const CSRSparseMatrix<ValueType> &adjM, const std::vector<DenseVector<ValueType>> &coords, const DenseVector<IndexType> &part, const std::string filename);
+    
 	/** Given the vector of the coordinates and their dimension, writes them in file "filename".
 	 * Coordinates are given as a DenseVector of size dim*numPoints.
 	*/
@@ -73,7 +79,7 @@ public:
     
     /* Each PE writes its own part of the coordinates in a separate file.
      * */
-    static void writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename);
+    static void writeCoordsDistributed (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const IndexType dimensions, const std::string filename);
 
     /*Given the vector of the coordinates and the nodeWeights writes them both in a file in the form:
     *
@@ -170,13 +176,14 @@ public:
 
 	static DenseVector<IndexType> readPartition(const std::string filename, IndexType n);
     
-    
+    /** The partition is redistributed and printed only by root processor.
+     */    
     static void writePartitionCentral( DenseVector<IndexType> &part, const std::string filename);
     
     
     /** Read graph and coordinates from a OFF file. Coordinates are (usually) in 3D.
     */
-    static void readOFFCentral( scai::lama::CSRSparseMatrix<ValueType>& graph, std::vector<DenseVector<ValueType>>& coords, const std::string filename);
+    static void readOFFTriangularCentral( scai::lama::CSRSparseMatrix<ValueType>& graph, std::vector<DenseVector<ValueType>>& coords, const std::string filename);
 
 private:
 	/**

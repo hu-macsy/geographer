@@ -668,7 +668,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         }
 
         if(dimension==2){
-            ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordsDV, N, destPath+"pixel");
+            ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordsDV, N, dimension, destPath+"pixel");
         }
         
         //redistribute
@@ -682,10 +682,8 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         graph.redistribute(newDist, noDist);
         hilbertPartition.redistribute(newDist);
 
-        if(dimension==2){
-            ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordsDV, N, destPath+"hilbert");
-        }
-        
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordsDV, N, dimension, destPath+"hilbert");
+                
         cut = ITI::GraphUtils::computeCut(graph, hilbertPartition, true);
         imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>(hilbertPartition, k);
         

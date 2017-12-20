@@ -231,7 +231,7 @@ TEST_F(FileIOTest, testWriteCoordsDistributed){
     std::vector<DenseVector<ValueType>> coords2D = FileIO<IndexType, ValueType>::readCoords( coordFile, nodes, dim);
     EXPECT_TRUE(coords2D[0].getDistributionPtr()->isEqual(*distPtr));
     
-    FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords2D, nodes, "writeCoordsDist");
+    FileIO<IndexType, ValueType>::writeCoordsDistributed( coords2D, nodes, dim, "writeCoordsDist");
     //TODO: delete files after they have been written!
 }
 //-------------------------------------------------------------------------------------------------
@@ -566,7 +566,7 @@ TEST_F (FileIOTest, testreadOFFCentral){
     scai::lama::CSRSparseMatrix<ValueType> graph;
     std::vector<DenseVector<ValueType>> coords;
     
-    FileIO<IndexType, ValueType>::readOFFCentral( graph, coords, file );
+    FileIO<IndexType, ValueType>::readOFFTriangularCentral( graph, coords, file );
     
     IndexType N = coords[0].size();
     
@@ -589,6 +589,29 @@ TEST_F (FileIOTest, testreadOFFCentral){
     
     PRINT( graph.getNumValues() << " _ " << graph.getNumRows() << " @ " << graph.getNumColumns() );
 }
+//-------------------------------------------------------------------------------------------------
+/*
+TEST_F (FileIOTest, testreadPartition){
+    std::string file = graphPath+ "example.partition";
+    
+        IndexType numVertices;
+    {
+        std::ifstream f(file);
+        if(f.fail())
+            throw std::runtime_error("File "+ file + " failed.");
+        
+        std::string line;
+        std::getline(f, line);
+        if( line[0]=='%' ){
+            std::stringstream ss;
+            ss.str( line );
+            ss >> numVertices >> numFaces >> numEdges;
+    }
+    scai::lama::DenseVector<IndexType> partition = ITI::FileIO::readPartition( file,
+    
+}
+
+*/
     
 
 } /* namespace ITI */

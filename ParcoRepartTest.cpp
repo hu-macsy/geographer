@@ -72,7 +72,7 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     //get sfc partition
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(coords[0].getDistributionPtr(), 1);
     DenseVector<IndexType> hilbertInitialPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition(coords, uniformWeights, settings);
-    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coords, N, "hilbertPartition");
+    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coords, N, dimensions, "hilbertPartition");
     
     EXPECT_GE(k-1, hilbertInitialPartition.getLocalValues().max() );
     EXPECT_EQ(N, hilbertInitialPartition.size());

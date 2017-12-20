@@ -121,7 +121,7 @@ TEST_F (auxTest, testInitialPartitions){
 	}
 
     if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"pixelPart");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, destPath+"pixelPart");
     }
     //cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
     cut = GraphUtils::computeCut( graph, pixeledPartition);
@@ -134,7 +134,7 @@ TEST_F (auxTest, testInitialPartitions){
 	scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, halo, settings);
     if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithPixel");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, destPath+"finalWithPixel");
     }
     cut = GraphUtils::computeCut( graph, pixeledPartition);
     imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( pixeledPartition, k);
@@ -166,7 +166,7 @@ TEST_F (auxTest, testInitialPartitions){
 
     //aux::print2DGrid( graph, hilbertPartition );
     if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"hilbertPart");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, destPath+"hilbertPart");
     }
     cut = GraphUtils::computeCut( graph, hilbertPartition);
     imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( hilbertPartition, k);
@@ -179,7 +179,7 @@ TEST_F (auxTest, testInitialPartitions){
 
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, halo, settings);
     if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath+"finalWithHilbert");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, destPath+"finalWithHilbert");
     }
     cut = GraphUtils::computeCut( graph, hilbertPartition);
     imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( hilbertPartition, k);

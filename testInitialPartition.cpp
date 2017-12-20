@@ -134,6 +134,7 @@ int main(int argc, char** argv) {
         struct Settings settings;
         //ITI::Format ff = ITI::Format::METIS;
         std::string blockSizesFile;
+        bool writePartition = false;
         
         desc.add_options()
             ("help", "display options")
@@ -161,6 +162,8 @@ int main(int argc, char** argv) {
             ("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
             ("multiLevelRounds", value<IndexType>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
             ("blockSizesFile", value<std::string>(&blockSizesFile) , " file to read the block sizes for every block")
+            ("writePartition", "Writes the partition in the outFile.partition file")
+            ("outFile", value<std::string>(&settings.outFile), "write result partition into file")
             ;
         
         variables_map vm;
@@ -198,6 +201,8 @@ int main(int argc, char** argv) {
         }
             
         IndexType N = -1; 		// total number of points
+        
+        writePartition = vm.count("writePartition");
         
         char machineChar[255];
         std::string machine;
@@ -565,8 +570,20 @@ int main(int argc, char** argv) {
         std::string destPath = "partResults/testInitial_"+std::to_string(initialPartition) +"/blocks_" + std::to_string(settings.numBlocks) ;
         
         boost::filesystem::create_directories( destPath );   
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed_2D( coordinates, N, destPath + "/debugResult");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, destPath + "/debugResult");
     }
     
+    if( writePartition ){
+        std::string partOutFile;
+        if( settings.outFile!="-" ){
+            partOutFile = settings.outFile + ".partition";
+        }else if( vm.count("graphFile") ){
+            partOutFile = graphFile + ".partition";
+        }else if( vm.count("generate") ){
+            partOutFile = "generate_"+ std::to_string(settings.numX)+ ".partition";
+        }
+        // write partition in file
+        ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partition, partOutFile );        
+    }
     
 }

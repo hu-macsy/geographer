@@ -467,6 +467,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             // TODO: now k must be number such that k^(1/d) is an integer, drop this condition, generalize
             ValueType sqrtK = std::pow( k, 1.0/dim );
             IndexType intSqrtK = sqrtK;
+PRINT( sqrtK << " _ " << intSqrtK );            
             // TODO/check: sqrtK is not correct, it is -1 but not sure if always
             
             if( std::pow( intSqrtK+1, dim ) == k){

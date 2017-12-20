@@ -130,21 +130,121 @@ void FileIO<IndexType, ValueType>::writeGraphDistributed (const CSRSparseMatrix<
     f.close();
 }
 //-------------------------------------------------------------------------------------------------
-/*
+
 template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writeGraphSequencialBinary (const CSRSparseMatrix<ValueType> &adjM, const std::string filename){
-    SCAI_REGION( "FileIO.writeGraphBinary" )        
+void FileIO<IndexType, ValueType>::writeVTKCentral (const CSRSparseMatrix<ValueType> &adjM, const std::vector<DenseVector<ValueType>> &coords, const DenseVector<IndexType> &part, const std::string filename){
+    SCAI_REGION( "FileIO.writeVTKCentral" )        
+        
+    const IndexType N = adjM.getNumRows();
+    const IndexType dimensions = coords.size();
     
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();        scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
+    std::ofstream f(filename);
+    if(f.fail())
+        throw std::runtime_error("File "+ filename+ " failed.");
 
-    IndexType root =0;
-    IndexType thisPE = comm->getRank();
-    IndexType numPEs = comm->getSize();
+    //------------------------------------------------------
+    // write header
     
-    typedef unsigned long int ULONG;
-
+    f << "# vtk DataFile Version 2.0" << std::endl;
+    f << "Saved graph and partition" << std::endl;
+    f << "ASCII" << std::endl;
+    f << "DATASET UNSTRUCTURED_GRID" << std::endl;
+    
+    //------------------------------------------------------
+    // write 3D coordinates
+    // TODO: use ReadAccess or copy to a vector<vector<>> of size [N,d] and not [d,N] 
+    
+    f << "POINTS " << N << " double" << std::endl;
+    for(int i=0; i<N; i++){
+        for(int d=0; d<dimensions; d++){
+            f<< coords[d].getLocalValues()[i] << " ";
+        }
+        f << std::endl;
+    }
+    
+    //------------------------------------------------------
+    // write the cells, TODO: in this version we have only vertices=points, no cells
+/*    
+    f << std::endl << "CELLS " << N  << " " << N << std::endl; //since here, we have only points
+    for(int i=0; i<N; i++){
+        f << "1 " << i << std::endl;
+    }
+*/    
+    //------------------------------------------------------
+    // write cell types, TODO: in this version we only have points and no cells
+    
+    f << std::endl << "CELL_TYPES "<< N << std::endl;
+    for(int i=0; i<N; i++){
+        f << "1" << std::endl;
+    }
+    
+    //------------------------------------------------------
+    // write the partition    
+    
+    f <<  std::endl << "POINT_DATA " << N << std::endl;
+    // below is the number or variables, aka how many different partitions we have in this file
+    f << "FIELD FieldData 1" <<  std::endl; // TODO: in this version, hardcoded to 1
+    // for(inv v=0; v<number_of_variables; v++){}
+    
+    f << "Partition 1 " << N << " int" << std::endl;
+    for( int i=0; i<N; i++){
+        f << part.getLocalValues()[i] << " ";
+    }
+    f << std::endl;
+    
+    f.close();    
 }
-*/
+//-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+void FileIO<IndexType, ValueType>::writeVTKCentral_ver2 (const CSRSparseMatrix<ValueType> &adjM, const std::vector<DenseVector<ValueType>> &coords, const DenseVector<IndexType> &part, const std::string filename){
+    SCAI_REGION( "FileIO.writeVTKCentral" )        
+        
+    const IndexType N = adjM.getNumRows();
+    const IndexType dimensions = coords.size();
+    
+    std::ofstream f(filename);
+    if(f.fail())
+        throw std::runtime_error("File "+ filename+ " failed.");
+
+    //------------------------------------------------------
+    // write header
+    
+    f << "# vtk DataFile Version 2.0" << std::endl;
+    f << "Saved graph and partition" << std::endl;
+    f << "ASCII" << std::endl;
+    f << "DATASET UNSTRUCTURED_GRID" << std::endl;
+    
+    //------------------------------------------------------
+    // write 3D coordinates
+    // TODO: use ReadAccess or copy to a vector<vector<>> of size [N,d] and not [d,N] 
+    
+    f << "POINTS " << N << " double" << std::endl;
+    for(int i=0; i<N; i++){
+        for(int d=0; d<dimensions; d++){
+            f<< coords[d].getLocalValues()[i] << " ";
+        }
+        f << std::endl;
+    }
+    
+    //------------------------------------------------------
+    // write the partition    
+    
+    f <<  std::endl << "POINT_DATA " << N << std::endl;
+    // below is the number or variables, aka how many different partitions we have in this file
+    f << "SCALARS Partition float" <<  std::endl; // TODO: in this version, hardcoded to 1
+    // for(inv v=0; v<number_of_variables; v++){}
+    
+    f << "LOOKUP_TABLE default" << std::endl;
+    int k = part.max().Scalar::getValue<IndexType>();
+    for( int i=0; i<N; i++){
+        f << (double) part.getLocalValues()[i]/(double)k << std::endl;
+    }
+    f << std::endl;
+    
+    f.close();    
+}
+
 //-------------------------------------------------------------------------------------------------
 /*Given the vector of the coordinates and their dimension, writes them in file "filename".
  */
@@ -260,12 +360,17 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVe
 /*Given the vector of the coordinates each PE writes its own part in file "filename".
  */
 template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writeCoordsDistributed_2D (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const std::string filename){
+void FileIO<IndexType, ValueType>::writeCoordsDistributed(const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const IndexType dimensions, const std::string filename){
     SCAI_REGION( "FileIO.writeCoordsDistributed" )
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr distPtr = coords[0].getDistributionPtr();
     
+    if( !(dimensions==2 or dimensions==3) ){
+        PRINT0("Only implemented for dimensions 2 or 3 for now, not for " << dimensions <<". Aborting.");
+        throw std::runtime_error("Wrong number of dimensions.");
+    }
+        
     std::string thisPEFilename = filename +'_'+ std::to_string(comm->getRank()) + ".xyz";
     std::ofstream f(thisPEFilename);
     if(f.fail())
@@ -281,9 +386,15 @@ void FileIO<IndexType, ValueType>::writeCoordsDistributed_2D (const std::vector<
     
     scai::hmemo::ReadAccess<ValueType> coordAccess0( coords[0].getLocalValues() );
     scai::hmemo::ReadAccess<ValueType> coordAccess1( coords[1].getLocalValues() );
-    
+    // in case dimensions==2 this will be ignored
+    scai::hmemo::ReadAccess<ValueType> coordAccess2( coords[dimensions-1].getLocalValues() );
+        
     for(i=0; i<localN; i++){
-        f<< std::setprecision(15)<< coordAccess0[i] << " " << coordAccess1[i] << std::endl;
+        f<< std::setprecision(15)<< coordAccess0[i] << " " << coordAccess1[i];
+        if( dimensions==3 ){
+            f << " "<< coordAccess2[i];
+        }
+        f<< std::endl;
     }
     
 }
@@ -373,6 +484,7 @@ void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<Inde
             if( comm->getRank()==p ){ 
                 if( p==0 ){
                     outfile.open(filename.c_str(), std::ios::binary | std::ios::out);
+                    outfile << "% " << globalN << std::endl;    // the first line has a comment with the number of nodes
                 }else{
                     // if not the first PE then append to file
                     outfile.open(filename.c_str(), std::ios::binary | std::ios::app);
@@ -402,7 +514,7 @@ void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<Inde
 template<typename IndexType, typename ValueType>
 template<typename T>
 void FileIO<IndexType, ValueType>::writeDenseVectorParallel(const DenseVector<T> &dv, const std::string filename) {
-    SCAI_REGION( "FileIO.writePartitionParallel" );
+    SCAI_REGION( "FileIO.writeDenseVectorParallel" );
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -456,7 +568,6 @@ void FileIO<IndexType, ValueType>::writeDenseVectorParallel(const DenseVector<T>
 template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writePartitionCentral(DenseVector<IndexType> &part, const std::string filename) {
 
-    
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	scai::dmemo::DistributionPtr dist = part.getDistributionPtr();
 
@@ -1367,7 +1478,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsMatr
  */
 
 template<typename IndexType, typename ValueType>
-void  FileIO<IndexType, ValueType>::readOFFCentral( scai::lama::CSRSparseMatrix<ValueType>& graph, std::vector<DenseVector<ValueType>>& coords, const std::string filename ){
+void  FileIO<IndexType, ValueType>::readOFFTriangularCentral( scai::lama::CSRSparseMatrix<ValueType>& graph, std::vector<DenseVector<ValueType>>& coords, const std::string filename ){
     
     std::ifstream file(filename);
     if(file.fail())
@@ -1459,6 +1570,7 @@ PRINT( N << " _ " << numFaces << ", numEdges= " << numEdges );
         
         IndexType numVertices;  // number of vertices of this face
         ss >> numVertices;
+        SCAI_ASSERT_EQ_ERROR( numVertices, 3 , "Found face with more than 3 vertices; this is not a triangular mesh. Aborting");
         
         std::vector<IndexType> face( numVertices );
         
@@ -1472,17 +1584,25 @@ PRINT( N << " _ " << numFaces << ", numEdges= " << numEdges );
             for(IndexType v2=v1+1; v2<numVertices; v2++){
                 adjList[face[v1]].insert(face[v2]);
                 adjList[face[v2]].insert(face[v1]);
+//PRINT( face[v1] << " -- " << face[v2] ); 
                 ++edgeCnt;            
             }
         }
     }
-    SCAI_ASSERT_EQ_ERROR( numEdges, edgeCnt/2, "Possibly wrong number of edges");
+    if( numEdges!=0 ){
+        SCAI_ASSERT_EQ_ERROR( numEdges, edgeCnt/2, "Possibly wrong number of edges");
+    }
     
     //
     // convert adjacency list to CSR matrix
     //
     
     graph = GraphUtils::getCSRmatrixNoEgdeWeights<IndexType, ValueType>( adjList );
+    SCAI_ASSERT_EQ_ERROR( graph.getNumColumns(), N, "Wrong number of columns");
+    SCAI_ASSERT_EQ_ERROR( graph.getNumRows(), N, "Wrong number of rows");
+    if( numEdges!=0 ){
+        SCAI_ASSERT_EQ_ERROR( graph.getNumValues()/2, numEdges , "Wrong number of edges");
+    }
 }
 
 
@@ -1495,6 +1615,16 @@ DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::st
 	if(file.fail())
 		throw std::runtime_error("File "+ filename+ " failed.");
 
+    //skip the first lines that have comments starting with '%'
+    std::string line;
+    std::getline(file, line);
+
+    while( line[0]== '%'){
+       std::getline(file, line);
+    }
+    std::stringstream ss;
+    ss.str( line );
+    
 	//get local range
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
@@ -1502,7 +1632,7 @@ DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::st
 	scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
 	const IndexType localN = endLocalRange - beginLocalRange;
 
-	std::string line;
+	//std::string line;
 
 	//scroll to begin of local range.
 	for (IndexType i = 0; i < beginLocalRange; i++) {
@@ -1524,6 +1654,7 @@ DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::st
 
 	return result;
 }
+
 
 template<typename IndexType, typename ValueType>
 std::pair<std::vector<ValueType>, std::vector<ValueType>> FileIO<IndexType, ValueType>::getBoundingCoords(std::vector<ValueType> centralCoords, IndexType level) {
