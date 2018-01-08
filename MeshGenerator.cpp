@@ -165,7 +165,8 @@ void MeshGenerator<IndexType, ValueType>::writeGraphStructured3DMesh( std::vecto
         IndexType nnzCounter = 0; // count non-zero elements
         // for every node= for every line of adjM
         for(IndexType i=0; i<N; i++){
-            IndexType ngbIndex = 0;           
+            IndexType ngbIndex = 0;      
+     
             
             std::tuple<IndexType, IndexType, IndexType> thisPoint = aux<IndexType,ValueType>::index2_3DPoint( i, numPoints);
             
