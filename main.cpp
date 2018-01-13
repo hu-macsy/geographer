@@ -132,6 +132,25 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
             out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
             <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
             << std::endl;
+            
+        out << std::setprecision(2) << std::fixed;
+        out << "gather" << std::endl;
+        out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt" << std::endl;
+        out <<  ValueType(sumKmeans)/numRuns<< " " \
+            <<  ValueType(sumPrelimanry)/numRuns<< " " \
+            <<  ValueType(sumLocalRef)/numRuns<< " " \
+            <<  ValueType(sumFinalTime)/numRuns<< " " \
+            <<  ValueType(sumPreliminaryCut)/numRuns<< " " \
+            <<  ValueType(sumFinalCut)/numRuns<< " " \
+            <<  ValueType(sumImbalace)/numRuns<< " " \
+            <<  ValueType(sumMaxBnd)/numRuns<< " " \
+            <<  ValueType(sumTotBnd)/numRuns<< " " \
+            <<  ValueType(sumMaxCommVol)/numRuns<< " " \
+            <<  ValueType(sumTotCommVol)/numRuns<< " ";
+            out << std::setprecision(6) << std::fixed;
+            out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< " " \
+            <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
+            << std::endl;        
     }
     
 }
@@ -835,7 +854,7 @@ int main(int argc, char** argv) {
                 printVectorMetrics( metricsVec, outF ); 
                 std::cout<< "Output information written to file " << settings.outFile << " in total time " << totalT << std::endl;
             }else{
-                std::cout<< "Could not open file " << settings.outFile << " informations not stored"<< std::endl;
+                std::cout<< "Could not open file " << settings.outFile << " information not stored"<< std::endl;
             }            
         }
     }    
