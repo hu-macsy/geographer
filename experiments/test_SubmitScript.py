@@ -267,7 +267,7 @@ for e in wantedExp:				#TODO: adapt so you can run a subset of all the experimen
 		
 		submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_p"+str(exp.k[i])+".cmd"
 		submitfile = createLLSubmitFile( runDir, submitFilename, commandString, "00:10:00", int(exp.k[i]) )
-		#call(["llsubmit", submitfile])
+		call(["llsubmit", submitfile])
 
 
 
