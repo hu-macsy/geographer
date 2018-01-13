@@ -101,7 +101,7 @@ def createLLSubmitFile( path, filename, commandString, walltime, processors):
 		f.write("#@ network.MPI = sn_all,,us,,"+"\n")
 		f.write("#@ output = "+jobName+".out\n")
 		f.write("#@ error = "+jobName+".err\n")
-		f.write("#@ node = "+ str(nodes)+"\n")
+		f.write("#@ node = "+ str(int(nodes))+"\n")
 	
 		if nodes<128 :
 			f.write("#@ island_count=1"+"\n")

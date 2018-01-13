@@ -6,6 +6,7 @@ import os
 import math
 import random
 import re
+import sys
 
 
 
@@ -43,8 +44,18 @@ class experiment:
 	#	return self.graph[i]+"_"+self.k[i]
 
 
+#############################################################
+## main
+
+print ('Argument List:' + str(sys.argv))
+
+wantedExp =[]
+if len(sys.argv)==2:
+	wantedExp = [ int(x) for x in sys.argv[1].split(',')] 
+	
+
 #dirString = os.path("/gpfs/work/pr87si/di36qin/meshes/")
-dirString = "/gpfs/work/pr87si/di36qin/meshes/"
+#dirString = "/gpfs/work/pr87si/di36qin/meshes/"
 basicPath = os.path.expanduser("~/parco-repart/Implementation/experiments/")
 inPath = ""
 
@@ -84,7 +95,7 @@ with open(configFile) as f:
 		else:
 			expHeader = re.split('\W+',line)
 			
-		print(expHeader)
+		#print(expHeader)
 		
 		# traverse the experiment header line to store parameters
 		dimension = -1
@@ -103,8 +114,8 @@ with open(configFile) as f:
 			exp.expType = 0
 			exp.dimension = dimension
 			exp.fileFormat = fileFormat
-			assert(exp.dimension>0),"Wrong or missing dimension in line "+str(lineCnt)
-			assert(exp.fileFormat>0),"Wrong or missing fileFormat in line "+str(lineCnt)
+			assert(int(exp.dimension)>0),"Wrong or missing dimension in line "+str(lineCnt)
+			assert(int(exp.fileFormat)>=0),"Wrong or missing fileFormat in line "+str(lineCnt)
 			expData = f.readline(); lineCnt +=1
 
 			while expData[0]!="#":
@@ -127,8 +138,8 @@ with open(configFile) as f:
 				exp.expType = 1
 				exp.dimension = dimension
 				exp.fileFormat = fileFormat
-				assert(exp.dimension>0), "Wrong or missing dimension in line "+str(lineCnt)
-				assert(exp.fileFormat>0),"Wrong or missing fileFormat in line "+str(lineCnt)
+				assert(int(exp.dimension)>0), "Wrong or missing dimension in line "+str(lineCnt)
+				assert(int(exp.fileFormat)>=0),"Wrong or missing fileFormat in line "+str(lineCnt)
 				expTokens = expData.split()
 				
 				for i in range(0, len(expTokens)-1):
@@ -148,8 +159,8 @@ with open(configFile) as f:
 				exp.expType = 2
 				exp.dimension = dimension
 				exp.fileFormat = fileFormat
-				assert(exp.dimension>0), "Wrong or missing dimension in line "+str(lineCnt)
-				assert(exp.fileFormat>0),"Wrong or missing fileFormat in line "+str(lineCnt)
+				assert(int(exp.dimension)>0), "Wrong or missing dimension in line "+str(lineCnt)
+				assert(int(exp.fileFormat)>=0),"Wrong or missing fileFormat in line "+str(lineCnt)
 				expTokens = expData.split()
 				
 				for i in range(0, len(expTokens)-1):
@@ -166,24 +177,24 @@ with open(configFile) as f:
 		line = f.readline(); lineCnt +=1
 	#while line
 
-print("\nAll experiments:")
-for exp in allExperiments:
-	exp.printExp()
-
+#print("\nAll experiments:")
+#for exp in allExperiments:
+#	exp.printExp()
 
 #
 # recheck experiments and if all files exist
 #
 
 for exp in allExperiments:
+	'''	
 	for path in exp.paths:
 		#graphPath =  os.path.join(inPath, graph)
 		if not os.path.exists( path ) :
 			print("WARNING: " + path + " does not exist.")
-		
-	if exp.dimension <=0:
+	'''		
+	if int(exp.dimension) <=0:
 		print("WARNING: wrong value for dimension: " + str(exp.dimension))
-	if exp.fileFormat <=0:
+	if int(exp.fileFormat) <0:
 		print("WARNING: wrong value for fileFormat: " + str(exp.dimension))
 
 
@@ -204,10 +215,35 @@ else:
 gatherPath = os.path.join( runDir, 'gather.config' )	
 gatherFile = open( gatherPath,'w' )
 
+if len(wantedExp)==0:
+	wantedExp = [x for x in range(0, len(allExperiments)) ]
+							   
 
-#for exp in allExperiments:
-for e in range(0,4):				#TODO: adapt so you can run a subset of all the experiments, e.g.: 1,3,7-10
+print("About to submit the following experiments:")
+totalSubmits = 0
+for e in wantedExp:
 	exp = allExperiments[e]
+	exp.printExp()
+	totalSubmits += exp.size
+	for path in exp.paths:
+		if not os.path.exists( path ) :
+			print("WARNING: " + path + " does not exist.")
+print("in total "+ str(totalSubmits)+" submits")
+
+confirm = input("Submit experiments Y/N:")
+while not(str(confirm)=="Y" or str(confirm)=="N"):
+	confirm= input("Please type Y or N ")
+	
+if str(confirm)=='N':
+		print("Aborting...")
+		exit(0)
+
+for e in wantedExp:				#TODO: adapt so you can run a subset of all the experiments, e.g.: 1,3,7-10
+	exp = allExperiments[e]
+	for path in exp.paths:
+		if not os.path.exists( path ) :
+			print("WARNING: " + path + " does not exist.")
+			
 	gatherFile.write("experiment "+ str(e) +" type "+ str(exp.expType) + " size " + str(exp.size) + "\n")
 	
 	for i in range(0,exp.size):
@@ -229,7 +265,7 @@ for e in range(0,4):				#TODO: adapt so you can run a subset of all the experime
 		print( commandString )
 		print( " " )
 		
-		submitFilename = "llsub-"+exp.graphs[i]+"_p"+str(exp.k[i])+".cmd"
+		submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_p"+str(exp.k[i])+".cmd"
 		submitfile = createLLSubmitFile( runDir, submitFilename, commandString, "00:10:00", int(exp.k[i]) )
 		#call(["llsubmit", submitfile])
 
