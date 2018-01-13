@@ -43,8 +43,9 @@ class experiment:
 	#	return self.graph[i]+"_"+self.k[i]
 
 
-dirString = os.path.expanduser("~/ParcoRepart/Implementation/meshes/")
-basicPath = os.path.expanduser("~/ParcoRepart/Implementation/experiments/")
+#dirString = os.path("/gpfs/work/pr87si/di36qin/meshes/")
+dirString = "/gpfs/work/pr87si/di36qin/meshes/"
+basicPath = os.path.expanduser("~/parco-repart/Implementation/experiments/")
 inPath = ""
 
 ##
