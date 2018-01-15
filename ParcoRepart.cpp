@@ -501,7 +501,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         //call distributed sort
         //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
         MPI_Comm mpi_comm = MPI_COMM_WORLD;
-        SQuick::sort<sort_pair>(mpi_comm, localPairs, globalN);
+        SQuick::sort<sort_pair>(mpi_comm, localPairs, -1);
 
         //copy indices into array
         IndexType newLocalN = 0;
