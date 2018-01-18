@@ -900,7 +900,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     std::vector<IndexType> ja;
     std::vector<ValueType> values;
     
-    
+
     while( lowPE<numPEs ){
         if( thisPE>=lowPE and thisPE<highPE){
             std::ifstream file;
@@ -1002,7 +1002,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 
-    scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
+    return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
 
 }
 

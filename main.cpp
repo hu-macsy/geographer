@@ -848,7 +848,7 @@ int main(int argc, char** argv) {
     
     if( settings.storeInfo && settings.outFile!="-" ) {
         if( comm->getRank()==0){
-            std::ofstream outF( settings.outFile+".info", std::ios::out);
+            std::ofstream outF( settings.outFile, std::ios::out);
             if(outF.is_open()){
                 settings.print( outF, comm);
                 printVectorMetrics( metricsVec, outF ); 
@@ -916,7 +916,7 @@ int main(int argc, char** argv) {
       
         
     //this is needed for supermuc
-//    std::exit(0);   
+    std::exit(0);   
     
     return 0;
 }

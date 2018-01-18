@@ -1,9 +1,41 @@
 import os
 import re
 
-#class settings:
-	
-#	def __init__(self):
+
+class experiment:
+	def __init__(self):
+		self.expType = -1	# 0 weak, 1 strong, 2 other
+		self.size = 0
+		self.dimension = -1
+		self.fileFormat = -1
+		
+		self.graphs = []
+		self.paths = []
+		self.k = []
+
+	#def submitExp(self):
+		
+		
+
+	def printExp(self):
+		if self.expType==0:
+			print("Experiment type: weak" )
+		elif self.expType==1:
+			print("Experiment type: strong" )
+		elif self.expType==2:
+			print("Experiment type: other" )
+		else:
+			print("Unrecognized type: " + str(self.expType) )
+
+		print("Number of experiments: " + str(self.size) + ", dim= " + str(self.dimension) + ", fileFormat: " + str(self.fileFormat) )
+		
+		for i in range(0, self.size):
+			print("graph: " + self.graphs[i] + " , k= "+ str(self.k[i]) + ",\t full path: " + self.paths[i]  )
+
+	#def (self, i):
+	#	return self.graph[i]+"_"+self.k[i]
+
+#######################################################################
 
 def defaultSettings():
 	epsilon = 0.03
@@ -33,7 +65,8 @@ def defaultSettings():
 	
 	return retString
 
-	
+#######################################################################
+
 def getRunNumber(path):
 	runsFile = os.path.join( path,".runs")
 	
@@ -45,3 +78,42 @@ def getRunNumber(path):
 		f.write( str(newRun) )
 		
 	return newRun
+
+#######################################################################
+
+def parseOutFile( outFile ):
+	
+	if not os.path.exists(outFile):
+		print ("File "+outFile+" does not exist.\nAborting...");
+		exit(-1)
+	else:
+		print ("Parsing outFile: " + outFile)
+	n = -1
+		
+	with open(outFile) as f:
+		line = f.readline()
+		tokens = line.split()
+		while tokens[0]!="gather":
+			line = f.readline();
+			tokens = line.split()
+			#print(tokens)
+			if tokens[0]=="numBlocks=":
+				n = tokens[1]	
+		
+		metricNames = f.readline().split()
+		numMetrics = len(metricNames)
+		#print(metricNames)
+		line = f.readline()
+		metricValues = [ float(x) for x in line.split()]
+		#print(metricValues)
+		
+	return metricNames, metricValues, n
+		
+			
+			
+			
+			
+			
+			
+			
+			

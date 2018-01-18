@@ -56,7 +56,7 @@ def createMOABSubmitFile(filename, commandString, walltime, processors, memory, 
 
 # for supermuc
 
-JOB_DIR="/home/hpc/pr87si/di36qin/parco-repart/Implementation"
+JOB_DIR="/home/hpc/pr87si/di36qin/parco-repart/Implementation/experiments"
 SM_SCAI_LIB="/home/hpc/pr87si/di36qin/Lama/lib"
 SM_BOOST_LIB="/home/hpc/pr87si/di36qin/Code/boost_1_63_0/stage/lib"
 METIS_LIB="/home/hpc/pr87si/di36qin/parco-repart/metis/lib"
@@ -116,7 +116,7 @@ def createLLSubmitFile( path, filename, commandString, walltime, processors):
 
 		f.write("#@ total_tasks = "+str(processors)+"\n")
 		f.write("#@ notification=always\n")
-		f.write("#@ notify_user=charilaos.tzovas@kit.edu\n")      
+		f.write("#@ notify_user=ctzovas@uni-koeln.de\n")      
 
 		#	not sure if it should be used
 		#	energyTag = jobName.replace("-","_")	#not allowed character
@@ -135,7 +135,7 @@ def createLLSubmitFile( path, filename, commandString, walltime, processors):
 		f.write("export MP_TASK_AFFINITY=core:$OMP_NUM_THREADS\n")
 		f.write("mpiexec -n "+ str(processors) + " " + commandString+"\n")
 
-	return filename
+	return fullPath
 
 def assembleCommandString(partitioner, graphFile, others=""):
 	if partitioner.lower() == "parco":

@@ -9,49 +9,14 @@ import re
 import sys
 
 
-
-class experiment:
-	def __init__(self):
-		self.expType = -1	# 0 weak, 1 strong, 2 other
-		self.size = 0
-		self.dimension = -1
-		self.fileFormat = -1
-		
-		self.graphs = []
-		self.paths = []
-		self.k = []
-
-	#def submitExp(self):
-		
-		
-
-	def printExp(self):
-		if self.expType==0:
-			print("Experiment type: weak" )
-		elif self.expType==1:
-			print("Experiment type: strong" )
-		elif self.expType==2:
-			print("Experiment type: other" )
-		else:
-			print("Unrecognized type: " + str(self.expType) )
-
-		print("Number of experiments: " + str(self.size) + ", dim= " + str(self.dimension) + ", fileFormat: " + str(self.fileFormat) )
-		
-		for i in range(0, self.size):
-			print("graph: " + self.graphs[i] + " , k= "+ str(self.k[i]) + ",\t full path: " + self.paths[i]  )
-
-	#def (self, i):
-	#	return self.graph[i]+"_"+self.k[i]
-
-
-#############################################################
+############################################################ 
 ## main
 
-print ('Argument List:' + str(sys.argv))
+#print ('Argument List:' + str(sys.argv))
 
 wantedExp =[]
-if len(sys.argv)==2:
-	wantedExp = [ int(x) for x in sys.argv[1].split(',')] 
+if len(sys.argv)==3:
+	wantedExp = [ int(x) for x in sys.argv[2].split(',')] 
 	
 
 #dirString = os.path("/gpfs/work/pr87si/di36qin/meshes/")
@@ -59,14 +24,26 @@ if len(sys.argv)==2:
 basicPath = os.path.expanduser("~/parco-repart/Implementation/experiments/")
 inPath = ""
 
-##
-configFile = os.path.join(basicPath,"SaGa.config")
-##
+configFile = ""
+
+if len(sys.argv)>3:
+	print("Too many arguments. First argument  is the config file, senond the subset ow wanted expriments. Aborting...\n")
+	exit(-1)
+elif len(sys.argv)==3:
+	configFile = sys.argv[1]
+	wantedExp = [ int(x) for x in sys.argv[2].split(',')] 
+elif len(sys.argv)==2:
+	configFile = sys.argv[1]
+else:	
+	configFile = os.path.join(basicPath,"SaGa.config")
+
+	
 
 if not os.path.exists(configFile):
 	print("Configuration file " + configFile + " does not exist. Aborting...")
 	exit(-1)
-
+else:
+	print("Collecting information from configuration file: " + configFile )
 
 #
 # parse config file
@@ -74,7 +51,6 @@ if not os.path.exists(configFile):
 
 expTypeFlag = -1; # 0 for weak, 1 for strong
 lineCnt = 0
-experiments = []
 allExperiments = []
 
 with open(configFile) as f:
@@ -126,6 +102,10 @@ with open(configFile) as f:
 					exp.k.append(expTokens[i+1])
 					exp.size +=1
 				expData = f.readline(); lineCnt +=1
+				if len(expData)==0:
+					print ("WARNING: possibly forgot \'#\' at end of an experiment")
+				elif expData[0]=="weak" or expData[0]=="strong" or expData[0]=="other": 
+					print ("WARNING: possibly forgot \'#\' at end of an experiment")
 				
 			allExperiments.append(exp)
 			
@@ -202,23 +182,9 @@ for exp in allExperiments:
 # submit a job for every experiment
 #
 
-# create the run directory and gather file
-run = getRunNumber(basicPath)
-
-runDir =  os.path.join(basicPath,"run"+str(run))
-if not os.path.exists(runDir):
-    os.makedirs(runDir)
-else:
-	print("WARNING: folder for run " + str(run) + " already exists. Danger of overwritting older data, aborting...")
-	exit(0)
-	
-gatherPath = os.path.join( runDir, 'gather.config' )	
-gatherFile = open( gatherPath,'w' )
-
 if len(wantedExp)==0:
 	wantedExp = [x for x in range(0, len(allExperiments)) ]
-							   
-
+	
 print("About to submit the following experiments:")
 totalSubmits = 0
 for e in wantedExp:
@@ -235,8 +201,23 @@ while not(str(confirm)=="Y" or str(confirm)=="N"):
 	confirm= input("Please type Y or N ")
 	
 if str(confirm)=='N':
+		#call( ["rm -rf", runDir] )
 		print("Aborting...")
 		exit(0)
+
+# create the run directory and gather file
+run = getRunNumber(basicPath)
+
+runDir =  os.path.join(basicPath,"run"+str(run))
+if not os.path.exists(runDir):
+    os.makedirs(runDir)
+else:
+	print("WARNING: folder for run " + str(run) + " already exists. Danger of overwritting older data, aborting...")
+	exit(0)
+	
+gatherPath = os.path.join( runDir, 'gather.config' )	
+gatherFile = open( gatherPath,'w' )
+
 
 for e in wantedExp:				#TODO: adapt so you can run a subset of all the experiments, e.g.: 1,3,7-10
 	exp = allExperiments[e]
@@ -247,7 +228,7 @@ for e in wantedExp:				#TODO: adapt so you can run a subset of all the experimen
 	gatherFile.write("experiment "+ str(e) +" type "+ str(exp.expType) + " size " + str(exp.size) + "\n")
 	
 	for i in range(0,exp.size):
-		outFile = str(e)+str(i)+str(exp.expType)+"_"+ exp.graphs[i].split('.')[0] + "_k" + exp.k[i] + ".out"
+		outFile = str(e)+str(i)+str(exp.expType)+"_"+ exp.graphs[i].split('.')[0] + "_k" + exp.k[i]+".info"
 		outPath = os.path.join(runDir, outFile)
 
 		# set parameters for every experiment
@@ -261,12 +242,14 @@ for e in wantedExp:				#TODO: adapt so you can run a subset of all the experimen
 		gatherFile.write( outFile+ "\n" )
 		#gatherFile.write( "#\n")
 		
-		commandString = "Diamerisi --graphFile="+ exp.paths[i]+ params
+		commandString = "../Diamerisi --graphFile="+ exp.paths[i]+ params
 		print( commandString )
 		print( " " )
 		
 		submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_p"+str(exp.k[i])+".cmd"
 		submitfile = createLLSubmitFile( runDir, submitFilename, commandString, "00:10:00", int(exp.k[i]) )
+		#submitPath = os.path.join( runDir, submitfile)
+		print( submitfile )
 		call(["llsubmit", submitfile])
 
 
