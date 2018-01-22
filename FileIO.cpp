@@ -245,7 +245,6 @@ void FileIO<IndexType, ValueType>::writeVTKCentral_ver2 (const CSRSparseMatrix<V
     
     f.close();    
 }
-
 //-------------------------------------------------------------------------------------------------
 /*Given the vector of the coordinates and their dimension, writes them in file "filename".
  */
@@ -515,7 +514,7 @@ void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<Inde
 template<typename IndexType, typename ValueType>
 template<typename T>
 void FileIO<IndexType, ValueType>::writeDenseVectorParallel(const DenseVector<T> &dv, const std::string filename) {
-    SCAI_REGION( "FileIO.writeDenseVectorParallel" );
+    SCAI_REGION( "FileIO.writePartitionParallel" );
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -901,7 +900,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     std::vector<IndexType> ja;
     std::vector<ValueType> values;
     
-
+    
     while( lowPE<numPEs ){
         if( thisPE>=lowPE and thisPE<highPE){
             std::ifstream file;
@@ -1583,7 +1582,6 @@ PRINT( N << " _ " << numFaces << ", numEdges= " << numEdges );
             for(IndexType v2=v1+1; v2<numVertices; v2++){
                 adjList[face[v1]].insert(face[v2]);
                 adjList[face[v2]].insert(face[v1]);
-//PRINT( face[v1] << " -- " << face[v2] ); 
                 ++edgeCnt;            
             }
         }
@@ -1632,54 +1630,61 @@ void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix
 	// Next, there are some numbers, each corresponding to one node (not elements) ID. We will construct
 	// the graph using these nodes as graph nodes.
 	
-	std::vector<std::set<IndexType>> adjList( N );
-	
-    IndexType edgeCnt =0;
-	int numElems = 0;
-	
-	while( std::getline(file, line) ){
-		size_t pos = line.find("END_ELEMENTS");
-		if(pos!=std::string::npos){ 		//found
-			std::cout<< "FOUND end of elements" << std::endl;
-			break;
-		}
+	{
+		std::vector<std::set<IndexType>> adjList( N );
 		
-		std::vector<IndexType> face;
+		IndexType edgeCnt =0;
+		int numElems = 0;
 		
-		std::stringstream ss( line );
-		IndexType currElem = 0;
-		ss >> currElem;
-		
-		IndexType v;
-        while( ss >> v){
-			face.push_back(v);
-			assert(v>0);
-		}
-		
-		//std::pair<std::set<IndexType>::iterator,bool> ret;
-		
-		for(IndexType v1=0; v1<face.size()-1; v1++){
-            SCAI_ASSERT_LE_ERROR( face[v1], N, "Found vertex with too big index.");	
-			auto ret = adjList[face[v1]-1].insert(face[v1+1]-1);		//TODO: check if correct: abstract 1 to start from 0
-			adjList[face[v1+1]-1].insert(face[v1]-1);
-			//std::cout << face[v1] << "-" << face[v1+1] << "    ";
+		while( std::getline(file, line) ){
+			size_t pos = line.find("END_ELEMENTS");
+			if(pos!=std::string::npos){ 		//found
+				std::cout<< "FOUND end of elements" << std::endl;
+				break;
+			}
+			
+			std::vector<IndexType> face;
+			
+			std::stringstream ss( line );
+			IndexType currElem = 0;
+			ss >> currElem;
+			
+			IndexType v;
+			while( ss >> v){
+				face.push_back(v);
+				assert(v>0);
+			}
+			
+			//std::pair<std::set<IndexType>::iterator,bool> ret;
+			
+			for(IndexType v1=0; v1<face.size()-1; v1++){
+				SCAI_ASSERT_LE_ERROR( face[v1], N, "Found vertex with too big index.");	
+				auto ret = adjList[face[v1]-1].insert(face[v1+1]-1);		//TODO: check if correct: abstract 1 to start from 0
+				adjList[face[v1+1]-1].insert(face[v1]-1);
+				//std::cout << face[v1] << "-" << face[v1+1] << "    ";
+				if(ret.second==true){
+					++edgeCnt;            
+				}
+			}
+			auto ret = adjList[face[0]-1].insert(face.back()-1);
+			adjList[face.back()-1].insert(face[0]-1);
+			
 			if(ret.second==true){
 				++edgeCnt;            
 			}
-        }
-		auto ret = adjList[face[0]-1].insert(face.back()-1);
-		adjList[face.back()-1].insert(face[0]-1);
-		
-		if(ret.second==true){
-			++edgeCnt;            
-		}
 
-		//if(lala>10) break;
-		numElems++;
-		//if( numElems>9800300) std::cout<<"Current element=" <<  currElem << std::endl;
+			//if(lala>10) break;
+			numElems++;
+			//if( numElems>9800300) std::cout<<"Current element=" <<  currElem << std::endl;
+		}
+		std::cout<< "Counted " << numElems << " elements and " << edgeCnt << " edges" << std::endl;
+			
+		//
+		// convert adjacency list to CSR matrix
+		//
+		
+		graph = GraphUtils::getCSRmatrixNoEgdeWeights<IndexType, ValueType>( adjList );
 	}
-	std::cout<< "Counted " << numElems << " elements and " << edgeCnt << " edges" << std::endl;
-	
 	
     //ss >> N >> numFaces >> numEdges;
 	//
@@ -1715,24 +1720,7 @@ void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix
 			coordsLA[dim][i] = coord;         
 			dim++;
 		}
-		/*
-		IndexType dim = 0;
-		while (dim < dimensions) {
-			bool readCoord;
-			do {//skip multiple whitespace
-				readCoord = !std::getline(ss, item, ' ').fail();
-			} while (item.size() == 0);
 
-			if (!readCoord) {
-				throw std::runtime_error("Unexpected end of line " + line +". Was the number of dimensions correct?");
-			}
-			// WARNING: in supermuc (with gcc/5) the std::stod returns the int part !!
-			//ValueType coord = std::stod(item);
-			ValueType coord = boost::lexical_cast<ValueType>(item);
-			coordsLA[dim][i] = coord;         
-			dim++;
-		}
-		*/
 		if (dim < dimensions) {
 			throw std::runtime_error("Only " + std::to_string(dim - 1)  + " values found, but " + std::to_string(dimensions) + " expected in line '" + line + "'");
 		}		
@@ -1751,12 +1739,6 @@ void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix
         coords[i] = DenseVector<ValueType>( coordsLA[i] );
     }    
 
-    
-    //
-    // convert adjacency list to CSR matrix
-    //
-    
-    graph = GraphUtils::getCSRmatrixNoEgdeWeights<IndexType, ValueType>( adjList );
 }
 
 
@@ -1808,7 +1790,6 @@ DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::st
 
 	return result;
 }
-
 
 template<typename IndexType, typename ValueType>
 std::pair<std::vector<ValueType>, std::vector<ValueType>> FileIO<IndexType, ValueType>::getBoundingCoords(std::vector<ValueType> centralCoords, IndexType level) {
