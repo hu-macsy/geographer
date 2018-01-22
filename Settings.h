@@ -139,7 +139,8 @@ struct Settings{
             } else {
                 out<< "initial partition undefined" << std::endl;
             }
-            out<< "epsilon= "<< epsilon << std::endl<< "numBlocks= " << numBlocks << std::endl;
+            out << "epsilon= "<< epsilon << std::endl;
+			out << "numBlocks= " << numBlocks << std::endl;
         }
     }
 };

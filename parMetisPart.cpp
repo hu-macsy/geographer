@@ -76,6 +76,25 @@ std::ostream& operator<<(std::ostream& out, Format method)
 }
 }
 
+
+void printMetisMetrics(struct Metrics metrics, std::ostream& out){
+	out << "gather" << std::endl;
+	out << "timeTotal finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt" << std::endl;
+    out << metrics.timeFinalPartition<< " " \
+		<< metrics.finalCut << " "\
+		<< metrics.finalImbalance << " "\
+		<< metrics.maxBoundaryNodes << " "\
+		<< metrics.totalBoundaryNodes << " "\
+		<< metrics.maxCommVolume << " "\
+		<< metrics.totalCommVolume << " ";
+	out << std::setprecision(6) << std::fixed;
+	out <<  metrics.maxBorderNodesPercent << " " \
+		<<  metrics.avgBorderNodesPercent \
+		<< std::endl; 
+}
+
+//---------------------------------------------------------------------------------------------
+
 int main(int argc, char** argv) {
 
 	using namespace boost::program_options;
@@ -115,7 +134,8 @@ int main(int argc, char** argv) {
 
     parMetisGeom = vm.count("geom");
     writePartition = vm.count("writePartition");
-
+	bool writeDebugCoordinates = settings.writeDebugCoordinates;
+	
 	if (vm.count("help")) {
 		std::cout << desc << "\n";
 		return 0;
@@ -176,7 +196,7 @@ int main(int argc, char** argv) {
                 
         SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
         SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
-        
+        		
         if(parMetisGeom or writeDebugCoordinates ){
             if (vm.count("fileFormat")) {
                 coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
@@ -423,15 +443,18 @@ int main(int argc, char** argv) {
         }
         
         if( sumKwayTime>500){
+			std::cout<< "Stopping runs because of excessive running total running time: " << sumKwayTime << std::endl;
             break;
         }
     }
 
-    if(comm->getRank()==0 ){
-        std::cout<<"Number of runs: " << r+1 << std::endl;	
+	if( r!=repeatTimes){		// in case it has to break before all the runs are completed
+		repeatTimes = r+1;
+	}
+	if(comm->getRank()==0 ){
+        std::cout<<"Number of runs: " << repeatTimes << std::endl;	
     }
-
-    repeatTimes = r+1;
+    
     double avgKwayTime = sumKwayTime/repeatTimes;
 
     //
@@ -505,18 +528,19 @@ int main(int argc, char** argv) {
         
         // write in a file
         if( settings.outFile!="-" ){
-            std::ofstream outF( settings.outFile+".info", std::ios::out);
+            std::ofstream outF( settings.outFile, std::ios::out);
             if(outF.is_open()){
                 if( vm.count("generate") ){
                     outF << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
                 }else{
                     outF << std::endl << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
                 }
-                
-                metrics.print( outF ); 
-                std::cout<< "Output information written to file " << settings.outFile+".info" << std::endl;
+                outF << "numBlocks= " << settings.numBlocks << std::endl;
+                //metrics.print( outF ); 
+				printMetisMetrics( metrics, outF);
+                std::cout<< "Output information written to file " << settings.outFile << std::endl;
             }else{
-                std::cout<< "Could not open file " << settings.outFile+".info" << " informations not stored"<< std::endl;
+                std::cout<< "Could not open file " << settings.outFile << " informations not stored"<< std::endl;
             }       
         }
     }
@@ -536,7 +560,7 @@ int main(int argc, char** argv) {
     }
 
     //settings.writeDebugCoordinates = 0;
-    if (settings.writeDebugCoordinates or parMetisGeom) {
+    if (writeDebugCoordinates and parMetisGeom) {
         scai::dmemo::DistributionPtr metisDistributionPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partitionKway.getDistribution(), partitionKway.getLocalValues() ) );
         scai::dmemo::Redistributor prepareRedist(metisDistributionPtr, coords[0].getDistributionPtr());
         
@@ -554,7 +578,10 @@ int main(int argc, char** argv) {
         boost::filesystem::create_directories( destPath );   		
 		ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coords, N, settings.dimensions, destPath + "/metisResult");
     }
-
+	        
+    //this is needed for supermuc
+    std::exit(0);   
+	
     return 0;
 }
 

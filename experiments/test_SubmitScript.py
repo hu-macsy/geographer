@@ -7,37 +7,144 @@ import math
 import random
 import re
 import sys
+import argparse
 
 
+# paths are in header.py
+
+# all avaialble tools
+#allTools = ["Geographer", "parMetisGeom", "parMetisGraph"]
+
+# absolute paths for the executable of each tool
+#geoExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/Diamerisi"
+#parMetisExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/parMetisExe"
+
+# other paths
+#basisPath = os.path.expanduser("~/parco-repart/Implementation/experiments/")
+#competitorsPath = os.path.join( basisPath, "competitors" )
+
+
+
+
+#---------------------------------------------------------------------------------------------
+# choose with which tool to submit the experiments
+
+def submitExp( tool, exp, runDir):
+
+	if tool=="Geographer":
+		submitGeographer(exp, runDir)
+	elif tool=="parMetisGraph":
+		geom = False
+		submitParMetis(exp, geom)
+	elif tool=="parMetisGeom":
+		geom= True
+		submitParMetis(exp, geom)
+	else:
+		print("First argument must be a tool name. Possible tool name are: Geographer, parMetisGraph, parMetisGeom.")
+		print("They must be given with these exact names, you gave: " + str(tool) + "'n.Aborting...\n")
+		return -1
+		
+#---------------------------------------------------------------------------------------------		
+# submit an experiment with geographer. runDir is the directory from where to gather info
+
+def submitGeographer(exp, runDir):
+		
+	gatherPath = os.path.join( runDir, 'gather.config' )	
+	gatherFile = open( gatherPath,'w' )
+
+	for path in exp.paths:
+		if not os.path.exists( path ) :
+			print("WARNING: " + path + " does not exist.")
+			
+	gatherFile.write("experiment "+ str(e) +" type "+ str(exp.expType) + " size " + str(exp.size) + "\n")
+	
+	for i in range(0,exp.size):
+		outFile = str(e)+str(i)+str(exp.expType)+"_"+ exp.graphs[i].split('.')[0] + "_k" + exp.k[i]+".info"
+		outPath = os.path.join(runDir, outFile)
+
+		# set parameters for every experiment
+		params = defaultSettings()
+		params += " --outFile="+ outPath
+		params += " --dimensions="+ exp.dimension
+		params += " --fileFormat="+ exp.fileFormat
+		#print(params)
+			
+		# add info in file gather.config
+		gatherFile.write( outFile+ "\n" )
+		
+		#commandString = "../Diamerisi --graphFile="+ exp.paths[i]+ params
+		commandString = geoExe + " --graphFile="+ exp.paths[i]+ params
+		print( commandString )
+		print( " " )
+		
+		submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_k"+str(exp.k[i])+"_Geographer.cmd"
+		submitfile = createLLSubmitFile( runDir, submitFilename, commandString, "00:10:00", int(exp.k[i]) )
+		print( submitfile )
+		#call(["llsubmit", submitfile])
+
+#---------------------------------------------------------------------------------------------		
+
+
+def submitParMetis(exp, geom):	
+	
+	for i in range(0,exp.size):
+		
+		params = ""
+		if geom:
+			outFile1 = exp.graphs[i].split('.')[0] + "_k" + exp.k[i]+"_parMetisGeom.info"
+			outFile = os.path.join( competitorsPath, "parMetisGeom", outFile1)
+			if not os.path.exists( os.path.join( competitorsPath, "parMetisGeom") ):
+				print("WARNING: Output directory " + os.path.join( competitorsPath, "parMetisGeom") +" does not exist, job NOT submited.\n Aborting...")
+				exit(-1)
+			params += " --geom"
+		else:
+			outFile1 = exp.graphs[i].split('.')[0] + "_k" + exp.k[i]+"_parMetisGraph.info"
+			outFile = os.path.join( competitorsPath, "parMetisGraph", outFile1)
+			if not os.path.exists( os.path.join( competitorsPath, "parMetisGraph") ):
+				print("WARNING: Output directory " + os.path.join( competitorsPath, "parMetisGraph") +" does not exist, job NOT submited.\n Aborting...")
+				exit(-1)
+			
+		params += " --dimensions=" + exp.dimension
+		params += " --fileFormat="+ exp.fileFormat
+	
+		commandString = parMetisExe + " --graphFile " + exp.paths[i] + params + " --outFile="+outFile
+		if geom:
+			submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_k"+str(exp.k[i])+"_parMetisGeom.cmd"
+		else:
+			submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_k"+str(exp.k[i])+"_parMetisGraph.cmd"
+		submitfile = createLLSubmitFile( os.path.join( competitorsPath, "tmp") , submitFilename, commandString, "00:05:00", int(exp.k[i]) )
+		call(["llsubmit", submitfile])
+		
+		
+		
+		
+		
+	
 ############################################################ 
-## main
+# # # # # # # # # # # #  main
 
 #print ('Argument List:' + str(sys.argv))
 
-wantedExp =[]
-if len(sys.argv)==3:
-	wantedExp = [ int(x) for x in sys.argv[2].split(',')] 
-	
+parser = argparse.ArgumentParser(description='Submit jobs in Supermuc batch job system  for the selected tool. The experiments must be stored in the given configuration file.')
+parser.add_argument('--tool','-t' , default="Geographer", help='Name of the tool. It can be: Geographer, parMetisGraph, parMetisGeom.')
+parser.add_argument('--configFile','-c', default="SaGa.config", help='The configuration file. ')
+parser.add_argument('--wantedExp', '-we', type=int, nargs='*', metavar='exp', help='A subset of the experiments that will be submited.')
+#parse.add_argument('--runDirName')
 
-#dirString = os.path("/gpfs/work/pr87si/di36qin/meshes/")
-#dirString = "/gpfs/work/pr87si/di36qin/meshes/"
-basicPath = os.path.expanduser("~/parco-repart/Implementation/experiments/")
-inPath = ""
+args = parser.parse_args()
+print(args)
 
-configFile = ""
-
-if len(sys.argv)>3:
-	print("Too many arguments. First argument  is the config file, senond the subset ow wanted expriments. Aborting...\n")
+wantedExp = args.wantedExp
+configFile = args.configFile
+tool = args.tool
+if not tool in allTools:
+	print("Wrong tool name: " + str(tool) +". Choose from: ") 
+	for x in allTools:
+		print( "\t"+str(x) ) 
+	print("Aborting...")
 	exit(-1)
-elif len(sys.argv)==3:
-	configFile = sys.argv[1]
-	wantedExp = [ int(x) for x in sys.argv[2].split(',')] 
-elif len(sys.argv)==2:
-	configFile = sys.argv[1]
-else:	
-	configFile = os.path.join(basicPath,"SaGa.config")
-
 	
+print(tool, configFile, wantedExp)
 
 if not os.path.exists(configFile):
 	print("Configuration file " + configFile + " does not exist. Aborting...")
@@ -49,6 +156,7 @@ else:
 # parse config file
 #
 
+inPath = ""
 expTypeFlag = -1; # 0 for weak, 1 for strong
 lineCnt = 0
 allExperiments = []
@@ -81,6 +189,9 @@ with open(configFile) as f:
 				dimension = expHeader[i+1]
 			elif expHeader[i]=="fileFormat":
 				fileFormat = expHeader[i+1]
+				if int(fileFormat)<0 or int(fileFormat)>6:
+					print("ERROR: unknown file format " + str(fileFormat) + ".\nAborting...")
+					exit(-1)
 			
 		# create and store experiments in an array
 		
@@ -157,9 +268,6 @@ with open(configFile) as f:
 		line = f.readline(); lineCnt +=1
 	#while line
 
-#print("\nAll experiments:")
-#for exp in allExperiments:
-#	exp.printExp()
 
 #
 # recheck experiments and if all files exist
@@ -172,6 +280,9 @@ for exp in allExperiments:
 		if not os.path.exists( path ) :
 			print("WARNING: " + path + " does not exist.")
 	'''		
+	for i in range(0, exp.size):
+		if int(exp.k[i])/16 != int(int(exp.k[i])/16):
+			print("WARNING: k= " + exp.k[i] + " is not a multiple of 16")
 	if int(exp.dimension) <=0:
 		print("WARNING: wrong value for dimension: " + str(exp.dimension))
 	if int(exp.fileFormat) <0:
@@ -182,13 +293,15 @@ for exp in allExperiments:
 # submit a job for every experiment
 #
 
-if len(wantedExp)==0:
+if wantedExp is None or len(wantedExp)==0:
+#if len(wantedExp)==0:
 	wantedExp = [x for x in range(0, len(allExperiments)) ]
 	
 print("About to submit the following experiments:")
 totalSubmits = 0
 for e in wantedExp:
 	exp = allExperiments[e]
+	print("\t\t### Experiment number: " + str(e) + " ###")
 	exp.printExp()
 	totalSubmits += exp.size
 	for path in exp.paths:
@@ -196,9 +309,11 @@ for e in wantedExp:
 			print("WARNING: " + path + " does not exist.")
 print("in total "+ str(totalSubmits)+" submits")
 
-confirm = input("Submit experiments Y/N:")
-while not(str(confirm)=="Y" or str(confirm)=="N"):
-	confirm= input("Please type Y or N ")
+#confirm = input("Submit experiments Y/N:")
+confirm = raw_input("Submit experiments with >>> " + str(tool) +" <<< Y/N:")
+while not(str(confirm)=="Y" or str(confirm)=="N" or str(confirm)=="y" or str(confirm)=="n"):
+	#confirm= input("Please type Y or N ")		#python3
+	confirm= raw_input("Please type Y/y or N/n: ")	
 	
 if str(confirm)=='N':
 		#call( ["rm -rf", runDir] )
@@ -206,51 +321,22 @@ if str(confirm)=='N':
 		exit(0)
 
 # create the run directory and gather file
-run = getRunNumber(basicPath)
+run = getRunNumber(basisPath)
 
-runDir =  os.path.join(basicPath,"run"+str(run))
+runDir =  os.path.join(basisPath,"run"+str(run))
 if not os.path.exists(runDir):
     os.makedirs(runDir)
 else:
 	print("WARNING: folder for run " + str(run) + " already exists. Danger of overwritting older data, aborting...")
-	exit(0)
+	exit(-1)
 	
-gatherPath = os.path.join( runDir, 'gather.config' )	
-gatherFile = open( gatherPath,'w' )
-
-
 for e in wantedExp:				#TODO: adapt so you can run a subset of all the experiments, e.g.: 1,3,7-10
 	exp = allExperiments[e]
-	for path in exp.paths:
-		if not os.path.exists( path ) :
-			print("WARNING: " + path + " does not exist.")
-			
-	gatherFile.write("experiment "+ str(e) +" type "+ str(exp.expType) + " size " + str(exp.size) + "\n")
-	
-	for i in range(0,exp.size):
-		outFile = str(e)+str(i)+str(exp.expType)+"_"+ exp.graphs[i].split('.')[0] + "_k" + exp.k[i]+".info"
-		outPath = os.path.join(runDir, outFile)
+		
+	submitExp(tool, exp, runDir)
 
-		# set parameters for every experiment
-		params = defaultSettings()
-		params += " --outFile="+ outPath
-		params += " --dimensions="+ exp.dimension
-		params += " --fileFormat="+ exp.fileFormat
-		#print(params)
-			
-		# add info in file gather.config
-		gatherFile.write( outFile+ "\n" )
-		#gatherFile.write( "#\n")
-		
-		commandString = "../Diamerisi --graphFile="+ exp.paths[i]+ params
-		print( commandString )
-		print( " " )
-		
-		submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_p"+str(exp.k[i])+".cmd"
-		submitfile = createLLSubmitFile( runDir, submitFilename, commandString, "00:10:00", int(exp.k[i]) )
-		#submitPath = os.path.join( runDir, submitfile)
-		print( submitfile )
-		call(["llsubmit", submitfile])
+exit(0)
+
 
 
 

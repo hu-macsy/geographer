@@ -2,6 +2,20 @@ import os
 import re
 
 
+# all avaialble tools
+allTools = ["Geographer", "parMetisGeom", "parMetisGraph"]
+
+# absolute paths for the executable of each tool
+geoExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/Diamerisi"
+parMetisExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/parMetisExe"
+
+# other paths
+basisPath = os.path.expanduser("~/parco-repart/Implementation/experiments/")
+competitorsPath = os.path.join( basisPath, "competitors" )
+
+
+
+
 class experiment:
 	def __init__(self):
 		self.expType = -1	# 0 weak, 1 strong, 2 other
@@ -93,15 +107,20 @@ def parseOutFile( outFile ):
 	with open(outFile) as f:
 		line = f.readline()
 		tokens = line.split()
+
+		if len(tokens)==0:
+			tokens = "0"
+			#print(len(tokens))
 		while tokens[0]!="gather":
 			line = f.readline();
 			tokens = line.split()
+			if len(tokens)==0:
+				tokens = "0"
 			#print(tokens)
 			if tokens[0]=="numBlocks=":
 				n = tokens[1]	
 		
 		metricNames = f.readline().split()
-		numMetrics = len(metricNames)
 		#print(metricNames)
 		line = f.readline()
 		metricValues = [ float(x) for x in line.split()]
@@ -110,10 +129,4 @@ def parseOutFile( outFile ):
 	return metricNames, metricValues, n
 		
 			
-			
-			
-			
-			
-			
-			
-			
+						

@@ -93,7 +93,7 @@ def createLLSubmitFile( path, filename, commandString, walltime, processors):
 		f.write("#! /bin/bash"+"\n")
 		#f.write("#@ shell = /usr/bin/bash"+"\n")
 		f.write("#@ job_type = parallel"+"\n")
-		f.write("#@ initialdir="+JOB_DIR+"\n")
+		f.write("#@ initialdir="+JOB_DIR+"/jobOutputs \n")
 		f.write("#@ job_name ="+jobName+"\n")
 		f.write("#@ class = "+classstring+"\n")
 		f.write("#@ node_usage = not_shared"+"\n")
