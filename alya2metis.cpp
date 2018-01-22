@@ -10,9 +10,10 @@
 
 
 int main(int argc, char** argv) {
-    std::cout << "A program converts an alya .dom.geo file to two files: one with the graph in metis format and one for the coordinates."  << std::endl;
+    std::cout << "\nA program converts an alya .dom.geo file to two files: one with the graph in metis format and one for the coordinates."  << std::endl;
     std::cout << "The endings are added automatically. The filenames are: outputFilename.graph and outputFilename.graph.xyz" <<std::endl;
-    std::cout << "usage: ./a.out inputFilename outputFilename dimensions numberOfNodes, eg: ./a.out plane.off planeMetis 3 1000" << std::endl;
+    std::cout << "usage: ./a.out inputFilename outputFilename dimensions numberOfNodes, eg: ./a.out plane.dom.geo planeMetis 3 1000" << std::endl;
+	std::cout << "usually, the number of points can be found in the *.dom.dat under \"NODAL_POINTS\""<< std::endl;
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     if( comm->getSize()>1 ){
@@ -45,7 +46,7 @@ int main(int argc, char** argv) {
     scai::lama::CSRSparseMatrix<ValueType> graph;
     std::vector<DenseVector<ValueType>> coords;
     
-PRINT0( N );	
+	PRINT0( N );	
 	
     ITI::FileIO<IndexType, ValueType>::readAlyaCentral( graph, coords, N, dimensions, inFilename);
     

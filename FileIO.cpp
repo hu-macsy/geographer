@@ -1654,7 +1654,6 @@ void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix
         while( ss >> v){
 			face.push_back(v);
 			assert(v>0);
-			if(currElem>9800340) std::cout << v << std::endl;
 		}
 		
 		//std::pair<std::set<IndexType>::iterator,bool> ret;
@@ -1674,16 +1673,6 @@ void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix
 		if(ret.second==true){
 			++edgeCnt;            
 		}
-//		++edgeCnt;
-//		std::cout << face[0] << "-" << face.back() << "    ";
-//		std::cout << std::endl;
-/*
-		boost::tokenizer<> tokens(line);
-		for(boost::tokenizer<>::iterator beg=tokens.begin(); beg!=tokens.end(); ++beg){
-			std::cout << *beg << " ";
-		}
-		std::cout << std::endl;
-*/		
 
 		//if(lala>10) break;
 		numElems++;
@@ -1709,15 +1698,6 @@ void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix
 	for (IndexType dim = 0; dim < dimensions; dim++) {
 		coordsLA[dim] = scai::utilskernel::LArray<ValueType>(N, 0);
 	}
-	/*
-	while( std::getline(file, line) ){
-		size_t pos = line.find("END_COORDINATES");
-		if(pos!=std::string::npos){ 		//found
-			std::cout<< "FOUND end of coordinates" << std::endl;
-			break;
-		}
-	}
-	*/
 	
 	for(IndexType i=0; i<N; i++){
 		bool read = !std::getline(file, line).fail();
@@ -1760,7 +1740,7 @@ void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix
 	std::getline(file, line);
 	size_t pos = line.find("END_COORDINATES");
 	if(pos==std::string::npos){ 		// NOT found
-		std::cout<< "Did nnit find end of coordinates but: " << line << std::endl;
+		std::cout<< "Did not find end of coordinates but: " << line << std::endl;
 		throw std::runtime_error("Wrong number of points and coordinates?");
 	}
 	
