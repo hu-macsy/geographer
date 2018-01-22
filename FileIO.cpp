@@ -18,6 +18,7 @@
 #include <scai/tracing.hpp>
 
 #include <boost/algorithm/string.hpp>
+#include <boost/tokenizer.hpp>
 
 #include <assert.h>
 #include <cmath>
@@ -1472,7 +1473,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsMatr
 
     return result;
 }
-
+//-------------------------------------------------------------------------------------------------
 
 /** Read graph and coordinates from a OFF file. Coordinates are (usually) in 3D.
  */
@@ -1566,8 +1567,7 @@ PRINT( N << " _ " << numFaces << ", numEdges= " << numEdges );
 			throw std::runtime_error("Unexpected end of faces part in OFF file. Was the number of nodes correct?");
 		}
 		std::stringstream ss( line );
-		std::string item;        
-        
+
         IndexType numVertices;  // number of vertices of this face
         ss >> numVertices;
         SCAI_ASSERT_EQ_ERROR( numVertices, 3 , "Found face with more than 3 vertices; this is not a triangular mesh. Aborting");
@@ -1576,9 +1576,8 @@ PRINT( N << " _ " << numFaces << ", numEdges= " << numEdges );
         
         for(IndexType f=0; f<numVertices; f++){
             ss >> face[f];
-//PRINT(face[f]);            
         }
-//std::cout<<std::endl;        
+
         for(IndexType v1=0; v1<numVertices; v1++){
             SCAI_ASSERT_LE_ERROR( v1, N, "Found vertex with too big index.");
             for(IndexType v2=v1+1; v2<numVertices; v2++){
@@ -1603,6 +1602,181 @@ PRINT( N << " _ " << numFaces << ", numEdges= " << numEdges );
     if( numEdges!=0 ){
         SCAI_ASSERT_EQ_ERROR( graph.getNumValues()/2, numEdges , "Wrong number of edges");
     }
+}
+//-------------------------------------------------------------------------------------------------
+
+/** Read graph and coordinates from a dom.geo file of the ALYA tool. Coordinates are (usually) in 3D.
+ * The mesh is composed out of elements (eg. hexagons, tetrahedra etc) and each elements is composed out of nodes.
+ */
+
+template<typename IndexType, typename ValueType>
+void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix<ValueType>& graph, std::vector<DenseVector<ValueType>>& coords, const IndexType N, const IndexType dimensions,  const std::string filename ){
+    
+    std::ifstream file(filename);
+    if(file.fail())
+        throw std::runtime_error("File "+ filename+ " failed.");
+    
+    std::string line;
+    
+	// skip first part of file until we find the line with keyword "ELEMENTS"
+	
+	while( std::getline(file, line) ){	
+		size_t pos = line.find("ELEMENTS");
+		if(pos!=std::string::npos){ 		//found
+			std::cout<< "FOUND start of ELEMENTS" << std::endl;
+			break;
+		}
+	}
+	
+	// We are in the "ELEMENTS" part, each line starts with a number, the ID of this element.
+	// Next, there are some numbers, each corresponding to one node (not elements) ID. We will construct
+	// the graph using these nodes as graph nodes.
+	
+	std::vector<std::set<IndexType>> adjList( N );
+	
+    IndexType edgeCnt =0;
+	int numElems = 0;
+	
+	while( std::getline(file, line) ){
+		size_t pos = line.find("END_ELEMENTS");
+		if(pos!=std::string::npos){ 		//found
+			std::cout<< "FOUND end of elements" << std::endl;
+			break;
+		}
+		
+		std::vector<IndexType> face;
+		
+		std::stringstream ss( line );
+		IndexType currElem = 0;
+		ss >> currElem;
+		
+		IndexType v;
+        while( ss >> v){
+			face.push_back(v);
+			assert(v>0);
+			if(currElem>9800340) std::cout << v << std::endl;
+		}
+		
+		//std::pair<std::set<IndexType>::iterator,bool> ret;
+		
+		for(IndexType v1=0; v1<face.size()-1; v1++){
+            SCAI_ASSERT_LE_ERROR( face[v1], N, "Found vertex with too big index.");	
+			auto ret = adjList[face[v1]-1].insert(face[v1+1]-1);		//TODO: check if correct: abstract 1 to start from 0
+			adjList[face[v1+1]-1].insert(face[v1]-1);
+			//std::cout << face[v1] << "-" << face[v1+1] << "    ";
+			if(ret.second==true){
+				++edgeCnt;            
+			}
+        }
+		auto ret = adjList[face[0]-1].insert(face.back()-1);
+		adjList[face.back()-1].insert(face[0]-1);
+		
+		if(ret.second==true){
+			++edgeCnt;            
+		}
+//		++edgeCnt;
+//		std::cout << face[0] << "-" << face.back() << "    ";
+//		std::cout << std::endl;
+/*
+		boost::tokenizer<> tokens(line);
+		for(boost::tokenizer<>::iterator beg=tokens.begin(); beg!=tokens.end(); ++beg){
+			std::cout << *beg << " ";
+		}
+		std::cout << std::endl;
+*/		
+
+		//if(lala>10) break;
+		numElems++;
+		//if( numElems>9800300) std::cout<<"Current element=" <<  currElem << std::endl;
+	}
+	std::cout<< "Counted " << numElems << " elements and " << edgeCnt << " edges" << std::endl;
+	
+	
+    //ss >> N >> numFaces >> numEdges;
+	//
+	// get the coordinates
+	//
+	
+	while( std::getline(file, line) ){	
+		size_t pos = line.find("COORDINATES");
+		if(pos!=std::string::npos){ 		//found
+			std::cout<< "FOUND start of COORDINATES" << std::endl;
+			break;
+		}
+	}
+	
+	std::vector<scai::utilskernel::LArray<ValueType> > coordsLA(dimensions);
+	for (IndexType dim = 0; dim < dimensions; dim++) {
+		coordsLA[dim] = scai::utilskernel::LArray<ValueType>(N, 0);
+	}
+	/*
+	while( std::getline(file, line) ){
+		size_t pos = line.find("END_COORDINATES");
+		if(pos!=std::string::npos){ 		//found
+			std::cout<< "FOUND end of coordinates" << std::endl;
+			break;
+		}
+	}
+	*/
+	
+	for(IndexType i=0; i<N; i++){
+		bool read = !std::getline(file, line).fail();
+		if (!read) {
+    		throw std::runtime_error("Unexpected end of coordinates part in OFF file. Was the number of nodes correct?");
+		}
+		std::stringstream ss( line );
+		
+		IndexType currElem = 0;
+		ss >> currElem;
+
+		ValueType coord;
+		IndexType dim = 0;
+		while( ss >> coord){
+			coordsLA[dim][i] = coord;         
+			dim++;
+		}
+		/*
+		IndexType dim = 0;
+		while (dim < dimensions) {
+			bool readCoord;
+			do {//skip multiple whitespace
+				readCoord = !std::getline(ss, item, ' ').fail();
+			} while (item.size() == 0);
+
+			if (!readCoord) {
+				throw std::runtime_error("Unexpected end of line " + line +". Was the number of dimensions correct?");
+			}
+			// WARNING: in supermuc (with gcc/5) the std::stod returns the int part !!
+			//ValueType coord = std::stod(item);
+			ValueType coord = boost::lexical_cast<ValueType>(item);
+			coordsLA[dim][i] = coord;         
+			dim++;
+		}
+		*/
+		if (dim < dimensions) {
+			throw std::runtime_error("Only " + std::to_string(dim - 1)  + " values found, but " + std::to_string(dimensions) + " expected in line '" + line + "'");
+		}		
+    }
+	std::getline(file, line);
+	size_t pos = line.find("END_COORDINATES");
+	if(pos==std::string::npos){ 		// NOT found
+		std::cout<< "Did nnit find end of coordinates but: " << line << std::endl;
+		throw std::runtime_error("Wrong number of points and coordinates?");
+	}
+	
+	
+    coords.resize( dimensions );
+
+    for (IndexType i = 0; i < dimensions; i++) {
+        coords[i] = DenseVector<ValueType>( coordsLA[i] );
+    }    
+
+    
+    //
+    // convert adjacency list to CSR matrix
+    //
+    
+    graph = GraphUtils::getCSRmatrixNoEgdeWeights<IndexType, ValueType>( adjList );
 }
 
 
