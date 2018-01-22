@@ -185,17 +185,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 migrationSettings.numBlocks = comm->getSize();
                 migrationSettings.epsilon = settings.epsilon;
                 //migrationSettings.bisect = true;
-              
+                
                 // the distribution for the initial migration   
                 scai::dmemo::DistributionPtr initMigrationPtr;
                 
                 if (!settings.repartition || comm->getSize() != settings.numBlocks) {
                     DenseVector<IndexType> tempResult;
-PRINT(*comm);   
+                    
                     if( settings.initialMigration == InitialPartitioningMethods::SFC){
-PRINT(*comm);                        
                         tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, migrationSettings);
-PRINT(*comm);                        
                         initMigrationPtr = tempResult.getDistributionPtr();
                     } else if ( settings.initialMigration == InitialPartitioningMethods::Multisection){
                         DenseVector<ValueType> convertedWeights(nodeWeights);
@@ -203,7 +201,7 @@ PRINT(*comm);
                         initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
                     } else if ( settings.initialMigration == InitialPartitioningMethods::KMeans){
                         DenseVector<ValueType> convertedWeights(nodeWeights.getDistributionPtr(), 1);
-                        std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );                  
+                        std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );;
                         tempResult = ITI::KMeans::computePartition(coordinates, migrationSettings.numBlocks, convertedWeights, migrationBlockSizes, migrationSettings);
                         initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
                     } else if (settings.initialMigration == InitialPartitioningMethods::None) {
@@ -212,7 +210,7 @@ PRINT(*comm);
                     } else {
                         throw std::logic_error("Method not yet supported for preparing for K-Means");
                     }
- 
+                      
                     migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
                     metrics.timeMigrationAlgo[rank]  = migrationCalculation.count();
                     
@@ -232,7 +230,7 @@ PRINT(*comm);
                 }
             
             }
-PRINT(*comm);            
+            
             const ValueType weightSum = nodeWeights.sum().Scalar::getValue<ValueType>();
             
             // vector of size k, each element represents the size of one block
@@ -265,7 +263,7 @@ PRINT(*comm);
 
             assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
             assert(result.min().Scalar::getValue<IndexType>() == 0);
-PRINT(*comm);
+
         } else if (settings.initialPartition == InitialPartitioningMethods::Multisection) {// multisection
             PRINT0("Initial partition with multisection");
             DenseVector<ValueType> convertedWeights(nodeWeights);
@@ -343,7 +341,7 @@ PRINT(*comm);
                 }
             */
             }
-PRINT(*comm);
+
             metrics.timeSecondDistribution[rank] = secondRedistributionTime.count();
             metrics.timePreliminary[rank] = partitionTime.count();
 
@@ -423,7 +421,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     /**
      *	create space filling curve indices.
      */
-
+    
     scai::lama::DenseVector<ValueType> hilbertIndices(coordDist);
  
     {
@@ -502,10 +500,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
 
         //call distributed sort
         //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
-PRINT(*comm);         
         MPI_Comm mpi_comm = MPI_COMM_WORLD;
-        SQuick::sort<sort_pair>(mpi_comm, localPairs, globalN);
-PRINT(*comm); 
+        SQuick::sort<sort_pair>(mpi_comm, localPairs, -1);
+
         //copy indices into array
         IndexType newLocalN = 0;
         newLocalIndices.resize(maxLocalN);
@@ -538,7 +535,7 @@ PRINT(*comm);
 
         //possible optimization: remove dummy values during first copy, then directly copy into HArray and sort with pointers. Would save one copy.
     }
-PRINT(*comm);     
+    
     {
     	assert(!coordDist->isReplicated() && comm->getSize() == k);
         SCAI_REGION( "ParcoRepart.hilbertPartition.createDistribution" );
