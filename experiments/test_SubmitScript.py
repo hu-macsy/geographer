@@ -49,6 +49,13 @@ def submitExp( tool, exp, runDir):
 
 def submitGeographer(exp, runDir):
 		
+	runDir =  os.path.join(basisPath,"run"+str(run))
+	if not os.path.exists(runDir):
+		os.makedirs(runDir)
+	else:
+		print("WARNING: folder for run " + str(run) + " already exists. Danger of overwritting older data, aborting...")
+		exit(-1)
+		
 	gatherPath = os.path.join( runDir, 'gather.config' )	
 	gatherFile = open( gatherPath,'w' )
 
@@ -80,7 +87,7 @@ def submitGeographer(exp, runDir):
 		submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_k"+str(exp.k[i])+"_Geographer.cmd"
 		submitfile = createLLSubmitFile( runDir, submitFilename, commandString, "00:10:00", int(exp.k[i]) )
 		print( submitfile )
-		#call(["llsubmit", submitfile])
+		call(["llsubmit", submitfile])
 
 #---------------------------------------------------------------------------------------------		
 
@@ -94,15 +101,19 @@ def submitParMetis(exp, geom):
 			outFile1 = exp.graphs[i].split('.')[0] + "_k" + exp.k[i]+"_parMetisGeom.info"
 			outFile = os.path.join( competitorsPath, "parMetisGeom", outFile1)
 			if not os.path.exists( os.path.join( competitorsPath, "parMetisGeom") ):
-				print("WARNING: Output directory " + os.path.join( competitorsPath, "parMetisGeom") +" does not exist, job NOT submited.\n Aborting...")
-				exit(-1)
+				print("\t\tWARNING: Output directory " + os.path.join( competitorsPath, "parMetisGeom") +" does not exist, experiment NOT submited.\n Aborting...")
+				exit(-1)			
 			params += " --geom"
 		else:
 			outFile1 = exp.graphs[i].split('.')[0] + "_k" + exp.k[i]+"_parMetisGraph.info"
 			outFile = os.path.join( competitorsPath, "parMetisGraph", outFile1)
 			if not os.path.exists( os.path.join( competitorsPath, "parMetisGraph") ):
-				print("WARNING: Output directory " + os.path.join( competitorsPath, "parMetisGraph") +" does not exist, job NOT submited.\n Aborting...")
+				print("WARNING: Output directory " + os.path.join( competitorsPath, "parMetisGraph") +" does not exist, experiment NOT submited.\n Aborting...")
 				exit(-1)
+			
+		if os.path.exists( outFile ):
+			print("\t\tWARNING: The outFile: " + outFile + " already exists, job NOT submitted".)
+			continue
 			
 		params += " --dimensions=" + exp.dimension
 		params += " --fileFormat="+ exp.fileFormat
@@ -323,17 +334,11 @@ if str(confirm)=='N':
 # create the run directory and gather file
 run = getRunNumber(basisPath)
 
-runDir =  os.path.join(basisPath,"run"+str(run))
-if not os.path.exists(runDir):
-    os.makedirs(runDir)
-else:
-	print("WARNING: folder for run " + str(run) + " already exists. Danger of overwritting older data, aborting...")
-	exit(-1)
 	
 for e in wantedExp:				#TODO: adapt so you can run a subset of all the experiments, e.g.: 1,3,7-10
 	exp = allExperiments[e]
 		
-	submitExp(tool, exp, runDir)
+	submitExp(tool, exp)
 
 exit(0)
 

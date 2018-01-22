@@ -1679,14 +1679,13 @@ void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix
 		}
 		std::cout<< "Counted " << numElems << " elements and " << edgeCnt << " edges" << std::endl;
 			
-		//
 		// convert adjacency list to CSR matrix
 		//
 		
 		graph = GraphUtils::getCSRmatrixNoEgdeWeights<IndexType, ValueType>( adjList );
 	}
 	
-    //ss >> N >> numFaces >> numEdges;
+    
 	//
 	// get the coordinates
 	//
@@ -1740,7 +1739,6 @@ void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix
     }    
 
 }
-
 
 
 
