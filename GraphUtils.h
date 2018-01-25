@@ -84,7 +84,7 @@ scai::lama::DenseVector<IndexType> getBorderNodes( const scai::lama::CSRSparseMa
  *
  */
 template<typename IndexType, typename ValueType>
-std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part);
+std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const struct Settings settings);
 
 /* Computes the communication volume for every block. 
  * TODO: Should the result is gathered in the root PE and not be replicated?

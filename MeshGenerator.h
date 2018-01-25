@@ -37,7 +37,6 @@
 #include "AuxiliaryFunctions.h"
 #include "Settings.h"
 
-#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;

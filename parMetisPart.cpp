@@ -21,7 +21,7 @@
 #include <scai/dmemo/BlockDistribution.hpp>
 
 #include "FileIO.h"
-#include "GraphUtils.h"
+//#include "GraphUtils.h"
 #include "Settings.h"
 #include "Metrics.h"
 #include "MeshGenerator.h"
@@ -76,8 +76,8 @@ std::ostream& operator<<(std::ostream& out, Format method)
 }
 }
 
-
-void printMetisMetrics(struct Metrics metrics, std::ostream& out){
+/*
+void printCompetitorMetrics(struct Metrics metrics, std::ostream& out){
 	out << "gather" << std::endl;
 	out << "timeTotal finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt" << std::endl;
     out << metrics.timeFinalPartition<< " " \
@@ -92,6 +92,7 @@ void printMetisMetrics(struct Metrics metrics, std::ostream& out){
 		<<  metrics.avgBorderNodesPercent \
 		<< std::endl; 
 }
+*/
 
 //---------------------------------------------------------------------------------------------
 
@@ -537,7 +538,7 @@ int main(int argc, char** argv) {
                 }
                 outF << "numBlocks= " << settings.numBlocks << std::endl;
                 //metrics.print( outF ); 
-				printMetisMetrics( metrics, outF);
+				printMetricsShort( metrics, outF);
                 std::cout<< "Output information written to file " << settings.outFile << std::endl;
             }else{
                 std::cout<< "Could not open file " << settings.outFile << " informations not stored"<< std::endl;

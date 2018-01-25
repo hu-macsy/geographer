@@ -439,7 +439,7 @@ DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, c
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part) {
+std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes	( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const struct Settings settings) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
@@ -453,6 +453,11 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes(
 
     IndexType globalN = dist->getGlobalSize();
     IndexType max = part.max().Scalar::getValue<IndexType>();
+	
+	if(max!=settings.numBlocks-1){
+		PRINT("\n\t\tWARNING: the max block id is " << max << " but it should be " << settings.numBlocks-1);
+		max = settings.numBlocks-1;
+	}
     
     // the number of border nodes per block
     std::vector<IndexType> borderNodesPerBlock( max+1, 0 );
@@ -1007,7 +1012,7 @@ template std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMat
 template std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input, const std::set<IndexType>& candidates);
 template std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
 template DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
-template std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
+template std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const struct Settings settings);
 template std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
 template std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part);
 template scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
