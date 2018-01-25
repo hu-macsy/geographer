@@ -98,8 +98,9 @@ def getRunNumber(path):
 def parseOutFile( outFile ):
 	
 	if not os.path.exists(outFile):
-		print ("File "+outFile+" does not exist.\nAborting...");
-		exit(-1)
+		print ("WARNING: File "+outFile+" does not exist.\nSkipping...");
+		return [], [], -1
+		#exit(-1)
 	else:
 		print ("Parsing outFile: " + outFile)
 	n = -1

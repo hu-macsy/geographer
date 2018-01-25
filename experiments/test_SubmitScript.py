@@ -29,10 +29,10 @@ import argparse
 #---------------------------------------------------------------------------------------------
 # choose with which tool to submit the experiments
 
-def submitExp( tool, exp, runDir):
+def submitExp( tool, exp):
 
 	if tool=="Geographer":
-		submitGeographer(exp, runDir)
+		submitGeographer(exp)
 	elif tool=="parMetisGraph":
 		geom = False
 		submitParMetis(exp, geom)
@@ -47,7 +47,7 @@ def submitExp( tool, exp, runDir):
 #---------------------------------------------------------------------------------------------		
 # submit an experiment with geographer. runDir is the directory from where to gather info
 
-def submitGeographer(exp, runDir):
+def submitGeographer(exp):
 		
 	runDir =  os.path.join(basisPath,"run"+str(run))
 	if not os.path.exists(runDir):
@@ -57,7 +57,7 @@ def submitGeographer(exp, runDir):
 		exit(-1)
 		
 	gatherPath = os.path.join( runDir, 'gather.config' )	
-	gatherFile = open( gatherPath,'w' )
+	gatherFile = open( gatherPath,'a' )
 
 	for path in exp.paths:
 		if not os.path.exists( path ) :
@@ -112,7 +112,7 @@ def submitParMetis(exp, geom):
 				exit(-1)
 			
 		if os.path.exists( outFile ):
-			print("\t\tWARNING: The outFile: " + outFile + " already exists, job NOT submitted".)
+			print("\t\tWARNING: The outFile: " + outFile + " already exists, job NOT submitted.")
 			continue
 			
 		params += " --dimensions=" + exp.dimension
