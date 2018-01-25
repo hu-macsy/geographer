@@ -352,10 +352,9 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
     
     if( comm->getRank()==0 ){
         out << "gather" << std::endl;
-        out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt" << std::endl;
+        out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxBndPercnt avgBndPercnt " << std::endl;
 		
         out << std::setprecision(2) << std::fixed;
-        out << "average,  "\
             //<<  ValueType(sumKmeans)/numRuns<< "  " \
             //<<  ValueType(sumLocalRef)/numRuns<< ",  "  
             <<  ValueType(sumFinalTime)/numRuns<< " " \
