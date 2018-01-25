@@ -9,6 +9,7 @@ OBJ_CONVERTER = quadTreeConverter.o FileIO.o
 OBJ_DIFFUSIONCOORDS = FileIO.o Diffusion.o diffusionCoords.o
 OBJ_TEST_INITIAL= $(OBJ_COMMON) testInitial.o 
 OBJ_WEAKSCALING= $(OBJ_COMMON) testWeakScaling.o 
+OBJ_XTRAPULP = FileIO.o GraphUtils.o xtrapulpWrapper.cpp MeshGenerator.o
 
 EXECUTABLE_GOOGLETEST=KatanomiTest
 EXECUTABLE_MAIN=Katanomi
@@ -28,8 +29,14 @@ QUICKSORT_INCLUDE=schizoQuicksort/src
 QUICKSORT_LIB=schizoQuicksort/build
 MPI_INCLUDE=/usr/lib/openmpi/include/
 MPI_LIB=/usr/lib/openmpi/lib/
-LFLAGS= -Wl,-rpath=$(SCAI_LIB) -L$(SCAI_LIB) -L$(GTEST_LIB) -L$(QUICKSORT_LIB) -L$(MPI_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lscai_sparsekernel -lscai_solver -lboost_program_options -lboost_filesystem -lboost_system -lquicksort -lparmetis -lmetis
-CCFLAGS= --openmp --std=c++11 -g -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -I$(QUICKSORT_INCLUDE) -I$(MPI_INCLUDE) -DSCAI_TRACE_ON  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR -DBUILD_COMMIT=$(GIT_COMMIT)
+RBC_DIR=./RBC
+
+XTRAPULP_INCLUDE= /usr/xtrapulp
+XTRAPULP_LIB= /usr/xtrapulp
+
+LFLAGS= -Wl,-rpath=$(SCAI_LIB) -L$(SCAI_LIB) -L$(GTEST_LIB) -L$(RBC_DIR)/build/lib -L$(MPI_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lscai_sparsekernel -lscai_solver -lboost_program_options -lboost_filesystem -lboost_system -lquicksort -lparmetis -lmetis
+
+CCFLAGS= --openmp --std=c++11 -g -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -I$(RCB_DIR)/Sort -I$(QUICKSORT_INCLUDE) -I$(MPI_INCLUDE) -DSCAI_TRACE_ON  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR -DBUILD_COMMIT=$(GIT_COMMIT)
 
 all: main tests metisWrapper lib converter diffusionCoords graphGen testInitial weakScaling
 .PHONY: all
@@ -45,6 +52,9 @@ graphGen: $(OBJ_GRAPH_GEN)
 
 metisWrapper: $(OBJ_COMMON) parMetisPart.cpp
 	$(CC) $(CCFLAGS) -I$(PARMETIS_INCLUDE) $(OBJ_COMMON) parMetisPart.cpp -o metisWrapper -L$(PARMETIS_LIB) -lparmetis $(LFLAGS)
+
+xtrapulpWrapper: $(OBJ_XTRAPULP)
+	$(CC)  $(CCFLAGS) $(OBJ_XTRAPULP)  -o xtrapulpEXE -L$(XTRAPULP_LIB) -lxtrapulp $(LFLAGS)
 
 testInitial: $(OBJ_TEST_INITIAL)
 	$(CC) $(CCFLAGS) $(OBJ_TEST_INITIAL) -o $(EXECUTABLE_INITIAL) $(LFLAGS)
