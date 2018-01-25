@@ -22,9 +22,6 @@
 #include <set>
 #include <memory>
 
-#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-#define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-
 
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;

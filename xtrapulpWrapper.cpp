@@ -3,7 +3,7 @@
  *
  *
  * example of use: 
- * mpirun -n #p parMetis --graphFile="meshes/hugetrace/hugetrace-00008.graph" --dimensions=2 --numBlocks=#k --geom=0
+ * mpirun -n #p pulpEXE --graphFile="meshes/hugetrace/hugetrace-00008.graph" --dimensions=2 --numBlocks=#k
  * 
  * 
  * where #p is the number of PEs that the graph is distributed to and #k the number of blocks to partition to
@@ -14,7 +14,8 @@
 #include <fstream>
 #include <chrono>
 #include <numeric>
- 
+#include <mpi.h>
+
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 
@@ -26,7 +27,19 @@
 #include "Metrics.h"
 #include "MeshGenerator.h"
 
+/*
+#include "comms.h"
+#include "generate.h"
+#include "io_pp.h"
+#include "pulp_util.h"
+#include "util.h"
+*/
+#include "fast_map.h"
+#include "dist_graph.h"
 #include "xtrapulp.h"
+
+extern int procid, nprocs;
+
 
 
 namespace ITI {
@@ -77,22 +90,6 @@ std::ostream& operator<<(std::ostream& out, Format method)
 }
 
 
-void printMetisMetrics(struct Metrics metrics, std::ostream& out){
-	out << "gather" << std::endl;
-	out << "timeTotal finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt" << std::endl;
-    out << metrics.timeFinalPartition<< " " \
-		<< metrics.finalCut << " "\
-		<< metrics.finalImbalance << " "\
-		<< metrics.maxBoundaryNodes << " "\
-		<< metrics.totalBoundaryNodes << " "\
-		<< metrics.maxCommVolume << " "\
-		<< metrics.totalCommVolume << " ";
-	out << std::setprecision(6) << std::fixed;
-	out <<  metrics.maxBorderNodesPercent << " " \
-		<<  metrics.avgBorderNodesPercent \
-		<< std::endl; 
-}
-
 //---------------------------------------------------------------------------------------------
 
 int main(int argc, char** argv) {
@@ -101,7 +98,6 @@ int main(int argc, char** argv) {
 	options_description desc("Supported options");
 
 	struct Settings settings;
-    bool parMetisGeom = false;
     bool writePartition = false;
     
 	desc.add_options()
@@ -120,21 +116,24 @@ int main(int argc, char** argv) {
 		("dimensions", value<IndexType>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 		("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
         ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
-        ("geom", "use ParMetisGeomKway, with coordinates. Default is parmetisKway (no coordinates)")
         
         ("writePartition", "Writes the partition in the outFile.partition file")
         ("outFile", value<std::string>(&settings.outFile), "write result partition into file")
-        ("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 		;
         
+		
+	//--------------------------------------------------------------
+	//
+	// read options, input parameters and declare and initialize variables
+	//
+		
 	variables_map vm;
 	store(command_line_parser(argc, argv).
 			  options(desc).run(), vm);
 	notify(vm);
 
-    parMetisGeom = vm.count("geom");
     writePartition = vm.count("writePartition");
-	bool writeDebugCoordinates = settings.writeDebugCoordinates;
+	
 	
 	if (vm.count("help")) {
 		std::cout << desc << "\n";
@@ -149,22 +148,13 @@ int main(int argc, char** argv) {
 	if (! (vm.count("graphFile") or vm.count("generate")) ) {
 		std::cout << "Specify input file with --graphFile or mesh generation with --generate and number of points per dimension." << std::endl; //TODO: change into positional argument
 	}
-           
+	
+
 	
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     IndexType N;
-
-    if( comm->getRank()==0 ){
-        std::cout << "\033[1;31m";
-        std::cout << "IndexType size: " << sizeof(IndexType) << " , ValueType size: "<< sizeof(ValueType) << std::endl;
-        if( sizeof(IndexType)!=sizeof(idx_t) ){
-            std::cout<< "WARNING: IndexType size= " << sizeof(IndexType) << " and idx_t size=" << sizeof(idx_t) << "  do not agree, this may cause problems " << std::endl;
-        }
-        if( sizeof(ValueType)!=sizeof(real_t) ){
-            std::cout<< "WARNING: IndexType size= " << sizeof(IndexType) << " and idx_t size=" << sizeof(idx_t) << "  do not agree, this may cause problems " << std::endl;
-        }
-        std::cout<<"\033[0m";
-    }
+	IndexType numBlocks = settings.numBlocks;
+	
              
     //-----------------------------------------
     //
@@ -196,16 +186,7 @@ int main(int argc, char** argv) {
                 
         SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
         SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
-        		
-        if(parMetisGeom or writeDebugCoordinates ){
-            if (vm.count("fileFormat")) {
-                coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
-            } else {
-                coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
-            }
-            SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size() , coords[1].getLocalValues().size(), "coordinates not of same size" );
-        }
-        
+
     } else if(vm.count("generate")){
         if (settings.dimensions != 3) {
             if(comm->getRank() == 0) {
@@ -260,194 +241,242 @@ int main(int argc, char** argv) {
     
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
 
+	
     //-----------------------------------------------------
     //
-    // convert to parMetis data types
+    // convert to xtraPulp data types
     //
     
-    //get the vtx array
-    
-    IndexType size = comm->getSize();
-    scai::hmemo::HArray<IndexType> sendVtx(size+1, static_cast<ValueType>( 0 ));
-    scai::hmemo::HArray<IndexType> recvVtx(size+1);
-    
-    IndexType lb, ub;
-    scai::dmemo::BlockDistribution blockDist(N, comm);
-    blockDist.getLocalRange(lb, ub, N, comm->getRank(), comm->getSize() );
-    //PRINT(*comm<< ": "<< lb << " _ "<< ub);
-    
+	// xtrapulp variables
+	
+	ValueType vert_balance = 1.1;
+	ValueType edge_balance = 1.1;
+	bool do_bfs_init = true;
+	bool do_lp_init = false;
+	bool do_repart = false;
+	bool do_edge_balance = false;
+	bool do_maxcut_balance = false;	
+	int pulp_seed = rand();
+		
+	pulp_part_control_t ppc = {vert_balance,      edge_balance, do_lp_init,
+                             do_bfs_init,       do_repart,    do_edge_balance,
+                             do_maxcut_balance, false,        pulp_seed};
+/*							 
+	mpi_data_t pulpComm;
+	init_comm_data(&pulpComm);
+	
+	queue_data_t q;
+	init_queue_data(&g, &q);
+	get_ghost_degrees(&g, &comm, &q);
+	
+	pulp_data_t pulp;
+	init_pulp_data(&g, &pulp, numBlocks);
+*/
 
-    for(IndexType round=0; round<comm->getSize(); round++){
-        SCAI_REGION("ParcoRepart.getBlockGraph.shiftArray");
-        {   // write your part 
-            scai::hmemo::WriteAccess<IndexType> sendPartWrite( sendVtx );
-            sendPartWrite[0]=0;
-            sendPartWrite[comm->getRank()+1]=ub;
-        }
-        comm->shiftArray(recvVtx , sendVtx, 1);
-        sendVtx.swap(recvVtx);
-    } 
+    IndexType localN = dist->getLocalSize();
+	IndexType M = graph.getNumValues()/2;
+	IndexType localM = graph.getLocalNumValues()/*/2*/;
+	IndexType thisPE = comm->getRank();
+	IndexType numPEs = comm->getSize();
 
-    scai::hmemo::ReadAccess<IndexType> recvPartRead( recvVtx );
+	dist_graph_t g;
+	
+    g.n = N /*+1*/;				// global/total number of vertices
+	g.m = M;					// global/total number of edges
+	g.m_local = localM;			// local number of edges
+	g.n_offset = thisPE * (g.n/numPEs /*+1*/);
+	g.n_local = g.n/numPEs /*+1*/;	// local number of vertices
+	SCAI_ASSERT_EQ_ERROR(g.n_local, localN, "Should be equal??" );
+	
+	bool offset_vids = false;
+	if( thisPE==numPEs-1 && !offset_vids ){
+			g.n_local = g.n - g.n_offset /*+1*/;
+	}
+			
+	g.vertex_weights = NULL;
+	g.edge_weights = NULL;
+	
+	//WARNING: assuming that out_edges is the local ja values of the CSRSparseMatrix
+	uint64_t* out_edges = new uint64_t[g.m_local];
+	uint64_t* out_degree_list = new uint64_t[g.n_local+1];
+	{
+		scai::lama::CSRStorage<ValueType>& localMatrix= graph.getLocalStorage();
+		scai::hmemo::ReadAccess<IndexType> ia( localMatrix.getIA() );
+		scai::hmemo::ReadAccess<IndexType> ja( localMatrix.getJA() );
+		SCAI_ASSERT_EQ_ERROR( g.m_local, ja.size(), "Should be equal?");		
+		
+		for(int i=0; i<ja.size() ; i++){
+			out_edges[i]= ja[i];
+			//PRINT(*comm << ": " << i << " , " << ja[i]);
+			SCAI_ASSERT( out_edges[i] >=0, "negative value for i= "<< i << " , val= "<< out_edges[i]);
+		}
+		for(int i=0; i<ia.size() ; i++){
+			out_degree_list[i]= ia[i];
+			//PRINT(*comm << ": " << i << " , " << ia[i]);
+		}
+		
+	}
+	g.out_edges = out_edges;				//ja array of CSR sparce matrix
+	g.out_degree_list = out_degree_list;	//ia array of CSR sparce matrix
+	
+	uint64_t* local_unmap = new uint64_t[ g.n_local];	// map from local index to global
+	for (uint64_t i = 0; i < g.n_local; ++i){
+		local_unmap[i] = i + g.n_offset;
+		//PRINT(*comm << ": " << i << ", g.local_unmap= " << i + g.n_offset << " ___ local2global= " << dist->local2global(i) );
+		SCAI_ASSERT_EQ_ERROR( i + g.n_offset, dist->local2global(i), "global id should be equal ?? ");
+	}
+	g.local_unmap = local_unmap;
+	
+	//g.max_degree_vert =
+	//g.max_degree	=
+	
+	//
+	// ghost nodes
+	//
+	std::vector<IndexType> nonLocalNgbrs = ITI::GraphUtils::nonLocalNeighbors<IndexType,ValueType>( graph );
+	//PRINT(*comm <<": "<< nonLocalNgbrs.size() );	
+	
+	g.n_ghost = nonLocalNgbrs.size();	//number of ghost nodes: nodes that share an edge with a local node but are not local
+	g.n_total = g.n_local + g.n_ghost;	
+	
+	uint64_t* ghost_unmap = new uint64_t[g.n_ghost];			// global id of the ghost nodes
+	for( unsigned int gh=0; gh<g.n_ghost; gh++){
+		ghost_unmap[gh] = (uint64_t) nonLocalNgbrs[gh];
+	}
+	g.ghost_unmap = ghost_unmap;
+	
+	
+	//g.ghost_tasks = new uint64_t[g.n_ghost];			// WARNING: owning PE of each ghost node?
+	scai::utilskernel::LArray<IndexType> indexTransport(nonLocalNgbrs.size(), nonLocalNgbrs.data());
+    // find the PEs that own every non-local index
+    scai::hmemo::HArray<IndexType> owners(nonLocalNgbrs.size() , -1);
+    dist->computeOwners( owners, indexTransport);
+	
+	scai::hmemo::ReadAccess<IndexType> rOwners(owners);
+	std::vector<IndexType> neighborPEs(rOwners.get(), rOwners.get()+rOwners.size());
+	g.ghost_tasks = (uint64_t *) neighborPEs.data();
+    rOwners.release();
+	
+	
+	g.ghost_degrees = new uint64_t[g.n_ghost];		// degree of every shost node
+	
+	/*
+	PRINT( sizeof(g.ghost_degrees) );
+		get_ghost_degrees(g, &comm, &q);
+	PRINT( sizeof(g.ghost_degrees) );  
+	*/
+	
 
-    // vtxDist is an array of size numPEs and is replicated in every processor
-    idx_t vtxDist[ size+1 ];
-    vtxDist[0]= 0;
- 
-    for(int i=0; i<recvPartRead.size()-1; i++){
-        vtxDist[i+1]= recvPartRead[i+1];
-    }
-    /*
-    for(IndexType i=0; i<recvPartRead.size(); i++){
-        PRINT(*comm<< " , " << i <<": " << vtxDist[i]);
-    }
-    */
-    recvPartRead.release();
-
-    //
-    // setting xadj=ia and adjncy=ja values, these are the local values of every processor
-    //
-    
-    scai::lama::CSRStorage<ValueType>& localMatrix= graph.getLocalStorage();
-    
-    scai::hmemo::ReadAccess<IndexType> ia( localMatrix.getIA() );
-    scai::hmemo::ReadAccess<IndexType> ja( localMatrix.getJA() );
-    IndexType iaSize= ia.size();
-    
-    idx_t* xadj = new idx_t[ iaSize ];
-    idx_t* adjncy = new idx_t[ ja.size() ];
-    
-    for(int i=0; i<iaSize ; i++){
-        xadj[i]= ia[i];
-        SCAI_ASSERT( xadj[i] >=0, "negative value for i= "<< i << " , val= "<< xadj[i]);
-    }
-
-    for(int i=0; i<ja.size(); i++){
-        adjncy[i]= ja[i];
-        SCAI_ASSERT( adjncy[i] >=0, "negative value for i= "<< i << " , val= "<< adjncy[i]);
-        SCAI_ASSERT( adjncy[i] <N , "too large value for i= "<< i << " , val= "<< adjncy[i]);
-    }
-    ia.release();
-    ja.release();
-
-
-    //vwgt , adjwgt store the weigths of edges and vertices. Here we have
-    // no weight so are both NULL.
-    idx_t* vwgt= NULL;
-    idx_t* adjwgt= NULL;
-    
-    // wgtflag is for the weight and can take 4 values. Here =0.
-    idx_t wgtflag= 0;
-    
-    // numflag: 0 for C-style (start from 0), 1 for Fortrant-style (start from 1)
-    idx_t numflag= 0;
-    
-    // ndims: the number of dimensions
-    idx_t ndims = settings.dimensions;
-
-    // the xyz array for coordinates of size dim*localN contains the local coords
-    // convert the vector<DenseVector> to idx_t*
-    IndexType localN= dist->getLocalSize();
-    real_t *xyzLocal;
-
-    if( parMetisGeom or writeDebugCoordinates ){
-        xyzLocal = new real_t[ ndims*localN ];
-        
-        std::vector<scai::utilskernel::LArray<ValueType>> localPartOfCoords( ndims );
-        for(int d=0; d<ndims; d++){
-            localPartOfCoords[d] = coords[d].getLocalValues();
-        }
-        for(unsigned int i=0; i<localN; i++){
-            SCAI_ASSERT_LE_ERROR( ndims*(i+1), ndims*localN, "Too large index, localN= " << localN );
-            for(int d=0; d<ndims; d++){
-                xyzLocal[ndims*i+d] = real_t(localPartOfCoords[d][i]);
-            }
-        }
-        
-    }
-    // ncon: the numbers of weigths each vertex has. Here 1;
-    idx_t ncon = 1;
-    
-    // nparts: the number of parts to partition (=k)
-    if( !vm.count("numBlocks") ){
-        settings.numBlocks = comm->getSize();
-    }
-    idx_t nparts= settings.numBlocks;
+	// copied from xtrapulp/dist_graph.h
   
-    // tpwgts: array of size ncons*nparts, that is used to specify the fraction of 
-    // vertex weight that should be distributed to each sub-domain for each balance
-    // constraint. Here we want equal sizes, so every value is 1/nparts.
-    real_t tpwgts[ nparts ];
-    real_t total = 0;
-    for(int i=0; i<sizeof(tpwgts)/sizeof(real_t) ; i++){
-	tpwgts[i] = real_t(1)/nparts;
-    //PRINT(*comm << ": " << i <<": "<< tpwgts[i]);
-	total += tpwgts[i];
-    }
+	g.map = (struct fast_map*)malloc(sizeof(struct fast_map));
+	
+	uint64_t cur_label = g.n_local;
+	uint64_t total_edges = g.m_local + g.n_local;
 
-    // ubvec: array of size ncon to specify imbalance for every vertex weigth.
-    // 1 is perfect balance and nparts perfect imbalance. Here 1 for now
-    real_t ubvec= settings.epsilon + 1;
-    
-    // options: array of integers for passing arguments.
-    // Here, options[0]=0 for the default values.
-    idx_t options[1]= {0};
-    
+	if (total_edges * 2 < g.n)
+		init_map_nohash(g.map, g.n); 
+	else 
+		init_map(g.map, total_edges * 2);
+		
+		for (uint64_t i = 0; i < g.n_local; ++i) {
+			uint64_t vert = g.local_unmap[i];
+			set_value(g.map, vert, i);
+		}
+
+	for (uint64_t i = 0; i < g.m_local; ++i) {	
+		uint64_t out = g.out_edges[i];
+		uint64_t val = get_value(g.map, out);
+		if (val == NULL_KEY) {
+			set_value_uq(g.map, out, cur_label);
+			g.out_edges[i] = cur_label++;
+		} else
+			g.out_edges[i] = val;
+	}
+	
+
+
+	// PRINTS
+/*	
+	
+	PRINT(g.m_local );
+    for(unsigned int h=0; h<g.m_local; h++){
+		std::cout<< g.out_edges[h] << ", ";
+	}
+	std::cout<< std::endl;
+	PRINT(g.n_local);
+	
+	for(unsigned int h=0; h<g.n_local+1; h++){
+		std::cout<< g.out_degree_list[h] << ", ";
+	}
+	std::cout<< std::endl;
+	PRINT(g.n_offset);
+
+
+	PRINT(*comm << ": g.n= " << g.n << ", g.m= " << g.m << ", g.m_local = " << g.m_local << ", g.n_local= " << g.n_local << \
+			", g.n_offset= " << g.n_offset << ", g.ghost= " << g.n_ghost << ", g.n_total= " << g.n_total);
+	
+	for(unsigned int h=0; h<g.n_ghost; h++){
+		PRINT(*comm << ": >>> " << g.ghost_unmap[h] << " ~~~~~ " << g.ghost_tasks[h]);// << "  ### " << g.ghost_degrees[h] );
+	}
+*/		
+
+
+	MPI_Comm_rank(MPI_COMM_WORLD, &procid);
+	MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+
+
+	//---------------------------------------------------------
     //
-    // OUTPUT parameters
-    //
-    // edgecut: the size of cut
-    idx_t edgecut;
-    
-    // partition array of size localN, contains the block every vertex belongs
-    idx_t *partKway = new idx_t[ localN ];
-    
-    // comm: the MPI comunicator
-    MPI_Comm metisComm;
-    MPI_Comm_dup(MPI_COMM_WORLD, &metisComm);
-     
-    //PRINT(*comm<< ": xadj.size()= "<< sizeof(xadj) << "  adjncy.size=" <<sizeof(adjncy) ); 
-    //PRINT(*comm << ": "<< sizeof(xyzLocal)/sizeof(real_t) << " ## "<< sizeof(partKway)/sizeof(idx_t) << " , localN= "<< localN);
-    
-    if(comm->getRank()==0){
-	    PRINT("dims=" << ndims << ", nparts= " << nparts<<", ubvec= "<< ubvec << ", options="<< *options << ", ncon= "<< ncon );
-    }
-     
-    //
-    // get the partitions with parMetis
+    //  xtraPulp partition
     //
 
-    double sumKwayTime = 0.0;
+    double sumPulpTime = 0.0;
     int repeatTimes = 5;
     
-    int metisRet;
-    
-    //
-    // parmetis partition
-    //
-    int r;
-    for( r=0; r<repeatTimes; r++){
-        
-        std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
-        if( parMetisGeom ){
-            metisRet = ParMETIS_V3_PartGeomKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ndims, xyzLocal, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );  
-        }else{
-            metisRet = ParMETIS_V3_PartKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
+	int* pulpPartitionArray = new int[g.n_local];
+	
+	std::vector<struct Metrics> metricsVec;
+	scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
+	scai::lama::DenseVector<IndexType> pulpPartitionDV(dist);
+	
+	int r;
+	for( r=0; r<repeatTimes; r++){		
+		metricsVec.push_back( Metrics( comm->getSize()) );
+		
+		std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
+		//
+		xtrapulp_run( &g, &ppc, pulpPartitionArray, numBlocks);
+		//
+		std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
+		double partPulpTime= comm->max(partitionTime.count() );
+		sumPulpTime += partPulpTime;
+		
+		
+		//scai::lama::DenseVector<IndexType> pulpPartitionDV(dist);
+		for(unsigned int i=0; i<localN; i++){
+			pulpPartitionDV.getLocalValues()[i] = pulpPartitionArray[i];
+		}
+		
+		metricsVec[r].finalCut = ITI::GraphUtils::computeCut(graph, pulpPartitionDV, true);
+        metricsVec[r].finalImbalance = ITI::GraphUtils::computeImbalance<IndexType,ValueType>(pulpPartitionDV, settings.numBlocks ,nodeWeights);
+        //metricsVec[r].inputTime = ValueType ( comm->max(inputTime.count() ));
+        metricsVec[r].timeFinalPartition = ValueType (comm->max(partitionTime.count()));		
+		
+		// get metrics
+		metricsVec[r].getMetrics( graph, pulpPartitionDV, nodeWeights, settings );
+		
+		if (comm->getRank() == 0 ) {
+            metricsVec[r].print( std::cout );            
+            std::cout<< "Running time for run number " << r << " is " << partPulpTime << std::endl;
         }
-        std::chrono::duration<double> partitionKwayTime =  std::chrono::system_clock::now() - beforePartTime;
-        double partKwayTime= comm->max(partitionKwayTime.count() );
-        sumKwayTime += partKwayTime;
         
-        if( comm->getRank()==0 ){
-            std::cout<< "Running time for run number " << r << " is " << partKwayTime << std::endl;
-        }
-        
-        if( sumKwayTime>500){
-			std::cout<< "Stopping runs because of excessive running total running time: " << sumKwayTime << std::endl;
+        if( sumPulpTime>500){
+			std::cout<< "Stopping runs because of excessive running total running time: " << sumPulpTime << std::endl;
             break;
         }
-    }
-
+    }// for(repeatTimes)
+	
 	if( r!=repeatTimes){		// in case it has to break before all the runs are completed
 		repeatTimes = r+1;
 	}
@@ -455,51 +484,57 @@ int main(int argc, char** argv) {
         std::cout<<"Number of runs: " << repeatTimes << std::endl;	
     }
     
-    double avgKwayTime = sumKwayTime/repeatTimes;
-
-    //
-    // free arrays
-    //
-    delete[] xadj;
-    delete[] adjncy;
-    if( parMetisGeom or writeDebugCoordinates ){
-        delete[] xyzLocal;
-    }
-    
-    //
+    double avgPulpTime = sumPulpTime/repeatTimes;
+	
+	
+	//
+	// free arrays
+	//
+	
+	delete[] out_edges;
+	delete[] out_degree_list;
+	delete[] local_unmap;
+	delete[] ghost_unmap;
+	
+	//clear_graph( &g );
+	
+	//
     // convert partition to a DenseVector
     //
-    DenseVector<IndexType> partitionKway(dist);
+	/*
+    scai::lama::DenseVector<IndexType> pulpPartitionDV(dist);
     for(unsigned int i=0; i<localN; i++){
-        partitionKway.getLocalValues()[i] = partKway[i];
+        pulpPartitionDV.getLocalValues()[i] = pulpPartitionArray[i];
     }
     
-    // check correct transformation to DenseVector
+	// check correct transformation to DenseVector
     for(int i=0; i<localN; i++){
-        //PRINT(*comm << ": "<< part[i] << " _ "<< partition.getLocalValues()[i] );
-        assert( partKway[i]== partitionKway.getLocalValues()[i]);
+        PRINT(*comm << ": "<< pulpPartitionArray[i] << " _ "<< pulpPartitionDV.getLocalValues()[i] );
+        assert( pulpPartitionArray[i]== pulpPartitionDV.getLocalValues()[i]);
     }
     
-    delete[] partKway;
+    delete[] pulpPartitionArray;
+    */
+    
     
     //---------------------------------------------
     //
     // Get metrics
     //
-    
+    /*
     // the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
     struct Metrics metrics(1);
     
-    metrics.timeFinalPartition = avgKwayTime;
+    metrics.timeFinalPartition = avgPulpTime;
     
     // uniform node weights
     scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
-    metrics.getMetrics( graph, partitionKway, nodeWeights, settings );
-    
+    metrics.getMetrics( graph, pulpPartitionDV, nodeWeights, settings );
+    */
         
     //---------------------------------------------------------------
     //
-    // Reporting output to std::cout
+    // Reporting output to std::cout and to the given outFile
     //
     
     char machineChar[255];
@@ -509,6 +544,9 @@ int main(int argc, char** argv) {
         machine = std::string(machineChar);
     }
     
+    //
+    printVectorMetricsShort( metricsVec, std::cout );
+    
     if(comm->getRank()==0){
         if( vm.count("generate") ){
             std::cout << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon;
@@ -516,16 +554,13 @@ int main(int argc, char** argv) {
             std::cout << std::endl << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon;
         }
         std::cout << "\033[1;36m";
-        
-        if( parMetisGeom ){
-            std::cout << std::endl << "ParMETIS_V3_PartGeomKway: "<< std::endl;
-        }else{
-            std::cout << std::endl << "ParMETIS_V3_PartKway: " << std::endl;
-        }
+		std::cout << std::endl << "XtraPulp: "<< std::endl;        
         std::cout<<  " \033[0m" << std::endl;
 
-        metrics.print( std::cout );
-        
+        //metrics.print( std::cout );
+		//printMetricsShort( metricsVec, std::cout );
+        //printVectorMetricsShort( metricsVec, std::cout ); 
+		
         // write in a file
         if( settings.outFile!="-" ){
             std::ofstream outF( settings.outFile, std::ios::out);
@@ -535,9 +570,10 @@ int main(int argc, char** argv) {
                 }else{
                     outF << std::endl << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
                 }
-                outF << "numBlocks= " << settings.numBlocks << std::endl;
+                outF << "numBlocks= " << numBlocks << std::endl;
                 //metrics.print( outF ); 
-				printMetisMetrics( metrics, outF);
+				printVectorMetricsShort( metricsVec, outF ); 
+				//printMetricsShort( metrics, outF);
                 std::cout<< "Output information written to file " << settings.outFile << std::endl;
             }else{
                 std::cout<< "Could not open file " << settings.outFile << " informations not stored"<< std::endl;
@@ -545,42 +581,16 @@ int main(int argc, char** argv) {
         }
     }
     
-    // the code below writes the output coordinates in one file per processor for visualization purposes.
-    //=================
-
     // WARNING: the function writePartitionCentral redistributes the coordinates
     if( writePartition ){
-        if( parMetisGeom ){    
-            std::cout<<" write partition" << std::endl;
-            ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partitionKway, settings.outFile+"_parMetisGeom_k_"+std::to_string(nparts)+".partition");    
-        }else{
-            std::cout<<" write partition" << std::endl;
-            ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partitionKway, settings.outFile+"_parMetisGraph_k_"+std::to_string(nparts)+".partition");    
-        }
-    }
-
-    //settings.writeDebugCoordinates = 0;
-    if (writeDebugCoordinates and parMetisGeom) {
-        scai::dmemo::DistributionPtr metisDistributionPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partitionKway.getDistribution(), partitionKway.getLocalValues() ) );
-        scai::dmemo::Redistributor prepareRedist(metisDistributionPtr, coords[0].getDistributionPtr());
+		if(comm->getRank()==0) std::cout<<" write partition" << std::endl;
+		ITI::FileIO<IndexType, ValueType>::writePartitionCentral( pulpPartitionDV, settings.outFile+"_xtrapulp_k_"+std::to_string(numBlocks)+".partition");    
         
-		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-			SCAI_ASSERT_EQ_ERROR( coords[dim].size(), N, "Wrong coordinates size for coord "<< dim);
-			coords[dim].redistribute( prepareRedist );
-		}
-        
-        std::string destPath;
-        if( parMetisGeom){
-            destPath = "partResults/parMetisGeom/blocks_" + std::to_string(settings.numBlocks) ;
-        }else{
-            destPath = "partResults/parMetis/blocks_" + std::to_string(settings.numBlocks) ;
-        }
-        boost::filesystem::create_directories( destPath );   		
-		ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coords, N, settings.dimensions, destPath + "/metisResult");
     }
-	        
+  
+		
     //this is needed for supermuc
-    std::exit(0);   
+    //std::exit(0);   
 	
     return 0;
 }
