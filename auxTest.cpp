@@ -225,7 +225,7 @@ TEST_F (auxTest,testGetBorderAndInnerNodes){
     std::vector<IndexType> numBorderNodes;
     std::vector<IndexType> numInnerNodes;
     
-    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition);
+    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition, settings);
     
     //assertions - prints
     SCAI_ASSERT_EQ_ERROR( numBorderNodes.size(), k, "Size of numBorderNodes is wrong");
@@ -275,7 +275,7 @@ TEST_F (auxTest,testComputeCommVolume){
     std::vector<IndexType> numBorderNodes;
     std::vector<IndexType> numInnerNodes;
     
-    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition);
+    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition, settings);
     
     SCAI_ASSERT_EQ_ERROR( commVolume.size(), numBorderNodes.size(), "size mismatch");
     
