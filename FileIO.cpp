@@ -723,7 +723,6 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
             exit(0);
         }
     }
-//PRINT( *comm << ": " << ll << " __ " << file.tellg() );
 
     std::vector<IndexType> ia(localN+1, 0);
     std::vector<IndexType> ja;

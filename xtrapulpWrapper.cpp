@@ -249,6 +249,12 @@ int main(int argc, char** argv) {
     
 	// xtrapulp variables
 	
+	
+	MPI_Comm_rank(MPI_COMM_WORLD, &procid);
+	MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+
+
+	
 	ValueType vert_balance = 1.1;
 	ValueType edge_balance = 1.1;
 	bool do_bfs_init = true;
@@ -282,23 +288,29 @@ int main(int argc, char** argv) {
 	dist_graph_t g;
 	
     g.n = N /*+1*/;				// global/total number of vertices
-	g.m = M;					// global/total number of edges
+	g.m = 2*M;					// global/total number of edges
 	g.m_local = localM;			// local number of edges
-	g.n_offset = thisPE * (g.n/numPEs /*+1*/);
-	g.n_local = g.n/numPEs /*+1*/;	// local number of vertices
-	SCAI_ASSERT_EQ_ERROR(g.n_local, localN, "Should be equal??" );
+	//g.n_offset = thisPE * (g.n/numPEs /*+1*/);
+	g.n_offset = dist->local2global(0);
+	//g.n_local = g.n/numPEs /*+1*/;	// local number of vertices
+	
+	//SCAI_ASSERT_EQ_ERROR(g.n_local, localN, "Should be equal??" );
+	
+	g.n_local = localN;					// local number of vertices
+	PRINT(*comm << ": g.n_local= " << g.n_local <<" , localN= " << localN);
+	
 	
 	bool offset_vids = false;
-	if( thisPE==numPEs-1 && !offset_vids ){
-			g.n_local = g.n - g.n_offset /*+1*/;
-	}
+	//if( thisPE==numPEs-1 && !offset_vids ){
+	//		g.n_local = g.n - g.n_offset /*+1*/;
+	//}
 			
 	g.vertex_weights = NULL;
 	g.edge_weights = NULL;
 	
 	//WARNING: assuming that out_edges is the local ja values of the CSRSparseMatrix
 	uint64_t* out_edges = new uint64_t[g.m_local];
-	uint64_t* out_degree_list = new uint64_t[g.n_local+1];
+	uint64_t* out_degree_list = new uint64_t[g.n_local +1];
 	{
 		scai::lama::CSRStorage<ValueType>& localMatrix= graph.getLocalStorage();
 		scai::hmemo::ReadAccess<IndexType> ia( localMatrix.getIA() );
@@ -310,6 +322,10 @@ int main(int argc, char** argv) {
 			//PRINT(*comm << ": " << i << " , " << ja[i]);
 			SCAI_ASSERT( out_edges[i] >=0, "negative value for i= "<< i << " , val= "<< out_edges[i]);
 		}
+		
+		SCAI_ASSERT_EQ_ERROR( ia.size(), localN+1,  *comm << ": Should they be equal ?? ");
+		SCAI_ASSERT_EQ_ERROR( ia.size(), g.n_local+1, *comm << ": Should they be equal ?? "); // ia.size == out_degree_list.size ??
+		
 		for(int i=0; i<ia.size() ; i++){
 			out_degree_list[i]= ia[i];
 			//PRINT(*comm << ": " << i << " , " << ia[i]);
@@ -321,11 +337,12 @@ int main(int argc, char** argv) {
 	
 	uint64_t* local_unmap = new uint64_t[ g.n_local];	// map from local index to global
 	for (uint64_t i = 0; i < g.n_local; ++i){
-		local_unmap[i] = i + g.n_offset;
+		//local_unmap[i] = i + g.n_offset;
+		local_unmap[i] = dist->local2global(i);
 		//PRINT(*comm << ": " << i << ", g.local_unmap= " << i + g.n_offset << " ___ local2global= " << dist->local2global(i) );
-		SCAI_ASSERT_EQ_ERROR( i + g.n_offset, dist->local2global(i), "global id should be equal ?? ");
+		//SCAI_ASSERT_EQ_ERROR( i + g.n_offset, dist->local2global(i), "PE " << comm->getRank() <<": for i= " << i << ", id should be equal ?? ");
 	}
-	g.local_unmap = local_unmap;
+	g.local_unmap = local_unmap;			// local ids to global
 	
 	//g.max_degree_vert =
 	//g.max_degree	=
@@ -336,7 +353,11 @@ int main(int argc, char** argv) {
 	std::vector<IndexType> nonLocalNgbrs = ITI::GraphUtils::nonLocalNeighbors<IndexType,ValueType>( graph );
 	//PRINT(*comm <<": "<< nonLocalNgbrs.size() );	
 	
-	g.n_ghost = nonLocalNgbrs.size();	//number of ghost nodes: nodes that share an edge with a local node but are not local
+	//g.n_ghost = nonLocalNgbrs.size();	//number of ghost nodes: nodes that share an edge with a local node but are not local
+	g.n_ghost = 1;
+	if( thisPE==0){
+		g.n_ghost = g.n-g.n_local;
+	}
 	g.n_total = g.n_local + g.n_ghost;	
 	
 	uint64_t* ghost_unmap = new uint64_t[g.n_ghost];			// global id of the ghost nodes
@@ -346,7 +367,7 @@ int main(int argc, char** argv) {
 	g.ghost_unmap = ghost_unmap;
 	
 	
-	//g.ghost_tasks = new uint64_t[g.n_ghost];			// WARNING: owning PE of each ghost node?
+	g.ghost_tasks = new uint64_t[g.n_ghost];			// WARNING: owning PE of each ghost node?
 	scai::utilskernel::LArray<IndexType> indexTransport(nonLocalNgbrs.size(), nonLocalNgbrs.data());
     // find the PEs that own every non-local index
     scai::hmemo::HArray<IndexType> owners(nonLocalNgbrs.size() , -1);
@@ -367,38 +388,56 @@ int main(int argc, char** argv) {
 	*/
 	
 
-	// copied from xtrapulp/dist_graph.h
+	// copied from xtrapulp/dist_graph.cpp::relabel_edges
   
-	g.map = (struct fast_map*)malloc(sizeof(struct fast_map));
+	g.map = (struct fast_map*)malloc(sizeof(struct fast_map));		// ?
 	
 	uint64_t cur_label = g.n_local;
 	uint64_t total_edges = g.m_local + g.n_local;
 
-	if (total_edges * 2 < g.n)
+	if (total_edges * 2 < g.n){
+		PRINT("\n\t\t initializing NO hash map with " << g.n<<" values \n\n");
 		init_map_nohash(g.map, g.n); 
-	else 
+	}else{ 
+		PRINT("\n\t\t initializing hash map with "<< total_edges*2<< " values \n");
 		init_map(g.map, total_edges * 2);
+	}
 		
-		for (uint64_t i = 0; i < g.n_local; ++i) {
-			uint64_t vert = g.local_unmap[i];
-			set_value(g.map, vert, i);
-		}
+	for (uint64_t i = 0; i < g.n_local; ++i) {
+		uint64_t vert = g.local_unmap[i];		//vert= global vertex id
+		//if( comm->getRank()==0)
+//PRINT(*comm <<":  vert "<< vert << " -> " << i);
+		set_value(g.map, vert, i);
+	}
 
 	for (uint64_t i = 0; i < g.m_local; ++i) {	
-		uint64_t out = g.out_edges[i];
+		uint64_t out = g.out_edges[i];			// out= global id of neighboring nodes
 		uint64_t val = get_value(g.map, out);
+			
+		// if val==NULL_KEY then this neighbor is not local
 		if (val == NULL_KEY) {
+//PRINT( *comm << ":non-local neighbor " << out << ", setting value " << cur_label);
 			set_value_uq(g.map, out, cur_label);
 			g.out_edges[i] = cur_label++;
-		} else
+		} else{
+//PRINT(*comm << "local neighbor " << out <<", setting value " << val);
 			g.out_edges[i] = val;
+		}
 	}
 	
 
 
 	// PRINTS
+
+
+	PRINT(*comm << ": g.n= " << g.n << ", g.m= " << g.m << ", g.m_local = " << g.m_local << ", g.n_local= " << g.n_local << \
+			", g.n_offset= " << g.n_offset << ", g.n_ghost= " << g.n_ghost << ", g.n_total= " << g.n_total);
+
 /*	
-	
+	for(unsigned int h=0; h<g.n_ghost; h++){
+		PRINT(*comm << ": >>> " << g.ghost_unmap[h] << " ~~~~~ " << g.ghost_tasks[h]);// << "  ### " << g.ghost_degrees[h] );
+	}
+			
 	PRINT(g.m_local );
     for(unsigned int h=0; h<g.m_local; h++){
 		std::cout<< g.out_edges[h] << ", ";
@@ -412,18 +451,7 @@ int main(int argc, char** argv) {
 	std::cout<< std::endl;
 	PRINT(g.n_offset);
 
-
-	PRINT(*comm << ": g.n= " << g.n << ", g.m= " << g.m << ", g.m_local = " << g.m_local << ", g.n_local= " << g.n_local << \
-			", g.n_offset= " << g.n_offset << ", g.ghost= " << g.n_ghost << ", g.n_total= " << g.n_total);
-	
-	for(unsigned int h=0; h<g.n_ghost; h++){
-		PRINT(*comm << ": >>> " << g.ghost_unmap[h] << " ~~~~~ " << g.ghost_tasks[h]);// << "  ### " << g.ghost_degrees[h] );
-	}
-*/		
-
-
-	MPI_Comm_rank(MPI_COMM_WORLD, &procid);
-	MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+*/
 
 
 	//---------------------------------------------------------
