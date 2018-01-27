@@ -572,8 +572,8 @@ int main(int argc, char** argv) {
                 }
                 outF << "numBlocks= " << numBlocks << std::endl;
                 //metrics.print( outF ); 
-				printVectorMetricsShort( metricsVec, outF ); 
-				//printMetricsShort( metrics, outF);
+		printVectorMetricsShort( metricsVec, outF ); 
+		//printMetricsShort( metrics, outF);
                 std::cout<< "Output information written to file " << settings.outFile << std::endl;
             }else{
                 std::cout<< "Could not open file " << settings.outFile << " informations not stored"<< std::endl;
@@ -590,8 +590,7 @@ int main(int argc, char** argv) {
   
 		
     //this is needed for supermuc
-    //std::exit(0);   
+    std::exit(0);   
 	
     return 0;
 }
-

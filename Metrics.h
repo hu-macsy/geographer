@@ -126,7 +126,7 @@ struct Metrics{
 			if( std::isnan(percentBorderNodesPerBlock[i]) ){
 					PRINT("\n\t\t\t WARNING: found NaN value for percentBnd for block " << i <<", probably is has no vertices.\n\n");
 			}
-			PRINT( percentBorderNodesPerBlock[i] );
+			//PRINT( percentBorderNodesPerBlock[i] );
         }
         
         maxBorderNodesPercent = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
@@ -357,7 +357,7 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
         out << std::setprecision(2) << std::fixed;
             //<<  ValueType(sumKmeans)/numRuns<< "  " \
             //<<  ValueType(sumLocalRef)/numRuns<< ",  "  
-            <<  ValueType(sumFinalTime)/numRuns<< " " \
+        out <<  ValueType(sumFinalTime)/numRuns<< " " \
             //<<  ValueType(sumPreliminaryCut)/numRuns<< ",  " 
             <<  ValueType(sumFinalCut)/numRuns<< " " \
             <<  ValueType(sumImbalace)/numRuns<< " " \
