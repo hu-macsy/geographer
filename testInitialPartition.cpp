@@ -24,6 +24,7 @@
 #include "FileIO.h"
 #include "ParcoRepart.h"
 #include "Settings.h"
+#include "Metrics.h"
 #include "MultiLevel.h"
 #include "LocalRefinement.h"
 #include "SpectralPartition.h"
@@ -40,7 +41,6 @@
  * for generating a 10x20x30 mesh
  * ./a.out --generate --numX=10 --numY=20 --numZ=30 --epsilon 0.05 --sfcRecursionSteps=10 --dimensions=3 --borderDepth=10  --stopAfterNoGainRounds=3 --minGainForNextGlobalRound=10
  * 
- * !! for now, when reading a file --dimensions must be 2
  */
 
 //----------------------------------------------------------------------------
@@ -58,8 +58,12 @@ namespace ITI {
 			format = ITI::Format::ADCIRC;
 		else if (token == "OCEAN" or token == "3")
 			format = ITI::Format::OCEAN;
-                else if (token == "MATRIXMARKET" or token == "4")
-			format = ITI::Format::MATRIXMARKET;                        
+		else if (token == "MATRIXMARKET" or token == "4")
+			format = ITI::Format::MATRIXMARKET;    
+		else if (token == "TEEC" or token == "5")
+			format = ITI::Format::TEEC;
+        else if (token == "BINARY" or token == "6")
+			format = ITI::Format::BINARY;
 		else
 			in.setstate(std::ios_base::failbit);
 		return in;
@@ -78,7 +82,11 @@ namespace ITI {
 		else if (method == ITI::Format::OCEAN)
 			token = "OCEAN";
 		else if (method == ITI::Format::MATRIXMARKET)
-			token = "MATRIXMARKET";                 
+			token = "MATRIXMARKET";      
+		else if (method == ITI::Format::TEEC)
+			token = "TEEC";
+        else if (method == ITI::Format::BINARY)
+            token == "BINARY";
 		out << token;
 		return out;
 	}
@@ -229,14 +237,14 @@ int main(int argc, char** argv) {
         if (comm->getRank() == 0){
             std::string inputstring;
             if (vm.count("graphFile")) {
-    		inputstring = vm["graphFile"].as<std::string>();
-    	} else if (vm.count("quadTreeFile")) {
-    		inputstring = vm["quadTreeFile"].as<std::string>();
-    	} else {
-    		inputstring = "generate";
-    	}
-        std::cout<< "commit:"<< version<<  " input:"<< inputstring << std::endl;
-	}
+				inputstring = vm["graphFile"].as<std::string>();
+			} else if (vm.count("quadTreeFile")) {
+				inputstring = vm["quadTreeFile"].as<std::string>();
+			} else {
+				inputstring = "generate";
+			}
+			std::cout<< "commit:"<< version<<  " input:"<< inputstring << std::endl;
+		}
 
     std::string graphFile;
 	
@@ -501,52 +509,45 @@ int main(int argc, char** argv) {
         }
     }
     
-    std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
+    //
+    // Get metrics
+    //
     
-    ValueType cut = GraphUtils::computeCut<IndexType, ValueType>( graph, partition);
-    ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( partition, k);
-    IndexType maxComm, totalComm;
-    std::tie(maxComm, totalComm) = ITI::GraphUtils::computeBlockGraphComm<IndexType, ValueType>( graph, partition, settings.numBlocks);
-    
-    std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
-    
-    if(comm->getRank()==0){
-        logF << "--  Initial parition, total time: " << partitionTime.count() << std::endl;
-        logF << "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance << " ,maxComm= "<< maxComm;
-        logF  << std::endl  << std::endl  << std::endl; 
-        std::cout << "\033[1;36m--Initial partition, total time: " << partitionTime.count() << std::endl;
-        std::cout << "\tfinal cut= "<< cut << ", final imbalance= "<< imbalance << ", maxComm= "<< maxComm << "\033[0m";
-        std::cout << std::endl  << std::endl  << std::endl;
-        
-        logF<< "Results for file " << graphFile << std::endl;
-        logF<< "nodes= "<< N << std::endl<< std::endl;
-        settings.print( logF , comm);
-        logF<< std::endl<< std::endl << "Only initial partition, no MultiLevel or LocalRefinement"<< std::endl << std::endl;
-    }
-    
-    // Reporting output to std::cout
-    ValueType inputT = ValueType ( comm->max(inputTime.count() ));
-    ValueType partT = ValueType (comm->max(partitionTime.count()));
-    ValueType repT = ValueType (comm->max(reportTime.count()));
-
+    struct Metrics metrics(1);
+	
+	metrics.timeFinalPartition = comm->max( partitionTime.count() );
+	metrics.getMetrics( graph, partition, nodeWeights, settings );
+	
+	//
+    // Reporting output to std::cout and/or outFile
+	//
+	
     if (comm->getRank() == 0) {
-        for (IndexType i = 0; i < argc; i++) {
-            std::cout << std::string(argv[i]) << " ";
-        }
-        std::cout << std::endl;
-        std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
-        std::cout<< " nodes:"<< N<< " dimensions:"<< settings.dimensions <<" k:" << settings.numBlocks;
-        std::cout<< " epsilon:" << settings.epsilon << " minBorderNodes:"<< settings.minBorderNodes;
-        std::cout<< " minGainForNextRound:" << settings.minGainForNextRound;
-        std::cout<< " stopAfterNoGainRounds:"<< settings.stopAfterNoGainRounds << std::endl;
-        
-        std::cout<< "cut:"<< cut<< " imbalance:"<< imbalance << std::endl;
-        std::cout<<"inputTime:" << inputT << " partitionTime:" << partT <<" reportTime:"<< repT << std::endl;
+		//metrics.print( std::cout );
+		printMetricsShort( metrics, std::cout);
+		// write in a file
+        if( settings.outFile!="-" ){
+			std::ofstream outF( settings.outFile, std::ios::out);
+			if(outF.is_open()){
+                if( vm.count("generate") ){
+                    outF << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
+                }else{
+                    outF << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
+                }
+                settings.print( outF, comm );
+                //outF << "numBlocks= " << settings.numBlocks << std::endl;
+                //metrics.print( outF ); 
+				printMetricsShort( metrics, outF);
+                std::cout<< "Output information written to file " << settings.outFile << std::endl;
+            }else{
+                std::cout<< "Could not open file " << settings.outFile << " informations not stored"<< std::endl;
+            } 
+		}
+		
     }
     
     // the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================
-    settings.writeDebugCoordinates = 1;
     
     if (settings.writeDebugCoordinates) {
         
