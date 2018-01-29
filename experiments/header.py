@@ -10,7 +10,7 @@ geoExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/Diamerisi"
 parMetisExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/parMetisExe"
 
 # other paths
-basisPath = os.path.expanduser("~/parco-repart/Implementation/experiments/")
+basisPath = os.path.expanduser("~/supermuc/parco-repart/Implementation/experiments/")
 competitorsPath = os.path.join( basisPath, "competitors" )
 
 
@@ -109,7 +109,7 @@ def parseOutFile( outFile ):
 		line = f.readline()
 		tokens = line.split()
 
-		if len(tokens)==0:
+		if len(tokens)==0:	#found an empty line
 			tokens = "0"
 			#print(len(tokens))
 		while tokens[0]!="gather":
