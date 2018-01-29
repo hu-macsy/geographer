@@ -532,9 +532,9 @@ int main(int argc, char** argv) {
             std::ofstream outF( settings.outFile, std::ios::out);
             if(outF.is_open()){
                 if( vm.count("generate") ){
-                    outF << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
+                    outF << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
                 }else{
-                    outF << std::endl << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
+                    outF << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
                 }
                 outF << "numBlocks= " << settings.numBlocks << std::endl;
                 //metrics.print( outF ); 
