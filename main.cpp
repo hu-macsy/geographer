@@ -717,6 +717,7 @@ int main(int argc, char** argv) {
     
     settings.print( std::cout, comm );
     if (comm->getRank() == 0) {
+		std::cout << "Running " << __FILE__ << std::endl;
         std::cout<<  "\033[1;36m";
     }
     printVectorMetrics( metricsVec, std::cout );
@@ -728,6 +729,7 @@ int main(int argc, char** argv) {
         if( comm->getRank()==0){
             std::ofstream outF( settings.outFile, std::ios::out);
             if(outF.is_open()){
+				outF << "Running " << __FILE__ << std::endl;
                 settings.print( outF, comm);
                 printVectorMetrics( metricsVec, outF ); 
                 std::cout<< "Output information written to file " << settings.outFile << " in total time " << totalT << std::endl;

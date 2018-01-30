@@ -80,6 +80,10 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		const std::vector<IndexType> &blockSizes, const Settings settings) {
 	std::vector<ValueType> minCoords, maxCoords;
 	std::tie(minCoords, maxCoords) = getLocalMinMaxCoords(coordinates);
+	for(int d=0; d<settings.dimensions; d++){
+		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		SCAI_ASSERT_NE_ERROR( minCoords[d], maxCoords[d], *comm << ": min=max for dimension "<< d << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
+	}
 	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
 
 	return computePartition(coordinates, k, nodeWeights, blockSizes, centers, settings);
