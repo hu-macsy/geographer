@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
 	options_description desc("Supported options");
 
 	struct Settings settings;
-    bool parMetisGeom = false;
+    int parMetisGeom = 0;			//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
     bool writePartition = false;
     
 	desc.add_options()
@@ -121,7 +121,7 @@ int main(int argc, char** argv) {
 		("dimensions", value<IndexType>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 		("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
         ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
-        ("geom", "use ParMetisGeomKway, with coordinates. Default is parmetisKway (no coordinates)")
+        ("geom", value<int>(&parMetisGeom), "use ParMetisGeomKway, with coordinates. Default is parmetisKway (no coordinates)")
         
         ("writePartition", "Writes the partition in the outFile.partition file")
         ("outFile", value<std::string>(&settings.outFile), "write result partition into file")
@@ -133,7 +133,7 @@ int main(int argc, char** argv) {
 			  options(desc).run(), vm);
 	notify(vm);
 
-    parMetisGeom = vm.count("geom");
+    //parMetisGeom = vm.count("geom");
     writePartition = vm.count("writePartition");
 	bool writeDebugCoordinates = settings.writeDebugCoordinates;
 	
@@ -198,7 +198,7 @@ int main(int argc, char** argv) {
         SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
         SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
         		
-        if(parMetisGeom or writeDebugCoordinates ){
+        if(parMetisGeom!=0 or writeDebugCoordinates ){
             if (vm.count("fileFormat")) {
                 coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
             } else {
@@ -351,7 +351,7 @@ int main(int argc, char** argv) {
     IndexType localN= dist->getLocalSize();
     real_t *xyzLocal;
 
-    if( parMetisGeom or writeDebugCoordinates ){
+    if( parMetisGeom!=0 or writeDebugCoordinates ){
         xyzLocal = new real_t[ ndims*localN ];
         
         std::vector<scai::utilskernel::LArray<ValueType>> localPartOfCoords( ndims );
@@ -430,12 +430,16 @@ int main(int argc, char** argv) {
     for( r=0; r<repeatTimes; r++){
         
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
-        if( parMetisGeom ){
+		
+		if( parMetisGeom==0){
+			metisRet = ParMETIS_V3_PartKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
+		}else if( parMetisGeom==1 ){
             metisRet = ParMETIS_V3_PartGeomKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ndims, xyzLocal, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );  
         }else{
-            metisRet = ParMETIS_V3_PartKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );
-        }
-        std::chrono::duration<double> partitionKwayTime =  std::chrono::system_clock::now() - beforePartTime;
+			metisRet = ParMETIS_V3_PartGeom( vtxDist, &ndims, xyzLocal, partKway, &metisComm ); 
+		}
+		
+		std::chrono::duration<double> partitionKwayTime = std::chrono::system_clock::now() - beforePartTime;
         double partKwayTime= comm->max(partitionKwayTime.count() );
         sumKwayTime += partKwayTime;
         
@@ -511,6 +515,7 @@ int main(int argc, char** argv) {
     }
     
     if(comm->getRank()==0){
+		std::cout << "Running " << __FILE__ << std::endl;
         if( vm.count("generate") ){
             std::cout << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon;
         }else{
@@ -531,6 +536,7 @@ int main(int argc, char** argv) {
         if( settings.outFile!="-" ){
             std::ofstream outF( settings.outFile, std::ios::out);
             if(outF.is_open()){
+				outF << "Running " << __FILE__ << std::endl;
                 if( vm.count("generate") ){
                     outF << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
                 }else{

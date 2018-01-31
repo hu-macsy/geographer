@@ -217,10 +217,10 @@ int main(int argc, char** argv) {
         gethostname(machineChar, 255);
         if (machineChar) {
             machine = std::string(machineChar);
-			settings.machine = machine;
+		settings.machine = machine;
         } else {
             std::cout << "machine char not valid" << std::endl;
- 			machine = "machine char not valid";
+ 		machine = "machine char not valid";
         }
         
         scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
@@ -464,35 +464,45 @@ int main(int argc, char** argv) {
             std::terminate();
         }
         case 3:{  //------------------------------------------- k-means
-            
+            beforeInitialTime =  std::chrono::system_clock::now();
             PRINT0( "Get a k-means partition");
             
             // get a k-means partition
-			IndexType weightSum;
-			bool uniformWeights = true;
+		IndexType weightSum;
+		bool uniformWeights = true;
 			
-			if( not uniformWeights){
-				DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
+		if( not uniformWeights){
+			DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
+			
+			scai::hmemo::HArray<IndexType> localWeightsInt( rowDistPtr->getLocalSize(), 1 );
+			scai::lama::DenseVector<IndexType> nodeWeightsInt;     // node weights
+			nodeWeightsInt.swap( localWeightsInt, rowDistPtr );
+			nodeWeightsInt.redistribute(tempResult.getDistributionPtr());
 				
-				scai::hmemo::HArray<IndexType> localWeightsInt( rowDistPtr->getLocalSize(), 1 );
-				scai::lama::DenseVector<IndexType> nodeWeightsInt;     // node weights
-				nodeWeightsInt.swap( localWeightsInt, rowDistPtr );
-				nodeWeightsInt.redistribute(tempResult.getDistributionPtr());
-				
-				weightSum = nodeWeightsInt.sum().Scalar::getValue<IndexType>();
-			}else{
-				// if all nodes have weight 1 then weightSum = globalN
-				weightSum = N;
-			}
-			
-            const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
-            
-			beforeInitialTime =  std::chrono::system_clock::now();
-			
-            partition = ITI::KMeans::computePartition(coordinates, settings.numBlocks, nodeWeights, blockSizes, settings);      
+			weightSum = nodeWeightsInt.sum().Scalar::getValue<IndexType>();
+		}else{
+			// if all nodes have weight 1 then weightSum = globalN
+			weightSum = N;
+		}
+            	const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
+	        
+		// WARNING: getting an error in KMeans.h, try to redistribute coordinates
+		std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
+		for (IndexType d = 0; d < dimensions; d++) {
+			coordinateCopy[d].redistribute( tempResult.getDistributionPtr() );
+		}
+	  	//
+		beforeInitialTime =  std::chrono::system_clock::now();
+
+            partition = ITI::KMeans::computePartition(coordinatesCopy, settings.numBlocks, nodeWeights, blockSizes, settings);      
             
             partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
             
+			
+		// must repartition graph according to the new partition/distribution
+		graph.redistribute( partition.getDistributionPtr() , noDistPtr );
+            rowDistPtr = graph.getRowDistributionPtr();
+			
             assert( partition.size() == N);
             assert( coordinates[0].size() == N);
             break;
@@ -537,11 +547,13 @@ int main(int argc, char** argv) {
 	
     if (comm->getRank() == 0) {
 		//metrics.print( std::cout );
+		std::cout << "Running " << __FILE__ << std::endl;
 		printMetricsShort( metrics, std::cout);
 		// write in a file
         if( settings.outFile!="-" ){
 			std::ofstream outF( settings.outFile, std::ios::out);
 			if(outF.is_open()){
+				outF << "Running " << __FILE__ << std::endl;
                 if( vm.count("generate") ){
                     outF << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
                 }else{
@@ -600,4 +612,6 @@ int main(int argc, char** argv) {
         ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partition, partOutFile );        
     }
     
+    std::exit(0);
+	return 0;
 }
