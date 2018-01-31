@@ -471,9 +471,9 @@ int main(int argc, char** argv) {
 		IndexType weightSum;
 		bool uniformWeights = true;
 			
-		if( not uniformWeights){
-			DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
-			
+		DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
+		
+		if( not uniformWeights){	
 			scai::hmemo::HArray<IndexType> localWeightsInt( rowDistPtr->getLocalSize(), 1 );
 			scai::lama::DenseVector<IndexType> nodeWeightsInt;     // node weights
 			nodeWeightsInt.swap( localWeightsInt, rowDistPtr );
@@ -484,7 +484,7 @@ int main(int argc, char** argv) {
 			// if all nodes have weight 1 then weightSum = globalN
 			weightSum = N;
 		}
-            	const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
+		const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
 	        
 		// WARNING: getting an error in KMeans.h, try to redistribute coordinates
 		std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
@@ -494,10 +494,9 @@ int main(int argc, char** argv) {
 	  	//
 		beforeInitialTime =  std::chrono::system_clock::now();
 
-            partition = ITI::KMeans::computePartition(coordinatesCopy, settings.numBlocks, nodeWeights, blockSizes, settings);      
+		partition = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeights, blockSizes, settings);      
             
-            partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
-            
+		partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
 			
 		// must repartition graph according to the new partition/distribution
 		graph.redistribute( partition.getDistributionPtr() , noDistPtr );
