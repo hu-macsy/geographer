@@ -860,8 +860,11 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             file.read((char*)(&header[0]), headerSize*sizeof(ULONG));
         }
         file.close();
-        SCAI_ASSERT_ERROR( success, "Error while opening the file " << filename); 
-    }            
+    }
+
+    if (not comm->any(success)) {
+        throw std::runtime_error("Error while opening the file " + filename);
+    }
         
     //broadcast the header info
     comm->bcast( header.data(), 3, 0 );
