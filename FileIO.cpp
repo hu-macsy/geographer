@@ -994,16 +994,15 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     //
     
     scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, ja.size(),   
-                scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
-    		scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
-    		scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
+    scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
+    scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
+    scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
     
     // block distribution for rows and no distribution for columns
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 
-    scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
-
+    return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
 }
 
 //-------------------------------------------------------------------------------------------------
