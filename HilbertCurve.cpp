@@ -228,7 +228,7 @@ template<typename IndexType, typename ValueType>
 DenseVector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point(ValueType index, IndexType level){
 	SCAI_REGION( "HilbertCurve.Hilbert3DIndex2Point" )
 	
-        DenseVector<ValueType>  p(3,0), ret(3,0);
+	DenseVector<ValueType>  p(3,0), ret(3,0);
 	ValueType r;
 	IndexType q;
 	

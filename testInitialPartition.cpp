@@ -217,8 +217,10 @@ int main(int argc, char** argv) {
         gethostname(machineChar, 255);
         if (machineChar) {
             machine = std::string(machineChar);
+			settings.machine = machine;
         } else {
             std::cout << "machine char not valid" << std::endl;
+ 			machine = "machine char not valid";
         }
         
         scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
@@ -385,7 +387,7 @@ int main(int argc, char** argv) {
     scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
     scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
     
-    DenseVector<IndexType> uniformWeights;
+    //DenseVector<IndexType> uniformWeights;
     
     settings.minGainForNextRound = IndexType(10);
     settings.minBorderNodes = IndexType(10);
@@ -462,20 +464,31 @@ int main(int argc, char** argv) {
             std::terminate();
         }
         case 3:{  //------------------------------------------- k-means
-            beforeInitialTime =  std::chrono::system_clock::now();
+            
             PRINT0( "Get a k-means partition");
             
             // get a k-means partition
-            DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
-            
-            scai::hmemo::HArray<IndexType> localWeightsInt( rowDistPtr->getLocalSize(), 1 );
-            scai::lama::DenseVector<IndexType> nodeWeightsInt;     // node weights
-            nodeWeightsInt.swap( localWeightsInt, rowDistPtr );
-            nodeWeightsInt.redistribute(tempResult.getDistributionPtr());
-            
-            const IndexType weightSum = nodeWeightsInt.sum().Scalar::getValue<IndexType>();
+			IndexType weightSum;
+			bool uniformWeights = true;
+			
+			if( not uniformWeights){
+				DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
+				
+				scai::hmemo::HArray<IndexType> localWeightsInt( rowDistPtr->getLocalSize(), 1 );
+				scai::lama::DenseVector<IndexType> nodeWeightsInt;     // node weights
+				nodeWeightsInt.swap( localWeightsInt, rowDistPtr );
+				nodeWeightsInt.redistribute(tempResult.getDistributionPtr());
+				
+				weightSum = nodeWeightsInt.sum().Scalar::getValue<IndexType>();
+			}else{
+				// if all nodes have weight 1 then weightSum = globalN
+				weightSum = N;
+			}
+			
             const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
             
+			beforeInitialTime =  std::chrono::system_clock::now();
+			
             partition = ITI::KMeans::computePartition(coordinates, settings.numBlocks, nodeWeights, blockSizes, settings);      
             
             partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
