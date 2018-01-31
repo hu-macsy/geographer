@@ -124,24 +124,25 @@ def submitGeographer_noGather(exp, version):
 	params = "-1"
 	tool = "-1"
 	
-	if version=="graph":
-		# set parameters for every experiment
-		params = defaultSettings()
-		executable = geoExe
-		tool = "Geographer"
-	elif version=="geoKmeans":
-		executable = initialExe
-		params = " --initialPartition=3"
-		tool = version
-	elif version=="geoSfc":
-		executable = initialExe
-		params = " --initialPartition=0"
-		tool = version
-	else:
-		print("Version given: " + version + " is not implemented.\nAborting...");
-		exit(-1)			
-	
 	for i in range(0,exp.size):
+		
+		if version=="graph":
+			# set parameters for every experiment
+			params = defaultSettings()
+			executable = geoExe
+			tool = "Geographer"
+		elif version=="geoKmeans":
+			executable = initialExe
+			params = " --initialPartition=3"
+			tool = version
+		elif version=="geoSfc":
+			executable = initialExe
+			params = " --initialPartition=0"
+			tool = version
+		else:
+			print("Version given: " + version + " is not implemented.\nAborting...");
+			exit(-1)
+
 		outFile = outFileString( exp, i, tool)
 		
 		if outFile=="":
@@ -154,7 +155,7 @@ def submitGeographer_noGather(exp, version):
 		params += " --outFile="+ outFile
 		params += " --dimensions="+ exp.dimension
 		params += " --fileFormat="+ exp.fileFormat
-		#print(params)
+		print(params)
 
 		commandString = executable + " --graphFile="+ exp.paths[i]+ params
 		
@@ -171,8 +172,7 @@ def submitParMetis(exp, geom):
 	for i in range(0,exp.size):
 		
 		params = ""
-		parMetisVersion = ""
-		
+				
 		if geom==0:
 			tool = "parMetisGraph"
 		elif geom==1:
@@ -189,7 +189,7 @@ def submitParMetis(exp, geom):
 			print( "outFile is empty for tool " + tool + " and experiment " + str(exp.ID) + "\n. Skippong job ...")
 			return -1
 		
-		if not os.path.exists( os.path.join( toolsPath, parMetisVersion) ):
+		if not os.path.exists( os.path.join( toolsPath, tool) ):
 			print("WARNING: Output directory " + os.path.join( toolsPath, "parMetisGraph") +" does not exist, experiment NOT submited.\n Aborting...")
 			exit(-1)
 		
@@ -203,7 +203,7 @@ def submitParMetis(exp, geom):
 	
 		commandString = parMetisExe + " --graphFile " + exp.paths[i] + params + " --outFile="+outFile
 
-		submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_k"+str(exp.k[i])+"_" + parMetisVersion+".cmd"
+		submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_k"+str(exp.k[i])+"_" + tool+".cmd"
 		submitfile = createLLSubmitFile( os.path.join( toolsPath, "tmp") , submitFilename, commandString, "00:05:00", int(exp.k[i]) )
 		call(["llsubmit", submitfile])
 		
@@ -229,7 +229,7 @@ configFile = args.configFile
 tools = args.tools
 
 if tools[0]=="all":
-	tools = allTools
+	tools = allTools[1:]
 	
 for tool in tools:
 	if not tool in allTools:
