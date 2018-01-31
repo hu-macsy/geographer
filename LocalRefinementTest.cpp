@@ -117,14 +117,15 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
 
 	//get random node weights
-	DenseVector<ValueType> weights(graph.getRowDistributionPtr(),1);
+	DenseVector<ValueType> weights(graph.getRowDistributionPtr());
+	weights.fillRange(1,1);
 	// setRandom creates too big numbers and weights.sum() < 0 because (probably) sum does not fit in int
 	//weights.setRandom(graph.getRowDistributionPtr(), 1);
 	ValueType totalWeight = n*(n+1)/2;
 	ValueType minNodeWeight = weights.min().Scalar::getValue<IndexType>();
 	ValueType maxNodeWeight = weights.max().Scalar::getValue<IndexType>();
 
-	EXPECT_EQ(weights.sum(), totalWeight );
+	EXPECT_EQ(weights.sum().getValue<ValueType>(), totalWeight );
 	if (comm->getRank() == 0) {
 		std::cout << "Max node weight: " << maxNodeWeight << std::endl;
 		std::cout << "Min node weight: " << minNodeWeight << std::endl;

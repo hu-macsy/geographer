@@ -49,6 +49,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     	throw std::runtime_error("Called with " + std::to_string(comm->getSize()) + " processors, but " + std::to_string(settings.numBlocks) + " blocks.");
     }
 
+    //TODO: opt size
     const IndexType optSize_old = ceil(double(globalN) / settings.numBlocks);
     const IndexType optSize =  nodeWeights.sum().Scalar::getValue<IndexType>() / settings.numBlocks;
     const IndexType maxAllowableBlockSize = optSize*(1+settings.epsilon);
@@ -245,7 +246,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				const scai::utilskernel::LArray<ValueType>& localWeights = nodeWeights.getLocalValues();
 				assert(localWeights.size() == localN);
 				comm->updateHalo( nodeWeightHaloData, localWeights, graphHalo );
-				borderNodeWeights.resize(borderRegionSize);
+				borderNodeWeights.resize(borderRegionSize,-1);
 				for (IndexType i = 0; i < borderRegionSize; i++) {
 					const IndexType globalI = borderRegionIDs[i];
 					const IndexType localI = inputDist->global2local(globalI);
@@ -256,7 +257,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 						assert(localI != nIndex);
 						borderNodeWeights[i] = nodeWeightHaloData[localI];
 					}
-					assert(borderNodeWeights[i] > 0);
+					assert(borderNodeWeights[i] >= 0);
 				}
 			}
 
