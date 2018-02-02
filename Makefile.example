@@ -59,27 +59,27 @@ testSpMV: $(OBJ_COMMON) testSpMV.o
 PARMETIS_INCLUDE= 
 PARMETIS_LIB= 	
 
-parMetisPart.o:	parMetisPart.cpp
+parMetisPart.o:	parMetisPart.cpp Wrappers.cpp
 	$(CC) $(CCFLAGS) -I$(PARMETIS_INCLUDE) -I$(METIS_INCLUDE) $(OBJ_COMMON) -c -o parMetisPart.o parMetisPart.cpp
 	
-metisWrapper: $(OBJ_COMMON) parMetisPart.o
+metisWrapper: $(OBJ_COMMON) parMetisPart.o Wrappers.o
 	$(CC) $(CCFLAGS) -I$(PARMETIS_INCLUDE) $(OBJ_COMMON) parMetisPart. -o pareMetisEXE -L$(PARMETIS_LIB) -lparmetis $(LFLAGS)
 
 # xtrapulp
 XTRAPULP_INCLUDE= /usr/xtrapulp
 XTRAPULP_LIB= /usr/xtrapulp
 
-xtrapulpWrapper: $(OBJ_XTRAPULP)
+xtrapulpWrapper: $(OBJ_XTRAPULP) Wrappers.o
 	$(CC)  $(CCFLAGS) $(OBJ_XTRAPULP)  -o xtrapulpEXE -L$(XTRAPULP_LIB) -lxtrapulp $(LFLAGS)
 
 # zoltan
 ZOLTAN_MAKEFILE_EXPORT=$(HOME)/Code/Trilinos/build/packages/zoltan2/Makefile.export.Zoltan2
 include $(ZOLTAN_MAKEFILE_EXPORT)
 
-zoltanRcb.o: zoltanRcb.cpp
+zoltanRcb.o: zoltanRcb.cpp Wrappers.cpp
 	$(CC) $(CCFLAGS) $(ZOLTAN2_ALL_INCLUDE_DIRS) -I$(TRILINOS_INCLUDE) $(OBJ_COMMON) -c -o zoltanRcb.o zoltanRcb.cpp
 	
-zoltanWrapper: $(OBJ_ZOLTAN2) zoltanRcb.o
+zoltanWrapper: $(OBJ_ZOLTAN2) zoltanRcb.o Wrappers.o
 	$(CC) $(CCFLAGS) $(Zoltan2_INCLUDE_DIRS) $(OBJ_COMMON) zoltanRcb.o -o zoltanRcbEXE  $(Zoltan2_LIBRARY_DIRS) $(Zoltan2_LIBRARIES) $(LFLAGS)
 
 	
