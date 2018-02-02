@@ -56,14 +56,16 @@ testSpMV: $(OBJ_COMMON) testSpMV.o
 ###### wrappers	
 
 # parmetis
-PARMETIS_INCLUDE= 
-PARMETIS_LIB= 	
+PARMETIS_LIB= 
+OBJ_PARMETIS = FileIO.o GraphUtils.o MeshGenerator.o Wrappers.o
+PARMETIS_INCLUDE= -I../metis/include -I../parmetis/include
+EXECUTABLE_PARMETIS= parMetis
 
-parMetisPart.o:	parMetisPart.cpp Wrappers.cpp
-	$(CC) $(CCFLAGS) -I$(PARMETIS_INCLUDE) -I$(METIS_INCLUDE) $(OBJ_COMMON) -c -o parMetisPart.o parMetisPart.cpp
-	
-metisWrapper: $(OBJ_COMMON) parMetisPart.o Wrappers.o
-	$(CC) $(CCFLAGS) -I$(PARMETIS_INCLUDE) $(OBJ_COMMON) parMetisPart. -o pareMetisEXE -L$(PARMETIS_LIB) -lparmetis $(LFLAGS)
+parMetisPart.o: $(OBJ_PARMETIS)
+	$(CC) $(CCFLAGS) $(PARMETIS_INCLUDE)  -c -o parMetisPart.o parMetisPart.cpp
+
+parMetisWrapper:$(OBJ_COMMON) parMetisPart.o
+	$(CC) $(CCFLAGS) $(PARMETIS_INCLUDE) $(OBJ_PARMETIS) parMetisPart.o -o $(EXECUTABLE_PARMETIS)  $(LFLAGS) -L../parmetis/lib -lparmetis -L../metis/lib
 
 # xtrapulp
 XTRAPULP_INCLUDE= /usr/xtrapulp
