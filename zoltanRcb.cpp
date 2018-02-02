@@ -282,9 +282,6 @@ int main(int argc, char *argv[])
 	}
   
   
-  
-  
-  
   // Create global ids for the coordinates.
 
   IndexType *globalIds = new IndexType [localN];
@@ -309,7 +306,7 @@ int main(int argc, char *argv[])
 
   params.set("algorithm", "rcb");
   params.set("imbalance_tolerance", tolerance );
-  params.set("num_global_parts", int(settings.numBlocks) );
+  params.set("num_global_parts", nprocs );
 
   ///////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////
