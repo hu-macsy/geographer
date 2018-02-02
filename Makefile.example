@@ -85,6 +85,11 @@ zoltanWrapper: $(OBJ_ZOLTAN2) zoltanRcb.o Wrappers.o
 	$(CC) $(CCFLAGS) $(Zoltan2_INCLUDE_DIRS) $(OBJ_COMMON) zoltanRcb.o -o zoltanRcbEXE  $(Zoltan2_LIBRARY_DIRS) $(Zoltan2_LIBRARIES) $(LFLAGS)
 
 	
+###### for all wrappers	
+Wrappers.o: Wrappers.cpp
+	$(CC) $(CCFLAGS) $(PARMETIS_INCLUDE) $(ZOLTAN2_ALL_INCLUDE_DIRS) $(XTRAPULP_INCLUDE) -c -o Wrappers.o Wrappers.cpp
+
+	
 ###### misc	
 	
 graphGen: $(OBJ_GRAPH_GEN)

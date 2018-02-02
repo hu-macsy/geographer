@@ -124,6 +124,7 @@ struct Settings{
     bool writeDebugCoordinates = false;
     bool writeInFile = false;
     bool storeInfo = false;
+	int repeatTimes = 1;
     
     //
     // print settings

@@ -17,16 +17,29 @@ namespace ITI {
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper (
 	const CSRSparseMatrix<ValueType> &graph,
-	std::vector<DenseVector<ValueType>> &coords, 
-	DenseVector<ValueType> &nodeWeights,
+	const std::vector<DenseVector<ValueType>> &coords, 
+	const DenseVector<ValueType> &nodeWeights,
 	int parMetisGeom,
-	struct Settings settings,
-	struct Metrics& metrics){
+	struct Settings &settings,
+	struct Metrics &metrics){
 		
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
 	const IndexType N = graph.getNumRows();
 	
+	PRINT0("\t\tStarting the metis wrapper");
+	 
+	if( comm->getRank()==0 ){
+        std::cout << "\033[1;31m";
+        std::cout << "IndexType size: " << sizeof(IndexType) << " , ValueType size: "<< sizeof(ValueType) << std::endl;
+        if( int(sizeof(IndexType)) != int(sizeof(idx_t)) ){
+            std::cout<< "WARNING: IndexType size= " << sizeof(IndexType) << " and idx_t size=" << sizeof(idx_t) << "  do not agree, this may cause problems (even if this print looks OK)." << std::endl;
+        }
+        if( sizeof(ValueType)!=sizeof(real_t) ){
+            std::cout<< "WARNING: IndexType size= " << sizeof(IndexType) << " and idx_t size=" << sizeof(idx_t) << "  do not agree, this may cause problems " << std::endl;
+        }
+        std::cout<<"\033[0m";
+    }
     //-----------------------------------------------------
     //
     // convert to parMetis data types
@@ -35,7 +48,8 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper 
     //get the vtx array
     
     IndexType size = comm->getSize();
-    scai::hmemo::HArray<IndexType> sendVtx(size+1, static_cast<ValueType>( 0 ));
+
+	scai::hmemo::HArray<IndexType> sendVtx(size+1, static_cast<ValueType>( 0 ));
     scai::hmemo::HArray<IndexType> recvVtx(size+1);
     
     IndexType lb, ub;
@@ -75,12 +89,12 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper 
     // setting xadj=ia and adjncy=ja values, these are the local values of every processor
     //
     
-    scai::lama::CSRStorage<ValueType>& localMatrix= graph.getLocalStorage();
+    const scai::lama::CSRStorage<ValueType>& localMatrix= graph.getLocalStorage();
     
     scai::hmemo::ReadAccess<IndexType> ia( localMatrix.getIA() );
     scai::hmemo::ReadAccess<IndexType> ja( localMatrix.getJA() );
     IndexType iaSize= ia.size();
-    
+
     idx_t* xadj = new idx_t[ iaSize ];
     idx_t* adjncy = new idx_t[ ja.size() ];
     
@@ -116,7 +130,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper 
     // convert the vector<DenseVector> to idx_t*
     IndexType localN= dist->getLocalSize();
     real_t *xyzLocal;
-
+	
     if( parMetisGeom!=0 or settings.writeDebugCoordinates ){
         xyzLocal = new real_t[ ndims*localN ];
         
@@ -144,9 +158,9 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper 
     real_t tpwgts[ nparts ];
     real_t total = 0;
     for(int i=0; i<sizeof(tpwgts)/sizeof(real_t) ; i++){
-	tpwgts[i] = real_t(1)/nparts;
-    //PRINT(*comm << ": " << i <<": "<< tpwgts[i]);
-	total += tpwgts[i];
+		tpwgts[i] = real_t(1)/nparts;
+		//PRINT(*comm << ": " << i <<": "<< tpwgts[i]);
+		total += tpwgts[i];
     }
 
     // ubvec: array of size ncon to specify imbalance for every vertex weigth.
@@ -180,9 +194,9 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper 
     //
     // get the partitions with parMetis
     //
-
+    
     double sumKwayTime = 0.0;
-    int repeatTimes = 5;
+    int repeatTimes = settings.repeatTimes;
     
     int metisRet;
     
@@ -224,7 +238,8 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper 
     }
     
     double avgKwayTime = sumKwayTime/repeatTimes;
-
+	metrics.timeFinalPartition = avgKwayTime;
+	
     //
     // free arrays
     //
@@ -254,4 +269,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper 
 		
 	}
 
+	
+	 template class Wrappers<IndexType, ValueType>;
+	
 }//namespace

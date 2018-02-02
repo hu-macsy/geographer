@@ -35,6 +35,7 @@
 #include "MultiSection.h"
 #include "KMeans.h"
 #include "GraphUtils.h"
+#include "Wrappers.h"
 
 /**
  *  Examples of use:
@@ -48,53 +49,6 @@
  */
 
 //----------------------------------------------------------------------------
-
-namespace ITI {
-	std::istream& operator>>(std::istream& in, Format& format)
-	{
-		std::string token;
-		in >> token;
-		if (token == "AUTO" or token == "0")
-			format = ITI::Format::AUTO ;
-		else if (token == "METIS" or token == "1")
-			format = ITI::Format::METIS;
-		else if (token == "ADCIRC" or token == "2")
-			format = ITI::Format::ADCIRC;
-		else if (token == "OCEAN" or token == "3")
-			format = ITI::Format::OCEAN;
-		else if (token == "MATRIXMARKET" or token == "4")
-			format = ITI::Format::MATRIXMARKET;    
-		else if (token == "TEEC" or token == "5")
-			format = ITI::Format::TEEC;
-        else if (token == "BINARY" or token == "6")
-			format = ITI::Format::BINARY;
-		else
-			in.setstate(std::ios_base::failbit);
-		return in;
-	}
-
-	std::ostream& operator<<(std::ostream& out, Format method)
-	{
-		std::string token;
-
-		if (method == ITI::Format::AUTO)
-			token = "AUTO";
-		else if (method == ITI::Format::METIS)
-			token = "METIS";
-		else if (method == ITI::Format::ADCIRC)
-			token = "ADCIRC";
-		else if (method == ITI::Format::OCEAN)
-			token = "OCEAN";
-		else if (method == ITI::Format::MATRIXMARKET)
-			token = "MATRIXMARKET";      
-		else if (method == ITI::Format::TEEC)
-			token = "TEEC";
-        else if (method == ITI::Format::BINARY)
-            token == "BINARY";
-		out << token;
-		return out;
-	}
-}
 
 
 std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
@@ -148,6 +102,7 @@ int main(int argc, char** argv) {
         std::string blockSizesFile;
         bool writePartition = false;
         IndexType repeatTimes = 1;
+		IndexType partAlgo = 0;
 		
         desc.add_options()
             ("help", "display options")
@@ -164,7 +119,10 @@ int main(int argc, char** argv) {
             ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
             ("minBorderNodes", value<IndexType>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
             ("stopAfterNoGainRounds", value<IndexType>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
-            ("initialPartition",  value<InitialPartitioningMethods> (&settings.initialPartition), "Parameter for different initial partition: 0 or 'SFC' for the hilbert space filling curve, 1 or 'Pixel' for the pixeled method, 2 or 'Spectral' for spectral parition, 3 or 'KMeans' for Kmeans and 4 or 'MultiSection' for Multisection")
+            //("initialPartition",  value<InitialPartitioningMethods> (&settings.initialPartition), "Parameter for different initial partition: 0 or 'SFC' for the hilbert space filling curve, 1 or 'Pixel' for the pixeled method, 2 or 'Spectral' for spectral parition, 3 or 'KMeans' for Kmeans and 4 or 'MultiSection' for Multisection")
+			
+			("partAlgo", value<IndexType>(&partAlgo),"The algorithm to be used for partitioning")
+			
             ("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
             ("cutsPerDim", value<std::vector<IndexType>>(&settings.cutsPerDim)->multitoken(), "If msOption=2, then provide d values that define the number of cuts per dimension.")
             ("pixeledSideLen", value<IndexType>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
@@ -430,11 +388,14 @@ int main(int argc, char** argv) {
     
     comm->synchronize();
 	
+	struct Metrics metrics(1);
+	
+	//----------------------------------------------------------------
 	//
 	// partition with the chosen algorithm
 	//
     
-    switch( initialPartition ){
+    switch( partAlgo ){
         case 0:{  //------------------------------------------- hilbert/sfc
            
             beforeInitialTime =  std::chrono::system_clock::now();
@@ -534,6 +495,18 @@ int main(int argc, char** argv) {
             assert( coordinates[0].size() == N);
             break;   
         }
+		case 5 : { 	//--------------------------------------- parmetis
+			
+			int parMetisGeom = 0; 		//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
+			settings.repeatTimes = 1;
+			
+			beforeInitialTime =  std::chrono::system_clock::now();
+			// get parMetis parition
+			partition = ITI::Wrappers<IndexType,ValueType>::metisWrapper ( graph, coordinates, nodeWeights, parMetisGeom, settings, metrics);
+			partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
+			
+			break;
+		}
         default:{
             PRINT0("Value "<< initialPartition << " for option initialPartition not supported" );
             break;
@@ -548,7 +521,7 @@ int main(int argc, char** argv) {
 	//get the distribution from the partition
 	scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
 	
-	
+	std::chrono::time_point<std::chrono::system_clock> beforeRedistribution;
 	//
 	// redistribute according to the new distribution
 	//
@@ -557,6 +530,11 @@ int main(int argc, char** argv) {
 	partition.redistribute( distFromPartition );
 	nodeWeights.redistribute( distFromPartition );
 	//TODO: redistribute also coordinates?	probably not needed	
+	
+	std::chrono::duration<double> redistributionTime =  std::chrono::system_clock::now() - beforeRedistribution;
+	
+	time = comm->max( redistributionTime.count() );
+	PRINT0("time to redistribute: " << time);
 	
 	rowDistPtr = graph.getRowDistributionPtr();
 	
@@ -620,7 +598,6 @@ int main(int argc, char** argv) {
     
     
     
-    struct Metrics metrics(1);
 	
 	metrics.timeFinalPartition = comm->max( partitionTime.count() );
 	metrics.getMetrics( graph, partition, nodeWeights, settings );

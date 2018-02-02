@@ -39,12 +39,12 @@ public:
 	//static void writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
 
 	static scai::lama::DenseVector<IndexType> metisWrapper (
-		const CSRSparseMatrix<ValueType> &adjM,
-		std::vector<DenseVector<ValueType>> &coordinates, 
-		DenseVector<ValueType> &nodeWeights,
+		const CSRSparseMatrix<ValueType> &graph,
+		const std::vector<DenseVector<ValueType>> &coordinates, 
+		const DenseVector<ValueType> &nodeWeights,
 		int parMetisGeom,
-		struct Settings settings,
-		struct Metrics& metrics);
+		struct Settings &settings,
+		struct Metrics &metrics);
 		
 };
 } /* namespace ITI */
