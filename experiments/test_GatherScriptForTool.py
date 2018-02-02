@@ -231,7 +231,10 @@ def createPlotsGeneric(exp, toolNames, metricNames, metricValues):
 				#for i in range(0,exp.size):
 				#print("WARNING:" + str(len(thisToolMetrics[m])) )
 				for i in range(0,len(thisToolMetrics[m])):
-					plotF.write("("+str(exp.k[i])+", "+ str(thisToolMetrics[m][i]) + ")\n")
+					if thisToolMetrics[m][i]!=-1:
+						plotF.write("("+str(exp.k[i])+", "+ str(thisToolMetrics[m][i]) + ")\n")
+					else:
+						plotF.write("("+str(exp.k[i])+", nan)\n")
 										
 				plotF.write("};\n")
 				plotF.write("\\addlegendentry{"+thisToolName+"}\n")

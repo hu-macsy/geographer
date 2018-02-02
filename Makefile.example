@@ -31,8 +31,8 @@ MPI_INCLUDE=/usr/lib/openmpi/include/
 MPI_LIB=/usr/lib/openmpi/lib/
 RBC_DIR=./RBC
 
-XTRAPULP_INCLUDE= /usr/xtrapulp
-XTRAPULP_LIB= /usr/xtrapulp
+
+
 
 LFLAGS= -Wl,-rpath=$(SCAI_LIB) -L$(SCAI_LIB) -L$(GTEST_LIB) -L$(RBC_DIR)/build/lib -L$(MPI_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lscai_sparsekernel -lscai_solver -lboost_program_options -lboost_filesystem -lboost_system -lquicksort -lparmetis -lmetis
 
@@ -47,17 +47,46 @@ tests: $(OBJ_GOOGLETEST)
 main: $(OBJ_TEST_MAIN)
 	$(CC) $(CCFLAGS) $(OBJ_TEST_MAIN) -o $(EXECUTABLE_MAIN) $(LFLAGS)
 
-graphGen: $(OBJ_GRAPH_GEN)
-	$(CC) $(CCFLAGS) $(OBJ_GRAPH_GEN) -o $(EXECUTABLE_GRAPH_GEN) $(LFLAGS)
+testInitial: $(OBJ_TEST_INITIAL)
+	$(CC) $(CCFLAGS) $(OBJ_TEST_INITIAL) -o $(EXECUTABLE_INITIAL) $(LFLAGS)
 
-metisWrapper: $(OBJ_COMMON) parMetisPart.cpp
-	$(CC) $(CCFLAGS) -I$(PARMETIS_INCLUDE) $(OBJ_COMMON) parMetisPart.cpp -o metisWrapper -L$(PARMETIS_LIB) -lparmetis $(LFLAGS)
+testSpMV: $(OBJ_COMMON) testSpMV.o
+	$(CC) $(CCFLAGS) $(OBJ_COMMON) testSpMV.o -o testSpMV $(LFLAGS)
+	
+###### wrappers	
+
+# parmetis
+PARMETIS_INCLUDE= 
+PARMETIS_LIB= 	
+
+parMetisPart.o:	parMetisPart.cpp
+	$(CC) $(CCFLAGS) -I$(PARMETIS_INCLUDE) -I$(METIS_INCLUDE) $(OBJ_COMMON) -c -o parMetisPart.o parMetisPart.cpp
+	
+metisWrapper: $(OBJ_COMMON) parMetisPart.o
+	$(CC) $(CCFLAGS) -I$(PARMETIS_INCLUDE) $(OBJ_COMMON) parMetisPart. -o pareMetisEXE -L$(PARMETIS_LIB) -lparmetis $(LFLAGS)
+
+# xtrapulp
+XTRAPULP_INCLUDE= /usr/xtrapulp
+XTRAPULP_LIB= /usr/xtrapulp
 
 xtrapulpWrapper: $(OBJ_XTRAPULP)
 	$(CC)  $(CCFLAGS) $(OBJ_XTRAPULP)  -o xtrapulpEXE -L$(XTRAPULP_LIB) -lxtrapulp $(LFLAGS)
 
-testInitial: $(OBJ_TEST_INITIAL)
-	$(CC) $(CCFLAGS) $(OBJ_TEST_INITIAL) -o $(EXECUTABLE_INITIAL) $(LFLAGS)
+# zoltan
+ZOLTAN_MAKEFILE_EXPORT=$(HOME)/Code/Trilinos/build/packages/zoltan2/Makefile.export.Zoltan2
+include $(ZOLTAN_MAKEFILE_EXPORT)
+
+zoltanRcb.o: zoltanRcb.cpp
+	$(CC) $(CCFLAGS) $(ZOLTAN2_ALL_INCLUDE_DIRS) -I$(TRILINOS_INCLUDE) $(OBJ_COMMON) -c -o zoltanRcb.o zoltanRcb.cpp
+	
+zoltanWrapper: $(OBJ_ZOLTAN2) zoltanRcb.o
+	$(CC) $(CCFLAGS) $(Zoltan2_INCLUDE_DIRS) $(OBJ_COMMON) zoltanRcb.o -o zoltanRcbEXE  $(Zoltan2_LIBRARY_DIRS) $(Zoltan2_LIBRARIES) $(LFLAGS)
+
+	
+###### misc	
+	
+graphGen: $(OBJ_GRAPH_GEN)
+	$(CC) $(CCFLAGS) $(OBJ_GRAPH_GEN) -o $(EXECUTABLE_GRAPH_GEN) $(LFLAGS)
 
 converter: $(OBJ_CONVERTER)
 	$(CC) $(CCFLAGS) $(OBJ_CONVERTER) -o $(EXECUTABLE_CONVERTER) $(LFLAGS)
