@@ -119,14 +119,24 @@ public:
 	 */
 	static scai::lama::CSRSparseMatrix<ValueType> readGraphBinary(const std::string filename);
         
+	/*Every PE reads its part of the file. The file contains all the edges of the graph: each line has two numbers indicating
+	 * the vertices of the edge. 
+	 * 0 1
+	 * 0 2				0 - 1 - 3 - 4
+	 * 3 1				  \    /  
+	 * 4 3				    2 
+	 * 3 2
+	 */
+	static scai::lama::CSRSparseMatrix<ValueType> readEdgeList(const std::string filename);
+	
 	/* Reads the coordinates from file "filename" and returns then in a vector of DenseVector
 	 */
 	static std::vector<DenseVector<ValueType>> readCoords ( std::string filename, IndexType numberOfCoords, IndexType dimension, Format = Format::METIS);
-
-        /**
-         * 
-         */
-        static std::vector<DenseVector<ValueType>> readCoordsBinary( std::string filename, const IndexType numberOfPoints, const IndexType dimension);
+	
+	/**
+     * 
+    */
+	static std::vector<DenseVector<ValueType>> readCoordsBinary( std::string filename, const IndexType numberOfPoints, const IndexType dimension);
         
         
 	/*

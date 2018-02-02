@@ -225,11 +225,11 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
             comm->sumImpl( globalSubsetSizes.data() , subsetSizes.data(), k, scai::common::TypeTraits<ValueType>::stype);
 	}else{
             globalSubsetSizes = subsetSizes;
-        }
+	}
 
 	ValueType maxBlockSize = *std::max_element(globalSubsetSizes.begin(), globalSubsetSizes.end());
 
-        if (!weighted) {
+	if (!weighted) {
 		assert(maxBlockSize >= optSize);
 	}
 	return (ValueType(maxBlockSize - optSize)/ optSize);

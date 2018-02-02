@@ -701,9 +701,9 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
             }
         }
         
-        const ValueType avgDegree = ValueType(2*globalM) / globalN;
+	const ValueType avgDegree = ValueType(2*globalM) / globalN;
         
-        //get distribution and local range
+    //get distribution and local range
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 
@@ -1047,6 +1047,86 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphMa
 }
 //-------------------------------------------------------------------------------------------------
     
+    
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeList(const std::string filename){
+    SCAI_REGION( "FileIO.readEdgeListDistributed" );
+	
+	typedef unsigned long long int ULLI;     
+	
+    std::ifstream file(filename);
+    
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	
+	//const std::string
+	
+    if(file.fail())
+        throw std::runtime_error("Could not open file "+ filename + ".");
+    
+    //skip the first lines that have comments starting with '%'
+    std::string line;
+    std::getline(file, line);
+
+	// skip comments, maybe not needed
+    while( line[0]== '%'){
+       std::getline(file, line);
+    }
+    std::stringstream ss;
+	std::string item;
+    ss.str( line );
+	
+	ULLI globalM, globalN;
+	
+	std::getline(ss, item, ' ');
+	globalN = std::stoll(item);
+	std::getline(ss, item, ' ');
+	globalM = std::stoll(item);
+	
+	if( globalN<=0 or globalM<=0 ){
+		PRINT0("Negative input, maybe int value is not big enough: globalN= " << globalN << " , globalM= "<< globalM);
+		exit(0);
+	}
+	// TODO:the file size, mabe use it as an extra check or a way to get the number of edges
+	//ULLI filesize;
+	//{
+	//	std::ifstream in(filename, std::ifstream::ate | std::ifstream::binary);
+	//	filesize = in.tellg();
+	//}
+	
+	const IndexType thisPE = comm->getRank();
+	const IndexType numPEs = comm->getSize();
+	const ULLI avgEdgesPerPE = globalM/numPEs;
+	
+	const ULLI beginLocalRange = thisPE*avgEdgesPerPE;
+	const ULLI endLocalRange = (thisPE+1)*avgEdgesPerPE;
+	
+	
+	
+	/*
+    IndexType numRows;
+    IndexType numColumns;
+    IndexType numValues;
+    
+    ss >> numRows>> numColumns >> numValues;
+    
+    SCAI_ASSERT( numRows==numColumns , "Number of rows should be equal to number of columns");
+
+    scai::lama::CSRSparseMatrix<ValueType> graph;
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+  
+    const scai::dmemo::DistributionPtr rowDist(new scai::dmemo::BlockDistribution(numRows, comm));
+    
+    graph.readFromFile( filename, rowDist );
+    */
+    //unsetenv( "SCAI_IO_TYPE_DATA" );
+    
+    scai::lama::CSRSparseMatrix<ValueType> graph;
+    
+    return graph;
+}
+//-------------------------------------------------------------------------------------------------
+
+
 template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOcean(std::string filename, IndexType dimension) {
 	SCAI_REGION( "FileIO.readCoords" );

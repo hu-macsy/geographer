@@ -184,7 +184,7 @@ scai::lama::CSRSparseMatrix<ValueType> SpectralPartition<IndexType, ValueType>::
     
     const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
     
-    // vector of size globalN with the degree for every edge
+    // distributed vector of size globalN with the degree for every edge. It has the same distribution as the rowDistribution of adjM
     scai::lama::DenseVector<IndexType> degreeVector = SpectralPartition<IndexType, ValueType>::getDegreeVector( adjM );
     SCAI_ASSERT( degreeVector.size() == globalN, "Degree vector global size not correct: " << degreeVector.size() << " , shoulb be " << globalN);
     SCAI_ASSERT( degreeVector.getLocalValues().size() == localN,"Degree vector local size not correct: " << degreeVector.getLocalValues().size() << " , shoulb be " << localN);
@@ -197,9 +197,9 @@ scai::lama::CSRSparseMatrix<ValueType> SpectralPartition<IndexType, ValueType>::
     IndexType laplacianNnzValues;
     {        
         // get local data of adjM
-        scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-        scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-        scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+        const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+        const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+        const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
         
         // local data of degree vector
         scai::hmemo::ReadAccess<IndexType>  rLocalDegree( degreeVector.getLocalValues() );
