@@ -35,7 +35,9 @@
 #include "quadtree/SpatialCell.h"
 #include "quadtree/QuadTreeCartesianEuclid.h" 
 #include "AuxiliaryFunctions.h"
+#ifndef SETTINGS_H
 #include "Settings.h"
+#endif
 
 
 using scai::lama::CSRSparseMatrix;

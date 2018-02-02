@@ -15,8 +15,10 @@
 #include <boost/lexical_cast.hpp>
 
 #include "quadtree/QuadTreeCartesianEuclid.h"
-#include "Settings.h"
 #include "GraphUtils.h"
+#ifndef SETTINGS_H
+#include "Settings.h"
+#endif
 
 #include <vector>
 #include <set>

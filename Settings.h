@@ -13,8 +13,8 @@ typedef double ValueType;
 
 namespace ITI{
 enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5, BINARY = 6};
-	
-std::istream& operator>>(std::istream& in, Format& format){
+
+inline std::istream& operator>>(std::istream& in, Format& format){
 	std::string token;
 	in >> token;
 	if (token == "AUTO" or token == "0")
@@ -36,7 +36,7 @@ std::istream& operator>>(std::istream& in, Format& format){
 	return in;
 }
 
-std::ostream& operator<<(std::ostream& out, Format method){
+inline std::ostream& operator<<(std::ostream& out, Format method){
 	std::string token;
 
 	if (method == ITI::Format::AUTO)

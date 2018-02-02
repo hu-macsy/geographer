@@ -19,7 +19,9 @@
 #include <climits>
 #include <queue>
 
+#ifndef SETTINGS_H
 #include "Settings.h"
+#endif
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 

@@ -27,7 +27,9 @@
 #include "PrioQueue.h"
 #include "HilbertCurve.h"
 #include "MultiLevel.h"
+#ifndef SETTINGS_H
 #include "Settings.h"
+#endif
 
 namespace ITI {
 

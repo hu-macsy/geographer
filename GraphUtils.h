@@ -11,7 +11,9 @@
 #include <set>
 
 #include <scai/lama/matrix/CSRSparseMatrix.hpp>
+#ifndef SETTINGS_H
 #include "Settings.h"
+#endif
 
 namespace ITI {
 

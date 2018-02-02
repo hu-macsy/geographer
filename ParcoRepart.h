@@ -18,9 +18,12 @@
 #include <boost/graph/edge_coloring.hpp>
 #include <boost/graph/properties.hpp>
 
-#include "Settings.h"
 #include "Metrics.h"
 #include "FileIO.h"
+#ifndef SETTINGS_H
+#include "Settings.h"
+#endif
+
 
 using namespace scai::lama;
 using scai::dmemo::Halo;

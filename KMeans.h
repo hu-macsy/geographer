@@ -13,8 +13,11 @@
 #include <scai/tracing.hpp>
 
 #include "quadtree/QuadNodeCartesianEuclid.h"
-#include "Settings.h"
 #include "GraphUtils.h"
+#ifndef SETTINGS_H
+#include "Settings.h"
+#endif
+
 
 using scai::lama::DenseVector;
 

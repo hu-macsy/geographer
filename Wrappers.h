@@ -19,10 +19,11 @@
 #include <scai/dmemo/BlockDistribution.hpp>
 
 #include "FileIO.h"
-//#include "GraphUtils.h"
-#include "Settings.h"
 #include "Metrics.h"
 #include "MeshGenerator.h"
+#ifndef SETTINGS_H
+#include "Settings.h"
+#endif
 
 #include <parmetis.h>
 
