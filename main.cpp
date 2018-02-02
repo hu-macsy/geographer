@@ -47,7 +47,9 @@
  */
 
 //----------------------------------------------------------------------------
+/*
 namespace ITI {
+
 	std::istream& operator>>(std::istream& in, Format& format)
 	{
 		std::string token;
@@ -93,7 +95,7 @@ namespace ITI {
 		return out;
 	}
 }
-
+*/
 
 std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
 {

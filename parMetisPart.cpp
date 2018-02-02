@@ -28,54 +28,6 @@
 
 #include <parmetis.h>
 
-
-namespace ITI {
-std::istream& operator>>(std::istream& in, Format& format)
-{
-	std::string token;
-	in >> token;
-	if (token == "AUTO" or token == "0")
-		format = ITI::Format::AUTO ;
-	else if (token == "METIS" or token == "1")
-		format = ITI::Format::METIS;
-	else if (token == "ADCIRC" or token == "2")
-		format = ITI::Format::ADCIRC;
-	else if (token == "OCEAN" or token == "3")
-		format = ITI::Format::OCEAN;
-    else if (token == "MATRIXMARKET" or token == "4")
-		format = ITI::Format::MATRIXMARKET;
-    else if (token == "TEEC" or token == "5")
-        format = ITI::Format::TEEC;
-    else if (token == "BINARY" or token == "6")
-        format = ITI::Format::BINARY;
-	else
-		in.setstate(std::ios_base::failbit);
-	return in;
-}
-
-std::ostream& operator<<(std::ostream& out, Format method)
-{
-	std::string token;
-
-	if (method == ITI::Format::AUTO)
-		token = "AUTO";
-	else if (method == ITI::Format::METIS)
-		token = "METIS";
-	else if (method == ITI::Format::ADCIRC)
-		token = "ADCIRC";
-	else if (method == ITI::Format::OCEAN)
-		token = "OCEAN";
-    else if (method == ITI::Format::MATRIXMARKET)
-        token = "MATRIXMARKET";
-    else if (method == ITI::Format::TEEC)
-        token = "TEEC";
-    else if (method == ITI::Format::BINARY)
-        token == "BINARY";
-	out << token;
-	return out;
-}
-}
-
 /*
 void printCompetitorMetrics(struct Metrics metrics, std::ostream& out){
 	out << "gather" << std::endl;
@@ -93,6 +45,8 @@ void printCompetitorMetrics(struct Metrics metrics, std::ostream& out){
 		<< std::endl; 
 }
 */
+
+
 
 //---------------------------------------------------------------------------------------------
 
@@ -130,7 +84,7 @@ int main(int argc, char** argv) {
         
 	variables_map vm;
 	store(command_line_parser(argc, argv).
-			  options(desc).run(), vm);
+	options(desc).run(), vm);
 	notify(vm);
 
     //parMetisGeom = vm.count("geom");
