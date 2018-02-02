@@ -236,13 +236,13 @@ int main(int argc, char** argv) {
         std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
         
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-
+		const IndexType thisPE = comm->getRank();
         
         /* timing information
          */
         std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
         
-        if (comm->getRank() == 0){
+        if ( thisPE== 0){
             std::string inputstring;
             if (vm.count("graphFile")) {
 				inputstring = vm["graphFile"].as<std::string>();
@@ -257,7 +257,7 @@ int main(int argc, char** argv) {
     std::string graphFile;
 	
     if (vm.count("graphFile")) {
-        if (comm->getRank() == 0){
+        if ( thisPE == 0){
             std::cout<< "input: graphFile" << std::endl;
         }
     	graphFile = vm["graphFile"].as<std::string>();
@@ -274,7 +274,7 @@ int main(int argc, char** argv) {
             throw std::runtime_error("File "+ graphFile + " failed.");
         }
         
-        if (comm->getRank() == 0)
+        if ( thisPE== 0)
         {
             std::cout<< "Reading from file \""<< graphFile << "\" for the graph and \"" << coordFile << "\" for coordinates"<< std::endl;
             std::cout<< "File format: " << settings.fileFormat << std::endl;
@@ -319,7 +319,7 @@ int main(int argc, char** argv) {
 
     }
     else if(vm.count("generate")){
-        if (comm->getRank() == 0){
+        if (thisPE==0){
             std::cout<< "input: generate" << std::endl;
         }
         if (settings.dimensions == 2) {
@@ -338,7 +338,7 @@ int main(int argc, char** argv) {
             numPoints[i] = maxCoord[i];
         }
         
-        if( comm->getRank()== 0){
+        if( thisPE== 0){
             std::cout<< "Generating for dim= "<< settings.dimensions << " and numPoints= "<< settings.numX << ", " << settings.numY << ", "<< settings.numZ << ", in total "<< N << " number of points" << std::endl;
             std::cout<< "\t\t and maxCoord= "<< maxCoord[0] << ", "<< maxCoord[1] << ", " << maxCoord[2]<< std::endl;
         }
@@ -567,10 +567,9 @@ int main(int argc, char** argv) {
     //
     
     
-    
     // the graph is distributed here based on the algorithm we chose
     IndexType localN = rowDistPtr->getLocalSize();
-	PRINT(*comm << ": localN= " << localN);
+	PRINT(" localN for "<< thisPE << " = " << localN);
 	
 	std::chrono::time_point<std::chrono::system_clock> beforeLaplacian = std::chrono::system_clock::now();
 	
@@ -597,7 +596,7 @@ int main(int argc, char** argv) {
 		//DenseVector<ValueType> result( graph * x );
 	}
 	std::chrono::duration<ValueType> SpMVTime = std::chrono::system_clock::now() - beforeSpMVTime;
-	PRINT(*comm << ": SpMV time for this PE: " << SpMVTime.count() );
+	PRINT(" SpMV time for PE "<< thisPE << " = " << SpMVTime.count() );
 	
 	time = comm->max(SpMVTime.count());
 	PRINT0("time for " << repeatTimes <<" SpMVs: " << time );
@@ -609,11 +608,17 @@ int main(int argc, char** argv) {
     */
 	
 	
+	ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
+	
+	if( thisPE==0 )
+		std::cout<<"imbalance = " << imbalance << std::endl;
 	
 	/*
     //
     // Get metrics
     //
+    
+    
     
     struct Metrics metrics(1);
 	

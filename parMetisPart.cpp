@@ -25,6 +25,7 @@
 #include "Settings.h"
 #include "Metrics.h"
 #include "MeshGenerator.h"
+#include "Wrappers.h"
 
 #include <parmetis.h>
 
@@ -130,12 +131,15 @@ int main(int argc, char** argv) {
         
 	variables_map vm;
 	store(command_line_parser(argc, argv).
-			  options(desc).run(), vm);
+	options(desc).run(), vm);
 	notify(vm);
 
     //parMetisGeom = vm.count("geom");
     writePartition = vm.count("writePartition");
 	bool writeDebugCoordinates = settings.writeDebugCoordinates;
+	
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    IndexType N;
 	
 	if (vm.count("help")) {
 		std::cout << desc << "\n";
@@ -151,9 +155,9 @@ int main(int argc, char** argv) {
 		std::cout << "Specify input file with --graphFile or mesh generation with --generate and number of points per dimension." << std::endl; //TODO: change into positional argument
 	}
            
-	
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    IndexType N;
+	if( !vm.count("numBlocks") ){
+        settings.numBlocks = comm->getSize();
+    }
 
     if( comm->getRank()==0 ){
         std::cout << "\033[1;31m";
