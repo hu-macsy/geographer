@@ -319,6 +319,26 @@ TEST_F (auxTest,testGraphMaxDegree){
     }
 }
 //-----------------------------------------------------------------
+ 
+TEST_F (auxTest,testEdgeList2CSR){
+	
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	const IndexType thisPE = comm->getRank();
+	const IndexType numPEs = comm->getSize();
+	
+    const IndexType localN = 10;	
+	std::vector< std::pair<IndexType, IndexType>> localEdgeList( localN );
+	
+    for(int i=0; i<localN; i++){
+		IndexType v1 = (thisPE-1)%numPEs;
+		IndexType v2 = (thisPE+1)%numPEs;
+		localEdgeList[i] = std::make_pair( v1, v2 );
+		PRINT(thisPE << ": inserting edge " << v1 << " - " << v2 );
+	}
+	
+	scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils::edgeList2CSR<IndexType, ValueType>( localEdgeList );
+}
+//-----------------------------------------------------------------
 
 TEST_F (auxTest, testPixelDistance) {
     

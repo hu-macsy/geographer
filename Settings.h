@@ -113,11 +113,11 @@ struct Settings{
     bool bisect = false;    // 0: works for square k, 1: bisect, for k=power of 2
     bool useExtent = false;
     std::vector<IndexType> cutsPerDim;
+    IndexType pixeledSideLen = 10;
 
     //tuning parameters for multiLevel heuristic
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
-    IndexType pixeledSideLen = 10;
 
     //debug and profiling parameters
     bool verbose = false;

@@ -221,9 +221,10 @@ int main(int argc, char** argv) {
 
 	//--------------------------------------------
 	//
-	// get the partition
+	// get the partition and metrics
 	//
 	
+	// the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
 	struct Metrics metrics(1);
 	
     // uniform node weights
@@ -233,16 +234,12 @@ int main(int argc, char** argv) {
 	
 	DenseVector<IndexType> partitionKway = ITI::Wrappers<IndexType,ValueType>::metisWrapper ( graph, coords, nodeWeights, parMetisGeom, settings, metrics);
 	
+	//DenseVector<IndexType> partitionKway = ITI::Wrappers<IndexType,ValueType>::zoltanWrapper ( graph, coords, nodeWeights, zoltanAlgo, settings, metrics);
+	
 	//metrics.timeFinalPartition = avgKwayTime;
 	PRINT0("time for partition: " <<  metrics.timeFinalPartition );
-		
-    //
-    // Get metrics
-    //
-    
-    // the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
-	    
-
+	
+	
     metrics.getMetrics( graph, partitionKway, nodeWeights, settings );
     
         

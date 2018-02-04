@@ -62,7 +62,7 @@
 #include <scai/dmemo/BlockDistribution.hpp>
 
 #include "FileIO.h"
-//#include "GraphUtils.h"
+#include "AuxiliaryFunctions.h"
 #include "Settings.h"
 #include "Metrics.h"
 #include "MeshGenerator.h"
@@ -78,12 +78,12 @@
 int main(int argc, char *argv[])
 {
 #ifdef HAVE_ZOLTAN2_MPI                   
-  MPI_Init(&argc, &argv);
-  int rank, nprocs;
-  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  //MPI_Init(&argc, &argv);
+  //int rank, nprocs;
+  //MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+  //MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 #else
-  int rank=0, nprocs=1;
+  //int rank=0, nprocs=1;
 #endif
 
   // For convenience, we'll use the Tpetra defaults for local/global ID types
@@ -103,12 +103,10 @@ int main(int argc, char *argv[])
   
   	using namespace boost::program_options;
 	options_description desc("Supported options");
-  
+      
 	struct Settings settings;
-    bool geomFlag = true;
-    bool writePartition = false;
-	std::string algo = "";			// the algorithm to be used by zoltan
-    
+	std::string algo = "rcb";			// the algorithm to be used by zoltan
+
 	desc.add_options()
 		("help", "display options")
 		("version", "show version")
@@ -131,6 +129,8 @@ int main(int argc, char *argv[])
         ("writePartition", "Writes the partition in the outFile.partition file")
         ("outFile", value<std::string>(&settings.outFile), "write result partition into file")
         ("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
+		("verbose", "print more info")
+		("debug", "more output")
 		;
         
 	variables_map vm;
@@ -138,8 +138,24 @@ int main(int argc, char *argv[])
 	options(desc).run(), vm);
 	notify(vm);
 	
+    bool geomFlag = true;
+    bool writePartition = false;
 	writePartition = vm.count("writePartition");
 	bool writeDebugCoordinates = settings.writeDebugCoordinates;
+	bool verbose = false;
+	if( vm.count("verbose") ){
+		verbose = true;
+	}
+	
+	bool debug = false;
+	if( vm.count("debug") ){
+		debug = true;
+	}
+	
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	const IndexType thisPE = comm->getRank();
+	const IndexType numPEs = comm->getSize();
+	IndexType N;
 	
 	if (vm.count("help")) {
 		std::cout << desc << "\n";
@@ -155,9 +171,10 @@ int main(int argc, char *argv[])
 		std::cout << "Specify input file with --graphFile or mesh generation with --generate and number of points per dimension." << std::endl; //TODO: change into positional argument
 	}
 	
-	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	IndexType N;
-	const IndexType thisPE = comm->getRank();
+	if( !vm.count("numBlocks") ){
+        settings.numBlocks = comm->getSize();
+    }
+	
 	
 	//-----------------------------------------
     //
@@ -252,8 +269,10 @@ int main(int argc, char *argv[])
     }
     
         
-    scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
 	SCAI_ASSERT_EQ_ERROR( coords[0].getLocalValues().size(), dist->getLocalSize(), "Possible local size mismatch")
+	
+	const IndexType numBlocks = settings.numBlocks;
 	
 	//-----------------------------------------------------
     //
@@ -263,66 +282,121 @@ int main(int argc, char *argv[])
 	IndexType dimensions = settings.dimensions;
 	IndexType localN= dist->getLocalSize();
 	
+	//TODO: point directly to the localCoords data and save time and space for zoltanCoords
 	// the local part of coordinates for zoltan
 	ValueType *zoltanCoords = new ValueType [dimensions * localN];
-	
-	ValueType *x = zoltanCoords; 
-	ValueType *y = x + localN; 
-	ValueType *z = y + localN; 
 
 	std::vector<scai::utilskernel::LArray<ValueType>> localPartOfCoords( dimensions );
 	for(unsigned int d=0; d<dimensions; d++){
 		localPartOfCoords[d] = coords[d].getLocalValues();
 	}
-	for(IndexType i=0; i<localN; i++){
-		SCAI_ASSERT_LE_ERROR( dimensions*(i+1), dimensions*localN, "Too large index, localN= " << localN );
-		for(int d=0; d<dimensions; d++){
-			zoltanCoords[dimensions*i+d] = localPartOfCoords[d][i];
+	IndexType coordInd = 0;
+	for(int d=0; d<dimensions; d++){
+		//SCAI_ASSERT_LE_ERROR( dimensions*(i+1), dimensions*localN, "Too large index, localN= " << localN );
+		for(IndexType i=0; i<localN; i++){
+			//zoltanCoords[dimensions*i+d] = localPartOfCoords[d][i];
+			//SCAI_ASSERT_LE_ERROR( dimensions*(i+1), dimensions*localN, "Too large index, localN= " << localN );
+			SCAI_ASSERT_LT_ERROR( coordInd, localN*dimensions, "Too large coordinate index");
+			zoltanCoords[coordInd++] = localPartOfCoords[d][i];
 		}
 	}
-  
+  	
+  	ValueType *x = zoltanCoords; 	// localPartOfCoords[0]
+	ValueType *y = x + localN;  	// localPartOfCoords[1]
+	ValueType *z = 0; 				// localPartOfCoords[2]
+	
+	if( dimensions==3 ){
+		z = y + localN;
+	}
+	
+	std::vector<const ValueType *>coordVec( dimensions );
+	std::vector<int> coordStrides(dimensions);
+	
+	coordVec[0] = zoltanCoords; 	// coordVec[d] = localCoords[d].data(); or something
+	coordStrides[0] = 1;
+	/*
+	coordVec[1] = y; 
+	coordStrides[1] = 1;
+	if( dimensions==3 ){
+		coordVec[2] = z; 
+		coordStrides[2] = 1;
+	}
+	*/
+	for( int d=1; d<dimensions; d++){
+		coordVec[d] = coordVec[d-1] + localN;
+		coordStrides[d] = 1;
+	}	
+	
+	
+	if( debug ){
+		for(int i=0; i<localN; i++){
+			//PRINT( thisPE << ": " << dist->local2global(i) << " coords: ");
+			std::cout<< thisPE << ": " << dist->local2global(i) << " coords: ";
+			for(int d=0; d<dimensions; d++){
+				std::cout<< coordVec[d][i] << ", ";
+			}
+			std::cout << std::endl;
+		}		
+	}
+	///////////////////////////////////////////////////////////////////////
+	// Create parameters for an RCB problem
+	
+	ValueType tolerance = 1.1;
+	
+	if (thisPE == 0)
+		std::cout << "Imbalance tolerance is " << tolerance << std::endl;
+	
+	Teuchos::ParameterList params("test params");
+	params.set("debug_level", "basic_status");
+	params.set("debug_procs", "0");
+	params.set("error_check_level", "debug_mode_assertions");
+	
+	params.set("algorithm", algo);
+	params.set("imbalance_tolerance", tolerance );
+	params.set("num_global_parts", numBlocks );		   
+	
+
+
   
   // Create global ids for the coordinates.
 
   IndexType *globalIds = new IndexType [localN];
-  IndexType offset = rank * localN;
+  IndexType offset = thisPE * localN;
 
   //TODO: can also be taken from the distribution?
   for (size_t i=0; i < localN; i++)
     globalIds[i] = offset++;
-   
-  ///////////////////////////////////////////////////////////////////////
-  // Create parameters for an RCB problem
 
-  ValueType tolerance = 1.1;
+  
+	std::vector<ValueType> localUnitWeight( localN, 1.0);
+	std::vector<const ValueType *>weightVec(1);
+	weightVec[0] = localUnitWeight.data();
+	std::vector<int> weightStrides(1);
+	weightStrides[0] = 1;
+	
+	inputAdapter_t *ia2=new inputAdapter_t(localN, globalIds, coordVec, 
+                                         coordStrides, weightVec, weightStrides);
+  
+	//
+	//
+	//lala;
+	//
+	//
+	
+	
+/*
 
-  if (rank == 0)
-    std::cout << "Imbalance tolerance is " << tolerance << std::endl;
-
-  Teuchos::ParameterList params("test params");
-  params.set("debug_level", "basic_status");
-  params.set("debug_procs", "0");
-  params.set("error_check_level", "debug_mode_assertions");
-
-  params.set("algorithm", "rcb");
-  params.set("imbalance_tolerance", tolerance );
-  params.set("num_global_parts", nprocs );
-
-  ///////////////////////////////////////////////////////////////////////
-  ///////////////////////////////////////////////////////////////////////
-  // A simple problem with no weights.
-  ///////////////////////////////////////////////////////////////////////
-  ///////////////////////////////////////////////////////////////////////
-
+	
   // Create a Zoltan2 input adapter for this geometry. TODO explain
 
   inputAdapter_t *ia1 = new inputAdapter_t(localN,globalIds,x,y,z,1,1,1);
 
   // Create a Zoltan2 partitioning problem
-
-  Zoltan2::PartitioningProblem<inputAdapter_t> *problem1 =
+	Zoltan2::PartitioningProblem<inputAdapter_t> *problem1 =
            new Zoltan2::PartitioningProblem<inputAdapter_t>(ia1, &params);
-   
+      
+	
+		   
   // Solve the problem
 	std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
 	problem1->solve();
@@ -349,39 +423,69 @@ int main(int argc, char *argv[])
     std::cout << std::endl;
   }
   delete metricObject1;
-  
-  
-	//
-	// free arrays
-    //
+
   
 	//delete[] globalIds;
-	delete[] zoltanCoords;
 	
 	//
     // convert partition to a DenseVector
     //
-	const Zoltan2::PartitioningSolution<inputAdapter_t> &solution = problem1->getSolution();
-	const int *partAssignments = solution.getPartListView();
-	
-	for( int i=0; i<localN; i++){
-		PRINT(thisPE << ": "<< i << " _ " << globalIds[i] << " >> " << partAssignments[i] );
-	}
-	
-	
-PRINT(*comm << ": " << problem1->getSolution().oneToOnePartDistribution() );
-//PRINT(*comm << ": " << sizeof(&(problem1->getSolution())->getPartDistribution()) );
-//PRINT(*comm << ": " << sizeof(&(problem1->getSolution()).getProcDistribution()) );
 
-	//const std::vector<int> zoltanLocalPart (problem1->getSolution().getPartDistribution() );
-	const int *zoltanLocalPart;
+    DenseVector<IndexType> partitionZoltan(dist);
 	
-	if( solution.getPartDistribution()==NULL ){
-		PRINT0("null PART dist");
+	const Zoltan2::PartitioningSolution<inputAdapter_t> &solution1 = problem1->getSolution();
+	
+	std::vector<IndexType> localBlockSize( numBlocks, 0 );
+	
+	const int *partAssignments = solution1.getPartListView();
+	for(unsigned int i=0; i<localN; i++){
+		IndexType thisBlock = partAssignments[i];
+		SCAI_ASSERT_LT_ERROR( thisBlock, numBlocks, "found wrong vertex id");
+		SCAI_ASSERT_GE_ERROR( thisBlock, 0, "found negetive vertex id");
+		partitionZoltan.getLocalValues()[i] = thisBlock;
+		localBlockSize[thisBlock]++;
+		if( debug )
+			PRINT(thisPE << ": " << dist->local2global(i) << " -- " << thisBlock );
 	}
-	if( solution.getProcDistribution()==NULL ){
-		PRINT0("null PROC dist");
+	
+	// check correct transformation to DenseVector
+	for(int i=0; i<localN; i++){
+		//PRINT(*comm << ": "<< part[i] << " _ "<< partition.getLocalValues()[i] );
+		SCAI_ASSERT_EQ_ERROR( partitionZoltan.getLocalValues()[i], partAssignments[i], "Wrong conversion to DenseVector");
 	}
+	
+	if( verbose ){
+		PRINT(*comm);
+		ITI::aux<IndexType,ValueType>::printVector( localBlockSize );
+		PRINT(*comm << ": " << std::accumulate( localBlockSize.begin(), localBlockSize.end(), 0) );
+	}
+	comm->synchronize();
+	if( verbose){
+		std::vector<IndexType> globalBlockSize( numBlocks );
+		comm->sumImpl( globalBlockSize.data(), localBlockSize.data(), numBlocks, scai::common::TypeTraits<ValueType>::stype);
+		if(thisPE==0){
+			ITI::aux<IndexType,ValueType>::printVector( globalBlockSize );
+			PRINT(*comm << ": " << std::accumulate( globalBlockSize.begin(), globalBlockSize.end(), 0) );
+		}
+	}
+	
+	
+	struct Metrics metrics(1);
+	
+	metrics.timeFinalPartition = partitionTime;
+	PRINT0("time for partition: " <<  metrics.timeFinalPartition );
+	
+	metrics.getMetrics( graph, partitionZoltan, nodeWeights, settings );
+	
+	if( thisPE==0 ){
+		printMetricsShort( metrics, std::cout );
+	}
+	*/
+	
+	
+	//const std::vector<int> zoltanLocalPart (problem1->getSolution().getPartDistribution() );
+	//const int *zoltanLocalPart;
+
 	
 	/*
 	if( solution.oneToOnePartDistribution() ){
@@ -393,12 +497,6 @@ PRINT(*comm << ": " << problem1->getSolution().oneToOnePartDistribution() );
 	for( int i=0; i<localN; i++){
 		PRINT(thisPE << ": "<< i << " _ " << globalIds[i] << " >> " << zoltanLocalPart[i] );
 	}
-
-	
-    DenseVector<IndexType> partitionZoltan(dist);
-    for(unsigned int i=0; i<localN; i++){
-        //partitionZoltan.getLocalValues()[i] = problem1->getSolution()[i];
-    }
     */
     
 
@@ -410,9 +508,85 @@ PRINT(*comm << ": " << problem1->getSolution().oneToOnePartDistribution() );
         assert( partKway[i]== partitionKway.getLocalValues()[i]);
     }
     */
- 
+   
+  	Zoltan2::PartitioningProblem<inputAdapter_t> *problem2 =
+           new Zoltan2::PartitioningProblem<inputAdapter_t>(ia2, &params);	
+		   
+	std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
+	problem2->solve();
+  	
+	std::chrono::duration<double> partitionTmpTime = std::chrono::system_clock::now() - beforePartTime;
+	double partitionTime= comm->max(partitionTmpTime.count() );
+		
+	quality_t *metricObject2 = new quality_t(ia2, &params, //problem1->getComm(),
+					   &problem2->getSolution());
 	
+	if (thisPE == 0) {
+		metricObject2->printMetrics(std::cout);
+	}
+	// uniform node weights
+    scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
 	
+
+	///////////////////////////////////////////////////
+	///////////////////////////////////////////////////
+	//
+    // convert partition to a DenseVector
+    //
+	DenseVector<IndexType> partitionZoltan2(dist);
+
+	std::vector<IndexType> localBlockSize( numBlocks, 0 );
+	
+	const Zoltan2::PartitioningSolution<inputAdapter_t> &solution2 = problem2->getSolution();
+	const int *partAssignments2 = solution2.getPartListView();
+	for(unsigned int i=0; i<localN; i++){
+		IndexType thisBlock = partAssignments2[i];
+		SCAI_ASSERT_LT_ERROR( thisBlock, numBlocks, "found wrong vertex id");
+		SCAI_ASSERT_GE_ERROR( thisBlock, 0, "found negetive vertex id");
+		partitionZoltan2.getLocalValues()[i] = thisBlock;
+		localBlockSize[thisBlock]++;
+		if( debug )
+			PRINT( thisPE << ": " << dist->local2global(i) << " -- " << thisBlock );
+	}
+	for(int i=0; i<localN; i++){
+		//PRINT(*comm << ": "<< part[i] << " _ "<< partition.getLocalValues()[i] );
+		SCAI_ASSERT_EQ_ERROR( partitionZoltan2.getLocalValues()[i], partAssignments2[i], "Wrong conversion to DenseVector");
+	}
+	
+	if( verbose ){
+		PRINT(*comm);
+		ITI::aux<IndexType,ValueType>::printVector( localBlockSize );
+		PRINT(*comm << ": " << std::accumulate( localBlockSize.begin(), localBlockSize.end(), 0) );
+	}
+	comm->synchronize();
+	if( verbose){
+		std::vector<IndexType> globalBlockSize( numBlocks );
+		comm->sumImpl( globalBlockSize.data(), localBlockSize.data(), numBlocks, scai::common::TypeTraits<ValueType>::stype);
+		if(thisPE==0){
+			ITI::aux<IndexType,ValueType>::printVector( globalBlockSize );
+			PRINT(*comm << ": " << std::accumulate( globalBlockSize.begin(), globalBlockSize.end(), 0) );
+		}
+	}
+		
+	if( solution2.getPartDistribution()==NULL ){
+		PRINT0("null PART dist");
+	}
+	if( solution2.getProcDistribution()==NULL ){
+		PRINT0("null PROC dist");
+	}
+	
+	struct Metrics metrics2(1);
+	
+	metrics2.timeFinalPartition = partitionTime;
+	PRINT0("time for partition: " <<  metrics2.timeFinalPartition );
+	
+	metrics2.getMetrics( graph, partitionZoltan2, nodeWeights, settings );
+	
+	if( thisPE==0 ){
+		printMetricsShort( metrics2, std::cout );
+	}
+	
+	//PRINT(*comm << ": " << problem2->getSolution().oneToOnePartDistribution() );
 	
 /*	
     //---------------------------------------------
@@ -765,14 +939,17 @@ PRINT(*comm << ": " << problem1->getSolution().oneToOnePartDistribution() );
 
   if (globalIds)
     delete [] globalIds;
-
-  delete problem1;
-  delete ia1;
-  delete problem2;
-  delete ia2;
-  delete problem3;
-  delete ia3;
 */
+
+	delete[] zoltanCoords;
+	
+	//delete problem1;
+	//delete ia1;
+	delete problem2;
+	delete ia2;
+  //delete problem3;
+  //delete ia3;
+
 #ifdef HAVE_ZOLTAN2_MPI
   MPI_Finalize();
 #endif

@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <queue>
 #include <unordered_set>
+#include <chrono>
 
 #include <scai/hmemo/ReadAccess.hpp>
 #include <scai/hmemo/WriteAccess.hpp>
@@ -15,6 +16,9 @@
 #include <scai/dmemo/HaloBuilder.hpp>
 
 #include "GraphUtils.h"
+
+#include "RBC/Sort/SQuick.hpp"
+
 
 using std::vector;
 using std::queue;
@@ -641,36 +645,6 @@ std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama::CSRSpars
     
     return std::make_pair(maxComm, totalComm);
 }
-//------------------------------------------------------------------------------
-
-/** Compute maximum and total communication volume.
- *  TODO: generalize for any pand k, just add a local array of size k and a comm->sumArray()
- */
-/*
-template<typename IndexType, typename ValueType>
-std::pair<IndexType,IndexType> computeCommVolume( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part){
-
-    scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
-    
-    std::vector<IndexType> numBorderNodes;
-    std::vector<IndexType> numInnerNodes;
-    
-    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition);
-    
-    IndexType numBlocks = numBorderNodes.size();
-    
-    IndexType maxCommVol = std::max( numBorderNodes.begin(), numBorderNodesend() );
-    IndexType totalCommVol = std::accumulate( numBorderNodes.begin(), numBorderNodesend(), 0 );
-    
-    std::vector<ValueType> percentBorderNodesPerBlock( numBlocks, 0);
-    
-    for(IndexType i=0; i<numBlocks; i++){
-        percentBorderNodesPerBlock[i] = numBorderNodes[i]/(numBorderNodes[i]+numInnerNodes[i]);
-    }
-    
-    return std::make_pair(maxCommVol, totalCommVol);
-}
-*/
 
 //------------------------------------------------------------------------------
 
@@ -999,6 +973,62 @@ scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vec
     
     return scai::lama::CSRSparseMatrix<ValueType>(myStorage);
 }
+//------------------------------------------------------------------------------
+
+
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( const std::vector< std::pair<IndexType, IndexType>> &edgeList ){
+
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	const IndexType thisPE = comm->getRank();
+	const IndexType localM = edgeList.size();
+	
+    int typesize;
+	MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
+	assert(typesize == sizeof(sort_pair));
+	
+	//TODO: not filling with dummy values, each localPairs can have different sizes
+	std::vector<sort_pair> localPairs(localM);
+	
+	IndexType minLocalVertex=0, maxLocalVertex=std::numeric_limits<IndexType>::max();
+	for(IndexType i=0; i<localM; i++){
+		IndexType v = edgeList[i].first;
+		localPairs[i].value = v;
+		localPairs[i].index = edgeList[i].second;
+		if( v<minLocalVertex ){
+			minLocalVertex = v;
+		}
+		if( v>maxLocalVertex ){
+			maxLocalVertex = v;
+		}
+	}
+	PRINT(thisPE << ": vertices range from "<< minLocalVertex << " to " << maxLocalVertex);
+	
+	// globally sort edges
+    std::chrono::time_point<std::chrono::system_clock> beforeSort =  std::chrono::system_clock::now();
+    MPI_Comm mpi_comm = MPI_COMM_WORLD;
+	SQuick::sort<sort_pair>(mpi_comm, localPairs, -1);
+	
+	std::chrono::duration<double> sortTmpTime = std::chrono::system_clock::now() - beforeSort;
+	ValueType sortTime = comm->max( sortTime );
+	PRINT0("time to sort edges: " << sortTime);
+	
+	PRINT(thisPE << ": "<< localPairs.back().value );
+	
+	// make sure that all edges for the first and last vertices are here
+	
+	// if thisPe==comm->getSize() do nothing
+	// else 
+	// 		communicate with your +1
+	
+	/* if( minLocalVertex(thisPE) == maxLocalVertex(thisPE-1) ){
+	 * 		exchange the edges of this vertex
+	 * 	}
+	 * */
+	
+	
+	
+}
 
 //-----------------------------------------------------------------------------------
 
@@ -1020,6 +1050,7 @@ template IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueTyp
 template  std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 template scai::lama::CSRSparseMatrix<ValueType> getPEGraph<IndexType,ValueType>( const scai::lama::CSRSparseMatrix<ValueType> &adjM);
 template scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vector<std::set<IndexType>> adjList);
+template scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( const std::vector< std::pair<IndexType, IndexType>> &edgeList );
 
 } /*namespace GraphUtils*/
 

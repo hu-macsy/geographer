@@ -346,6 +346,7 @@ int main(int argc, char** argv) {
         settings.numBlocks = comm->getSize();
     }
     
+    PRINT0("Got input");
     //------------------------------------------------------------------------------------------
     
     scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
@@ -395,7 +396,7 @@ int main(int argc, char** argv) {
 	// partition with the chosen algorithm
 	//
     
-    switch( partAlgo ){
+    switch( partAlgo ){	
         case 0:{  //------------------------------------------- hilbert/sfc
            
             beforeInitialTime =  std::chrono::system_clock::now();
@@ -418,6 +419,10 @@ int main(int argc, char** argv) {
         case 1:{  //------------------------------------------- pixeled
   
             beforeInitialTime =  std::chrono::system_clock::now();
+			
+			settings.pixeledSideLen = std::pow(2, dimensions)*k;
+			
+			
             PRINT0( "Get a pixeled partition");
             
             // get a pixelPartition
@@ -505,6 +510,19 @@ int main(int argc, char** argv) {
 			partition = ITI::Wrappers<IndexType,ValueType>::metisWrapper ( graph, coordinates, nodeWeights, parMetisGeom, settings, metrics);
 			partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
 			
+			//settings.repeatTimes = repeatTimes;
+			
+			break;
+		}
+		case 6:{
+			settings.repeatTimes = 1;
+			//TODO: fix to get algo as an input parameter
+			std::string zoltanAlgo = "rcb";
+			beforeInitialTime =  std::chrono::system_clock::now();
+			// get zoltan parition
+			partition = ITI::Wrappers<IndexType,ValueType>::zoltanWrapper ( graph, coordinates, nodeWeights, zoltanAlgo, settings, metrics);
+			partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
+			
 			break;
 		}
         default:{
@@ -516,7 +534,7 @@ int main(int argc, char** argv) {
     ValueType time = 0;
 	
 	time = comm->max( partitionTime.count() );
-	PRINT0("time to get partition: " << time);
+	PRINT0("time to convert data and get partition: " << time);
 
 	//get the distribution from the partition
 	scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
@@ -566,6 +584,7 @@ int main(int argc, char** argv) {
 		
 	// vector for multiplication
 	scai::lama::DenseVector<ValueType> x ( graph.getColDistributionPtr(), 3.3 );
+	//graph.purge();
 	
 	// perfom the actual multiplication
 	std::chrono::time_point<std::chrono::system_clock> beforeSpMVTime = std::chrono::system_clock::now();
@@ -632,7 +651,7 @@ int main(int argc, char** argv) {
 		
     }
 	*/
-   
-    //std::exit(0);
+    MPI_Finalize();
+    std::exit(0);
 	return 0;
 }

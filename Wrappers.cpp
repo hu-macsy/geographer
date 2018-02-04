@@ -269,6 +269,132 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper 
 		
 	}
 
+//---------------------------------------------------------------------------------------	
+	
+	
+template<typename IndexType, typename ValueType>
+scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanWrapper (
+	const CSRSparseMatrix<ValueType> &graph,
+	const std::vector<DenseVector<ValueType>> &coords, 
+	const DenseVector<ValueType> &nodeWeights,
+	std::string algo,
+	struct Settings &settings,
+	struct Metrics &metrics){
+		
+	typedef Zoltan2::BasicUserTypes<ValueType, IndexType, IndexType> myTypes;
+	typedef Zoltan2::BasicVectorAdapter<myTypes> inputAdapter_t;
+	typedef Zoltan2::EvaluatePartition<inputAdapter_t> quality_t;
+	//typedef inputAdapter_t::part_t part_t;
+	
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+	const IndexType thisPE = comm->getRank();
+	const IndexType numPEs = comm->getSize();
+	const IndexType N = graph.getNumRows();
+	const IndexType numBlocks = settings.numBlocks;
+	
+	PRINT0("\t\tStarting the zoltan wrapper");
+	 
+	IndexType dimensions = settings.dimensions;
+	IndexType localN= dist->getLocalSize();
+	
+	//TODO: point directly to the localCoords data and save time and space for zoltanCoords
+	// the local part of coordinates for zoltan
+	ValueType *zoltanCoords = new ValueType [dimensions * localN];
+
+	std::vector<scai::utilskernel::LArray<ValueType>> localPartOfCoords( dimensions );
+	for(unsigned int d=0; d<dimensions; d++){
+		localPartOfCoords[d] = coords[d].getLocalValues();
+	}
+	IndexType coordInd = 0;
+	for(int d=0; d<dimensions; d++){
+		//SCAI_ASSERT_LE_ERROR( dimensions*(i+1), dimensions*localN, "Too large index, localN= " << localN );
+		for(IndexType i=0; i<localN; i++){
+			SCAI_ASSERT_LT_ERROR( coordInd, localN*dimensions, "Too large coordinate index");
+			zoltanCoords[coordInd++] = localPartOfCoords[d][i];
+		}
+	}
+	
+	std::vector<const ValueType *>coordVec( dimensions );
+	std::vector<int> coordStrides(dimensions);
+	
+	coordVec[0] = zoltanCoords; 	// coordVec[d] = localCoords[d].data(); or something
+	coordStrides[0] = 1;
+
+	for( int d=1; d<dimensions; d++){
+		coordVec[d] = coordVec[d-1] + localN;
+		coordStrides[d] = 1;
+	}	
+		
+	///////////////////////////////////////////////////////////////////////
+	// Create parameters
+	
+	ValueType tolerance = settings.epsilon;
+	
+	if (thisPE == 0)
+		std::cout << "Imbalance tolerance is " << tolerance << std::endl;
+	
+	Teuchos::ParameterList params("test params");
+	params.set("debug_level", "basic_status");
+	params.set("debug_procs", "0");
+	params.set("error_check_level", "debug_mode_assertions");
+	
+	params.set("algorithm", algo);
+	params.set("imbalance_tolerance", tolerance );
+	params.set("num_global_parts", numBlocks );		   
+				
+	// Create global ids for the coordinates.
+	IndexType *globalIds = new IndexType [localN];
+	IndexType offset = thisPE * localN;
+
+	//TODO: can also be taken from the distribution?
+	for (size_t i=0; i < localN; i++)
+		globalIds[i] = offset++;
+	
+	std::vector<ValueType> localUnitWeight( localN, 1.0);
+	std::vector<const ValueType *>weightVec(1);
+	weightVec[0] = localUnitWeight.data();
+	std::vector<int> weightStrides(1);
+	weightStrides[0] = 1;
+	
+	//create the problem and solve it
+	inputAdapter_t *ia=new inputAdapter_t(localN, globalIds, coordVec, 
+                                         coordStrides, weightVec, weightStrides);
+  
+	Zoltan2::PartitioningProblem<inputAdapter_t> *problem =
+           new Zoltan2::PartitioningProblem<inputAdapter_t>(ia, &params);	
+		   
+	std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
+	problem->solve();
+  	
+	std::chrono::duration<double> partitionTmpTime = std::chrono::system_clock::now() - beforePartTime;
+	double partitionTime= comm->max(partitionTmpTime.count() );
+	
+	// convert partition to a DenseVector
+    //
+	scai::lama::DenseVector<IndexType> partitionZoltan(dist);
+
+	//std::vector<IndexType> localBlockSize( numBlocks, 0 );
+	
+	const Zoltan2::PartitioningSolution<inputAdapter_t> &solution = problem->getSolution();
+	const int *partAssignments = solution.getPartListView();
+	for(unsigned int i=0; i<localN; i++){
+		IndexType thisBlock = partAssignments[i];
+		SCAI_ASSERT_LT_ERROR( thisBlock, numBlocks, "found wrong vertex id");
+		SCAI_ASSERT_GE_ERROR( thisBlock, 0, "found negetive vertex id");
+		partitionZoltan.getLocalValues()[i] = thisBlock;
+		//localBlockSize[thisBlock]++;
+	}
+	for(int i=0; i<localN; i++){
+		//PRINT(*comm << ": "<< part[i] << " _ "<< partition.getLocalValues()[i] );
+		SCAI_ASSERT_EQ_ERROR( partitionZoltan.getLocalValues()[i], partAssignments[i], "Wrong conversion to DenseVector");
+	}
+	
+	return partitionZoltan;
+		
+	}
+	
+//---------------------------------------------------------------------------------------	
 	
 	 template class Wrappers<IndexType, ValueType>;
 	

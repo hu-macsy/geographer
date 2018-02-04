@@ -27,6 +27,11 @@
 
 #include <parmetis.h>
 
+//for zoltan
+#include <Zoltan2_PartitioningSolution.hpp>
+#include <Zoltan2_PartitioningProblem.hpp>
+#include <Zoltan2_BasicVectorAdapter.hpp>
+#include <Zoltan2_InputTraits.hpp>
 
 namespace ITI {
 
@@ -43,6 +48,15 @@ public:
 		const std::vector<DenseVector<ValueType>> &coordinates, 
 		const DenseVector<ValueType> &nodeWeights,
 		int parMetisGeom,
+		struct Settings &settings,
+		struct Metrics &metrics);
+		
+	
+	static scai::lama::DenseVector<IndexType> zoltanWrapper (
+		const CSRSparseMatrix<ValueType> &graph,
+		const std::vector<DenseVector<ValueType>> &coords, 
+		const DenseVector<ValueType> &nodeWeights,
+		std::string algo,
 		struct Settings &settings,
 		struct Metrics &metrics);
 		

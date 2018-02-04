@@ -30,6 +30,14 @@
 #include <tuple>    
 #include <random>
 
+/*
+//KaGen includes
+#include "geometric/delaunay/delaunay_3d.h"
+#include "benchmark.h"
+#include "generator_config.h"
+#include "io/generator_io.h"
+*/
+
 #include "quadtree/Point.h"
 #include "quadtree/SpatialTree.h"
 #include "quadtree/SpatialCell.h"
@@ -80,6 +88,8 @@ namespace ITI {
 
                 static void graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid &quad);
                     
+				static void createDelaunay3D_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<IndexType> numPoints);
+				
                 /* Creates random points in the cube for the given dimension, points in [0,maxCoord]^dim.
                  */
                 static std::vector<DenseVector<ValueType>> randomPoints(IndexType numberOfPoints, int dimensions, ValueType maxCoord);
