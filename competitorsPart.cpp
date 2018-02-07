@@ -234,6 +234,7 @@ int main(int argc, char** argv) {
 	
 	// the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
 	struct Metrics metrics(1);
+	metrics.numBlocks = settings.numBlocks;
 	
     // uniform node weights
     scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
@@ -339,8 +340,8 @@ int main(int argc, char** argv) {
 		ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coords, N, settings.dimensions, destPath + "/metisResult");
     }
 	        
-	std::chrono::duration<ValueTyps> totalTimeLocal = std::chrono::system_clock::now() - startTime;
-	ValueType totalTime = comm->max( totalTimeLocal );
+	std::chrono::duration<ValueType> totalTimeLocal = std::chrono::system_clock::now() - startTime;
+	ValueType totalTime = comm->max( totalTimeLocal.count() );
 	if( thisPE==0 ){
 		std::cout<<"Exiting file " << __FILE__ << " , total time= " << totalTime <<  std::endl;
 	}

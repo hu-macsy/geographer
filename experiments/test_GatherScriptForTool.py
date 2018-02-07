@@ -29,24 +29,9 @@ def addRelativePlot( exp, metricValues, metricName, toolNames, baseToolId, plotF
 		return -1
 	# now m is the index of the wanted metric
 	
-	#baseMetric = []
-	#wantedMetricForTools = []
 	if baseToolId >= len(toolNames):
 		print("ERROR: tool ID given " +  str(baseToolId) +" is too big, must be < " + str(len(toolNames)) )
 		return -1;
-	
-	#for t in range(0,len(toolNames)):
-		#thisMetric = metricValues[t][m]
-		#if t>= len(allTools):
-		#	 print("ERROR: wrong index " +str(t) +" for tool, len(allTools)= " + str(len(allTools)) )
-		#if baseTool==toolNames[t]:
-		#	 baseToolId = t
-		#else:
-		#	wantedMetricForTools.append(thisMetric)
-		
-	#if baseToolId==-1:
-	#	print("ERROR: did not find base tool in given tools")
-	#	return -1
 
 	plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel=ratio , legend style={at={(1.5,0.7)}}, xtick={")
 	for x in range(0, len(exp.k)-1 ):
@@ -59,7 +44,7 @@ def addRelativePlot( exp, metricValues, metricName, toolNames, baseToolId, plotF
 		plotF.write( "}]\n")
 		
 	#plotF.write("\\addplot plot coordinates{\n")
-	print( len(toolNames))
+
 	for t in range(0,len(toolNames)):
 		
 		#if baseToolId==t:	# do not print the base tool metric
@@ -67,9 +52,6 @@ def addRelativePlot( exp, metricValues, metricName, toolNames, baseToolId, plotF
 		
 		thisToolMetrics = metricValues[t]
 		thisToolName = toolNames[t]
-		
-		#frameinfo = getframeinfo(currentframe())
-		#print(frameinfo.filename +", " + str(frameinfo.lineno) + " :: " + str(len(thisToolMetrics)) + " __ " + thisToolName )
 		
 		if baseToolId==t:
 			plotF.write("\\addplot [mark=none] plot coordinates{\n")
@@ -163,8 +145,6 @@ def createPlotsGeneric(exp, toolNames, metricNames, metricValues):
 	print(plotFile)
 	#exit(-1)
 	#
-	
-	
 	
 	#plotFile = os.path.join( plotDir, "plots_new_"+str(exp.expType)+expNumber+".tex")
 		

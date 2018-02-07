@@ -6,8 +6,9 @@ from inspect import currentframe, getframeinfo
 
 # all avaialble tools
 allTools = ["Geographer", "geoKmeans", "geoSfc", "parMetisGeom", "parMetisGraph", "parMetisSfc", "zoltanRib", "zoltanRcb", "zoltanHsfc", "zoltanMJ"]
+allCompetitors = allTools[3:]
 NUM_TOOLS = len( allTools)
-NUM_COMPETITORS = 7
+NUM_COMPETITORS = len( allCompetitors)
 
 # absolute paths for the executable of each tool
 geoExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/Diamerisi"

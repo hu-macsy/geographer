@@ -192,23 +192,22 @@ def submitAllCompetitors( exp ):
 		graphName = exp.graphs[i].split('.')[0]
 		submitFlag = 0
 		
-		for tool in allTools[1:]:
+		for tool in allCompetitors:
 			if not os.path.exists( os.path.join( toolsPath, tool) ):
 				print("WARNING: Output directory " + os.path.join( toolsPath, tool) +" does not exist, experiment NOT submited.\n Aborting...")
 				exit(-1)
 			#outFile = os.path.join( toolsPath, tool, graphName)
 			outFile = outFileString( exp, i, tool)
-			
+		
 			if os.path.exists( outFile ):
 				submitFlag += 1
-			
+		
 		if submitFlag == NUM_COMPETITORS:
 			print("\t\tWARNING: The graph: " + exp.graphs[i] + " for k=" + str(exp.k[i]) +" has an outFile for all tools, job NOT submitted.")
 			continue
 			
 		params = " --dimensions=" + exp.dimension
 		params += " --fileFormat="+ exp.fileFormat
-		#outPath = os.path.join( toolsPath, tool)
 		params += " --outPath=" + toolsPath +"/"
 		params += " --graphName=" + graphName
 		

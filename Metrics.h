@@ -76,7 +76,7 @@ struct Metrics{
         ValueType timeLocalRef = timeFinalPartition - maxTimePreliminary;
         
 		std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
-		std::time_t timeNow = td::chrono::system_clock::to_time_t(now);
+		std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
 		out << "date and time: " << std::ctime(&timeNow) << std::endl;
 		
 		out << "numBlocks= " << numBlocks << std::endl;
@@ -159,8 +159,8 @@ struct Metrics{
 		const IndexType N = graph.getNumRows();
 		
 		// the original row and  column distributions
-		scai::dmemo::DistributionPtr initRowDistPtr = graph.getRowDistributionPtr();
-		scai::dmemo::DistributionPtr initColDistPtr = graph.getColDistributionPtr();
+		const scai::dmemo::DistributionPtr initRowDistPtr = graph.getRowDistributionPtr();
+		const scai::dmemo::DistributionPtr initColDistPtr = graph.getColDistributionPtr();
 		
 		//get the distribution from the partition
 		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
@@ -178,9 +178,9 @@ struct Metrics{
 		const IndexType localN = distFromPartition->getLocalSize();
 		SCAI_ASSERT_EQ_ERROR( localN, graph.getLocalNumRows(), "Distribution mismatch")
 		
-		IndexType maxLocalN = comm->max(localN);
-		IndexType minLocalN = comm->min(localN);
-		ValueType optSize = ValueType(N)/comm->getSize();
+		const IndexType maxLocalN = comm->max(localN);
+		const IndexType minLocalN = comm->min(localN);
+		const ValueType optSize = ValueType(N)/comm->getSize();
 		
 		ValueType imbalance = ValueType( maxLocalN - optSize)/optSize;
 		PRINT0("minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", imbalance= " << imbalance);
@@ -232,7 +232,7 @@ struct Metrics{
 inline void printMetricsShort(struct Metrics metrics, std::ostream& out){
 	
 	std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
-	std::time_t timeNow = td::chrono::system_clock::to_time_t(now);
+	std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
 	out << "date and time: " << std::ctime(&timeNow) << std::endl;
 	out << "numBlocks= " << metrics.numBlocks << std::endl;
 	out << "gather" << std::endl;
@@ -262,7 +262,7 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
     
     if( comm->getRank()==0 ){
 		std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
-		std::time_t timeNow = td::chrono::system_clock::to_time_t(now);
+		std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
 		out << "date and time: " << std::ctime(&timeNow) << std::endl;
 		out << "numBlocks= " << metricsVec[0].numBlocks << std::endl;
         out << "# times, input, migrAlgo, 1distr, kmeans, 2redis, prelim, localRef, total,    prel cut, finalcut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg   timeSpMV" << std::endl;
@@ -398,7 +398,7 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
     
     if( comm->getRank()==0 ){
 		std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
-		std::time_t timeNow = td::chrono::system_clock::to_time_t(now);
+		std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
 		out << "date and time: " << std::ctime(&timeNow) << std::endl;
 		out << "numBlocks= " << metricsVec[0].numBlocks << std::endl;
         out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxBndPercnt avgBndPercnt timeSpMV" << std::endl;

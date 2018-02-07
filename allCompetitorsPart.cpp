@@ -338,8 +338,8 @@ int main(int argc, char** argv) {
 		
 	} // for allTools.size()
      
-	std::chrono::duration<ValueTyps> totalTimeLocal = std::chrono::system_clock::now() - startTime;
-	ValueType totalTime = comm->max( totalTimeLocal );
+	std::chrono::duration<ValueType> totalTimeLocal = std::chrono::system_clock::now() - startTime;
+	ValueType totalTime = comm->max( totalTimeLocal.count() );
 	if( thisPE==0 ){
 		std::cout<<"Exiting file " << __FILE__ << " , total time= " << totalTime <<  std::endl;
 	}

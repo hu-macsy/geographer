@@ -97,7 +97,7 @@ int main(int argc, char** argv) {
         std::string blockSizesFile;
         bool writePartition = false;
         
-		std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+		//std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
 		
         desc.add_options()
             ("help", "display options")
@@ -185,13 +185,13 @@ int main(int argc, char** argv) {
         std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
         
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-
+		const IndexType thisPE = comm->getRank();
         
         /* timing information
          */
         std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
         
-        if (comm->getRank() == 0){
+        if ( thisPE == 0){
             std::string inputstring;
             if (vm.count("graphFile")) {
 				inputstring = vm["graphFile"].as<std::string>();
@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
     std::string graphFile;
 	
     if (vm.count("graphFile")) {
-        if (comm->getRank() == 0){
+        if ( thisPE== 0){
             std::cout<< "input: graphFile" << std::endl;
         }
     	graphFile = vm["graphFile"].as<std::string>();
@@ -223,7 +223,7 @@ int main(int argc, char** argv) {
             throw std::runtime_error("File "+ graphFile + " failed.");
         }
         
-        if (comm->getRank() == 0)
+        if ( thisPE == 0)
         {
             std::cout<< "Reading from file \""<< graphFile << "\" for the graph and \"" << coordFile << "\" for coordinates"<< std::endl;
             std::cout<< "File format: " << settings.fileFormat << std::endl;
@@ -260,7 +260,7 @@ int main(int argc, char** argv) {
         scai::hmemo::HArray<ValueType> localWeights( rowDistPtr->getLocalSize(), 1 );
         nodeWeights.swap( localWeights, rowDistPtr );
 
-        if (comm->getRank() == 0) {
+        if (thisPE== 0) {
             std::cout << "Read " << N << " points." << std::endl;
             std::cout << "Read coordinates." << std::endl;
             std::cout << "On average there are about " << N/comm->getSize() << " points per PE."<<std::endl;
@@ -268,7 +268,7 @@ int main(int argc, char** argv) {
 
     }
     else if(vm.count("generate")){
-        if (comm->getRank() == 0){
+        if ( thisPE == 0){
             std::cout<< "input: generate" << std::endl;
         }
         if (settings.dimensions == 2) {
@@ -287,7 +287,7 @@ int main(int argc, char** argv) {
             numPoints[i] = maxCoord[i];
         }
         
-        if( comm->getRank()== 0){
+        if( thisPE== 0){
             std::cout<< "Generating for dim= "<< settings.dimensions << " and numPoints= "<< settings.numX << ", " << settings.numY << ", "<< settings.numZ << ", in total "<< N << " number of points" << std::endl;
             std::cout<< "\t\t and maxCoord= "<< maxCoord[0] << ", "<< maxCoord[1] << ", " << maxCoord[2]<< std::endl;
         }
@@ -308,7 +308,7 @@ int main(int argc, char** argv) {
         IndexType nodes= graph.getNumRows();
         IndexType edges= graph.getNumValues()/2;	
         
-        if(comm->getRank()==0){
+        if( thisPE==0 ){
             std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
         }
         
@@ -492,6 +492,7 @@ int main(int argc, char** argv) {
     //
     
     struct Metrics metrics(1);
+	metrics.numBlocks = settings.numBlocks;
 	
 	metrics.timeFinalPartition = comm->max( partitionTime.count() );
 	metrics.getMetrics( graph, partition, nodeWeights, settings );
@@ -500,7 +501,7 @@ int main(int argc, char** argv) {
     // Reporting output to std::cout and/or outFile
 	//
 	
-    if (comm->getRank() == 0) {
+    if ( thisPE == 0) {
 		//metrics.print( std::cout );
 		std::cout << "Running " << __FILE__ << std::endl;
 		printMetricsShort( metrics, std::cout);
@@ -567,8 +568,8 @@ int main(int argc, char** argv) {
         ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partition, partOutFile );        
     }
     
-    std::chrono::duration<ValueTyps> totalTimeLocal = std::chrono::system_clock::now() - startTime;
-	ValueType totalTime = comm->max( totalTimeLocal );
+    std::chrono::duration<ValueType> totalTimeLocal = std::chrono::system_clock::now() - startTime;
+	ValueType totalTime = comm->max( totalTimeLocal.count() );
 	if( thisPE==0 ){
 		std::cout<<"Exiting file " << __FILE__ << " , total time= " << totalTime <<  std::endl;
 	}
