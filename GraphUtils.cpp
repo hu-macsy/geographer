@@ -1060,7 +1060,7 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueTy
 //-----------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vector<std::set<IndexType>> adjList) {
+scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vector<std::set<IndexType>>& adjList) {
     
     IndexType N = adjList.size();
 
@@ -1231,7 +1231,7 @@ scai::lama::CSRSparseMatrix<ValueType> getLaplacian( const scai::lama::CSRSparse
 
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( const std::vector< std::pair<IndexType, IndexType>> &edgeList ){
+scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList ){
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType thisPE = comm->getRank();
@@ -1244,7 +1244,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( const std::vector< std::pai
 	//TODO: not filling with dummy values, each localPairs can have different sizes
 	std::vector<sort_pair> localPairs(localM);
 	
-	IndexType minLocalVertex=0, maxLocalVertex=std::numeric_limits<IndexType>::max();
+	IndexType maxLocalVertex=0, minLocalVertex=std::numeric_limits<IndexType>::max();
 	for(IndexType i=0; i<localM; i++){
 		IndexType v = edgeList[i].first;
 		localPairs[i].value = v;
@@ -1267,7 +1267,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( const std::vector< std::pai
 	ValueType sortTime = comm->max( sortTime );
 	PRINT0("time to sort edges: " << sortTime);
 	
-	PRINT(thisPE << ": "<< localPairs.back().value );
+	PRINT(thisPE << ": "<< localPairs.back().value << " - " << localPairs.back().index );
 	
 	// make sure that all edges for the first and last vertices are here
 	
@@ -1279,8 +1279,12 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( const std::vector< std::pai
 	 * 		exchange the edges of this vertex
 	 * 	}
 	 * */
-	
-	
+	for(IndexType i=0; i<localM; i++){
+		IndexType v1 = localPairs[i].value;
+		IndexType v2 = localPairs[i].index;
+		PRINT(thisPE << ": edge " << v1 << " - " << v2 );
+	}
+	return scai::lama::CSRSparseMatrix<ValueType>( maxLocalVertex,  maxLocalVertex);
 	
 }
 
@@ -1304,8 +1308,8 @@ template scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama:
 template IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 template  std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 template scai::lama::CSRSparseMatrix<ValueType> getPEGraph<IndexType,ValueType>( const scai::lama::CSRSparseMatrix<ValueType> &adjM);
-template scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vector<std::set<IndexType>> adjList);
-template scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( const std::vector< std::pair<IndexType, IndexType>> &edgeList );
+template scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vector<std::set<IndexType>> &adjList);
+template scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList );
 template scai::lama::CSRSparseMatrix<ValueType> getLaplacian<IndexType,ValueType>( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 template scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 

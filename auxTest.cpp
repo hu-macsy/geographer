@@ -24,13 +24,12 @@
 #include "LocalRefinement.h"
 #include "SpectralPartition.h"
 #include "GraphUtils.h"
+#include "AuxiliaryFunctions.h"
 
 #include "gtest/gtest.h"
 
 #include <boost/filesystem.hpp>
 
-#include "GraphUtils.h"
-#include "AuxiliaryFunctions.h"
 
 
 using namespace scai;
@@ -270,7 +269,7 @@ TEST_F (auxTest,testComputeCommVolume){
     
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
     
-    std::vector<IndexType> commVolume = ITI::GraphUtils::computeCommVolume( graph, partition );
+    std::vector<IndexType> commVolume = ITI::GraphUtils::computeCommVolume( graph, partition, k );
         
     std::vector<IndexType> numBorderNodes;
     std::vector<IndexType> numInnerNodes;
@@ -326,12 +325,16 @@ TEST_F (auxTest,testEdgeList2CSR){
 	const IndexType thisPE = comm->getRank();
 	const IndexType numPEs = comm->getSize();
 	
-    const IndexType localN = 10;	
-	std::vector< std::pair<IndexType, IndexType>> localEdgeList( localN );
+    const IndexType localM = 10;	
+	const IndexType N = numPEs * 4;
+	std::vector< std::pair<IndexType, IndexType>> localEdgeList( localM );
+
+	srand( std::time(NULL)*thisPE );
 	
-    for(int i=0; i<localN; i++){
-		IndexType v1 = (thisPE-1)%numPEs;
-		IndexType v2 = (thisPE+1)%numPEs;
+    for(int i=0; i<localM; i++){
+		IndexType v1 = i;
+		//IndexType v1 = (thisPE+numPEs/2)%numPEs;
+		IndexType v2 = (v1+rand())%N;
 		localEdgeList[i] = std::make_pair( v1, v2 );
 		PRINT(thisPE << ": inserting edge " << v1 << " - " << v2 );
 	}
