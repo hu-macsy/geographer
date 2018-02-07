@@ -1,6 +1,7 @@
 from subprocess import call
 from submitFileWrapper_Supermuc import *
 from header import*
+from inspect import currentframe, getframeinfo
 
 import os
 import math
@@ -12,74 +13,83 @@ import argparse
 
 
 
+# addRelativePlot( exp, [[],[],[],..], "time", "tool1", plotF)
+# exp: a struct experiment
+# metricValues: a 2D matrix, len(metricValues)= exp.size, len(metricValues[i])
 
-def addplot( exp, plotF, wantedMetric, competitorMetricName, metricNames, metricValues, competitorNames, metricNamesCompetitors, metricValuesCompetitors ):
-	# addplot( "prelCut", ["all", "finalCut"] )
-		
-	ourMetricTmp = []
-	competitorMetricTmp = []
-	competitorNameTmp = []
-			
-	for m in range(0, numMetrics):
-		if metricNames[m]==wantedMetric:
-			ourMetricTmp = metricValues[m]
-		#else:
-		#	print("ERROR: Metric " + wantedMetric +" not found.\nAborting...")
-		#	exit(-1)
-		
-	if len(ourMetricTmp)==0:
-		print("ERROR: Metric " + wantedMetric +" not found.\nAborting...")
-		exit(-1)
-		
-	numCompetitors = len(metricNamesCompetitors)
+#addRelativePlot( exp, ... , "timeSpMV", plotF)
+
+def addRelativePlot( exp, metricValues, metricName, toolNames, baseToolId, plotF):
+	for m in range(0, NUM_METRICS):
+		if metricName==METRIC_NAMES[m]:
+			break;
 	
-	for c in range(0, numCompetitors):
-		competitorName = competitorNames[c]
-		for j in range(0, len(metricNamesCompetitors[c])):
-			#print( competitorMetricName+" __ " + metricNamesCompetitors[c][j] )
-			if competitorMetricName==metricNamesCompetitors[c][j]:
-				competitorMetricTmp.append( metricValuesCompetitors[c][j] )
-				competitorNameTmp.append( competitorName )
-				break
+	if m==NUM_METRICS:
+		print("ERROR: metric " + metricName + " was not found")
+		return -1
+	# now m is the index of the wanted metric
+	
+	#baseMetric = []
+	#wantedMetricForTools = []
+	if baseToolId >= len(toolNames):
+		print("ERROR: tool ID given " +  str(baseToolId) +" is too big, must be < " + str(len(toolNames)) )
+		return -1;
+	
+	#for t in range(0,len(toolNames)):
+		#thisMetric = metricValues[t][m]
+		#if t>= len(allTools):
+		#	 print("ERROR: wrong index " +str(t) +" for tool, len(allTools)= " + str(len(allTools)) )
+		#if baseTool==toolNames[t]:
+		#	 baseToolId = t
+		#else:
+		#	wantedMetricForTools.append(thisMetric)
+		
+	#if baseToolId==-1:
+	#	print("ERROR: did not find base tool in given tools")
+	#	return -1
+
+	plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel=ratio , legend style={at={(1.5,0.7)}}, xtick={")
+	for x in range(0, len(exp.k)-1 ):
+		if exp.k[x]!=-1:
+			plotF.write( str(exp.k[x]) +", ")
 					
-	#found at least one competitor with the same metric name
-	if len(competitorMetricTmp)!=0:
-		plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel=value, legend style={at={(1.5,0.7)}}, xtick={")	
-		for x in range(0, len(exp.k)-1 ):
-			if( exp.k[x] != -1):
-				plotF.write( str(exp.k[x]) +", ")
-		if( exp.k[x] != -1):
-			plotF.write(str(exp.k[-1]) + "}]\n")		
+	if exp.k[-1]!=-1:
+		plotF.write( str(exp.k[-1]) + "}]\n")
+	else:
+		plotF.write( "}]\n")
+		
+	#plotF.write("\\addplot plot coordinates{\n")
+	print( len(toolNames))
+	for t in range(0,len(toolNames)):
+		
+		#if baseToolId==t:	# do not print the base tool metric
+		#	continue
+		
+		thisToolMetrics = metricValues[t]
+		thisToolName = toolNames[t]
+		
+		#frameinfo = getframeinfo(currentframe())
+		#print(frameinfo.filename +", " + str(frameinfo.lineno) + " :: " + str(len(thisToolMetrics)) + " __ " + thisToolName )
+		
+		if baseToolId==t:
+			plotF.write("\\addplot [mark=none] plot coordinates{\n")
 		else:
-			plotF.write("}]\n")
-			
-		# plot our metric values
-		plotF.write("\\addplot plot coordinates{\n")
-		for i in range(0,exp.size):
-			if( metricValues[m][i]==-1 ):
-				plotF.write("("+str(exp.k[i]) +", nan)\n")
-			else:
-				plotF.write("("+str(exp.k[i]) +", "+ str(ourMetricTmp[i]) +")\n")
-										
-		plotF.write("};\n")
-		plotF.write("\\addlegendentry{Geographer "+ str(wantedMetric) +"}\n")			
-			
-		if exp.size != len(competitorMetricTmp[c]):
-			print("Size mismatch for competitor, exp.size= " +str(exp.size) + " and len(compMetric)= " + str(len(competitorMetricTmp[c])) );
-			#exit(-1)
-			
-		#plot all competitors values
-		for c in range(0, len(competitorMetricTmp) ):
 			plotF.write("\\addplot plot coordinates{\n")
-			for i in range(0,exp.size):
-			#for i in range(0,len(competitorMetricTmp[c])):
-				plotF.write("("+str(exp.k[i])+", "+ str(competitorMetricTmp[c][i]) + ")\n")
-										
-			plotF.write("};\n")
-			plotF.write("\\addlegendentry{"+competitorNameTmp[c]+" "+ competitorMetricName+"}\n")
-				
-		plotF.write("\\end{axis}\n\\end{tikzpicture}\n")
-		plotF.write("\\caption{Metric: Geographer "+ wantedMetric +"}\n\\end{figure}\n\n")
+		
+		
+		for i in range(0,len(thisToolMetrics[m])):
+			if thisToolMetrics[m][i]!=-1:
+				# get the relative value, divide by the base tool metric
+				plotF.write("("+str(exp.k[i])+", "+ str(thisToolMetrics[m][i]/metricValues[baseToolId][m][i]) + ")\n")	#
+				#print( metricValues[baseToolId][m][i] )
+			else:
+				plotF.write("("+str(exp.k[i])+", nan)\n")
+		
+		plotF.write("};\n")
+		plotF.write("\\addlegendentry{"+thisToolName+"}\n")
+		
+	plotF.write("\\end{axis}\n\\end{tikzpicture}\n")
+	plotF.write("\\caption{Metric: "+ metricName+" relative to "+ toolNames[baseToolId] +"}\n\\end{figure}\n\n")		
 
 
 #---------------------------------------------------------------------------------------------		
@@ -93,6 +103,7 @@ def addplot( exp, plotF, wantedMetric, competitorMetricName, metricNames, metric
 def createPlotsGeneric(exp, toolNames, metricNames, metricValues):
 	
 	numMetrics = len(metricNames)
+	#numMetrics =NUM_METRICS
 	numTools = len(toolNames)
 	print("number of metrics in createPlotsGeneric is " + str(numMetrics)+" and number of tools " + str(numTools) )
 	
@@ -153,6 +164,8 @@ def createPlotsGeneric(exp, toolNames, metricNames, metricValues):
 	#exit(-1)
 	#
 	
+	
+	
 	#plotFile = os.path.join( plotDir, "plots_new_"+str(exp.expType)+expNumber+".tex")
 		
 	with open(plotFile,'w') as plotF:
@@ -182,19 +195,23 @@ def createPlotsGeneric(exp, toolNames, metricNames, metricValues):
 					outF2 = outF2+"\_"
 						
 			plotF.write( outF2  +", ")
+			if exp.expType==1 or exp.expType==2:
+				break
 			#print( outF2 )
 				
 		#
 		# plot each metric that is shared with the competitors in one figure
 		#
 		
+		plotF.write("\\clearpage")
 		
+		# for all metrics
 		for m in range(0, numMetrics):
 			metricName = metricNames[m]
 			
-			plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel=value, legend style={at={(1.5,0.7)}}, xtick={")
+			plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel= "+ METRIC_VALUES[m] +", legend style={at={(1.5,0.7)}}, xtick={")
 			for x in range(0, len(exp.k)-1 ):
-				if exp.k[i]!=-1:
+				if exp.k[x]!=-1:							### changed index from i to x
 					plotF.write( str(exp.k[x]) +", ")
 						
 			if exp.k[-1]!=-1:
@@ -207,25 +224,10 @@ def createPlotsGeneric(exp, toolNames, metricNames, metricValues):
 				thisToolName = toolNames[t]
 				thisToolMetrics = metricValues[t]
 				
-				if len(thisToolMetrics)!=numMetrics:
-					printError("WARNING: number of metrics mismatch")
-				#print( metricName )
-				#print( metricValues[m] )
-						
-				'''
-				# plot our metric values
-				plotF.write("\\addplot plot coordinates{\n")
-				for i in range(0,exp.size):
-					#plotF.write("("+str(exp.k[i])+", "+ str(ourMetricTmp[i]) + ")\n")
-					if( metricValues[m][i]==-1 ):
-						plotF.write("("+str(exp.k[i]) +", nan)\n")
-					else:
-						plotF.write("("+str(exp.k[i]) +", "+ str(ourMetricTmp[i]) +")\n")
-										
-				plotF.write("};\n")
-				plotF.write("\\addlegendentry{Geographer}\n")
-				'''
-				
+				if len(thisToolMetrics)>numMetrics :
+					print("WARNING: number of metrics mismatch: len(thisToolMetrics)= " + str(len(thisToolMetrics)) + ", numMetrics= " + str(numMetrics) )
+					print("\tfor tool " + thisToolName + ", graph: " + exp.graphs[i] +", k= " + str(exp.k[i])+" and metric: " + metricName)
+					print("\tSkipping this metric")
 
 				plotF.write("\\addplot plot coordinates{\n")
 				#for i in range(0,exp.size):
@@ -241,7 +243,11 @@ def createPlotsGeneric(exp, toolNames, metricNames, metricValues):
 				
 			plotF.write("\\end{axis}\n\\end{tikzpicture}\n")
 			plotF.write("\\caption{Metric: "+ metricName+"}\n\\end{figure}\n\n")
+			
+			addRelativePlot( exp, metricValues, metricName, toolNames, 0, plotF)
+			plotF.write("\\clearpage")
 		
+		#addRelativePlot( exp, metricValues, "timeSpMV", toolNames, 0, plotF)
 		
 		plotF.write("\\end{document}")
 
@@ -281,7 +287,8 @@ def gatherExpTool( exp, tool ):
 			#metricNames = ["-"]*NUM_METRICS
 		else:
 			metricNames, metricValuesTmp, k = parseOutFile( gatherFile )
-
+	
+		#print( str(len(metricValuesTmp)) )
 		
 		allMetrics.append( metricValuesTmp )
 		#print(metricNames)
@@ -289,8 +296,10 @@ def gatherExpTool( exp, tool ):
 
 	# convert to traspose so we have a list for every metric		
 	numMetrics = len(metricNames)
+	if len(allMetrics[0])!=numMetrics:
+		print("WARNING: num metrics mismatch in gatherExpTool for tool " + tool+ ", numMetrics = " + str(numMetrics) +", len(allMetrics[0])= " + str(len(allMetrics[0])) )
 	if NUM_METRICS!=numMetrics:
-		print("WARNING: num metrics mismatch in gatherExpTool for tool " + tool+ ", numMetrics = " + str(numMetrics) );
+		print("WARNING: num metrics mismatch in gatherExpTool for tool " + tool+ ", numMetrics = " + str(numMetrics) + ", NUM_METRICS= " +str(NUM_METRICS) )
 		
 	metricValues = [None]*numMetrics
 	for m in range(0,numMetrics):
@@ -374,7 +383,7 @@ configFile = args.configFile
 wantedTools = args.tools
 
 if wantedTools[0]=="all":
-	wantedTools = allTools
+	wantedTools = allTools[1:]		# skipping Geographer
 	
 for tool in wantedTools:
 	if not tool in allTools:
@@ -429,7 +438,7 @@ for exp in wantedExp:
 	foundTools= [] 
 	
 	for tool in wantedTools:
-		
+		print ("Start gather experiments fot tool " + tool)		
 		#metricName is a list of size numMetrics with all the metric names
 		#metricValues is list of lists, or a 2D matrix:
 		#	metricValues[i] = a list of size exp.size for metric i

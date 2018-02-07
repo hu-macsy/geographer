@@ -138,6 +138,7 @@ std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method)
     return out;
 }
 
+//void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);	
 
 
 int main(int argc, char** argv) {
@@ -613,6 +614,14 @@ int main(int argc, char** argv) {
     
     std::vector<struct Metrics> metricsVec;
     
+	/*
+	//TODO: used ifort -nofor-main ... to compile but does not link properly
+	size_t total=-1,used=-1,free=-1,buffers=-1, cached=-1;
+	memusage(&total, &used, &free, &buffers, &cached);
+	printf("%ld %ld %ld %ld %ld \n", total,used,free,buffers, cached);
+	*/
+	
+	
     //------------------------------------------------------------
     //
     // partition the graph

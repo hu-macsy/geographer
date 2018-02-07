@@ -5,12 +5,16 @@ from inspect import currentframe, getframeinfo
 
 
 # all avaialble tools
-allTools = ["Geographer", "geoKmeans", "geoSfc", "parMetisGeom", "parMetisGraph", "parMetisSfc"]
+allTools = ["Geographer", "geoKmeans", "geoSfc", "parMetisGeom", "parMetisGraph", "parMetisSfc", "zoltanRib", "zoltanRcb", "zoltanHsfc", "zoltanMJ"]
+NUM_TOOLS = len( allTools)
+NUM_COMPETITORS = 7
 
 # absolute paths for the executable of each tool
 geoExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/Diamerisi"
 initialExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/geomDiamerisi"
 parMetisExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/parMetisExe"
+competitorsExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/competitorsExe"
+allCompetitorsExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/allCompetitorsExe"
 
 # other paths
 basisPath = os.path.expanduser("~/parco-repart/Implementation/experiments/")
@@ -18,9 +22,9 @@ competitorsPath = os.path.join( basisPath, "competitors" )
 toolsPath = os.path.join( basisPath, "tools" )
 plotsPath = os.path.join( basisPath, "plots" )
 
-NUM_METRICS = 9
-METRIC_NAMES = ['timeTotal', 'finalCut', 'imbalance', 'maxBnd', 'totBnd', 'maxCommVol', 'totCommVol', 'maxBndPercnt', 'avgBndPercnt']
-
+NUM_METRICS = 10
+METRIC_NAMES = ['timeTotal', 'finalCut', 'imbalance', 'maxBnd', 'totBnd', 'maxCommVol', 'totCommVol', 'maxBndPercnt', 'avgBndPercnt', 'timeSpMV']
+METRIC_VALUES = [ 'seconds', 'number of edges', 'ratio', 'number of vertices', 'number of vertices', 'number of vertices', 'number of vertices', 'ratio', 'ratio', 'seconds']
 
 class experiment:
 	def __init__(self):
@@ -34,9 +38,6 @@ class experiment:
 		self.paths = []
 		self.k = []
 
-	#def submitExp(self):
-		
-		
 
 	def printExp(self):
 		if self.expType==0:
@@ -265,6 +266,11 @@ def parseOutFile( outFile ):
 		#print(metricNames)
 		line = f.readline()
 		metricValues = [ float(x) for x in line.split()]
+		
+		# in case metrics are less than NUM_METRICS, fill the rest with -1
+		for i in range(len(metricValues), NUM_METRICS):
+			metricValues.append(-1)
+			metricNames.append("-")
 		#print(metricValues)
 		
 	return metricNames, metricValues, n
@@ -279,7 +285,7 @@ def outFileString( exp, i, tool):
 		print("WARNING: tool " + tool + " is invalid")
 		return ""
 	
-	outFile = exp.graphs[i].split('.')[0] + "_k" + exp.k[i]+"_"+ tool + ".info"
+	outFile = exp.graphs[i].split('.')[0] + "_k" + str(exp.k[i]) +"_"+ tool + ".info"
 	
 	return os.path.join( toolsPath, tool , outFile)
 

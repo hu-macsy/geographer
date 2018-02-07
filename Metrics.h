@@ -3,6 +3,8 @@
 #include <numeric>
 #include <math.h>
 #include <scai/lama.hpp>
+#include <chrono>
+
 #include "GraphUtils.h"
 
 struct Metrics{
@@ -19,6 +21,7 @@ struct Metrics{
     ValueType timeFinalPartition = -1;
     ValueType reportTime = -1 ;
     ValueType timeTotal = -1;
+	ValueType timeSpMV = -1;
     
     //metrics, each for every time we repeat the algo
     //
@@ -36,6 +39,8 @@ struct Metrics{
     ValueType maxBorderNodesPercent= 0;
     ValueType avgBorderNodesPercent= 0;
 
+	// various other needed info
+	IndexType numBlocks = -1;
     
     //constructor
     //
@@ -70,6 +75,12 @@ struct Metrics{
             
         ValueType timeLocalRef = timeFinalPartition - maxTimePreliminary;
         
+		std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
+		std::time_t timeNow = td::chrono::system_clock::to_time_t(now);
+		out << "date and time: " << std::ctime(&timeNow) << std::endl;
+		
+		out << "numBlocks= " << numBlocks << std::endl;
+		
         if( maxBlockGraphDegree==-1 ){
             out << " ### WARNING: setting dummy value -1 for expensive (and not used) metrics max and total blockGraphDegree ###" << std::endl;
         }else if (maxBlockGraphDegree==0 ){
@@ -77,7 +88,7 @@ struct Metrics{
         }
         //out << "times: input, migrAlgo , 1redistr , k-means , 2redistr , prelim, localRef, total  , metrics:  prel cut, cut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg  " << std::endl;
         out << "gather" << std::endl;
-        out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt" << std::endl;
+        out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt timeSpMV" << std::endl;
 		
         out << std::setprecision(3) << std::fixed;
         out<<  "         "<< inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << " ,  "<< timeFinalPartition << " ,  \t "\
@@ -85,8 +96,8 @@ struct Metrics{
         << maxBoundaryNodes << ",  " << totalBoundaryNodes << ",    "  \
         << maxCommVolume << ",  " << totalCommVolume << ",    ";
         out << std::setprecision(6) << std::fixed;
-        out << maxBorderNodesPercent << ",  " << avgBorderNodesPercent \
-        << std::endl;
+        out << maxBorderNodesPercent << ",  " << avgBorderNodesPercent<< ",  " \
+        << timeSpMV << std::endl;
     }
     
     void getMetrics( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
@@ -102,16 +113,21 @@ struct Metrics{
         totalBlockGraphEdges = -1;
 
         // communication volume
-        std::vector<IndexType> commVolume = ITI::GraphUtils::computeCommVolume( graph, partition );
-        
+        //std::vector<IndexType> commVolume = ITI::GraphUtils::computeCommVolume( graph, partition, settings.numBlocks);
+		// 3 vector each of size numBlocks
+        std::vector<IndexType> commVolume;
+        std::vector<IndexType> numBorderNodesPerBlock;  
+        std::vector<IndexType> numInnerNodesPerBlock;
+		
+		// TODO: can re returned in an auto, check if it is faster
+		// it is a bit uglier but saves time
+		std::tie( commVolume, numBorderNodesPerBlock, numInnerNodesPerBlock ) = \
+				 ITI::GraphUtils::computeCommBndInner( graph, partition, settings.numBlocks );
+		
         maxCommVolume = *std::max_element( commVolume.begin(), commVolume.end() );
         totalCommVolume = std::accumulate( commVolume.begin(), commVolume.end(), 0 );
         
-        // 2 vectors of size k
-        std::vector<IndexType> numBorderNodesPerBlock;  
-        std::vector<IndexType> numInnerNodesPerBlock;
-        
-        std::tie( numBorderNodesPerBlock, numInnerNodesPerBlock ) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition, settings);
+        //std::tie( numBorderNodesPerBlock, numInnerNodesPerBlock ) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition, settings);
         
         //TODO: are num of boundary nodes needed ????         
         maxBoundaryNodes = *std::max_element( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end() );
@@ -132,14 +148,95 @@ struct Metrics{
         maxBorderNodesPercent = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
         avgBorderNodesPercent = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(settings.numBlocks));
         
+		int numSpMVs = 100;
+		timeSpMV = getSpMVtime( graph, partition, numSpMVs)/numSpMVs;
     }
+    
+    
+	ValueType getSpMVtime( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, const IndexType repeatTimes ){
+	
+		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		const IndexType N = graph.getNumRows();
+		
+		// the original row and  column distributions
+		scai::dmemo::DistributionPtr initRowDistPtr = graph.getRowDistributionPtr();
+		scai::dmemo::DistributionPtr initColDistPtr = graph.getColDistributionPtr();
+		
+		//get the distribution from the partition
+		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
+		
+		ValueType time = 0;
+		
+		std::chrono::time_point<std::chrono::system_clock> beforeRedistribution = std::chrono::system_clock::now();
+		// redistribute graph according to partition distribution
+		graph.redistribute( distFromPartition, initColDistPtr);
+		
+		std::chrono::duration<ValueType> redistributionTime =  std::chrono::system_clock::now() - beforeRedistribution;
+		time = comm->max( redistributionTime.count() );
+		PRINT0("time to redistribute: " << time);
+		
+		const IndexType localN = distFromPartition->getLocalSize();
+		SCAI_ASSERT_EQ_ERROR( localN, graph.getLocalNumRows(), "Distribution mismatch")
+		
+		IndexType maxLocalN = comm->max(localN);
+		IndexType minLocalN = comm->min(localN);
+		ValueType optSize = ValueType(N)/comm->getSize();
+		
+		ValueType imbalance = ValueType( maxLocalN - optSize)/optSize;
+		PRINT0("minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", imbalance= " << imbalance);
+		
+		// get the SpMV 
+		std::chrono::time_point<std::chrono::system_clock> beforeLaplacian = std::chrono::system_clock::now();
+		
+		// the laplacian has the same row and column distributios as the (now partitioned) graph
+		scai::lama::CSRSparseMatrix<ValueType> laplacian = ITI::GraphUtils::getLaplacian<IndexType, ValueType>( graph );
+		
+		SCAI_ASSERT( laplacian.getRowDistributionPtr()->isEqual( graph.getRowDistribution() ), "Row distributions do not agree" );
+		SCAI_ASSERT( laplacian.getColDistributionPtr()->isEqual( graph.getColDistribution() ), "Column distributions do not agree" );
+		
+		std::chrono::duration<ValueType> laplacianTime = std::chrono::system_clock::now() - beforeLaplacian;
+		time = comm->max(laplacianTime.count());
+		PRINT0("time to get the laplacian: " << time );
+		
+		// vector for multiplication
+		srand( std::time(NULL) );
+		scai::lama::DenseVector<ValueType> x ( graph.getColDistributionPtr(), 0 );
+		for( int l=0; l<x.getLocalValues().size(); l++){
+			x.getLocalValues()[l] = rand()%100;
+		}
+		
+		// perfom the actual multiplication
+		std::chrono::time_point<std::chrono::system_clock> beforeSpMVTime = std::chrono::system_clock::now();
+		for(IndexType r=0; r<repeatTimes; r++){
+			scai::lama::DenseVector<ValueType> result( laplacian * x );
+			//DenseVector<ValueType> result( graph * x );
+		}
+		std::chrono::duration<ValueType> SpMVTime = std::chrono::system_clock::now() - beforeSpMVTime;
+		//PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
+		
+		time = comm->max(SpMVTime.count());
+		ValueType minTime = comm->min( SpMVTime.count() );
+		PRINT0("max time for " << repeatTimes <<" SpMVs: " << time << " , min time " << minTime);
+	
+	
+		//redistibute back to initial distributions
+		graph.redistribute( initRowDistPtr, initColDistPtr );
+		
+		return time;
+}
+
 };
 
 //------------------------------------------------------------------------------------------------------------
 
 inline void printMetricsShort(struct Metrics metrics, std::ostream& out){
+	
+	std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
+	std::time_t timeNow = td::chrono::system_clock::to_time_t(now);
+	out << "date and time: " << std::ctime(&timeNow) << std::endl;
+	out << "numBlocks= " << metrics.numBlocks << std::endl;
 	out << "gather" << std::endl;
-	out << "timeTotal finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt" << std::endl;
+	out << "timeTotal finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt timeSpMV" << std::endl;
     out << metrics.timeFinalPartition<< " " \
 		<< metrics.finalCut << " "\
 		<< metrics.finalImbalance << " "\
@@ -148,8 +245,9 @@ inline void printMetricsShort(struct Metrics metrics, std::ostream& out){
 		<< metrics.maxCommVolume << " "\
 		<< metrics.totalCommVolume << " ";
 	out << std::setprecision(6) << std::fixed;
-	out <<  metrics.maxBorderNodesPercent << " " \
-		<<  metrics.avgBorderNodesPercent \
+	out << metrics.maxBorderNodesPercent << " " \
+		<< metrics.avgBorderNodesPercent << " " \
+		<< metrics.timeSpMV \
 		<< std::endl; 
 }
 
@@ -163,7 +261,11 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
     IndexType numRuns = metricsVec.size();
     
     if( comm->getRank()==0 ){
-        out << "# times, input, migrAlgo, 1distr, kmeans, 2redis, prelim, localRef, total,    prel cut, finalcut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg  " << std::endl;
+		std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
+		std::time_t timeNow = td::chrono::system_clock::to_time_t(now);
+		out << "date and time: " << std::ctime(&timeNow) << std::endl;
+		out << "numBlocks= " << metricsVec[0].numBlocks << std::endl;
+        out << "# times, input, migrAlgo, 1distr, kmeans, 2redis, prelim, localRef, total,    prel cut, finalcut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg   timeSpMV" << std::endl;
     }
 
     ValueType sumMigrAlgo = 0;
@@ -186,6 +288,8 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
     ValueType sumMaxBorderNodesPerc = 0;
     ValueType sumAvgBorderNodesPerc = 0;
 
+	ValueType sumTimeSpMV = 0;
+	
     for(IndexType run=0; run<numRuns; run++){
         Metrics thisMetric = metricsVec[ run ];
         
@@ -210,8 +314,8 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
             << thisMetric.maxBoundaryNodes << ", " << thisMetric.totalBoundaryNodes << ",    " \
             << thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << ",    ";
             out << std::setprecision(6) << std::fixed;
-            out << thisMetric.maxBorderNodesPercent << ",  " << thisMetric.avgBorderNodesPercent \
-            << std::endl;
+            out << thisMetric.maxBorderNodesPercent << ",  " << thisMetric.avgBorderNodesPercent<< ", " \
+            << thisMetric.timeSpMV << std::endl;
         }
         
         sumMigrAlgo += maxTimeMigrationAlgo;
@@ -231,6 +335,8 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
         sumTotCommVol += thisMetric.totalCommVolume;
         sumMaxBorderNodesPerc += thisMetric.maxBorderNodesPercent;
         sumAvgBorderNodesPerc += thisMetric.avgBorderNodesPercent;
+		
+		sumTimeSpMV += thisMetric.timeSpMV;
     }
     
     if( comm->getRank()==0 ){
@@ -253,12 +359,13 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
             <<  ValueType(sumTotCommVol)/numRuns<< ",    ";
             out << std::setprecision(6) << std::fixed;
             out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
-            <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
+            << ValueType(sumAvgBorderNodesPerc)/numRuns << ", " \
+            << ValueType(sumTimeSpMV)/numRuns \
             << std::endl;
             
         out << std::setprecision(2) << std::fixed;
         out << "gather" << std::endl;
-        out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt" << std::endl;
+        out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt timeSpMV" << std::endl;
         out <<  ValueType(sumKmeans)/numRuns<< " " \
             <<  ValueType(sumPrelimanry)/numRuns<< " " \
             <<  ValueType(sumLocalRef)/numRuns<< " " \
@@ -272,7 +379,8 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
             <<  ValueType(sumTotCommVol)/numRuns<< " ";
             out << std::setprecision(6) << std::fixed;
             out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< " " \
-            <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
+            <<  ValueType(sumAvgBorderNodesPerc)/numRuns << " " \
+            << ValueType(sumTimeSpMV)/numRuns \
             << std::endl;        
     }
     
@@ -289,7 +397,11 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
     IndexType numRuns = metricsVec.size();
     
     if( comm->getRank()==0 ){
-        out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxBndPercnt avgBndPercnt " << std::endl;
+		std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
+		std::time_t timeNow = td::chrono::system_clock::to_time_t(now);
+		out << "date and time: " << std::ctime(&timeNow) << std::endl;
+		out << "numBlocks= " << metricsVec[0].numBlocks << std::endl;
+        out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxBndPercnt avgBndPercnt timeSpMV" << std::endl;
     }
 
     //ValueType sumKmeans = 0;
@@ -307,7 +419,8 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
     IndexType totalBoundaryNodes = 0;
     ValueType sumMaxBorderNodesPerc = 0;
     ValueType sumAvgBorderNodesPerc = 0;
-
+	ValueType sumTimeSpMV = 0;
+	
     for(IndexType run=0; run<numRuns; run++){
         Metrics thisMetric = metricsVec[ run ];
         
@@ -331,7 +444,8 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
             << thisMetric.maxBoundaryNodes << " " << thisMetric.totalBoundaryNodes << "  " \
             << thisMetric.maxCommVolume << "  " << thisMetric.totalCommVolume << " ";
             out << std::setprecision(6) << std::fixed;
-            out << thisMetric.maxBorderNodesPercent << " " << thisMetric.avgBorderNodesPercent \
+            out << thisMetric.maxBorderNodesPercent << " " << thisMetric.avgBorderNodesPercent << " "\
+            << thisMetric.timeSpMV \
             << std::endl;
         }
         
@@ -348,6 +462,7 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
         sumTotCommVol += thisMetric.totalCommVolume;
         sumMaxBorderNodesPerc += thisMetric.maxBorderNodesPercent;
         sumAvgBorderNodesPerc += thisMetric.avgBorderNodesPercent;
+		sumTimeSpMV += thisMetric.timeSpMV;
     }
     
     if( comm->getRank()==0 ){
@@ -367,7 +482,8 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
             <<  ValueType(sumTotCommVol)/numRuns<< " ";
             out << std::setprecision(6) << std::fixed;
             out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< " " \
-            <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
+            << ValueType(sumAvgBorderNodesPerc)/numRuns  <<" "\
+            << ValueType(sumTimeSpMV)/numRuns \
             << std::endl;
 		
 		
@@ -392,3 +508,5 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
     }
     
 }
+
+

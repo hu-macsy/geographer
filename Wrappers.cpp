@@ -8,17 +8,16 @@
 
 #include "Wrappers.h"
 
-/* wrapper<metis> call
- * wrapper<zoltan> call( ... )
- * 
- * */
+
+IndexType HARD_TIME_LIMIT= 600; 	// hard limit in seconds to stop execution if exceeded
+
 namespace ITI {
 
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper (
-	const CSRSparseMatrix<ValueType> &graph,
-	const std::vector<DenseVector<ValueType>> &coords, 
-	const DenseVector<ValueType> &nodeWeights,
+	const scai::lama::CSRSparseMatrix<ValueType> &graph,
+	const std::vector<scai::lama::DenseVector<ValueType>> &coords, 
+	const scai::lama::DenseVector<ValueType> &nodeWeights,
 	int parMetisGeom,
 	struct Settings &settings,
 	struct Metrics &metrics){
@@ -203,6 +202,10 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper 
     //
     // parmetis partition
     //
+	if( parMetisGeom==0 and comm->getRank()==0 ) std::cout<< "About to call ParMETIS_V3_PartKway" << std::endl;
+	if( parMetisGeom==1 and comm->getRank()==0 ) std::cout<< "About to call ParMETIS_V3_PartGeomKway" << std::endl;
+	if( parMetisGeom==2 and comm->getRank()==0 ) std::cout<< "About to call ParMETIS_V3_PartGeom" << std::endl;
+	
     int r;
     for( r=0; r<repeatTimes; r++){
         
@@ -224,7 +227,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper 
             std::cout<< "Running time for run number " << r << " is " << partKwayTime << std::endl;
         }
         
-        if( sumKwayTime>500){
+        if( sumKwayTime>HARD_TIME_LIMIT){
 			std::cout<< "Stopping runs because of excessive running total running time: " << sumKwayTime << std::endl;
             break;
         }
@@ -237,8 +240,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper 
         std::cout<<"Number of runs: " << repeatTimes << std::endl;	
     }
     
-    double avgKwayTime = sumKwayTime/repeatTimes;
-	metrics.timeFinalPartition = avgKwayTime;
+	metrics.timeFinalPartition = sumKwayTime/(ValueType)repeatTimes;
 	
     //
     // free arrays
@@ -252,7 +254,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper 
     //
     // convert partition to a DenseVector
     //
-    DenseVector<IndexType> partitionKway(dist);
+    scai::lama::DenseVector<IndexType> partitionKway(dist);
     for(unsigned int i=0; i<localN; i++){
         partitionKway.getLocalValues()[i] = partKway[i];
     }
@@ -274,9 +276,9 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper 
 	
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanWrapper (
-	const CSRSparseMatrix<ValueType> &graph,
-	const std::vector<DenseVector<ValueType>> &coords, 
-	const DenseVector<ValueType> &nodeWeights,
+	const scai::lama::CSRSparseMatrix<ValueType> &graph,
+	const std::vector<scai::lama::DenseVector<ValueType>> &coords, 
+	const scai::lama::DenseVector<ValueType> &nodeWeights,
 	std::string algo,
 	struct Settings &settings,
 	struct Metrics &metrics){
@@ -329,19 +331,20 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanWrapper
 	///////////////////////////////////////////////////////////////////////
 	// Create parameters
 	
-	ValueType tolerance = settings.epsilon;
+	ValueType tolerance = 1+settings.epsilon;
 	
 	if (thisPE == 0)
 		std::cout << "Imbalance tolerance is " << tolerance << std::endl;
 	
 	Teuchos::ParameterList params("test params");
-	params.set("debug_level", "basic_status");
+	//params.set("debug_level", "basic_status");
+	params.set("debug_level", "no_status");
 	params.set("debug_procs", "0");
 	params.set("error_check_level", "debug_mode_assertions");
 	
 	params.set("algorithm", algo);
 	params.set("imbalance_tolerance", tolerance );
-	params.set("num_global_parts", numBlocks );		   
+	params.set("num_global_parts", (int)numBlocks );		   
 				
 	// Create global ids for the coordinates.
 	IndexType *globalIds = new IndexType [localN];
@@ -358,18 +361,44 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanWrapper
 	weightStrides[0] = 1;
 	
 	//create the problem and solve it
-	inputAdapter_t *ia=new inputAdapter_t(localN, globalIds, coordVec, 
+	inputAdapter_t *ia= new inputAdapter_t(localN, globalIds, coordVec, 
                                          coordStrides, weightVec, weightStrides);
   
 	Zoltan2::PartitioningProblem<inputAdapter_t> *problem =
            new Zoltan2::PartitioningProblem<inputAdapter_t>(ia, &params);	
 		   
-	std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
-	problem->solve();
-  	
-	std::chrono::duration<double> partitionTmpTime = std::chrono::system_clock::now() - beforePartTime;
-	double partitionTime= comm->max(partitionTmpTime.count() );
+	if( comm->getRank()==0 ) std::cout<< "About to call zoltan, algo " << algo << std::endl;
 	
+	int repeatTimes = settings.repeatTimes;
+	double sumPartTime = 0.0;
+	int r=0;
+	
+	for( r=0; r<repeatTimes; r++){
+		std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
+		problem->solve();
+  	
+		std::chrono::duration<double> partitionTmpTime = std::chrono::system_clock::now() - beforePartTime;
+		double partitionTime= comm->max(partitionTmpTime.count() );
+		sumPartTime += partitionTime;
+		if( comm->getRank()==0 ){
+            std::cout<< "Running time for run number " << r << " is " << partitionTime << std::endl;
+        }
+		if( sumPartTime>HARD_TIME_LIMIT){
+			std::cout<< "Stopping runs because of excessive running total running time: " << sumPartTime << std::endl;
+            break;
+        }
+	}
+	
+	if( r!=repeatTimes){		// in case it has to break before all the runs are completed
+		repeatTimes = r+1;
+	}
+	if(comm->getRank()==0 ){
+        std::cout<<"Number of runs: " << repeatTimes << std::endl;	
+    }
+    
+	metrics.timeFinalPartition = sumPartTime/(ValueType)repeatTimes;
+	
+	//
 	// convert partition to a DenseVector
     //
 	scai::lama::DenseVector<IndexType> partitionZoltan(dist);
@@ -389,6 +418,9 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanWrapper
 		//PRINT(*comm << ": "<< part[i] << " _ "<< partition.getLocalValues()[i] );
 		SCAI_ASSERT_EQ_ERROR( partitionZoltan.getLocalValues()[i], partAssignments[i], "Wrong conversion to DenseVector");
 	}
+	
+	delete[] globalIds;
+	delete[] zoltanCoords;
 	
 	return partitionZoltan;
 		

@@ -97,6 +97,8 @@ int main(int argc, char** argv) {
         std::string blockSizesFile;
         bool writePartition = false;
         
+		std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+		
         desc.add_options()
             ("help", "display options")
             ("version", "show version")
@@ -347,6 +349,7 @@ int main(int argc, char** argv) {
     settings.useGeometricTieBreaking = IndexType(1);
     settings.pixeledSideLen = IndexType ( std::min(settings.numBlocks, IndexType(100) ) );
     
+	/*
     std::string destPath = "./partResults/testInitial/blocks_"+std::to_string(settings.numBlocks)+"/";
     boost::filesystem::create_directories( destPath );   
     
@@ -354,7 +357,7 @@ int main(int argc, char** argv) {
     std::string logFile = destPath + "results_" + graphFile.substr(found+1)+ ".log";
     std::ofstream logF(logFile);
     std::ifstream f(graphFile);
-    
+    */
     
     settings.print( std::cout , comm );
         
@@ -512,7 +515,7 @@ int main(int argc, char** argv) {
                     outF << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
                 }
                 settings.print( outF, comm );
-                //outF << "numBlocks= " << settings.numBlocks << std::endl;
+
                 //metrics.print( outF ); 
 				printMetricsShort( metrics, outF);
                 std::cout<< "Output information written to file " << settings.outFile << std::endl;
@@ -564,6 +567,12 @@ int main(int argc, char** argv) {
         ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partition, partOutFile );        
     }
     
+    std::chrono::duration<ValueTyps> totalTimeLocal = std::chrono::system_clock::now() - startTime;
+	ValueType totalTime = comm->max( totalTimeLocal );
+	if( thisPE==0 ){
+		std::cout<<"Exiting file " << __FILE__ << " , total time= " << totalTime <<  std::endl;
+	}
+	
     std::exit(0);
 	return 0;
 }

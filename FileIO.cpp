@@ -633,13 +633,18 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
 	std::ifstream file(filename);
 
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+	typedef unsigned long long int ULLI;        
+
 	if (file.fail()) {
 		throw std::runtime_error("Reading graph from " + filename + " failed.");
+	}else{
+		if( comm->getRank()==0 ){
+			std::cout<< "Reading from file "<< filename << std::endl;
+		}
 	}
         
-        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-        
-        typedef unsigned long long int ULLI;        
         
 	//define variables
 	std::string line;

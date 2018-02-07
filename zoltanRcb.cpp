@@ -954,7 +954,7 @@ int main(int argc, char *argv[])
   MPI_Finalize();
 #endif
 
-	if (rank == 0)
+	if (thisPE == 0)
 		std::cout << "PASS LALA !!" << std::endl;
 	
 	exit(0);

@@ -9,6 +9,7 @@
 #define GRAPHUTILS_H_
 
 #include <set>
+#include <tuple>
 
 #include <scai/lama/matrix/CSRSparseMatrix.hpp>
 #ifndef SETTINGS_H
@@ -92,8 +93,15 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes(
  * TODO: Should the result is gathered in the root PE and not be replicated?
  * */
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> computeCommVolume( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part /*, const IndexType root*/ );
+std::vector<IndexType> computeCommVolume( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part , const IndexType numBlocks );
 
+/**Computes the communication volume, boundary and inner nodes in one pass to save time.
+ * 
+ * @return A tuple with three vectors each od size numBlocks: first vector is the communication volume, second is the number of boundary nodes and third
+ * the number of inner nodes pre block.
+ */
+template<typename IndexType, typename ValueType>
+std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType>> computeCommBndInner( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType numBlocks);
 
 /** Returns the edges of the block graph only for the local part. Eg. if blocks 1 and 2 are local
  * in this processor it finds the edge (1,2) ( and the edge (2,1)).
@@ -156,6 +164,11 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::lama::CSRSparseMa
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::Halo& halo);
 
+template<typename IndexType, typename ValueType>
+scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
+	
+template <typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> getLaplacian( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vector<std::set<IndexType>> adjList);

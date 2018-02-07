@@ -18,9 +18,7 @@
 
 #include <scai/dmemo/BlockDistribution.hpp>
 
-#include "FileIO.h"
 #include "Metrics.h"
-#include "MeshGenerator.h"
 #ifndef SETTINGS_H
 #include "Settings.h"
 #endif
@@ -40,22 +38,20 @@ template <typename IndexType, typename ValueType>
 class Wrappers {
 
 public:
-	
-	//static void writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
 
 	static scai::lama::DenseVector<IndexType> metisWrapper (
-		const CSRSparseMatrix<ValueType> &graph,
-		const std::vector<DenseVector<ValueType>> &coordinates, 
-		const DenseVector<ValueType> &nodeWeights,
+		const scai::lama::CSRSparseMatrix<ValueType> &graph,
+		const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
+		const scai::lama::DenseVector<ValueType> &nodeWeights,
 		int parMetisGeom,
 		struct Settings &settings,
 		struct Metrics &metrics);
 		
 	
 	static scai::lama::DenseVector<IndexType> zoltanWrapper (
-		const CSRSparseMatrix<ValueType> &graph,
-		const std::vector<DenseVector<ValueType>> &coords, 
-		const DenseVector<ValueType> &nodeWeights,
+		const scai::lama::CSRSparseMatrix<ValueType> &graph,
+		const std::vector<scai::lama::DenseVector<ValueType>> &coords, 
+		const scai::lama::DenseVector<ValueType> &nodeWeights,
 		std::string algo,
 		struct Settings &settings,
 		struct Metrics &metrics);
