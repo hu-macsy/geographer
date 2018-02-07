@@ -1051,11 +1051,10 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphMa
     return graph;
 }
 //-------------------------------------------------------------------------------------------------
-    
-    
+   
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeList(const std::string filename){
-    SCAI_REGION( "FileIO.readEdgeListDistributed" );
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeListCentral(const std::string filename){
+    SCAI_REGION( "FileIO.readEdgeListCentral" );
 	
 	typedef unsigned long long int ULLI;     
 	
@@ -1128,6 +1127,19 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
     scai::lama::CSRSparseMatrix<ValueType> graph;
     
     return graph;
+}
+//-------------------------------------------------------------------------------------------------
+   
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeListDistributed(const std::string filename){
+    SCAI_REGION( "FileIO.readEdgeListDistributed" );
+	
+	typedef unsigned long long int ULLI;     
+	
+    std::ifstream file(filename);
+    
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	
 }
 //-------------------------------------------------------------------------------------------------
 

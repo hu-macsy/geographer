@@ -1231,7 +1231,7 @@ scai::lama::CSRSparseMatrix<ValueType> getLaplacian( const scai::lama::CSRSparse
 
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( const std::vector< std::pair<IndexType, IndexType>> &edgeList ){
+scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList ){
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType thisPE = comm->getRank();
@@ -1305,7 +1305,7 @@ template IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueTyp
 template  std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 template scai::lama::CSRSparseMatrix<ValueType> getPEGraph<IndexType,ValueType>( const scai::lama::CSRSparseMatrix<ValueType> &adjM);
 template scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vector<std::set<IndexType>> adjList);
-template scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( const std::vector< std::pair<IndexType, IndexType>> &edgeList );
+template scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList );
 template scai::lama::CSRSparseMatrix<ValueType> getLaplacian<IndexType,ValueType>( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 template scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 

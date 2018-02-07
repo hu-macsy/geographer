@@ -173,8 +173,12 @@ scai::lama::CSRSparseMatrix<ValueType> getLaplacian( const scai::lama::CSRSparse
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vector<std::set<IndexType>> adjList);
 
+/** Get an vector of the local edges, sorts the edges and constructs the local part of CSR sparse matrix.
+ * @param[in,out] edgeList The local list of edges for this PE. The edge list is sorted and redistributed also.
+ * @return The distributed adjacency matrix.
+ */
 template<typename IndexType, typename ValueType>
-static scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( const std::vector< std::pair<IndexType, IndexType>> &edgeList );
+static scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList );
 
 //taken from https://stackoverflow.com/a/9345144/494085
 template<class BidiIter >
