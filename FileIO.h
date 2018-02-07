@@ -129,7 +129,12 @@ public:
 	 * 4 3				    2 
 	 * 3 2
 	 */
-	static scai::lama::CSRSparseMatrix<ValueType> readEdgeList(const std::string filename);
+	static scai::lama::CSRSparseMatrix<ValueType> readEdgeListCentral(const std::string filename);
+	
+	
+	/* Edge list format but now there are k files, one for each PE
+	 * */
+	static scai::lama::CSRSparseMatrix<ValueType> readEdgeListDistributed(const std::string filename);
 	
 	/* Reads the coordinates from file "filename" and returns then in a vector of DenseVector
 	 */

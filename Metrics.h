@@ -22,6 +22,7 @@ struct Metrics{
     ValueType reportTime = -1 ;
     ValueType timeTotal = -1;
 	ValueType timeSpMV = -1;
+	ValueType timeComm = -1;
     
     //metrics, each for every time we repeat the algo
     //
@@ -148,8 +149,10 @@ struct Metrics{
         maxBorderNodesPercent = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
         avgBorderNodesPercent = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(settings.numBlocks));
         
-		int numSpMVs = 100;
-		timeSpMV = getSpMVtime( graph, partition, numSpMVs)/numSpMVs;
+		int numIter = 100;
+		timeSpMV = getSpMVtime( graph, partition, numIter)/numIter;
+		
+		//timeComm = getCommScheduleTime( graph, partition, numIter)/numIter;
     }
     
     
@@ -165,13 +168,12 @@ struct Metrics{
 		//get the distribution from the partition
 		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
 		
-		ValueType time = 0;
-		
 		std::chrono::time_point<std::chrono::system_clock> beforeRedistribution = std::chrono::system_clock::now();
 		// redistribute graph according to partition distribution
 		graph.redistribute( distFromPartition, initColDistPtr);
-		
 		std::chrono::duration<ValueType> redistributionTime =  std::chrono::system_clock::now() - beforeRedistribution;
+		
+		ValueType time = 0;
 		time = comm->max( redistributionTime.count() );
 		PRINT0("time to redistribute: " << time);
 		
@@ -199,18 +201,18 @@ struct Metrics{
 		PRINT0("time to get the laplacian: " << time );
 		
 		// vector for multiplication
-		srand( std::time(NULL) );
-		scai::lama::DenseVector<ValueType> x ( graph.getColDistributionPtr(), 0 );
-		for( int l=0; l<x.getLocalValues().size(); l++){
-			x.getLocalValues()[l] = rand()%100;
-		}
+		scai::lama::DenseVector<ValueType> x ( graph.getColDistributionPtr(), 1.0 );
+		scai::lama::DenseVector<ValueType> y ( graph.getRowDistributionPtr(), 0.0 );
+		graph.setCommunicationKind( scai::lama::Matrix::SyncKind::SYNCHRONOUS );
 		
+		comm->synchronize();
 		// perfom the actual multiplication
 		std::chrono::time_point<std::chrono::system_clock> beforeSpMVTime = std::chrono::system_clock::now();
 		for(IndexType r=0; r<repeatTimes; r++){
-			scai::lama::DenseVector<ValueType> result( laplacian * x );
+			y = laplacian *x +y;
 			//DenseVector<ValueType> result( graph * x );
 		}
+		comm->synchronize();
 		std::chrono::duration<ValueType> SpMVTime = std::chrono::system_clock::now() - beforeSpMVTime;
 		//PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
 		
@@ -218,12 +220,67 @@ struct Metrics{
 		ValueType minTime = comm->min( SpMVTime.count() );
 		PRINT0("max time for " << repeatTimes <<" SpMVs: " << time << " , min time " << minTime);
 	
+		//redistibute back to initial distributions
+		graph.redistribute( initRowDistPtr, initColDistPtr );
+		
+		return time;
+	}
+
+	ValueType getCommScheduleTime( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, const IndexType repeatTimes){
+			
+		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		const IndexType N = graph.getNumRows();
+		
+		// the original row and  column distributions
+		const scai::dmemo::DistributionPtr initRowDistPtr = graph.getRowDistributionPtr();
+		const scai::dmemo::DistributionPtr initColDistPtr = graph.getColDistributionPtr();
+		
+		//get the distribution from the partition
+		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
+		
+		std::chrono::time_point<std::chrono::system_clock> beforeRedistribution = std::chrono::system_clock::now();
+		// redistribute graph according to partition distribution
+		graph.redistribute( distFromPartition, initColDistPtr);
+		std::chrono::duration<ValueType> redistributionTime =  std::chrono::system_clock::now() - beforeRedistribution;
+		
+		ValueType time = 0;
+		time = comm->max( redistributionTime.count() );
+		PRINT0("time to redistribute: " << time);
+	
+		const IndexType localN = distFromPartition->getLocalSize();
+		SCAI_ASSERT_EQ_ERROR( localN, graph.getLocalNumRows(), "Distribution mismatch")
+		
+		const IndexType maxLocalN = comm->max(localN);
+		const IndexType minLocalN = comm->min(localN);
+		const ValueType optSize = ValueType(N)/comm->getSize();
+		
+		ValueType imbalance = ValueType( maxLocalN - optSize)/optSize;
+		PRINT0("minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", imbalance= " << imbalance);
+		
+		const scai::dmemo::CommunicationPlan& sendPlan  = graph.getHalo().getProvidesPlan();
+		const scai::dmemo::CommunicationPlan& recvPlan  = graph.getHalo().getRequiredPlan();
+		
+		scai::hmemo::HArray<ValueType> sendData( sendPlan.size(), 1.0 );
+		scai::hmemo::HArray<ValueType> recvData;
+		
+		comm->synchronize();
+		std::chrono::time_point<std::chrono::system_clock> beforeCommTime = std::chrono::system_clock::now();
+		for ( IndexType i = 0; i < repeatTimes; ++i ){
+			comm->exchangeByPlan( recvData, recvPlan, sendData, sendPlan );
+		}
+		comm->synchronize();
+		std::chrono::duration<ValueType> commTime = std::chrono::system_clock::now() - beforeCommTime;
+		
+		time = comm->max(commTime.count());
+		
+		ValueType minTime = comm->min( commTime.count() );
+		PRINT0("max time for " << repeatTimes <<" SpMVs: " << time << " , min time " << minTime);
 	
 		//redistibute back to initial distributions
 		graph.redistribute( initRowDistPtr, initColDistPtr );
 		
 		return time;
-}
+	}
 
 };
 

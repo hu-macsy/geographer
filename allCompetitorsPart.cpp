@@ -64,6 +64,7 @@ int main(int argc, char** argv) {
 	struct Settings settings;
     //int parMetisGeom = 0;			//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
     bool writePartition = false;
+	bool storeInfo = true;
 	std::string outPath;
 	std::string graphName;
 	
@@ -92,6 +93,7 @@ int main(int argc, char** argv) {
 		("outPath", value<std::string>(&outPath), "write result partition into file")
 		("graphName", value<std::string>(&graphName), "this is needed to create the correct outFile for every tool. Must be the graphFile with the path and the ending")
 		
+		("storeInfo", value<bool>(&storeInfo), "is this is false then no outFile is produced")
         ("writePartition", "Writes the partition in the outFile.partition file")
         ("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 		;
@@ -257,7 +259,11 @@ int main(int argc, char** argv) {
 		//WARNING: in order for the SaGa scripts to work this must be done as in Saga/header.py::outFileSting
 		//create the outFile for this tool
 		//settings.outFile = outPath+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ thisTool + ".info";
-		settings.outFile = outPath+ thisTool+"/"+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ thisTool + ".info";
+		if( storeInfo){
+			settings.outFile = outPath+ thisTool+"/"+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ thisTool + ".info";
+		}else{
+			settings.outFile ="-";
+		}
 		//PRINT0( "\n" << settings.outFile << "\n");
 		{
 			std::ifstream f(settings.outFile);
