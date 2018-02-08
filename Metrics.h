@@ -150,7 +150,9 @@ struct Metrics{
         avgBorderNodesPercent = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(settings.numBlocks));
         
 		int numIter = 100;
-		timeSpMV = getSpMVtime( graph, partition, numIter)/numIter;
+		timeSpMV = -1;
+		//timeSpMV = getSpMVtime( graph, partition, numIter)/numIter;
+		
 		
 		//timeComm = getCommScheduleTime( graph, partition, numIter)/numIter;
     }
@@ -274,7 +276,7 @@ struct Metrics{
 		time = comm->max(commTime.count());
 		
 		ValueType minTime = comm->min( commTime.count() );
-		PRINT0("max time for " << repeatTimes <<" SpMVs: " << time << " , min time " << minTime);
+		PRINT0("max time for " << repeatTimes <<" communications: " << time << " , min time " << minTime);
 	
 		//redistibute back to initial distributions
 		graph.redistribute( initRowDistPtr, initColDistPtr );

@@ -116,6 +116,7 @@ def submitGeographer(exp, version):
 		params += " --outFile="+ outPath
 		params += " --dimensions="+ exp.dimension
 		params += " --fileFormat="+ exp.fileFormat
+		#params += " --storeInfo=0"
 		#print(params)
 		
 		if not os.path.exists( executable):
