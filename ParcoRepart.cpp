@@ -32,7 +32,7 @@
 #include "MultiSection.h"
 #include "GraphUtils.h"
 
-#include "RBC/Sort/SQuick.hpp"
+//  #include "RBC/Sort/SQuick.hpp"
 
 using scai::lama::Scalar;
 
@@ -40,7 +40,7 @@ namespace ITI {
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings, struct Metrics& metrics)
 {
-	DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(input.getRowDistributionPtr(), 1);
+	auto uniformWeights = fill<DenseVector<ValueType>>(input.getRowDistributionPtr(), 1);
 	return partitionGraph(input, coordinates, uniformWeights, settings, metrics);
 }
 
@@ -63,7 +63,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
     struct Metrics metrics(settings.numBlocks);
     assert(settings.storeInfo == false); // Cannot return timing information. Better throw an error than silently drop it.
     
-    DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(input.getRowDistributionPtr(), 1);
+    auto uniformWeights = fill<DenseVector<ValueType>>(input.getRowDistributionPtr(), 1);
     return partitionGraph(input, coordinates, uniformWeights, settings, metrics);
 }
 
@@ -141,7 +141,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         // get an initial partition
         DenseVector<IndexType> result;
         if (nodeWeights.size() == 0) {
-        	nodeWeights = DenseVector<ValueType>(inputDist, 1);
+        	nodeWeights = fill<DenseVector<ValueType>>(inputDist, 1);
         }
         
         assert(nodeWeights.getDistribution().isEqual(*inputDist));
@@ -200,7 +200,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                         tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, migrationSettings);
                         initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
                     } else if ( settings.initialMigration == InitialPartitioningMethods::KMeans){
-                        DenseVector<ValueType> convertedWeights(nodeWeights.getDistributionPtr(), 1);
+                        auto convertedWeights = fill<DenseVector<ValueType>>(nodeWeights.getDistributionPtr(), 1);
                         std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );;
                         tempResult = ITI::KMeans::computePartition(coordinates, migrationSettings.numBlocks, convertedWeights, migrationBlockSizes, migrationSettings);
                         initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
@@ -231,7 +231,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             
             }
             
-            const ValueType weightSum = nodeWeights.sum().Scalar::getValue<ValueType>();
+            const ValueType weightSum = nodeWeights.sum();
             
             // vector of size k, each element represents the size of one block
             std::vector<IndexType> blockSizes;
@@ -261,8 +261,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                     std::cout << "K-Means, Time:" << totKMeansTime << std::endl;
             }
 
-            assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
-            assert(result.min().Scalar::getValue<IndexType>() == 0);
+            assert(result.max() == settings.numBlocks -1);
+            assert(result.min() == 0);
 
         } else if (settings.initialPartition == InitialPartitioningMethods::Multisection) {// multisection
             PRINT0("Initial partition with multisection");
@@ -278,7 +278,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         } else if (settings.initialPartition == InitialPartitioningMethods::None) {
             //no need to explicitly check for repartitioning mode or not.
             assert(comm->getSize() == settings.numBlocks);
-            result = DenseVector<IndexType>(input.getRowDistributionPtr(), comm->getRank());
+            result = fill<DenseVector<IndexType>>(input.getRowDistributionPtr(), comm->getRank());
         }
         else {
             throw std::runtime_error("Initial Partitioning mode undefined.");
@@ -308,7 +308,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             std::chrono::time_point<std::chrono::system_clock> beforeSecondRedistributiom =  std::chrono::system_clock::now();
             
             scai::dmemo::Redistributor resultRedist(result.getLocalValues(), result.getDistributionPtr());
-            result = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
+            result = fill<DenseVector<IndexType>>(resultRedist.getTargetDistributionPtr(), comm->getRank());
             
             scai::dmemo::Redistributor redistributor(resultRedist.getTargetDistributionPtr(), input.getRowDistributionPtr());
             input.redistribute(redistributor, noDist);
@@ -373,7 +373,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings){
 
-    DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(coordinates[0].getDistributionPtr(), 1);
+    auto uniformWeights = fill<DenseVector<ValueType>>(coordinates[0].getDistributionPtr(), 1);
     return hilbertPartition( coordinates, settings);
 }
 //--------------------------------------------------------------------------------------- 
@@ -408,8 +408,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     {
 		SCAI_REGION( "ParcoRepart.hilbertPartition.minMax" )
 		for (IndexType dim = 0; dim < dimensions; dim++) {
-			minCoords[dim] = coordinates[dim].min().Scalar::getValue<ValueType>();
-			maxCoords[dim] = coordinates[dim].max().Scalar::getValue<ValueType>();
+			minCoords[dim] = coordinates[dim].min();
+			maxCoords[dim] = coordinates[dim].max();
 			assert(std::isfinite(minCoords[dim]));
 			assert(std::isfinite(maxCoords[dim]));
 			SCAI_ASSERT(maxCoords[dim] > minCoords[dim], "Wrong coordinates.");
@@ -471,7 +471,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     /**
      * now sort the global indices by where they are on the space-filling curve.
      */
+
     std::vector<IndexType> newLocalIndices;
+
+    /* Disabled
     {
         SCAI_REGION( "ParcoRepart.hilbertPartition.sorting" );
         
@@ -539,6 +542,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
 
         //possible optimization: remove dummy values during first copy, then directly copy into HArray and sort with pointers. Would save one copy.
     }
+    */
     
     {
     	assert(!coordDist->isReplicated() && comm->getSize() == k);
@@ -549,7 +553,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
         
         if (comm->getRank() == 0) std::cout << "Created distribution." << std::endl;
-        result = DenseVector<IndexType>(newDistribution, comm->getRank());
+        result = fill<DenseVector<IndexType>>(newDistribution, comm->getRank());
         if (comm->getRank() == 0) std::cout << "Created initial partition." << std::endl;
     }
 

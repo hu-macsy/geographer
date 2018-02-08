@@ -66,10 +66,10 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
     // in order to keep input array unchanged, create new tmp array by coping
     // adjM.redistribute( noDist , noDist);
     
-    scai::lama::CSRSparseMatrix<ValueType> tmpAdjM ( adjM.getLocalStorage(),
-                                                     adjM.getRowDistributionPtr(),
-                                                     adjM.getColDistributionPtr()
-                                           );
+    auto tmpAdjM = scai::lama::distribute<scai::lama::CSRSparseMatrix<ValueType>>( adjM.getLocalStorage(),
+                                                                                   adjM.getRowDistributionPtr(),
+                                                                                   adjM.getColDistributionPtr()
+                                                                                );
     tmpAdjM.redistribute( noDist , noDist);
 
     if(comm->getRank()==root){
@@ -236,7 +236,7 @@ void FileIO<IndexType, ValueType>::writeVTKCentral_ver2 (const CSRSparseMatrix<V
     // for(inv v=0; v<number_of_variables; v++){}
     
     f << "LOOKUP_TABLE default" << std::endl;
-    int k = part.max().Scalar::getValue<IndexType>();
+    int k = part.max();
     for( int i=0; i<N; i++){
         f << (double) part.getLocalValues()[i]/(double)k << std::endl;
     }
@@ -270,7 +270,7 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
 	if (!dist->isReplicated()) {
 		maybeCopy.resize(dimension);
 		for (IndexType d = 0; d < dimension; d++) {
-			maybeCopy[d] = DenseVector<ValueType>(coords[d], noDist);
+			maybeCopy[d] = scai::lama::distribute<DenseVector<ValueType>>(coords[d], noDist);
 		}
 
 	}
@@ -829,14 +829,15 @@ if( !read) PRINT(*comm << ": " <<  i << " __ " << line << " || " << file.tellg()
     }
 
     //assign matrix
-    scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, ja.size(), 
+    scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, 
                 scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
     		scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
     		scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
 
     //std::cout << "Process " << comm->getRank() << " created local storage " << std::endl;
 
-    return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
+    return scai::lama::distribute<scai::lama::CSRSparseMatrix<ValueType>>(myStorage, dist, noDist);
+    //ThomasBranses ? return scai::lama::CSRSparseMatrix<ValueType>( dist, std::move(myStorage) ); // if no comm
 }
 //-------------------------------------------------------------------------------------------------
 
@@ -996,16 +997,17 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     //assign matrix
     //
     
-    scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, ja.size(),   
-    scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
-    scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
-    scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
+    scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, 
+        scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
+        scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
+        scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
     
     // block distribution for rows and no distribution for columns
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
-    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 
-    return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
+    // myStorage is exactly my local part corresponding to the block distribution
+    // ThomasBrandes: is localN realy dist->getLocalSize()
+    return scai::lama::CSRSparseMatrix<ValueType>( dist, std::move( myStorage ) );
 }
 
 //-------------------------------------------------------------------------------------------------

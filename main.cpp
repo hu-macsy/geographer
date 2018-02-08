@@ -490,11 +490,11 @@ int main(int argc, char** argv) {
         		IndexType n = vm["numX"].as<IndexType>();
 				scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(n, comm));
 				scai::dmemo::DistributionPtr noDist( new scai::dmemo::NoDistribution(n));
-				graph = scai::lama::CSRSparseMatrix<ValueType>(dist, noDist);
+				graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDist);
 				ITI::FileIO<IndexType, ValueType>::readCoordsTEEC(graphFile, n, settings.dimensions, vectorOfNodeWeights);
 				if (settings.verbose) {
-					ValueType minWeight = vectorOfNodeWeights[0].min().Scalar::getValue<ValueType>();
-					ValueType maxWeight = vectorOfNodeWeights[0].max().Scalar::getValue<ValueType>();
+					ValueType minWeight = vectorOfNodeWeights[0].min();
+					ValueType maxWeight = vectorOfNodeWeights[0].max();
 					if (comm->getRank() == 0) std::cout << "Min node weight:" << minWeight << ", max weight: " << maxWeight << std::endl;
 				}
 				coordFile = graphFile;
@@ -511,7 +511,7 @@ int main(int argc, char** argv) {
 
         IndexType numNodeWeights = vectorOfNodeWeights.size();
         if (numNodeWeights == 0) {
-			nodeWeights = DenseVector<ValueType>(rowDistPtr, 1);
+			nodeWeights = fill<DenseVector<ValueType>>(rowDistPtr, 1);
 		}
 		else if (numNodeWeights == 1) {
 			nodeWeights = vectorOfNodeWeights[0];
@@ -607,7 +607,7 @@ int main(int argc, char** argv) {
         
         scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
         scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
-        graph = scai::lama::CSRSparseMatrix<ValueType>( rowDistPtr , noDistPtr );
+        graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( rowDistPtr , noDistPtr );
         
         scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
         for(IndexType i=0; i<settings.dimensions; i++){
@@ -624,7 +624,7 @@ int main(int argc, char** argv) {
             std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
         }
         
-        nodeWeights = scai::lama::DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+        nodeWeights = scai::lama::fill<scai::lama::DenseVector<ValueType>>(graph.getRowDistributionPtr(), 1);
         
     } else if (vm.count("quadTreeFile")) {
         //if (comm->getRank() == 0) {
@@ -643,7 +643,7 @@ int main(int argc, char** argv) {
         for (IndexType i = 0; i < settings.dimensions; i++) {
         	coordinates[i].redistribute(rowDistPtr);
         }
-        nodeWeights = scai::lama::DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
+        nodeWeights = scai::lama::fill<scai::lama::DenseVector<ValueType>>(graph.getRowDistributionPtr(), 1);
 
     } else{
     	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;
@@ -658,7 +658,7 @@ int main(int argc, char** argv) {
     if( vm.count("blockSizesFile") ){
         settings.blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
         IndexType blockSizesSum  = std::accumulate( settings.blockSizes.begin(), settings.blockSizes.end(), 0);
-        IndexType nodeWeightsSum = nodeWeights.sum().Scalar::getValue<IndexType>();
+        IndexType nodeWeightsSum = nodeWeights.sum();
         SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
     }
     
@@ -674,11 +674,11 @@ int main(int argc, char** argv) {
     	if (previous.size() != N) {
     		throw std::runtime_error("Previous partition has wrong size.");
     	}
-    	if (previous.max().Scalar::getValue<IndexType>() != settings.numBlocks-1) {
-    		throw std::runtime_error("Illegal maximum block ID in previous partition:" + std::to_string(previous.max().Scalar::getValue<IndexType>()));
+    	if (previous.max() != settings.numBlocks-1) {
+    		throw std::runtime_error("Illegal maximum block ID in previous partition:" + std::to_string(previous.max()));
     	}
-    	if (previous.min().Scalar::getValue<IndexType>() != 0) {
-    		throw std::runtime_error("Illegal minimum block ID in previous partition:" + std::to_string(previous.min().Scalar::getValue<IndexType>()));
+    	if (previous.min() != 0) {
+    		throw std::runtime_error("Illegal minimum block ID in previous partition:" + std::to_string(previous.min()));
     	}
     	settings.repartition = true;
     }
@@ -704,7 +704,7 @@ int main(int argc, char** argv) {
     	if (nodeWeights.size() > 0) {
     		nodeWeights.redistribute(previousRedist);
     	}
-    	previous = DenseVector<IndexType>(previousRedist.getTargetDistributionPtr(), comm->getRank());
+    	previous = fill<DenseVector<IndexType>>(previousRedist.getTargetDistributionPtr(), comm->getRank());
 
     }
 

@@ -778,8 +778,8 @@ public:
                 
             }
                     
-            scai::lama::CSRStorage<ValueType> localMatrix( N, N, nnzValues, csrIA, csrJA, csrValues );            
-            scai::lama::CSRSparseMatrix<ValueType> ret(localMatrix);
+            scai::lama::CSRStorage<ValueType> localMatrix( N, N, csrIA, csrJA, csrValues );            
+            scai::lama::CSRSparseMatrix<ValueType> ret( std::move(localMatrix));
 
             return ret;
         }

@@ -78,7 +78,7 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 
 	for (IndexType j = 0; j < k; j++) {
 		IndexType localIndex = blockDist->global2local(wantedIndices[j]);
-		if (localIndex != nIndex) {
+		if (localIndex != scai::invalidIndex) {
 			assert(localIndex < localN);
 			IndexType permutedIndex = localIndices[localIndex];
 			assert(permutedIndex < localN);
@@ -124,7 +124,7 @@ std::vector<std::vector<ValueType> > findInitialCenters(
 		IndexType i = 0;
 		for (IndexType index : indices) {
 			//yes, this is very expensive, since each call triggers a global communication. However, this needs to be done anyway, if not here then later.
-			result[d][i] = coordinates[d].getValue(index).Scalar::getValue<ValueType>();
+			result[d][i] = coordinates[d].getValue(index);
 			i++;
 		}
 	}

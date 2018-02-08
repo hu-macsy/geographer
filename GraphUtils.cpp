@@ -27,7 +27,6 @@ using scai::hmemo::ReadAccess;
 using scai::dmemo::Distribution;
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
-using scai::lama::Scalar;
 using scai::lama::CSRStorage;
 
 template<typename IndexType, typename ValueType>
@@ -61,7 +60,7 @@ IndexType getFarthestLocalNode(const scai::lama::CSRSparseMatrix<ValueType> grap
 
 		for (IndexType j = ia[nextNode]; j < ia[nextNode+1]; j++) {
 			IndexType localNeighbour = dist.global2local(ja[j]);
-			if (localNeighbour != nIndex && !visited[localNeighbour]) {
+			if (localNeighbour != scai::invalidIndex && !visited[localNeighbour]) {
 				bfsQueue.push(localNeighbour);
 				visited[localNeighbour] = true;
 			}
@@ -85,8 +84,7 @@ ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<
 
 	const IndexType n = inputDist->getGlobalSize();
 	const IndexType localN = inputDist->getLocalSize();
-	const Scalar maxBlockScalar = part.max();
-	const IndexType maxBlockID = maxBlockScalar.getValue<IndexType>();
+	const IndexType maxBlockID = part.max();
 
     scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
     
@@ -170,8 +168,8 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 	if (weighted) {
 		assert(weightsSize == globalN);
 		assert(nodeWeights.getDistributionPtr()->getLocalSize() == localN);
-		minWeight = nodeWeights.min().Scalar::getValue<ValueType>();
-		maxWeight = nodeWeights.max().Scalar::getValue<ValueType>();
+		minWeight = nodeWeights.min();
+		maxWeight = nodeWeights.max();
 	} else {
 		minWeight = 1;
 		maxWeight = 1;
@@ -186,8 +184,8 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 	}
 
 	std::vector<ValueType> subsetSizes(k, 0);
-	const IndexType minK = part.min().Scalar::getValue<IndexType>();
-	const IndexType maxK = part.max().Scalar::getValue<IndexType>();
+	const IndexType minK = part.min();
+	const IndexType maxK = part.max();
 
 	if (minK < 0) {
 		throw std::runtime_error("Block id " + std::to_string(minK) + " found in partition with supposedly " + std::to_string(k) + " blocks.");
@@ -297,7 +295,7 @@ inline bool hasNonLocalNeighbors(const CSRSparseMatrix<ValueType> &input, IndexT
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
 	const IndexType localID = inputDist->global2local(globalID);
-	assert(localID != nIndex);
+	assert(localID != scai::invalidIndex);
 
 	const IndexType beginCols = ia[localID];
 	const IndexType endCols = ia[localID+1];
@@ -324,7 +322,7 @@ std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<Value
 
     for (IndexType globalI : candidates) {
         const IndexType localI = inputDist->global2local(globalI);
-        if (localI == nIndex) {
+        if (localI == scai::invalidIndex) {
             continue;
         }
         const IndexType beginCols = ia[localI];
@@ -399,7 +397,7 @@ DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, c
     scai::utilskernel::LArray<IndexType>& localBorder= border.getLocalValues();
 
     IndexType globalN = dist->getGlobalSize();
-    IndexType max = part.max().Scalar::getValue<IndexType>();
+    IndexType max = part.max();
 
     if( !dist->isEqual( part.getDistribution() ) ){
         std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and partition dist: "<< part.getDistribution() << std::endl;
@@ -452,7 +450,7 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes(
     const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
 
     IndexType globalN = dist->getGlobalSize();
-    IndexType max = part.max().Scalar::getValue<IndexType>();
+    IndexType max = part.max();
     
     // the number of border nodes per block
     std::vector<IndexType> borderNodesPerBlock( max+1, 0 );
@@ -525,7 +523,7 @@ std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM
     const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
 
     IndexType globalN = dist->getGlobalSize();
-    IndexType max = part.max().Scalar::getValue<IndexType>();
+    IndexType max = part.max();
     
     // the communication volume per block for this PE
     std::vector<IndexType> commVolumePerBlock( max+1, 0 );
@@ -689,7 +687,7 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
     const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
     IndexType N = adjM.getNumColumns();
-    IndexType max = part.max().Scalar::getValue<IndexType>();
+    IndexType max = part.max();
    
     if( !dist->isEqual( part.getDistribution() ) ){
         std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and partition dist: "<< part.getDistribution() << std::endl;
@@ -757,7 +755,7 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
     }
     SCAI_REGION_START("ParcoRepart.getLocalBlockGraphEdges.gatherNonLocal")
     //gather all non-local indexes
-    gatheredPart.gather(part, nonLocalDV , scai::common::binary::COPY );
+    gatheredPart.gather(part, nonLocalDV , scai::common::BinaryOp::COPY );
     SCAI_REGION_END("ParcoRepart.getLocalBlockGraphEdges.gatherNonLocal")
     
     assert( gatheredPart.size() == nonLocalInd.size() );
@@ -766,7 +764,7 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
     for(IndexType i=0; i<gatheredPart.size(); i++){
         SCAI_REGION("ParcoRepart.getLocalBlockGraphEdges.addNonLocalEdge");
         IndexType u = localPart[ localInd[i] ];         
-        IndexType v = gatheredPart.getValue(i).scai::lama::Scalar::getValue<IndexType>();
+        IndexType v = gatheredPart.getValue(i);
         assert( u < max +1);
         assert( v < max +1);
         if( u != v){    // the nodes belong to different blocks                  
@@ -955,11 +953,10 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueTy
     scai::utilskernel::LArray<IndexType> ia(2, 0, numNeighbors);
     scai::utilskernel::LArray<IndexType> ja(numNeighbors, neighborPEs.data());
     scai::utilskernel::LArray<ValueType> values(numNeighbors, 1);
-    scai::lama::CSRStorage<ValueType> myStorage(1, numPEs, neighborPEs.size(), ia, ja, values);
+    scai::lama::CSRStorage<ValueType> myStorage(1, numPEs, std::move(ia), std::move(ja), std::move(values));
     SCAI_REGION_END("ParcoRepart.getPEGraph.buildMatrix");
     
-    scai::lama::CSRSparseMatrix<ValueType> PEgraph(distPEs, noDistPEs);
-    PEgraph.swapLocalStorage(myStorage);
+    scai::lama::CSRSparseMatrix<ValueType> PEgraph(distPEs, std::move(myStorage));
 
     return PEgraph;
 }
@@ -986,13 +983,13 @@ scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vec
     
     std::vector<IndexType> values(ja.size(), 1);
     
-    scai::lama::CSRStorage<ValueType> myStorage( N, N, ja.size(), 
+    scai::lama::CSRStorage<ValueType> myStorage( N, N,
             scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
             scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
             scai::utilskernel::LArray<ValueType>(values.size(), values.data())
     );
     
-    return scai::lama::CSRSparseMatrix<ValueType>(myStorage);
+    return scai::lama::CSRSparseMatrix<ValueType>(std::move(myStorage));
 }
 
 //-----------------------------------------------------------------------------------

@@ -13,7 +13,6 @@
 #include <scai/dmemo/Distribution.hpp>
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/common/Math.hpp>
-#include <scai/common/unique_ptr.hpp>
 #include <scai/lama/storage/MatrixStorage.hpp>
 #include <scai/tracing.hpp>
 

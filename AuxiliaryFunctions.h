@@ -89,8 +89,8 @@ static void print2DGrid(scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama
     IndexType bordViz[numX][numY]; 
     for(int i=0; i<numX; i++)
         for(int j=0; j<numY; j++){
-            partViz[i][j]=partition.getValue(i*numX+j).scai::lama::Scalar::getValue<IndexType>();
-            bordViz[i][j]=border.getValue(i*numX+j).scai::lama::Scalar::getValue<IndexType>();
+            partViz[i][j]=partition.getValue(i*numX+j);
+            bordViz[i][j]=border.getValue(i*numX+j);
         }
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();

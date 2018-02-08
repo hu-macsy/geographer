@@ -10,7 +10,6 @@
 
 #include <scai/hmemo/ReadAccess.hpp>
 #include <scai/hmemo/WriteAccess.hpp>
-#include <scai/lama/Scalar.hpp>
 #include <scai/solver.hpp>
 
 #include "Diffusion.h"
@@ -23,7 +22,6 @@ using scai::lama::DIASparseMatrix;
 using scai::lama::DIAStorage;
 using scai::lama::DenseMatrix;
 using scai::lama::DenseStorage;
-using scai::lama::Scalar;
 using scai::hmemo::ReadAccess;
 using scai::hmemo::WriteAccess;
 
@@ -31,6 +29,8 @@ template<typename IndexType, typename ValueType>
 DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource( CSRSparseMatrix<ValueType> laplacian, DenseVector<ValueType> nodeWeights, IndexType source, ValueType eps) {
 	using scai::lama::NormPtr;
 	using scai::lama::L2Norm;
+	using scai::lama::fill;
+	using scai::lama::eval;
 	using namespace scai::solver;
 
 	const IndexType n = laplacian.getNumRows();
@@ -46,35 +46,35 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource( CS
 	IndexType sourceSum = comm->sum(source);
 	assert(sourceSum == source*comm->getSize());
 
-	ValueType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
+	ValueType weightSum = nodeWeights.sum();
 
 	IndexType sourceWeight;
 
 	IndexType sourceIndex = dist->global2local(source);
 
-	DenseVector<ValueType> nullVector(dist,0);
-	DenseVector<ValueType> d(nullVector - nodeWeights);
+	auto nullVector = fill<DenseVector<ValueType>>(dist,0);
+	auto d = eval<DenseVector<ValueType>>(nullVector - nodeWeights);
 
-	if (sourceIndex != nIndex) {
+	if (sourceIndex != scai::invalidIndex) {
 		d.getLocalValues()[sourceIndex] = weightSum - nodeWeights.getLocalValues()[sourceIndex];
 	}
 
-	ValueType newWeightSum = d.sum().Scalar::getValue<IndexType>();
+	ValueType newWeightSum = d.sum();
 	if (std::abs(newWeightSum) >= eps) {
 		throw std::logic_error("Residual weight sum " + std::to_string(newWeightSum) + " too large!");
 	}
 
-	DenseVector<ValueType> solution( dist, 0.0 );
+	auto solution = fill<DenseVector<ValueType>>( dist, 0.0 );
 
-	NormPtr norm( new L2Norm() );
+        auto norm = std::make_shared<L2Norm<ValueType>>();
 
-	CriterionPtr rt( new ResidualThreshold( norm, eps, ResidualThreshold::Relative ) );
+        auto rt = std::make_shared<ResidualThreshold<ValueType>>( norm, eps, ResidualCheck::Relative );
 
-	LoggerPtr logger( new CommonLogger ( "myLogger: ",
-	                                        LogLevel::convergenceHistory,
-	                                        LoggerWriteBehaviour::toConsoleOnly ) );
+        auto logger = std::make_shared<CommonLogger>( "myLogger: ",
+                                                      LogLevel::convergenceHistory,
+ 	                                              LoggerWriteBehaviour::toConsoleOnly );
 
-	CG solver( "simpleCG" );
+	CG<ValueType> solver( "simpleCG" );
 
 	//solver.setLogger( logger );
 
@@ -113,7 +113,7 @@ DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(scai:
 	assert(offset == localN*l);
 
 	//the matrix is transposed, not sure if this is a problem.
-	return DenseMatrix<ValueType>(DenseStorage<ValueType>(resultContainer, l, localN), lDist, dist);
+	return scai::lama::distribute<DenseMatrix<ValueType>>(DenseStorage<ValueType>(l, localN, resultContainer), lDist, dist);
 }
 
 
@@ -133,7 +133,7 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 	scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
     scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
 
-    if (dist->getBlockDistributionSize() == nIndex) {
+    if (dist->getBlockDistributionSize() == scai::invalidIndex) {
     	throw std::runtime_error("Only replicated or block distributions supported.");
     }
 
@@ -157,10 +157,9 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 		}
 	}
 
-	DIASparseMatrix<ValueType> D(dist,noDist);
-	DIAStorage<ValueType> dstor(localN, n, 1, HArray<IndexType>(1,firstIndex), HArray<ValueType>(localN, targetDegree.data()) );
-	D.swapLocalStorage(dstor);
-	CSRSparseMatrix<ValueType> result(D-graph);
+	DIAStorage<ValueType> dstor(localN, n, HArray<IndexType>( { firstIndex } ), HArray<ValueType>(localN, targetDegree.data()) );
+	DIASparseMatrix<ValueType>D(dist, std::move( dstor ));
+	auto result = scai::lama::eval<CSRSparseMatrix<ValueType>>(D-graph);
 	assert(result.getNumValues() == graph.getNumValues() + n);
 
 	return result;
@@ -177,7 +176,7 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructFJLTMatrix(
 	if (origDimension <= targetDimension) {
 		//better to just return the identity
 		std::cout << "Target dimension " << targetDimension << " is higher than original dimension " << origDimension << ". Returning identity instead." << std::endl;
-		DIASparseMatrix<ValueType> D(DIAStorage<ValueType>(origDimension, origDimension, IndexType(1), HArray<IndexType>(IndexType(1), IndexType(0) ), HArray<ValueType>(origDimension, IndexType(1) )));
+		DIASparseMatrix<ValueType> D(DIAStorage<ValueType>(origDimension, origDimension, HArray<IndexType>( { 0 } ), HArray<ValueType>(origDimension, ValueType(1) )));
 		return CSRSparseMatrix<ValueType>(D);
 	}
 
@@ -202,7 +201,6 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructFJLTMatrix(
 
 	DenseMatrix<ValueType> H = constructHadamardMatrix(origDimension);
 
-	DIASparseMatrix<ValueType> D(origDimension,origDimension);
 	HArray<ValueType> randomDiagonal(origDimension);
 	{
 		WriteAccess<ValueType> wDiagonal(randomDiagonal);
@@ -211,20 +209,20 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructFJLTMatrix(
 			wDiagonal[i] = 1-2*(rand() ^ 1);
 		}
 	}
-	DIAStorage<ValueType> dstor(origDimension, origDimension, IndexType(1), HArray<IndexType>(IndexType(1), IndexType(0) ), randomDiagonal );
-	D.swapLocalStorage(dstor);
+	DIAStorage<ValueType> dstor(origDimension, origDimension, HArray<IndexType>( { 0 } ), randomDiagonal );
+	DIASparseMatrix<ValueType>D( std::move( dstor ) );
 	DenseMatrix<ValueType> Ddense(D);
 
-	DenseMatrix<ValueType> PH(P*H);
-	DenseMatrix<ValueType> denseTemp(PH*Ddense);
+	auto PH = scai::lama::eval<DenseMatrix<ValueType>>(P*H);
+	auto denseTemp = scai::lama::eval<DenseMatrix<ValueType>>(PH*Ddense);
 	return CSRSparseMatrix<ValueType>(denseTemp);
 }
 
 template<typename IndexType, typename ValueType>
 DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructHadamardMatrix(IndexType d) {
 	const ValueType scalingFactor = 1/sqrt(d);
-	DenseMatrix<ValueType> result(d,d);
-	WriteAccess<ValueType> wResult(result.getLocalStorage().getData());
+        scai::hmemo::HArray<ValueType> result(d * d);
+	WriteAccess<ValueType> wResult( result );
 	for (IndexType i = 0; i < d; i++) {
 		for (IndexType j = 0; j < d; j++) {
 			IndexType dotProduct = (i-1) ^ (j-1);
@@ -232,7 +230,7 @@ DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructHadamardMatrix(
 			wResult[i*d+j] = scalingFactor*entry;
 		}
 	}
-	return result;
+	return DenseMatrix<ValueType>( DenseStorage<ValueType>( d, d, std::move(result) ) );
 }
 
 template class Diffusion<IndexType, ValueType>;

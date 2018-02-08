@@ -690,7 +690,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
                 // but we may have already inserted
                 
                 // insert the index to the set. if it already exists then setInsertion.second = false
-                setInsertion = ngbGloblaIndSet.insert(ngbGlobalInd);
+                // setInsertion = ngbGloblaIndSet.insert(ngbGlobalInd);
           
             }while(setInsertion.second==false);
             //finally, we inserted a valid (>0 && <N && close enough) neighbour
@@ -1028,7 +1028,7 @@ Scalar MeshGenerator<IndexType, ValueType>::dist3D(DenseVector<ValueType> p1, De
   res2= p1.getValue(2)-p2.getValue(2);
   res2= res2*res2;
   res = res0+ res1+ res2;
-  return scai::common::Math::sqrt( res.getValue<ScalarRepType>() );
+  return scai::common::Math::sqrt( res );
 }
 
 //-------------------------------------------------------------------------------------------------

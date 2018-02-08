@@ -37,7 +37,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 		}
 	}
 
-	DenseVector<IndexType> origin(input.getRowDistributionPtr(), comm->getRank());//to track node movements through the hierarchies
+	auto origin = fill<DenseVector<IndexType>>(input.getRowDistributionPtr(), comm->getRank());//to track node movements through the hierarchies
         
 	if (settings.multiLevelRounds > 0) {
 		SCAI_REGION_START( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
@@ -62,7 +62,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 			}
 		}
 
-		DenseVector<IndexType> coarsePart = DenseVector<IndexType>(coarseGraph.getRowDistributionPtr(), comm->getRank());
+		DenseVector<IndexType> coarsePart = fill<DenseVector<IndexType>>(coarseGraph.getRowDistributionPtr(), comm->getRank());
 
 		DenseVector<ValueType> coarseWeights = sumToCoarse(nodeWeights, fineToCoarseMap);
 
@@ -71,7 +71,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 		comm->updateHalo(haloData, fineToCoarseMap.getLocalValues(), halo);
 		scai::dmemo::HaloBuilder::coarsenHalo(coarseGraph.getRowDistribution(), halo, fineToCoarseMap.getLocalValues(), haloData, coarseHalo);
 
-		assert(coarseWeights.sum().Scalar::getValue<ValueType>() == nodeWeights.sum().Scalar::getValue<ValueType>());
+		assert(coarseWeights.sum() == nodeWeights.sum());
 
 		std::chrono::duration<double> coarseningTime =  std::chrono::system_clock::now() - beforeCoarse;
 		ValueType timeForCoarse = ValueType ( comm->max(coarseningTime.count() ));
@@ -95,7 +95,8 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 			scai::dmemo::DistributionPtr projectedFineDist = redistributor.getTargetDistributionPtr();
 
 			assert(projectedFineDist->getGlobalSize() == globalN);
-			part = DenseVector<IndexType>(projectedFineDist, comm->getRank());
+			// part = fill<DenseVector<IndexType>>(projectedFineDist, comm->getRank());
+			part.setSameValue(projectedFineDist, comm->getRank());
 
 			if (settings.useGeometricTieBreaking) {
 				for (IndexType dim = 0; dim < settings.dimensions; dim++) {
@@ -178,11 +179,11 @@ DenseVector<IndexType> MultiLevel<IndexType, ValueType>::getFineTargets(const De
 	SCAI_ASSERT_EQ_ERROR(oldCoarseDist->getGlobalSize(), coarseOrigin.size(), "Old coarse distribution has wrong size.");
 
 	//use it to inform source PEs where their elements went in the coarser local refinement step
-	DenseVector<IndexType> targets(coarseDist, coarseDist->getCommunicatorPtr()->getRank());
+	auto targets = fill<DenseVector<IndexType>>(coarseDist, coarseDist->getCommunicatorPtr()->getRank());
 	targets.redistribute(coarseReverseRedist);//targets now have old coarse dist
 
 	//build fine target array by checking in fineToCoarseMap
-	DenseVector<IndexType> result(oldFineDist, nIndex);
+	auto result = fill<DenseVector<IndexType>>(oldFineDist, scai::invalidIndex);
 	{
 		scai::hmemo::ReadAccess<IndexType> rMap(fineToCoarseMap.getLocalValues());
 		scai::hmemo::ReadAccess<IndexType> rTargets(targets.getLocalValues());
@@ -192,7 +193,7 @@ DenseVector<IndexType> MultiLevel<IndexType, ValueType>::getFineTargets(const De
 
 		for (IndexType i = 0; i < oldFineLocalN; i++) {
 			IndexType oldLocalCoarse =  oldCoarseDist->global2local(rMap[i]);//TODO: optimize this
-			SCAI_ASSERT_DEBUG(oldLocalCoarse != nIndex, "Index " << rMap[i] << " maybe not local after all?");
+			SCAI_ASSERT_DEBUG(oldLocalCoarse != scai::invalidIndex, "Index " << rMap[i] << " maybe not local after all?");
 			SCAI_ASSERT_DEBUG(oldLocalCoarse < rTargets.size(), "Index " << oldLocalCoarse << " does not fit in " << rTargets.size());
 			wResult[i] = rTargets[oldLocalCoarse];
 		}
@@ -299,7 +300,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
 					for (IndexType j = ia[i]; j < ia[i+1]; j++) {
 						IndexType edgeTarget = ja[j];
 						IndexType localTarget = distPtr->global2local(edgeTarget);//TODO: maybe optimize this
-						if (localTarget != nIndex && !localPreserved[localTarget]) {
+						if (localTarget != scai::invalidIndex && !localPreserved[localTarget]) {
 							localTarget = localMatchingPartner[localTarget];
 							edgeTarget = rIndex[localTarget];
 						}
@@ -346,8 +347,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
             //scai::lama::CSRStorage<ValueType> localStorage(1, comm->getSize(), numNeighbors, ia, ja, values);;
             LArray<IndexType> lJA(newJA.size(), newJA.data());
             LArray<ValueType> lValues(newValues.size(), newValues.data());
-            CSRStorage<ValueType> storage(localN, globalN, newValues.size(), newIA, lJA, lValues );
-            graph.swapLocalStorage(storage);
+            graph.getLocalStorage() = CSRStorage<ValueType>(localN, globalN, std::move( newIA ), std::move( lJA ), std::move( lValues ));
         }
     }
 
@@ -357,7 +357,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
     DenseVector<IndexType> distPreserved(blockDist, preserved);
     DenseVector<IndexType> blockFineToCoarse = computeGlobalPrefixSum(distPreserved, IndexType(-1) );
-    const IndexType newGlobalN = blockFineToCoarse.max().Scalar::getValue<IndexType>() + 1;
+    const IndexType newGlobalN = blockFineToCoarse.max() + 1;
     fineToCoarse = DenseVector<IndexType>(distPtr, blockFineToCoarse.getLocalValues());
     const IndexType newLocalN = preserved.sum();
 
@@ -371,7 +371,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
         }
     }
 
-    assert(fineToCoarse.max().Scalar::getValue<IndexType>() + 1 == newGlobalN);
+    assert(fineToCoarse.max() + 1 == newGlobalN);
     assert(newGlobalN <= globalN);
     assert(newGlobalN == comm->sum(newLocalN));
     SCAI_REGION_END("MultiLevel.coarsen.newGlobalIndices")
@@ -412,12 +412,12 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
                     //only need to reroute nonlocal edges
                     IndexType localNeighbor = distPtr->global2local(ja[j]);
 
-                    if (localNeighbor != nIndex) {
+                    if (localNeighbor != scai::invalidIndex) {
                         assert(outgoingEdges.count(rFineToCoarse[localNeighbor]) == 0);
                         outgoingEdges[rFineToCoarse[localNeighbor]] = values[j];
                     } else {
                         IndexType haloIndex = halo.global2halo(ja[j]);
-                        assert(haloIndex != nIndex);
+                        assert(haloIndex != scai::invalidIndex);
                         if (outgoingEdges.count(rHalo[haloIndex]) == 0)  outgoingEdges[rHalo[haloIndex]] = 0;
                         outgoingEdges[rHalo[haloIndex]] += values[j];
                     }
@@ -456,10 +456,14 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     const scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(newGlobalN, myGlobalIndices, comm));
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(newGlobalN));
 
-    CSRStorage<ValueType> storage;
-    storage.setCSRDataSwap(newLocalN, newGlobalN, localEdgeCount, newIA, csrJA, csrValues, scai::hmemo::ContextPtr());
-    coarseGraph = CSRSparseMatrix<ValueType>(newDist, noDist);
-    coarseGraph.swapLocalStorage(storage);
+    // CSRStorage<ValueType> storage;
+    // storage.setCSRDataSwap(newLocalN, newGlobalN, localEdgeCount, newIA, csrJA, csrValues, scai::hmemo::ContextPtr());
+    // coarseGraph = CSRSparseMatrix<ValueType>(newDist, noDist);
+    // coarseGraph.swapLocalStorage(storage);
+
+    CSRStorage<ValueType> storage( newLocalN, newGlobalN, std::move(newIA), std::move(csrJA), std::move(csrValues) );
+    coarseGraph = CSRSparseMatrix<ValueType>( newDist, std::move( storage ) );
+
  }//---------------------------------------------------------------------------------------
  
 template<typename IndexType, typename ValueType>
@@ -472,7 +476,7 @@ DenseVector<T> MultiLevel<IndexType, ValueType>::computeGlobalPrefixSum(const De
 
 	//first, check that the input is some block distribution
 	const IndexType localN = input.getDistributionPtr()->getBlockDistributionSize();
-    if (localN == nIndex) {
+    if (localN == scai::invalidIndex) {
     	throw std::logic_error("Global Prefix sum only implemented for block distribution.");
     }
 
@@ -585,7 +589,7 @@ scai::dmemo::DistributionPtr MultiLevel<IndexType, ValueType>::projectToFine(sca
 template<typename IndexType, typename ValueType>
 scai::dmemo::DistributionPtr MultiLevel<IndexType, ValueType>::projectToCoarse(const DenseVector<IndexType>& fineToCoarse) {
 	SCAI_REGION("MultiLevel.projectToCoarse.distribution");
-	const IndexType newGlobalN = fineToCoarse.max().Scalar::getValue<IndexType>() +1;
+	const IndexType newGlobalN = fineToCoarse.max() + 1;
 	scai::dmemo::DistributionPtr fineDist = fineToCoarse.getDistributionPtr();
 	const IndexType fineLocalN = fineDist->getLocalSize();
 
@@ -710,7 +714,7 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
         const IndexType endCols = ia[localNode+1];
         for (IndexType j = ia[localNode]; j < endCols; j++) {
         	IndexType localNeighbor = distPtr->global2local(ja[j]);
-        	if (localNeighbor != nIndex && localNeighbor != localNode && !matched[localNeighbor]) {
+        	if (localNeighbor != scai::invalidIndex && localNeighbor != localNode && !matched[localNeighbor]) {
         		//neighbor is local and unmatched, possible partner
         		ValueType thisEdgeRating = values[j]*values[j]/(rLocalNodeWeights[localNode]*rLocalNodeWeights[localNeighbor]);
         		if (bestTarget < 0 ||  thisEdgeRating > maxEdgeRating) {
@@ -728,7 +732,7 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
 			// and should be matched with -localNode-.
 			// So, actually, globalNgbr is also local....
 			IndexType localNgbr = distPtr->global2local(globalNgbr);
-			assert(localNgbr != nIndex);
+			assert(localNgbr != scai::invalidIndex);
             //TODO: search neighbors for the heaviest edge
 			matching.push_back( std::pair<IndexType,IndexType> (localNode, localNgbr) );
 
@@ -1035,11 +1039,10 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
     }
     
     scai::lama::CSRStorage<ValueType> pixelStorage;
-    pixelStorage.setCSRData( cubeSize, cubeSize, nnzValues, pixelIA, pixelJA, pixelValues);
-    
 
-    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( cubeSize) );
-    scai::lama::CSRSparseMatrix<ValueType> pixelGraph( pixelStorage, noDistPointer, noDistPointer);
+    pixelStorage.setCSRData( cubeSize, cubeSize, pixelIA, pixelJA, pixelValues);
+    
+    scai::lama::CSRSparseMatrix<ValueType> pixelGraph( std::move( pixelStorage ) );
 
     SCAI_ASSERT_DEBUG( pixelGraph.isConsistent(), pixelGraph << ": matrix is not consistent." )
  

@@ -179,7 +179,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     }
 
     // TODO: try to avoid that, probably not needed
-    ValueType totalWeight = nodeWeights.sum().scai::lama::Scalar::getValue<ValueType>();
+    ValueType totalWeight = nodeWeights.sum();
     ValueType averageWeight = totalWeight/k;
 
     bBox.weight = totalWeight;
@@ -497,7 +497,7 @@ PRINT( sqrtK << " _ " << intSqrtK );
     }
 
     // TODO: try to avoid that
-    ValueType totalWeight = nodeWeights.sum().scai::lama::Scalar::getValue<ValueType>();
+    ValueType totalWeight = nodeWeights.sum();
     ValueType averageWeight = totalWeight/k;
 
     bBox.weight = totalWeight;
@@ -1105,10 +1105,9 @@ scai::lama::CSRSparseMatrix<ValueType> MultiSection<IndexType, ValueType>::getBl
     const IndexType numLeaves = allLeaves.size();
     SCAI_ASSERT_EQ_ERROR( numLeaves, treeRoot->getNumLeaves() , "Number of leaves is wrong");
 
-    scai::lama::CSRSparseMatrix<ValueType> ret( numLeaves, numLeaves );
     
     //TODO: has size k^2, change that to save memory and time
-    scai::common::scoped_array<ValueType> rawArray( new ValueType[ numLeaves*numLeaves ] );
+    std::unique_ptr<ValueType[]> rawArray( new ValueType[ numLeaves*numLeaves ] );
     
     for(IndexType l=0; l<numLeaves; l++){
         for(IndexType l2=0; l2<numLeaves; l2++){
@@ -1123,6 +1122,8 @@ scai::lama::CSRSparseMatrix<ValueType> MultiSection<IndexType, ValueType>::getBl
             }
         }
     }
+
+    scai::lama::CSRSparseMatrix<ValueType> ret;
     ret.setRawDenseData( numLeaves, numLeaves, rawArray.get() );
     return ret;
 }

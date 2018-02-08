@@ -9,8 +9,6 @@
 #include "SpectralPartition.h"
 #include "GraphUtils.h"
 
-using scai::lama::Scalar;
-
 namespace ITI {
 
 
@@ -75,7 +73,7 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
     
     // TODO: change to localPixelPartition( numPixels, k-1); so that the last part get the remaining pixels (if any)
     // get local partition of the pixeled graph
-    DenseVector<IndexType> localPixelPartition( numPixels, -1);
+    auto localPixelPartition = scai::lama::fill<DenseVector<IndexType>>( numPixels, -1);
     IndexType averageBlockSize = globalN/k +1;
     IndexType serialPixelInd =0;
     
@@ -99,7 +97,7 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
             if(serialPixelInd >= numPixels){
                 if(block != k-1){
                     PRINT("Pixels finished but still have blocks that will be empty: current block is "<< block << " and k= "<< k << std::endl << "This should not happen. Exiting...");
-                    return DenseVector<IndexType>(inputDist, -1);
+                    return scai::lama::fill<DenseVector<IndexType>>(inputDist, -1);
                 }
                 break;
             }
@@ -271,12 +269,13 @@ scai::lama::CSRSparseMatrix<ValueType> SpectralPartition<IndexType, ValueType>::
         SCAI_ASSERT_EQ_ERROR(rLaplacianIA[ rLaplacianIA.size()-1] , laplacianJA.size(), "Wrong sizes." );
     }
     
-    scai::lama::CSRStorage<ValueType> resultStorage( localN, globalN, laplacianNnzValues, laplacianIA, laplacianJA, laplacianValues);
+    scai::lama::CSRStorage<ValueType> resultStorage( localN, globalN, laplacianIA, laplacianJA, laplacianValues);
     
-    scai::lama::CSRSparseMatrix<ValueType> result(adjM.getRowDistributionPtr() , adjM.getColDistributionPtr() );
-    result.swapLocalStorage( resultStorage );
-    
-    return result;
+    // scai::lama::CSRSparseMatrix<ValueType> result(adjM.getRowDistributionPtr() , adjM.getColDistributionPtr() );
+    // result.swapLocalStorage( resultStorage );
+    // return result;
+
+    return scai::lama::CSRSparseMatrix<ValueType>( adjM.getRowDistributionPtr(), std::move(resultStorage) );
 
 }
 //---------------------------------------------------------------------------------------
@@ -293,22 +292,22 @@ scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getF
     // set u=[ 1+sqrt(n), 1, 1, 1, ... ]
     ValueType n12 = scai::common::Math::sqrt( ValueType( globalN ));
     
-    scai::lama::DenseVector<ValueType> u( laplacian.getRowDistributionPtr(), 1);
+    auto u = scai::lama::fill<scai::lama::DenseVector<ValueType>>( laplacian.getRowDistributionPtr(), 1);
     u[0] = n12 + 1;
     
-    scai::lama::Scalar alpha= globalN + n12;
+    ValueType alpha= globalN + n12;
     
     // set h= L*u/alpha
-    scai::lama::DenseVector<ValueType> h( laplacian*u );
+    auto h = scai::lama::eval<scai::lama::DenseVector<ValueType>>( laplacian*u );
     h /= alpha;
     
     // set v= h - gamma*u/2
-    scai::lama::Scalar gamma= u.dotProduct(h)/ alpha * 0.5;
-    scai::lama::DenseVector<ValueType> v(h - gamma*u);
+    ValueType gamma= u.dotProduct(h)/ alpha * 0.5;
+    auto v = scai::lama::eval<scai::lama::DenseVector<ValueType>>(h - gamma*u);
     
     scai::lama::DenseVector<ValueType> r(u); r[0]= 0.0;
     scai::lama::DenseVector<ValueType> s(v); s[0]= 0.0;
-    scai::lama::DenseVector<ValueType> t( laplacian.getRowDistributionPtr(), 1.0);
+    auto t = scai::lama::fill<scai::lama::DenseVector<ValueType>>( laplacian.getRowDistributionPtr(), 1.0);
     
     scai::lama::DenseVector<ValueType> y;
     scai::lama::DenseVector<ValueType> diff;
@@ -317,8 +316,12 @@ scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getF
     scai::lama::DenseVector<ValueType> z(t);
     
     IndexType kmax = 220;        // maximal number of iterations
-    Scalar    eps  = 1e-7;       // accuracy for maxNorm
-    scai::lama::Scalar lambda = 0.0;   // the eigenvalue (?) TODO: make sure
+    ValueType eps  = 1e-7;       // accuracy for maxNorm
+    ValueType lambda = 0.0;   // the eigenvalue (?) TODO: make sure
+
+    // temporary vector outside of loop for reuse, avoids alloc/dealloc
+    scai::lama::DenseVector<ValueType> res;
+    scai::lama::DenseVector<ValueType> x;
     
     for(IndexType k=0; k<kmax; k++){
         // normalize t
@@ -331,7 +334,7 @@ scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getF
         
         lambda = t.dotProduct( y );
         diff = y - lambda * t;
-        Scalar diffNorm = diff.maxNorm();
+        ValueType  diffNorm = diff.maxNorm();
         
         if( diffNorm<eps){
             break;
@@ -339,44 +342,44 @@ scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getF
         
         //solve
         //set res
-        scai::lama::DenseVector<ValueType> res ( t- laplacian*z );
+        res = t - laplacian * z;
         res += s.dotProduct(z) * r;
         res += r.dotProduct(z) * s;
         res[0] = 0.0;
         
         scai::lama::DenseVector<ValueType> d(res);
         
-        scai::lama::Scalar rOld = res.dotProduct( res );
-        scai::lama::L2Norm norm;
-        scai::lama::Scalar rNorm = norm(res);
+        ValueType rOld  = res.dotProduct( res );
+        ValueType rNorm = res.l2Norm();
         
         IndexType maxIter= 100;
         
+
         for(IndexType kk=0; kk<maxIter and rNorm>eps; kk++){
-            scai::lama::DenseVector<ValueType> x( laplacian*d );
+            x = laplacian*d;
             
             x -= s.dotProduct(d) * r;
             x -= r.dotProduct(d) * s;
             x[0] = 0.0;
             
-            scai::lama::Scalar tmpSc = rOld/ d.dotProduct(x);
+            ValueType tmpSc = rOld/ d.dotProduct(x);
             z = z + tmpSc*d;
             res = res - tmpSc*x;
-            scai::lama::Scalar rNew = res.dotProduct(res);
-            scai::lama::Scalar beta = rNew/ rOld;
+            ValueType rNew = res.dotProduct(res);
+            ValueType beta = rNew/ rOld;
             d = res + beta*d;
             rOld = rNew;
-            rNorm = norm( res );
+            rNorm = res.l2Norm();
         }
       
         t = z;
     }
  
     t[0] = 0.0;
-    scai::lama::Scalar beta = u.dotProduct(t) / alpha;
+    ValueType beta = u.dotProduct(t) / alpha;
     t = t- beta*u;
     
-    eigenvalue = lambda.Scalar::getValue<ValueType>();
+    eigenvalue = lambda;
     
     return t;
 }
