@@ -549,23 +549,23 @@ scai::dmemo::DistributionPtr MultiLevel<IndexType, ValueType>::projectToFine(sca
 	for (IndexType i = 0; i < sendIndices.size(); i++) {
 		std::copy(sendIndices[i].begin(), sendIndices[i].end(), std::back_inserter(flatIndexVector));
 	}
-
+	
 	assert(flatIndexVector.size() == fineLocalN);
-        
-        scai::dmemo::CommunicationPlan sendPlan;
-        
-        sendPlan.allocate( quantities.data(), comm->getSize() );
-        
-        assert(sendPlan.totalQuantity() == fineLocalN);
-        
-        scai::dmemo::CommunicationPlan recvPlan;
-        
+	
+	scai::dmemo::CommunicationPlan sendPlan;
+	
+	sendPlan.allocate( quantities.data(), comm->getSize() );
+	
+	assert(sendPlan.totalQuantity() == fineLocalN);
+	
+	scai::dmemo::CommunicationPlan recvPlan;
+	
 	recvPlan.allocateTranspose( sendPlan, *comm );
-
+	
 	scai::utilskernel::LArray<IndexType> newValues;
-
+	
 	IndexType newLocalSize = recvPlan.totalQuantity();
-
+	
 	{
             scai::hmemo::WriteOnlyAccess<IndexType> recvVals( newValues, newLocalSize );
             comm->exchangeByPlan( recvVals.get(), recvPlan, flatIndexVector.data(), sendPlan );

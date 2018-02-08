@@ -154,7 +154,7 @@ struct Metrics{
 		//timeSpMV = getSpMVtime( graph, partition, numIter)/numIter;
 		
 		
-		//timeComm = getCommScheduleTime( graph, partition, numIter)/numIter;
+		timeComm = getCommScheduleTime( graph, partition, numIter)/numIter;
     }
     
     
@@ -206,7 +206,7 @@ struct Metrics{
 		scai::lama::DenseVector<ValueType> x ( graph.getColDistributionPtr(), 1.0 );
 		scai::lama::DenseVector<ValueType> y ( graph.getRowDistributionPtr(), 0.0 );
 		graph.setCommunicationKind( scai::lama::Matrix::SyncKind::SYNCHRONOUS );
-		
+PRINT( x.getLocalValues().size() << " __ " <<  y.getLocalValues().size() );
 		comm->synchronize();
 		// perfom the actual multiplication
 		std::chrono::time_point<std::chrono::system_clock> beforeSpMVTime = std::chrono::system_clock::now();
@@ -259,9 +259,11 @@ struct Metrics{
 		ValueType imbalance = ValueType( maxLocalN - optSize)/optSize;
 		PRINT0("minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", imbalance= " << imbalance);
 		
-		const scai::dmemo::CommunicationPlan& sendPlan  = graph.getHalo().getProvidesPlan();
-		const scai::dmemo::CommunicationPlan& recvPlan  = graph.getHalo().getRequiredPlan();
+		const scai::dmemo::Halo& matrixHalo = graph.getHalo();
+		const scai::dmemo::CommunicationPlan& sendPlan  = matrixHalo.getProvidesPlan();
+		const scai::dmemo::CommunicationPlan& recvPlan  = matrixHalo.getRequiredPlan();
 		
+PRINT(*comm << ": " << 	sendPlan.size() << " ++ " << sendPlan << " ___ " << recvPlan);
 		scai::hmemo::HArray<ValueType> sendData( sendPlan.size(), 1.0 );
 		scai::hmemo::HArray<ValueType> recvData;
 		
