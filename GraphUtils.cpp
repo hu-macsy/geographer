@@ -16,7 +16,6 @@
 #include <scai/dmemo/HaloBuilder.hpp>
 
 #include "GraphUtils.h"
-
 #include "RBC/Sort/SQuick.hpp"
 
 
@@ -1060,7 +1059,7 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueTy
 //-----------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vector<std::set<IndexType>>& adjList) {
+scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>>& adjList) {
     
     IndexType N = adjList.size();
 
@@ -1235,30 +1234,53 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType thisPE = comm->getRank();
-	const IndexType localM = edgeList.size();
-	
+	IndexType localM = edgeList.size();
+		
     int typesize;
 	MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
 	assert(typesize == sizeof(sort_pair));
 	
+	//-------------------------------------------------------------------
+	//
+	// add edges to the local_pairs vector for sorting
+	//
+	
 	//TODO: not filling with dummy values, each localPairs can have different sizes
-	std::vector<sort_pair> localPairs(localM);
+	std::vector<sort_pair> localPairs(localM*2);
+	
+	//TODO: if nothing better comes up, duplicate and reverse all edges before SortingDatatype
+	//		to ensure matrix will be symmetric
 	
 	IndexType maxLocalVertex=0, minLocalVertex=std::numeric_limits<IndexType>::max();
+	
 	for(IndexType i=0; i<localM; i++){
-		IndexType v = edgeList[i].first;
-		localPairs[i].value = v;
-		localPairs[i].index = edgeList[i].second;
-		if( v<minLocalVertex ){
-			minLocalVertex = v;
+		IndexType v1 = edgeList[i].first;
+		IndexType v2 = edgeList[i].second;
+		localPairs[2*i].value = v1;
+		localPairs[2*i].index = v2;
+		
+		//insert also reversed edge to keep matric symmetric
+		localPairs[2*i+1].value = v2;
+		localPairs[2*i+1].index = v1;
+		
+		IndexType minV = std::min(v1,v2);
+		IndexType maxV = std::max(v1,v2);
+		
+		if( minV<minLocalVertex ){
+			minLocalVertex = minV;
 		}
-		if( v>maxLocalVertex ){
-			maxLocalVertex = v;
+		if( maxV>maxLocalVertex ){
+			maxLocalVertex = maxV;
 		}
 	}
-	PRINT(thisPE << ": vertices range from "<< minLocalVertex << " to " << maxLocalVertex);
+	//PRINT(thisPE << ": vertices range from "<< minLocalVertex << " to " << maxLocalVertex);
 	
+	const IndexType N = comm->max( maxLocalVertex );
+	localM *=2 ;	// for the duplicated edges
+	
+	//
 	// globally sort edges
+	//
     std::chrono::time_point<std::chrono::system_clock> beforeSort =  std::chrono::system_clock::now();
     MPI_Comm mpi_comm = MPI_COMM_WORLD;
 	SQuick::sort<sort_pair>(mpi_comm, localPairs, -1);
@@ -1267,24 +1289,164 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	ValueType sortTime = comm->max( sortTime );
 	PRINT0("time to sort edges: " << sortTime);
 	
-	PRINT(thisPE << ": "<< localPairs.back().value << " - " << localPairs.back().index );
+	//PRINT(thisPE << ": "<< localPairs.back().value << " - " << localPairs.back().index << " in total " <<  localPairs.size() );
 	
-	// make sure that all edges for the first and last vertices are here
+	//-------------------------------------------------------------------
+	//
+	// communicate so each PE have all the edges of the last node
+	// each PE just collect the edges of it last node and sends them to its +1 neighbor
+	//
 	
-	// if thisPe==comm->getSize() do nothing
-	// else 
-	// 		communicate with your +1
+	// get vertex with max local id
+	IndexType newMaxLocalVertex = localPairs.back().value;
 	
-	/* if( minLocalVertex(thisPE) == maxLocalVertex(thisPE-1) ){
-	 * 		exchange the edges of this vertex
-	 * 	}
-	 * */
-	for(IndexType i=0; i<localM; i++){
-		IndexType v1 = localPairs[i].value;
-		IndexType v2 = localPairs[i].index;
-		PRINT(thisPE << ": edge " << v1 << " - " << v2 );
+	//TODO: communicate first to see if you need eo send. now, just send to your +1 the your last vertex
+	// store the edges you must send
+	std::vector<IndexType> sendEdgeList;
+	
+	IndexType vertex = newMaxLocalVertex;
+	IndexType numEdgesToRemove = 0;
+	for( std::vector<sort_pair>::reverse_iterator edgeIt = localPairs.rbegin(); edgeIt->value==newMaxLocalVertex; ++edgeIt){
+		sendEdgeList.push_back( edgeIt->value);
+		sendEdgeList.push_back( edgeIt->index);
+		++numEdgesToRemove;
 	}
-	return scai::lama::CSRSparseMatrix<ValueType>( maxLocalVertex,  maxLocalVertex);
+	
+	if( thisPE!= comm->getSize()-1){
+		for( int i=0; i<numEdgesToRemove; i++ ){
+			localPairs.pop_back();
+		}
+	}
+
+    // make communication plan
+    std::vector<IndexType> quantities(comm->getSize(), 0);
+		
+	if( thisPE==comm->getSize()-1 ){	//the last PE will only receive
+		// do nothing, quantities is 0 for all
+	}else{
+		quantities[thisPE+1] = sendEdgeList.size();		// will only send to your +1 neighbor
+	}
+	
+	scai::dmemo::CommunicationPlan sendPlan( quantities.data(), comm->getSize() );
+	
+	scai::dmemo::CommunicationPlan recvPlan;
+	recvPlan.allocateTranspose( sendPlan, *comm );
+	
+	scai::utilskernel::LArray<IndexType> recvEdges;		// the edges to be received
+	IndexType recvEdgesSize = recvPlan.totalQuantity();
+	//PRINT(thisPE <<": received  " << recvEdgesSize << " edges");
+
+	{
+		scai::hmemo::WriteOnlyAccess<IndexType> recvVals( recvEdges, recvEdgesSize );
+		comm->exchangeByPlan( recvVals.get(), recvPlan, sendEdgeList.data(), sendPlan );
+	}
+
+	// insert all the received edges to your local edges
+	for( IndexType i=0; i<recvEdgesSize; i+=2){
+		sort_pair sp;
+		sp.value = recvEdges[i];
+		sp.index = recvEdges[i+1];
+		localPairs.insert( localPairs.begin(), sp);
+		//PRINT( thisPE << ": recved edge: "<< recvEdges[i] << " - " << recvEdges[i+1] );
+	}
+
+	IndexType numEdges = localPairs.size() ;
+	
+	//
+	//remove duplicates
+	//
+	localPairs.erase(unique(localPairs.begin(), localPairs.end(), [](sort_pair p1, sort_pair p2) {
+		if( (p1.index==p2.index) and (p1.value==p2.value)) 
+			return true;
+		else
+			return false;
+	}), localPairs.end() );
+	//PRINT( thisPE <<": removed " << numEdges - localPairs.size() << " duplicate edges" );
+
+	//
+	// check than all is correct
+	//
+	newMaxLocalVertex = localPairs.back().value;
+	IndexType newMinLocalVertex = localPairs[0].value;
+	IndexType checkSum = newMaxLocalVertex - newMinLocalVertex;
+	IndexType globCheckSum = comm->sum( checkSum ) + comm->getSize() -1;
+
+	SCAI_ASSERT_EQ_ERROR( globCheckSum, N , "Checksum mismatch, maybe some node id missing." );
+	
+	//PRINT( *comm << ": from "<< newMinLocalVertex << " to " << newMaxLocalVertex );
+	
+	localM = localPairs.size();					// after sorting, exchange and removing duplicates
+	
+	IndexType localN = newMaxLocalVertex-newMinLocalVertex+1;	
+	IndexType globalN = comm->sum( localN );	
+	IndexType globalM = comm->sum( localM );
+	//PRINT(thisPE << ": N: localN, global= " << localN << ", " << globalN << ", \tM: local, global= " << localM  << ", " << globalM );
+
+	//
+	// create local indices and general distribution
+	//
+	scai::hmemo::HArray<IndexType> localIndices( localN , -1);
+	IndexType index = 1;
+	
+	{
+		scai::hmemo::WriteOnlyAccess<IndexType> wLocalIndices(localIndices);
+		IndexType oldV1 = localPairs[0].value;
+		wLocalIndices[0] = oldV1;
+		
+		for(IndexType i=1; i<localPairs.size(); i++){
+			IndexType newV1 = localPairs[i].value;
+			if( newV1!=wLocalIndices[index-1] ){
+				wLocalIndices[index++] = newV1;	
+				SCAI_ASSERT_LE_ERROR( index, localN,"Too large index for localIndices array.");
+			}
+			// newV1-oldV1 should be either 0 or 1
+			SCAI_ASSERT_LE_ERROR( newV1-oldV1, 1, "Vertex with id " << newV1-1 <<" is missing. Error in edge list, vertex should be contunious");
+			oldV1 = newV1;
+		}
+		SCAI_ASSERT_NE_ERROR( wLocalIndices[localN-1], -1, "localIndices array not full");
+	}
+	
+	const scai::dmemo::DistributionPtr genDist(new scai::dmemo::GeneralDistribution(globalN, localIndices, comm));
+	
+	//-------------------------------------------------------------------
+	//
+	// turn the local edge list to a CSRSparseMatrix
+	//
+	
+	// the CSRSparseMatrix vectors
+    std::vector<IndexType> ia(localN+1);
+    ia[0] = 0;
+	index = 0;
+    std::vector<IndexType> ja;
+	
+	for( IndexType e=0; e<localM; ){
+		IndexType v1 = localPairs[e].value;		//the vertices of this edge
+		IndexType v1Degree = 0;
+		// for all edges of v1
+		for( std::vector<sort_pair>::iterator edgeIt = localPairs.begin()+e; edgeIt->value==v1 and edgeIt!=localPairs.end(); ++edgeIt){
+			ja.push_back( edgeIt->index );	// the neighbor of v1
+			//PRINT( thisPE << ": " << v1 << " -- " << 	edgeIt->index );
+			++v1Degree;
+			++e;
+		}
+		index++;
+		//TODO: can remove the assertion if we do not initialise ia and use push_back
+		SCAI_ASSERT_LE_ERROR( index, localN, thisPE << ": Wrong ia size and localN.");
+		ia[index] = ia[index-1] + v1Degree;
+	}
+	SCAI_ASSERT_EQ_ERROR( ja.size(), localM, thisPE << ": Wrong ja size and localM.");
+	std::vector<IndexType> values(ja.size(), 1);
+	
+	//assign/assemble the matrix
+    scai::lama::CSRStorage<ValueType> myStorage ( localN, globalN, ja.size(), 
+			scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
+    		scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
+    		scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
+	
+	const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
+    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
+	
+	return scai::lama::CSRSparseMatrix<ValueType>(myStorage, genDist, noDist);
 	
 }
 
@@ -1308,7 +1470,7 @@ template scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama:
 template IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 template  std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 template scai::lama::CSRSparseMatrix<ValueType> getPEGraph<IndexType,ValueType>( const scai::lama::CSRSparseMatrix<ValueType> &adjM);
-template scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vector<std::set<IndexType>> &adjList);
+template scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>> &adjList);
 template scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList );
 template scai::lama::CSRSparseMatrix<ValueType> getLaplacian<IndexType,ValueType>( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 template scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType>& adjM);

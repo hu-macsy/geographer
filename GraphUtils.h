@@ -12,6 +12,10 @@
 #include <tuple>
 
 #include <scai/lama/matrix/CSRSparseMatrix.hpp>
+#include <scai/dmemo/Distribution.hpp>
+#include <scai/dmemo/BlockDistribution.hpp>
+#include <scai/dmemo/GeneralDistribution.hpp>
+
 #ifndef SETTINGS_H
 #include "Settings.h"
 #endif
@@ -171,7 +175,7 @@ template <typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getLaplacian( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vector<std::set<IndexType>>& adjList);
+scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>>& adjList);
 
 /** Get an vector of the local edges, sorts the edges and constructs the local part of CSR sparse matrix.
  * @param[in,out] edgeList The local list of edges for this PE. The edge list is sorted and redistributed also.

@@ -621,11 +621,11 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
             return FileIO<IndexType, ValueType>::readGraphMatrixMarket(filename);
         }
         
-        // if file has a .bgf ending then is a binary file
-        std::string ending = filename.substr( filename.size()-3,  filename.size() );
-        if( ending == "bgf" or format==Format::BINARY){
-            return readGraphBinary( filename );
-        }
+	// if file has a .bgf ending then is a binary file
+	std::string ending = filename.substr( filename.size()-3,  filename.size() );
+	if( ending == "bgf" or format==Format::BINARY){
+		return readGraphBinary( filename );
+	}
         
 	if (!(format == Format::METIS or format == Format::AUTO)) {
 		throw std::logic_error("Format not yet implemented.");
@@ -648,8 +648,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         
 	//define variables
 	std::string line;
-	//IndexType globalN, globalM;
-        ULLI globalN, globalM;
+	ULLI globalN, globalM;
 	IndexType numberNodeWeights = 0;
 	bool hasEdgeWeights = false;
 	std::vector<ValueType> edgeWeights;//possibly of size 0
@@ -998,7 +997,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     //
     
     scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, ja.size(),   
-                scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
+			scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
     		scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
     		scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
     
@@ -1136,9 +1135,41 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 	
 	typedef unsigned long long int ULLI;     
 	
-    std::ifstream file(filename);
-    
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	const IndexType thisPE = comm->getRank();
+	
+	std::string thisFileName = filename+std::to_string(thisPE);
+	std::ifstream file( thisFileName );
+	
+	// open thisFile and store edges in the edge list
+	std::vector< std::pair<IndexType, IndexType>> edgeList;
+	
+	if (file.fail()) {
+		PRINT("Read from multiple files, one file per PE");
+		throw std::runtime_error("Reading graph from " + filename + " failed for PE" + std::to_string(thisPE) );
+	}else{
+		if( comm->getRank()==0 ){
+			std::cout<< "Reading from file "<< filename << std::endl;
+		}
+	}
+	
+	std::string line;
+    std::string item;
+	
+	while (std::getline(file, line)){
+		std::stringstream ss( line );
+		
+		IndexType v1 , v2;
+		ss >> v1;
+		ss >> v2;
+
+		edgeList.push_back( std::make_pair( v1, v2) );
+		
+	}
+	
+	scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils::edgeList2CSR<IndexType, ValueType>( edgeList );
+    
+    return graph;
 	
 }
 //-------------------------------------------------------------------------------------------------
@@ -1690,7 +1721,7 @@ PRINT( N << " _ " << numFaces << ", numEdges= " << numEdges );
     // convert adjacency list to CSR matrix
     //
     
-    graph = GraphUtils::getCSRmatrixNoEgdeWeights<IndexType, ValueType>( adjList );
+    graph = GraphUtils::getCSRmatrixFromAdjList_NoEgdeWeights<IndexType, ValueType>( adjList );
     SCAI_ASSERT_EQ_ERROR( graph.getNumColumns(), N, "Wrong number of columns");
     SCAI_ASSERT_EQ_ERROR( graph.getNumRows(), N, "Wrong number of rows");
     if( numEdges!=0 ){
@@ -1778,7 +1809,7 @@ void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix
 		// convert adjacency list to CSR matrix
 		//
 		
-		graph = GraphUtils::getCSRmatrixNoEgdeWeights<IndexType, ValueType>( adjList );
+		graph = GraphUtils::getCSRmatrixFromAdjList_NoEgdeWeights<IndexType, ValueType>( adjList );
 	}
 	
     

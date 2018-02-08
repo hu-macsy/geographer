@@ -332,14 +332,17 @@ TEST_F (auxTest,testEdgeList2CSR){
 	srand( std::time(NULL)*thisPE );
 	
     for(int i=0; i<localM; i++){
-		IndexType v1 = i;
-		//IndexType v1 = (thisPE+numPEs/2)%numPEs;
+		//IndexType v1 = i;
+		IndexType v1 = (rand())%N;
 		IndexType v2 = (v1+rand())%N;
 		localEdgeList[i] = std::make_pair( v1, v2 );
-		PRINT(thisPE << ": inserting edge " << v1 << " - " << v2 );
+		//PRINT(thisPE << ": inserting edge " << v1 << " - " << v2 );
 	}
 	
 	scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils::edgeList2CSR<IndexType, ValueType>( localEdgeList );
+	
+	SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
+	EXPECT_TRUE( graph.checkSymmetry() );
 }
 //-----------------------------------------------------------------
 
