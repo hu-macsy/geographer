@@ -33,7 +33,7 @@ def addRelativePlot( exp, metricValues, metricName, toolNames, baseToolId, plotF
 		print("ERROR: tool ID given " +  str(baseToolId) +" is too big, must be < " + str(len(toolNames)) )
 		return -1;
 
-	plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel=ratio , legend style={at={(1.5,0.7)}}, xtick={")
+	plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel=ratio , legend style={at={(1.5,0.7)}}, xmode = log, log basis x= 2, xtick={")
 	for x in range(0, len(exp.k)-1 ):
 		if exp.k[x]!=-1:
 			plotF.write( str(exp.k[x]) +", ")
@@ -62,7 +62,10 @@ def addRelativePlot( exp, metricValues, metricName, toolNames, baseToolId, plotF
 		for i in range(0,len(thisToolMetrics[m])):
 			if thisToolMetrics[m][i]!=-1:
 				# get the relative value, divide by the base tool metric
-				plotF.write("("+str(exp.k[i])+", "+ str(thisToolMetrics[m][i]/metricValues[baseToolId][m][i]) + ")\n")	#
+				if metricValues[baseToolId][m][i] == -1:
+					plotF.write("("+str(exp.k[i])+", nan)\n")
+				else:
+					plotF.write("("+str(exp.k[i])+", "+ str(thisToolMetrics[m][i]/metricValues[baseToolId][m][i]) + ")\n")	#
 				#print( metricValues[baseToolId][m][i] )
 			else:
 				plotF.write("("+str(exp.k[i])+", nan)\n")
@@ -189,7 +192,7 @@ def createPlotsGeneric(exp, toolNames, metricNames, metricValues):
 		for m in range(0, numMetrics):
 			metricName = metricNames[m]
 			
-			plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel= "+ METRIC_VALUES[m] +", legend style={at={(1.5,0.7)}}, xtick={")
+			plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel= "+ METRIC_VALUES[m] +", legend style={at={(1.5,0.7)}},xmode = log, log basis x= 2, xtick={")
 			for x in range(0, len(exp.k)-1 ):
 				if exp.k[x]!=-1:							### changed index from i to x
 					plotF.write( str(exp.k[x]) +", ")

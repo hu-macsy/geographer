@@ -116,6 +116,7 @@ def submitGeographer(exp, version):
 		params += " --outFile="+ outPath
 		params += " --dimensions="+ exp.dimension
 		params += " --fileFormat="+ exp.fileFormat
+		#params += " --storeInfo=0"
 		#print(params)
 		
 		if not os.path.exists( executable):
@@ -180,7 +181,7 @@ def submitGeographer_noGather(exp, version):
 		commandString = executable + " --graphFile="+ exp.paths[i]+ params
 		
 		submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_k"+str(exp.k[i])+"_"+version+".cmd"
-		submitfile = createLLSubmitFile( os.path.join( toolsPath, "tmp"), submitFilename, commandString, "00:10:00", int(exp.k[i]) )
+		submitfile = createLLSubmitFile( os.path.join( toolsPath, "tmp"), submitFilename, commandString, "00:20:00", int(exp.k[i]) )
 		#print( submitfile )
 		call(["llsubmit", submitfile])
 		
