@@ -177,7 +177,7 @@ int main(int argc, char** argv) {
         SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
         SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
         
-        if(parMetisGeom or writeDebugCoordinates ){
+        if(parMetisGeom or settings.writeDebugCoordinates ){
             if (vm.count("fileFormat")) {
                 coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
             } else {
@@ -330,7 +330,7 @@ int main(int argc, char** argv) {
     IndexType localN= dist->getLocalSize();
     real_t *xyzLocal;
 
-    if( parMetisGeom or writeDebugCoordinates ){
+    if( parMetisGeom or settings.writeDebugCoordinates ){
         xyzLocal = new real_t[ ndims*localN ];
         
         std::vector<scai::utilskernel::LArray<ValueType>> localPartOfCoords( ndims );
@@ -439,7 +439,7 @@ int main(int argc, char** argv) {
     //
     delete[] xadj;
     delete[] adjncy;
-    if( parMetisGeom or writeDebugCoordinates ){
+    if( parMetisGeom or settings.writeDebugCoordinates ){
         delete[] xyzLocal;
     }
     
