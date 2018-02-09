@@ -62,7 +62,10 @@ def addRelativePlot( exp, metricValues, metricName, toolNames, baseToolId, plotF
 		for i in range(0,len(thisToolMetrics[m])):
 			if thisToolMetrics[m][i]!=-1:
 				# get the relative value, divide by the base tool metric
-				plotF.write("("+str(exp.k[i])+", "+ str(thisToolMetrics[m][i]/metricValues[baseToolId][m][i]) + ")\n")	#
+				if metricValues[baseToolId][m][i] == -1:
+					plotF.write("("+str(exp.k[i])+", nan)\n")
+				else:
+					plotF.write("("+str(exp.k[i])+", "+ str(thisToolMetrics[m][i]/metricValues[baseToolId][m][i]) + ")\n")	#
 				#print( metricValues[baseToolId][m][i] )
 			else:
 				plotF.write("("+str(exp.k[i])+", nan)\n")
