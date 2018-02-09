@@ -609,6 +609,10 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
             return readGraphBinary( filename );
         }
         
+        if( format==Format::EDGELISTDIST){
+			return readEdgeListDistributed( filename);
+		}
+        
 	std::vector<DenseVector<ValueType>> dummyWeightContainer;
 	return readGraph(filename, dummyWeightContainer, format);
 }
@@ -1132,6 +1136,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeListDistributed(const std::string filename){
     SCAI_REGION( "FileIO.readEdgeListDistributed" );
+	
+	PRINT0("About to read a distribute edge list");
 	
 	typedef unsigned long long int ULLI;     
 	
