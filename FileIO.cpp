@@ -1136,13 +1136,12 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeListDistributed(const std::string filename){
     SCAI_REGION( "FileIO.readEdgeListDistributed" );
-	
-	PRINT0("About to read a distribute edge list");
-	
+		
 	typedef unsigned long long int ULLI;     
 	
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType thisPE = comm->getRank();
+	PRINT0("About to read a distribute edge list");
 	
 	std::string thisFileName = filename+std::to_string(thisPE);
 	std::ifstream file( thisFileName );

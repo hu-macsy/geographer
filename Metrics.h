@@ -151,8 +151,7 @@ struct Metrics{
         
 		int numIter = 100;
 		timeSpMV = -1;
-		//timeSpMV = getSpMVtime( graph, partition, numIter)/numIter;
-		
+		timeSpMV = getSpMVtime( graph, partition, numIter)/numIter;
 		
 		timeComm = getCommScheduleTime( graph, partition, numIter)/numIter;
     }
@@ -163,6 +162,8 @@ struct Metrics{
 		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 		const IndexType N = graph.getNumRows();
 		
+		PRINT0("starting SpMV...");
+		
 		// the original row and  column distributions
 		const scai::dmemo::DistributionPtr initRowDistPtr = graph.getRowDistributionPtr();
 		const scai::dmemo::DistributionPtr initColDistPtr = graph.getColDistributionPtr();
@@ -172,12 +173,26 @@ struct Metrics{
 		
 		std::chrono::time_point<std::chrono::system_clock> beforeRedistribution = std::chrono::system_clock::now();
 		// redistribute graph according to partition distribution
-		graph.redistribute( distFromPartition, initColDistPtr);
+		//graph.redistribute( distFromPartition, initColDistPtr);
+		
 		std::chrono::duration<ValueType> redistributionTime =  std::chrono::system_clock::now() - beforeRedistribution;
 		
 		ValueType time = 0;
 		time = comm->max( redistributionTime.count() );
+		/*
+		std::chrono::time_point<std::chrono::system_clock> beforeLaplacian = std::chrono::system_clock::now();
+		// the laplacian has the same row and column distributios as the (now partitioned) graph
+		scai::lama::CSRSparseMatrix<ValueType> laplacian = ITI::GraphUtils::getLaplacian<IndexType, ValueType>( graph );
+		std::chrono::duration<ValueType> laplacianTime = std::chrono::system_clock::now() - beforeLaplacian;
+		time = comm->max(laplacianTime.count());
+		PRINT0("time to get the laplacian: " << time );
+		*/
+		
 		PRINT0("time to redistribute: " << time);
+		graph.redistribute( distFromPartition, distFromPartition);		
+		//laplacian.redistribute( distFromPartition, distFromPartition);		
+		//SCAI_ASSERT( laplacian.getRowDistributionPtr()->isEqual( graph.getRowDistribution() ), "Row distributions do not agree" );
+		//SCAI_ASSERT( laplacian.getColDistributionPtr()->isEqual( graph.getColDistribution() ), "Column distributions do not agree" );
 		
 		const IndexType localN = distFromPartition->getLocalSize();
 		SCAI_ASSERT_EQ_ERROR( localN, graph.getLocalNumRows(), "Distribution mismatch")
@@ -190,29 +205,17 @@ struct Metrics{
 		PRINT0("minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", imbalance= " << imbalance);
 		
 		// get the SpMV 
-		std::chrono::time_point<std::chrono::system_clock> beforeLaplacian = std::chrono::system_clock::now();
-		
-		// the laplacian has the same row and column distributios as the (now partitioned) graph
-		scai::lama::CSRSparseMatrix<ValueType> laplacian = ITI::GraphUtils::getLaplacian<IndexType, ValueType>( graph );
-		
-		SCAI_ASSERT( laplacian.getRowDistributionPtr()->isEqual( graph.getRowDistribution() ), "Row distributions do not agree" );
-		SCAI_ASSERT( laplacian.getColDistributionPtr()->isEqual( graph.getColDistribution() ), "Column distributions do not agree" );
-		
-		std::chrono::duration<ValueType> laplacianTime = std::chrono::system_clock::now() - beforeLaplacian;
-		time = comm->max(laplacianTime.count());
-		PRINT0("time to get the laplacian: " << time );
 		
 		// vector for multiplication
 		scai::lama::DenseVector<ValueType> x ( graph.getColDistributionPtr(), 1.0 );
 		scai::lama::DenseVector<ValueType> y ( graph.getRowDistributionPtr(), 0.0 );
 		graph.setCommunicationKind( scai::lama::Matrix::SyncKind::SYNCHRONOUS );
-PRINT( x.getLocalValues().size() << " __ " <<  y.getLocalValues().size() );
 		comm->synchronize();
 		// perfom the actual multiplication
 		std::chrono::time_point<std::chrono::system_clock> beforeSpMVTime = std::chrono::system_clock::now();
 		for(IndexType r=0; r<repeatTimes; r++){
-			y = laplacian *x +y;
-			//DenseVector<ValueType> result( graph * x );
+			//y = laplacian *x +y;
+			y = graph *x +y;
 		}
 		comm->synchronize();
 		std::chrono::duration<ValueType> SpMVTime = std::chrono::system_clock::now() - beforeSpMVTime;
@@ -233,6 +236,8 @@ PRINT( x.getLocalValues().size() << " __ " <<  y.getLocalValues().size() );
 		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 		const IndexType N = graph.getNumRows();
 		
+		PRINT0("starting comm shcedule...");
+		
 		// the original row and  column distributions
 		const scai::dmemo::DistributionPtr initRowDistPtr = graph.getRowDistributionPtr();
 		const scai::dmemo::DistributionPtr initColDistPtr = graph.getColDistributionPtr();
@@ -242,7 +247,8 @@ PRINT( x.getLocalValues().size() << " __ " <<  y.getLocalValues().size() );
 		
 		std::chrono::time_point<std::chrono::system_clock> beforeRedistribution = std::chrono::system_clock::now();
 		// redistribute graph according to partition distribution
-		graph.redistribute( distFromPartition, initColDistPtr);
+		//graph.redistribute( distFromPartition, initColDistPtr);
+		graph.redistribute( distFromPartition, distFromPartition);
 		std::chrono::duration<ValueType> redistributionTime =  std::chrono::system_clock::now() - beforeRedistribution;
 		
 		ValueType time = 0;
@@ -263,8 +269,8 @@ PRINT( x.getLocalValues().size() << " __ " <<  y.getLocalValues().size() );
 		const scai::dmemo::CommunicationPlan& sendPlan  = matrixHalo.getProvidesPlan();
 		const scai::dmemo::CommunicationPlan& recvPlan  = matrixHalo.getRequiredPlan();
 		
-PRINT(*comm << ": " << 	sendPlan.size() << " ++ " << sendPlan << " ___ " << recvPlan);
-		scai::hmemo::HArray<ValueType> sendData( sendPlan.size(), 1.0 );
+//PRINT(*comm << ": " << 	sendPlan.size() << " ++ " << sendPlan << " ___ " << recvPlan);
+		scai::hmemo::HArray<ValueType> sendData( sendPlan.totalQuantity(), 1.0 );
 		scai::hmemo::HArray<ValueType> recvData;
 		
 		comm->synchronize();
