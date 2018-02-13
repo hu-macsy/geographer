@@ -87,18 +87,30 @@ struct Metrics{
         }else if (maxBlockGraphDegree==0 ){
             out << " ### WARNING: possibly not all metrics calculated ###" << std::endl;
         }
-        //out << "times: input, migrAlgo , 1redistr , k-means , 2redistr , prelim, localRef, total  , metrics:  prel cut, cut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg  " << std::endl;
         out << "gather" << std::endl;
-        out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt timeSpMV" << std::endl;
 		
-        out << std::setprecision(3) << std::fixed;
-        out<<  "         "<< inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << " ,  "<< timeFinalPartition << " ,  \t "\
+        /*// more detailed output
+		 out << "times: input, migrAlgo , 1redistr , k-means , 2redistr , prelim, localRef, total  , metrics:  prel cut, cut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg  " << std::endl;
+		out << std::setprecision(3) << std::fixed;
+		out<<  "         "<< inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << " ,  "<< timeFinalPartition << " ,  \t "\
         << preliminaryCut << ",  "<< finalCut << ",  " << finalImbalance << ",    "  \
         << maxBoundaryNodes << ",  " << totalBoundaryNodes << ",    "  \
         << maxCommVolume << ",  " << totalCommVolume << ",    ";
         out << std::setprecision(6) << std::fixed;
         out << maxBorderNodesPercent << ",  " << avgBorderNodesPercent<< ",  " \
         << timeSpMV << std::endl;
+		*/
+        
+        out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm" << std::endl;
+		
+        out << std::setprecision(3) << std::fixed;
+		out<<  maxTimeKmeans << " , " << maxTimePreliminary << " , " << timeLocalRef << " , "<< timeFinalPartition << " , "\
+        << preliminaryCut << " , "<< finalCut << " , " << finalImbalance << " , "  \
+        << maxBoundaryNodes << " , " << totalBoundaryNodes << " , "  \
+        << maxCommVolume << " , " << totalCommVolume << " , ";
+        out << std::setprecision(6) << std::fixed;
+        out << maxBorderNodesPercent << " , " << avgBorderNodesPercent<< " , " \
+        << timeSpMV << " , " << timeComm << std::endl;
     }
     
     void getMetrics( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
@@ -188,11 +200,12 @@ struct Metrics{
 		PRINT0("time to get the laplacian: " << time );
 		*/
 		
-		PRINT0("time to redistribute: " << time);
+
 		graph.redistribute( distFromPartition, distFromPartition);		
 		//laplacian.redistribute( distFromPartition, distFromPartition);		
 		//SCAI_ASSERT( laplacian.getRowDistributionPtr()->isEqual( graph.getRowDistribution() ), "Row distributions do not agree" );
 		//SCAI_ASSERT( laplacian.getColDistributionPtr()->isEqual( graph.getColDistribution() ), "Column distributions do not agree" );
+		PRINT0("time to redistribute: " << time);		
 		
 		const IndexType localN = distFromPartition->getLocalSize();
 		SCAI_ASSERT_EQ_ERROR( localN, graph.getLocalNumRows(), "Distribution mismatch")
@@ -278,9 +291,10 @@ struct Metrics{
 		for ( IndexType i = 0; i < repeatTimes; ++i ){
 			comm->exchangeByPlan( recvData, recvPlan, sendData, sendPlan );
 		}
-		comm->synchronize();
+		//comm->synchronize();
 		std::chrono::duration<ValueType> commTime = std::chrono::system_clock::now() - beforeCommTime;
 		
+PRINT(*comm << ": "<< sendPlan );		
 		time = comm->max(commTime.count());
 		
 		ValueType minTime = comm->min( commTime.count() );
@@ -303,7 +317,7 @@ inline void printMetricsShort(struct Metrics metrics, std::ostream& out){
 	out << "date and time: " << std::ctime(&timeNow) << std::endl;
 	out << "numBlocks= " << metrics.numBlocks << std::endl;
 	out << "gather" << std::endl;
-	out << "timeTotal finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt timeSpMV" << std::endl;
+	out << "timeTotal finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm" << std::endl;
     out << metrics.timeFinalPartition<< " " \
 		<< metrics.finalCut << " "\
 		<< metrics.finalImbalance << " "\
@@ -314,7 +328,8 @@ inline void printMetricsShort(struct Metrics metrics, std::ostream& out){
 	out << std::setprecision(6) << std::fixed;
 	out << metrics.maxBorderNodesPercent << " " \
 		<< metrics.avgBorderNodesPercent << " " \
-		<< metrics.timeSpMV \
+		<< metrics.timeSpMV << " "\
+		<< metrics.timeComm \
 		<< std::endl; 
 }
 
@@ -332,7 +347,7 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
 		std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
 		out << "date and time: " << std::ctime(&timeNow) << std::endl;
 		out << "numBlocks= " << metricsVec[0].numBlocks << std::endl;
-        out << "# times, input, migrAlgo, 1distr, kmeans, 2redis, prelim, localRef, total,    prel cut, finalcut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg   timeSpMV" << std::endl;
+        out << "# times, input, migrAlgo, 1distr, kmeans, 2redis, prelim, localRef, total,    prel cut, finalcut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg   timeSpMV timeComm" << std::endl;
     }
 
     ValueType sumMigrAlgo = 0;
@@ -356,6 +371,7 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
     ValueType sumAvgBorderNodesPerc = 0;
 
 	ValueType sumTimeSpMV = 0;
+	ValueType sumTimeComm = 0;
 	
     for(IndexType run=0; run<numRuns; run++){
         Metrics thisMetric = metricsVec[ run ];
@@ -404,6 +420,7 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
         sumAvgBorderNodesPerc += thisMetric.avgBorderNodesPercent;
 		
 		sumTimeSpMV += thisMetric.timeSpMV;
+		sumTimeComm += thisMetric.timeComm;
     }
     
     if( comm->getRank()==0 ){
@@ -427,12 +444,13 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
             out << std::setprecision(6) << std::fixed;
             out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
             << ValueType(sumAvgBorderNodesPerc)/numRuns << ", " \
-            << ValueType(sumTimeSpMV)/numRuns \
+            << ValueType(sumTimeSpMV)/numRuns << ", " \
+            << ValueType(sumTimeComm)/numRuns \
             << std::endl;
             
         out << std::setprecision(2) << std::fixed;
         out << "gather" << std::endl;
-        out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt timeSpMV" << std::endl;
+        out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm" << std::endl;
         out <<  ValueType(sumKmeans)/numRuns<< " " \
             <<  ValueType(sumPrelimanry)/numRuns<< " " \
             <<  ValueType(sumLocalRef)/numRuns<< " " \
@@ -447,7 +465,8 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
             out << std::setprecision(6) << std::fixed;
             out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< " " \
             <<  ValueType(sumAvgBorderNodesPerc)/numRuns << " " \
-            << ValueType(sumTimeSpMV)/numRuns \
+            << ValueType(sumTimeSpMV)/numRuns << " " \
+            << ValueType(sumTimeComm)/numRuns \
             << std::endl;        
     }
     
@@ -468,7 +487,7 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
 		std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
 		out << "date and time: " << std::ctime(&timeNow) << std::endl;
 		out << "numBlocks= " << metricsVec[0].numBlocks << std::endl;
-        out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxBndPercnt avgBndPercnt timeSpMV" << std::endl;
+        out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm" << std::endl;
     }
 
     //ValueType sumKmeans = 0;
@@ -487,6 +506,7 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
     ValueType sumMaxBorderNodesPerc = 0;
     ValueType sumAvgBorderNodesPerc = 0;
 	ValueType sumTimeSpMV = 0;
+	ValueType sumTimeComm = 0;
 	
     for(IndexType run=0; run<numRuns; run++){
         Metrics thisMetric = metricsVec[ run ];
@@ -512,7 +532,8 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
             << thisMetric.maxCommVolume << "  " << thisMetric.totalCommVolume << " ";
             out << std::setprecision(6) << std::fixed;
             out << thisMetric.maxBorderNodesPercent << " " << thisMetric.avgBorderNodesPercent << " "\
-            << thisMetric.timeSpMV \
+            << thisMetric.timeSpMV << " " \
+            << thisMetric.timeComm \
             << std::endl;
         }
         
@@ -530,11 +551,12 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
         sumMaxBorderNodesPerc += thisMetric.maxBorderNodesPercent;
         sumAvgBorderNodesPerc += thisMetric.avgBorderNodesPercent;
 		sumTimeSpMV += thisMetric.timeSpMV;
+		sumTimeComm += thisMetric.timeComm;
     }
     
     if( comm->getRank()==0 ){
         out << "gather" << std::endl;
-        out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxBndPercnt avgBndPercnt " << std::endl;
+        out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm " << std::endl;
 		
         out << std::setprecision(2) << std::fixed;
             //<<  ValueType(sumKmeans)/numRuns<< "  " \
@@ -550,7 +572,8 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
             out << std::setprecision(6) << std::fixed;
             out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< " " \
             << ValueType(sumAvgBorderNodesPerc)/numRuns  <<" "\
-            << ValueType(sumTimeSpMV)/numRuns \
+            << ValueType(sumTimeSpMV)/numRuns << " "\
+            << ValueType(sumTimeComm)/numRuns \
             << std::endl;
 		
 		
