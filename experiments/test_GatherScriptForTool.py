@@ -64,6 +64,8 @@ def addRelativePlot( exp, metricValues, metricName, toolNames, baseToolId, plotF
 				# get the relative value, divide by the base tool metric
 				if metricValues[baseToolId][m][i] == -1:
 					plotF.write("("+str(exp.k[i])+", nan)\n")
+				elif metricValues[baseToolId][m][i] == 0:	# avoid division with zero
+					plotF.write("("+str(exp.k[i])+", "+ str(0) + ")\n")	
 				else:
 					plotF.write("("+str(exp.k[i])+", "+ str(thisToolMetrics[m][i]/metricValues[baseToolId][m][i]) + ")\n")	#
 				#print( metricValues[baseToolId][m][i] )
@@ -153,7 +155,7 @@ def createPlotsGeneric(exp, toolNames, metricNames, metricValues):
 		
 	with open(plotFile,'w') as plotF:
 		plotF.write("\\documentclass{article}\n\\usepackage{tikz}\n\\usepackage{pgfplots}\n\\begin{document}\n\n")
-			
+		plotF.write("\\today\n\n");
 		plotF.write("Experiment type: ");
 		if exp.expType==0:
 			plotF.write(" weak\n\n")
@@ -236,6 +238,33 @@ def createPlotsGeneric(exp, toolNames, metricNames, metricValues):
 
 	print("Plots written in file " + plotFile )
 
+#---------------------------------------------------------------------------------------------		
+
+def createCsv(exp, toolNames, metricNames, metricValues):
+
+	numMetrics = len(metricNames)
+	#numMetrics =NUM_METRICS
+	numTools = len(toolNames)
+	print("number of metrics in createPlotsGeneric is " + str(numMetrics)+" and number of tools " + str(numTools) )
+	
+	#
+	print( str( len(metricValues) ) )
+	print( str( len(metricValues[0]) ) )
+	print( str( len(metricValues[0][0]) ) )
+	#		
+	
+	if numMetrics!= len(metricValues[0]) :
+		print("WARNING: len(metricNames)= "+ str(numMetrics) + " and len(metricValues) mismatch= " + str(len(metricValues[0])) )	
+	if len(metricValues[0][0])!= exp.size :
+		print("WARNING: len(metricNames)= "+ len(metricsValues[0][0]) + " and exp.size mismatch= " + str(exp.size) )
+	if numTools!=len(metricValues):
+		print("WARNING: len(metricValues)= "+ str(len(metricValues)) + " and numTools mismatch= " + str(numTools))	
+	#
+	# create time plots, figures in .tex file
+	#
+	
+	csvFileName = "exp"+str(exp.ID)+".csv"
+	
 #---------------------------------------------------------------------------------------------		
 # gather info for an experiment for a tool
 

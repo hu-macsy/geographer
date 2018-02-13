@@ -226,8 +226,8 @@ int main(int argc, char** argv) {
     }
     
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-	
-	/*//TODO: used ifort -nofor-main ... to compile but does not link properly
+	/*
+	//TODO: used ifort -nofor-main ... to compile but does not link properly
 	size_t total=-1,used=-1,free=-1,buffers=-1, cached=-1;
 	memusage(&total, &used, &free, &buffers, &cached);
 	printf("%ld %ld %ld %ld %ld \n", total,used,free,buffers, cached);
