@@ -293,7 +293,7 @@ int main(int argc, char** argv) {
 			return -1;
 		}
 		
-		PRINT0("time to convert to get the partition: " <<  metrics.timeFinalPartition );
+		PRINT0("time to get the partition: " <<  metrics.timeFinalPartition );
 		
 		metrics.getMetrics( graph, partition, nodeWeights, settings );
 		

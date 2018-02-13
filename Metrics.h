@@ -108,7 +108,7 @@ struct Metrics{
         << preliminaryCut << " , "<< finalCut << " , " << finalImbalance << " , "  \
         << maxBoundaryNodes << " , " << totalBoundaryNodes << " , "  \
         << maxCommVolume << " , " << totalCommVolume << " , ";
-        out << std::setprecision(6) << std::fixed;
+        out << std::setprecision(8) << std::fixed;
         out << maxBorderNodesPercent << " , " << avgBorderNodesPercent<< " , " \
         << timeSpMV << " , " << timeComm << std::endl;
     }
@@ -325,7 +325,7 @@ inline void printMetricsShort(struct Metrics metrics, std::ostream& out){
 		<< metrics.totalBoundaryNodes << " "\
 		<< metrics.maxCommVolume << " "\
 		<< metrics.totalCommVolume << " ";
-	out << std::setprecision(6) << std::fixed;
+	out << std::setprecision(8) << std::fixed;
 	out << metrics.maxBorderNodesPercent << " " \
 		<< metrics.avgBorderNodesPercent << " " \
 		<< metrics.timeSpMV << " "\
@@ -396,7 +396,7 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
             // << thisMetric.maxBlockGraphDegree << ",  " << thisMetric.totalBlockGraphEdges << " ," 
             << thisMetric.maxBoundaryNodes << ", " << thisMetric.totalBoundaryNodes << ",    " \
             << thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << ",    ";
-            out << std::setprecision(6) << std::fixed;
+            out << std::setprecision(8) << std::fixed;
             out << thisMetric.maxBorderNodesPercent << ",  " << thisMetric.avgBorderNodesPercent<< ", " \
             << thisMetric.timeSpMV << std::endl;
         }
@@ -441,7 +441,7 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
             <<  ValueType(sumTotBnd)/numRuns<< ",    " \
             <<  ValueType(sumMaxCommVol)/numRuns<< ", " \
             <<  ValueType(sumTotCommVol)/numRuns<< ",    ";
-            out << std::setprecision(6) << std::fixed;
+            out << std::setprecision(8) << std::fixed;
             out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
             << ValueType(sumAvgBorderNodesPerc)/numRuns << ", " \
             << ValueType(sumTimeSpMV)/numRuns << ", " \
@@ -462,7 +462,7 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
             <<  ValueType(sumTotBnd)/numRuns<< " " \
             <<  ValueType(sumMaxCommVol)/numRuns<< " " \
             <<  ValueType(sumTotCommVol)/numRuns<< " ";
-            out << std::setprecision(6) << std::fixed;
+            out << std::setprecision(8) << std::fixed;
             out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< " " \
             <<  ValueType(sumAvgBorderNodesPerc)/numRuns << " " \
             << ValueType(sumTimeSpMV)/numRuns << " " \
@@ -530,7 +530,7 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
 			out << thisMetric.finalCut << "  " << thisMetric.finalImbalance << "  "  \
             << thisMetric.maxBoundaryNodes << " " << thisMetric.totalBoundaryNodes << "  " \
             << thisMetric.maxCommVolume << "  " << thisMetric.totalCommVolume << " ";
-            out << std::setprecision(6) << std::fixed;
+            out << std::setprecision(8) << std::fixed;
             out << thisMetric.maxBorderNodesPercent << " " << thisMetric.avgBorderNodesPercent << " "\
             << thisMetric.timeSpMV << " " \
             << thisMetric.timeComm \
@@ -569,7 +569,7 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
             <<  ValueType(sumTotBnd)/numRuns<< " " \
             <<  ValueType(sumMaxCommVol)/numRuns<< " " \
             <<  ValueType(sumTotCommVol)/numRuns<< " ";
-            out << std::setprecision(6) << std::fixed;
+            out << std::setprecision(8) << std::fixed;
             out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< " " \
             << ValueType(sumAvgBorderNodesPerc)/numRuns  <<" "\
             << ValueType(sumTimeSpMV)/numRuns << " "\
