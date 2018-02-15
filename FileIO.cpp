@@ -876,9 +876,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     PRINT0( "Binary read, version= " << version << ", N= " << globalN << ", M= " << M );
     
     if( version != fileTypeVersionNumber ) {
-        PRINT0( "filetype version missmatch" );
-        //MPI_Finalize();
-        exit(0);
+        throw std::runtime_error( "filetype version mismatch" );
     }
     
     const IndexType numPEs = comm->getSize();
