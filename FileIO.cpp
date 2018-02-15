@@ -751,7 +751,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     for (IndexType i = 0; i < localN; i++) {
     	bool read = !std::getline(file, line).fail();
         
-if( !read) PRINT(*comm << ": " <<  i << " __ " << line << " || " << file.tellg() );        
+	if( !read) PRINT(*comm << ": " <<  i << " __ " << line << " || " << file.tellg() );        
     	//remove leading and trailing whitespace, since these can confuse the string splitter
     	boost::algorithm::trim(line);
     	assert(read);//if we have read past the end of the file, the node count was incorrect

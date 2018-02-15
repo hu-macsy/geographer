@@ -33,7 +33,8 @@ def addRelativePlot( exp, metricValues, metricName, toolNames, baseToolId, plotF
 		print("ERROR: tool ID given " +  str(baseToolId) +" is too big, must be < " + str(len(toolNames)) )
 		return -1;
 
-	plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel=ratio , legend style={at={(1.5,0.7)}}, xmode = log, log basis x= 2, xtick={")
+	#plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel=ratio , legend style={at={(1.5,0.7)}}, xmode = log, log basis x= 2, xtick={")
+	plotF.write("\n\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel=ratio , legend style={at={(1.5,0.7)}}, xmode = log, log basis x= 2, xtick={")
 	for x in range(0, len(exp.k)-1 ):
 		if exp.k[x]!=-1:
 			plotF.write( str(exp.k[x]) +", ")
@@ -76,11 +77,155 @@ def addRelativePlot( exp, metricValues, metricName, toolNames, baseToolId, plotF
 		plotF.write("\\addlegendentry{"+thisToolName+"}\n")
 		
 	plotF.write("\\end{axis}\n\\end{tikzpicture}\n")
-	plotF.write("\\caption{Metric: "+ metricName+" relative to "+ toolNames[baseToolId] +"}\n\\end{figure}\n\n")		
+	plotF.write("\\caption{Metric: "+ metricName+" relative to "+ toolNames[baseToolId] +"}\n\n")		
 
+#---------------------------------------------------------------------------------------------	
 
+# returns a list of size len(toolNames) (the number of given tools) with one value per tool for the given metric
+
+def getGeomMean( metricValues, metricName, toolNames, baseToolId):
+	for m in range(0, NUM_METRICS):
+		if metricName==METRIC_NAMES[m]:
+			break;
+	
+	if m==NUM_METRICS:
+		print("ERROR: metric " + metricName + " was not found")
+		return -1
+	# now m is the index of the wanted metric
+	
+	if baseToolId >= len(toolNames):
+		print("ERROR: tool ID given " +  str(baseToolId) +" is too big, must be < " + str(len(toolNames)) )
+		return -1;
+	
+	# all the metrics for the base tool
+	baseToolMetrics = metricValues[baseToolId]
+	
+	returnMeans = []
+	
+	for t in range(0,len(toolNames)):
+		
+		#if baseToolId==t:	# do not print the base tool metric
+		#	continue
+		
+		thisToolMetrics = metricValues[t]
+		thisToolName = toolNames[t]	
+		thisToolThisMetric = thisToolMetrics[m]
+		
+		baseToolThisMetric = baseToolMetrics[m];
+		
+		assert( len(thisToolThisMetric)==len(baseToolThisMetric) )
+		numValidMetrics = 0
+		productRatios = 1
+		
+		# could also multiply all elements in list baseToolThisMetric and thisToolThisMetric and divide
+		# but I want to check for -1 and 0 values
+		for i in range(0,len(thisToolThisMetric)):
+			if thisToolThisMetric[i]==-1 or baseToolThisMetric[i]==-1:
+				continue		# missing value, skip
+			if thisToolThisMetric[i]==0 or baseToolThisMetric[i]==0:
+				print ("Skipping metric " + metricName + " as a zero value was found and do not know how to handle\n")
+				returnMeans[0]=-1
+				return returnMeans;
+			
+			productRatios *= (thisToolThisMetric[i]/baseToolThisMetric[i])
+			numValidMetrics += 1
+		
+		returnMeans.append( productRatios**(1/float(numValidMetrics)) )
+		
+	print( returnMeans )
+	return returnMeans
+		
+
+#---------------------------------------------------------------------------------------------	
+
+def addGeoMeanInfo(exp, metricValues, metricName, toolNames, baseToolId, plotF):
+	
+	geoMeanForTools = getGeomMean( metricValues, metricName, toolNames, baseToolId)
+	
+	if geoMeanForTools[0] == -1:
+		print("Skipping the geometric mean for metric " + metricName);
+		return -1;
+	
+	plotF.write("\nGeometric mean for metric: " + metricName + " , base tool: " + toolNames[baseToolId] +"\\\\ \n" )
+	
+	for i in range(0, len(geoMeanForTools) ):
+		plotF.write(toolNames[i] + " " + str(geoMeanForTools[i]) + "\\\\\n")
+	
+#---------------------------------------------------------------------------------------------	
+
+# returns a list of size len(toolNames) (the number of given tools) with one value per tool for the given metric
+
+def getHarmMean( metricValues, metricName, toolNames, baseToolId):
+	for m in range(0, NUM_METRICS):
+		if metricName==METRIC_NAMES[m]:
+			break;
+	
+	if m==NUM_METRICS:
+		print("ERROR: metric " + metricName + " was not found")
+		return -1
+	# now m is the index of the wanted metric
+	
+	if baseToolId >= len(toolNames):
+		print("ERROR: tool ID given " +  str(baseToolId) +" is too big, must be < " + str(len(toolNames)) )
+		return -1;
+	
+	# all the metrics for the base tool
+	baseToolMetrics = metricValues[baseToolId]
+	
+	returnMeans = []
+	
+	for t in range(0,len(toolNames)):
+		
+		#if baseToolId==t:	# do not print the base tool metric
+		#	continue
+		
+		thisToolMetrics = metricValues[t]
+		thisToolName = toolNames[t]	
+		thisToolThisMetric = thisToolMetrics[m]
+		
+		baseToolThisMetric = baseToolMetrics[m];
+		
+		assert( len(thisToolThisMetric)==len(baseToolThisMetric) )
+		numValidMetrics = 0
+		sumRatios = 0
+		
+		# could also multiply all elements in list baseToolThisMetric and thisToolThisMetric and divide
+		# but I want to check for -1 and 0 values
+		for i in range(0,len(thisToolThisMetric)):
+			if thisToolThisMetric[i]==-1 or baseToolThisMetric[i]==-1:
+				continue		# missing value, skip
+			if thisToolThisMetric[i]==0 or baseToolThisMetric[i]==0:
+				print ("Skipping metric " + metricName + " as a zero value was found and do not know how to handle\n")
+				returnMeans[0]=-1
+				return returnMeans;
+			
+			ratio = 1/(thisToolThisMetric[i]/baseToolThisMetric[i])	# from the harmonic definition
+			sumRatios += ratio
+			numValidMetrics += 1
+		
+		returnMeans.append( numValidMetrics/sumRatios )
+		
+	print( returnMeans )
+	return returnMeans
+		
+
+#---------------------------------------------------------------------------------------------	
+
+def addHarmMeanInfo(exp, metricValues, metricName, toolNames, baseToolId, plotF):
+	
+	harmMeanForTools = getHarmMean( metricValues, metricName, toolNames, baseToolId)
+	
+	if harmMeanForTools[0] == -1:
+		print("Skipping the harmonic mean for metric " + metricName);
+		return -1;
+	
+	plotF.write("\nHarmonic mean for metric: " + metricName + " , base tool: " + toolNames[baseToolId] +"\\\\ \n" )
+	
+	for i in range(0, len(harmMeanForTools) ):
+		plotF.write(toolNames[i] + " " + str(harmMeanForTools[i]) + "\\\\\n")
+		
 #---------------------------------------------------------------------------------------------		
-# len(metricValues) == len(tools)
+# len(metricValues) == len(tools), a numTools*numMetrics*exp.size 3D matrix
 # len(metricValues[i]) == len(metricNames)
 # metricValues is a list of lists of lists (3D array): 
 #		metricValues[i] = a list of lists for all all metric values for tool i ,	size = num_of_tools
@@ -154,8 +299,11 @@ def createPlotsGeneric(exp, toolNames, metricNames, metricValues):
 	#plotFile = os.path.join( plotDir, "plots_new_"+str(exp.expType)+expNumber+".tex")
 		
 	with open(plotFile,'w') as plotF:
-		plotF.write("\\documentclass{article}\n\\usepackage{tikz}\n\\usepackage{pgfplots}\n\\begin{document}\n\n")
+		plotF.write("\\documentclass{article}\n\\usepackage{tikz}\n\\usepackage{pgfplots}\n") 
+		plotF.write("\\usepackage[total={7in, 9in}]{geometry}\n\n")
+		plotF.write("\\begin{document}\n\n")
 		plotF.write("\\today\n\n");
+		
 		plotF.write("Experiment type: ");
 		if exp.expType==0:
 			plotF.write(" weak\n\n")
@@ -227,9 +375,15 @@ def createPlotsGeneric(exp, toolNames, metricNames, metricValues):
 				plotF.write("\\addlegendentry{"+thisToolName+"}\n")
 				
 			plotF.write("\\end{axis}\n\\end{tikzpicture}\n")
+			
+			#plotF.write("\\caption{Metric: "+ metricName+"}\n\n")
+			
+			addRelativePlot( exp, metricValues, metricName, toolNames, 0, plotF )
 			plotF.write("\\caption{Metric: "+ metricName+"}\n\\end{figure}\n\n")
 			
-			addRelativePlot( exp, metricValues, metricName, toolNames, 0, plotF)
+			addGeoMeanInfo( exp, metricValues, metricName, toolNames, 0, plotF )
+			addHarmMeanInfo( exp, metricValues, metricName, toolNames, 0, plotF )
+						
 			plotF.write("\\clearpage")
 		
 		#addRelativePlot( exp, metricValues, "timeSpMV", toolNames, 0, plotF)

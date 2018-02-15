@@ -49,9 +49,10 @@ void printCompetitorMetrics(struct Metrics metrics, std::ostream& out){
 */
 
 
-//scai::lama::DenseVector callTool( std::String tool)'
-	
-//void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);	
+
+extern "C"{
+	void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);	
+}
 
 
 //---------------------------------------------------------------------------------------------
@@ -227,10 +228,10 @@ int main(int argc, char** argv) {
     
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
 	/*
-	//TODO: used ifort -nofor-main ... to compile but does not link properly
+	//TODO: must compile with mpicc and module mpi.ibm/1.4 and NOT mpi.ibm/1.4_gcc
 	size_t total=-1,used=-1,free=-1,buffers=-1, cached=-1;
-	memusage(&total, &used, &free, &buffers, &cached);
-	printf("%ld %ld %ld %ld %ld \n", total,used,free,buffers, cached);
+	memusage(&total, &used, &free, &buffers, &cached);	
+	printf("MEM: avail: %ld , used: %ld , free: %ld , buffers: %ld , file cache: %ld \n",total,used,free,buffers, cached);
 	*/
 
 	//---------------------------------------------------------------------------------
@@ -267,7 +268,7 @@ int main(int argc, char** argv) {
 		//PRINT0( "\n" << settings.outFile << "\n");
 		{
 			std::ifstream f(settings.outFile);
-			if( f.good() ){
+			if( f.good() and storeInfo ){
 				comm->synchronize();	// maybe not needed
 				PRINT0("\n\tWARNING: File " << settings.outFile << " allready exists. Skipping partition with " << thisTool);
 				continue;
@@ -341,7 +342,10 @@ int main(int argc, char** argv) {
 				}       
 			}
 		}
-		
+/*		
+memusage(&total, &used, &free, &buffers, &cached);	
+printf("\nMEM: avail: %ld , used: %ld , free: %ld , buffers: %ld , file cache: %ld \n\n",total,used,free,buffers, cached);
+*/		
 	} // for allTools.size()
      
 	std::chrono::duration<ValueType> totalTimeLocal = std::chrono::system_clock::now() - startTime;
