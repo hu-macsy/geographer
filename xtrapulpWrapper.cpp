@@ -246,8 +246,8 @@ int main(int argc, char** argv) {
     	return 126;
     }
     
-    scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-
+    const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+	scai::dmemo::DistributionPtr noDistPtr  = graph.getColDistributionPtr();
 	
     //-----------------------------------------------------
     //
@@ -331,7 +331,7 @@ int main(int argc, char** argv) {
 		//
 		
 //		const MPI_Comm mpi_comm = MPI_COMM_WORLD;
-//		SQuick::sort<sort_pair>(MPI_COMM_WORLD, localPairs, -1);
+		SQuick::sort<sort_pair>(MPI_COMM_WORLD, localPairs, -1);
 	}
 	
 	MPI_Comm_rank(MPI_COMM_WORLD, &procid);
@@ -352,11 +352,13 @@ PRINT(*comm << ": PE: " << procid << " , all " << nprocs );
 	
 	IndexType maxLocalVertex=0;
 	
-	uint64_t* gen_edges = new uint64_t[ 2*localM ];	// 2 values per edge
+	//WARNING: the next line is wrong as after the sort the localM can be different
+	//uint64_t* gen_edges = new uint64_t[ 2*localM];
+	uint64_t* gen_edges = new uint64_t[ 2*ggi.m_local_read ];	// 2 values per edge
 	for(IndexType i=0; i<localPairs.size(); i++){
 		gen_edges[2*i] = localPairs[i].value;
 		gen_edges[2*i+1] = localPairs[i].index;
-		
+		SCAI_ASSERT_LE_ERROR( 2*i+1, 2*ggi.m_local_read, "Large edge index.");
 		// check only the first vertex of the edge, it is considered to be local
 		if( localPairs[i].value>maxLocalVertex ){
 			maxLocalVertex = localPairs[i].value;
@@ -623,7 +625,37 @@ init_pulp_data(&g, &pulp, numBlocks);
 
 	std::vector<struct Metrics> metricsVec;
 	scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
-	scai::lama::DenseVector<IndexType> pulpPartitionDV(dist);
+	//scai::lama::DenseVector<IndexType> pulpPartitionDV(dist);
+	
+	// create a new GeneralDistribution based on the distribution created by the sort
+	//WARNING: is it assumed here that the local indices are consequtive/successive??
+	scai::hmemo::HArray<IndexType> localIndices( g.n_local , -1);
+	{
+		// get indices from offset till offset+n_local
+		scai::hmemo::WriteOnlyAccess<IndexType> wLocalIndices(localIndices);
+		for( IndexType i=0; i<g.n_local; i++){
+			wLocalIndices[i] = g.n_offset+i;
+		}
+		SCAI_ASSERT_LE_ERROR( g.n_offset+g.n_local, N, *comm <<": Too large vertex index.");
+		// check number of vertices in last PE
+		if( thisPE==comm->getSize()-1){
+			SCAI_ASSERT_EQ_ERROR(g.n_offset+g.n_local, N, *comm <<": Vertex index mismatch on last PE.");
+		}
+		//checksum for small values of N
+		if( N<std::pow(2,26) ){		//TODO: do not ask why, just picked a value...
+			IndexType localCheckSum = g.n_local*g.n_offset + (0.5)*(g.n_local)*(g.n_local+1);
+			IndexType globalCheckSum = (0.5)*N*(N+1);
+PRINT(*comm << ": " << localCheckSum << " == " << globalCheckSum <<"\t"<< g.n_offset << " , " << g.n_local);
+			IndexType commGlobalSum = comm->sum(localCheckSum);
+			SCAI_ASSERT_EQ_ERROR( globalCheckSum, commGlobalSum, "Global sum mismatch, maybe not correct, check again");
+		}
+	}
+	
+	const scai::dmemo::DistributionPtr pulpDist(new scai::dmemo::GeneralDistribution(N, localIndices, comm));
+	scai::lama::DenseVector<IndexType> pulpPartitionDV(pulpDist);
+	
+	SCAI_ASSERT_EQ_ERROR( pulpPartitionDV.getLocalValues().size(), g.n_local, *comm<<": Sizes mismatch");
+	IndexType newLocalN = pulpDist->getLocalSize();
 	
 	int r;
 	for( r=0; r<repeatTimes; r++){		
@@ -641,17 +673,26 @@ init_pulp_data(&g, &pulp, numBlocks);
 		
 		
 		//scai::lama::DenseVector<IndexType> pulpPartitionDV(dist);
-		for(unsigned int i=0; i<localN; i++){
+		for(unsigned int i=0; i<newLocalN; i++){
 			pulpPartitionDV.getLocalValues()[i] = pulpPartitionArray[i];
 		}
-		
-		metricsVec[r].finalCut = ITI::GraphUtils::computeCut(graph, pulpPartitionDV, true);
-        metricsVec[r].finalImbalance = ITI::GraphUtils::computeImbalance<IndexType,ValueType>(pulpPartitionDV, settings.numBlocks ,nodeWeights);
-        //metricsVec[r].inputTime = ValueType ( comm->max(inputTime.count() ));
-        metricsVec[r].timeFinalPartition = ValueType (comm->max(partitionTime.count()));		
-		
-		// get metrics
-		metricsVec[r].getMetrics( graph, pulpPartitionDV, nodeWeights, settings );
+		{
+			// vector must have same distribution as the graph to get metrics
+			//pulpPartitionDV.redistribute( dist );
+			graph.redistribute( pulpDist, noDistPtr);
+			nodeWeights.redistribute( pulpDist );
+			
+			metricsVec[r].finalCut = ITI::GraphUtils::computeCut(graph, pulpPartitionDV, true);
+			metricsVec[r].finalImbalance = ITI::GraphUtils::computeImbalance<IndexType,ValueType>(pulpPartitionDV, settings.numBlocks ,nodeWeights);
+			metricsVec[r].timeFinalPartition = ValueType (comm->max(partitionTime.count()));		
+			
+			// get metrics
+			metricsVec[r].getMetrics( graph, pulpPartitionDV, nodeWeights, settings );
+			// redistribute back to pulp distribution
+			//pulpPartitionDV.redistribute( pulpDist );
+			graph.redistribute( dist, noDistPtr);
+			nodeWeights.redistribute( dist );
+		}
 		
 		if (comm->getRank() == 0 ) {
             metricsVec[r].print( std::cout );            
@@ -778,9 +819,15 @@ init_pulp_data(&g, &pulp, numBlocks);
 		ITI::FileIO<IndexType, ValueType>::writePartitionCentral( pulpPartitionDV, settings.outFile+"_xtrapulp_k_"+std::to_string(numBlocks)+".partition");    
         
     }
-  
-	//ITI::aux<IndexType,ValueType>::print2DGrid(graph, pulpPartitionDV  );
-		
+    {
+		comm->synchronize();
+		// vector must have same distribution as the graph to get metrics
+		//pulpPartitionDV.redistribute( dist );
+		graph.redistribute( pulpDist, noDistPtr);
+		ITI::aux<IndexType,ValueType>::print2DGrid(graph, pulpPartitionDV  );
+		comm->synchronize();
+	}
+	
     //this is needed for supermuc
     std::exit(0);   
 	

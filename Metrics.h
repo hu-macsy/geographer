@@ -186,25 +186,12 @@ struct Metrics{
 		std::chrono::time_point<std::chrono::system_clock> beforeRedistribution = std::chrono::system_clock::now();
 		// redistribute graph according to partition distribution
 		//graph.redistribute( distFromPartition, initColDistPtr);
+		graph.redistribute( distFromPartition, distFromPartition);		
 		
 		std::chrono::duration<ValueType> redistributionTime =  std::chrono::system_clock::now() - beforeRedistribution;
 		
 		ValueType time = 0;
 		time = comm->max( redistributionTime.count() );
-		/*
-		std::chrono::time_point<std::chrono::system_clock> beforeLaplacian = std::chrono::system_clock::now();
-		// the laplacian has the same row and column distributios as the (now partitioned) graph
-		scai::lama::CSRSparseMatrix<ValueType> laplacian = ITI::GraphUtils::getLaplacian<IndexType, ValueType>( graph );
-		std::chrono::duration<ValueType> laplacianTime = std::chrono::system_clock::now() - beforeLaplacian;
-		time = comm->max(laplacianTime.count());
-		PRINT0("time to get the laplacian: " << time );
-		*/
-		
-
-		graph.redistribute( distFromPartition, distFromPartition);		
-		//laplacian.redistribute( distFromPartition, distFromPartition);		
-		//SCAI_ASSERT( laplacian.getRowDistributionPtr()->isEqual( graph.getRowDistribution() ), "Row distributions do not agree" );
-		//SCAI_ASSERT( laplacian.getColDistributionPtr()->isEqual( graph.getColDistribution() ), "Column distributions do not agree" );
 		PRINT0("time to redistribute: " << time);		
 		
 		const IndexType localN = distFromPartition->getLocalSize();
@@ -294,7 +281,7 @@ struct Metrics{
 		//comm->synchronize();
 		std::chrono::duration<ValueType> commTime = std::chrono::system_clock::now() - beforeCommTime;
 		
-PRINT(*comm << ": "<< sendPlan );		
+//PRINT(*comm << ": "<< sendPlan );		
 		time = comm->max(commTime.count());
 		
 		ValueType minTime = comm->min( commTime.count() );
