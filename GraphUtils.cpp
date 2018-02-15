@@ -100,6 +100,7 @@ ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<
     }
     
 	if (partDist->getLocalSize() != localN) {
+		PRINT0("Local values mismatch for matrix and partition");
 		throw std::runtime_error("partition has " + std::to_string(partDist->getLocalSize()) + " local values, but matrix has " + std::to_string(localN));
 	}
 	
@@ -1390,18 +1391,19 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	
 	{
 		scai::hmemo::WriteOnlyAccess<IndexType> wLocalIndices(localIndices);
-		IndexType oldV1 = localPairs[0].value;
-		wLocalIndices[0] = oldV1;
+		IndexType oldVertex = localPairs[0].value;
+		wLocalIndices[0] = oldVertex;
 		
+		// go through all local edges and add a local index if it is not already added
 		for(IndexType i=1; i<localPairs.size(); i++){
-			IndexType newV1 = localPairs[i].value;
-			if( newV1!=wLocalIndices[index-1] ){
-				wLocalIndices[index++] = newV1;	
+			IndexType newVertex = localPairs[i].value;
+			if( newVertex!=wLocalIndices[index-1] ){
+				wLocalIndices[index++] = newVertex;	
 				SCAI_ASSERT_LE_ERROR( index, localN,"Too large index for localIndices array.");
 			}
-			// newV1-oldV1 should be either 0 or 1
-			SCAI_ASSERT_LE_ERROR( newV1-oldV1, 1, "Vertex with id " << newV1-1 <<" is missing. Error in edge list, vertex should be contunious");
-			oldV1 = newV1;
+			// newVertex-oldVertex should be either 0 or 1, either are the same or differ by 1
+			SCAI_ASSERT_LE_ERROR( newVertex-oldVertex, 1, "Vertex with id " << newVertex-1 <<" is missing. Error in edge list, vertex should be contunious");
+			oldVertex = newVertex;
 		}
 		SCAI_ASSERT_NE_ERROR( wLocalIndices[localN-1], -1, "localIndices array not full");
 	}
