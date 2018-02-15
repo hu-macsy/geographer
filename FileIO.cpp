@@ -604,15 +604,9 @@ void FileIO<IndexType, ValueType>::writePartitionCentral(DenseVector<IndexType> 
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, Format format) {
     
-        std::string ending = filename.substr( filename.size()-3,  filename.size() );
-        if( ending == "bgf" or format==Format::BINARY ){
-            return readGraphBinary( filename );
-        }
+
         
-        if( format==Format::EDGELISTDIST){
-			return readEdgeListDistributed( filename);
-		}
-        
+    //then call other function, handling formats with optional node weights
 	std::vector<DenseVector<ValueType>> dummyWeightContainer;
 	return readGraph(filename, dummyWeightContainer, format);
 }
@@ -622,19 +616,30 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 	SCAI_REGION("FileIO.readGraph");
 
 	if(format == Format::MATRIXMARKET){
-            return FileIO<IndexType, ValueType>::readGraphMatrixMarket(filename);
-        }
-        
-	// if file has a .bgf ending then is a binary file
-	std::string ending = filename.substr( filename.size()-3,  filename.size() );
-	if( ending == "bgf" or format==Format::BINARY){
-		return readGraphBinary( filename );
-	}
+	    return FileIO<IndexType, ValueType>::readGraphMatrixMarket(filename);
+    }
+
+    std::string ending = filename.substr( filename.size()-3,  filename.size() );
+    if ((format == Format::AUTO && ending == "bgf") or format==Format::BINARY) {
+        // if file has a .bgf ending then is a binary file
+        return readGraphBinary( filename );
+    }
+
+    if (format==Format::EDGELIST) {
+        return readEdgeList(filename);
+    }
+
+    if (format==Format::EDGELISTDIST){
+        return readEdgeListDistributed( filename);
+    }
         
 	if (!(format == Format::METIS or format == Format::AUTO)) {
 		throw std::logic_error("Format not yet implemented.");
 	}
 
+	/**
+	 * Now assuming METIS format
+	 */
 	std::ifstream file(filename);
 
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -1096,25 +1101,35 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 	const IndexType rank = comm->getRank();
 	const IndexType numPEs = comm->getSize();
 	const ULLI avgEdgesPerPE = globalM/numPEs;
+	assert(avgEdgesPerPE >= 0);
+	assert(avgEdgesPerPE <= globalM);
 	
 	const ULLI beginLocalRange = rank*avgEdgesPerPE;
-	const ULLI endLocalRange = (rank == numPEs) -1 ? globalM : (rank+1)*avgEdgesPerPE;
-	
-	std::vector< std::pair<IndexType, IndexType>> edgeList;
+	const ULLI endLocalRange = (rank == numPEs-1) ? globalM : (rank+1)*avgEdgesPerPE;
 
 	// scroll to own part of file
-	for (IndexType i = 0; i < beginLocalRange; i++) {
+	for (ULLI i = 0; i < beginLocalRange; i++) {
 	    std::getline(file, line);
 	}
 
+	std::vector< std::pair<IndexType, IndexType>> edgeList;
+
 	// read in edge lists
-	for (IndexType i = beginLocalRange; i < endLocalRange; i++) {
+	for (ULLI i = beginLocalRange; i < endLocalRange; i++) {
 	    std::getline(file, line);
         std::stringstream ss( line );
 
         IndexType v1 , v2;
         ss >> v1;
         ss >> v2;
+
+        if (v1 >= globalN) {
+            throw std::runtime_error("Process " + std::to_string(rank) + ": Illegal node id " + std::to_string(v1) + " in edge list for " + std::to_string(globalN) + " nodes.");
+        }
+
+        if (v2 >= globalN) {
+            throw std::runtime_error("Process " + std::to_string(rank) + ": Illegal node id " + std::to_string(v2) + " in edge list for " + std::to_string(globalN) + " nodes.");
+        }
 
         edgeList.push_back( std::make_pair( v1, v2) );
 	}
