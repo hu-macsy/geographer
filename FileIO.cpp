@@ -1056,8 +1056,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphMa
 //-------------------------------------------------------------------------------------------------
    
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeListCentral(const std::string filename){
-    SCAI_REGION( "FileIO.readEdgeListCentral" );
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeList(const std::string filename){
+    SCAI_REGION( "FileIO.readEdgeList" );
 	
 	typedef unsigned long long int ULLI;     
 	
@@ -1088,55 +1088,45 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 	globalN = std::stoll(item);
 	std::getline(ss, item, ' ');
 	globalM = std::stoll(item);
-	
-	throw std::logic_error("Not yet implemented.");
 
 	if( globalN<=0 or globalM<=0 ){
-		PRINT0("Negative input, maybe int value is not big enough: globalN= " << globalN << " , globalM= "<< globalM);
-		exit(0);
+		throw std::runtime_error("Negative input, maybe int value is not big enough: globalN= " + std::to_string(globalN) + " , globalM= " + std::to_string(globalM));
 	}
-	// TODO:the file size, mabe use it as an extra check or a way to get the number of edges
-	//ULLI filesize;
-	//{
-	//	std::ifstream in(filename, std::ifstream::ate | std::ifstream::binary);
-	//	filesize = in.tellg();
-	//}
 	
-	const IndexType thisPE = comm->getRank();
+	const IndexType rank = comm->getRank();
 	const IndexType numPEs = comm->getSize();
 	const ULLI avgEdgesPerPE = globalM/numPEs;
 	
-	const ULLI beginLocalRange = thisPE*avgEdgesPerPE;
-	const ULLI endLocalRange = (thisPE+1)*avgEdgesPerPE;
+	const ULLI beginLocalRange = rank*avgEdgesPerPE;
+	const ULLI endLocalRange = (rank == numPEs) -1 ? globalM : (rank+1)*avgEdgesPerPE;
 	
-	
+	std::vector< std::pair<IndexType, IndexType>> edgeList;
 
-	/*
-    IndexType numRows;
-    IndexType numColumns;
-    IndexType numValues;
-    
-    ss >> numRows>> numColumns >> numValues;
-    
-    SCAI_ASSERT( numRows==numColumns , "Number of rows should be equal to number of columns");
+	// scroll to own part of file
+	for (IndexType i = 0; i < beginLocalRange; i++) {
+	    std::getline(file, line);
+	}
 
-    scai::lama::CSRSparseMatrix<ValueType> graph;
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-  
-    const scai::dmemo::DistributionPtr rowDist(new scai::dmemo::BlockDistribution(numRows, comm));
+	// read in edge lists
+	for (IndexType i = beginLocalRange; i < endLocalRange; i++) {
+	    std::getline(file, line);
+        std::stringstream ss( line );
+
+        IndexType v1 , v2;
+        ss >> v1;
+        ss >> v2;
+
+        edgeList.push_back( std::make_pair( v1, v2) );
+	}
     
-    graph.readFromFile( filename, rowDist );
-    */
-    //unsetenv( "SCAI_IO_TYPE_DATA" );
-    
-    scai::lama::CSRSparseMatrix<ValueType> graph;
+    scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils::edgeList2CSR<IndexType, ValueType>( edgeList );
     
     return graph;
 }
 //-------------------------------------------------------------------------------------------------
    
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeListDistributed(const std::string filename){
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeListDistributed(const std::string prefix){
     SCAI_REGION( "FileIO.readEdgeListDistributed" );
 		
 	typedef unsigned long long int ULLI;     
@@ -1145,7 +1135,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 	const IndexType thisPE = comm->getRank();
 	PRINT0("About to read a distributed edge list");
 	
-	std::string thisFileName = filename+std::to_string(thisPE);
+	std::string thisFileName = prefix+std::to_string(thisPE);
 	std::ifstream file( thisFileName );
 	
 	// open thisFile and store edges in the edge list
@@ -1153,10 +1143,10 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 	
 	if (file.fail()) {
 		PRINT("Read from multiple files, one file per PE");
-		throw std::runtime_error("Reading graph from " + filename + " failed for PE" + std::to_string(thisPE) );
+		throw std::runtime_error("Reading graph from " + prefix + " failed for PE" + std::to_string(thisPE) );
 	}else{
 		if( comm->getRank()==0 ){
-			std::cout<< "Reading from file "<< filename << std::endl;
+			std::cout<< "Reading from file "<< prefix << std::endl;
 		}
 	}
 	
