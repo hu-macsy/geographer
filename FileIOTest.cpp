@@ -41,7 +41,7 @@ class FileIOTest : public ::testing::Test {
   
 protected:
         // the directory of all the meshes used
-        std::string graphPath = "./meshes/";
+        const std::string graphPath = "./meshes/";
 
 };
 
@@ -238,7 +238,7 @@ TEST_F(FileIOTest, testWriteCoordsDistributed){
 
 TEST_F(FileIOTest, testReadCoordsOcean) {
 	std::string graphFile = graphPath + "fesom_core2.graph";
-	std::string coordFile = graphPath + "nod2d_core2.out";
+	std::string coordFile = graphPath + "node2d_core2.out";
 
 	std::vector<DenseVector<ValueType> > coords = FileIO<IndexType, ValueType>::readCoordsOcean(coordFile, 2);
 	EXPECT_EQ(126858, coords[0].size());
