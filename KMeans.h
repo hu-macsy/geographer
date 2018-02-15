@@ -239,6 +239,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		}
 
 		delta = *std::max_element(deltas.begin(), deltas.end());
+		assert(delta >= 0);
 		const double deltaSq = delta*delta;
 		const double maxInfluence = *std::max_element(influence.begin(), influence.end());
 		const double minInfluence = *std::min_element(influence.begin(), influence.end());
@@ -262,9 +263,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 					lowerBoundNextCenter[i] = 0;
 				} else {
 					ValueType diff = (-2*delta*pureSqrt + deltaSq)*(maxInfluence + 1e-10);
- 					//TODO: assertion fails for small graphs
-					//SCAI_ASSERT_LT_ERROR( diff, 0, "Supposed lower bound exceeded");
-					if(diff > 0){ PRINT(diff); }
 					assert(diff <= 0);
 					lowerBoundNextCenter[i] += diff;
 					if (!(lowerBoundNextCenter[i] > 0)) lowerBoundNextCenter[i] = 0;

@@ -673,8 +673,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
             globalM = std::stoll(item);
             
             if( globalN<=0 or globalM<=0 ){
-                PRINT0("Negative input, maybe int value is not big enough: globalN= " << globalN << " , globalM= "<< globalM);
-                exit(0);
+                throw std::runtime_error("Negative input, maybe int value is not big enough: globalN= "
+                        + std::to_string(globalN) + " , globalM= " + std::to_string(globalM));
             }
             
             bool readWeightInfo = !std::getline(ss, item, ' ').fail();
@@ -728,7 +728,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     	std::getline(file, line);
         if( file.tellg()<0){
             PRINT(*comm << " : "<<  ll);
-            exit(0);
+            exit(1);
         }
     }
 
@@ -867,8 +867,11 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             file.read((char*)(&header[0]), headerSize*sizeof(ULONG));
         }
         file.close();
-        SCAI_ASSERT_ERROR( success, "Error while opening the file " << filename); 
-    }            
+    }
+
+    if (not comm->any(success)) {
+        throw std::runtime_error("Error while opening the file " + filename);
+    }
         
     //broadcast the header info
     comm->bcast( header.data(), 3, 0 );
@@ -880,9 +883,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     PRINT0( "Binary read, version= " << version << ", N= " << globalN << ", M= " << M );
     
     if( version != fileTypeVersionNumber ) {
-        PRINT0( "filetype version missmatch" );
-        //MPI_Finalize();
-        exit(0);
+        throw std::runtime_error( "filetype version mismatch" );
     }
     
     const IndexType numPEs = comm->getSize();
@@ -1001,16 +1002,15 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     //
     
     scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, ja.size(),   
-			scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
-    		scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
-    		scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
+    scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
+    scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
+    scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
     
     // block distribution for rows and no distribution for columns
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 
     return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
-
 }
 
 //-------------------------------------------------------------------------------------------------

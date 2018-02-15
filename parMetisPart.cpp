@@ -155,8 +155,8 @@ int main(int argc, char** argv) {
                 
         SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
         SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
-        		
-        if(parMetisGeom!=0 or writeDebugCoordinates ){
+        
+        if(parMetisGeom!=0 or settings.writeDebugCoordinates ){
             if (vm.count("fileFormat")) {
                 coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
             } else {
@@ -308,7 +308,7 @@ int main(int argc, char** argv) {
     }
 
     //settings.writeDebugCoordinates = 0;
-    if (writeDebugCoordinates and parMetisGeom) {
+    if (settings.writeDebugCoordinates and parMetisGeom) {
         scai::dmemo::DistributionPtr metisDistributionPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partitionKway.getDistribution(), partitionKway.getLocalValues() ) );
         scai::dmemo::Redistributor prepareRedist(metisDistributionPtr, coords[0].getDistributionPtr());
         
