@@ -27,20 +27,22 @@
 #include "Metrics.h"
 #include "MeshGenerator.h"
 
-/*
-#include "comms.h"
-#include "generate.h"
-#include "io_pp.h"
-#include "pulp_util.h"
-#include "util.h"
-*/
+
 #include "fast_map.h"
 #include "dist_graph.h"
 #include "xtrapulp.h"
+#include "comms.h"
+#include "pulp_util.h"
+#include "util.h"
+#include "io_pp.h"
+#include "generate.h"
+
+#include "RBC/Sort/SQuick.hpp"
+
 
 extern int procid, nprocs;
 
-
+/*
 
 namespace ITI {
 std::istream& operator>>(std::istream& in, Format& format)
@@ -88,7 +90,9 @@ std::ostream& operator<<(std::ostream& out, Format method)
 	return out;
 }
 }
+*/
 
+extern bool verbose;
 
 //---------------------------------------------------------------------------------------------
 
@@ -148,14 +152,17 @@ int main(int argc, char** argv) {
 	if (! (vm.count("graphFile") or vm.count("generate")) ) {
 		std::cout << "Specify input file with --graphFile or mesh generation with --generate and number of points per dimension." << std::endl; //TODO: change into positional argument
 	}
-	
-
-	
+		
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     IndexType N;
-	IndexType numBlocks = settings.numBlocks;
 	
-             
+	if( !vm.count("numBlocks") ){
+        settings.numBlocks = comm->getSize();
+    }
+    
+    IndexType numBlocks = settings.numBlocks;
+	
+	
     //-----------------------------------------
     //
     // read the input graph or generate
@@ -252,8 +259,7 @@ int main(int argc, char** argv) {
 	
 	MPI_Comm_rank(MPI_COMM_WORLD, &procid);
 	MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-
-
+	
 	
 	ValueType vert_balance = 1.1;
 	ValueType edge_balance = 1.1;
@@ -267,6 +273,11 @@ int main(int argc, char** argv) {
 	pulp_part_control_t ppc = {vert_balance,      edge_balance, do_lp_init,
                              do_bfs_init,       do_repart,    do_edge_balance,
                              do_maxcut_balance, false,        pulp_seed};
+							 
+	graph_gen_data_t ggi;
+	dist_graph_t g;
+	
+	
 /*							 
 	mpi_data_t pulpComm;
 	init_comm_data(&pulpComm);
@@ -280,19 +291,178 @@ int main(int argc, char** argv) {
 */
 
     IndexType localN = dist->getLocalSize();
-	IndexType M = graph.getNumValues()/2;
+	IndexType M = graph.getNumValues()/*/2*/;
 	IndexType localM = graph.getLocalNumValues()/*/2*/;
 	IndexType thisPE = comm->getRank();
 	IndexType numPEs = comm->getSize();
 
-	dist_graph_t g;
+	/*
+	* 	version where we create and sort an edge list	
+	*/
+
+	std::vector<sort_pair> localPairs(localM);
+	IndexType e = 0;
 	
-    g.n = N /*+1*/;				// global/total number of vertices
+	{
+		scai::lama::CSRStorage<ValueType>& localMatrix= graph.getLocalStorage();
+		scai::hmemo::ReadAccess<IndexType> ia( localMatrix.getIA() );
+		scai::hmemo::ReadAccess<IndexType> ja( localMatrix.getJA() );
+		SCAI_ASSERT_EQ_ERROR( localM, ja.size(), "Should be equal?");		
+		
+		for( IndexType i=0; i<localN; i++){
+			IndexType v = dist->local2global(i);
+			const IndexType beginCols = ia[i];
+			const IndexType endCols = ia[i+1];
+
+			for (IndexType j = beginCols; j < endCols; j++) {
+				//IndexType neighbor = ja[j];
+				localPairs[e].value = dist->local2global(i);	//global id of thisNode
+				localPairs[e].index = ja[j];
+				++e;
+			}
+		SCAI_ASSERT_LE_ERROR( e, localM , "Edge index too large");
+		}
+	}
+	SCAI_ASSERT_EQ_ERROR(e, localM, "Edge count mismatch");
+	SCAI_ASSERT_EQ_ERROR( comm->sum(e), M, "Global edge count mismatch");
+	
+	{	
+		// globally sort edges
+		//
+		
+//		const MPI_Comm mpi_comm = MPI_COMM_WORLD;
+//		SQuick::sort<sort_pair>(MPI_COMM_WORLD, localPairs, -1);
+	}
+	
+	MPI_Comm_rank(MPI_COMM_WORLD, &procid);
+	MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+	
+	mpi_data_t xtrapulpComm;
+PRINT(*comm << ": PE: " << procid << " , all " << nprocs ); 		
+	init_comm_data(&xtrapulpComm);
+	
+	//
+	// build ggi
+	//
+	
+	ggi.n = N;
+	ggi.m = M;
+	
+	ggi.m_local_read = localPairs.size();	// local size of edges
+	
+	IndexType maxLocalVertex=0;
+	
+	uint64_t* gen_edges = new uint64_t[ 2*localM ];	// 2 values per edge
+	for(IndexType i=0; i<localPairs.size(); i++){
+		gen_edges[2*i] = localPairs[i].value;
+		gen_edges[2*i+1] = localPairs[i].index;
+		
+		// check only the first vertex of the edge, it is considered to be local
+		if( localPairs[i].value>maxLocalVertex ){
+			maxLocalVertex = localPairs[i].value;
+		}
+	}
+	ggi.gen_edges = gen_edges;
+	
+	uint64_t n_global = comm->max( maxLocalVertex );
+	ggi.n = n_global +1;
+	ggi.n_offset = (uint64_t)procid * (ggi.n / (uint64_t)nprocs + 1);
+	ggi.n_local = ggi.n / (uint64_t)nprocs + 1;
+	if (procid == nprocs - 1 )
+		ggi.n_local = n_global - ggi.n_offset + 1;
+	
+	printf("Task %d, n %lu, n_offset %lu, n_local %lu, m %lu, m_local_read %lu\n", procid, ggi.n, ggi.n_offset, ggi.n_local, ggi.m , ggi.m_local_read);
+	
+	verbose = true;
+	
+	
+	if (nprocs > 1){
+		exchange_edges( &ggi, &xtrapulpComm );
+		create_graph( &ggi, &g );
+		relabel_edges( &g );
+	}
+	else{
+		create_graph_serial(&ggi, &g);
+	}
+	
+	/*
+	 *  version where we create the graph_gen_data_t ggi and then call exchange_edges, create_graph, relabel_edges
+	 */
+
+/*	
+	ggi.n = N;
+	ggi.m = M;
+	//ggi.n_local = localN;
+	ggi.m_local_read = localM;
+		
+	//uint64_t* gen_edges = (uint64_t*)malloc(2*nedges*sizeof(uint64_t));
+	uint64_t* gen_edges = new uint64_t[ 2*localM ];	// 2 values per edge
+	IndexType e = 0;
+	
+	{
+		scai::lama::CSRStorage<ValueType>& localMatrix= graph.getLocalStorage();
+		scai::hmemo::ReadAccess<IndexType> ia( localMatrix.getIA() );
+		scai::hmemo::ReadAccess<IndexType> ja( localMatrix.getJA() );
+		SCAI_ASSERT_EQ_ERROR( ggi.m_local_read, ja.size(), "Should be equal?");		
+		
+		for( IndexType i=0; i<localN; i++){
+			IndexType v = dist->local2global(i);
+			const IndexType beginCols = ia[i];
+			const IndexType endCols = ia[i+1];
+
+			for (IndexType j = beginCols; j < endCols; j++) {
+				//IndexType neighbor = ja[j];
+				gen_edges[e++] = (uint64_t) v;
+				gen_edges[e++] = (uint64_t) ja[j];
+			}
+		SCAI_ASSERT_LE_ERROR( e, 2*localM , "Edge index too large");
+		}
+	}
+	SCAI_ASSERT_EQ_ERROR(e, 2*localM, "Edge count mismatch");
+	SCAI_ASSERT_EQ_ERROR( comm->sum(e), 2*M, "Global edge count mismatch");
+	
+	ggi.gen_edges = gen_edges;
+	
+	ggi.n_offset = (uint64_t)procid * (ggi.n / (uint64_t)nprocs + 1);
+	ggi.n_local = ggi.n / (uint64_t)nprocs + 1;
+	if (procid == nprocs - 1 ){
+		ggi.n_local = N - ggi.n_offset + 1; 
+	}
+	
+	IndexType beginLocalRange, endLocalRange;
+    scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, N, thisPE, numPEs );
+PRINT(*comm << ": " << beginLocalRange << " - " << endLocalRange );
+	
+	ggi.n_offset = beginLocalRange;
+	ggi.n_local = localN;
+	
+	printf("Task %d, n %lu, n_offset %lu, n_local %lu, m %lu, m_local_read %lu\n", procid, ggi.n, ggi.n_offset, ggi.n_local, ggi.m , ggi.m_local_read);
+	
+	verbose = true;
+	
+	if (nprocs > 1){
+		exchange_edges( &ggi, &xtrapulpComm );
+		create_graph( &ggi, &g );
+		relabel_edges( &g );
+	}
+	else{
+		create_graph_serial(&ggi, &g);
+	}
+*/	
+	
+	
+	/* 
+	 * 		version where we create directly the distributed graph
+	 * 
+	 */ 
+	
+/*	
+    g.n = N; //+1;				// global/total number of vertices
 	g.m = 2*M;					// global/total number of edges
 	g.m_local = localM;			// local number of edges
-	//g.n_offset = thisPE * (g.n/numPEs /*+1*/);
+	//g.n_offset = thisPE * (g.n/numPEs); // +1);
 	g.n_offset = dist->local2global(0);
-	//g.n_local = g.n/numPEs /*+1*/;	// local number of vertices
+	//g.n_local = g.n/numPEs;// +1;	// local number of vertices
 	
 	//SCAI_ASSERT_EQ_ERROR(g.n_local, localN, "Should be equal??" );
 	
@@ -302,7 +472,7 @@ int main(int argc, char** argv) {
 	
 	bool offset_vids = false;
 	//if( thisPE==numPEs-1 && !offset_vids ){
-	//		g.n_local = g.n - g.n_offset /*+1*/;
+	//		g.n_local = g.n - g.n_offset;// +1;
 	//}
 			
 	g.vertex_weights = NULL;
@@ -353,11 +523,11 @@ int main(int argc, char** argv) {
 	std::vector<IndexType> nonLocalNgbrs = ITI::GraphUtils::nonLocalNeighbors<IndexType,ValueType>( graph );
 	//PRINT(*comm <<": "<< nonLocalNgbrs.size() );	
 	
-	//g.n_ghost = nonLocalNgbrs.size();	//number of ghost nodes: nodes that share an edge with a local node but are not local
-	g.n_ghost = 1;
-	if( thisPE==0){
-		g.n_ghost = g.n-g.n_local;
-	}
+	g.n_ghost = nonLocalNgbrs.size();	//number of ghost nodes: nodes that share an edge with a local node but are not local
+	//g.n_ghost = 1;
+	//if( thisPE==0){
+	//	g.n_ghost = g.n-g.n_local;
+	//}
 	g.n_total = g.n_local + g.n_ghost;	
 	
 	uint64_t* ghost_unmap = new uint64_t[g.n_ghost];			// global id of the ghost nodes
@@ -378,28 +548,18 @@ int main(int argc, char** argv) {
 	g.ghost_tasks = (uint64_t *) neighborPEs.data();
     rOwners.release();
 	
-	
-	g.ghost_degrees = new uint64_t[g.n_ghost];		// degree of every shost node
-	
-	/*
-	PRINT( sizeof(g.ghost_degrees) );
-		get_ghost_degrees(g, &comm, &q);
-	PRINT( sizeof(g.ghost_degrees) );  
-	*/
-	
 
 	// copied from xtrapulp/dist_graph.cpp::relabel_edges
   
 	g.map = (struct fast_map*)malloc(sizeof(struct fast_map));		// ?
 	
-	uint64_t cur_label = g.n_local;
 	uint64_t total_edges = g.m_local + g.n_local;
 
 	if (total_edges * 2 < g.n){
-		PRINT("\n\t\t initializing NO hash map with " << g.n<<" values \n\n");
+		PRINT("\n\t\t"<< *comm<< ": initializing NO hash map with " << g.n<<" values \n\n");
 		init_map_nohash(g.map, g.n); 
 	}else{ 
-		PRINT("\n\t\t initializing hash map with "<< total_edges*2<< " values \n");
+		PRINT("\n\t\t"<< *comm<< ": initializing hash map with "<< total_edges*2<< " values \n");
 		init_map(g.map, total_edges * 2);
 	}
 		
@@ -409,9 +569,11 @@ int main(int argc, char** argv) {
 //PRINT(*comm <<":  vert "<< vert << " -> " << i);
 		set_value(g.map, vert, i);
 	}
-
+	
+	uint64_t cur_label = g.n_local;
+	
 	for (uint64_t i = 0; i < g.m_local; ++i) {	
-		uint64_t out = g.out_edges[i];			// out= global id of neighboring nodes
+		uint64_t out = g.out_edges[i];			// out= global id of neighbor
 		uint64_t val = get_value(g.map, out);
 			
 		// if val==NULL_KEY then this neighbor is not local
@@ -424,7 +586,8 @@ int main(int argc, char** argv) {
 			g.out_edges[i] = val;
 		}
 	}
-	
+*/	
+
 
 
 	// PRINTS
@@ -433,25 +596,17 @@ int main(int argc, char** argv) {
 	PRINT(*comm << ": g.n= " << g.n << ", g.m= " << g.m << ", g.m_local = " << g.m_local << ", g.n_local= " << g.n_local << \
 			", g.n_offset= " << g.n_offset << ", g.n_ghost= " << g.n_ghost << ", g.n_total= " << g.n_total);
 
-/*	
-	for(unsigned int h=0; h<g.n_ghost; h++){
-		PRINT(*comm << ": >>> " << g.ghost_unmap[h] << " ~~~~~ " << g.ghost_tasks[h]);// << "  ### " << g.ghost_degrees[h] );
-	}
-			
-	PRINT(g.m_local );
-    for(unsigned int h=0; h<g.m_local; h++){
-		std::cout<< g.out_edges[h] << ", ";
-	}
-	std::cout<< std::endl;
-	PRINT(g.n_local);
 	
-	for(unsigned int h=0; h<g.n_local+1; h++){
-		std::cout<< g.out_degree_list[h] << ", ";
-	}
-	std::cout<< std::endl;
-	PRINT(g.n_offset);
+g.ghost_degrees = new uint64_t[g.n_ghost];		// degree of every ghost node	
+queue_data_t q;
+init_queue_data(&g, &q);
+get_ghost_degrees(&g, &xtrapulpComm, &q);	
 
-*/
+
+pulp_data_t pulp;
+init_pulp_data(&g, &pulp, numBlocks);	
+	
+
 
 
 	//---------------------------------------------------------
@@ -460,10 +615,12 @@ int main(int argc, char** argv) {
     //
 
     double sumPulpTime = 0.0;
-    int repeatTimes = 5;
-    
+    int repeatTimes = 1;
+//printf("Task %d, n %lu, n_offset %lu, n_local %lu, m %lu, m_local_read %lu\n", procid, ggi.n, ggi.n_offset, ggi.n_local, ggi.m , ggi.m_local_read);
+	
 	int* pulpPartitionArray = new int[g.n_local];
 	
+
 	std::vector<struct Metrics> metricsVec;
 	scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
 	scai::lama::DenseVector<IndexType> pulpPartitionDV(dist);
@@ -471,10 +628,12 @@ int main(int argc, char** argv) {
 	int r;
 	for( r=0; r<repeatTimes; r++){		
 		metricsVec.push_back( Metrics( comm->getSize()) );
+		metricsVec[r].numBlocks = settings.numBlocks;
 		
 		std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
 		//
 		xtrapulp_run( &g, &ppc, pulpPartitionArray, numBlocks);
+		//xtrapulp(&g, &ppc, &xtrapulpComm, &pulp, &q);
 		//
 		std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
 		double partPulpTime= comm->max(partitionTime.count() );
@@ -519,10 +678,14 @@ int main(int argc, char** argv) {
 	// free arrays
 	//
 	
+	//delete[] gen_edges;
+	
+	/*
 	delete[] out_edges;
 	delete[] out_degree_list;
 	delete[] local_unmap;
 	delete[] ghost_unmap;
+	*/
 	
 	//clear_graph( &g );
 	
@@ -610,12 +773,13 @@ int main(int argc, char** argv) {
     }
     
     // WARNING: the function writePartitionCentral redistributes the coordinates
-    if( writePartition ){
+    if( writePartition && settings.outFile!="-"){
 		if(comm->getRank()==0) std::cout<<" write partition" << std::endl;
 		ITI::FileIO<IndexType, ValueType>::writePartitionCentral( pulpPartitionDV, settings.outFile+"_xtrapulp_k_"+std::to_string(numBlocks)+".partition");    
         
     }
   
+	//ITI::aux<IndexType,ValueType>::print2DGrid(graph, pulpPartitionDV  );
 		
     //this is needed for supermuc
     std::exit(0);   
