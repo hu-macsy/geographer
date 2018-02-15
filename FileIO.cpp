@@ -665,8 +665,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
             globalM = std::stoll(item);
             
             if( globalN<=0 or globalM<=0 ){
-                PRINT0("Negative input, maybe int value is not big enough: globalN= " << globalN << " , globalM= "<< globalM);
-                exit(0);
+                throw std::runtime_error("Negative input, maybe int value is not big enough: globalN= "
+                        + std::to_string(globalN) + " , globalM= " + std::to_string(globalM));
             }
             
             bool readWeightInfo = !std::getline(ss, item, ' ').fail();
@@ -720,7 +720,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     	std::getline(file, line);
         if( file.tellg()<0){
             PRINT(*comm << " : "<<  ll);
-            exit(0);
+            exit(1);
         }
     }
 //PRINT( *comm << ": " << ll << " __ " << file.tellg() );
