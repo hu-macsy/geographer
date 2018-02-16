@@ -1135,6 +1135,9 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 	}
     
     scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils::edgeList2CSR<IndexType, ValueType>( edgeList );
+    scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, globalN) );
+    scai::dmemo::DistributionPtr noDist( new scai::dmemo::NoDistribution(globalN));
+    graph.redistribute(rowDistPtr, noDist);
     
     return graph;
 }
