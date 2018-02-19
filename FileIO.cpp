@@ -1089,6 +1089,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 	std::getline(ss, item, ' ');
 	globalM = std::stoll(item);
 	
+	throw std::logic_error("Not yet implemented.");
+
 	if( globalN<=0 or globalM<=0 ){
 		PRINT0("Negative input, maybe int value is not big enough: globalN= " << globalN << " , globalM= "<< globalM);
 		exit(0);
@@ -1108,7 +1110,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 	const ULLI endLocalRange = (thisPE+1)*avgEdgesPerPE;
 	
 	
-	
+
 	/*
     IndexType numRows;
     IndexType numColumns;
@@ -1141,7 +1143,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 	
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType thisPE = comm->getRank();
-	PRINT0("About to read a distribute edge list");
+	PRINT0("About to read a distributed edge list");
 	
 	std::string thisFileName = filename+std::to_string(thisPE);
 	std::ifstream file( thisFileName );
