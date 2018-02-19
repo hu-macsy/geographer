@@ -89,19 +89,6 @@ def defaultSettings():
 	
 	return retString
 
-#######################################################################
-
-def getRunNumber(path):
-	runsFile = os.path.join( path,".runs")
-	
-	with open(runsFile,"r+") as f:
-		line = f.readline().split()
-		prevRun = int(line[0])
-		newRun = prevRun+1
-		f.seek(0)
-		f.write( str(newRun) )
-		
-	return newRun
 
 #######################################################################
 
@@ -244,8 +231,8 @@ def parseOutFile( outFile ):
 		print ("WARNING: File "+outFile+" does not exist.\nSkipping...");
 		return [-1]*NUM_METRICS, [-1]*NUM_METRICS, -1
 		#exit(-1)
-	else:
-		print ("Parsing outFile: " + outFile)
+	#else:
+		#print ("Parsing outFile: " + outFile)
 	n = -1
 		
 	with open(outFile) as f:

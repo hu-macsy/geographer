@@ -36,7 +36,7 @@ def addRelativePlot( exp, metricValues, metricName, toolNames, baseToolId, plotF
 		return -1;
 
 	#plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel=ratio , legend style={at={(1.5,0.7)}}, xmode = log, log basis x= 2, xtick={")
-	plotF.write("\n\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel=ratio , legend style={at={(1.5,0.7)}}, xmode = log, log basis x= 2, xtick={")
+	plotF.write("\n\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel=ratio, legend style={at={(1.5,0.7)}}, xmode = log, log basis x= 2, xtick={")
 	for x in range(0, len(exp.k)-1 ):
 		if exp.k[x]!=-1:
 			plotF.write( str(exp.k[x]) +", ")
@@ -250,7 +250,7 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues):
 			if metricName=="imbalance":				
 				continue
 			
-			plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel= "+ METRIC_VALUES[m] +", legend style={at={(1.5,0.7)}},xmode = log, log basis x= 2, xtick={")
+			plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel= "+ METRIC_VALUES[m] +", legend style={at={(1.5,0.7)}},xmode = log, ymode=log, log basis x= 2, xtick={")
 			for x in range(0, len(exp.k)-1 ):
 				if exp.k[x]!=-1:							### changed index from i to x
 					plotF.write( str(exp.k[x]) +", ")
@@ -635,22 +635,12 @@ if __name__=="__main__":
 	# get the wanted experiments
 	wantedExp = []
 
-	#
-	print( wantedExpIDs )
-	#
-
 	if wantedExpIDs is None or len(wantedExpIDs)==0:
 		wantedExp = allExperiments
 	else:
 		for i in range(0, numExps):
 			if i in wantedExpIDs:
 				wantedExp.append( allExperiments[i] )
-
-	#exit(0)
-	# debug
-	#for exp in wantedExp:
-	#	exp.printExp()
-	#
 
 	#
 	# gather info for each wanted experiment
