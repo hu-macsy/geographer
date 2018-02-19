@@ -1275,7 +1275,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 			maxLocalVertex = maxV;
 		}
 	}
-	PRINT(thisPE << ": vertices range from "<< minLocalVertex << " to " << maxLocalVertex);
+	//PRINT(thisPE << ": vertices range from "<< minLocalVertex << " to " << maxLocalVertex);
 	
 	const IndexType N = comm->max( maxLocalVertex );
 	localM *=2 ;	// for the duplicated edges
@@ -1341,26 +1341,34 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	
 	scai::dmemo::CommunicationPlan sendPlan( quantities.data(), comm->getSize() );
 	
+	PRINT0("allocated send plan");
+
 	scai::dmemo::CommunicationPlan recvPlan;
 	recvPlan.allocateTranspose( sendPlan, *comm );
 	
-	scai::utilskernel::LArray<IndexType> recvEdges;		// the edges to be received
 	IndexType recvEdgesSize = recvPlan.totalQuantity();
+	scai::utilskernel::LArray<IndexType> recvEdges(recvEdgesSize, -1);		// the edges to be received
 	//PRINT(thisPE <<": received  " << recvEdgesSize << " edges");
+
+    PRINT0("allocated communication plans");
 
 	{
 		scai::hmemo::WriteOnlyAccess<IndexType> recvVals( recvEdges, recvEdgesSize );
 		comm->exchangeByPlan( recvVals.get(), recvPlan, sendEdgeList.data(), sendPlan );
 	}
 
+	PRINT0("exchanged edges");
+
 	const IndexType minLocalVertexBeforeInsertion = localPairs.front().first;
 	SCAI_ASSERT_LE_ERROR(minLocalVertexBeforeInsertion - recvEdges[0], 1, "Gap too high between received edges and beginning of own.");
 
 	// insert all the received edges to your local edges
+	scai::hmemo::ReadAccess<IndexType> rRecvEdges(recvEdges);
+	SCAI_ASSERT_EQ_ERROR(rRecvEdges.size(), recvEdgesSize, "mismatch");
 	for( IndexType i=0; i<recvEdgesSize; i+=2){
 		int_pair sp;
-		sp.first = recvEdges[i];
-		sp.second = recvEdges[i+1];
+		sp.first = rRecvEdges[i];
+		sp.second = rRecvEdges[i+1];
 		localPairs.insert( localPairs.begin(), sp);//this is horribly expensive! Will move the entire list of local edges with each insertion!
 		//PRINT( thisPE << ": recved edge: "<< recvEdges[i] << " - " << recvEdges[i+1] );
 	}
@@ -1402,7 +1410,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	IndexType index = 1;
 	
 	{
-		scai::hmemo::WriteOnlyAccess<IndexType> wLocalIndices(localIndices);
+		scai::hmemo::WriteAccess<IndexType> wLocalIndices(localIndices);
 		IndexType oldVertex = localPairs[0].first;
 		wLocalIndices[0] = oldVertex;
 		
