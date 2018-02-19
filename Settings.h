@@ -12,7 +12,7 @@ typedef long int IndexType;
 typedef double ValueType;
 
 namespace ITI{
-enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5, BINARY = 6, EDGELISTDIST = 7};
+enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5, BINARY = 6, EDGELIST = 7, EDGELISTDIST = 8};
 
 inline std::istream& operator>>(std::istream& in, Format& format){
 	std::string token;
@@ -31,8 +31,10 @@ inline std::istream& operator>>(std::istream& in, Format& format){
         format = ITI::Format::TEEC;
     else if (token == "BINARY" or token == "6")
         format = ITI::Format::BINARY;
-	else if (token == "EDGELISTDIST" or token == "7")
-        format = ITI::Format::EDGELISTDIST;
+	else if (token == "EDGELIST" or token == "7")
+        format = ITI::Format::EDGELIST;
+	else if (token == "EDGELISTDIST" or token == "8")
+	    format = ITI::Format::EDGELISTDIST;
 	else
 		in.setstate(std::ios_base::failbit);
 	return in;
@@ -57,6 +59,8 @@ inline std::ostream& operator<<(std::ostream& out, Format method){
         token == "BINARY";
 	else if (method == ITI::Format::EDGELISTDIST)
         token == "EDGELISTDIST";
+	else if (method == ITI::Format::EDGELIST)
+	    token == "EDGELIST";
 	out << token;
 	return out;
 }

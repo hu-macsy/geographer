@@ -38,9 +38,9 @@ namespace ITI {
          *                            coordinates. If the coordinates are in 2D the last number is 0.
          * MATRIXMARKET format: for graphs: we use the function readFromFile (or readFromSingleFile) 
          *                            provided by LAMA.
-         *                for coordiantes: first line has two numbers, the number of points N and
+         *                for coordinates: first line has two numbers, the number of points N and
          *                            the dimension d. Then next N*d lines contain the coordinates
-         *                            for the poitns: every d lines are the coordinates for a point.
+         *                            for the points: every d lines are the coordinates for a point.
         */
 
         
@@ -129,7 +129,7 @@ public:
 	 * 4 3				    2 
 	 * 3 2
 	 */
-	static scai::lama::CSRSparseMatrix<ValueType> readEdgeListCentral(const std::string filename);
+	static scai::lama::CSRSparseMatrix<ValueType> readEdgeList(const std::string filename);
 	
 	
 	/* Edge list format but now there are k files, one for each PE
