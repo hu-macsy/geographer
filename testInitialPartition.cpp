@@ -420,39 +420,42 @@ int main(int argc, char** argv) {
             std::terminate();
         }
         case 3:{  //------------------------------------------- k-means
-            beforeInitialTime =  std::chrono::system_clock::now();
             PRINT0( "Get a k-means partition");
             
             // get a k-means partition
 			IndexType weightSum;
 			bool uniformWeights = true;
-				
-			DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
 			
-			if( not uniformWeights){	
-				scai::hmemo::HArray<IndexType> localWeightsInt( rowDistPtr->getLocalSize(), 1 );
-				scai::lama::DenseVector<IndexType> nodeWeightsInt;     // node weights
-				nodeWeightsInt.swap( localWeightsInt, rowDistPtr );
-				nodeWeightsInt.redistribute(tempResult.getDistributionPtr());
-					
-				weightSum = nodeWeightsInt.sum().Scalar::getValue<IndexType>();
-			}else{
-				// if all nodes have weight 1 then weightSum = globalN
-				weightSum = N;
-			}
-			const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
-				
-			// WARNING: getting an error in KMeans.h, try to redistribute coordinates
-			std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
-			for (IndexType d = 0; d < dimensions; d++) {
-				coordinateCopy[d].redistribute( tempResult.getDistributionPtr() );
-			}
 			//
 			int repeatTimes = 5;
 			beforeInitialTime =  std::chrono::system_clock::now();
 
 			for(int r=0 ; r< repeatTimes; r++){
+				
+				const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
+				
 				std::chrono::time_point<std::chrono::system_clock> beforeTmp = std::chrono::system_clock::now();
+				
+				DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
+				
+				if( not uniformWeights){	
+					scai::hmemo::HArray<IndexType> localWeightsInt( rowDistPtr->getLocalSize(), 1 );
+					scai::lama::DenseVector<IndexType> nodeWeightsInt;     // node weights
+					nodeWeightsInt.swap( localWeightsInt, rowDistPtr );
+					nodeWeightsInt.redistribute(tempResult.getDistributionPtr());
+						
+					weightSum = nodeWeightsInt.sum().Scalar::getValue<IndexType>();
+				}else{
+					// if all nodes have weight 1 then weightSum = globalN
+					weightSum = N;
+				}
+					
+				// WARNING: getting an error in KMeans.h, try to redistribute coordinates
+				std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
+				for (IndexType d = 0; d < dimensions; d++) {
+					coordinateCopy[d].redistribute( tempResult.getDistributionPtr() );
+				}
+							
 				partition = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeights, blockSizes, settings);     
 				std::chrono::duration<double> thisPartitionTime = std::chrono::system_clock::now() - beforeTmp;
 				ValueType time  = comm->max( thisPartitionTime.count() );
