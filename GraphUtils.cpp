@@ -1252,7 +1252,8 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	//TODO: if nothing better comes up, duplicate and reverse all edges before SortingDatatype
 	//		to ensure matrix will be symmetric
 	
-	IndexType maxLocalVertex=0, minLocalVertex=std::numeric_limits<IndexType>::max();
+	IndexType maxLocalVertex=0;
+	IndexType minLocalVertex=std::numeric_limits<IndexType>::max();
 	
 	for(IndexType i=0; i<localM; i++){
 		IndexType v1 = edgeList[i].first;
@@ -1301,14 +1302,13 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	// get vertex with max local id
 	IndexType newMaxLocalVertex = localPairs.back().value;
 	
-	//TODO: communicate first to see if you need eo send. now, just send to your +1 the your last vertex
+	//TODO: communicate first to see if you need to send. now, just send to your +1 the your last vertex
 	// store the edges you must send
 	std::vector<IndexType> sendEdgeList;
 	
-	IndexType vertex = newMaxLocalVertex;
 	IndexType numEdgesToRemove = 0;
 	for( std::vector<sort_pair>::reverse_iterator edgeIt = localPairs.rbegin(); edgeIt->value==newMaxLocalVertex; ++edgeIt){
-		sendEdgeList.push_back( edgeIt->value);
+		sendEdgeList.push_back( edgeIt->value); //Caution: This is an implicit conversion from double to int
 		sendEdgeList.push_back( edgeIt->index);
 		++numEdgesToRemove;
 	}
@@ -1342,30 +1342,31 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 		comm->exchangeByPlan( recvVals.get(), recvPlan, sendEdgeList.data(), sendPlan );
 	}
 
+	const IndexType minLocalVertexBeforeInsertion = localPairs.front().value;
+	SCAI_ASSERT_LE_ERROR(minLocalVertexBeforeInsertion - recvEdges[0], 1, "Gap too high between received edges and beginning of own.");
+
 	// insert all the received edges to your local edges
 	for( IndexType i=0; i<recvEdgesSize; i+=2){
 		sort_pair sp;
 		sp.value = recvEdges[i];
 		sp.index = recvEdges[i+1];
-		localPairs.insert( localPairs.begin(), sp);
+		localPairs.insert( localPairs.begin(), sp);//this is horribly expensive! Will move the entire list of local edges with each insertion!
 		//PRINT( thisPE << ": recved edge: "<< recvEdges[i] << " - " << recvEdges[i+1] );
 	}
 
 	IndexType numEdges = localPairs.size() ;
 	
+	SCAI_ASSERT_ERROR(std::is_sorted(localPairs.begin(), localPairs.end()), "Disorder after insertion of received edges." );
+
 	//
 	//remove duplicates
 	//
 	localPairs.erase(unique(localPairs.begin(), localPairs.end(), [](sort_pair p1, sort_pair p2) {
-		if( (p1.index==p2.index) and (p1.value==p2.value)) 
-			return true;
-		else
-			return false;
-	}), localPairs.end() );
+		return ( (p1.index==p2.index) and (p1.value==p2.value)); 	}), localPairs.end() );
 	//PRINT( thisPE <<": removed " << numEdges - localPairs.size() << " duplicate edges" );
 
 	//
-	// check than all is correct
+	// check that all is correct
 	//
 	newMaxLocalVertex = localPairs.back().value;
 	IndexType newMinLocalVertex = localPairs[0].value;
