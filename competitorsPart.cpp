@@ -64,6 +64,7 @@ int main(int argc, char** argv) {
 	struct Settings settings;
     //int parMetisGeom = 0;			//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
     bool writePartition = false;
+	ITI::Format coordFormat;
 	std::string tool;
 	
 	std::vector<std::string> allTools = {"parMetisGraph", "parMetisGeom", "parMetisSfc", "zoltanRcb", "zoltanRib", "zoltanMJ", "zoltanHsfc"};
@@ -76,7 +77,7 @@ int main(int argc, char** argv) {
 		("graphFile", value<std::string>(), "read graph from file")
         ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
 		("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
-		("coordFormat", value<ITI::Format>(), "format of coordinate file")
+		("coordFormat",  value<ITI::Format>(&coordFormat), "format of coordinate file")
         
         ("generate", "generate random graph. Currently, only uniform meshes are supported.")
         ("numX", value<IndexType>(&settings.numX), "Number of points in x dimension of generated graph")
@@ -153,7 +154,9 @@ int main(int argc, char** argv) {
             coordFile = graphFile + ".xyz";
         }
         
-        if (vm.count("fileFormat")) {
+        if (vm.count("coordFormat")) {
+			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
+		}else if (vm.count("fileFormat")) {
             graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, settings.fileFormat );
         }else{
             graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
@@ -239,7 +242,12 @@ int main(int argc, char** argv) {
     // uniform node weights
     scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
 	
-	settings.repeatTimes = 5;
+	// if graph is too big, repeat less times to avoid memory and time problems
+	if( N>std::pow(2,29) ){
+		settings.repeatTimes = 2;
+	}else{
+		settings.repeatTimes = 5;
+	}
 	int parMetisGeom=0	;
 	
 	//PRINT0(tool.substr(0,8) << " __ " << tool.substr(0,6) );

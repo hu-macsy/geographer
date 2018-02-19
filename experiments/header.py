@@ -63,16 +63,16 @@ class experiment:
 
 def defaultSettings():
 	epsilon = 0.03
-	minBorderNodes = 100
-	stopAfterNoGainRounds = 20
-	minGainForNextGlobalRound = 10
+	minBorderNodes = 1000
+	stopAfterNoGainRounds = 100
+	minGainForNextGlobalRound = 100
 	multiLevelRounds = 12
 	initialPartition = 3	# 0:SFC, 3:k-means, 4:ms
 	initialMigration = 0	# 0:SFC, 3:k-means, 4:ms
 	gainOverBalance = 0
 	skipNoGainColors = 0
 	tieBreakingStrategy = 1
-	repeatTimes = 10	
+	repeatTimes = 5	
 	
 	#retString = " --dimensions=" + str(dimensions)
 	retString = " --minBorderNodes="+str(minBorderNodes)
@@ -277,6 +277,31 @@ def parseOutFile( outFile ):
 		
 	return metricNames, metricValues, n
 		
+#######################################################################
+# Special routine only for Geographers metric
+# parses an outFile and returns the metric name found and the actual metric values
+
+def parseOutFileForGeographer( outFile ):
+	
+	metricNames, metricValues, k = parseOutFile( outFile )
+	
+	numMetrics = len(metricNames)
+	if numMetrics==NUM_METRICS:
+		return metricNames, metricValues, k 
+	
+	retNames = []
+	retValues = []
+	
+	for m in range(0, numMetrics):
+		thisMetricName = metricNames[m] 
+		thisMetricValues = metricValues[m]
+		
+		if thisMetricName in METRIC_NAMES:
+			retNames.append( thisMetricName )
+			retValues.append( thisMetricValues )
+			
+	return retNames, retValues, k
+	
 #######################################################################
 
 def outFileString( exp, i, tool):

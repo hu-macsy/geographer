@@ -66,10 +66,12 @@ int main(int argc, char** argv) {
     //int parMetisGeom = 0;			//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
     bool writePartition = false;
 	bool storeInfo = true;
+	ITI::Format coordFormat;
 	std::string outPath;
 	std::string graphName;
 	
-	std::vector<std::string> allTools = {"zoltanRcb", "zoltanRib", "zoltanMJ", "zoltanHsfc", "parMetisSfc", "parMetisGeom", "parMetisGraph" };
+	//WARNING: removed parmetis sfc
+	std::vector<std::string> allTools = {"zoltanRcb", "zoltanRib", "zoltanMJ", "zoltanHsfc", /*"parMetisSfc",*/ "parMetisGeom", "parMetisGraph" };
     
 	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
 	
@@ -79,7 +81,7 @@ int main(int argc, char** argv) {
 		("graphFile", value<std::string>(), "read graph from file")
         ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
 		("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
-		("coordFormat", value<ITI::Format>(), "format of coordinate file")
+		("coordFormat",  value<ITI::Format>(&coordFormat), "format of coordinate file")
         
         ("generate", "generate random graph. Currently, only uniform meshes are supported.")
         ("numX", value<IndexType>(&settings.numX), "Number of points in x dimension of generated graph")
@@ -167,7 +169,9 @@ int main(int argc, char** argv) {
         SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
         		
         //read the coordinates file
-		if (vm.count("fileFormat")) {
+		if (vm.count("coordFormat")) {
+			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
+		}else if (vm.count("fileFormat")) {
 			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
 		} else {
 			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
@@ -254,7 +258,12 @@ int main(int argc, char** argv) {
 		// uniform node weights
 		scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
 		
-		settings.repeatTimes = 5;
+		// if graph is too big, repeat less times to avoid memory and time problems
+		if( N>std::pow(2,29) ){
+			settings.repeatTimes = 2;
+		}else{
+			settings.repeatTimes = 5;
+		}
 		int parMetisGeom=0	;
 		
 		//WARNING: in order for the SaGa scripts to work this must be done as in Saga/header.py::outFileSting

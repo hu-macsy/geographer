@@ -253,8 +253,8 @@ def submitCompetitor(exp, tool):
 		commandString = competitorsExe + " --tool " + tool + " --graphFile " + exp.paths[i] + params + " --outFile="+outFile
 
 		submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_k"+str(exp.k[i])+"_" + tool+".cmd"
-		submitfile = createLLSubmitFile( os.path.join( toolsPath, "tmp") , submitFilename, commandString, "00:05:00", int(exp.k[i]) )
-		call(["llsubmit", submitfile])
+		submitfile = createLLSubmitFile( os.path.join( toolsPath, "tmp") , submitFilename, commandString, "00:10:00", int(exp.k[i]) )
+		#call(["llsubmit", submitfile])
 		
 
 	
@@ -302,7 +302,7 @@ def submitParMetis(exp, geom):
 		commandString = parMetisExe + " --graphFile " + exp.paths[i] + params + " --outFile="+outFile
 
 		submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_k"+str(exp.k[i])+"_" + tool+".cmd"
-		submitfile = createLLSubmitFile( os.path.join( toolsPath, "tmp") , submitFilename, commandString, "00:05:00", int(exp.k[i]) )
+		submitfile = createLLSubmitFile( os.path.join( toolsPath, "tmp") , submitFilename, commandString, "00:10:00", int(exp.k[i]) )
 		call(["llsubmit", submitfile])
 		
 

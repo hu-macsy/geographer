@@ -2,6 +2,8 @@ from subprocess import call
 from submitFileWrapper_Supermuc import *
 from header import*
 from inspect import currentframe, getframeinfo
+from meansHeader import *
+
 
 import os
 import math
@@ -77,152 +79,45 @@ def addRelativePlot( exp, metricValues, metricName, toolNames, baseToolId, plotF
 		plotF.write("\\addlegendentry{"+thisToolName+"}\n")
 		
 	plotF.write("\\end{axis}\n\\end{tikzpicture}\n")
-	plotF.write("\\caption{Metric: "+ metricName+" relative to "+ toolNames[baseToolId] +"}\n\n")		
+	#plotF.write("\\caption{Metric: "+ metricName+" relative to "+ toolNames[baseToolId] +"}\n\n")		
+
 
 #---------------------------------------------------------------------------------------------	
 
-# returns a list of size len(toolNames) (the number of given tools) with one value per tool for the given metric
-
-def getGeomMean( metricValues, metricName, toolNames, baseToolId):
-	for m in range(0, NUM_METRICS):
-		if metricName==METRIC_NAMES[m]:
-			break;
+def addGeoMeanInfo( metricValues, metricName, toolNames, baseToolId, plotF):
 	
-	if m==NUM_METRICS:
-		print("ERROR: metric " + metricName + " was not found")
-		return -1
-	# now m is the index of the wanted metric
+	# one metric, for all tools
+	geoMeanForAllTools = getGeomMeanForMetric( metricValues, metricName, toolNames, baseToolId)
 	
-	if baseToolId >= len(toolNames):
-		print("ERROR: tool ID given " +  str(baseToolId) +" is too big, must be < " + str(len(toolNames)) )
-		return -1;
-	
-	# all the metrics for the base tool
-	baseToolMetrics = metricValues[baseToolId]
-	
-	returnMeans = []
-	
-	for t in range(0,len(toolNames)):
-		
-		#if baseToolId==t:	# do not print the base tool metric
-		#	continue
-		
-		thisToolMetrics = metricValues[t]
-		thisToolName = toolNames[t]	
-		thisToolThisMetric = thisToolMetrics[m]
-		
-		baseToolThisMetric = baseToolMetrics[m];
-		
-		assert( len(thisToolThisMetric)==len(baseToolThisMetric) )
-		numValidMetrics = 0
-		productRatios = 1
-		
-		# could also multiply all elements in list baseToolThisMetric and thisToolThisMetric and divide
-		# but I want to check for -1 and 0 values
-		for i in range(0,len(thisToolThisMetric)):
-			if thisToolThisMetric[i]==-1 or baseToolThisMetric[i]==-1:
-				continue		# missing value, skip
-			if thisToolThisMetric[i]==0 or baseToolThisMetric[i]==0:
-				print ("Skipping metric " + metricName + " as a zero value was found and do not know how to handle\n")
-				returnMeans[0]=-1
-				return returnMeans;
-			
-			productRatios *= (thisToolThisMetric[i]/baseToolThisMetric[i])
-			numValidMetrics += 1
-		
-		returnMeans.append( productRatios**(1/float(numValidMetrics)) )
-		
-	print( returnMeans )
-	return returnMeans
-		
-
-#---------------------------------------------------------------------------------------------	
-
-def addGeoMeanInfo(exp, metricValues, metricName, toolNames, baseToolId, plotF):
-	
-	geoMeanForTools = getGeomMean( metricValues, metricName, toolNames, baseToolId)
-	
-	if geoMeanForTools[0] == -1:
+	if geoMeanForAllTools[0] == -1:
 		print("Skipping the geometric mean for metric " + metricName);
 		return -1;
 	
 	plotF.write("\nGeometric mean for metric: " + metricName + " , base tool: " + toolNames[baseToolId] +"\\\\ \n" )
 	
-	for i in range(0, len(geoMeanForTools) ):
-		plotF.write(toolNames[i] + " " + str(geoMeanForTools[i]) + "\\\\\n")
+	for i in range(0, len(geoMeanForAllTools) ):
+		plotF.write(toolNames[i] + " " + str(geoMeanForAllTools[i]) + "\\\\\n")
+		
+	return geoMeanForAllTools
 	
-#---------------------------------------------------------------------------------------------	
-
-# returns a list of size len(toolNames) (the number of given tools) with one value per tool for the given metric
-
-def getHarmMean( metricValues, metricName, toolNames, baseToolId):
-	for m in range(0, NUM_METRICS):
-		if metricName==METRIC_NAMES[m]:
-			break;
-	
-	if m==NUM_METRICS:
-		print("ERROR: metric " + metricName + " was not found")
-		return -1
-	# now m is the index of the wanted metric
-	
-	if baseToolId >= len(toolNames):
-		print("ERROR: tool ID given " +  str(baseToolId) +" is too big, must be < " + str(len(toolNames)) )
-		return -1;
-	
-	# all the metrics for the base tool
-	baseToolMetrics = metricValues[baseToolId]
-	
-	returnMeans = []
-	
-	for t in range(0,len(toolNames)):
-		
-		#if baseToolId==t:	# do not print the base tool metric
-		#	continue
-		
-		thisToolMetrics = metricValues[t]
-		thisToolName = toolNames[t]	
-		thisToolThisMetric = thisToolMetrics[m]
-		
-		baseToolThisMetric = baseToolMetrics[m];
-		
-		assert( len(thisToolThisMetric)==len(baseToolThisMetric) )
-		numValidMetrics = 0
-		sumRatios = 0
-		
-		# could also multiply all elements in list baseToolThisMetric and thisToolThisMetric and divide
-		# but I want to check for -1 and 0 values
-		for i in range(0,len(thisToolThisMetric)):
-			if thisToolThisMetric[i]==-1 or baseToolThisMetric[i]==-1:
-				continue		# missing value, skip
-			if thisToolThisMetric[i]==0 or baseToolThisMetric[i]==0:
-				print ("Skipping metric " + metricName + " as a zero value was found and do not know how to handle\n")
-				returnMeans[0]=-1
-				return returnMeans;
-			
-			ratio = 1/(thisToolThisMetric[i]/baseToolThisMetric[i])	# from the harmonic definition
-			sumRatios += ratio
-			numValidMetrics += 1
-		
-		returnMeans.append( numValidMetrics/sumRatios )
-		
-	print( returnMeans )
-	return returnMeans
-		
 
 #---------------------------------------------------------------------------------------------	
 
-def addHarmMeanInfo(exp, metricValues, metricName, toolNames, baseToolId, plotF):
+def addHarmMeanInfo( metricValues, metricName, toolNames, baseToolId, plotF):
 	
-	harmMeanForTools = getHarmMean( metricValues, metricName, toolNames, baseToolId)
+	# one metric, for all tools
+	harmMeanForAllTools = getHarmMeanForMetric( metricValues, metricName, toolNames, baseToolId)
 	
-	if harmMeanForTools[0] == -1:
+	if harmMeanForAllTools[0] == -1:
 		print("Skipping the harmonic mean for metric " + metricName);
 		return -1;
 	
 	plotF.write("\nHarmonic mean for metric: " + metricName + " , base tool: " + toolNames[baseToolId] +"\\\\ \n" )
 	
-	for i in range(0, len(harmMeanForTools) ):
-		plotF.write(toolNames[i] + " " + str(harmMeanForTools[i]) + "\\\\\n")
+	for i in range(0, len(harmMeanForAllTools) ):
+		plotF.write(toolNames[i] + " " + str(harmMeanForAllTools[i]) + "\\\\\n")
+		
+	return harmMeanForAllTools
 		
 #---------------------------------------------------------------------------------------------		
 # len(metricValues) == len(tools), a numTools*numMetrics*exp.size 3D matrix
@@ -232,12 +127,12 @@ def addHarmMeanInfo(exp, metricValues, metricName, toolNames, baseToolId, plotF)
 #		metricValues[i][j] = a list with values for tool i and metric j	,			size = num_of_metrics
 #		metricValues[i][j][l] = the value for tool i, metric j, for exp.k[l] ,		size = size_of_experiment
 		
-def createPlotsGeneric(exp, toolNames, metricNames, metricValues):
+def createPlotsForExp(exp, toolNames, metricNames, metricValues):
 	
 	numMetrics = len(metricNames)
 	#numMetrics =NUM_METRICS
 	numTools = len(toolNames)
-	print("number of metrics in createPlotsGeneric is " + str(numMetrics)+" and number of tools " + str(numTools) )
+	print("number of metrics in createPlotsForExp is " + str(numMetrics)+" and number of tools " + str(numTools) )
 	
 	#
 	print( str( len(metricValues) ) )
@@ -313,7 +208,6 @@ def createPlotsGeneric(exp, toolNames, metricNames, metricValues):
 			plotF.write(" other\n\n")
 			
 		plotF.write("Data gathered from directory: \n\n")
-		#plotF.write( os.path.join(os.getcwd(),gatherDir) +"\n\n")
 		plotF.write( toolsPath +"\n\n")
 		plotF.write("From files: \n")
 			
@@ -327,20 +221,34 @@ def createPlotsGeneric(exp, toolNames, metricNames, metricValues):
 				else:
 					outF2 = outF2+"\_"
 						
-			plotF.write( outF2  +", ")
-			if exp.expType==1 or exp.expType==2:
-				break
-			#print( outF2 )
-				
+			#plotF.write( outF2  +", ")
+			plotF.write( outF2  +", k= " + str(exp.k[i]) +"\\\\")
+			#if exp.expType==1 or exp.expType==2:
+			#	break
+					
+		plotF.write("\\clearpage")
+		
 		#
 		# plot each metric that is shared with the competitors in one figure
 		#
 		
-		plotF.write("\\clearpage")
+		# these are 2D matrices with numRows= numMetrics and numColumns=numTools
+		# geoMeanMatrix[i][j] will have the geomMean (of the ralative values compared to the base tool (toolNames[0]))
+		# 		for tool i and metric j. The same for the harmonic mean
+		geoMeanMatrix = []
+		harmMeanMatrix = []
+		
 		
 		# for all metrics
 		for m in range(0, numMetrics):
 			metricName = metricNames[m]
+			print(">>> to plot for metric" + metricName)
+			## TODO:
+			## maybe skip some metrics for brevity??
+			## for example imbalance
+			##
+			if metricName=="imbalance":				
+				continue
 			
 			plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel= "+ METRIC_VALUES[m] +", legend style={at={(1.5,0.7)}},xmode = log, log basis x= 2, xtick={")
 			for x in range(0, len(exp.k)-1 ):
@@ -381,25 +289,173 @@ def createPlotsGeneric(exp, toolNames, metricNames, metricValues):
 			addRelativePlot( exp, metricValues, metricName, toolNames, 0, plotF )
 			plotF.write("\\caption{Metric: "+ metricName+"}\n\\end{figure}\n\n")
 			
-			addGeoMeanInfo( exp, metricValues, metricName, toolNames, 0, plotF )
-			addHarmMeanInfo( exp, metricValues, metricName, toolNames, 0, plotF )
+			# write the geom and harm mean as text
+			addGeoMeanInfo( metricValues, metricName, toolNames, 0, plotF) 
+			addHarmMeanInfo( metricValues, metricName, toolNames, 0, plotF)
+			
+			geoMeanMatrix.append( getGeomMeanForMetric( metricValues, metricName, toolNames, 0) )
+			harmMeanMatrix.append( getHarmMeanForMetric( metricValues, metricName, toolNames, 0) )
 						
-			plotF.write("\\clearpage")
+			plotF.write("\\clearpage\n\n")
 		
-		#addRelativePlot( exp, metricValues, "timeSpMV", toolNames, 0, plotF)
+		plotF.write("\n\\begin{figure}\n")
+		plotMeanForAllTool( geoMeanMatrix, metricNames, numMetrics, toolNames, plotF, "Geometric")
+		plotF.write("\\caption{Geometric mean for all metrics and all tools for experiment:" + str(exp.ID) +" with base tool: " + wantedTools[0] +"}\n\\end{figure}\n\n")
+		plotF.write("\n\\begin{figure}\n")
+		plotMeanForAllTool( harmMeanMatrix, metricNames, numMetrics, toolNames, plotF,"Harmonic")
+		plotF.write("\\caption{Harmonic mean for all metrics and all tools for experiment:" + str(exp.ID) +" with base tool: " + wantedTools[0] +"}\n\\end{figure}\n\n")
+		plotF.write("\n\n")
 		
+		newNumMetrics = len(geoMeanMatrix)
+		
+		'''
+		for m in range(0, newNumMetrics):
+			assert( len(geoMeanMatrix[m])==numTools )
+						
+			thisMetric = geoMeanMatrix[m]
+			metricName = metricNames[m]
+			
+			if metricName=="imbalance":				
+				continue
+			
+			plotF.write(metricName + " for all given tools: ")
+			for x in thisMetric:
+				plotF.write(str(x) + " , ")
+			plotF.write("\n\n")
+		'''
+		plotF.write("\n\n")
 		plotF.write("\\end{document}")
 
 	print("Plots written in file " + plotFile )
 
 #---------------------------------------------------------------------------------------------		
 
+def createMeanPlotsForAllExp( wantedExp, wantedTools):
+	
+	numExp = len(wantedExp)
+	
+	# create the filename
+	plotFileName = "expMeans_t"
+	#plotFileName += "t"
+	for t in wantedTools:
+		for t2 in range(0,NUM_TOOLS):
+			tool2 = allTools[t2]
+			if t==tool2:
+				plotFileName += str(t2)
+				
+	plotFileName += "_exp"
+	for exp in wantedExp:
+		plotFileName+=str(exp.ID)
+	
+	plotFileName += ".tex"
+	plotFile = os.path.join( plotsPath, plotFileName);
+		
+	if os.path.exists(plotFile + ".tex"):
+		print("WARNING: Plot file " + plotFile + " already exists and will be overwriten.")
+	
+	# write file header
+	with open(plotFile,'w') as plotF:
+		plotF.write("\\documentclass{article}\n\\usepackage{tikz}\n\\usepackage{pgfplots}\n") 
+		plotF.write("\\usepackage[total={7in, 9in}]{geometry}\n\n")
+		plotF.write("\\begin{document}\n\n")
+		plotF.write("\\today\n\n");
+	
+		plotF.write("Data gathered from directory: \n\n")
+		plotF.write( toolsPath +"\n\n")
+		#plotF.write("From files: \n")
+		#TODO: add all the files?
+		
+		plotF.write("\\clearpage\n\n")
+	
+	
+	#for e in range(0, numExp):
+	#		exp = wantedExp[e]
+
+	for exp in wantedExp:	
+		
+		metricValues= []
+		for tool in wantedTools:
+			metricNames, metricValuesTmp = gatherExpTool( exp, tool )
+			metricValues.append( metricValuesTmp)
+			
+			
+		numMetrics = len(metricNames)
+		numTools = len(wantedTools)
+		print("number of metrics in createMeanPlotsForAllExp is " + str(numMetrics)+" and number of tools " + str(numTools) )
+		
+		#print( str( len(metricValues) ) )
+		#rint( str( len(metricValues[0]) ) )
+		#print( str( len(metricValues[0][0]) ) )
+		
+		if numMetrics!= len(metricValues[0]) :
+			print("WARNING: len(metricNames)= "+ str(numMetrics) + " and len(metricValues) mismatch= " + str(len(metricValues[0])) )	
+		if len(metricValues[0][0])!= exp.size :
+			print("WARNING: len(metricNames)= "+ len(metricsValues[0][0]) + " and exp.size mismatch= " + str(exp.size) )
+		if numTools!=len(metricValues):
+			print("WARNING: len(metricValues)= "+ str(len(metricValues)) + " and numTools mismatch= " + str(numTools))	
+		
+	
+		# these are 2D matrices with numRows= numMetrics and numColumns=numTools
+		# geoMeanMatrix[i][j] will have the geomMean (of the relative values compared to the base tool (wantedTools[0]))
+		# 		for tool i and metric j. The same for the harmonic mean
+		geoMeanMatrix = []
+		harmMeanMatrix = []
+		
+		plotF= open(plotFile,'a')
+		
+		for m in range(0, numMetrics):
+			metricName = metricNames[m]
+		
+			## skip certain metrics
+			## or handle differently
+			if metricName=="imbalance":				
+				continue
+			if metricName=="timeTotal":
+				timeTmeans = getGeomMeanForMetric( metricValues, metricName, wantedTools, 0)
+				plotF.write("Values for metric timeTotal: ")
+				for t in range(0, len(timeTmeans)):
+					plotF.write(wantedTools[t]+"= " + str(timeTmeans[t])+" , ")
+					
+			geoMeanMatrix.append( getGeomMeanForMetric( metricValues, metricName, wantedTools, 0) )
+			harmMeanMatrix.append( getHarmMeanForMetric( metricValues, metricName, wantedTools, 0) )
+		
+		
+		plotF.write("\n\nPlots for experiment with id:" + str(exp.ID) + " containing instances:\\\\")
+		for i in range(0,exp.size):
+			outF1 = exp.graphs[i]
+			outF2 = ""
+			for c in outF1:
+				if c!="_":
+					outF2 += c
+				else:
+					outF2 = outF2+"\_"
+						
+			plotF.write( outF2  +", k= " + str(exp.k[i]) +"\\\\")
+			#if exp.expType==1 or exp.expType==2:
+			#	break
+			
+		plotF.write("\n\\begin{figure}\n")
+		plotMeanForAllTool( geoMeanMatrix, metricNames, numMetrics, wantedTools, plotF, "Geometric")
+		#plotMeanForAllTool( harmMeanMatrix, metricNames, numMetrics, wantedTools, plotF, "Harmonic")
+		plotF.write("\\caption{Geometric mean for all metrics and all tools for experiment:" + str(exp.ID) +" with base tool: " + wantedTools[0] +"}\n\\end{figure}\n\n")	
+		plotF.write("\n\n\\clearpage\n\n")
+		plotF.close()
+		
+		
+	plotF= open(plotFile,'a')
+	plotF.write("\n\n")
+	plotF.write("\\end{document}")
+	print("Collective results written in file " + plotFile)
+
+#---------------------------------------------------------------------------------------------		
+	
+	
 def createCsv(exp, toolNames, metricNames, metricValues):
 
 	numMetrics = len(metricNames)
 	#numMetrics =NUM_METRICS
 	numTools = len(toolNames)
-	print("number of metrics in createPlotsGeneric is " + str(numMetrics)+" and number of tools " + str(numTools) )
+	print("number of metrics in createCsv is " + str(numMetrics)+" and number of tools " + str(numTools) )
 	
 	#
 	print( str( len(metricValues) ) )
@@ -452,7 +508,10 @@ def gatherExpTool( exp, tool ):
 			metricValuesTmp = [-1 for x in range(0, NUM_METRICS)]
 			#metricNames = ["-"]*NUM_METRICS
 		else:
-			metricNames, metricValuesTmp, k = parseOutFile( gatherFile )
+			if tool=="Geographer":
+				metricNames, metricValuesTmp, k = parseOutFileForGeographer( gatherFile )
+			else:
+				metricNames, metricValuesTmp, k = parseOutFile( gatherFile )
 	
 		#print( str(len(metricValuesTmp)) )
 		
@@ -521,11 +580,11 @@ def gatherCompetitor( exp, tool ):
 		#print(metricNames)
 		#print(metricValues)
 
-	# convert to traspose so we have a list for every metric		
+	# convert to transpose so we have a list for every metric		
 	numMetrics = len(metricNames)
 	metricValues = [None]*numMetrics
 	for m in range(0,numMetrics):
-		metricValues[m] = [row[m] for row in allMetrics]		
+		metricValues[m] = [row[m] for row in allMetrics]
 	
 	return metricNames, metricValues
 			
@@ -535,92 +594,95 @@ def gatherCompetitor( exp, tool ):
 ############################################################ 
 # # # # # # # # # # # #  main
 
-#print ('Argument List:' + str(sys.argv))
+if __name__=="__main__":
 
-parser = argparse.ArgumentParser(description='Gather output information from file in specified folder. The folder must contail a gather.config that is created automatically by the submit script and list the output files for each experiment')
-parser.add_argument('--tools','-t' , type=str , nargs='*', default="Geographer", help='Name of the tools. It can be: Geographer, parMetisGraph, parMetisGeom.')
-parser.add_argument('--configFile','-c', default="SaGa.config", help='The configuration file. ')
-parser.add_argument('--wantedExp', '-we', type=int, nargs='*', metavar='exp', help='A subset of the experiments that will be submited.')
+	parser = argparse.ArgumentParser(description='Gather output information from file in specified folder. The folder must contail a gather.config that is created automatically by the submit script and list the output files for each experiment')
+	parser.add_argument('--tools','-t' , type=str , nargs='*', default="Geographer", help='Name of the tools. It can be: Geographer, parMetisGraph, parMetisGeom.')
+	parser.add_argument('--configFile','-c', default="SaGa.config", help='The configuration file. ')
+	parser.add_argument('--wantedExp', '-we', type=int, nargs='*', metavar='exp', help='A subset of the experiments that will be submited.')
 
-args = parser.parse_args()
+	args = parser.parse_args()
 
-wantedExpIDs = args.wantedExp
-configFile = args.configFile
-wantedTools = args.tools
+	wantedExpIDs = args.wantedExp
+	configFile = args.configFile
+	wantedTools = args.tools
 
-if wantedTools[0]=="all":
-	wantedTools = allTools[1:]		# skipping Geographer
-	
-for tool in wantedTools:
-	if not tool in allTools:
-		print("Wrong tool name: " + str(tool) +". Choose from: ") 
-		for x in allTools:
-			print( "\t"+str(x) ) 
-		print("Aborting...")
-		exit(-1)
-
-if not os.path.exists(configFile):
-	print("Configuration file " + configFile + " does not exist. Aborting...")
-	exit(-1)
-else:
-	print("Collecting information from configuration file: " + configFile )
-
-#
-# parse config file
-#
-
-allExperiments = parseConfigFile( configFile )
-
-numExps = len(allExperiments);
-
-# get the wanted experiments
-wantedExp = []
-
-#
-print( wantedExpIDs )
-#
-
-if wantedExpIDs is None or len(wantedExpIDs)==0:
-	wantedExp = allExperiments
-else:
-	for i in range(0, numExps):
-		if i in wantedExpIDs:
-			wantedExp.append( allExperiments[i] )
-
-#exit(0)
-# debug
-#for exp in wantedExp:
-#	exp.printExp()
-#
-
-#
-# gather info for each wanted experiment
-#
-
-for exp in wantedExp:
-	allMetricsForAllTools = []
-	
-	# it can be that gather files for some tool are missing
-	foundTools= [] 
-	
+	if wantedTools[0]=="all":
+		wantedTools = allTools[1:]		# skipping Geographer
+		
 	for tool in wantedTools:
-		print ("Start gather experiments fot tool " + tool)		
-		#metricName is a list of size numMetrics with all the metric names
-		#metricValues is list of lists, or a 2D matrix:
-		#	metricValues[i] = a list of size exp.size for metric i
-		#	metricValues[i][j] = the value of metric i for experiment run j
-		metricNames, metricValues = gatherExpTool( exp, tool )
+		if not tool in allTools:
+			print("Wrong tool name: " + str(tool) +". Choose from: ") 
+			for x in allTools:
+				print( "\t"+str(x) ) 
+			print("Aborting...")
+			exit(-1)
+
+	if not os.path.exists(configFile):
+		print("Configuration file " + configFile + " does not exist. Aborting...")
+		exit(-1)
+	else:
+		print("Collecting information from configuration file: " + configFile )
+
+	#
+	# parse config file
+	#
+
+	allExperiments = parseConfigFile( configFile )
+
+	numExps = len(allExperiments);
+
+	# get the wanted experiments
+	wantedExp = []
+
+	#
+	print( wantedExpIDs )
+	#
+
+	if wantedExpIDs is None or len(wantedExpIDs)==0:
+		wantedExp = allExperiments
+	else:
+		for i in range(0, numExps):
+			if i in wantedExpIDs:
+				wantedExp.append( allExperiments[i] )
+
+	#exit(0)
+	# debug
+	#for exp in wantedExp:
+	#	exp.printExp()
+	#
+
+	#
+	# gather info for each wanted experiment
+	#
+
+
+	for exp in wantedExp:
+		allMetricsForAllTools = []
 		
-		# this means that gatherExpTool actually found the files to gather
-		if not metricNames==[]:
-			#this is a 3D matrix and starts to get ugly...
-			allMetricsForAllTools.append( metricValues)
-			foundTools.append( tool )
+		# it can be that gather files for some tool are missing
+		foundTools= [] 
 		
-		#print(metricNames)
-		#print(metricValues)
-	print(" " )
-	createPlotsGeneric(exp, foundTools, metricNames, allMetricsForAllTools)
-	
-exit(0)
+		for tool in wantedTools:
+			print ("Start gather experiments fot tool " + tool)		
+			#metricName is a list of size numMetrics with all the metric names
+			#metricValues is list of lists, or a 2D matrix:
+			#	metricValues[i] = a list of size exp.size for metric i
+			#	metricValues[i][j] = the value of metric i for experiment run j
+			metricNames, metricValues = gatherExpTool( exp, tool )
+			
+			# this means that gatherExpTool actually found the files to gather
+			if not metricNames==[]:
+				#TODO: this is a 3D matrix and starts to get ugly...
+				allMetricsForAllTools.append( metricValues)
+				foundTools.append( tool )
+			
+			#print(metricNames)
+			#print(metricValues)
+		
+		createPlotsForExp(exp, foundTools, metricNames, allMetricsForAllTools)
+		
+	createMeanPlotsForAllExp( wantedExp, wantedTools)
+		
+	exit(0)
 
