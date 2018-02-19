@@ -1319,7 +1319,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	
 	IndexType numEdgesToRemove = 0;
 	for( std::vector<int_pair>::reverse_iterator edgeIt = localPairs.rbegin(); edgeIt->first==newMaxLocalVertex; ++edgeIt){
-		sendEdgeList.push_back( edgeIt->first); //Caution: This is an implicit conversion from double to int
+		sendEdgeList.push_back( edgeIt->first);
 		sendEdgeList.push_back( edgeIt->second);
 		++numEdgesToRemove;
 	}
@@ -1347,6 +1347,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	recvPlan.allocateTranspose( sendPlan, *comm );
 	
 	IndexType recvEdgesSize = recvPlan.totalQuantity();
+	SCAI_ASSERT_EQ_ERROR(recvEdgesSize % 2, 0, "List of received edges must have even length.");
 	scai::utilskernel::LArray<IndexType> recvEdges(recvEdgesSize, -1);		// the edges to be received
 	//PRINT(thisPE <<": received  " << recvEdgesSize << " edges");
 
@@ -1360,18 +1361,22 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	PRINT0("exchanged edges");
 
 	const IndexType minLocalVertexBeforeInsertion = localPairs.front().first;
-	SCAI_ASSERT_LE_ERROR(minLocalVertexBeforeInsertion - recvEdges[0], 1, "Gap too high between received edges and beginning of own.");
 
 	// insert all the received edges to your local edges
-	scai::hmemo::ReadAccess<IndexType> rRecvEdges(recvEdges);
-	SCAI_ASSERT_EQ_ERROR(rRecvEdges.size(), recvEdgesSize, "mismatch");
-	for( IndexType i=0; i<recvEdgesSize; i+=2){
-		int_pair sp;
-		sp.first = rRecvEdges[i];
-		sp.second = rRecvEdges[i+1];
-		localPairs.insert( localPairs.begin(), sp);//this is horribly expensive! Will move the entire list of local edges with each insertion!
-		//PRINT( thisPE << ": recved edge: "<< recvEdges[i] << " - " << recvEdges[i+1] );
+	{
+        scai::hmemo::ReadAccess<IndexType> rRecvEdges(recvEdges);
+        SCAI_ASSERT_EQ_ERROR(rRecvEdges.size(), recvEdgesSize, "mismatch");
+        for( IndexType i=0; i<recvEdgesSize; i+=2){
+            SCAI_ASSERT_LT_ERROR(i+1, rRecvEdges.size(), "index mismatch");
+            int_pair sp;
+            sp.first = rRecvEdges[i];
+            sp.second = rRecvEdges[i+1];
+            localPairs.insert( localPairs.begin(), sp);//this is horribly expensive! Will move the entire list of local edges with each insertion!
+            //PRINT( thisPE << ": recved edge: "<< recvEdges[i] << " - " << recvEdges[i+1] );
+        }
 	}
+
+	PRINT0("rebuild local edge list");
 
 	IndexType numEdges = localPairs.size() ;
 	
@@ -1383,6 +1388,8 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	localPairs.erase(unique(localPairs.begin(), localPairs.end(), [](int_pair p1, int_pair p2) {
 		return ( (p1.second==p2.second) and (p1.first==p2.first)); 	}), localPairs.end() );
 	//PRINT( thisPE <<": removed " << numEdges - localPairs.size() << " duplicate edges" );
+
+	PRINT0("removed duplicates");
 
 	//
 	// check that all is correct
@@ -1408,6 +1415,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	//
 	scai::hmemo::HArray<IndexType> localIndices( localN , -1);
 	IndexType index = 1;
+	PRINT0("prepared data structure for local indices");
 	
 	{
 		scai::hmemo::WriteAccess<IndexType> wLocalIndices(localIndices);
@@ -1427,8 +1435,10 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 		}
 		SCAI_ASSERT_NE_ERROR( wLocalIndices[localN-1], -1, "localIndices array not full");
 	}
+
+	PRINT0("assembled local indices");
 	
-	const scai::dmemo::DistributionPtr genDist(new scai::dmemo::GeneralDistribution(globalN, localIndices, comm));
+	const scai::dmemo::DistributionPtr genDist(new scai::dmemo::GeneralDistribution(globalN, localIndices, comm));//this could be a GenBlockDistribution, right?
 	
 	//-------------------------------------------------------------------
 	//
@@ -1445,7 +1455,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 		IndexType v1 = localPairs[e].first;		//the vertices of this edge
 		IndexType v1Degree = 0;
 		// for all edges of v1
-		for( std::vector<int_pair>::iterator edgeIt = localPairs.begin()+e; edgeIt->second==v1 and edgeIt!=localPairs.end(); ++edgeIt){
+		for( std::vector<int_pair>::iterator edgeIt = localPairs.begin()+e; edgeIt->first==v1 and edgeIt!=localPairs.end(); ++edgeIt){
 			ja.push_back( edgeIt->second );	// the neighbor of v1
 			//PRINT( thisPE << ": " << v1 << " -- " << 	edgeIt->second );
 			++v1Degree;
@@ -1458,6 +1468,8 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	}
 	SCAI_ASSERT_EQ_ERROR( ja.size(), localM, thisPE << ": Wrong ja size and localM.");
 	std::vector<IndexType> values(ja.size(), 1);
+
+	PRINT0("assembled CSR arrays");
 	
 	//assign/assemble the matrix
     scai::lama::CSRStorage<ValueType> myStorage ( localN, globalN, ja.size(), 
@@ -1467,6 +1479,8 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	
 	const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
+
+PRINT0("assembled CSR storage");
 	
 	return scai::lama::CSRSparseMatrix<ValueType>(myStorage, genDist, noDist);
 	
