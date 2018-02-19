@@ -1291,6 +1291,17 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	ValueType sortTime = comm->max( sortTime );
 	PRINT0("time to sort edges: " << sortTime);
 	
+	//check for isolated nodes and wrong conversions
+	bool foundIsolatedNodes = false;
+	IndexType lastNode = localPairs[0].value;//caution, implicit conversion
+	for (sort_pair edge : localPairs) {
+	    double currentNode = edge.value;
+	    IndexType converted(currentNode);
+	    SCAI_ASSERT_LT_ERROR(double(converted) - currentNode, 0.001, "Conversion error with node IDs!");
+	    SCAI_ASSERT_LE_ERROR(converted - lastNode, 1, "Gap in sorted node IDs before edge exchange.");
+	    lastNode = converted;
+	}
+
 	//PRINT(thisPE << ": "<< localPairs.back().value << " - " << localPairs.back().index << " in total " <<  localPairs.size() );
 	
 	//-------------------------------------------------------------------
