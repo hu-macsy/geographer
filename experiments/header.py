@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 from inspect import currentframe, getframeinfo
 
 
@@ -35,9 +36,11 @@ class experiment:
 		self.ID = 0
 		self.dimension = -1
 		self.fileFormat = -1
+		self.coordFormat = -1
 		
 		self.graphs = []
 		self.paths = []
+		self.coordPaths = []
 		self.k = []
 
 
@@ -50,11 +53,16 @@ class experiment:
 			print("Experiment type: other" )
 		else:
 			print("Unrecognized type: " + str(self.expType) )
-
-		print("Number of experiments: " + str(self.size) + ", dim= " + str(self.dimension) + ", fileFormat: " + str(self.fileFormat) )
+		
+		print("Number of experiments: " + str(self.size) + ", dim= " + str(self.dimension) + ", fileFormat: " + str(self.fileFormat) + ", coordFormat: " + str(self.coordFormat) )
 		
 		for i in range(0, self.size):
-			print("graph: " + self.graphs[i] + " , k= "+ str(self.k[i]) + ",\t full path: " + self.paths[i]  )
+			sys.stdout.write("graph: " + self.graphs[i] + " , k= "+ str(self.k[i]) + ",\t full path: " + self.paths[i] )
+			if self.coordPaths is not None and len(self.coordPaths)>0:
+				if self.coordPaths[i] != "-":
+					sys.stdout.write(", coordFile: " + self.coordPaths[i])
+			
+			sys.stdout.write("\n")
 
 	#def (self, i):
 	#	return self.graph[i]+"_"+self.k[i]
@@ -126,14 +134,26 @@ def parseConfigFile( configFile ):
 			# traverse the experiment header line to store parameters
 			dimension = -1
 			fileFormat = -1
+			coordFormat = -1
+			
 			for i in range(1, len(expHeader) ):
 				if expHeader[i]=="dim":
 					dimension = expHeader[i+1]
 				elif expHeader[i]=="fileFormat":
 					fileFormat = expHeader[i+1]
-					if int(fileFormat)<0 or int(fileFormat)>6:
+					if int(fileFormat)<0 or int(fileFormat)>8:
 						print("ERROR: unknown file format " + str(fileFormat) + ".\nAborting...")
 						exit(-1)
+				elif expHeader[i]=="coordFormat":
+					coordFormat = expHeader[i+1]
+					if int(coordFormat)<0 or int(coordFormat)>8:
+						print("ERROR: unknown file format " + str(coordFormat) + ".\nAborting...")
+						exit(-1)
+					
+			# if no coordFormat was given assume the same as the fileFormat
+			#if coordFormat==-1:
+			#	coordFormat = fileFormat
+				
 				
 			# create and store experiments in an array
 			
@@ -143,6 +163,7 @@ def parseConfigFile( configFile ):
 				exp.expType = 0
 				exp.dimension = dimension
 				exp.fileFormat = fileFormat
+				exp.coordFormat = coordFormat
 				exp.ID= expID
 				expID += 1
 				assert(int(exp.dimension)>0),"Wrong or missing dimension in line "+str(lineCnt)
@@ -153,65 +174,65 @@ def parseConfigFile( configFile ):
 					
 				while expData[0]!="#":
 					expTokens = expData.split()
-					for i in range(0, len(expTokens)-1):
-						exp.graphs.append( expTokens[0] )
-						exp.paths.append( os.path.join(inPath, expTokens[0]) )
-						exp.k.append(expTokens[i+1])
-						exp.size +=1
+					#first token is the graph file
+					exp.graphs.append( expTokens[0] )
+					exp.paths.append( os.path.join(inPath, expTokens[0]) )
+					
+					#second token is the coord file, third token is k
+					
+					#coord file can be omitted
+					if len( expTokens)==2:	#assume coord file is missing
+						exp.k.append(expTokens[1])
+					else:	#len(expTokens)=3
+						exp.coordPaths.append( os.path.join(inPath, expTokens[1]) )
+						exp.k.append(expTokens[2])
+					
+					exp.size +=1
+						
 					expData = f.readline(); lineCnt +=1
 					if len(expData)==0:
 						print ("WARNING: possibly forgot \'#\' at end of an experiment")
 					elif expData[0]=="weak" or expData[0]=="strong" or expData[0]=="other": 
 						print ("WARNING: possibly forgot \'#\' at end of an experiment")
-					
+				#exp.printExp()
 				allExperiments.append(exp)
 				
-			# for strong scaling
-			elif expHeader[0]=="strong":	
+			# for strong scaling or miscellanous experiments
+			elif expHeader[0]=="strong" or expHeader[0]=="other":	
 				expData = f.readline(); lineCnt +=1
 				if len(expData)==0:
 					print("WARNING: each experiment must end with a \#");
 					
 				while expData[0]!="#":
 					exp = experiment()
-					exp.expType = 1
+					if expHeader[0]=="strong":
+						exp.expType = 1
+					else:
+						exp.expType = 2
 					exp.dimension = dimension
 					exp.fileFormat = fileFormat
+					exp.coordFormat = coordFormat
 					exp.ID= expID
 					expID += 1
 					assert(int(exp.dimension)>0), "Wrong or missing dimension in line "+str(lineCnt)
 					assert(int(exp.fileFormat)>=0),"Wrong or missing fileFormat in line "+str(lineCnt)
 					expTokens = expData.split()
 					
-					for i in range(0, len(expTokens)-1):
+					
+					for i in range(2, len(expTokens)):
+						#first token is the graph file
 						exp.graphs.append( expTokens[0] )
 						exp.paths.append( os.path.join(inPath, expTokens[0]) )
-						exp.k.append(expTokens[i+1])
-						exp.size +=1
-					allExperiments.append(exp)
-					expData = f.readline(); lineCnt +=1
-		
-			# miscellanous experiments
-			elif expHeader[0]=="other":		
-				expData = f.readline(); lineCnt +=1
-
-				while expData[0]!="#":
-					exp = experiment()
-					exp.expType = 2
-					exp.dimension = dimension
-					exp.fileFormat = fileFormat
-					exp.ID= expID
-					expID += 1
-					assert(int(exp.dimension)>0), "Wrong or missing dimension in line "+str(lineCnt)
-					assert(int(exp.fileFormat)>=0),"Wrong or missing fileFormat in line "+str(lineCnt)
-					expTokens = expData.split()
-					
-					for i in range(0, len(expTokens)-1):
-						exp.graphs.append( expTokens[0] )
-						exp.paths.append( os.path.join(inPath, expTokens[0]) )
-						exp.k.append(expTokens[i+1])
+						#second token is the coord file
+						#WARNING: coord file CANNOT be omitted
+						if expTokens[1]!="-":
+							exp.coordPaths.append( os.path.join(inPath, expTokens[1]) )
+						else:
+							exp.coordPaths.append( expTokens[1] )
+						exp.k.append(expTokens[i])
 						exp.size +=1
 					
+					#exp.printExp()
 					allExperiments.append(exp)
 					expData = f.readline(); lineCnt +=1
 			else:
@@ -299,7 +320,10 @@ def outFileString( exp, i, tool):
 		print("WARNING: tool " + tool + " is invalid")
 		return ""
 	
-	outFile = exp.graphs[i].split('.')[0] + "_k" + str(exp.k[i]) +"_"+ tool + ".info"
+	#outFile = exp.graphs[i].split('.')[0] + "_k" + str(exp.k[i]) +"_"+ tool + ".info"
+	outFile = os.path.basename(exp.graphs[i]).split('.')[0] + "_k" + str(exp.k[i]) +"_"+ tool + ".info"
+	
+	#print(outFile)
 	
 	return os.path.join( toolsPath, tool , outFile)
 

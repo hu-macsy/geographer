@@ -309,7 +309,7 @@ DenseVector<IndexType> assignBlocks(
 	for (IndexType i = 0; i < k; i++) {
 		IndexType c = clusterIndices[i];
 		ValueType effectiveDist = minDistance[c]*minDistance[c]*influence[c];
-		//SCAI_ASSERT_LT_ERROR( std::abs(effectiveMinDistance[i] - effectiveDist), 1e-5, "effectiveMinDistance[" << i << "] = " << effectiveMinDistance[i] << " != " << effectiveDist << " = effectiveDist");
+		SCAI_ASSERT_LT_ERROR( std::abs(effectiveMinDistance[i] - effectiveDist), 1e-5, "effectiveMinDistance[" << i << "] = " << effectiveMinDistance[i] << " != " << effectiveDist << " = effectiveDist");
 	}
 
 	ValueType localSampleWeightSum = 0;

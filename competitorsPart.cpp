@@ -154,9 +154,8 @@ int main(int argc, char** argv) {
             coordFile = graphFile + ".xyz";
         }
         
-        if (vm.count("coordFormat")) {
-			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
-		}else if (vm.count("fileFormat")) {
+        
+		if (vm.count("fileFormat")) {
             graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, settings.fileFormat );
         }else{
             graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
@@ -168,7 +167,9 @@ int main(int argc, char** argv) {
         SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
         		
         //read the coordinates file
-		if (vm.count("fileFormat")) {
+		if (vm.count("coordFormat")) {
+			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
+		}else if (vm.count("fileFormat")) {
 			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
 		} else {
 			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);

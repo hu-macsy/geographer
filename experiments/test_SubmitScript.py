@@ -62,73 +62,7 @@ def submitExp2( exp, tool ):
 		submitGeographer_noGather(exp, "geoSfc")
 	else:
 		submitCompetitor( exp, tool)
-	
-#---------------------------------------------------------------------------------------------		
-# submit an experiment with geographer. runDir is the directory from where to gather info
 
-def submitGeographer(exp, version):
-		
-	'''
-	runDir =  os.path.join(basisPath,"run"+str(run))
-	if not os.path.exists(runDir):
-		os.makedirs(runDir)
-	else:
-		print("WARNING: folder for run " + str(run) + " already exists. Danger of overwritting older data, aborting...")
-		exit(-1)
-	'''
-	# create a gather.config file
-	toolDir= os.path.join( toolsPath, version )
-	gatherPath = os.path.join( toolDir, 'gather_'+ str(exp.ID)+'.config' )	
-	gatherFile = open( gatherPath,'a' )
-	
-	for path in exp.paths:
-		if not os.path.exists( path ) :
-			print("WARNING: " + path + " does not exist.")
-			
-	gatherFile.write("experiment "+ str(e) +" type "+ str(exp.expType) + " size " + str(exp.size) + "\n")
-	
-	for i in range(0,exp.size):
-		#outFile = str(e)+str(i)+str(exp.expType)+"_"+ exp.graphs[i].split('.')[0] +"_k" + exp.k[i]+ "_geo"+version.capitalize() + ".info"
-		outFile = exp.graphs[i].split('.')[0] +"_k" + exp.k[i]+ "_" + version + ".info"
-		outPath = os.path.join(toolDir, outFile)
-		
-		if os.path.exists( outPath):
-			print("\t\tWARNING: The outFile: " + outPath + " already exists, job NOT submitted.")
-			continue
-		
-		# add info in file gather.config
-		gatherFile.write( outFile+ " " + str(exp.k[i]) + "\n" )
-		
-		if version=="graph":
-			# set parameters for every experiment
-			params = defaultSettings()
-			executable = geoExe
-		elif version=="geoKmeans":
-			executable = initialExe
-			params = " --initialPartition=3"
-		elif version=="geoSfc":
-			executable = initialExe
-			params = " --initialPartition=0"
-		else:
-			print("Version given: " + version + " is not implemented.\nAborting...");
-			exit(-1)
-		
-		params += " --outFile="+ outPath
-		params += " --dimensions="+ exp.dimension
-		params += " --fileFormat="+ exp.fileFormat
-		#params += " --storeInfo=0"
-		#print(params)
-		
-		if not os.path.exists( executable):
-			print("Executable " + executable + " does not exist.\nSkiping job submission")
-			return -1
-		
-		commandString = executable + " --graphFile="+ exp.paths[i]+ params
-		
-		submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_k"+str(exp.k[i])+"_"+version+".cmd"
-		submitfile = createLLSubmitFile( os.path.join( toolsPath, "tmp"), submitFilename, commandString, "00:10:00", int(exp.k[i]) )
-		#print( submitfile )
-		call(["llsubmit", submitfile])
 
 #---------------------------------------------------------------------------------------------		
 
@@ -169,18 +103,28 @@ def submitGeographer_noGather(exp, version):
 			print("\t\tWARNING: The outFile: " + outFile + " already exists, job NOT submitted.")
 			continue
 		
-		params += " --outFile="+ outFile
 		params += " --dimensions="+ exp.dimension
 		params += " --fileFormat="+ exp.fileFormat
-		print(params)
-
+				
+		if exp.coordFormat!=-1:
+			params += " --coordFormat="+ str(exp.coordFormat)
+		
+		if  exp.coordPaths is not None and len( exp.coordPaths)>0:
+			if exp.coordPaths[i]!="-":
+				params += " --coordFile=" + exp.coordPaths[i]
+		
+		params += " --outFile="+ outFile
+		
+		
 		if not os.path.exists( executable):
 			print("Executable " + executable + " does not exist.\nSkiping job submission")
 			return -1
 		
 		commandString = executable + " --graphFile="+ exp.paths[i]+ params
 		
-		submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_k"+str(exp.k[i])+"_"+version+".cmd"
+		print(commandString)
+		
+		submitFilename = "llsub-"+os.path.basename(exp.graphs[i]).split('.')[0]+"_k"+str(exp.k[i])+"_"+version+".cmd"
 		submitfile = createLLSubmitFile( os.path.join( toolsPath, "tmp"), submitFilename, commandString, "00:20:00", int(exp.k[i]) )
 		#print( submitfile )
 		call(["llsubmit", submitfile])
@@ -212,12 +156,19 @@ def submitAllCompetitors( exp ):
 		params += " --outPath=" + toolsPath +"/"
 		params += " --graphName=" + graphName
 		
+		if exp.coordFormat!=-1:
+			params += " --coordFormat="+ str(exp.coordFormat)
+		
+		if  exp.coordPaths is not None and len( exp.coordPaths)>0:
+			if exp.coordPaths[i]!="-":
+				params += " --coordFile=" + exp.coordPaths[i]
+		
 		if not os.path.exists( allCompetitorsExe):
 			print("Executable " + allCompetitorsExe + " does not exist.\nSkiping job submission")
 			return -1
 
 		commandString = allCompetitorsExe + " --graphFile " + exp.paths[i] + params
-		submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_k"+str(exp.k[i])+"_allCompetitors.cmd"
+		submitFilename = "llsub-"+ os.path.basename(exp.graphs[i]).split('.')[0]+"_k"+str(exp.k[i])+"_allCompetitors.cmd"
 		submitfile = createLLSubmitFile( os.path.join( toolsPath, "tmp") , submitFilename, commandString, "00:20:00", int(exp.k[i]) )
 		call(["llsubmit", submitfile])
 
@@ -246,13 +197,20 @@ def submitCompetitor(exp, tool):
 		params += " --dimensions=" + exp.dimension
 		params += " --fileFormat="+ exp.fileFormat
 		
+		if exp.coordFormat!=-1:
+			params += " --coordFormat="+ str(exp.coordFormat)
+		
+		if  exp.coordPaths is not None and len( exp.coordPaths)>0:
+			if exp.coordPaths[i]!="-":
+				params += " --coordFile=" + exp.coordPaths[i]
+				
 		if not os.path.exists( competitorsExe):
 				print("Executable " + competitorsExe + " does not exist.\nSkiping job submission")
 				return -1
 	
 		commandString = competitorsExe + " --tool " + tool + " --graphFile " + exp.paths[i] + params + " --outFile="+outFile
 
-		submitFilename = "llsub-"+exp.graphs[i].split('.')[0]+"_k"+str(exp.k[i])+"_" + tool+".cmd"
+		submitFilename = "llsub-"+ os.path.basename(exp.graphs[i]).split('.')[0]+"_k"+str(exp.k[i])+"_" + tool+".cmd"
 		submitfile = createLLSubmitFile( os.path.join( toolsPath, "tmp") , submitFilename, commandString, "00:10:00", int(exp.k[i]) )
 		#call(["llsubmit", submitfile])
 		
