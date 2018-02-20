@@ -228,7 +228,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper 
             std::cout<< "Running time for run number " << r << " is " << partKwayTime << std::endl;
         }
         
-           //
+		//
 		// free arrays
 		//
 		delete[] xadj;

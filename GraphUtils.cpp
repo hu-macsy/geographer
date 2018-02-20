@@ -1249,7 +1249,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	//TODO: not filling with dummy values, each localPairs can have different sizes
 	std::vector<sort_pair> localPairs(localM*2);
 	
-	//TODO: if nothing better comes up, duplicate and reverse all edges before SortingDatatype
+	//TODO: if nothing better comes up, duplicate and reverse all edges before sorting
 	//		to ensure matrix will be symmetric
 	
 	IndexType maxLocalVertex=0, minLocalVertex=std::numeric_limits<IndexType>::max();
@@ -1260,7 +1260,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 		localPairs[2*i].value = v1;
 		localPairs[2*i].index = v2;
 		
-		//insert also reversed edge to keep matric symmetric
+		//insert also reversed edge to keep matrix symmetric
 		localPairs[2*i+1].value = v2;
 		localPairs[2*i+1].index = v1;
 		

@@ -348,20 +348,9 @@ int main(int argc, char** argv) {
     settings.minBorderNodes = IndexType(10);
     settings.useGeometricTieBreaking = IndexType(1);
     settings.pixeledSideLen = IndexType ( std::min(settings.numBlocks, IndexType(100) ) );
-    
-	/*
-    std::string destPath = "./partResults/testInitial/blocks_"+std::to_string(settings.numBlocks)+"/";
-    boost::filesystem::create_directories( destPath );   
-    
-    std::size_t found= graphFile.std::string::find_last_of("/");
-    std::string logFile = destPath + "results_" + graphFile.substr(found+1)+ ".log";
-    std::ofstream logF(logFile);
-    std::ifstream f(graphFile);
-    */
-    
+        
     settings.print( std::cout , comm );
         
-
     IndexType dimensions = settings.dimensions;
     IndexType k = settings.numBlocks;
     
@@ -392,8 +381,8 @@ int main(int argc, char** argv) {
             partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
             
             // the hilbert partition internally sorts and thus redistributes the points
-            graph.redistribute( partition.getDistributionPtr() , noDistPtr );
-            rowDistPtr = graph.getRowDistributionPtr();
+            //graph.redistribute( partition.getDistributionPtr() , noDistPtr );
+            //rowDistPtr = graph.getRowDistributionPtr();
             
             assert( partition.size() == N);
             assert( coordinates[0].size() == N);
@@ -425,18 +414,17 @@ int main(int argc, char** argv) {
             // get a k-means partition
 			IndexType weightSum;
 			bool uniformWeights = true;
-			
-			//
-			int repeatTimes = 5;
-			beforeInitialTime =  std::chrono::system_clock::now();
-
-			for(int r=0 ; r< repeatTimes; r++){
+			const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
 				
-				const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
+			
 				
 				std::chrono::time_point<std::chrono::system_clock> beforeTmp = std::chrono::system_clock::now();
 				
 				DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
+				
+				std::chrono::duration<double> sfcPartTime = std::chrono::system_clock::now() - beforeTmp;
+				ValueType time = comm->max( sfcPartTime.count() );
+				PRINT0("time to get the sfc partition: " << time);
 				
 				if( not uniformWeights){	
 					scai::hmemo::HArray<IndexType> localWeightsInt( rowDistPtr->getLocalSize(), 1 );
@@ -449,24 +437,35 @@ int main(int argc, char** argv) {
 					// if all nodes have weight 1 then weightSum = globalN
 					weightSum = N;
 				}
-					
+				std::chrono::time_point<std::chrono::system_clock> beforeRedist	=std::chrono::system_clock::now() ;
 				// WARNING: getting an error in KMeans.h, try to redistribute coordinates
 				std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
 				for (IndexType d = 0; d < dimensions; d++) {
 					coordinateCopy[d].redistribute( tempResult.getDistributionPtr() );
 				}
-							
+				std::chrono::duration<double> redistribTime = std::chrono::system_clock::now() - beforeRedist;
+				time = comm->max( redistribTime.count() );
+				PRINT0("time to redistribute coordinates: " << time);
+				
+				//
+				//settings.minSamplingNodes = 100;
+				//
+				//
+			int repeatTimes = 5;
+			beforeInitialTime =  std::chrono::system_clock::now();
+
+			for(int r=0 ; r< repeatTimes; r++){
 				partition = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeights, blockSizes, settings);     
 				std::chrono::duration<double> thisPartitionTime = std::chrono::system_clock::now() - beforeTmp;
-				ValueType time  = comm->max( thisPartitionTime.count() );
+				time  = comm->max( thisPartitionTime.count() );
 				PRINT0("Time for run " << r << " is " << time);
 			}
 				
 			partitionTime =  (std::chrono::system_clock::now() - beforeInitialTime)/repeatTimes;
 				
-			// must repartition graph according to the new partition/distribution
-			graph.redistribute( partition.getDistributionPtr() , noDistPtr );
-            rowDistPtr = graph.getRowDistributionPtr();
+			// the hilbert partition internally sorts and thus redistributes the points
+			//graph.redistribute( partition.getDistributionPtr() , noDistPtr );
+            //rowDistPtr = graph.getRowDistributionPtr();
 			
             assert( partition.size() == N);
             assert( coordinates[0].size() == N);
@@ -496,6 +495,10 @@ int main(int argc, char** argv) {
             break;
         }
     }
+    
+    partition.redistribute(  graph.getRowDistributionPtr() );
+    // partition has the the same distribution as the graph rows 
+	SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
     
     //
     // Get metrics

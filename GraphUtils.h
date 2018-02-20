@@ -198,7 +198,23 @@ static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_rand
     return begin;
 }
 
-
+/*
+template<class T>
+maxIndex indexReorder(IndexType maxIndex){
+	IndexType index = 0;
+	std::unordered_set<T> ret;
+	for( T window = maxIndex/2; window>1; window = window/2){
+		T v = window;
+		while( v<maxIndex ){
+			ret.insert(v);
+			v += window;
+		}
+	}
+	return ret;
+}
+ 
+ */
+ 
 } /*namespace GraphUtils*/
 
 } /* namespace ITI */
