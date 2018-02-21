@@ -625,8 +625,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         return readGraphBinary( filename );
     }
 
-    if (format==Format::EDGELIST) {
-        return readEdgeList(filename);
+    if (format==Format::EDGELIST or format==Format::BINARYEDGELIST) {
+        return readEdgeList(filename, format==Format::BINARYEDGELIST);
     }
 
     if (format==Format::EDGELISTDIST){
@@ -1061,12 +1061,14 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphMa
 //-------------------------------------------------------------------------------------------------
    
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeList(const std::string filename){
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeList(const std::string filename, const bool binary){
     SCAI_REGION( "FileIO.readEdgeList" );
 	
 	typedef unsigned long long int ULLI;     
 	
-    std::ifstream file(filename);
+	const auto flags = binary ? std::ios::in | std::ios::binary : std::ios::in;
+	const IndexType headerSize = 2;
+    std::ifstream file(filename, flags);
     
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	
@@ -1075,55 +1077,101 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
     if(file.fail())
         throw std::runtime_error("Could not open file "+ filename + ".");
     
-    //skip the first lines that have comments starting with '%'
-    std::string line;
-    std::getline(file, line);
+    ULLI globalM, globalN;
 
-	// skip comments, maybe not needed
-    while( line[0]== '%'){
-       std::getline(file, line);
+    if (binary) {
+        std::vector<ULLI> header(headerSize);
+
+        bool success=false;
+
+        if( comm->getRank()==0 ){
+            std::cout <<  "Reading binary edge list ..."  << std::endl;
+        }
+
+        if(file) {
+            success = true;
+            file.read((char*)(&header[0]), headerSize*sizeof(ULLI));
+        }
+
+
+        if (not comm->all(success)) {
+            throw std::runtime_error("Error while opening the file " + filename);
+        }
+
+         globalN = header[0];
+         globalM = header[1];
+
+    } else {
+        //skip the first lines that have comments starting with '%'
+        std::string line;
+        std::getline(file, line);
+
+        // skip comments, maybe not needed
+        while( line[0]== '%'){
+           std::getline(file, line);
+        }
+        std::stringstream ss;
+        std::string item;
+        ss.str( line );
+
+        std::getline(ss, item, ' ');
+        globalN = std::stoll(item);
+        std::getline(ss, item, ' ');
+        globalM = std::stoll(item);
     }
-    std::stringstream ss;
-	std::string item;
-    ss.str( line );
-	
-	ULLI globalM, globalN;
-	
-	std::getline(ss, item, ' ');
-	globalN = std::stoll(item);
-	std::getline(ss, item, ' ');
-	globalM = std::stoll(item);
 
 	if( globalN<=0 or globalM<=0 ){
 		throw std::runtime_error("Negative input, maybe int value is not big enough: globalN= " + std::to_string(globalN) + " , globalM= " + std::to_string(globalM));
 	}
 	
 	const IndexType rank = comm->getRank();
-	const IndexType numPEs = comm->getSize();
-	const ULLI avgEdgesPerPE = globalM/numPEs;
+	const IndexType size = comm->getSize();
+	const ULLI avgEdgesPerPE = globalM/size;
 	assert(avgEdgesPerPE >= 0);
 	assert(avgEdgesPerPE <= globalM);
 	
-	const ULLI beginLocalRange = rank*avgEdgesPerPE;
-	const ULLI endLocalRange = (rank == numPEs-1) ? globalM : (rank+1)*avgEdgesPerPE;
+	const ULLI beginLocalRange = rank*avgEdgesPerPE;//TODO: possibly adapt with block distribution
+	const ULLI endLocalRange = (rank == size-1) ? globalM : (rank+1)*avgEdgesPerPE;
 
-	// scroll to own part of file
-	for (ULLI i = 0; i < beginLocalRange; i++) {
-	    std::getline(file, line);
+	//seek own part of file
+	if (binary) {
+	    const ULLI startPos = (headerSize+beginLocalRange)*(sizeof(ULLI));
+	    file.seekg(startPos);
+	} else {
+	    // scroll to own part of file
+        for (ULLI i = 0; i < beginLocalRange; i++) {
+            std::string line;
+            std::getline(file, line);
+        }
 	}
 
 	std::vector< std::pair<IndexType, IndexType>> edgeList;
+	std::vector<ULLI> binaryEdges(2*(endLocalRange-beginLocalRange));
 
-	// read in edge lists
-	for (ULLI i = beginLocalRange; i < endLocalRange; i++) {
-	    std::getline(file, line);
-        std::stringstream ss( line );
+	//read in edges
+	if (binary) {
+	    std::vector<ULLI> binaryEdges(2*(endLocalRange-beginLocalRange));
+	    file.read( (char *)(binaryEdges.data()), (2*(endLocalRange-beginLocalRange))*sizeof(ULLI) );
+	} else {
+	    for (ULLI i = 0; i < endLocalRange - beginLocalRange; i++) {
+	        std::string line;
+	        std::getline(file, line);
+            std::stringstream ss( line );
 
-        IndexType v1 , v2;
-        ss >> v1;
-        ss >> v2;
+            IndexType v1 , v2;
+            ss >> v1;
+            ss >> v2;
+            binaryEdges[2*i] = v1;
+            binaryEdges[2*i+1] = v2;
+	    }
+	}
 
-        if (v1 >= globalN) {
+	//convert to edge lists
+	for (ULLI i = 0; i < endLocalRange - beginLocalRange; i++) {
+	    IndexType v1 = binaryEdges[2*i];
+	    IndexType v2 = binaryEdges[2*i+1];
+
+	    if (v1 >= globalN) {
             throw std::runtime_error("Process " + std::to_string(rank) + ": Illegal node id " + std::to_string(v1) + " in edge list for " + std::to_string(globalN) + " nodes.");
         }
 

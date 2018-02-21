@@ -129,7 +129,7 @@ public:
 	 * 4 3				    2 
 	 * 3 2
 	 */
-	static scai::lama::CSRSparseMatrix<ValueType> readEdgeList(const std::string filename);
+	static scai::lama::CSRSparseMatrix<ValueType> readEdgeList(const std::string filename, const bool binary = false);
 	
 	
 	/* Edge list format but now there are k files, one for each PE
