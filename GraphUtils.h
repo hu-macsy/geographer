@@ -10,7 +10,6 @@
 
 #include <set>
 #include <tuple>
-#include <unordered_set>
 
 #include <scai/lama/matrix/CSRSparseMatrix.hpp>
 #include <scai/dmemo/Distribution.hpp>
@@ -199,21 +198,6 @@ static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_rand
     return begin;
 }
 
-
-std::vector<IndexType> indexReorder(IndexType maxIndex, IndexType window){
-	IndexType index = 0;
-	std::vector<IndexType> ret(maxIndex, -1);
-	for( IndexType i=0; i<window; i++){
-		for( IndexType step=0; step<maxIndex; step+=window){
-			if(step+1>=maxIndex) continue;
-			//ret.insert( step+i); std::cout<< step+i <<" <> ";
-			ret[index++] = step+i;
-			if(index>=maxIndex) break;
-		}
-	}
-	
-	return ret;
-}
 
 } /*namespace GraphUtils*/
 

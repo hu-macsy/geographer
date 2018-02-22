@@ -305,6 +305,9 @@ int main(int argc, char** argv) {
 		
 		PRINT0("time to get the partition: " <<  metrics.timeFinalPartition );
 		
+		// partition has the the same distribution as the graph rows 
+		SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
+		
 		metrics.getMetrics( graph, partition, nodeWeights, settings );
 		
 		//---------------------------------------------------------------

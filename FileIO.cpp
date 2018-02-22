@@ -1070,11 +1070,10 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
     
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	
-	//const std::string
-	
     if(file.fail())
         throw std::runtime_error("Could not open file "+ filename + ".");
-    
+	PRINT0("Reading edge list from file " << filename);
+	
     //skip the first lines that have comments starting with '%'
     std::string line;
     std::getline(file, line);

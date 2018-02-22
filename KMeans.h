@@ -9,6 +9,7 @@
 
 #include <vector>
 #include <numeric>
+#include <cmath>
 #include <scai/lama/DenseVector.hpp>
 #include <scai/tracing.hpp>
 
@@ -165,9 +166,21 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	//prepare sampling
 	std::vector<IndexType> localIndices(localN);
 	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
-	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();;
+	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
 	std::iota(firstIndex, lastIndex, 0);
-
+	
+	/*
+	auto[](std::unordered_set<IndexType>& indices){
+		IndexType index = 0;
+		for( IndexType window = indices.size()/2; window>1; window = window/2){
+			IndexType v = window;
+			while( v<indices.size() ){
+				indices.insert(v);
+				v += window;
+			}
+		}
+	}
+	*/
 	IndexType minNodes = settings.minSamplingNodes*blocksPerProcess;
 	assert(minNodes > 0);
 	IndexType samplingRounds = 0;

@@ -94,6 +94,7 @@ int main(int argc, char** argv) {
         
         struct Settings settings;
         //ITI::Format ff = ITI::Format::METIS;
+		ITI::Format coordFormat;
         std::string blockSizesFile;
         bool writePartition = false;
         
@@ -105,13 +106,17 @@ int main(int argc, char** argv) {
             ("graphFile", value<std::string>(), "read graph from file")
             ("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
             ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
+			("coordFormat",  value<ITI::Format>(&coordFormat), "format of coordinate file")
+			
             ("generate", "generate random graph. Currently, only uniform meshes are supported.")
             ("dimensions", value<IndexType>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
             ("numX", value<IndexType>(&settings.numX)->default_value(settings.numX), "Number of points in x dimension of generated graph")
             ("numY", value<IndexType>(&settings.numY)->default_value(settings.numY), "Number of points in y dimension of generated graph")
             ("numZ", value<IndexType>(&settings.numZ)->default_value(settings.numZ), "Number of points in z dimension of generated graph")
             ("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
+			
             ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
+			
             ("minBorderNodes", value<IndexType>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
             ("stopAfterNoGainRounds", value<IndexType>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
             ("initialPartition",  value<InitialPartitioningMethods> (&settings.initialPartition), "Parameter for different initial partition: 0 or 'SFC' for the hilbert space filling curve, 1 or 'Pixel' for the pixeled method, 2 or 'Spectral' for spectral parition, 3 or 'KMeans' for Kmeans and 4 or 'MultiSection' for Multisection")
@@ -217,10 +222,11 @@ int main(int argc, char** argv) {
     		coordFile = graphFile + ".xyz";
     	}
     
-        std::fstream f(graphFile);
-
+        //std::fstream f(graphFile,std::ios::in);
+		std::ifstream f(graphFile);
+		
         if(f.fail()){
-            throw std::runtime_error("File "+ graphFile + " failed.");
+            throw std::runtime_error("Could not open file "+ graphFile );
         }
         
         if ( thisPE == 0)
@@ -248,8 +254,10 @@ int main(int argc, char** argv) {
         settings.numY = IndexType(1);
         settings.numZ = IndexType(1);
         
-        
-        if (vm.count("fileFormat")) {
+        //read the coordinates file
+		if (vm.count("coordFormat")) {
+			coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
+		}else if (vm.count("fileFormat")) {
             coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
         } else {
             coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
@@ -266,7 +274,7 @@ int main(int argc, char** argv) {
             std::cout << "On average there are about " << N/comm->getSize() << " points per PE."<<std::endl;
         }
 
-    }
+	}
     else if(vm.count("generate")){
         if ( thisPE == 0){
             std::cout<< "input: generate" << std::endl;
@@ -348,20 +356,9 @@ int main(int argc, char** argv) {
     settings.minBorderNodes = IndexType(10);
     settings.useGeometricTieBreaking = IndexType(1);
     settings.pixeledSideLen = IndexType ( std::min(settings.numBlocks, IndexType(100) ) );
-    
-	/*
-    std::string destPath = "./partResults/testInitial/blocks_"+std::to_string(settings.numBlocks)+"/";
-    boost::filesystem::create_directories( destPath );   
-    
-    std::size_t found= graphFile.std::string::find_last_of("/");
-    std::string logFile = destPath + "results_" + graphFile.substr(found+1)+ ".log";
-    std::ofstream logF(logFile);
-    std::ifstream f(graphFile);
-    */
-    
+        
     settings.print( std::cout , comm );
         
-
     IndexType dimensions = settings.dimensions;
     IndexType k = settings.numBlocks;
     
@@ -392,8 +389,8 @@ int main(int argc, char** argv) {
             partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
             
             // the hilbert partition internally sorts and thus redistributes the points
-            graph.redistribute( partition.getDistributionPtr() , noDistPtr );
-            rowDistPtr = graph.getRowDistributionPtr();
+            //graph.redistribute( partition.getDistributionPtr() , noDistPtr );
+            //rowDistPtr = graph.getRowDistributionPtr();
             
             assert( partition.size() == N);
             assert( coordinates[0].size() == N);
@@ -420,50 +417,64 @@ int main(int argc, char** argv) {
             std::terminate();
         }
         case 3:{  //------------------------------------------- k-means
-            beforeInitialTime =  std::chrono::system_clock::now();
             PRINT0( "Get a k-means partition");
             
             // get a k-means partition
 			IndexType weightSum;
 			bool uniformWeights = true;
 				
-			DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
-			
-			if( not uniformWeights){	
-				scai::hmemo::HArray<IndexType> localWeightsInt( rowDistPtr->getLocalSize(), 1 );
-				scai::lama::DenseVector<IndexType> nodeWeightsInt;     // node weights
-				nodeWeightsInt.swap( localWeightsInt, rowDistPtr );
-				nodeWeightsInt.redistribute(tempResult.getDistributionPtr());
-					
-				weightSum = nodeWeightsInt.sum().Scalar::getValue<IndexType>();
-			}else{
-				// if all nodes have weight 1 then weightSum = globalN
-				weightSum = N;
-			}
-			const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
-				
-			// WARNING: getting an error in KMeans.h, try to redistribute coordinates
-			std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
-			for (IndexType d = 0; d < dimensions; d++) {
-				coordinateCopy[d].redistribute( tempResult.getDistributionPtr() );
-			}
-			//
 			int repeatTimes = 5;
 			beforeInitialTime =  std::chrono::system_clock::now();
 
 			for(int r=0 ; r< repeatTimes; r++){
+				
 				std::chrono::time_point<std::chrono::system_clock> beforeTmp = std::chrono::system_clock::now();
+				
+				DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
+				
+				std::chrono::duration<double> sfcPartTime = std::chrono::system_clock::now() - beforeTmp;
+				ValueType time = comm->max( sfcPartTime.count() );
+				PRINT0("time to get the sfc partition: " << time);
+				
+				if( not uniformWeights){	
+					scai::hmemo::HArray<IndexType> localWeightsInt( rowDistPtr->getLocalSize(), 1 );
+					scai::lama::DenseVector<IndexType> nodeWeightsInt;     // node weights
+					nodeWeightsInt.swap( localWeightsInt, rowDistPtr );
+					nodeWeightsInt.redistribute(tempResult.getDistributionPtr());
+						
+					weightSum = nodeWeightsInt.sum().Scalar::getValue<IndexType>();
+				}else{
+					// if all nodes have weight 1 then weightSum = globalN
+					weightSum = N;
+				}
+				const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
+				
+				std::chrono::time_point<std::chrono::system_clock> beforeRedist	=std::chrono::system_clock::now() ;
+				// WARNING: getting an error in KMeans.h, try to redistribute coordinates
+				std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
+				for (IndexType d = 0; d < dimensions; d++) {
+					coordinateCopy[d].redistribute( tempResult.getDistributionPtr() );
+				}
+				std::chrono::duration<double> redistribTime = std::chrono::system_clock::now() - beforeRedist;
+				time = comm->max( redistribTime.count() );
+				PRINT0("time to redistribute coordinates: " << time);
+				
+				//
+				//settings.minSamplingNodes = 100;
+				//
+				//
+
 				partition = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeights, blockSizes, settings);     
 				std::chrono::duration<double> thisPartitionTime = std::chrono::system_clock::now() - beforeTmp;
-				ValueType time  = comm->max( thisPartitionTime.count() );
+				time  = comm->max( thisPartitionTime.count() );
 				PRINT0("Time for run " << r << " is " << time);
 			}
 				
 			partitionTime =  (std::chrono::system_clock::now() - beforeInitialTime)/repeatTimes;
 				
-			// must repartition graph according to the new partition/distribution
-			graph.redistribute( partition.getDistributionPtr() , noDistPtr );
-            rowDistPtr = graph.getRowDistributionPtr();
+			// the hilbert partition internally sorts and thus redistributes the points
+			//graph.redistribute( partition.getDistributionPtr() , noDistPtr );
+            //rowDistPtr = graph.getRowDistributionPtr();
 			
             assert( partition.size() == N);
             assert( coordinates[0].size() == N);
@@ -493,6 +504,10 @@ int main(int argc, char** argv) {
             break;
         }
     }
+    
+    partition.redistribute(  graph.getRowDistributionPtr() );
+    // partition has the the same distribution as the graph rows 
+	SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
     
     //
     // Get metrics

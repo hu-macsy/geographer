@@ -71,7 +71,7 @@ enum class InitialPartitioningMethods {SFC = 0, Pixel = 1, Spectral = 2, KMeans 
 struct Settings{
     //partition settings
     IndexType numBlocks = 2;
-    double epsilon = 0.05;
+    double epsilon = 0.01;
     bool repartition = false;
     
     //input data and other info
