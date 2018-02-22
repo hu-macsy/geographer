@@ -422,16 +422,27 @@ TEST_F(auxTest, testIndex2_2DPoint){
 }
 //-----------------------------------------------------------------
 
-TEST_F(auxTest, testInexReordering){
+TEST_F(auxTest, testIndexReordering){
 	
-	IndexType maxIndex = 10;
-	std::vector<IndexType> indices = GraphUtils::indexReorder( maxIndex, maxIndex/3 );
-	
-	for(int i=0; i<indices.size(); i++){
-		std::cout<< i <<": " << indices[i]<<std::endl;
+	IndexType M = 1000;
+	for( IndexType maxIndex = 5; maxIndex<M; maxIndex++){
+		//std::vector<IndexType> indices = GraphUtils::indexReorder( maxIndex, maxIndex/3 );
+		std::vector<IndexType> indices = GraphUtils::indexReorderCantor( maxIndex);
+		//std::cout <<std::endl;
+		
+		EXPECT_EQ( indices.size(), maxIndex );
+		
+		IndexType indexSum = std::accumulate( indices.begin(), indices.end(), 0);
+		EXPECT_EQ( indexSum, maxIndex*(maxIndex-1)/2);
+		/*
+		if(maxIndex==15){
+			for(int i=0; i<indices.size(); i++){
+				std::cout<< i <<": " << indices[i]<<std::endl;
+			}
+		}
+		*/
 	}
 	
-	std::cout << std::endl;
 }
 
 }

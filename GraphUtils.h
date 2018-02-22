@@ -198,6 +198,63 @@ static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_rand
     return begin;
 }
 
+static std::vector<IndexType> indexReorder(const IndexType maxIndex, const IndexType window){
+	IndexType index = 0;
+	std::vector<IndexType> ret(maxIndex, -1);
+    for( IndexType i=0; i<window; i++){
+		for( IndexType step=0; step<maxIndex; step+=window){
+			//if(step+1>=maxIndex) continue;
+			std::cout<< step+i <<" <> ";
+			ret[index++] = step+i;
+			//if(index>=maxIndex) break;
+			}
+		}
+
+	return ret;
+}
+	
+static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
+	IndexType index = 0;
+	std::vector<IndexType> ret(maxIndex, -1);
+	std::vector<bool> chosen(maxIndex, false);
+	
+	IndexType denom;
+    for( denom=1; denom<maxIndex; denom*=2){
+		for( IndexType numer=1; numer<denom; numer+=2){
+			//if(step+1>=maxIndex) continue;
+			IndexType val = (maxIndex*numer)/denom; 
+			//std::cout << numer <<"/" << denom << " = "<< val <<" <> ";
+			ret[index] = val;
+			chosen[val]=true;
+			++index;
+			//if(index>=maxIndex) break;
+		}
+	}
+	
+	for(IndexType i=0; i<maxIndex; i++){
+		if( chosen[i]==false ){
+			ret[index] = i;
+			chosen[i]=true;
+			++index;
+		}
+	}
+	
+	/*
+	for( IndexType numer=0; numer<denom; numer+=2){
+		IndexType val = (maxIndex*numer)/denom; 
+		if( chosen[val]==false ){
+			ret[index] = val;
+			chosen[val]=true;
+			++index;
+		}
+	}
+	*/
+	SCAI_ASSERT_EQ_ERROR( index, maxIndex, "index mismatch");
+	
+	return ret;
+}
+
+
 
 } /*namespace GraphUtils*/
 
