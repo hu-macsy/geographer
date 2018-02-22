@@ -420,6 +420,18 @@ TEST_F(auxTest, testIndex2_2DPoint){
         EXPECT_GE(std::get<1>(ind) , 0);
     }
 }
+//-----------------------------------------------------------------
 
+TEST_F(auxTest, testInexReordering){
+	
+	IndexType maxIndex = 10;
+	std::vector<IndexType> indices = GraphUtils::indexReorder( maxIndex, maxIndex/3 );
+	
+	for(int i=0; i<indices.size(); i++){
+		std::cout<< i <<": " << indices[i]<<std::endl;
+	}
+	
+	std::cout << std::endl;
+}
 
 }
