@@ -28,6 +28,9 @@ METRIC_NAMES = ['timeTotal', 'finalCut', 'imbalance', 'maxBnd', 'totBnd', 'maxCo
 METRIC_VALUES = [ 'seconds', 'number of edges', 'ratio', 'number of vertices', 'number of vertices', 'number of vertices', 'number of vertices', 'ratio', 'ratio', 'seconds', 'seconds']
 NUM_METRICS = len(METRIC_NAMES)
 
+# global settings for all 
+epsilon = 0.01
+
 
 class experiment:
 	def __init__(self):
@@ -70,7 +73,7 @@ class experiment:
 #######################################################################
 
 def defaultSettings():
-	epsilon = 0.03
+	#epsilon = 0.03
 	minBorderNodes = 1000
 	stopAfterNoGainRounds = 100
 	minGainForNextGlobalRound = 100
@@ -82,8 +85,8 @@ def defaultSettings():
 	tieBreakingStrategy = 1
 	repeatTimes = 5	
 	
-	#retString = " --dimensions=" + str(dimensions)
-	retString = " --minBorderNodes="+str(minBorderNodes)
+	retString = " --epsilon=" + str(epsilon)
+	retString += " --minBorderNodes="+str(minBorderNodes)
 	retString += " --stopAfterNoGainRounds="+str(stopAfterNoGainRounds)
 	retString += " --minGainForNextGlobalRound="+str(minGainForNextGlobalRound)
 	retString += " --multiLevelRounds="+str(multiLevelRounds)
@@ -320,9 +323,8 @@ def outFileString( exp, i, tool):
 		print("WARNING: tool " + tool + " is invalid")
 		return ""
 	
-	#outFile = exp.graphs[i].split('.')[0] + "_k" + str(exp.k[i]) +"_"+ tool + ".info"
+	#outFile = os.path.basename(exp.graphs[i]).split('.')[0] + "Epsilon01_k" + str(exp.k[i]) +"_"+ tool + ".info"
 	outFile = os.path.basename(exp.graphs[i]).split('.')[0] + "_k" + str(exp.k[i]) +"_"+ tool + ".info"
-	
 	#print(outFile)
 	
 	return os.path.join( toolsPath, tool , outFile)

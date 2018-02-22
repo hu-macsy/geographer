@@ -70,7 +70,7 @@ def addRelativePlot( exp, metricValues, metricName, toolNames, baseToolId, plotF
 				elif metricValues[baseToolId][m][i] == 0:	# avoid division with zero
 					plotF.write("("+str(exp.k[i])+", "+ str(0) + ")\n")	
 				else:
-					plotF.write("("+str(exp.k[i])+", "+ str(thisToolMetrics[m][i]/metricValues[baseToolId][m][i]) + ")\n")	#
+					plotF.write("("+str(exp.k[i])+", "+ str(thisToolMetrics[m][i]/metricValues[baseToolId][m][i]) + ")\n")	
 				#print( metricValues[baseToolId][m][i] )
 			else:
 				plotF.write("("+str(exp.k[i])+", nan)\n")
@@ -94,6 +94,10 @@ def addGeoMeanInfo( metricValues, metricName, toolNames, baseToolId, plotF):
 		return -1;
 	
 	plotF.write("\nGeometric mean for metric: " + metricName + " , base tool: " + toolNames[baseToolId] +"\\\\ \n" )
+	
+	#print(geoMeanForAllTools)
+	if geoMeanForAllTools==None:
+		return [-1]*len(toolNames)
 	
 	for i in range(0, len(geoMeanForAllTools) ):
 		plotF.write(toolNames[i] + " " + str(geoMeanForAllTools[i]) + "\\\\\n")
@@ -151,12 +155,7 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues):
 	#
 	
 	plotFileName = "exp"+str(exp.ID)+"_"
-	'''
-	for t in range(0, len(allTools)):
-		globTool = allTools[t]
-		if toolNames[t]==globTool:
-			plotFileName += str(t)
-	'''
+
 	plotID = []
 	for toolName in toolNames:
 		for t in range(0, len(allTools)):
@@ -183,15 +182,13 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues):
 				r = random.randint(0,99)
 				
 			plotFile += "_"+str(r)
-		#else, if option=="2", do not do anthing
+		#else, if option=="2", do not do anything
 			
 	plotFile += ".tex"
 	#
 	print(plotFile)
 	#exit(-1)
 	#
-	
-	#plotFile = os.path.join( plotDir, "plots_new_"+str(exp.expType)+expNumber+".tex")
 		
 	with open(plotFile,'w') as plotF:
 		plotF.write("\\documentclass{article}\n\\usepackage{tikz}\n\\usepackage{pgfplots}\n") 
@@ -209,7 +206,7 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues):
 			
 		plotF.write("Data gathered from directory: \n\n")
 		plotF.write( toolsPath +"\n\n")
-		plotF.write("From files: \n")
+		plotF.write("From files: \n\n")
 			
 		for i in range(0,exp.size):
 			#outF1 =  outFiles[i]
@@ -242,13 +239,13 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues):
 		# for all metrics
 		for m in range(0, numMetrics):
 			metricName = metricNames[m]
-			print(">>> to plot for metric" + metricName)
+			print(">>> to plot for metric " + metricName)
 			## TODO:
 			## maybe skip some metrics for brevity??
 			## for example imbalance
 			##
-			if metricName=="imbalance":				
-				continue
+			#if metricName=="imbalance":				
+			#	continue
 			
 			plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel= "+ METRIC_VALUES[m] +", legend style={at={(1.5,0.7)}},xmode = log, ymode=log, log basis x= 2, xtick={")
 			for x in range(0, len(exp.k)-1 ):
@@ -307,22 +304,7 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues):
 		plotF.write("\n\n")
 		
 		newNumMetrics = len(geoMeanMatrix)
-		
-		'''
-		for m in range(0, newNumMetrics):
-			assert( len(geoMeanMatrix[m])==numTools )
-						
-			thisMetric = geoMeanMatrix[m]
-			metricName = metricNames[m]
-			
-			if metricName=="imbalance":				
-				continue
-			
-			plotF.write(metricName + " for all given tools: ")
-			for x in thisMetric:
-				plotF.write(str(x) + " , ")
-			plotF.write("\n\n")
-		'''
+
 		plotF.write("\n\n")
 		plotF.write("\\end{document}")
 
@@ -336,7 +318,7 @@ def createMeanPlotsForAllExp( wantedExp, wantedTools):
 	
 	# create the filename
 	plotFileName = "expMeans_t"
-	#plotFileName += "t"
+
 	for t in wantedTools:
 		for t2 in range(0,NUM_TOOLS):
 			tool2 = allTools[t2]
@@ -408,8 +390,8 @@ def createMeanPlotsForAllExp( wantedExp, wantedTools):
 		
 			## skip certain metrics
 			## or handle differently
-			if metricName=="imbalance":				
-				continue
+			#if metricName=="imbalance":				
+				#continue
 			if metricName=="timeTotal":
 				timeTmeans = getGeomMeanForMetric( metricValues, metricName, wantedTools, 0)
 				plotF.write("Values for metric timeTotal: ")
@@ -494,9 +476,7 @@ def gatherExpTool( exp, tool ):
 	for i in range(0, exp.size):
 		#
 		#exp.printExp()
-		#
-		#gatherFileName = exp.graphs[i].split('.')[0] +"_"+tool+".info"
-		#gatherPath = os.path.join( toolsPath, tool, gatherFileName)
+		
 		gatherFile = outFileString( exp, i, tool)
 		
 		if not os.path.exists( os.path.join( toolsPath, tool) ):
@@ -551,7 +531,6 @@ def gatherCompetitor( exp, tool ):
 	#print(exp.size, len(exp.k), len(exp.graphs))
 	for i in range(0, exp.size):
 		gatherFileName = exp.graphs[i].split('.')[0] +"_"+tool+".info"
-		#gatherFileName = exp.graphs[i].split('.')[0]+".info"
 		gatherPath = os.path.join( toolsPath, tool, gatherFileName)
 		print( gatherFileName )
 		
@@ -559,7 +538,7 @@ def gatherCompetitor( exp, tool ):
 			print("### ERROR: directory to gather information " + os.path.join( toolsPath, tool) + " does not exist.\nAborting..." )
 			exit(-1)
 		if not os.path.exists(gatherPath):
-			print("### WARNING: file to gather information " + gatherPath + " does not exist.")#\nAborting...")
+			#print("### WARNING: file to gather information " + gatherPath + " does not exist.")#\nAborting...")
 			#metricNames = ["--"]*9
 			metricValuesTmp = [-1 for x in range(0,9)]
 			k=-1
@@ -567,14 +546,6 @@ def gatherCompetitor( exp, tool ):
 			#exit(-1)
 		else:
 			metricNames, metricValuesTmp, k = parseOutFile( gatherPath )
-				
-		#if not k==exp.k[i]:
-			#print("### WARNING: number of blocks mismatch, parse.k= "+ str(k) +" exp.k= "+ str(exp.k[i]) )#\nAborting...")
-			#print("the output file for Geographer or the competitor does not exist\n")
-			#metricNames = ["--"]*9
-			#metricValuesTmp = [0 for x in range(0,9)]			
-			#k= max(k, exp.k[i])
-			#exit(-1)
 		
 		allMetrics.append( metricValuesTmp )
 		#print(metricNames)
