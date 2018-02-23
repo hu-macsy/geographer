@@ -337,7 +337,7 @@ int main(int argc, char** argv) {
     }
     
     // time needed to get the input
-    std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
+    //std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
 
     assert(N > 0);
 

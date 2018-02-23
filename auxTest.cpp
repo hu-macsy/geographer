@@ -16,6 +16,7 @@
 #include <memory>
 #include <cstdlib>
 #include <numeric>
+#include <chrono>
 
 #include "MeshGenerator.h"
 #include "FileIO.h"
@@ -425,7 +426,7 @@ TEST_F(auxTest, testIndex2_2DPoint){
 TEST_F(auxTest, testIndexReordering){
 	
 	IndexType M = 1000;
-	for( IndexType maxIndex = 5; maxIndex<M; maxIndex++){
+	for( IndexType maxIndex = 100; maxIndex<M; maxIndex++){
 		//std::vector<IndexType> indices = GraphUtils::indexReorder( maxIndex, maxIndex/3 );
 		std::vector<IndexType> indices = GraphUtils::indexReorderCantor( maxIndex);
 		//std::cout <<std::endl;
@@ -444,5 +445,64 @@ TEST_F(auxTest, testIndexReordering){
 	}
 	
 }
+
+//-----------------------------------------------------------------
+
+TEST_F(auxTest, testBenchIndexReordering){
+
+	IndexType M = 10015009;
+	
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();	
+	std::chrono::time_point<std::chrono::high_resolution_clock> FYstart = std::chrono::high_resolution_clock::now();
+	ValueType time;
+	
+	std::vector<IndexType> indices(M);
+	const typename std::vector<IndexType>::iterator firstIndex = indices.begin();
+	typename std::vector<IndexType>::iterator lastIndex = indices.end();
+	std::iota(firstIndex, lastIndex, 0);
+	GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, M);
+	
+	std::chrono::duration<ValueType,std::ratio<1>> FYtime = std::chrono::high_resolution_clock::now() - FYstart;
+	PRINT0("FisherYatesShuffle for " << M <<" points is " << FYtime.count() );
+	
+	for(int i=0; i<M; i++){
+		EXPECT_LT(indices[i],M);
+		EXPECT_GE(indices[i],0);
+	}
+	EXPECT_EQ( indices.size(), M );
+	
+	
+	
+	// cantor reordering
+	std::chrono::time_point<std::chrono::high_resolution_clock> Cstart = std::chrono::high_resolution_clock::now();
+	
+	std::vector<IndexType> indicesCantor = GraphUtils::indexReorderCantor( M );
+		
+	std::chrono::duration<ValueType,std::ratio<1>> Ctime = std::chrono::high_resolution_clock::now() - Cstart;
+	PRINT0("Cantor for " << M <<" points is " << Ctime.count() );
+	
+	for(int i=0; i<M; i++){
+		EXPECT_LT(indicesCantor[i],M);
+		EXPECT_GE(indicesCantor[i],0);
+	}
+	EXPECT_EQ( indices.size(), M );
+	
+	//checks
+	
+	IndexType indexSumFY = std::accumulate( indices.begin(), indices.end(), 0);
+	IndexType indexSumC = std::accumulate( indicesCantor.begin(), indicesCantor.end(), 0);
+	// even with integer oveflow they should be the same, TODO: right?
+	EXPECT_EQ( indexSumFY, indexSumC);
+	
+	
+	//WARNING: integer overload for bigger values
+	if(M<60000){
+		EXPECT_EQ( indexSumFY, M*(M-1)/2);
+		EXPECT_EQ( indexSumC, M*(M-1)/2);
+	}
+		
+}
+
+
 
 }

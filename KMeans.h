@@ -169,27 +169,20 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
 	std::iota(firstIndex, lastIndex, 0);
 	
-	/*
-	auto[](std::unordered_set<IndexType>& indices){
-		IndexType index = 0;
-		for( IndexType window = indices.size()/2; window>1; window = window/2){
-			IndexType v = window;
-			while( v<indices.size() ){
-				indices.insert(v);
-				v += window;
-			}
-		}
-	}
-	*/
+
 	IndexType minNodes = settings.minSamplingNodes*blocksPerProcess;
 	assert(minNodes > 0);
 	IndexType samplingRounds = 0;
 	std::vector<IndexType> samples;
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
 	if (localN > minNodes) {
-		//ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
-		localIndices = ITI::GraphUtils::indexReorderCantor(localN);
-
+		std::chrono::time_point<std::chrono::high_resolution_clock> reorderStart = std::chrono::high_resolution_clock::now();
+		ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
+		//localIndices = ITI::GraphUtils::indexReorderCantor(localN);
+		std::chrono::duration<ValueType,std::ratio<1>> reorderTime = std::chrono::high_resolution_clock::now() - reorderStart;
+		ValueType time = comm->max( reorderTime.count() );
+		PRINT0("\tmax time to reorder indices= " << time);
+		
 		samplingRounds = std::ceil(std::log2(ValueType(localN) / minNodes))+1;
 		samples.resize(samplingRounds);
 		samples[0] = minNodes;

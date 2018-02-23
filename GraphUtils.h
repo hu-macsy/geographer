@@ -221,34 +221,20 @@ static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
 	IndexType denom;
     for( denom=1; denom<maxIndex; denom*=2){
 		for( IndexType numer=1; numer<denom; numer+=2){
-			//if(step+1>=maxIndex) continue;
 			IndexType val = (maxIndex*numer)/denom; 
 			//std::cout << numer <<"/" << denom << " = "<< val <<" <> ";
-			ret[index] = val;
+			ret[index++] = val;
 			chosen[val]=true;
-			++index;
-			//if(index>=maxIndex) break;
+			//++index;
 		}
 	}
-	
+	PRINT("Index= " << index <<", still "<< maxIndex-index << " to fill");
 	for(IndexType i=0; i<maxIndex; i++){
 		if( chosen[i]==false ){
 			ret[index] = i;
-			chosen[i]=true;
 			++index;
 		}
 	}
-	
-	/*
-	for( IndexType numer=0; numer<denom; numer+=2){
-		IndexType val = (maxIndex*numer)/denom; 
-		if( chosen[val]==false ){
-			ret[index] = val;
-			chosen[val]=true;
-			++index;
-		}
-	}
-	*/
 	SCAI_ASSERT_EQ_ERROR( index, maxIndex, "index mismatch");
 	
 	return ret;
