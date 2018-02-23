@@ -146,10 +146,10 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const*
 	x= scaledCoord[0];
 	y= scaledCoord[1];
 	z= scaledCoord[2];
-        //PRINT( x <<"__" << y<< "__"<<z );
-        SCAI_ASSERT(x>=0 && x<=1, x);
-        SCAI_ASSERT(y>=0 && y<=1, y);
-        SCAI_ASSERT(z>=0 && z<=1, z);
+	//PRINT( x <<"__" << y<< "__"<<z );
+	SCAI_ASSERT(x>=0 && x<=1, x);
+	SCAI_ASSERT(y>=0 && y<=1, y);
+	SCAI_ASSERT(z>=0 && z<=1, z);
 	unsigned long long integerIndex = 0;	//TODO: also check whether this data type is long enough
 
 	for (IndexType i = 0; i < recursionDepth; i++) {
@@ -212,9 +212,9 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const*
 		integerIndex = (integerIndex << 3) | subSquare;		
 	}
 	unsigned long long divisor = size_t(1) << size_t(3*int(recursionDepth));
-        double ret = double(integerIndex) / double(divisor);
-        SCAI_ASSERT(ret<1, ret << " , divisor= "<< divisor << " , integerIndex=" << integerIndex <<" , recursionDepth= " << recursionDepth << ", sizeof(unsigned long long)="<< sizeof(unsigned long long));
-        return ret;
+	double ret = double(integerIndex) / double(divisor);
+	SCAI_ASSERT(ret<1, ret << " , divisor= "<< divisor << " , integerIndex=" << integerIndex <<" , recursionDepth= " << recursionDepth << ", sizeof(unsigned long long)="<< sizeof(unsigned long long));
+	return ret;
 
 }
 

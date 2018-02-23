@@ -228,11 +228,12 @@ static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
 			//++index;
 		}
 	}
-	PRINT("Index= " << index <<", still "<< maxIndex-index << " to fill");
+	//PRINT("Index= " << index <<", still "<< maxIndex-index << " to fill");
 	for(IndexType i=0; i<maxIndex; i++){
 		if( chosen[i]==false ){
 			ret[index] = i;
 			++index;
+			SCAI_ASSERT_LE_ERROR( index, maxIndex, "index too high");
 		}
 	}
 	SCAI_ASSERT_EQ_ERROR( index, maxIndex, "index mismatch");

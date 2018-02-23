@@ -423,7 +423,7 @@ int main(int argc, char** argv) {
 			IndexType weightSum;
 			bool uniformWeights = true;
 				
-			int repeatTimes = 5;
+			int repeatTimes = 2;
 			beforeInitialTime =  std::chrono::system_clock::now();
 
 			for(int r=0 ; r< repeatTimes; r++){

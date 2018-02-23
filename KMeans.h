@@ -12,6 +12,7 @@
 #include <cmath>
 #include <scai/lama/DenseVector.hpp>
 #include <scai/tracing.hpp>
+#include <chrono>
 
 #include "quadtree/QuadNodeCartesianEuclid.h"
 #include "GraphUtils.h"
@@ -165,7 +166,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 
 	//prepare sampling
 	std::vector<IndexType> localIndices(localN);
-	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
+	typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
 	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
 	std::iota(firstIndex, lastIndex, 0);
 	
@@ -177,8 +178,8 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
 	if (localN > minNodes) {
 		std::chrono::time_point<std::chrono::high_resolution_clock> reorderStart = std::chrono::high_resolution_clock::now();
-		ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
-		//localIndices = ITI::GraphUtils::indexReorderCantor(localN);
+		//ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
+		localIndices = ITI::GraphUtils::indexReorderCantor(localN);
 		std::chrono::duration<ValueType,std::ratio<1>> reorderTime = std::chrono::high_resolution_clock::now() - reorderStart;
 		ValueType time = comm->max( reorderTime.count() );
 		PRINT0("\tmax time to reorder indices= " << time);
@@ -188,6 +189,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		samples[0] = minNodes;
 	}
 
+	firstIndex = localIndices.begin();
+	lastIndex = localIndices.end();
+	
 	if (samplingRounds > 0 && settings.verbose) {
 		if (comm->getRank() == 0) std::cout << "Starting with " << samplingRounds << " sampling rounds." << std::endl;
 	}
@@ -218,6 +222,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 				adjustedBlockSizes[j] = ValueType(blockSizes[j]) * ratio;
 			}
 		} else {
+			//SCAI_ASSERT_EQ_ERROR( *lastIndex, localIndices.back(), "Index mismatch");
 			assert(lastIndex == localIndices.end());
 		}
 

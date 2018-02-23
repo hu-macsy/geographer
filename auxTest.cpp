@@ -450,7 +450,7 @@ TEST_F(auxTest, testIndexReordering){
 
 TEST_F(auxTest, testBenchIndexReordering){
 
-	IndexType M = 10015009;
+	IndexType M = 51009;
 	
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();	
 	std::chrono::time_point<std::chrono::high_resolution_clock> FYstart = std::chrono::high_resolution_clock::now();
@@ -475,8 +475,8 @@ TEST_F(auxTest, testBenchIndexReordering){
 	
 	// cantor reordering
 	std::chrono::time_point<std::chrono::high_resolution_clock> Cstart = std::chrono::high_resolution_clock::now();
-	
-	std::vector<IndexType> indicesCantor = GraphUtils::indexReorderCantor( M );
+	std::vector<IndexType> indicesCantor(M);
+	indicesCantor = GraphUtils::indexReorderCantor( M );
 		
 	std::chrono::duration<ValueType,std::ratio<1>> Ctime = std::chrono::high_resolution_clock::now() - Cstart;
 	PRINT0("Cantor for " << M <<" points is " << Ctime.count() );
