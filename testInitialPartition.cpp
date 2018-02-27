@@ -432,8 +432,8 @@ int main(int argc, char** argv) {
 				
 				std::chrono::time_point<std::chrono::system_clock> beforeTmp = std::chrono::system_clock::now();
 				
-				 //tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
-				std::vector<sort_pair> localHilbertIndices = ITI::HilbertCurve<IndexType, ValueType>::getSortedHilbertIndices( coordinates );
+				DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
+				//std::vector<sort_pair> localHilbertIndices = ITI::HilbertCurve<IndexType, ValueType>::getSortedHilbertIndices( coordinates );
 				
 				std::chrono::duration<double> sfcPartTime = std::chrono::system_clock::now() - beforeTmp;
 				ValueType time = comm->max( sfcPartTime.count() );

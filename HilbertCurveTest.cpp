@@ -85,7 +85,7 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(HilbertCurveTest, testInverseHilbertIndex_Local_2D) {
-  const IndexType dimensions = 2;
+  //const IndexType dimensions = 2;
   const IndexType recursionDepth = 15;
   
   ValueType divisor=16;
@@ -106,7 +106,7 @@ TEST_F(HilbertCurveTest, testInverseHilbertIndex_Local_2D) {
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(HilbertCurveTest, testInverseHilbertIndex_Local_3D) {
-  const IndexType dimensions = 3;
+  //const IndexType dimensions = 3;
   const IndexType recursionDepth = 7;
   
   ValueType divisor=16;
@@ -466,7 +466,7 @@ TEST_F(HilbertCurveTest, testRandom_Distributed_3D) {
   
   const IndexType localN = dist->getLocalSize();
 
-  ValueType point[3], point2[3];
+  ValueType point[3];
   
   for (IndexType i = 0; i < localN; i++) {
     //check if the new function return the same index. seems OK.

@@ -187,8 +187,8 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
 	if (localN > minNodes) {
 		std::chrono::time_point<std::chrono::high_resolution_clock> reorderStart = std::chrono::high_resolution_clock::now();
-		//ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
-		localIndices = ITI::GraphUtils::indexReorderCantor(localN);
+		ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
+		//localIndices = ITI::GraphUtils::indexReorderCantor(localN);
 		std::chrono::duration<ValueType,std::ratio<1>> reorderTime = std::chrono::high_resolution_clock::now() - reorderStart;
 		ValueType time = comm->max( reorderTime.count() );
 		PRINT0("\tmax time to reorder indices= " << time);

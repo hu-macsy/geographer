@@ -131,7 +131,7 @@ int main(int argc, char** argv) {
     }
                         
     IndexType sideLen = 200;                            // length of grid side 
-    IndexType edges= -1;                                // number of edges
+    //IndexType edges= -1;                                // number of edges
     IndexType dim = settings.dimensions;
     IndexType N = std::pow( sideLen, dim);      	// total number of points
     
@@ -143,7 +143,7 @@ int main(int argc, char** argv) {
     scai::lama::DenseVector<ValueType> nodeWeights( distPtr );               // node weights
     std::vector<ValueType> maxCoord(dim);                                       // the max coordinate in every dimensions
     
-    IndexType initialPartition = static_cast<int> (settings.initialPartition);
+    //IndexType initialPartition = static_cast<int> (settings.initialPartition);
     
     IndexType bigR = 3*sideLen/4;       // radious of big circle
     IndexType bigRSq = bigR*bigR;
@@ -176,7 +176,7 @@ int main(int argc, char** argv) {
 PRINT0( localN );        
 
         for(IndexType i=0; i<localN; i++){  
-            IndexType globalIndex = distPtr->local2global(i);
+            //IndexType globalIndex = distPtr->local2global(i);
             
             std::tuple<IndexType, IndexType> point = ITI::aux<IndexType,ValueType>::index2_2DPoint( i , maxPoints );
             IndexType pointNormSq = std::pow(std::get<0>(point), 2) + std::pow(std::get<1>(point), 2);  //x^2 + y^2

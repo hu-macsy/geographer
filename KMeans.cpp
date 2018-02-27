@@ -30,14 +30,15 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 	SCAI_REGION( "KMeans.findInitialCentersSFC" );
 	const IndexType localN = coordinates[0].getLocalValues().size();
 	const IndexType globalN = coordinates[0].size();
-
+	const IndexType dimensions = settings.dimensions;
+	
 	//convert coordinates, switch inner and outer order
 	std::vector<std::vector<ValueType> > convertedCoords(localN);
 	for (IndexType i = 0; i < localN; i++) {
-		convertedCoords[i].resize(settings.dimensions);
+		convertedCoords[i].resize(dimensions);
 	}
 
-	for (IndexType d = 0; d < settings.dimensions; d++) {
+	for (IndexType d = 0; d < dimensions; d++) {
 		scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
 		assert(rAccess.size() == localN);
 		for (IndexType i = 0; i < localN; i++) {
@@ -46,10 +47,14 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 	}
 
 	//get local hilbert indices
+	/*
 	std::vector<ValueType> sfcIndices(localN);
 	for (IndexType i = 0; i < localN; i++) {
-		sfcIndices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(convertedCoords[i].data(), settings.dimensions, settings.sfcResolution, minCoords, maxCoords);
+		sfcIndices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(convertedCoords[i].data(), dimensions, settings.sfcResolution, minCoords, maxCoords);
 	}
+	*/
+	std::vector<ValueType> sfcIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector( coordinates, settings.sfcResolution, settings.dimensions);
+	SCAI_ASSERT_EQ_ERROR( sfcIndices.size(), localN, "wrong local number of indices (?) ");
 
 	//prepare indices for sorting
 	std::vector<IndexType> localIndices(localN);
@@ -72,8 +77,8 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 	scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
 
 	//set local values in vector, leave non-local values with zero
-	std::vector<std::vector<ValueType> > result(settings.dimensions);
-	for (IndexType d = 0; d < settings.dimensions; d++) {
+	std::vector<std::vector<ValueType> > result(dimensions);
+	for (IndexType d = 0; d < dimensions; d++) {
 		result[d].resize(k);
 	}
 
@@ -575,7 +580,7 @@ for( int i=0; i<newDistribution->getLocalSize(); i++){
 				point = HilbertCurve<IndexType,ValueType>::Hilbert2DIndex2PointVec(localHilbertIndices[i].value, recLevel);
 				wLocalCoords0[i] = point[0];
 				wLocalCoords1[i] = point[1];
-PRINT(*comm <<": "<< i << ", hilbert index= "<< localHilbertIndices[i].value << " >> " << point[0] << ", " << point[1]);				
+//PRINT(*comm <<": "<< i << ", hilbert index= "<< localHilbertIndices[i].value << " >> " << point[0] << ", " << point[1]);				
 			}
 		}else if (dimensions==3){
 			scai::hmemo::WriteAccess<ValueType> wLocalCoords0( localCoords[0].getLocalValues() );

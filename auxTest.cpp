@@ -294,8 +294,7 @@ TEST_F (auxTest,testComputeCommVolume){
 TEST_F (auxTest,testGraphMaxDegree){
     
     const IndexType N = 1000;
-    const IndexType k = 10;
-
+    
     //define distributions
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -456,7 +455,6 @@ TEST_F(auxTest, testBenchIndexReordering){
 	
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();	
 	std::chrono::time_point<std::chrono::high_resolution_clock> FYstart = std::chrono::high_resolution_clock::now();
-	ValueType time;
 	
 	std::vector<IndexType> indices(M);
 	const typename std::vector<IndexType>::iterator firstIndex = indices.begin();

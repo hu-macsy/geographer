@@ -39,6 +39,11 @@ namespace ITI {
 			* */
 			static ValueType getHilbertIndex(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 
+			/* Gets a vector of coordinates (either 2D or 3D) as input and returns a vector with the
+			 * hilbert indices for all coordinates.
+			 */
+			static std::vector<ValueType> getHilbertIndexVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth, const IndexType dimensions);
+			
 			/**
 			* Accepts a point and calculates where along the hilbert curve it lies.
 			*
@@ -53,6 +58,9 @@ namespace ITI {
 			*/                        
 			static ValueType getHilbertIndex2D(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 		
+			/* Gets a vector of coordinates (either 2D or 3D) as input and returns a vector with the
+			 * hilbert indices for all coordinates.
+			 */
 			static std::vector<ValueType> getHilbertIndex2DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth);
 			/**
 			*Accepts a point in 3 dimensions and calculates where along the hilbert curve it lies.
@@ -68,6 +76,11 @@ namespace ITI {
 			*/
 			static ValueType getHilbertIndex3D(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 
+			/* Gets a vector of coordinates (either 2D or 3D) as input and returns a vector with the
+			 * hilbert indices for all coordinates.
+			 */
+			static std::vector<ValueType> getHilbertIndex3DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth);
+			
 			/**
 			* Given an index between 0 and 1 returns a point in 2 dimensions along the hilbert curve based on
 			* the recursion depth. Mostly for test reasons.

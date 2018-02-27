@@ -239,8 +239,8 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_2D) {
             }
         }
     }
-    IndexType numX= numPoints[0];
-    IndexType numY= numPoints[1];
+    //IndexType numX= numPoints[0];
+    //IndexType numY= numPoints[1];
     
     //PRINT( comm->sum(cntCorners) );
     

@@ -226,8 +226,8 @@ TEST_F(ParcoRepartTest, testTwoWayCut) {
 
 	std::string file = graphPath + "Grid32x32";
 	const IndexType k = comm->getSize();
-	const ValueType epsilon = 0.05;
-	const IndexType iterations = 1;
+	//const ValueType epsilon = 0.05;
+	//const IndexType iterations = 1;
 
 	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
 
@@ -930,13 +930,13 @@ TEST_F (ParcoRepartTest, testGetLocalCommunicationWithColoring_2D) {
 
 std::string file = graphPath + "Grid16x16";
     std::ifstream f(file);
-    IndexType dimensions= 2, k=8;
+    IndexType dimensions= 2;
     IndexType N, edges;
     f >> N >> edges; 
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     // for now local refinement requires k = P
-    k = comm->getSize();
+    //IndexType k = comm->getSize();
     //
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));

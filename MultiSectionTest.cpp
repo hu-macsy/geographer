@@ -372,7 +372,7 @@ for(int i=0; i<part1D.size(); i++){
     PRINT(k-1 << ": from ["<< part1D.back() << " to " << N-1 << "] with weight " << weightPerPart.back() );
     
     ValueType totalWeight = std::accumulate(weightPerPart.begin(), weightPerPart.end(), 0.0);
-    ValueType averageWeight = totalWeight/k;
+    //ValueType averageWeight = totalWeight/k;
         
     SCAI_ASSERT( totalWeight==origTotalWeight, "totalWeight= "<< totalWeight << " should be= "<< origTotalWeight );
     
@@ -410,7 +410,7 @@ TEST_F(MultiSectionTest, test1DPartitionOptimalRandomWeights){
     */
     
     const ValueType origTotalWeight = std::accumulate( nodeWeights.begin(), nodeWeights.end(), 0.0);
-    const ValueType optimalWeight = origTotalWeight/k;
+    //const ValueType optimalWeight = origTotalWeight/k;
     //PRINT0(origTotalWeight << " @@ " << optimalWeight);
     
     std::vector<ValueType> weightPerPart, weightPerPartGreedy, weightPerPartMine;
@@ -1494,7 +1494,7 @@ TEST_F(MultiSectionTest, testInbBox){
     IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
-    IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
+    //IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
     
     // for all dimensions i: first[i]<second[i] 
     rectangle bBox;

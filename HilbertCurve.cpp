@@ -92,6 +92,19 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType const*
     return double(integerIndex) / double(divisor);
     
 }
+//-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndexVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth, const IndexType dimensions) {
+
+	if(dimensions==3) 
+        return HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVector( coordinates, recursionDepth);
+    
+    if(dimensions==2) 
+        return HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVector( coordinates, recursionDepth);
+    
+    throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
+}
 
 //-------------------------------------------------------------------------------------------------
 
@@ -191,6 +204,140 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
 				integerIndex = (integerIndex << 2) | subSquare;	
 			}
 			unsigned long divisor = size_t(1) << size_t(2*int(recursionDepth));
+			hilbertIndices[i] = double(integerIndex) / double(divisor);
+		}
+	}
+	
+    return hilbertIndices;   
+    
+}
+//-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth) {
+    SCAI_REGION("HilbertCurve.getHilbertIndex2DVector")
+	
+	using scai::lama::Scalar;
+	
+	const IndexType dimensions = coordinates.size();
+	
+    size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
+    if (recursionDepth > bitsInValueType/dimensions) {
+        throw std::runtime_error("A space-filling curve that precise won't fit into the return datatype.");
+    }    
+    
+	if( dimensions!=3 ){
+		PRINT("In HilbertCurve.getHilbertIndex2DVector but dimensions is " << dimensions << " and not 3");
+		throw std::runtime_error("Wrong dimensions given");
+	}
+	
+	/**
+     * get minimum / maximum of coordinates
+     */
+	ValueType minCoords[3];
+	ValueType maxCoords[3];
+
+	{
+		SCAI_REGION( "HilbertCurve.getHilbertIndex3DVector.minMax" )
+		for (IndexType dim = 0; dim < 3; dim++) {
+			minCoords[dim] = coordinates[dim].min().Scalar::getValue<ValueType>();
+			maxCoords[dim] = coordinates[dim].max().Scalar::getValue<ValueType>();
+			assert(std::isfinite(minCoords[dim]));
+			assert(std::isfinite(maxCoords[dim]));
+			SCAI_ASSERT(maxCoords[dim] > minCoords[dim], "Wrong coordinates.");
+		}
+    }
+    
+    ValueType dim0Extent = maxCoords[0] - minCoords[0];
+    ValueType dim1Extent = maxCoords[1] - minCoords[1];
+	ValueType dim2Extent = maxCoords[2] - minCoords[2];
+    
+    ValueType x ,y ,z;
+	unsigned long integerIndex = 0;	//TODO: also check whether this data type is long enough
+	const IndexType localN = coordinates[0].getLocalValues().size();
+	
+	// the DV to be returned
+	std::vector<ValueType> hilbertIndices(localN,-1);
+	
+	{
+		SCAI_REGION( "HilbertCurve.getHilbertIndex3DVector.indicesCalculation" )
+		
+		scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
+        scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
+		scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[2].getLocalValues() );
+		//scai::hmemo::WriteOnlyAccess<ValueType> hilbertIndices(hilbertIndices.getLocalValues());
+		
+		for (IndexType i = 0; i < localN; i++) {
+			x = (coordAccess0[i]-minCoords[0])/dim0Extent;
+			y = (coordAccess1[i]-minCoords[1])/dim1Extent;
+			z = (coordAccess2[i]-minCoords[2])/dim2Extent;
+			/*
+			if (scaledCoord[dim] < 0 || scaledCoord[dim] > 1) {
+				throw std::runtime_error("Coordinate " + std::to_string(point[dim]) +" does not agree with bounds "
+            + std::to_string(minCoords[dim]) + " and " + std::to_string(maxCoords[dim]));
+			}
+			*/
+			integerIndex = 0;
+			for (IndexType i = 0; i < recursionDepth; i++) {
+				int subSquare;
+				if (z < 0.5) {
+					if (x < 0.5) {
+						if (y <0.5){		//x,y,z <0.5
+							subSquare= 0;
+							//apply inverse hilbert operator
+							ValueType tmpX= x;
+							x= 2*z;
+							z= 2*y;
+							y= 2*tmpX;
+						} else{			//z<0.5, y>0.5, x<0.5
+							subSquare= 1;
+							ValueType tmpX= x;
+							x= 2*y-1;
+							y= 2*z;
+							z= 2*tmpX;
+						}
+					} else if (y>=0.5){		//z<0.5, y,x>0,5
+						subSquare= 2;
+						//apply inverse hilbert operator
+						ValueType tmpX= x;					
+						x= 2*y-1;
+						y= 2*z;
+						z= 2*tmpX-1;
+					}else{			//z<0.5, y<0.5, x>0.5
+						subSquare= 3;
+						x= -2*x+2;
+						y= -2*y+1;
+						z= 2*z;
+					}
+				} else if(x>=0.5){
+					if(y<0.5){ 		//z>0.5, y<0.5, x>0.5
+						subSquare= 4;
+						x= -2*x+2;
+						y= -2*y+1;
+						z= 2*z-1;
+					} else{			//z>0.5, y>0.5, x>0.5
+						subSquare= 5;
+						ValueType tmpX= x;
+						x= 2*y-1;
+						y= -2*z+2;
+						z= -2*tmpX+2;				
+					}
+				}else if(y<0.5){		//z>0.5, y<0.5, x<0.5
+					subSquare= 7;	//care, this is 7, not 6	
+					ValueType tmpX= x;
+					x= -2*z+2;
+					z= -2*y+1;
+					y= 2*tmpX;				
+				}else{			//z>0.5, y>0.5, x<0.5
+					subSquare= 6;	//this is case 6
+					ValueType tmpX= x;
+					x= 2*y-1;
+					y= -2*z +2;
+					z= -2*tmpX+1;				
+				}
+				integerIndex = (integerIndex << 3) | subSquare;	
+			}
+			unsigned long long divisor = size_t(1) << size_t(3*int(recursionDepth));
 			hilbertIndices[i] = double(integerIndex) / double(divisor);
 		}
 	}
