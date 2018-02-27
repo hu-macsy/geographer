@@ -12,6 +12,8 @@
 #include <scai/lama/Vector.hpp>
 #include <scai/dmemo/Distribution.hpp>
 
+//#include <scai/common/SCAITypes.hpp>
+
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 
 #include <assert.h>
@@ -51,6 +53,7 @@ namespace ITI {
 			*/                        
 			static ValueType getHilbertIndex2D(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 		
+			static std::vector<ValueType> getHilbertIndex2DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth);
 			/**
 			*Accepts a point in 3 dimensions and calculates where along the hilbert curve it lies.
 			*

@@ -166,8 +166,8 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     
     const scai::dmemo::DistributionPtr inputDist = nodeWeights.getDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
-    const IndexType localN = inputDist->getLocalSize();
-    const IndexType globalN = inputDist->getGlobalSize();
+    //const IndexType localN = inputDist->getLocalSize();
+    //const IndexType globalN = inputDist->getGlobalSize();
     
     // for all dimensions i: bBox.bottom[i]<bBox.top[i]
     struct rectangle bBox;
@@ -180,7 +180,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
 
     // TODO: try to avoid that, probably not needed
     ValueType totalWeight = nodeWeights.sum().scai::lama::Scalar::getValue<ValueType>();
-    ValueType averageWeight = totalWeight/k;
+    //ValueType averageWeight = totalWeight/k;
 
     bBox.weight = totalWeight;
 
@@ -191,7 +191,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     // TODO: now k must be number such that k^(1/d) is an integer, drop this condition, generalize
     const ValueType sqrtK = std::pow( k,  1.0/dim );
 
-    if( !std::floor(sqrtK)==sqrtK ){
+    if( !(std::floor(sqrtK)==sqrtK) ){
         PRINT0("Input k= "<< k << " and sqrt(k)= "<< sqrtK );
         throw std::logic_error("Number of blocks not a square number");
     }
@@ -439,7 +439,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     const scai::dmemo::DistributionPtr inputDist = nodeWeights.getDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
     const IndexType localN = inputDist->getLocalSize();
-    const IndexType globalN = inputDist->getGlobalSize();
+    //const IndexType globalN = inputDist->getGlobalSize();
     
     SCAI_ASSERT_EQ_ERROR( coordinates.size(), localN , "Size of coordinates vector is not right" );
     SCAI_ASSERT_EQ_ERROR( coordinates[0].size(),dim ,"Dimensions given and size of coordinates do not agree." );
@@ -498,7 +498,7 @@ PRINT( sqrtK << " _ " << intSqrtK );
 
     // TODO: try to avoid that
     ValueType totalWeight = nodeWeights.sum().scai::lama::Scalar::getValue<ValueType>();
-    ValueType averageWeight = totalWeight/k;
+    //ValueType averageWeight = totalWeight/k;
 
     bBox.weight = totalWeight;
     
@@ -572,8 +572,8 @@ PRINT( sqrtK << " _ " << intSqrtK );
             
             //TODO: make sure that projections[l] and allLeaves[l] refer to the same rectangle
             struct rectangle thisRectangle = allLeaves[l]->getRect();
-            ValueType thisRectWeight = thisRectangle.weight;
-            ValueType optWeight = thisRectWeight/(*thisDimCuts);
+            //ValueType thisRectWeight = thisRectangle.weight;
+            //ValueType optWeight = thisRectWeight/(*thisDimCuts);
             ValueType maxWeight = 0;
             
             // create the new rectangles and add them to the queue
@@ -735,7 +735,7 @@ template<typename IndexType, typename ValueType>
 std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1DGreedy( const std::vector<ValueType>& projection, const IndexType k, Settings settings){
     SCAI_REGION("MultiSection.partition1DGreedy");
     
-    const IndexType dimension = settings.dimensions;
+    //const IndexType dimension = settings.dimensions;
     
     ValueType totalWeight = std::accumulate(projection.begin(), projection.end(), 0.0);
     ValueType averageWeight = totalWeight/k;
@@ -951,7 +951,7 @@ bool MultiSection<IndexType, ValueType>::probe(const std::vector<ValueType>& pre
 template<typename IndexType, typename ValueType>
 std::pair<bool,std::vector<IndexType>> MultiSection<IndexType, ValueType>::probeAndGetSplitters(const std::vector<ValueType>& prefixSum, const IndexType k, const ValueType target){
 
-    const IndexType N = prefixSum.size();
+    //const IndexType N = prefixSum.size();
     IndexType p = 1;
     ValueType sumOfPartition = target;
     
@@ -1078,7 +1078,7 @@ ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vec
     const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
     const IndexType localN = inputDist->getLocalSize();
     
-    const IndexType dimension = bBox.top.size();
+    //const IndexType dimension = bBox.top.size();
     ValueType localWeight=0;
     
     {

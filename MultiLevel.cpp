@@ -130,7 +130,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 		}
 
 		IndexType numRefinementRounds = 0;
-		IndexType oldCut = 0;
+		//IndexType oldCut = 0;
 
 		ValueType gain = 0;
 		while (numRefinementRounds == 0 || gain >= settings.minGainForNextRound) {
@@ -596,7 +596,7 @@ scai::dmemo::DistributionPtr MultiLevel<IndexType, ValueType>::projectToCoarse(c
 	std::sort(wIndices.get(), wIndices.get() + fineLocalN);
 	auto newEnd = std::unique(wIndices.get(), wIndices.get() + fineLocalN);
 	wIndices.resize(std::distance(wIndices.get(), newEnd));
-	IndexType coarseLocalN = wIndices.size();
+	//IndexType coarseLocalN = wIndices.size();
 	wIndices.release();
 
 	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(newGlobalN, myCoarseGlobalIndices, fineToCoarse.getDistributionPtr()->getCommunicatorPtr()));
@@ -756,7 +756,7 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
     const scai::dmemo::DistributionPtr inputDist = adjM.getRowDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
     
-    IndexType k = settings.numBlocks;
+    //IndexType k = settings.numBlocks;
     const IndexType dimensions = coordinates.size();
     const IndexType localN = inputDist->getLocalSize();
     const IndexType globalN = inputDist->getGlobalSize();

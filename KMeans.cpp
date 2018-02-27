@@ -106,7 +106,7 @@ std::vector<std::vector<ValueType> > findInitialCenters(
 
 	const IndexType dim = coordinates.size();
 	const IndexType n = coordinates[0].size();
-	const IndexType localN = coordinates[0].getLocalValues().size();
+	//const IndexType localN = coordinates[0].getLocalValues().size();
 
 	std::vector<std::vector<ValueType> > result(dim);
 
@@ -147,8 +147,8 @@ std::vector<std::vector<ValueType> > findCenters(
 	SCAI_REGION( "KMeans.findCenters" );
 
 	const IndexType dim = coordinates.size();
-	const IndexType n = partition.size();
-	const IndexType localN = partition.getLocalValues().size();
+	//const IndexType n = partition.size();
+	//const IndexType localN = partition.getLocalValues().size();
 	const scai::dmemo::DistributionPtr resultDist(new scai::dmemo::NoDistribution(k));
 	const scai::dmemo::CommunicatorPtr comm = partition.getDistribution().getCommunicatorPtr();
 
@@ -176,7 +176,7 @@ std::vector<std::vector<ValueType> > findCenters(
 		for (Iterator it = firstIndex; it != lastIndex; it++) {
 			const IndexType i = *it;
 			const IndexType part = rPartition[i];
-			const IndexType weight = rWeights[i];
+			//const IndexType weight = rWeights[i];
 			result[d][part] += rCoords[i]*rWeights[i] / weightSum[part];//this is more expensive than summing first and dividing later, but avoids overflows
 		}
 	}
@@ -207,7 +207,7 @@ DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType> >& 
 	const IndexType dim = coordinates.size();
 	assert(dim > 0);
 	assert(centers.size() == dim);
-	const IndexType n = coordinates[0].size();
+	//const IndexType n = coordinates[0].size();
 	const IndexType localN = coordinates[0].getLocalValues().size();
 	const IndexType k = centers[0].size();
 
@@ -274,7 +274,7 @@ DenseVector<IndexType> assignBlocks(
 	const IndexType dim = coordinates.size();
 	const scai::dmemo::DistributionPtr dist = nodeWeights.getDistributionPtr();
 	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
-	const IndexType localN = nodeWeights.getLocalValues().size();
+	//const IndexType localN = nodeWeights.getLocalValues().size();
 	const IndexType k = targetBlockSizes.size();
 
 	assert(influence.size() == k);
@@ -486,7 +486,7 @@ DenseVector<IndexType> assignBlocks(
 			const IndexType currentLocalN = std::distance(firstIndex, lastIndex);
 			const IndexType takenLoops = currentLocalN - skippedLoops;
 			const ValueType averageComps = ValueType(totalComps) / currentLocalN;
-			double minInfluence, maxInfluence;
+			//double minInfluence, maxInfluence;
 			auto pair = std::minmax_element(influence.begin(), influence.end());
 			const ValueType influenceSpread = *pair.second / *pair.first;
 			auto oldprecision = std::cout.precision(3);

@@ -85,7 +85,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix
             IndexType ngb_node = 0;      
             // the number of neighbours for each node. Can be less that 6.
             IndexType numRowElems= 0;
-            ValueType max_offset =  *max_element(offset.begin(),offset.end());
+            //ValueType max_offset =  *max_element(offset.begin(),offset.end());
             
             std::tuple<IndexType, IndexType, IndexType> thisPoint = aux<IndexType,ValueType>::index2_3DPoint( i, numPoints);
             
@@ -851,7 +851,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
 
     {
         SCAI_REGION("MeshGenerator.createRandomStructured3DMesh_dist.setCSRSparseMatrix");
-        IndexType globalN= numX* numY* numZ;
+        //IndexType globalN= numX* numY* numZ;
         
         // Summing the size of all sets. This is the number of all edges.
         IndexType nnzValues=0;
@@ -972,7 +972,7 @@ template<typename IndexType, typename ValueType>
 
 template<typename IndexType, typename ValueType>
 void MeshGenerator<IndexType, ValueType>::graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid &quad) {
-	const IndexType numLeaves= quad.countLeaves();
+	//const IndexType numLeaves= quad.countLeaves();
 	const IndexType treeSize = quad.countNodes();
 	const IndexType dimension = quad.getDimensions();
 

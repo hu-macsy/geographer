@@ -403,7 +403,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     // vector of size k, each element represents the size of each block
     //
     std::vector<IndexType> blockSizes;
-    IndexType weightSum;// = nodeWeights.sum().Scalar::getValue<IndexType>();
+	//TODO: for nowm assume uniform nodeweights
+    IndexType weightSum = globalN;// = nodeWeights.sum().Scalar::getValue<IndexType>();
     if( settings.blockSizes.empty() ){
         blockSizes.assign( settings.numBlocks, weightSum/settings.numBlocks );
     }else{
@@ -415,6 +416,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     /**
      * get minimum / maximum of coordinates
      */
+	/*
 	std::vector<ValueType> minCoords(dimensions);
     std::vector<ValueType> maxCoords(dimensions);
     
@@ -428,7 +430,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
 			SCAI_ASSERT(maxCoords[dim] > minCoords[dim], "Wrong coordinates.");
 		}
     }
-    
+    */
     /**
      * Several possibilities exist for choosing the recursion depth.
      * Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
@@ -443,7 +445,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
 	//		store them directly to the localPairs vector
     
     scai::lama::DenseVector<ValueType> hilbertIndices(coordDist);
- 
+	std::vector<ValueType> localHilberIndices = HilbertCurve<IndexType,ValueType>::getHilbertIndex2DVector(coordinates, recursionDepth);
+	hilbertIndices.assign( scai::hmemo::HArray<ValueType>( localHilberIndices.size(), localHilberIndices.data()) , coordDist);
+	
+	/*
     {
         SCAI_REGION("ParcoRepart.hilbertPartition.spaceFillingCurve");
         // get local part of hilbert indices
@@ -468,7 +473,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
             hilbertIndicesLocal[i] = globalHilbertIndex;
         }
     }
-
+	*/
+	
     //TODO: use the blockSizes vector
     //TODO: take into account node weights: just sorting will create imbalanced blocks, not so much in number of node but in the total weight of each block
     

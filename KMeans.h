@@ -266,7 +266,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		assert(delta >= 0);
 		const double deltaSq = delta*delta;
 		const double maxInfluence = *std::max_element(influence.begin(), influence.end());
-		const double minInfluence = *std::min_element(influence.begin(), influence.end());
+		//const double minInfluence = *std::min_element(influence.begin(), influence.end());
 
 		{
 			SCAI_REGION( "KMeans.computePartition.updateBounds" );

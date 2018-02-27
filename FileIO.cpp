@@ -54,8 +54,8 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
     IndexType root =0;
-    IndexType rank = comm->getRank();
-    IndexType size = comm->getSize();
+    //IndexType rank = comm->getRank();
+    //IndexType size = comm->getSize();
     scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
         
     IndexType globalN = distPtr->getGlobalSize();
@@ -376,7 +376,6 @@ void FileIO<IndexType, ValueType>::writeCoordsDistributed(const std::vector<Dens
     if(f.fail())
         throw std::runtime_error("File "+ thisPEFilename+ " failed.");
 
-    IndexType i, j;
     IndexType dimension= coords.size();
 
     assert(coords.size() == dimension );
@@ -389,7 +388,7 @@ void FileIO<IndexType, ValueType>::writeCoordsDistributed(const std::vector<Dens
     // in case dimensions==2 this will be ignored
     scai::hmemo::ReadAccess<ValueType> coordAccess2( coords[dimensions-1].getLocalValues() );
         
-    for(i=0; i<localN; i++){
+    for(IndexType i=0; i<localN; i++){
         f<< std::setprecision(15)<< coordAccess0[i] << " " << coordAccess1[i];
         if( dimensions==3 ){
             f << " "<< coordAccess2[i];
@@ -412,7 +411,7 @@ void FileIO<IndexType, ValueType>::writeInputParallel (const std::vector<DenseVe
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr coordDistPtr = coords[0].getDistributionPtr();
-    const IndexType globalN = coordDistPtr->getGlobalSize();
+    //const IndexType globalN = coordDistPtr->getGlobalSize();
     const IndexType localN = coordDistPtr->getLocalSize();
     const IndexType dimension = coords.size();
     const IndexType numPEs = comm->getSize();
@@ -571,9 +570,9 @@ void FileIO<IndexType, ValueType>::writePartitionCentral(DenseVector<IndexType> 
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	scai::dmemo::DistributionPtr dist = part.getDistributionPtr();
 
-    const IndexType localN = dist->getLocalSize();
+    //const IndexType localN = dist->getLocalSize();
     const IndexType globalN = dist->getGlobalSize();
-    const IndexType numPEs = comm->getSize();
+    //const IndexType numPEs = comm->getSize();
     
     //TODO: change to gather as this way part is replicated in all PEs
     //comm->gatherImpl( localPart.get(), 
@@ -1146,7 +1145,7 @@ template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeListDistributed(const std::string prefix){
     SCAI_REGION( "FileIO.readEdgeListDistributed" );
 		
-	typedef unsigned long long int ULLI;     
+	//typedef unsigned long long int ULLI;     
 	
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType thisPE = comm->getRank();

@@ -94,6 +94,112 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType const*
 }
 
 //-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth) {
+    SCAI_REGION("HilbertCurve.getHilbertIndex2DVector")
+	
+	using scai::lama::Scalar;
+	
+	const IndexType dimensions = coordinates.size();
+	
+    size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
+    if (recursionDepth > bitsInValueType/dimensions) {
+        throw std::runtime_error("A space-filling curve that precise won't fit into the return datatype.");
+    }    
+    
+	if( dimensions!=2 ){
+		PRINT("In HilbertCurve.getHilbertIndex2DVector but dimensions is " << dimensions << " and not 2");
+		throw std::runtime_error("Wrong dimensions given");
+	}
+	
+	/**
+     * get minimum / maximum of coordinates
+     */
+	ValueType minCoords[2];
+	ValueType maxCoords[2];
+
+	{
+		SCAI_REGION( "HilbertCurve.getHilbertIndex2DVector.minMax" )
+		for (IndexType dim = 0; dim < 2; dim++) {
+			minCoords[dim] = coordinates[dim].min().Scalar::getValue<ValueType>();
+			maxCoords[dim] = coordinates[dim].max().Scalar::getValue<ValueType>();
+			assert(std::isfinite(minCoords[dim]));
+			assert(std::isfinite(maxCoords[dim]));
+			SCAI_ASSERT(maxCoords[dim] > minCoords[dim], "Wrong coordinates.");
+		}
+    }
+    
+    ValueType dim0Extent = maxCoords[0] - minCoords[0];
+    ValueType dim1Extent = maxCoords[1] - minCoords[1];
+    
+    ValueType scaledPoint[2];
+	unsigned long integerIndex = 0;//TODO: also check whether this data type is long enough
+	const IndexType localN = coordinates[0].getLocalValues().size();
+	
+	// the DV to be returned
+	std::vector<ValueType> hilbertIndices(localN,-1);
+	
+	{
+		SCAI_REGION( "HilbertCurve.getHilbertIndex2DVector.indicesCalculation" )
+		
+		scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
+        scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
+		//scai::hmemo::WriteOnlyAccess<ValueType> hilbertIndices(hilbertIndices.getLocalValues());
+		
+		for (IndexType i = 0; i < localN; i++) {
+			scaledPoint[0] = (coordAccess0[i]-minCoords[0])/dim0Extent;
+			scaledPoint[1] = (coordAccess1[i]-minCoords[1])/dim1Extent;
+			/*
+			if (scaledCoord[dim] < 0 || scaledCoord[dim] > 1) {
+				throw std::runtime_error("Coordinate " + std::to_string(point[dim]) +" does not agree with bounds "
+            + std::to_string(minCoords[dim]) + " and " + std::to_string(maxCoords[dim]));
+			}
+			*/
+			integerIndex = 0;
+			for (IndexType i = 0; i < recursionDepth; i++) {
+				int subSquare;
+				//two dimensions only, for now
+				if (scaledPoint[0] < 0.5) {
+					if (scaledPoint[1] < 0.5) {
+						subSquare = 0;
+						//apply inverse hilbert operator
+						double temp = scaledPoint[0];
+						scaledPoint[0] = 2*scaledPoint[1];
+						scaledPoint[1] = 2*temp;
+					} else {
+						subSquare = 1;
+						//apply inverse hilbert operator
+						scaledPoint[0] *= 2;
+						scaledPoint[1] = 2*scaledPoint[1] -1;
+					}
+				} else {
+					if (scaledPoint[1] < 0.5) {
+						subSquare = 3;
+						//apply inverse hilbert operator
+						double temp = scaledPoint[0];
+						scaledPoint[0] = -2*scaledPoint[1]+1;
+						scaledPoint[1] = -2*temp+2;
+					} else {
+						subSquare = 2;
+						//apply inverse hilbert operator
+						scaledPoint[0] = 2*scaledPoint[0]-1;
+						scaledPoint[1] = 2*scaledPoint[1]-1;
+					}
+				}
+				//std::cout<< subSquare<<std::endl;
+				integerIndex = (integerIndex << 2) | subSquare;	
+			}
+			unsigned long divisor = size_t(1) << size_t(2*int(recursionDepth));
+			hilbertIndices[i] = double(integerIndex) / double(divisor);
+		}
+	}
+	
+    return hilbertIndices;   
+    
+}
+
+//-------------------------------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
 DenseVector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(ValueType index, IndexType level){
 	SCAI_REGION( "HilbertCurve.Hilbert2DIndex2Point" )
@@ -401,7 +507,7 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
         SQuick::sort<sort_pair>(mpi_comm, localPairs, -1);
 
         //copy hilbert indices into array
-        IndexType newLocalN = localPairs.size();
+        //IndexType newLocalN = localPairs.size();
 
         //check size and sanity
         //SCAI_ASSERT_EQ_ERROR( newLocalN, localPairs.size(), "New local indices mismatch.");

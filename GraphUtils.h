@@ -218,8 +218,9 @@ static std::vector<IndexType> indexReorder(const IndexType maxIndex, const Index
 static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
 	IndexType index = 0;
 	std::vector<IndexType> ret(maxIndex, -1);
-	//std::vector<bool> chosen(maxIndex, false);
-	bool chosen2[maxIndex];
+	std::vector<bool> chosen(maxIndex, false);
+	//TODO: change vector of booleans?
+	//bool chosen2[maxIndex]=1;
 	
 	IndexType denom;
     for( denom=1; denom<maxIndex; denom*=2){
@@ -227,13 +228,13 @@ static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
 			IndexType val = (maxIndex*numer)/denom; 
 			//std::cout << numer <<"/" << denom << " = "<< val <<" <> ";
 			ret[index++] = val;
-			chosen2[val]=true;
+			chosen[val]=true;
 			//++index;
 		}
 	}
 	//PRINT("Index= " << index <<", still "<< maxIndex-index << " to fill");
 	for(IndexType i=0; i<maxIndex; i++){
-		if( chosen2[i]==false ){
+		if( chosen[i]==false ){
 			ret[index] = i;
 			++index;
 			SCAI_ASSERT_LE_ERROR( index, maxIndex, "index too high");
