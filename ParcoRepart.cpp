@@ -122,8 +122,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
 	const IndexType rank = comm->getRank();
 
-	const IndexType localN = inputDist->getLocalSize();
-	const IndexType globalN = inputDist->getGlobalSize();
+	//const IndexType localN = inputDist->getLocalSize();
+	//const IndexType globalN = inputDist->getGlobalSize();
 
 	if( !coordDist->isEqual( *inputDist) ){
 		throw std::runtime_error( "Distributions should be equal.");
@@ -398,13 +398,26 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     	throw std::logic_error("Hilbert curve partition only implemented for same number of blocks and processes.");
     }
  
-    std::vector<ValueType> minCoords(dimensions);
-    std::vector<ValueType> maxCoords(dimensions);
-    DenseVector<IndexType> result;
+ 
+    //
+    // vector of size k, each element represents the size of each block
+    //
+    std::vector<IndexType> blockSizes;
+    IndexType weightSum;// = nodeWeights.sum().Scalar::getValue<IndexType>();
+    if( settings.blockSizes.empty() ){
+        blockSizes.assign( settings.numBlocks, weightSum/settings.numBlocks );
+    }else{
+        blockSizes = settings.blockSizes;
+    }
+    SCAI_ASSERT( blockSizes.size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
+    
     
     /**
      * get minimum / maximum of coordinates
      */
+	std::vector<ValueType> minCoords(dimensions);
+    std::vector<ValueType> maxCoords(dimensions);
+    
     {
 		SCAI_REGION( "ParcoRepart.hilbertPartition.minMax" )
 		for (IndexType dim = 0; dim < dimensions; dim++) {
@@ -425,6 +438,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     /**
      *	create space filling curve indices.
      */
+	
+	//TODO: combine the two loops in one, do not store hilbert indices in a DV and then copy to a vector,
+	//		store them directly to the localPairs vector
     
     scai::lama::DenseVector<ValueType> hilbertIndices(coordDist);
  
@@ -453,18 +469,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         }
     }
 
-    //
-    // vector of size k, each element represents the size of each block
-    //
-    std::vector<IndexType> blockSizes;
-    IndexType weightSum;// = nodeWeights.sum().Scalar::getValue<IndexType>();
-    if( settings.blockSizes.empty() ){
-        blockSizes.assign( settings.numBlocks, weightSum/settings.numBlocks );
-    }else{
-        blockSizes = settings.blockSizes;
-    }
-    SCAI_ASSERT( blockSizes.size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
-    
     //TODO: use the blockSizes vector
     //TODO: take into account node weights: just sorting will create imbalanced blocks, not so much in number of node but in the total weight of each block
     
@@ -540,6 +544,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         //possible optimization: remove dummy values during first copy, then directly copy into HArray and sort with pointers. Would save one copy.
     }
     
+    DenseVector<IndexType> result;
+	
     {
     	assert(!coordDist->isReplicated() && comm->getSize() == k);
         SCAI_REGION( "ParcoRepart.hilbertPartition.createDistribution" );

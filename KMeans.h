@@ -64,6 +64,15 @@ DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &c
 		std::vector<ValueType> &influence,
 		Settings settings);
 
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> getPartitionWithSFCCoords(
+		const scai::lama::CSRSparseMatrix<ValueType>& adjM, \
+		const std::vector<DenseVector<ValueType> >& coordinates,\
+		const DenseVector<ValueType> &  nodeWeights,\
+		const Settings settings);
+//TODO: add block weights as an input param?: const std::vector<IndexType> &blockSizes
+
+
 /**
  * Implementations
  */
@@ -211,6 +220,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	ValueType delta = 0;
 	bool balanced = false;
 	const ValueType threshold = 0.002*diagonalLength;//TODO: take global point density into account
+
+//PRINT0("threshold= " << threshold << " , samplingRounds= " << samplingRounds);	
+
 	const IndexType maxIterations = settings.maxKMeansIterations;
 	do {
 
@@ -305,6 +317,8 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		if (comm->getRank() == 0) {
 			std::cout << "i: " << iter << ", delta: " << delta << std::endl;
 		}
+if(delta==0)
+	break;
 		iter++;
 	} while (iter < samplingRounds || (iter < maxIterations && (delta > threshold || !balanced)));
 	return result;

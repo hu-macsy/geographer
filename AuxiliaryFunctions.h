@@ -68,7 +68,7 @@ static void writeHeatLike_local_2D(scai::hmemo::HArray<IndexType> input,IndexTyp
 //------------------------------------------------------------------------------
 
 
-static void print2DGrid(scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama::DenseVector<IndexType>& partition  ){
+static void print2DGrid(const scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama::DenseVector<IndexType>& partition  ){
     
     IndexType N= adjM.getNumRows();
     

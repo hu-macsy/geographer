@@ -88,19 +88,7 @@ struct Metrics{
             out << " ### WARNING: possibly not all metrics calculated ###" << std::endl;
         }
         out << "gather" << std::endl;
-		
-        /*// more detailed output
-		 out << "times: input, migrAlgo , 1redistr , k-means , 2redistr , prelim, localRef, total  , metrics:  prel cut, cut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg  " << std::endl;
-		out << std::setprecision(3) << std::fixed;
-		out<<  "         "<< inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << " ,  "<< timeFinalPartition << " ,  \t "\
-        << preliminaryCut << ",  "<< finalCut << ",  " << finalImbalance << ",    "  \
-        << maxBoundaryNodes << ",  " << totalBoundaryNodes << ",    "  \
-        << maxCommVolume << ",  " << totalCommVolume << ",    ";
-        out << std::setprecision(6) << std::fixed;
-        out << maxBorderNodesPercent << ",  " << avgBorderNodesPercent<< ",  " \
-        << timeSpMV << std::endl;
-		*/
-        
+		        
         out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm" << std::endl;
 		
         out << std::setprecision(3) << std::fixed;
