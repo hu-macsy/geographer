@@ -113,7 +113,7 @@ TEST_F(KMeansTest, testFindCenters) {
 
 TEST_F(KMeansTest, testPartitionWithSFCCoords) {
 	//std::string fileName = "bubbles-00010.graph";
-	std::string fileName = "Grid4x4";
+	std::string fileName = "Grid8x8";
 	std::string graphFile = graphPath + fileName;
 	std::string coordFile = graphFile + ".xyz";
 	const IndexType dimensions = 2;

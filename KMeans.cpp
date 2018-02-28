@@ -119,12 +119,12 @@ std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly( const IndexT
 	std::vector<ValueType> centerCoords(dimensions,0);
 	for (IndexType i = 0; i < k; i++) {
 		ValueType centerHilbInd = i/ValueType(k) + offset;
-PRINT( centerHilbInd );		
+//PRINT( centerHilbInd );		
 		centerCoords = HilbertCurve<IndexType,ValueType>::HilbertIndex2PointVec( centerHilbInd, settings.sfcResolution, settings.dimensions);
 		SCAI_ASSERT_EQ_ERROR( centerCoords.size(), dimensions, "Wrong dimensions for center.");
 		
 		for (IndexType d = 0; d < dimensions; d++) {
-			result[d][i] = centerCoords[d];
+			result[d][i] = centerCoords[d]*maxCoords[d];
 		}
 	}
 	return result;
