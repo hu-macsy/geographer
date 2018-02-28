@@ -81,6 +81,10 @@ namespace ITI {
 			 */
 			static std::vector<ValueType> getHilbertIndex3DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth);
 			
+			/*	Wrapper to to get a hilbert index from a point as a vector based on its dimension.
+			 */
+			static std::vector<ValueType> HilbertIndex2PointVec(ValueType index, IndexType level, IndexType dimensions);
+			
 			/**
 			* Given an index between 0 and 1 returns a point in 2 dimensions along the hilbert curve based on
 			* the recursion depth. Mostly for test reasons.

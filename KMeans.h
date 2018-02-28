@@ -44,6 +44,9 @@ std::vector<std::vector<ValueType> >  findInitialCentersSFC(
 		const std::vector<ValueType> &maxCoords, Settings settings);
 
 template<typename IndexType, typename ValueType>
+std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly( const IndexType k, const std::vector<ValueType> &maxCoords, Settings settings);
+
+template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCenters(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights);
 
 template<typename IndexType, typename ValueType, typename Iterator>
@@ -98,7 +101,10 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		SCAI_ASSERT_NE_ERROR( minCoords[d], maxCoords[d], "min=max for dimension "<< d << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
 	}
 	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
+	//TODO: why <IndexType,ValueType> is needed here??
+	//std::vector<std::vector<ValueType> > centers = KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>( k, maxCoords, settings);
 
+	
 	return computePartition(coordinates, k, nodeWeights, blockSizes, centers, settings);
 }
 

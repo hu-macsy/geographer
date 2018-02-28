@@ -24,8 +24,7 @@ using scai::lama::Scalar;
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCentersSFC(
-		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords,
-		const std::vector<ValueType> &maxCoords, Settings settings) {
+		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords, Settings settings) {
 
 	SCAI_REGION( "KMeans.findInitialCentersSFC" );
 	const IndexType localN = coordinates[0].getLocalValues().size();
@@ -89,19 +88,48 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 			IndexType permutedIndex = localIndices[localIndex];
 			assert(permutedIndex < localN);
 			assert(permutedIndex >= 0);
-			for (IndexType d = 0; d < settings.dimensions; d++) {
+			for (IndexType d = 0; d < dimensions; d++) {
 				result[d][j] = convertedCoords[permutedIndex][d];
 			}
 		}
 	}
 
 	//global sum operation
-	for (IndexType d = 0; d < settings.dimensions; d++) {
+	for (IndexType d = 0; d < dimensions; d++) {
 		comm->sumImpl(result[d].data(), result[d].data(), k, scai::common::TypeTraits<ValueType>::stype);
 	}
 
 	return result;
 }
+
+
+
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly( const IndexType k, const std::vector<ValueType> &maxCoords, Settings settings){
+	
+	const IndexType dimensions = settings.dimensions;
+		
+	//set local values in vector, leave non-local values with zero
+	std::vector<std::vector<ValueType> > result(dimensions);
+	for (IndexType d = 0; d < dimensions; d++) {
+		result[d].resize(k);
+	}
+	
+	ValueType offset = 1.0/(ValueType(k)*2.0);
+	std::vector<ValueType> centerCoords(dimensions,0);
+	for (IndexType i = 0; i < k; i++) {
+		ValueType centerHilbInd = i/ValueType(k) + offset;
+PRINT( centerHilbInd );		
+		centerCoords = HilbertCurve<IndexType,ValueType>::HilbertIndex2PointVec( centerHilbInd, settings.sfcResolution, settings.dimensions);
+		SCAI_ASSERT_EQ_ERROR( centerCoords.size(), dimensions, "Wrong dimensions for center.");
+		
+		for (IndexType d = 0; d < dimensions; d++) {
+			result[d][i] = centerCoords[d];
+		}
+	}
+	return result;
+}
+
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCenters(
@@ -628,8 +656,10 @@ for( int i=0; i<newDistribution->getLocalSize(); i++){
 
 
 
-template std::vector<std::vector<ValueType> > findInitialCentersSFC( const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords,
-    const std::vector<ValueType> &maxCoords, Settings settings);
+template std::vector<std::vector<ValueType> > findInitialCentersSFC( const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords,    const std::vector<ValueType> &maxCoords, Settings settings);
+
+template std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly( const IndexType k,  const std::vector<ValueType> &maxCoords, Settings settings);
+
 template std::vector<std::vector<ValueType> > findInitialCenters(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights);
 template std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<IndexType> &partition, const IndexType k,
         std::vector<IndexType>::iterator firstIndex, std::vector<IndexType>::iterator lastIndex, const DenseVector<ValueType> &nodeWeights);

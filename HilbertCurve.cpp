@@ -536,6 +536,19 @@ DenseVector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point(
 }
 //-------------------------------------------------------------------------------------------------
 
+template<typename IndexType, typename ValueType>
+std::vector<ValueType> HilbertCurve<IndexType, ValueType>::HilbertIndex2PointVec(ValueType index, IndexType level, IndexType dimensions){
+	
+	if( dimensions==2 )
+		return HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2PointVec(index, level);
+	
+	if( dimensions==3 )
+		return HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2PointVec(index, level);
+	
+	throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
+}
+
+
 /*
 * Given a 3D point it returns its index in [0,1] on the hilbert curve based on the level depth.
 */
