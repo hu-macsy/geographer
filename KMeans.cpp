@@ -194,7 +194,9 @@ std::vector<std::vector<ValueType> > findCenters(
 			assert(std::isfinite(result[d][j]));
 
 			// make empty clusters explicit
-			if (weightSum[j] == 0) result[d][j] = NAN;
+			if (totalWeight[j] == 0) {
+			    result[d][j] = NAN;
+			}
 		}
 		comm->sumImpl(result[d].data(), result[d].data(), k, scai::common::TypeTraits<ValueType>::stype);
 	}
