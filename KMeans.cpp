@@ -192,6 +192,9 @@ std::vector<std::vector<ValueType> > findCenters(
 			ValueType weightedCoord = weightSum[j] == 0 ? 0 : result[d][j] * weightRatio;
 			result[d][j] = weightedCoord;
 			assert(std::isfinite(result[d][j]));
+
+			// make empty clusters explicit
+			if (weightSum[j] == 0) result[d][j] = NAN;
 		}
 		comm->sumImpl(result[d].data(), result[d].data(), k, scai::common::TypeTraits<ValueType>::stype);
 	}
@@ -434,6 +437,10 @@ DenseVector<IndexType> assignBlocks(
 					if (1 > maxRatio) maxRatio = 1;
 					continue;
 				}
+			}
+
+			if (ratio == 0) {
+			    throw std::runtime_error("Empty block, cannot continue.");
 			}
 
 			influence[j] = std::max(influence[j]*influenceChangeLowerBound[j], std::min(influence[j] * std::pow(ratio, settings.influenceExponent), influence[j]*influenceChangeUpperBound[j]));

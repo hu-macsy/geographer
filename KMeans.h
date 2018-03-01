@@ -214,6 +214,15 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
 		std::vector<std::vector<ValueType> > newCenters = findCenters(coordinates, result, k, firstIndex, lastIndex, nodeWeights);
+
+		//keep centroids of empty blocks at their last known position
+		for (IndexType j = 0; j < k; j++) {
+		    for (int d = 0; d < dim; d++) {
+		        if (std::isnan(newCenters[d][j])) {
+		            newCenters[d][j] = centers[d][j];
+		        }
+		    }
+		}
 		std::vector<ValueType> squaredDeltas(k,0);
 		std::vector<ValueType> deltas(k,0);
 		std::vector<ValueType> oldInfluence = influence;
