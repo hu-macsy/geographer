@@ -563,11 +563,8 @@ PRINT( *comm<<": localN= " << localN <<	", globlaN= " << globalN);
 	// the new distribution from the hilbert indices
 	scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
 	scai::dmemo::GeneralDistribution generalDist( globalN, indexTransport, comm);
-	//scai::dmemo::DistributionPtr newDistribution = generalDist.getDistributionPtr( "GENERAL", comm, globalN);
-	//scai::dmemo::GenBlockDistribution newGenBlocoDistPtr( globalN, newLocalIndices
-	
+		
 PRINT(*comm<<": " << *newDistribution);	
-
 { 
 	DenseVector<IndexType> tmpPartition( newDistribution, -1);
 	for( int i=0; i< tmpPartition.getLocalValues().size(); i++){
@@ -588,9 +585,9 @@ PRINT(*comm<<": " << *newDistribution);
 	
 	scai::hmemo::HArray<IndexType> localIndices = generalDist.getMyIndexes();
 	scai::hmemo::ReadAccess<IndexType> rlocalInd( localIndices );
-for( int i=0; i<newDistribution->getLocalSize(); i++){
-//PRINT0(*comm <<": local: "<< i<< " , global: " << rlocalInd[i] );
-}
+	//for( int i=0; i<newDistribution->getLocalSize(); i++){
+		//PRINT0(*comm <<": local: "<< i<< " , global: " << rlocalInd[i] );
+	//}
 	
 	// convert the hilbert indices to 2D/3D coordinates and copy to a vector<DenseVector>
 	{

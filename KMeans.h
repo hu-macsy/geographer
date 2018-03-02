@@ -100,9 +100,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	for(int d=0; d<settings.dimensions; d++){
 		SCAI_ASSERT_NE_ERROR( minCoords[d], maxCoords[d], "min=max for dimension "<< d << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
 	}
-	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
+	//std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
 	//TODO: why <IndexType,ValueType> is needed here??
-	//std::vector<std::vector<ValueType> > centers = KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>( k, maxCoords, settings);
+	std::vector<std::vector<ValueType> > centers = KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>( k, maxCoords, settings);
 
 	
 	return computePartition(coordinates, k, nodeWeights, blockSizes, centers, settings);
