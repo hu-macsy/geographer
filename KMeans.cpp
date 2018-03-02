@@ -441,10 +441,6 @@ DenseVector<IndexType> assignBlocks(
 				}
 			}
 
-			if (ratio == 0) {
-			    throw std::runtime_error("Empty block, cannot continue.");
-			}
-
 			influence[j] = std::max(influence[j]*influenceChangeLowerBound[j], std::min(influence[j] * std::pow(ratio, settings.influenceExponent), influence[j]*influenceChangeUpperBound[j]));
 			assert(influence[j] > 0);
 
