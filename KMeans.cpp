@@ -15,6 +15,7 @@
 
 #include "KMeans.h"
 #include "HilbertCurve.h"
+#include "AuxiliaryFunctions.h"
 
 namespace ITI {
 namespace KMeans {
@@ -23,20 +24,20 @@ using scai::lama::Scalar;
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCentersSFC(
-		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords,
-		const std::vector<ValueType> &maxCoords, Settings settings) {
+		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords, Settings settings) {
 
 	SCAI_REGION( "KMeans.findInitialCentersSFC" );
 	const IndexType localN = coordinates[0].getLocalValues().size();
 	const IndexType globalN = coordinates[0].size();
-
+	const IndexType dimensions = settings.dimensions;
+	
 	//convert coordinates, switch inner and outer order
 	std::vector<std::vector<ValueType> > convertedCoords(localN);
 	for (IndexType i = 0; i < localN; i++) {
-		convertedCoords[i].resize(settings.dimensions);
+		convertedCoords[i].resize(dimensions);
 	}
 
-	for (IndexType d = 0; d < settings.dimensions; d++) {
+	for (IndexType d = 0; d < dimensions; d++) {
 		scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
 		assert(rAccess.size() == localN);
 		for (IndexType i = 0; i < localN; i++) {
@@ -45,10 +46,14 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 	}
 
 	//get local hilbert indices
+	/*
 	std::vector<ValueType> sfcIndices(localN);
 	for (IndexType i = 0; i < localN; i++) {
-		sfcIndices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(convertedCoords[i].data(), settings.dimensions, settings.sfcResolution, minCoords, maxCoords);
+		sfcIndices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(convertedCoords[i].data(), dimensions, settings.sfcResolution, minCoords, maxCoords);
 	}
+	*/
+	std::vector<ValueType> sfcIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector( coordinates, settings.sfcResolution, settings.dimensions);
+	SCAI_ASSERT_EQ_ERROR( sfcIndices.size(), localN, "wrong local number of indices (?) ");
 
 	//prepare indices for sorting
 	std::vector<IndexType> localIndices(localN);
@@ -71,8 +76,8 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 	scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
 
 	//set local values in vector, leave non-local values with zero
-	std::vector<std::vector<ValueType> > result(settings.dimensions);
-	for (IndexType d = 0; d < settings.dimensions; d++) {
+	std::vector<std::vector<ValueType> > result(dimensions);
+	for (IndexType d = 0; d < dimensions; d++) {
 		result[d].resize(k);
 	}
 
@@ -83,19 +88,48 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 			IndexType permutedIndex = localIndices[localIndex];
 			assert(permutedIndex < localN);
 			assert(permutedIndex >= 0);
-			for (IndexType d = 0; d < settings.dimensions; d++) {
+			for (IndexType d = 0; d < dimensions; d++) {
 				result[d][j] = convertedCoords[permutedIndex][d];
 			}
 		}
 	}
 
 	//global sum operation
-	for (IndexType d = 0; d < settings.dimensions; d++) {
+	for (IndexType d = 0; d < dimensions; d++) {
 		comm->sumImpl(result[d].data(), result[d].data(), k, scai::common::TypeTraits<ValueType>::stype);
 	}
 
 	return result;
 }
+
+
+
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly( const IndexType k, const std::vector<ValueType> &maxCoords, Settings settings){
+	
+	const IndexType dimensions = settings.dimensions;
+		
+	//set local values in vector, leave non-local values with zero
+	std::vector<std::vector<ValueType> > result(dimensions);
+	for (IndexType d = 0; d < dimensions; d++) {
+		result[d].resize(k);
+	}
+	
+	ValueType offset = 1.0/(ValueType(k)*2.0);
+	std::vector<ValueType> centerCoords(dimensions,0);
+	for (IndexType i = 0; i < k; i++) {
+		ValueType centerHilbInd = i/ValueType(k) + offset;
+//PRINT( centerHilbInd );		
+		centerCoords = HilbertCurve<IndexType,ValueType>::HilbertIndex2PointVec( centerHilbInd, settings.sfcResolution, settings.dimensions);
+		SCAI_ASSERT_EQ_ERROR( centerCoords.size(), dimensions, "Wrong dimensions for center.");
+		
+		for (IndexType d = 0; d < dimensions; d++) {
+			result[d][i] = centerCoords[d]*maxCoords[d];
+		}
+	}
+	return result;
+}
+
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCenters(
@@ -105,7 +139,7 @@ std::vector<std::vector<ValueType> > findInitialCenters(
 
 	const IndexType dim = coordinates.size();
 	const IndexType n = coordinates[0].size();
-	const IndexType localN = coordinates[0].getLocalValues().size();
+	//const IndexType localN = coordinates[0].getLocalValues().size();
 
 	std::vector<std::vector<ValueType> > result(dim);
 
@@ -146,8 +180,8 @@ std::vector<std::vector<ValueType> > findCenters(
 	SCAI_REGION( "KMeans.findCenters" );
 
 	const IndexType dim = coordinates.size();
-	const IndexType n = partition.size();
-	const IndexType localN = partition.getLocalValues().size();
+	//const IndexType n = partition.size();
+	//const IndexType localN = partition.getLocalValues().size();
 	const scai::dmemo::DistributionPtr resultDist(new scai::dmemo::NoDistribution(k));
 	const scai::dmemo::CommunicatorPtr comm = partition.getDistribution().getCommunicatorPtr();
 
@@ -175,7 +209,7 @@ std::vector<std::vector<ValueType> > findCenters(
 		for (Iterator it = firstIndex; it != lastIndex; it++) {
 			const IndexType i = *it;
 			const IndexType part = rPartition[i];
-			const IndexType weight = rWeights[i];
+			//const IndexType weight = rWeights[i];
 			result[d][part] += rCoords[i]*rWeights[i] / weightSum[part];//this is more expensive than summing first and dividing later, but avoids overflows
 		}
 	}
@@ -206,7 +240,7 @@ DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType> >& 
 	const IndexType dim = coordinates.size();
 	assert(dim > 0);
 	assert(centers.size() == dim);
-	const IndexType n = coordinates[0].size();
+	//const IndexType n = coordinates[0].size();
 	const IndexType localN = coordinates[0].getLocalValues().size();
 	const IndexType k = centers[0].size();
 
@@ -273,7 +307,7 @@ DenseVector<IndexType> assignBlocks(
 	const IndexType dim = coordinates.size();
 	const scai::dmemo::DistributionPtr dist = nodeWeights.getDistributionPtr();
 	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
-	const IndexType localN = nodeWeights.getLocalValues().size();
+	//const IndexType localN = nodeWeights.getLocalValues().size();
 	const IndexType k = targetBlockSizes.size();
 
 	assert(influence.size() == k);
@@ -485,7 +519,7 @@ DenseVector<IndexType> assignBlocks(
 			const IndexType currentLocalN = std::distance(firstIndex, lastIndex);
 			const IndexType takenLoops = currentLocalN - skippedLoops;
 			const ValueType averageComps = ValueType(totalComps) / currentLocalN;
-			double minInfluence, maxInfluence;
+			//double minInfluence, maxInfluence;
 			auto pair = std::minmax_element(influence.begin(), influence.end());
 			const ValueType influenceSpread = *pair.second / *pair.first;
 			auto oldprecision = std::cout.precision(3);
@@ -500,8 +534,129 @@ DenseVector<IndexType> assignBlocks(
 	return assignment;
 }
 
-template std::vector<std::vector<ValueType> > findInitialCentersSFC( const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords,
-    const std::vector<ValueType> &maxCoords, Settings settings);
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> getPartitionWithSFCCoords(const scai::lama::CSRSparseMatrix<ValueType>& graph, \
+		const std::vector<DenseVector<ValueType> >& coordinates,\
+		const DenseVector<ValueType> &  nodeWeights,\
+		const Settings settings){
+	
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	
+	// sorted pair of coordinates and global indices
+	std::vector<sort_pair> localHilbertIndices = HilbertCurve<IndexType, ValueType>::getSortedHilbertIndices( coordinates );
+	
+	//create new distribution based on the hilbert indices
+	const IndexType localN = localHilbertIndices.size();
+	std::vector<IndexType> newLocalIndices(localN);
+	
+	const IndexType globalN = comm->sum( localN );
+PRINT( *comm<<": localN= " << localN <<	", globlaN= " << globalN);
+	// copy indices from the hilbert sfc to a vector
+	for(IndexType i=0; i<localN; i++){
+		newLocalIndices[i] = localHilbertIndices[i].index;
+//PRINT0( *comm << ": " << newLocalIndices[i] );
+	}
+	
+	scai::utilskernel::LArray<IndexType> indexTransport(newLocalIndices.size(), newLocalIndices.data());
+	
+	// the new distribution from the hilbert indices
+	scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
+	scai::dmemo::GeneralDistribution generalDist( globalN, indexTransport, comm);
+		
+PRINT(*comm<<": " << *newDistribution);	
+{ 
+	DenseVector<IndexType> tmpPartition( newDistribution, -1);
+	for( int i=0; i< tmpPartition.getLocalValues().size(); i++){
+		tmpPartition.getLocalValues()[i]= comm->getRank();
+	}
+	tmpPartition.redistribute( graph.getRowDistributionPtr() );
+	ITI::aux<IndexType,ValueType>::print2DGrid( graph, tmpPartition );
+}
+	
+
+
+	const IndexType dimensions = settings.dimensions;
+	
+	std::vector<DenseVector<ValueType>> localCoords( dimensions, DenseVector<ValueType>( newDistribution, 0) );
+	// nodeWeights must also be redistributed, TODO: can be avoided?
+	DenseVector<ValueType> copyNodeWeights = nodeWeights;
+	copyNodeWeights.redistribute( newDistribution );
+	
+	scai::hmemo::HArray<IndexType> localIndices = generalDist.getMyIndexes();
+	scai::hmemo::ReadAccess<IndexType> rlocalInd( localIndices );
+	//for( int i=0; i<newDistribution->getLocalSize(); i++){
+		//PRINT0(*comm <<": local: "<< i<< " , global: " << rlocalInd[i] );
+	//}
+	
+	// convert the hilbert indices to 2D/3D coordinates and copy to a vector<DenseVector>
+	{
+		SCAI_REGION( "KMeans.getPartitionWithSFCCoords.convert2DV" );
+
+		const IndexType recLevel = 16;	//TODO?: maybe change?
+
+		if( dimensions==2){
+			scai::hmemo::WriteAccess<ValueType> wLocalCoords0( localCoords[0].getLocalValues() );
+			scai::hmemo::WriteAccess<ValueType> wLocalCoords1( localCoords[1].getLocalValues() );
+			
+			std::vector<ValueType> point(2, 0);
+			
+			for(IndexType i=0; i<localN; i++){
+				point = HilbertCurve<IndexType,ValueType>::Hilbert2DIndex2PointVec(localHilbertIndices[i].value, recLevel);
+				wLocalCoords0[i] = point[0];
+				wLocalCoords1[i] = point[1];
+//PRINT(*comm <<": "<< i << ", hilbert index= "<< localHilbertIndices[i].value << " >> " << point[0] << ", " << point[1]);				
+			}
+		}else if (dimensions==3){
+			scai::hmemo::WriteAccess<ValueType> wLocalCoords0( localCoords[0].getLocalValues() );
+			scai::hmemo::WriteAccess<ValueType> wLocalCoords1( localCoords[1].getLocalValues() );
+			scai::hmemo::WriteAccess<ValueType> wLocalCoords2( localCoords[2].getLocalValues() );
+			
+			std::vector<ValueType> point(3, 0);
+			
+			for(IndexType i=0; i<localN; i++){
+				point = HilbertCurve<IndexType,ValueType>::Hilbert3DIndex2PointVec(localHilbertIndices[i].value, recLevel);
+				wLocalCoords0[i] = point[0];
+				wLocalCoords1[i] = point[1];
+				wLocalCoords2[i] = point[2];
+			}			
+		}else{
+			PRINT0("Dimensions: " << dimensions << " is not supported.\nAborting...");
+			throw std::runtime_error("Number of dimensions not supported");
+		}
+	}
+	
+	//TODO: assuming uniform block sizes
+	const std::vector<IndexType> blockSizes(settings.numBlocks, globalN/settings.numBlocks);
+	
+	/*
+	DenseVector<IndexType> result (newDistribution, 0);
+	{	
+		for( int i=0; i< result.getLocalValues().size(); i++){
+			result.getLocalValues()[i]= comm->getRank();
+		}
+		
+		std::vector<IndexType> localIndices = ITI::GraphUtils::indexReorderCantor(localN);
+		typename std::vector<IndexType>::iterator firstIndex, lastIndex;
+		firstIndex = localIndices.begin();
+		lastIndex = localIndices.end();
+		
+		std::vector<std::vector<ValueType> > centers = findCenters(localCoords, result, settings.numBlocks, firstIndex, lastIndex, nodeWeights);
+		
+		result = assignBlocks<IndexType>( localCoords, centers);
+	}
+	return result;
+	*/
+	return KMeans::computePartition(localCoords, settings.numBlocks, copyNodeWeights, blockSizes, settings);
+	
+}
+
+
+
+template std::vector<std::vector<ValueType> > findInitialCentersSFC( const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords,    const std::vector<ValueType> &maxCoords, Settings settings);
+
+template std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly( const IndexType k,  const std::vector<ValueType> &maxCoords, Settings settings);
+
 template std::vector<std::vector<ValueType> > findInitialCenters(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights);
 template std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<IndexType> &partition, const IndexType k,
         std::vector<IndexType>::iterator firstIndex, std::vector<IndexType>::iterator lastIndex, const DenseVector<ValueType> &nodeWeights);
@@ -511,6 +666,7 @@ template DenseVector<IndexType> assignBlocks(const std::vector<std::vector<Value
         std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter, std::vector<ValueType> &influence, Settings settings);
 template DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType> >& coordinates, const std::vector<std::vector<double> >& centers);
 
+template DenseVector<IndexType> getPartitionWithSFCCoords(const scai::lama::CSRSparseMatrix<ValueType>& adjM, const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings);
 
 }
 

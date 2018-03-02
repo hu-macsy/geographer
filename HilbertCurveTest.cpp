@@ -44,7 +44,7 @@ protected:
 TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
   const IndexType dimensions = 2;
   const IndexType recursionDepth = 7;
-  IndexType N=16*16;
+  const IndexType N=16*16;
 
   std::string coordFile = graphPath + "Grid16x16.xyz";
   
@@ -85,8 +85,8 @@ TEST_F(HilbertCurveTest, testHilbertIndexUnitSquare_Local_2D) {
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(HilbertCurveTest, testInverseHilbertIndex_Local_2D) {
-  const IndexType dimensions = 2;
-  const IndexType recursionDepth = 7;
+  //const IndexType dimensions = 2;
+  const IndexType recursionDepth = 15;
   
   ValueType divisor=16;
   for(int i=0; i<divisor; i++){
@@ -95,7 +95,7 @@ TEST_F(HilbertCurveTest, testInverseHilbertIndex_Local_2D) {
     assert(point.size()==2);
     ValueType x = point.getLocalValues()[0];
     ValueType y = point.getLocalValues()[1];
-    //PRINT(i << ": 1D index= \t"<< double(i)/divisor << " >> \t( "<< x <<" , "<< y << " )");
+    PRINT(i << ": 1D index= \t"<< double(i)/divisor << " >> \t( "<< x <<" , "<< y << " )");
     assert(x<=1);
     assert(x>=0);
     assert(y<=1);
@@ -103,6 +103,30 @@ TEST_F(HilbertCurveTest, testInverseHilbertIndex_Local_2D) {
   }
     
 }    
+//-------------------------------------------------------------------------------------------------
+
+TEST_F(HilbertCurveTest, testInverseHilbertIndex_Local_3D) {
+  //const IndexType dimensions = 3;
+  const IndexType recursionDepth = 7;
+  
+  ValueType divisor=16;
+  for(int i=0; i<divisor; i++){
+    DenseVector<ValueType> point = HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point( double(i)/divisor, recursionDepth);
+    
+    assert(point.size()==2);
+    ValueType x = point.getLocalValues()[0];
+    ValueType y = point.getLocalValues()[1];
+	ValueType z = point.getLocalValues()[2];
+    //PRINT(i << ": 1D index= \t"<< double(i)/divisor << " >> \t( "<< x <<" , "<< y << " )");
+    assert(x<=1);
+    assert(x>=0);
+    assert(y<=1);
+    assert(y>=0);
+	assert(z<=1);
+    assert(z>=0);
+  }
+    
+} 
 //-------------------------------------------------------------------------------------------------
 
 /* Read from file and test hilbert indices.
@@ -381,22 +405,6 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
       EXPECT_GE( hilbertIndex.getLocalValues()[i] , hilbertIndex.getLocalValues()[i-1]); 
   }
 
-  /*
-  std::ofstream f;
-  std::string fileName = std::string(graphPath+ "/my_meshes/hilbert3D_" + std::to_string(comm->getRank()) + ".plt");
-  f.open(fileName);
-
-  for(int i=0; i<N; i++){
-      ValueType x= coordinates[0].getValue( perm.getValue(i).Scalar::getValue<IndexType>() ).Scalar::getValue<ValueType>();
-      ValueType y= coordinates[1].getValue( perm.getValue(i).Scalar::getValue<IndexType>() ).Scalar::getValue<ValueType>();
-      ValueType z= coordinates[2].getValue( perm.getValue(i).Scalar::getValue<IndexType>() ).Scalar::getValue<ValueType>();
-      if( dist->isLocal(i)){
-        f << x << " "<< y << " "<< z << std::endl;
-      }
- }
- std::cout<< "Coordinates written in file: "<< fileName << " for processor #"<< comm->getRank()<< std::endl;
-  f.close();
-  */
 }
 	
 //-----------------------------------------------------------------
@@ -458,7 +466,7 @@ TEST_F(HilbertCurveTest, testRandom_Distributed_3D) {
   
   const IndexType localN = dist->getLocalSize();
 
-  ValueType point[3], point2[3];
+  ValueType point[3];
   
   for (IndexType i = 0; i < localN; i++) {
     //check if the new function return the same index. seems OK.
@@ -487,7 +495,49 @@ TEST_F(HilbertCurveTest, testRandom_Distributed_3D) {
   }
   
 }
-
+//-----------------------------------------------------------------
+//
+//Creates random coordinates for n points in 3D and test the new.
+//
+TEST_F(HilbertCurveTest, testSortedHilbertIndices) {
+	
+	
+	std::string coordFile = graphPath + "trace-00008.graph.xyz";
+	const IndexType N=8993;	//for trace-00008
+	
+	//std::string coordFile = graphPath + "Grid16x16.xyz";
+	//const IndexType N=16*16;
+	
+	const IndexType dimensions = 2;
+	
+	std::vector<DenseVector<ValueType>> coords =  FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions);
+	
+	const scai::dmemo::DistributionPtr coordDist = coords[0].getDistributionPtr();
+	const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
+	const IndexType localN = coordDist->getLocalSize();
+	
+	std::vector<sort_pair> localHilbertIndices = HilbertCurve<IndexType, ValueType>::getSortedHilbertIndices( coords);
+	
+	
+	// checks
+	
+	//const ValueType maxLocalIndex = *std::max_element( localHilbertIndices.begin(), localHilbertIndices.end() );
+	
+	//this assertion is wrong as the new local N can be different from the previous one
+	//SCAI_ASSERT_EQ_ERROR( localN, localHilbertIndices.size(), "Possible local size mismatch")
+	const IndexType newLocalN = localHilbertIndices.size();
+	PRINT(*comm<< ": previous local N=" << localN <<" , new local N= " << newLocalN);
+	
+	for( int i=0; i<newLocalN; i++){
+		//PRINT( *comm << ": "<< localHilbertIndices[i]);
+		SCAI_ASSERT_LE_ERROR(localHilbertIndices[i].value, 1, "Hilbert index too high.");
+		SCAI_ASSERT_GE_ERROR(localHilbertIndices[i].value, 0, "Hilbert index too low.");
+		if(i>0){
+			SCAI_ASSERT_LE_ERROR(localHilbertIndices[i-1].value, localHilbertIndices[i].value, "Indices not sorted?");
+		}
+	}
+	
+}
 //-------------------------------------------------------------------------------------------------
 
 } //namespace ITI

@@ -85,7 +85,6 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
     std::string file = "slowrot-00000.graph";
     std::string filename= graphPath + file;
     CSRSparseMatrix<ValueType> Graph;
-    IndexType N;    //number of points
 
     std::ifstream f(filename);
     IndexType nodes, edges;
@@ -100,7 +99,7 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
         SCAI_REGION("testReadAndWriteGraphFromFile.readGraphFromFile");
         Graph = FileIO<IndexType, ValueType>::readGraph(filename);
     }
-    N = Graph.getNumColumns();
+    //IndexType N = Graph.getNumColumns();
     EXPECT_EQ(Graph.getNumColumns(), Graph.getNumRows());
     EXPECT_EQ(nodes, Graph.getNumColumns());
     EXPECT_EQ(edges, (Graph.getNumValues())/2 );
@@ -146,7 +145,7 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
 // usually, graph file: "file.graph", coordinates file: "file.graph.xy" or .xyz
 TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     CSRSparseMatrix<ValueType> graph;       //the graph as an adjacency matrix
-    IndexType dim= 2, k= 8, i;
+    IndexType dim= 2, k= 8;
     ValueType epsilon= 0.1;
 
     std::string file= "slowrot-00000.graph";

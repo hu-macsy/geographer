@@ -16,6 +16,7 @@
 #include <memory>
 #include <cstdlib>
 #include <numeric>
+#include <chrono>
 
 #include "MeshGenerator.h"
 #include "FileIO.h"
@@ -25,6 +26,8 @@
 #include "SpectralPartition.h"
 #include "GraphUtils.h"
 #include "AuxiliaryFunctions.h"
+#include "KMeans.h"
+#include "Metrics.h"
 
 #include "gtest/gtest.h"
 
@@ -291,8 +294,7 @@ TEST_F (auxTest,testComputeCommVolume){
 TEST_F (auxTest,testGraphMaxDegree){
     
     const IndexType N = 1000;
-    const IndexType k = 10;
-
+    
     //define distributions
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -422,16 +424,149 @@ TEST_F(auxTest, testIndex2_2DPoint){
 }
 //-----------------------------------------------------------------
 
-TEST_F(auxTest, testInexReordering){
+TEST_F(auxTest, testIndexReordering){
 	
-	IndexType maxIndex = 10;
-	std::vector<IndexType> indices = GraphUtils::indexReorder( maxIndex, maxIndex/3 );
-	
-	for(int i=0; i<indices.size(); i++){
-		std::cout<< i <<": " << indices[i]<<std::endl;
+	IndexType M = 1000;
+	for( IndexType maxIndex = 100; maxIndex<M; maxIndex++){
+		//std::vector<IndexType> indices = GraphUtils::indexReorder( maxIndex, maxIndex/3 );
+		std::vector<IndexType> indices = GraphUtils::indexReorderCantor( maxIndex);
+		//std::cout <<std::endl;
+		
+		EXPECT_EQ( indices.size(), maxIndex );
+		
+		IndexType indexSum = std::accumulate( indices.begin(), indices.end(), 0);
+		EXPECT_EQ( indexSum, maxIndex*(maxIndex-1)/2);
+		/*
+		if(maxIndex==15){
+			for(int i=0; i<indices.size(); i++){
+				std::cout<< i <<": " << indices[i]<<std::endl;
+			}
+		}
+		*/
 	}
 	
-	std::cout << std::endl;
 }
+
+//-----------------------------------------------------------------
+
+TEST_F(auxTest, testBenchIndexReordering){
+
+	IndexType M = 51009;
+	
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();	
+	std::chrono::time_point<std::chrono::high_resolution_clock> FYstart = std::chrono::high_resolution_clock::now();
+	
+	std::vector<IndexType> indices(M);
+	const typename std::vector<IndexType>::iterator firstIndex = indices.begin();
+	typename std::vector<IndexType>::iterator lastIndex = indices.end();
+	std::iota(firstIndex, lastIndex, 0);
+	GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, M);
+	
+	std::chrono::duration<ValueType,std::ratio<1>> FYtime = std::chrono::high_resolution_clock::now() - FYstart;
+	PRINT0("FisherYatesShuffle for " << M <<" points is " << FYtime.count() );
+	
+	for(int i=0; i<M; i++){
+		EXPECT_LT(indices[i],M);
+		EXPECT_GE(indices[i],0);
+	}
+	EXPECT_EQ( indices.size(), M );
+	
+	
+	
+	// cantor reordering
+	std::chrono::time_point<std::chrono::high_resolution_clock> Cstart = std::chrono::high_resolution_clock::now();
+	std::vector<IndexType> indicesCantor(M);
+	indicesCantor = GraphUtils::indexReorderCantor( M );
+		
+	std::chrono::duration<ValueType,std::ratio<1>> Ctime = std::chrono::high_resolution_clock::now() - Cstart;
+	PRINT0("Cantor for " << M <<" points is " << Ctime.count() );
+	
+	for(int i=0; i<M; i++){
+		EXPECT_LT(indicesCantor[i],M);
+		EXPECT_GE(indicesCantor[i],0);
+	}
+	EXPECT_EQ( indices.size(), M );
+	
+	//checks
+	
+	IndexType indexSumFY = std::accumulate( indices.begin(), indices.end(), 0);
+	IndexType indexSumC = std::accumulate( indicesCantor.begin(), indicesCantor.end(), 0);
+	// even with integer oveflow they should be the same, TODO: right?
+	EXPECT_EQ( indexSumFY, indexSumC);
+	
+	
+	//WARNING: integer overload for bigger values
+	if(M<60000){
+		EXPECT_EQ( indexSumFY, M*(M-1)/2);
+		EXPECT_EQ( indexSumC, M*(M-1)/2);
+	}
+		
+}
+
+//-----------------------------------------------------------------
+
+TEST_F(auxTest, testBenchKMeansSFCCoords){
+	//std::string fileName = "bubbles-00010.graph";
+	std::string fileName = "Grid32x32";
+	std::string graphFile = graphPath + fileName;
+	std::string coordFile = graphFile + ".xyz";
+	const IndexType dimensions = 2;
+	
+	//load graph and coords
+	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+	const IndexType n = graph.getNumRows();
+	std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
+	
+	DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
+	
+	struct Settings settings;
+	settings.dimensions = dimensions;
+	settings.numBlocks = comm->getSize();
+		
+	std::chrono::time_point<std::chrono::high_resolution_clock> SFCstart = std::chrono::high_resolution_clock::now();
+	DenseVector<IndexType> partitionSFC = KMeans::getPartitionWithSFCCoords<IndexType>( graph, coords, uniformWeights, settings);
+	std::chrono::duration<ValueType,std::ratio<1>> SFCtime = std::chrono::high_resolution_clock::now() - SFCstart;
+	ValueType time = comm->max( SFCtime.count() );
+	PRINT0("time for the sfc coordinates: " << time );
+	
+	partitionSFC.redistribute( dist );
+	struct Metrics metrics1(1);
+	
+	metrics1.getMetrics( graph, partitionSFC, uniformWeights, settings );
+	printMetricsShort( metrics1, std::cout );
+	
+	ITI::aux<IndexType,ValueType>::print2DGrid(graph, partitionSFC  );
+	
+	// get k-means partition by copying and redistributing the original coords
+	
+	std::chrono::time_point<std::chrono::high_resolution_clock> startOrig = std::chrono::high_resolution_clock::now();
+	DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coords, settings);
+	
+	std::vector<DenseVector<ValueType> > coordinateCopy = coords;
+	for (IndexType d = 0; d < dimensions; d++) {
+		coordinateCopy[d].redistribute( tempResult.getDistributionPtr() );
+	}
+	
+	const std::vector<IndexType> blockSizes(settings.numBlocks, n/settings.numBlocks);
+	DenseVector<IndexType> partitionOrig = KMeans::computePartition(coordinateCopy, settings.numBlocks, uniformWeights, blockSizes, settings);
+	
+	std::chrono::duration<ValueType,std::ratio<1>> timeOrig = std::chrono::high_resolution_clock::now() - startOrig;
+	time = comm->max( timeOrig.count() );
+	PRINT0("time for the original coordinates: " << time );
+	
+	
+	partitionOrig.redistribute( dist );
+	
+	struct Metrics metrics2(1);
+	
+	metrics2.getMetrics( graph, partitionOrig, uniformWeights, settings );
+	printMetricsShort( metrics2, std::cout );
+	
+	ITI::aux<IndexType,ValueType>::print2DGrid(graph, partitionOrig  );
+	
+}
+
 
 }

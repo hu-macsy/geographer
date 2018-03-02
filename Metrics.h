@@ -68,10 +68,10 @@ struct Metrics{
     void print( std::ostream& out){
         
         // for these time we have one measurement per PE and must make a max
-        ValueType maxTimeMigrationAlgo = *std::max_element( timeMigrationAlgo.begin(), timeMigrationAlgo.end() );
-        ValueType maxTimeFirstDistribution = *std::max_element( timeFirstDistribution.begin(), timeFirstDistribution.end() );
+        //ValueType maxTimeMigrationAlgo = *std::max_element( timeMigrationAlgo.begin(), timeMigrationAlgo.end() );
+        //ValueType maxTimeFirstDistribution = *std::max_element( timeFirstDistribution.begin(), timeFirstDistribution.end() );
         ValueType maxTimeKmeans = *std::max_element( timeKmeans.begin(), timeKmeans.end() );
-        ValueType maxTimeSecondDistribution = *std::max_element( timeSecondDistribution.begin(), timeSecondDistribution.end() );
+        //ValueType maxTimeSecondDistribution = *std::max_element( timeSecondDistribution.begin(), timeSecondDistribution.end() );
         ValueType maxTimePreliminary = *std::max_element( timePreliminary.begin(), timePreliminary.end() );
             
         ValueType timeLocalRef = timeFinalPartition - maxTimePreliminary;
@@ -88,19 +88,7 @@ struct Metrics{
             out << " ### WARNING: possibly not all metrics calculated ###" << std::endl;
         }
         out << "gather" << std::endl;
-		
-        /*// more detailed output
-		 out << "times: input, migrAlgo , 1redistr , k-means , 2redistr , prelim, localRef, total  , metrics:  prel cut, cut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg  " << std::endl;
-		out << std::setprecision(3) << std::fixed;
-		out<<  "         "<< inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << " ,  "<< timeFinalPartition << " ,  \t "\
-        << preliminaryCut << ",  "<< finalCut << ",  " << finalImbalance << ",    "  \
-        << maxBoundaryNodes << ",  " << totalBoundaryNodes << ",    "  \
-        << maxCommVolume << ",  " << totalCommVolume << ",    ";
-        out << std::setprecision(6) << std::fixed;
-        out << maxBorderNodesPercent << ",  " << avgBorderNodesPercent<< ",  " \
-        << timeSpMV << std::endl;
-		*/
-        
+		        
         out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm" << std::endl;
 		
         out << std::setprecision(3) << std::fixed;
@@ -352,8 +340,8 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
     IndexType sumTotBnd = 0;
     IndexType sumMaxCommVol = 0;
     IndexType sumTotCommVol = 0;
-    IndexType maxBoundaryNodes = 0;
-    IndexType totalBoundaryNodes = 0;
+    //IndexType maxBoundaryNodes = 0;
+    //IndexType totalBoundaryNodes = 0;
     ValueType sumMaxBorderNodesPerc = 0;
     ValueType sumAvgBorderNodesPerc = 0;
 
@@ -488,8 +476,8 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
     IndexType sumTotBnd = 0;
     IndexType sumMaxCommVol = 0;
     IndexType sumTotCommVol = 0;
-    IndexType maxBoundaryNodes = 0;
-    IndexType totalBoundaryNodes = 0;
+    //IndexType maxBoundaryNodes = 0;
+    //IndexType totalBoundaryNodes = 0;
     ValueType sumMaxBorderNodesPerc = 0;
     ValueType sumAvgBorderNodesPerc = 0;
 	ValueType sumTimeSpMV = 0;
@@ -546,8 +534,7 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
         out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm " << std::endl;
 		
         out << std::setprecision(2) << std::fixed;
-            //<<  ValueType(sumKmeans)/numRuns<< "  " \
-            //<<  ValueType(sumLocalRef)/numRuns<< ",  "  
+            //<<  ValueType(sumKmeans)/numRuns<< "  " <<  ValueType(sumLocalRef)/numRuns<< ",  "  
         out <<  ValueType(sumFinalTime)/numRuns<< " " \
             //<<  ValueType(sumPreliminaryCut)/numRuns<< ",  " 
             <<  ValueType(sumFinalCut)/numRuns<< " " \

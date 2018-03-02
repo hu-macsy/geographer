@@ -32,6 +32,8 @@
 #include "KMeans.h"
 #include "GraphUtils.h"
 
+#include "RBC/Sort/SQuick.hpp"
+
 /**
  *  Examples of use:
  * 
@@ -337,7 +339,7 @@ int main(int argc, char** argv) {
     }
     
     // time needed to get the input
-    std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
+    //std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
 
     assert(N > 0);
 
@@ -431,10 +433,11 @@ int main(int argc, char** argv) {
 				std::chrono::time_point<std::chrono::system_clock> beforeTmp = std::chrono::system_clock::now();
 				
 				DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
+				//std::vector<sort_pair> localHilbertIndices = ITI::HilbertCurve<IndexType, ValueType>::getSortedHilbertIndices( coordinates );
 				
 				std::chrono::duration<double> sfcPartTime = std::chrono::system_clock::now() - beforeTmp;
 				ValueType time = comm->max( sfcPartTime.count() );
-				PRINT0("time to get the sfc partition: " << time);
+				PRINT0("time to get the sfc indices: " << time);
 				
 				if( not uniformWeights){	
 					scai::hmemo::HArray<IndexType> localWeightsInt( rowDistPtr->getLocalSize(), 1 );

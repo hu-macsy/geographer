@@ -48,8 +48,6 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource( CS
 
 	ValueType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
 
-	IndexType sourceWeight;
-
 	IndexType sourceIndex = dist->global2local(source);
 
 	DenseVector<ValueType> nullVector(dist,0);
