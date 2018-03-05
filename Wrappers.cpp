@@ -14,7 +14,7 @@ IndexType HARD_TIME_LIMIT= 600; 	// hard limit in seconds to stop execution if e
 namespace ITI {
 
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper (
+scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartition (
 	const scai::lama::CSRSparseMatrix<ValueType> &graph,
 	const std::vector<scai::lama::DenseVector<ValueType>> &coords, 
 	const scai::lama::DenseVector<ValueType> &nodeWeights,
@@ -277,7 +277,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisWrapper 
 	
 	
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanWrapper (
+scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanPartition (
 	const scai::lama::CSRSparseMatrix<ValueType> &graph,
 	const std::vector<scai::lama::DenseVector<ValueType>> &coords, 
 	const scai::lama::DenseVector<ValueType> &nodeWeights,

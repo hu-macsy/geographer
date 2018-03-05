@@ -232,9 +232,9 @@ int main(int argc, char** argv) {
 	
 	settings.repeatTimes = 5;
 	
-	DenseVector<IndexType> partitionKway = ITI::Wrappers<IndexType,ValueType>::metisWrapper ( graph, coords, nodeWeights, parMetisGeom, settings, metrics);
+	DenseVector<IndexType> partitionKway = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coords, nodeWeights, parMetisGeom, settings, metrics);
 	
-	//DenseVector<IndexType> partitionKway = ITI::Wrappers<IndexType,ValueType>::zoltanWrapper ( graph, coords, nodeWeights, zoltanAlgo, settings, metrics);
+	//DenseVector<IndexType> partitionKway = ITI::Wrappers<IndexType,ValueType>::zoltanPartition ( graph, coords, nodeWeights, zoltanAlgo, settings, metrics);
 	
 	//metrics.timeFinalPartition = avgKwayTime;
 	PRINT0("time for partition: " <<  metrics.timeFinalPartition );

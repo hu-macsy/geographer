@@ -39,7 +39,7 @@ class Wrappers {
 
 public:
 
-	static scai::lama::DenseVector<IndexType> metisWrapper (
+	static scai::lama::DenseVector<IndexType> metisPartition (
 		const scai::lama::CSRSparseMatrix<ValueType> &graph,
 		const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
 		const scai::lama::DenseVector<ValueType> &nodeWeights,
@@ -48,7 +48,7 @@ public:
 		struct Metrics &metrics);
 		
 	
-	static scai::lama::DenseVector<IndexType> zoltanWrapper (
+	static scai::lama::DenseVector<IndexType> zoltanPartition (
 		const scai::lama::CSRSparseMatrix<ValueType> &graph,
 		const std::vector<scai::lama::DenseVector<ValueType>> &coords, 
 		const scai::lama::DenseVector<ValueType> &nodeWeights,

@@ -90,6 +90,32 @@ Wrappers.o: Wrappers.cpp
 	$(CC) $(CCFLAGS) $(PARMETIS_INCLUDE) $(ZOLTAN2_ALL_INCLUDE_DIRS) $(XTRAPULP_INCLUDE) -c -o Wrappers.o Wrappers.cpp
 
 	
+COMP_OBJ= FileIO.o MeshGenerator.o Wrappers.o GraphUtils.o
+competitorsPart.o: $(COMP_OBJ) competitorsPart.cpp
+	$(CC) $(CCFLAGS)  $(myZOLTAN2_ALL_INCLUDE_DIRS) -I$(TRILINOS_INCLUDE) -I$(PARMETIS_INCLUDE) -I$(METIS_INCLUDE) -c -o competitorsPart.o competitorsPart.cpp
+
+competitors: $(COMP_OBJ) competitorsPart.o
+	$(CC) $(CCFLAGS) $(COMP_OBJ)  $(myZOLTAN2_ALL_INCLUDE_DIRS) -I$(TRILINOS_INCLUDE) -I$(PARMETIS_INCLUDE) -I$(METIS_INCLUDE)  competitorsPart.o -o competitorsExe $(Zoltan2_LIBRARY_DIRS) $(Zoltan2_LIBRARIES)  $(METIS_LIB)  $(PARMETIS_LIB) $(LFLAGS)
+	
+
+allCompetitorsPart.o: $(COMP_OBJ) allCompetitorsPart.cpp
+	$(CC) $(CCFLAGS)  $(myZOLTAN2_ALL_INCLUDE_DIRS) -I$(TRILINOS_INCLUDE) -I$(PARMETIS_INCLUDE) -I$(METIS_INCLUDE) -c -o allCompetitorsPart.o allCompetitorsPart.cpp
+
+
+allCompetitors: $(COMP_OBJ) allCompetitorsPart.o
+	$(CC) $(CCFLAGS) $(COMP_OBJ)  $(myZOLTAN2_ALL_INCLUDE_DIRS) -I$(TRILINOS_INCLUDE) -I$(PARMETIS_INCLUDE) -I$(METIS_INCLUDE)  allCompetitorsPart.o -o allCompetitorsExe $(Zoltan2_LIBRARY_DIRS) $(Zoltan2_LIBRARIES)  $(METIS_LIB)  $(PARMETIS_LIB) $(LFLAGS) 
+
+
+####### for repartition
+
+repartitionWithAll.o: $(COMP_OBJ) repartitionWithAll.cpp
+	$(CC) $(CCFLAGS)  $(myZOLTAN2_ALL_INCLUDE_DIRS) -I$(TRILINOS_INCLUDE) -I$(PARMETIS_INCLUDE) -I$(METIS_INCLUDE) -c -o repartitionWithAll.o repartitionWithAll.cpp
+
+repartition: $(COMP_OBJ) repartitionWithAll.o
+	$(CC) $(CCFLAGS) $(COMP_OBJ)  $(myZOLTAN2_ALL_INCLUDE_DIRS) -I$(TRILINOS_INCLUDE) -I$(PARMETIS_INCLUDE) -I$(METIS_INCLUDE)  repartitionWithAll.o -o repartitionWithAll $(Zoltan2_LIBRARY_DIRS) $(Zoltan2_LIBRARIES)  $(METIS_LIB)  $(PARMETIS_LIB) $(LFLAGS) 
+
+
+
 ###### misc	
 	
 graphGen: $(OBJ_GRAPH_GEN)

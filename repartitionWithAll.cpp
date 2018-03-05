@@ -70,9 +70,7 @@ int main(int argc, char** argv) {
 	std::string outPath;
 	std::string graphName;
 	
-	//WARNING: removed parmetis sfc
-	std::vector<std::string> allTools = {"zoltanRcb", "zoltanRib", "zoltanMJ", "zoltanHsfc", /*"parMetisSfc",*/ "parMetisGeom", "parMetisGraph" };
-    
+	
 	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
 	
 	desc.add_options()
@@ -241,27 +239,34 @@ int main(int argc, char** argv) {
 	//----------------------------------------------------------
 	//	add node weights to get first partition
 	
-	//scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
 	// nodeWeights have the same distribution as the coordinates
-	scai::lama::DenseVector<ValueType> nodeWeights = Repartition<IndexType,ValueType>::sNW( coords, 0, settings);
+	scai::lama::DenseVector<ValueType> imbaNodeWeights = Repartition<IndexType,ValueType>::sNW( coords, 0, settings);
 	
 	// use some tool to partition with the node weights
 	struct Metrics beforeMetrics(1);
 	metrics.numBlocks = settings.numBlocks;
 	
 	int parMetisVersion = 1;	//0: only graph, 1: graph+geometry, 2: only geometry (sfc)
-	scai::lama::DenseVector<IndexType> beforePartition = ITI::Wrappers<IndexType,ValueType>::metisWrapper ( graph, coords, nodeWeights, parMetisVersion, settings, beforeMetrics);
+	scai::lama::DenseVector<IndexType> beforePartition = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coords, imbaNodeWeights, parMetisVersion, settings, beforeMetrics);
 	
 	//get the distribution from the partition
 	scai::dmemo::DistributionPtr beforeDist = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( beforePartition.getDistribution(), beforePartition.getLocalValues() ) );
 	
 	scai::dmemo::DistributionPtr columnDist = graph.getColDistributionPtr();
 	
+	{
+		SCAI_ASSERT_ERROR( imbaNodeWeights.getDistributionPtr()->isEqual( graph.getRowDistributionPtr() ), "nodeWeights->distribution and graph.getRowDistribution do not agree.");
+		SCAI_ASSERT_ERROR( imbaNodeWeights.getDistributionPtr()->isEqual( coords[0].getDistributionPtr() ), "nodeWeights->distribution and coords[0].getDistribution do not agree.")'
+	}
+	
+	scai::dmemo::Redistributor prepareRedist(beforeDist, imbaNodeWeights.getDistributionPtr());
+	
 	//distribute graph and coordinates to mimic an imbalanced simulation
-	graph.redistribute( beforeDist, columnDist );
+	//TODO: what about nodeweights? now, just use uniform nodeweights for the repartition
+	graph.redistribute( prepareRedist, columnDist );
 	
 	for(IndexType i=0; i<dimensions; i++){
-		coords[i].redistribute( beforeDist );
+		coords[i].redistribute( prepareRedist );
 	}
 	
 	// calculate and print imbalance
@@ -272,13 +277,15 @@ int main(int argc, char** argv) {
 		const ValueType optSize = ValueType(N)/comm->getSize();
 		
 		ValueType imbalance = ValueType( maxLocalN - optSize)/optSize;
-		PRINT0("\tminLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", imbalance= " << imbalance);
+		PRINT0("\tpartition before: minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", imbalance= " << imbalance);
 	}
 	
 	//---------------------------------------------------------------------------------
 	//
 	// start main for loop for all tools
 	//
+	//WARNING: removed parmetis sfc
+	std::vector<std::string> allTools = {"zoltanRcb", "zoltanRib", "zoltanMJ", "zoltanHsfc", /*"parMetisSfc",*/ "parMetisGeom", "parMetisGraph" };
 	
 	for( int t=0; t<allTools.size(); t++){
 		
@@ -326,7 +333,7 @@ int main(int argc, char** argv) {
 			else if ( thisTool=="parMetisGeom"){	parMetisGeom = 1;	}
 			else if	( thisTool=="parMetisSfc"){		parMetisGeom = 2;	}
 			
-			partition = ITI::Wrappers<IndexType,ValueType>::metisWrapper ( graph, coords, nodeWeights, parMetisGeom, settings, metrics);
+			partition = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coords, nodeWeights, parMetisGeom, settings, metrics);
 		}else if (thisTool.substr(0,6)=="zoltan"){
 			std::string algo;
 			if		( thisTool=="zoltanRcb"){	algo = "rcb";	}
@@ -334,7 +341,7 @@ int main(int argc, char** argv) {
 			else if ( thisTool=="zoltanMJ"){	algo = "multijagged";}
 			else if ( thisTool=="zoltanHsfc"){	algo = "hsfc";	}
 			
-			partition = ITI::Wrappers<IndexType,ValueType>::zoltanWrapper ( graph, coords, nodeWeights, algo, settings, metrics);
+			partition = ITI::Wrappers<IndexType,ValueType>::zoltanPartition ( graph, coords, nodeWeights, algo, settings, metrics);
 		}else{
 			std::cout<< "Tool "<< thisTool <<" not supported.\nAborting..."<<std::endl;
 			return -1;

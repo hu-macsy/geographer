@@ -289,7 +289,7 @@ int main(int argc, char** argv) {
 			else if ( thisTool=="parMetisGeom"){	parMetisGeom = 1;	}
 			else if	( thisTool=="parMetisSfc"){		parMetisGeom = 2;	}
 			
-			partition = ITI::Wrappers<IndexType,ValueType>::metisWrapper ( graph, coords, nodeWeights, parMetisGeom, settings, metrics);
+			partition = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coords, nodeWeights, parMetisGeom, settings, metrics);
 		}else if (thisTool.substr(0,6)=="zoltan"){
 			std::string algo;
 			if		( thisTool=="zoltanRcb"){	algo = "rcb";	}
@@ -297,7 +297,7 @@ int main(int argc, char** argv) {
 			else if ( thisTool=="zoltanMJ"){	algo = "multijagged";}
 			else if ( thisTool=="zoltanHsfc"){	algo = "hsfc";	}
 			
-			partition = ITI::Wrappers<IndexType,ValueType>::zoltanWrapper ( graph, coords, nodeWeights, algo, settings, metrics);
+			partition = ITI::Wrappers<IndexType,ValueType>::zoltanPartition ( graph, coords, nodeWeights, algo, settings, metrics);
 		}else{
 			std::cout<< "Tool "<< thisTool <<" not supported.\nAborting..."<<std::endl;
 			return -1;

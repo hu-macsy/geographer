@@ -507,7 +507,7 @@ int main(int argc, char** argv) {
 			
 			beforeInitialTime =  std::chrono::system_clock::now();
 			// get parMetis parition
-			partition = ITI::Wrappers<IndexType,ValueType>::metisWrapper ( graph, coordinates, nodeWeights, parMetisGeom, settings, metrics);
+			partition = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coordinates, nodeWeights, parMetisGeom, settings, metrics);
 			partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
 			
 			//settings.repeatTimes = repeatTimes;
@@ -520,7 +520,7 @@ int main(int argc, char** argv) {
 			std::string zoltanAlgo = "rcb";
 			beforeInitialTime =  std::chrono::system_clock::now();
 			// get zoltan parition
-			partition = ITI::Wrappers<IndexType,ValueType>::zoltanWrapper ( graph, coordinates, nodeWeights, zoltanAlgo, settings, metrics);
+			partition = ITI::Wrappers<IndexType,ValueType>::zoltanPartition ( graph, coordinates, nodeWeights, zoltanAlgo, settings, metrics);
 			partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
 			
 			break;
