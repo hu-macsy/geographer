@@ -158,6 +158,19 @@ static ValueType pixelL2Distance2D(IndexType pixel1, IndexType pixel2, IndexType
      
      return std::pow( ValueType (std::pow(std::abs(col1-col2),2) + std::pow(std::abs(row1-row2),2)) , 0.5);
 }
+
+//template<T>
+static ValueType pointDistanceL2( std::vector<ValueType> p1, std::vector<ValueType> p2){
+	const IndexType dim = p1.size();
+	ValueType distance = 0;
+
+	for( IndexType d=0; d<dim; d++){
+		distance += std::pow( std::abs(p1[d]-p2[d]), 2 );
+	}
+	
+	return std::pow( distance, 1.0/2.0);
+}
+
 //------------------------------------------------------------------------------
 
 /* Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position

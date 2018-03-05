@@ -20,33 +20,46 @@
 #include "GraphUtils.h"
 #include "MeshGenerator.h"
 #include "FileIO.h"
-#include "ParcoRepart.h"
-#include "gtest/gtest.h"
+#include "Repartition.h"
 #include "AuxiliaryFunctions.h"
 
+#include "gtest/gtest.h"
 
 using namespace scai;
 
 namespace ITI {
 
-class ParcoRepartTest : public ::testing::Test {
+class RepartitionTest : public ::testing::Test {
     protected:
         // the directory of all the meshes used
         std::string graphPath = "./meshes/";
 
 };
 
-TEST_F(RepartitionTest, testRepart){
-    
+TEST_F(RepartitionTest, testNodeWeights){
+	//std::string fileName = "bubbles-00010.graph";
+	std::string fileName = "Grid16x16";
+	std::string graphFile = graphPath + fileName;
+	std::string coordFile = graphFile + ".xyz";
+	const IndexType dimensions = 2;
 	
-	const IndexType n= 100;
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	scai::dmemo::DistributionPtr distPtr(new scai::dmemo::BlockDistribution(n, comm));
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	
+	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+	
+	const IndexType n = graph.getNumRows();
+	
+	std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
+		
+	//scai::dmemo::DistributionPtr distPtr = coords[0].getDistributionPtr();
+	
+	
+	//scai::dmemo::DistributionPtr distPtr(new scai::dmemo::BlockDistribution(n, comm));
+	
 	struct Settings settings;
+	settings.dimensions = dimensions;
 	
-	settings.dimensions = 2;
-	
-	scai::lama::DenseVector<ValueType> nodeWeights = Repartition<IndexType,ValueType>::sNW( distPtr, 0, settings);
+	scai::lama::DenseVector<ValueType> nodeWeights = Repartition<IndexType,ValueType>::sNW( coords, 0, settings);
 }
 //-----------------------------------------------------------------------------------------------------
 

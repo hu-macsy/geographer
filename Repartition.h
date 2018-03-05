@@ -29,9 +29,9 @@
 namespace ITI {
 
 	template <typename IndexType, typename ValueType>
-	class ParcoRepart {
+	class Repartition {
 	public:
 		
-		static scai::lama::DenseVector<ValueType> sNW( const scai::dmemo::DistributionPtr distPtr, const IndexType seed, const Settings settings);
+		static scai::lama::DenseVector<ValueType> sNW(  const std::vector<scai::lama::DenseVector<ValueType> >& coordinates, const IndexType seed, const Settings settings);
 	};
 }

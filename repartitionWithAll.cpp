@@ -230,7 +230,7 @@ int main(int argc, char** argv) {
     	return 126;
     }
     
-    scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    
 	/*
 	//TODO: must compile with mpicc and module mpi.ibm/1.4 and NOT mpi.ibm/1.4_gcc
 	size_t total=-1,used=-1,free=-1,buffers=-1, cached=-1;
@@ -241,8 +241,39 @@ int main(int argc, char** argv) {
 	//----------------------------------------------------------
 	//	add node weights to get first partition
 	
-	scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
+	//scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
+	// nodeWeights have the same distribution as the coordinates
+	scai::lama::DenseVector<ValueType> nodeWeights = Repartition<IndexType,ValueType>::sNW( coords, 0, settings);
 	
+	// use some tool to partition with the node weights
+	struct Metrics beforeMetrics(1);
+	metrics.numBlocks = settings.numBlocks;
+	
+	int parMetisVersion = 1;	//0: only graph, 1: graph+geometry, 2: only geometry (sfc)
+	scai::lama::DenseVector<IndexType> beforePartition = ITI::Wrappers<IndexType,ValueType>::metisWrapper ( graph, coords, nodeWeights, parMetisVersion, settings, beforeMetrics);
+	
+	//get the distribution from the partition
+	scai::dmemo::DistributionPtr beforeDist = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( beforePartition.getDistribution(), beforePartition.getLocalValues() ) );
+	
+	scai::dmemo::DistributionPtr columnDist = graph.getColDistributionPtr();
+	
+	//distribute graph and coordinates to mimic an imbalanced simulation
+	graph.redistribute( beforeDist, columnDist );
+	
+	for(IndexType i=0; i<dimensions; i++){
+		coords[i].redistribute( beforeDist );
+	}
+	
+	// calculate and print imbalance
+	{
+		const IndexType localN = distFromPartition->getLocalSize();
+		const IndexType maxLocalN = comm->max(localN);
+		const IndexType minLocalN = comm->min(localN);
+		const ValueType optSize = ValueType(N)/comm->getSize();
+		
+		ValueType imbalance = ValueType( maxLocalN - optSize)/optSize;
+		PRINT0("\tminLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", imbalance= " << imbalance);
+	}
 	
 	//---------------------------------------------------------------------------------
 	//
