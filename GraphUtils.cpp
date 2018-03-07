@@ -31,7 +31,7 @@ using scai::lama::Scalar;
 using scai::lama::CSRStorage;
 
 template<typename IndexType, typename ValueType>
-IndexType getFarthestLocalNode(const scai::lama::CSRSparseMatrix<ValueType> graph, std::vector<IndexType> seedNodes) {
+IndexType getFarthestLocalNode(const scai::lama::CSRSparseMatrix<ValueType> &graph, std::vector<IndexType> seedNodes) {
 	/**
 	 * Yet another BFS. This currently has problems with unconnected graphs.
 	 */
@@ -75,6 +75,113 @@ IndexType getFarthestLocalNode(const scai::lama::CSRSparseMatrix<ValueType> grap
 	}
 
 	return nextNode;
+}
+
+template<typename IndexType, typename ValueType>
+std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u)
+{
+    const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
+    const IndexType localN = inputDist->getLocalSize();
+    assert(u < localN);
+    assert(u >= 0);
+
+    std::vector<IndexType> result(localN, std::numeric_limits<IndexType>::infinity());
+    std::queue<IndexType> queue;
+    std::queue<IndexType> alternateQueue;
+    std::vector<bool> visited(localN, false);
+
+    queue.push(u);
+    result[u] = 0;
+    visited[u] = true;
+
+    const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
+    const scai::hmemo::ReadAccess<IndexType> localIa(localStorage.getIA());
+    const scai::hmemo::ReadAccess<IndexType> localJa(localStorage.getJA());
+
+    bool done = false;
+    IndexType round = 0;
+    while (!queue.empty()) {
+        while (!queue.empty()) {
+            const IndexType v = queue.front();
+            queue.pop();
+            assert(v < localN);
+            assert(v >= 0);
+
+            const IndexType beginCols = localIa[v];
+            const IndexType endCols = localIa[v+1];
+            for (IndexType j = beginCols; j < endCols; j++) {
+                IndexType globalNeighbor = localJa[j];
+                IndexType localNeighbor = inputDist->global2local(globalNeighbor);
+                if (localNeighbor != nIndex && !visited[localNeighbor])  {
+                    assert(localNeighbor < localN);
+                    assert(localNeighbor >= 0);
+                    assert(localNeighbor != u);
+
+                    alternateQueue.push(localNeighbor);
+                    result[localNeighbor] = round+1;
+                    visited[localNeighbor] = true;
+                }
+            }
+        }
+        round++;
+        std::swap(queue, alternateQueue);
+        //if alternateQueue was empty, queue is now empty and outer loop will abort
+    }
+    assert(result[u] == 0);
+
+    return result;
+}
+
+template<typename IndexType, typename ValueType>
+IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, IndexType u, IndexType lowerBound, const IndexType k)
+{
+    const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
+
+    const IndexType localN = inputDist->getLocalSize();
+    std::cout << "Starting Diameter calculation..." << std::endl;
+    assert(u < localN);
+    assert(u >= 0);
+    std::vector<IndexType> ecc(localN);
+    std::vector<IndexType> distances = localBFS(graph, u);
+    assert(distances[u] == 0);
+    ecc[u] = *std::max_element(distances.begin(), distances.end());
+
+    if (localN > 1) {
+        assert(ecc[u] > 0);
+    }
+
+    if (ecc[u] > localN) {
+        assert(ecc[u] == std::numeric_limits<IndexType>::infinity());
+        return ecc[u];
+    }
+    IndexType i = ecc[u];
+    lowerBound = std::max(ecc[u], lowerBound);
+    IndexType upperBound = 2*ecc[u];
+
+    while (upperBound - lowerBound > k) {
+        assert(i > 0);
+        // get max eccentricity in fringe i
+        IndexType B_i = 0;
+        for (IndexType j = 0; j < localN; j++) {
+            if (distances[j] == i) {
+                assert(j != u);
+                std::vector<IndexType> jDistances = localBFS(graph, j);
+                ecc[j] = *std::max_element(jDistances.begin(), jDistances.end());
+                B_i = std::max(B_i, ecc[j]);
+            }
+        }
+
+        lowerBound = std::max(lowerBound, B_i);
+        if (lowerBound > 2*(i-1)) {
+            return lowerBound;
+        }   else {
+            upperBound = 2*(i-1);
+        }
+        std::cout << "proc " << comm->getRank() << ", i: " << i << ", lb:" << lowerBound << ", ub:" << upperBound << std::endl;
+        i -= 1;
+    }
+    return lowerBound;
 }
 
 template<typename IndexType, typename ValueType>
@@ -998,7 +1105,9 @@ scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vec
 //-----------------------------------------------------------------------------------
 
 
-template IndexType getFarthestLocalNode(const CSRSparseMatrix<ValueType> graph, std::vector<IndexType> seedNodes);
+template IndexType getFarthestLocalNode(const CSRSparseMatrix<ValueType> &graph, std::vector<IndexType> seedNodes);
+template std::vector<IndexType> localBFS(const CSRSparseMatrix<ValueType> &graph, IndexType u);
+template IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, IndexType u, IndexType lowerBound, const IndexType k);
 template ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool weighted);
 template ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<ValueType> &nodeWeights);
 template scai::dmemo::Halo buildNeighborHalo<IndexType,ValueType>(const CSRSparseMatrix<ValueType> &input);
