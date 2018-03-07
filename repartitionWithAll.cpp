@@ -290,7 +290,7 @@ int main(int argc, char** argv) {
 			imbaNodeWeights = ITI::Repartition<IndexType,ValueType>::sNW( coords, seed, diverg, dimensions);
 			
 			ValueType tmpE = settings.epsilon;
-			settings.epsilon = 0.2;		// to give imbalanced partitions
+			settings.epsilon = 0.1;		// to give imbalanced partitions
 			
 			int parMetisVersion = 1;	//0: only graph, 1: graph+geometry, 2: only geometry (sfc)
 			firstPartition = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coords, imbaNodeWeights, nodeWeightsFlag, parMetisVersion, settings, beforeMetrics);
@@ -299,7 +299,7 @@ int main(int argc, char** argv) {
 			
 			imbalance = ITI::GraphUtils::computeImbalance(firstPartition, settings.numBlocks, nodeWeights);
 			PRINT0("diverg= " << diverg<< " , first partition imbalance= " << imbalance);
-			diverg += 0.2;
+			diverg += 0.1;
 		}while( imbalance<0.2 and diverg<4);
 		//TODO: check that these are OK
 		
