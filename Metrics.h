@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include <scai/lama.hpp>
 #include "GraphUtils.h"
 
@@ -33,6 +35,9 @@ struct Metrics{
     IndexType totalBoundaryNodes= 0;
     ValueType maxBorderNodesPercent= 0;
     ValueType avgBorderNodesPercent= 0;
+
+    IndexType maxBlockDiameter = 0;
+    IndexType avgBlockDiameter = 0;
 
     
     //constructor
@@ -68,21 +73,46 @@ struct Metrics{
             
         ValueType timeLocalRef = timeFinalPartition - maxTimePreliminary;
         
+        //TODO: this is quite ugly. Refactor as dictionary with key-value-pairs, much more extensible.
         if( maxBlockGraphDegree==-1 ){
             out << " ### WARNING: setting dummy value -1 for expensive (and not used) metrics max and total blockGraphDegree ###" << std::endl;
         }else if (maxBlockGraphDegree==0 ){
             out << " ### WARNING: possibly not all metrics calculated ###" << std::endl;
         }
-        out << "# times: input, migrAlgo , 1redistr , k-means , 2redistr , prelim, localRef, total  , metrics:  prel cut, cut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg  " << std::endl;
+        out << "# times: input, migrAlgo , 1redistr , k-means , 2redistr , prelim, localRef, total";
+        out << ", metrics:  prel cut, cut, imbalance, maxCommVol, totalCommVol, maxDiameter, avgDiameter" << std::endl;
+
+        auto oldprecision = out.precision();
         
         out << std::setprecision(3) << std::fixed;
-        out<<  "         "<< inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << " ,  "<< timeFinalPartition << " ,  \t "\
-        << preliminaryCut << ",  "<< finalCut << ",  " << finalImbalance << ",    "  \
-        << maxBoundaryNodes << ",  " << totalBoundaryNodes << ",    "  \
-        << maxCommVolume << ",  " << totalCommVolume << ",    ";
+
+        //times
+        out << inputTime    << ", ";
+        out << maxTimeMigrationAlgo << ", ";
+        out << maxTimeFirstDistribution << ", ";
+        out << maxTimeKmeans    << ", ";
+        out << maxTimeSecondDistribution    << ", ";
+        out << maxTimePreliminary   << ", ";
+        out << timeLocalRef << ", ";
+        out << timeFinalPartition   << ", ";
+
+        //solution quality
+        out << preliminaryCut   << ", ";
+        out << finalCut << ", ";
+        out << finalImbalance   << ", ";
+        //out << maxBoundaryNodes << ", ";
+        //out << totalBoundaryNodes   << ", ";
+        out << maxCommVolume    << ", ";
+        out << totalCommVolume  << ", ";
+        out << maxBlockDiameter << ", ";
+        out << avgBlockDiameter << ", ";
+
         out << std::setprecision(6) << std::fixed;
-        out << maxBorderNodesPercent << ",  " << avgBorderNodesPercent \
-        << std::endl;
+        //out << maxBorderNodesPercent << ", ";
+        //out << avgBorderNodesPercent << ", ";
+        out << std::endl;
+
+        out.precision(oldprecision);
         
         
     }
@@ -124,5 +154,26 @@ struct Metrics{
         maxBorderNodesPercent = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
         avgBorderNodesPercent = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(settings.numBlocks));
         
+        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+        const IndexType localN = dist->getLocalSize();
+
+        if (settings.numBlocks == comm->getSize()) {
+            //maybe possible to compute diameter
+            bool allLocalNodesInSameBlock;
+            {
+                scai::hmemo::ReadAccess<IndexType> rPart(partition.getLocalValues());
+                auto result = std::minmax_element(rPart.get(), rPart.get()+localN);
+                allLocalNodesInSameBlock = ((*result.first) == (*result.second));
+            }
+            if (comm->all(allLocalNodesInSameBlock)) {
+                IndexType localDiameter = ITI::GraphUtils::getLocalBlockDiameter<IndexType, ValueType>(graph, localN/2, 0, 0);
+                maxBlockDiameter = comm->max(localDiameter);
+                avgBlockDiameter = comm->sum(localDiameter) / comm->getSize();
+            }
+
+        }
+
+
     }
 };
