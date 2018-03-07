@@ -242,7 +242,9 @@ int main(int argc, char** argv) {
 	
     // uniform node weights
     scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
-	
+	// if usign unit weights, set flag for wrappers
+	bool nodeWeightsUse = false;
+		
 	// if graph is too big, repeat less times to avoid memory and time problems
 	if( N>std::pow(2,29) ){
 		settings.repeatTimes = 2;
@@ -258,7 +260,7 @@ int main(int argc, char** argv) {
 		else if ( tool=="parMetisGeom"){	parMetisGeom = 1;	}
 		else if	( tool=="parMetisSfc"){		parMetisGeom = 2;	}
 		
-		partition = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coords, nodeWeights, parMetisGeom, settings, metrics);
+		partition = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coords, nodeWeights, nodeWeightsUse, parMetisGeom, settings, metrics);
 	}else if (tool.substr(0,6)=="zoltan"){
 		std::string algo;
 		if		( tool=="zoltanRcb"){	algo = "rcb";	}
@@ -266,7 +268,7 @@ int main(int argc, char** argv) {
 		else if ( tool=="zoltanMJ"){	algo = "multijagged";}
 		else if ( tool=="zoltanHsfc"){	algo = "hsfc";	}
 		
-		partition = ITI::Wrappers<IndexType,ValueType>::zoltanPartition ( graph, coords, nodeWeights, algo, settings, metrics);
+		partition = ITI::Wrappers<IndexType,ValueType>::zoltanPartition ( graph, coords, nodeWeights, nodeWeightsUse, algo, settings, metrics);
 	}else{
 		std::cout<< "Tool "<< tool <<" not supported.\nAborting..."<<std::endl;
 		return -1;

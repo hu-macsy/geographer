@@ -92,128 +92,128 @@ std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method)
 
 int main(int argc, char** argv) {
 	using namespace boost::program_options;
-        options_description desc("Supported options");
-        
-        struct Settings settings;
-        //ITI::Format ff = ITI::Format::METIS;
-		ITI::Format coordFormat;
-        std::string blockSizesFile;
-        bool writePartition = false;
-        
-		//std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
-		
-        desc.add_options()
-            ("help", "display options")
-            ("version", "show version")
-            ("graphFile", value<std::string>(), "read graph from file")
-            ("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
-            ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
-			("coordFormat",  value<ITI::Format>(&coordFormat), "format of coordinate file")
-			
-            ("generate", "generate random graph. Currently, only uniform meshes are supported.")
-            ("dimensions", value<IndexType>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
-            ("numX", value<IndexType>(&settings.numX)->default_value(settings.numX), "Number of points in x dimension of generated graph")
-            ("numY", value<IndexType>(&settings.numY)->default_value(settings.numY), "Number of points in y dimension of generated graph")
-            ("numZ", value<IndexType>(&settings.numZ)->default_value(settings.numZ), "Number of points in z dimension of generated graph")
-            ("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
-			
-            ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
-			
-            ("minBorderNodes", value<IndexType>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
-            ("stopAfterNoGainRounds", value<IndexType>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
-            ("initialPartition",  value<InitialPartitioningMethods> (&settings.initialPartition), "Parameter for different initial partition: 0 or 'SFC' for the hilbert space filling curve, 1 or 'Pixel' for the pixeled method, 2 or 'Spectral' for spectral parition, 3 or 'KMeans' for Kmeans and 4 or 'MultiSection' for Multisection")
-            ("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
-            ("cutsPerDim", value<std::vector<IndexType>>(&settings.cutsPerDim)->multitoken(), "If msOption=2, then provide d values that define the number of cuts per dimension.")
-            ("pixeledSideLen", value<IndexType>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
-            ("minGainForNextGlobalRound", value<IndexType>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
-            ("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
-            ("useDiffusionTieBreaking", value<bool>(&settings.useDiffusionTieBreaking)->default_value(settings.useDiffusionTieBreaking), "Tuning Parameter: Use diffusion to break ties in Fiduccia-Mattheyes algorithm")
-            ("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
-            ("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
-            ("multiLevelRounds", value<IndexType>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
-            ("blockSizesFile", value<std::string>(&blockSizesFile) , " file to read the block sizes for every block")
-            ("writePartition", "Writes the partition in the outFile.partition file")
-            ("outFile", value<std::string>(&settings.outFile), "write result partition into file")
-            ;
-        
-        variables_map vm;
-        store(command_line_parser(argc, argv).options(desc).run(), vm);
-        notify(vm);
-        
-        if (vm.count("help")) {
-            std::cout << desc << "\n";
-            return 0;
-        }
-        
-        if (vm.count("version")) {
-            std::cout << "Git commit " << version << std::endl;
-            return 0;
-        }
-        
-        if (vm.count("generate") && vm.count("file")) {
-            std::cout << "Pick one of --file or --generate" << std::endl;
-            return 0;
-        }
-        
-        if (vm.count("generate") && (vm["dimensions"].as<int>() != 3)) {
-            std::cout << "Mesh generation currently only supported for three dimensions" << std::endl;
-            return 0;
-        }
-        
-        if( vm.count("cutsPerDim") ){
-            SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
-            SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
-            IndexType tmpK = 1;
-            for( const auto& i: settings.cutsPerDim){
-                tmpK *= i;
-            }
-            settings.numBlocks= tmpK;
-        }
-            
-        IndexType N = -1; 		// total number of points
-        
-        writePartition = vm.count("writePartition");
-        
-        char machineChar[255];
-        std::string machine;
-        gethostname(machineChar, 255);
-        if (machineChar) {
-            machine = std::string(machineChar);
-		settings.machine = machine;
-        } else {
-            std::cout << "machine char not valid" << std::endl;
- 		machine = "machine char not valid";
-        }
-        
-        scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
-        std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
-        scai::lama::DenseVector<ValueType> nodeWeights;     // node weights
-        
-        std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
-        
-        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-		const IndexType thisPE = comm->getRank();
-        
-        /* timing information
-         */
-        std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
-        
-        if ( thisPE == 0){
-            std::string inputstring;
-            if (vm.count("graphFile")) {
-				inputstring = vm["graphFile"].as<std::string>();
-			} else if (vm.count("quadTreeFile")) {
-				inputstring = vm["quadTreeFile"].as<std::string>();
-			} else {
-				inputstring = "generate";
-			}
-			std::cout<< "commit:"<< version<<  " input:"<< inputstring << std::endl;
-		}
-
-    std::string graphFile;
+	options_description desc("Supported options");
 	
-    if (vm.count("graphFile")) {
-        if ( thisPE== 0){
+	struct Settings settings;
+	//ITI::Format ff = ITI::Format::METIS;
+	ITI::Format coordFormat;
+	std::string blockSizesFile;
+	bool writePartition = false;
+	
+	//std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+	
+	desc.add_options()
+	("help", "display options")
+	("version", "show version")
+	("graphFile", value<std::string>(), "read graph from file")
+	("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
+	("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
+	("coordFormat",  value<ITI::Format>(&coordFormat), "format of coordinate file")
+	
+	("generate", "generate random graph. Currently, only uniform meshes are supported.")
+	("dimensions", value<IndexType>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
+	("numX", value<IndexType>(&settings.numX)->default_value(settings.numX), "Number of points in x dimension of generated graph")
+	("numY", value<IndexType>(&settings.numY)->default_value(settings.numY), "Number of points in y dimension of generated graph")
+	("numZ", value<IndexType>(&settings.numZ)->default_value(settings.numZ), "Number of points in z dimension of generated graph")
+	("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
+	
+	("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
+	
+	("minBorderNodes", value<IndexType>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
+	("stopAfterNoGainRounds", value<IndexType>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
+	("initialPartition",  value<InitialPartitioningMethods> (&settings.initialPartition), "Parameter for different initial partition: 0 or 'SFC' for the hilbert space filling curve, 1 or 'Pixel' for the pixeled method, 2 or 'Spectral' for spectral parition, 3 or 'KMeans' for Kmeans and 4 or 'MultiSection' for Multisection")
+	("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
+	("cutsPerDim", value<std::vector<IndexType>>(&settings.cutsPerDim)->multitoken(), "If msOption=2, then provide d values that define the number of cuts per dimension.")
+	("pixeledSideLen", value<IndexType>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
+	("minGainForNextGlobalRound", value<IndexType>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
+	("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
+	("useDiffusionTieBreaking", value<bool>(&settings.useDiffusionTieBreaking)->default_value(settings.useDiffusionTieBreaking), "Tuning Parameter: Use diffusion to break ties in Fiduccia-Mattheyes algorithm")
+	("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
+	("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
+	("multiLevelRounds", value<IndexType>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
+	("blockSizesFile", value<std::string>(&blockSizesFile) , " file to read the block sizes for every block")
+	("writePartition", "Writes the partition in the outFile.partition file")
+	("outFile", value<std::string>(&settings.outFile), "write result partition into file")
+	;
+	
+	variables_map vm;
+	store(command_line_parser(argc, argv).options(desc).run(), vm);
+	notify(vm);
+	
+	if (vm.count("help")) {
+		std::cout << desc << "\n";
+		return 0;
+	}
+	
+	if (vm.count("version")) {
+		std::cout << "Git commit " << version << std::endl;
+		return 0;
+	}
+	
+	if (vm.count("generate") && vm.count("file")) {
+		std::cout << "Pick one of --file or --generate" << std::endl;
+		return 0;
+	}
+	
+	if (vm.count("generate") && (vm["dimensions"].as<int>() != 3)) {
+		std::cout << "Mesh generation currently only supported for three dimensions" << std::endl;
+		return 0;
+	}
+	
+	if( vm.count("cutsPerDim") ){
+		SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
+		SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
+		IndexType tmpK = 1;
+		for( const auto& i: settings.cutsPerDim){
+			tmpK *= i;
+		}
+		settings.numBlocks= tmpK;
+	}
+	
+	IndexType N = -1; 		// total number of points
+	
+	writePartition = vm.count("writePartition");
+	
+	char machineChar[255];
+	std::string machine;
+	gethostname(machineChar, 255);
+	if (machineChar) {
+		machine = std::string(machineChar);
+		settings.machine = machine;
+	} else {
+		std::cout << "machine char not valid" << std::endl;
+		machine = "machine char not valid";
+	}
+	
+	scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
+	std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
+	scai::lama::DenseVector<ValueType> nodeWeights;     // node weights
+	
+	std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
+	
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	const IndexType thisPE = comm->getRank();
+	
+	/* timing information
+	 */
+	std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
+	
+	if ( thisPE == 0){
+		std::string inputstring;
+		if (vm.count("graphFile")) {
+			inputstring = vm["graphFile"].as<std::string>();
+		} else if (vm.count("quadTreeFile")) {
+			inputstring = vm["quadTreeFile"].as<std::string>();
+		} else {
+			inputstring = "generate";
+		}
+		std::cout<< "commit:"<< version<<  " input:"<< inputstring << std::endl;
+	}
+	
+	std::string graphFile;
+	
+	if (vm.count("graphFile")) {
+		if ( thisPE== 0){
             std::cout<< "input: graphFile" << std::endl;
         }
     	graphFile = vm["graphFile"].as<std::string>();

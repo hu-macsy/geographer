@@ -32,6 +32,13 @@ namespace ITI {
 	class Repartition {
 	public:
 		
-		static scai::lama::DenseVector<ValueType> sNW(  const std::vector<scai::lama::DenseVector<ValueType> >& coordinates, const IndexType seed, const Settings settings);
+		/** Create node weights.
+		 * @param[in] coordinates The input coordinates.
+		 * @param[in] seed A random seed.
+		 * @param[in] diverg Divergence, how different are the node weigths. For 0 all weights are 1, the larger
+		 * the value more diverse the node weights.
+		 * @param[in] dimensions The dimension of the coordinates.
+		 */
+		static scai::lama::DenseVector<ValueType> sNW(  const std::vector<scai::lama::DenseVector<ValueType> >& coordinates, const IndexType seed, const ValueType diverg, const IndexType deimensions);
 	};
 }

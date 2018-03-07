@@ -268,7 +268,10 @@ int main(int argc, char** argv) {
         //unit weights
         scai::hmemo::HArray<ValueType> localWeights( rowDistPtr->getLocalSize(), 1 );
         nodeWeights.swap( localWeights, rowDistPtr );
-
+		// if usign unit weights, set flag for wrappers
+		bool nodeWeightsUse = false;
+			
+		
         if (comm->getRank() == 0) {
             std::cout << "Read " << N << " points." << std::endl;
             std::cout << "Read coordinates." << std::endl;
@@ -347,6 +350,7 @@ int main(int argc, char** argv) {
     }
     
     PRINT0("Got input");
+	
     //------------------------------------------------------------------------------------------
     
     scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
@@ -504,10 +508,11 @@ int main(int argc, char** argv) {
 			
 			int parMetisGeom = 0; 		//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
 			settings.repeatTimes = 1;
+			bool nodeWeightsUse = false;
 			
 			beforeInitialTime =  std::chrono::system_clock::now();
 			// get parMetis parition
-			partition = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coordinates, nodeWeights, parMetisGeom, settings, metrics);
+			partition = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coordinates, nodeWeights, nodeWeightsUse, parMetisGeom, settings, metrics);
 			partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
 			
 			//settings.repeatTimes = repeatTimes;
@@ -518,9 +523,11 @@ int main(int argc, char** argv) {
 			settings.repeatTimes = 1;
 			//TODO: fix to get algo as an input parameter
 			std::string zoltanAlgo = "rcb";
+			bool nodeWeightsUse = false;
+			
 			beforeInitialTime =  std::chrono::system_clock::now();
 			// get zoltan parition
-			partition = ITI::Wrappers<IndexType,ValueType>::zoltanPartition ( graph, coordinates, nodeWeights, zoltanAlgo, settings, metrics);
+			partition = ITI::Wrappers<IndexType,ValueType>::zoltanPartition ( graph, coordinates, nodeWeights, nodeWeightsUse, zoltanAlgo, settings, metrics);
 			partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
 			
 			break;

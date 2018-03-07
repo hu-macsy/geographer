@@ -49,6 +49,9 @@ std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly( const IndexT
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCenters(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights);
 
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<ValueType>> findLocalCenters(	const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights);
+
 template<typename IndexType, typename ValueType, typename Iterator>
 std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<IndexType> &partition, const IndexType k,
 		const Iterator firstIndex, const Iterator lastIndex,
@@ -76,9 +79,13 @@ DenseVector<IndexType> getPartitionWithSFCCoords(
 //TODO: add block weights as an input param?: const std::vector<IndexType> &blockSizes
 
 
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings);
+
 /**
  * Implementations
  */
+
 template<typename ValueType>
 std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates) {
 	const int dim = coordinates.size();
@@ -93,16 +100,15 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 
 //wrapper for initial partitioning
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights,
-		const std::vector<IndexType> &blockSizes, const Settings settings) {
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const Settings settings) {
 	std::vector<ValueType> minCoords, maxCoords;
 	std::tie(minCoords, maxCoords) = getLocalMinMaxCoords(coordinates);
 	for(int d=0; d<settings.dimensions; d++){
 		SCAI_ASSERT_NE_ERROR( minCoords[d], maxCoords[d], "min=max for dimension "<< d << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
 	}
-	//std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
+	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
 	//TODO: why <IndexType,ValueType> is needed here??
-	std::vector<std::vector<ValueType> > centers = KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>( k, maxCoords, settings);
+	//std::vector<std::vector<ValueType> > centers = KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>( k, maxCoords, settings);
 
 	
 	return computePartition(coordinates, k, nodeWeights, blockSizes, centers, settings);
@@ -119,6 +125,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<std::vector<ValueType> > initialCenters = findCenters(coordinates, previous, k,	indices.begin(), indices.end(), nodeWeights);
 	return computePartition(coordinates, k, nodeWeights, blockSizes, initialCenters, settings);
 }
+
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights,
@@ -193,8 +200,8 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
 	if (localN > minNodes) {
 		std::chrono::time_point<std::chrono::high_resolution_clock> reorderStart = std::chrono::high_resolution_clock::now();
-		ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
-		//localIndices = ITI::GraphUtils::indexReorderCantor(localN);
+		//ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
+		localIndices = ITI::GraphUtils::indexReorderCantor(localN);
 		std::chrono::duration<ValueType,std::ratio<1>> reorderTime = std::chrono::high_resolution_clock::now() - reorderStart;
 		ValueType time = comm->max( reorderTime.count() );
 		PRINT0("\tmax time to reorder indices= " << time);
@@ -323,8 +330,8 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		if (comm->getRank() == 0) {
 			std::cout << "i: " << iter << ", delta: " << delta << std::endl;
 		}
-if(delta==0)
-	break;
+		if(delta==0)
+			break;
 		iter++;
 	} while (iter < samplingRounds || (iter < maxIterations && (delta > threshold || !balanced)));
 	return result;

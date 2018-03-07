@@ -64,7 +64,7 @@ int main(int argc, char** argv) {
 
 	struct Settings settings;
     //int parMetisGeom = 0;			//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
-    bool writePartition = false;
+    //bool writePartition = false;
 	bool storeInfo = true;
 	ITI::Format coordFormat;
 	std::string outPath;
@@ -97,8 +97,8 @@ int main(int argc, char** argv) {
 		("graphName", value<std::string>(&graphName), "this is needed to create the correct outFile for every tool. Must be the graphFile with the path and the ending")
 		
 		("storeInfo", value<bool>(&storeInfo), "is this is false then no outFile is produced")
-        ("writePartition", "Writes the partition in the outFile.partition file")
-        ("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
+        //("writePartition", "Writes the partition in the outFile.partition file")
+        //("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 		;
         
 	variables_map vm;
@@ -107,8 +107,8 @@ int main(int argc, char** argv) {
 	notify(vm);
 
     //parMetisGeom = vm.count("geom");
-    writePartition = vm.count("writePartition");
-	bool writeDebugCoordinates = settings.writeDebugCoordinates;
+    //writePartition = vm.count("writePartition");
+	//bool writeDebugCoordinates = settings.writeDebugCoordinates;
 	
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType thisPE = comm->getRank();
@@ -132,7 +132,7 @@ int main(int argc, char** argv) {
         settings.numBlocks = comm->getSize();
     }
 
-    if( !vm.count("outPath") ){
+    if( (!vm.count("outPath")) and storeInfo ){
 		std::cout<< "Must give parameter outPath to store metrics.\nAborting..." << std::endl;
 		return -1;
 	}
@@ -257,6 +257,8 @@ int main(int argc, char** argv) {
 		
 		// uniform node weights
 		scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
+		// if usign unit weights, set flag for wrappers
+		bool nodeWeightsUse = false;
 		
 		// if graph is too big, repeat less times to avoid memory and time problems
 		if( N>std::pow(2,29) ){
@@ -289,7 +291,8 @@ int main(int argc, char** argv) {
 			else if ( thisTool=="parMetisGeom"){	parMetisGeom = 1;	}
 			else if	( thisTool=="parMetisSfc"){		parMetisGeom = 2;	}
 			
-			partition = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coords, nodeWeights, parMetisGeom, settings, metrics);
+			partition = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coords, nodeWeights, nodeWeightsUse, parMetisGeom, settings, metrics);
+
 		}else if (thisTool.substr(0,6)=="zoltan"){
 			std::string algo;
 			if		( thisTool=="zoltanRcb"){	algo = "rcb";	}
@@ -297,7 +300,7 @@ int main(int argc, char** argv) {
 			else if ( thisTool=="zoltanMJ"){	algo = "multijagged";}
 			else if ( thisTool=="zoltanHsfc"){	algo = "hsfc";	}
 			
-			partition = ITI::Wrappers<IndexType,ValueType>::zoltanPartition ( graph, coords, nodeWeights, algo, settings, metrics);
+			partition = ITI::Wrappers<IndexType,ValueType>::zoltanPartition ( graph, coords, nodeWeights, nodeWeightsUse, algo, settings, metrics);
 		}else{
 			std::cout<< "Tool "<< thisTool <<" not supported.\nAborting..."<<std::endl;
 			return -1;

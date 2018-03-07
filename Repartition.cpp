@@ -1,8 +1,8 @@
 /*
- * ParcoReport.cpp
+ * Repartition.cpp
  *
- *  Created on: 25.10.2016
- *      Author: moritzl
+ *  Created on: 25.02.18
+ *      Author: harry
  */
 
 #include <assert.h>
@@ -35,12 +35,12 @@ namespace ITI {
 //class Repartition{
 	
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<ValueType> Repartition<IndexType,ValueType>::sNW( const std::vector<DenseVector<ValueType> >& coordinates, const IndexType seed, const Settings settings){
+scai::lama::DenseVector<ValueType> Repartition<IndexType,ValueType>::sNW( const std::vector<DenseVector<ValueType> >& coordinates, const IndexType seed, const ValueType diverg, const IndexType dimensions){
 	
 	const scai::dmemo::DistributionPtr distPtr = coordinates[0].getDistributionPtr();
 	const scai::dmemo::CommunicatorPtr comm = distPtr->getCommunicatorPtr();
 	const IndexType localN = distPtr->getLocalSize();
-	const IndexType dimensions = settings.dimensions;
+	//const IndexType dimensions = settings.dimensions;
 	
 	
 	//1- create objects based on some input param
@@ -49,8 +49,6 @@ scai::lama::DenseVector<ValueType> Repartition<IndexType,ValueType>::sNW( const 
 	
 	//WARNING: does this always produces the same sequence of numbers for all PEs?
 	std::default_random_engine generator( seed );
-	
-	srand( seed );
 	
 	std::vector<ValueType> maxCoords(dimensions);
 	
@@ -61,7 +59,7 @@ scai::lama::DenseVector<ValueType> Repartition<IndexType,ValueType>::sNW( const 
 		std::uniform_real_distribution<ValueType> dist( 0, maxCoords[d]);
 		center[d] = dist( generator );
 		//center[d] = maxCoords[d]/2.0;
-PRINT(*comm << ": cent["<< d <<"]= " << center[d]);
+//PRINT(*comm << ": cent["<< d <<"]= " << center[d]);
 		
 	}
 
@@ -94,7 +92,7 @@ PRINT(*comm << ": cent["<< d <<"]= " << center[d]);
 		for(IndexType i=0; i<localN; i++){
 			point = localPoints[i];
 			ValueType distance = aux<IndexType,ValueType>::pointDistanceL2(center, point);
-			ValueType normDist  = distance/maxThres;
+			ValueType normDist = distance/maxThres;
 			//reverse distance and set as weight but crop so weights is >1 and <2
 			/*
 			if( distance>thresholdTop ){
@@ -105,7 +103,7 @@ PRINT(*comm << ": cent["<< d <<"]= " << center[d]);
 				wWeights[i]= distance;
 			}
 			*/
-			wWeights[i]= 2.0/(1+normDist);
+			wWeights[i]= std::pow(2.0/(1+normDist), diverg );
 //PRINT(*comm << ": " << wWeights[i] );
 		}
 	}

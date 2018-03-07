@@ -289,7 +289,7 @@ inline void printMetricsShort(struct Metrics metrics, std::ostream& out){
 	
 	std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
 	std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
-	out << "date and time: " << std::ctime(&timeNow) << std::endl;
+	out << "date and time: " << std::ctime(&timeNow); //<< std::endl;
 	out << "numBlocks= " << metrics.numBlocks << std::endl;
 	out << "gather" << std::endl;
 	out << "timeTotal finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm" << std::endl;

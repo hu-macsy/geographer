@@ -229,12 +229,14 @@ int main(int argc, char** argv) {
 	
     // uniform node weights
     scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
-	
+	// if usign unit weights, set flag for wrappers
+	bool nodeWeightsUse = false;
+		
 	settings.repeatTimes = 5;
 	
-	DenseVector<IndexType> partitionKway = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coords, nodeWeights, parMetisGeom, settings, metrics);
+	DenseVector<IndexType> partitionKway = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coords, nodeWeights, nodeWeightsUse, parMetisGeom, settings, metrics);
 	
-	//DenseVector<IndexType> partitionKway = ITI::Wrappers<IndexType,ValueType>::zoltanPartition ( graph, coords, nodeWeights, zoltanAlgo, settings, metrics);
+	//DenseVector<IndexType> partitionKway = ITI::Wrappers<IndexType,ValueType>::zoltanPartition ( graph, coords, nodeWeights, nodeWeightsUse, zoltanAlgo, settings, metrics);
 	
 	//metrics.timeFinalPartition = avgKwayTime;
 	PRINT0("time for partition: " <<  metrics.timeFinalPartition );
