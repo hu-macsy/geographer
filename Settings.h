@@ -82,6 +82,10 @@ struct Settings{
     bool writeInFile = false;
     bool storeInfo = false;
     
+    //calculate expensive performance metrics?
+    bool computeDiameter = false;
+    IndexType maxDiameterRounds = 10;
+
     //
     // print settings
     //

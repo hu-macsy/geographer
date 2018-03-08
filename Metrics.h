@@ -158,8 +158,7 @@ struct Metrics{
         const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
         const IndexType localN = dist->getLocalSize();
 
-        const bool computeDiameter = false;//set to true to compute diameter
-        if (settings.numBlocks == comm->getSize() && computeDiameter) {
+        if (settings.numBlocks == comm->getSize() && settings.computeDiameter) {
             //maybe possible to compute diameter
             bool allLocalNodesInSameBlock;
             {
@@ -168,7 +167,11 @@ struct Metrics{
                 allLocalNodesInSameBlock = ((*result.first) == (*result.second));
             }
             if (comm->all(allLocalNodesInSameBlock)) {
-                IndexType localDiameter = ITI::GraphUtils::getLocalBlockDiameter<IndexType, ValueType>(graph, localN/2, 0, 0);
+                IndexType maxRounds = settings.maxDiameterRounds;
+                if (maxRounds < 0) {
+                    maxRounds = localN;
+                }
+                IndexType localDiameter = ITI::GraphUtils::getLocalBlockDiameter<IndexType, ValueType>(graph, localN/2, 0, 0, maxRounds);
                 maxBlockDiameter = comm->max(localDiameter);
                 avgBlockDiameter = comm->sum(localDiameter) / comm->getSize();
             }

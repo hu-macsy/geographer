@@ -133,13 +133,13 @@ std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &gr
 }
 
 template<typename IndexType, typename ValueType>
-IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, IndexType u, IndexType lowerBound, const IndexType k)
+IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const IndexType u, IndexType lowerBound, const IndexType k, IndexType maxRounds)
 {
     const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
 
     const IndexType localN = inputDist->getLocalSize();
-    std::cout << "Starting Diameter calculation..." << std::endl;
+    //std::cout << "Starting Diameter calculation..." << std::endl;
     assert(u < localN);
     assert(u >= 0);
     std::vector<IndexType> ecc(localN);
@@ -158,8 +158,11 @@ IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, IndexTy
     IndexType i = ecc[u];
     lowerBound = std::max(ecc[u], lowerBound);
     IndexType upperBound = 2*ecc[u];
+    if (maxRounds == -1) {
+        maxRounds = localN;
+    }
 
-    while (upperBound - lowerBound > k) {
+    while (upperBound - lowerBound > k && ecc[u] - i < maxRounds) {
         assert(i > 0);
         // get max eccentricity in fringe i
         IndexType B_i = 0;
@@ -178,7 +181,7 @@ IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, IndexTy
         }   else {
             upperBound = 2*(i-1);
         }
-        std::cout << "proc " << comm->getRank() << ", i: " << i << ", lb:" << lowerBound << ", ub:" << upperBound << std::endl;
+        //std::cout << "proc " << comm->getRank() << ", i: " << i << ", lb:" << lowerBound << ", ub:" << upperBound << std::endl;
         i -= 1;
     }
     return lowerBound;
@@ -1107,7 +1110,7 @@ scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vec
 
 template IndexType getFarthestLocalNode(const CSRSparseMatrix<ValueType> &graph, std::vector<IndexType> seedNodes);
 template std::vector<IndexType> localBFS(const CSRSparseMatrix<ValueType> &graph, IndexType u);
-template IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, IndexType u, IndexType lowerBound, const IndexType k);
+template IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const IndexType u, IndexType lowerBound, const IndexType k, IndexType maxRounds);
 template ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool weighted);
 template ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<ValueType> &nodeWeights);
 template scai::dmemo::Halo buildNeighborHalo<IndexType,ValueType>(const CSRSparseMatrix<ValueType> &input);
