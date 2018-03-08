@@ -411,6 +411,8 @@ int main(int argc, char** argv) {
 			
 			partition = ITI::Wrappers<IndexType,ValueType>::zoltanRepartition ( graph, coords, nodeWeights, nodeWeightsUse, algo, settings, metrics);
 		}else if( thisTool=="geoKmeans" ){
+			settings.minSamplingNodes = std::min( IndexType(2000), minLocalN/16 );
+			PRINT0("samplingNodes= "<< settings.minSamplingNodes );
 			std::chrono::time_point<std::chrono::high_resolution_clock> repartStart = std::chrono::high_resolution_clock::now();
 			partition = ITI::KMeans::computeRepartition<IndexType,ValueType>( coords, nodeWeights, settings);
 			//partition = ITI::KMeans::computeRepartition( coords, nodeWeights, settings);
@@ -441,7 +443,7 @@ int main(int argc, char** argv) {
 		
 		
 		if( thisPE==0 ){
-			std::cout << "Finished tool" << thisTool << std::endl;
+			std::cout << "Finished tool " << thisTool << std::endl;
 			if( vm.count("generate") ){
 				std::cout << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon;
 			}else{

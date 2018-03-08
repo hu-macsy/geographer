@@ -170,7 +170,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
 			}
 			*/
 			integerIndex = 0;
-			for (IndexType i = 0; i < recursionDepth; i++) {
+			for (IndexType j = 0; j < recursionDepth; j++) {
 				int subSquare;
 				//two dimensions only, for now
 				if (scaledPoint[0] < 0.5) {
@@ -278,7 +278,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
 			}
 			*/
 			integerIndex = 0;
-			for (IndexType i = 0; i < recursionDepth; i++) {
+			for (IndexType j = 0; j < recursionDepth; j++) {
 				int subSquare;
 				if (z < 0.5) {
 					if (x < 0.5) {

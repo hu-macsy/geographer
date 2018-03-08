@@ -17,6 +17,7 @@ initialExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/geomDiamerisi
 parMetisExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/parMetisExe"
 competitorsExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/competitorsExe"
 allCompetitorsExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/allCompetitorsExe"
+repartAllExe =  "/home/hpc/pr87si/di36qin/parco-repart/Implementation/repartitionWithAll"
 
 # other paths
 basisPath = os.path.expanduser("~/parco-repart/Implementation/experiments/")
@@ -29,7 +30,7 @@ METRIC_VALUES = [ 'seconds', 'number of edges', 'ratio', 'number of vertices', '
 NUM_METRICS = len(METRIC_NAMES)
 
 # global settings for all 
-epsilon = 0.01
+epsilon = 0.03
 
 
 class experiment:

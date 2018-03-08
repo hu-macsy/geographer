@@ -134,7 +134,7 @@ def submitAllCompetitors( exp ):
 		params += " --dimensions=" + exp.dimension
 		params += " --fileFormat="+ exp.fileFormat
 		params += " --outPath=" + toolsPath +"/"
-		params += " --graphName=" + graphName + "Epsilon01"
+		params += " --graphName=" + graphName 
 		
 		if exp.coordFormat!=-1:
 			params += " --coordFormat="+ str(exp.coordFormat)
@@ -155,6 +155,50 @@ def submitAllCompetitors( exp ):
 
 #---------------------------------------------------------------------------------------------		
 
+def submitAllRepart( exp ):
+	for i in range(0,exp.size):
+		
+		graphName = os.path.basename(exp.graphs[i]).split('.')[0]
+		submitFlag = 0
+		
+		for tool in allCompetitors:
+			if not os.path.exists( os.path.join( toolsPath, tool) ):
+				print("WARNING: Output directory " + os.path.join( toolsPath, tool) +" does not exist, experiment NOT submited.\n Aborting...")
+				exit(-1)
+			#outFile = os.path.join( toolsPath, tool, graphName)
+			outFile = outFileString( exp, i, tool)
+		
+			if os.path.exists( outFile ):
+				submitFlag += 1
+		'''
+		if submitFlag == NUM_COMPETITORS:
+			print("\t\tWARNING: The graph: " + exp.graphs[i] + " for k=" + str(exp.k[i]) +" has an outFile for all tools, job NOT submitted.")
+			continue
+		'''	
+		params = " --epsilon=" + str(epsilon)			
+		params += " --dimensions=" + exp.dimension
+		params += " --fileFormat="+ exp.fileFormat
+		params += " --outPath=" + toolsPath +"/"
+		params += " --graphName=" + graphName 
+		
+		if exp.coordFormat!=-1:
+			params += " --coordFormat="+ str(exp.coordFormat)
+		
+		if  exp.coordPaths is not None and len( exp.coordPaths)>0:
+			if exp.coordPaths[i]!="-":
+				params += " --coordFile=" + exp.coordPaths[i]
+		
+		if not os.path.exists( repartAllExe):
+			print("Executable " + repartAllExe + " does not exist.\nSkiping job submission")
+			return -1
+
+		commandString = repartAllExe + " --graphFile " + exp.paths[i] + params
+		print(commandString)
+		submitFilename = "llsub-"+ os.path.basename(exp.graphs[i]).split('.')[0]+"_k"+str(exp.k[i])+"_repartAll.cmd"
+		submitfile = createLLSubmitFile( os.path.join( toolsPath, "tmp") , submitFilename, commandString, "00:20:00", int(exp.k[i]) )
+		call(["llsubmit", submitfile])
+
+#---------------------------------------------------------------------------------------------	
 def submitCompetitor(exp, tool):	
 	
 	for i in range(0,exp.size):
@@ -300,6 +344,7 @@ if __name__=="__main__":
 		for e in wantedExp:	
 			exp = allExperiments[e]
 			submitAllCompetitors( exp )	
+			#submitAllRepart( exp )
 			
 		exit(0)
 		
