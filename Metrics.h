@@ -158,7 +158,8 @@ struct Metrics{
         const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
         const IndexType localN = dist->getLocalSize();
 
-        if (settings.numBlocks == comm->getSize()) {
+        const bool computeDiameter = false;//set to true to compute diameter
+        if (settings.numBlocks == comm->getSize() && computeDiameter) {
             //maybe possible to compute diameter
             bool allLocalNodesInSameBlock;
             {
