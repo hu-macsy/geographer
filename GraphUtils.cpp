@@ -139,7 +139,9 @@ IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const I
     const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
 
     const IndexType localN = inputDist->getLocalSize();
-    //std::cout << "Starting Diameter calculation..." << std::endl;
+    if (comm->getRank() == 0) {
+        std::cout << "Starting Diameter calculation..." << std::endl;
+    }
     assert(u < localN);
     assert(u >= 0);
     std::vector<IndexType> ecc(localN);
