@@ -134,6 +134,10 @@ struct Settings{
     bool storeInfo = false;
 	int repeatTimes = 1;
     
+    //calculate expensive performance metrics?
+    bool computeDiameter = false;
+    IndexType maxDiameterRounds = 10;
+
     //
     // print settings
     //

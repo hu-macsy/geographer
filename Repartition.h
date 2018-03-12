@@ -39,6 +39,6 @@ namespace ITI {
 		 * the value more diverse the node weights.
 		 * @param[in] dimensions The dimension of the coordinates.
 		 */
-		static scai::lama::DenseVector<ValueType> sNW(  const std::vector<scai::lama::DenseVector<ValueType> >& coordinates, const IndexType seed, const ValueType diverg, const IndexType deimensions);
+		static scai::lama::DenseVector<ValueType> sNW(  const std::vector<scai::lama::DenseVector<ValueType> >& coordinates, const IndexType seed, const ValueType diverg, const IndexType dimensions);
 	};
 }

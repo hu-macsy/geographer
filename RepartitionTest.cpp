@@ -58,8 +58,9 @@ TEST_F(RepartitionTest, testNodeWeights){
 	
 	struct Settings settings;
 	settings.dimensions = dimensions;
-	
-	scai::lama::DenseVector<ValueType> nodeWeights = Repartition<IndexType,ValueType>::sNW( coords, 0, settings);
+	IndexType seed =0;
+	IndexType divergence = 1;
+	scai::lama::DenseVector<ValueType> nodeWeights = Repartition<IndexType,ValueType>::sNW( coords, seed, divergence, dimensions);
 }
 //-----------------------------------------------------------------------------------------------------
 
