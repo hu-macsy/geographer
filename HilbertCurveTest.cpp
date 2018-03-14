@@ -46,7 +46,7 @@ TEST_P(HilbertCurveTest, testHilbertIndexUnitSquare_Local) {
   ASSERT_GE(dimensions, 2);
   ASSERT_LE(dimensions, 3);
 
-  const IndexType recursionDepth = 7;
+  const IndexType recursionDepth = 11;
   IndexType N;
   
   std::vector<ValueType> maxCoords(dimensions);
@@ -73,16 +73,17 @@ TEST_P(HilbertCurveTest, testHilbertIndexUnitSquare_Local) {
         }
     }
   } else {
-    N = 7;
-        convertedCoords = {
-    {0.1, 0.1, 0.13},
-    {0.1, 0.61, 0.36},
-    {0.7, 0.7, 0.35},
-    {0.65, 0.41, 0.71},
-    {0.4, 0.13, 0.88},
-    {0.2, 0.11, 0.9},
-    {0.1, 0.1, 0.95}
-  };
+        N = 7;
+            convertedCoords = {
+        {0.1, 0.1, 0.13},
+        {0.1, 0.61, 0.36},
+        {0.7, 0.7, 0.35},
+        {0.65, 0.41, 0.71},
+        {0.4, 0.13, 0.88},
+        {0.2, 0.11, 0.9},
+        {0.1, 0.1, 0.95}
+      };
+      maxCoords = {1.0, 1.0, 1.0};
   }
     
   EXPECT_EQ(convertedCoords.size(), N);
@@ -109,7 +110,7 @@ TEST_P(HilbertCurveTest, testHilbertIndexUnitSquare_Local) {
     scai::hmemo::ReadAccess<ValueType> rPoint(point.getLocalValues());
     ASSERT_EQ(dimensions, rPoint.size());
     for (IndexType d = 0; d < dimensions; d++) {
-      EXPECT_NEAR(rPoint[d], convertedCoords[i][d], 0.001);
+      EXPECT_NEAR(rPoint[d]*(maxCoords[d] - minCoords[d])+minCoords[d], convertedCoords[i][d], 0.001);
     }
   }
   
