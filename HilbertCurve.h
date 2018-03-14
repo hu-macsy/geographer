@@ -69,7 +69,7 @@ namespace ITI {
 			*
 			* @return A point in the unit square [0,1]^2.
 			*/
-			static DenseVector<ValueType> Hilbert2DIndex2Point(ValueType index, IndexType recursionDepth);
+			static std::vector<ValueType> Hilbert2DIndex2Point(ValueType index, IndexType recursionDepth);
 
 			/**
 			* Given an index between 0 and 1 returns a point in 3 dimensions along the hilbert curve based on
@@ -79,7 +79,7 @@ namespace ITI {
 			*
 			* @return A point in the unit cube [0,1]^3
 			*/
-			static DenseVector<ValueType> Hilbert3DIndex2Point(ValueType index, IndexType recursionDepth);
+			static std::vector<ValueType> Hilbert3DIndex2Point(ValueType index, IndexType recursionDepth);
 
 	};
 }//namespace ITI

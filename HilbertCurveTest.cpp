@@ -100,17 +100,16 @@ TEST_P(HilbertCurveTest, testHilbertIndexUnitSquare_Local) {
 
   //recover into points, check for nearness
   for (IndexType i = 0; i < N; i++) {
-    DenseVector<ValueType> point(dimensions,0);
+    std::vector<ValueType> point(dimensions,0);
     if (dimensions == 2) {
       point = HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point( indices[i], recursionDepth);
     } else {
       point = HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point( indices[i], recursionDepth);
     }
 
-    scai::hmemo::ReadAccess<ValueType> rPoint(point.getLocalValues());
-    ASSERT_EQ(dimensions, rPoint.size());
+    ASSERT_EQ(dimensions, point.size());
     for (IndexType d = 0; d < dimensions; d++) {
-      EXPECT_NEAR(rPoint[d]*(maxCoords[d] - minCoords[d])+minCoords[d], convertedCoords[i][d], 0.001);
+      EXPECT_NEAR(point[d]*(maxCoords[d] - minCoords[d])+minCoords[d], convertedCoords[i][d], 0.001);
     }
   }
   
@@ -125,7 +124,7 @@ TEST_P(HilbertCurveTest, testInverseHilbertIndex_Local) {
   
   ValueType divisor=16;
   for(int i=0; i<divisor; i++){
-    DenseVector<ValueType> point(dimensions, 0);
+    std::vector<ValueType> point(dimensions, 0);
     if (dimensions == 2) {
       point = HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point( double(i)/divisor, recursionDepth);
     } else {
@@ -134,10 +133,9 @@ TEST_P(HilbertCurveTest, testInverseHilbertIndex_Local) {
 
     ASSERT_EQ(dimensions, point.size());
 
-    scai::hmemo::ReadAccess<ValueType> rPoint(point.getLocalValues());
     for (IndexType d = 0; d < dimensions; d++) {
-      EXPECT_GE(rPoint[d], 0);
-      EXPECT_LE(rPoint[d], 1);
+      EXPECT_GE(point[d], 0);
+      EXPECT_LE(point[d], 1);
     }
   }
     
