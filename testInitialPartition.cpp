@@ -131,6 +131,8 @@ int main(int argc, char** argv) {
 	("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
 	("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
 	("multiLevelRounds", value<IndexType>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
+	
+	("computeDiameter", value<bool>(&settings.computeDiameter)->default_value(true), "Compute Diameter of resulting block files.")
 	("blockSizesFile", value<std::string>(&blockSizesFile) , " file to read the block sizes for every block")
 	("writePartition", "Writes the partition in the outFile.partition file")
 	("outFile", value<std::string>(&settings.outFile), "write result partition into file")
@@ -173,6 +175,8 @@ int main(int argc, char** argv) {
 	IndexType N = -1; 		// total number of points
 	
 	writePartition = vm.count("writePartition");
+	
+	//settings.computeDiameter = vm.count("computeDiameter");
 	
 	char machineChar[255];
 	std::string machine;

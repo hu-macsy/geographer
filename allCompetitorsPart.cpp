@@ -96,6 +96,7 @@ int main(int argc, char** argv) {
 		("outPath", value<std::string>(&outPath), "write result partition into file")
 		("graphName", value<std::string>(&graphName), "this is needed to create the correct outFile for every tool. Must be the graphFile with the path and the ending")
 		
+		("computeDiameter", value<bool>(&settings.computeDiameter)->default_value(true), "Compute Diameter of resulting block files.")
 		("storeInfo", value<bool>(&storeInfo), "is this is false then no outFile is produced")
         //("writePartition", "Writes the partition in the outFile.partition file")
         //("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")

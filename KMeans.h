@@ -339,8 +339,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		if (comm->getRank() == 0) {
 			std::cout << "i: " << iter << ", delta: " << delta << std::endl;
 		}
-		if(delta==0)
-			break;
+
 		iter++;
 	} while (iter < samplingRounds || (iter < maxIterations && (delta > threshold || !balanced)));
 	return result;

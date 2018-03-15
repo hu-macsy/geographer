@@ -101,7 +101,7 @@ std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &gr
     const scai::hmemo::ReadAccess<IndexType> localIa(localStorage.getIA());
     const scai::hmemo::ReadAccess<IndexType> localJa(localStorage.getJA());
 
-    bool done = false;
+    //bool done = false;
     IndexType round = 0;
     while (!queue.empty()) {
         while (!queue.empty()) {

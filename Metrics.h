@@ -366,7 +366,7 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
 		std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
 		out << "date and time: " << std::ctime(&timeNow) << std::endl;
 		out << "numBlocks= " << metricsVec[0].numBlocks << std::endl;
-		out << "# times, input, migrAlgo, 1distr, kmeans, 2redis, prelim, localRef, total,    prel cut, finalcut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg   timeSpMV timeComm" << std::endl;
+		out << "# times, input, migrAlgo, 1distr, kmeans, 2redis, prelim, localRef, total,    prel cut, finalcut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,   max diameter , avg diameter,    timeSpMV timeComm" << std::endl;
 	}
 
 	ValueType sumMigrAlgo = 0;
@@ -388,8 +388,8 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
 	//IndexType totalBoundaryNodes = 0;
 	
 	//TODO: repalce with diameter
-	//ValueType sumMaxBorderNodesPerc = 0;
-	//ValueType sumAvgBorderNodesPerc = 0;
+	ValueType sumMaxDiameter = 0;
+	ValueType sumAvgDiameter = 0;
 
 	ValueType sumTimeSpMV = 0;
 	ValueType sumTimeComm = 0;
@@ -418,7 +418,7 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
 			<< thisMetric.maxBoundaryNodes << ", " << thisMetric.totalBoundaryNodes << ",    " \
 			<< thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << ",    ";
 			out << std::setprecision(8) << std::fixed;
-			out << thisMetric.maxBorderNodesPercent << ",  " << thisMetric.avgBorderNodesPercent<< ", " \
+			out << thisMetric.maxBlockDiameter << ",  " << thisMetric.avgBlockDiameter<< ", " \
 			<< thisMetric.timeSpMV << std::endl;
 		}
 		
@@ -437,8 +437,8 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
 		sumTotBnd += thisMetric.totalBoundaryNodes ;
 		sumMaxCommVol +=  thisMetric.maxCommVolume;
 		sumTotCommVol += thisMetric.totalCommVolume;
-		sumMaxBorderNodesPerc += thisMetric.maxBorderNodesPercent;
-		sumAvgBorderNodesPerc += thisMetric.avgBorderNodesPercent;
+		sumMaxDiameter += thisMetric.maxBlockDiameter;
+		sumAvgDiameter += thisMetric.avgBlockDiameter;
 		
 		sumTimeSpMV += thisMetric.timeSpMV;
 		sumTimeComm += thisMetric.timeComm;
@@ -463,8 +463,8 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
 			<<  ValueType(sumMaxCommVol)/numRuns<< ", " \
 			<<  ValueType(sumTotCommVol)/numRuns<< ",    ";
 			out << std::setprecision(8) << std::fixed;
-			out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
-			<< ValueType(sumAvgBorderNodesPerc)/numRuns << ", " \
+			out <<  ValueType(sumMaxDiameter)/numRuns<< ", " \
+			<< ValueType(sumAvgDiameter)/numRuns << ", " \
 			<< ValueType(sumTimeSpMV)/numRuns << ", " \
 			<< ValueType(sumTimeComm)/numRuns \
 			<< std::endl;
@@ -484,8 +484,8 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
 			<<  ValueType(sumMaxCommVol)/numRuns<< " " \
 			<<  ValueType(sumTotCommVol)/numRuns<< " ";
 			out << std::setprecision(8) << std::fixed;
-			out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< " " \
-			<<  ValueType(sumAvgBorderNodesPerc)/numRuns << " " \
+			out <<  ValueType(sumMaxDiameter)/numRuns<< " " \
+			<<  ValueType(sumAvgDiameter)/numRuns << " " \
 			<< ValueType(sumTimeSpMV)/numRuns << " " \
 			<< ValueType(sumTimeComm)/numRuns \
 			<< std::endl;        
@@ -508,7 +508,7 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
 		std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
 		out << "date and time: " << std::ctime(&timeNow) << std::endl;
 		out << "numBlocks= " << metricsVec[0].numBlocks << std::endl;
-		out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm" << std::endl;
+		out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxDiameter avgDiameter timeSpMV timeComm" << std::endl;
 	}
 
 	//ValueType sumKmeans = 0;
@@ -524,8 +524,8 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
 	IndexType sumTotCommVol = 0;
 	//IndexType maxBoundaryNodes = 0;
 	//IndexType totalBoundaryNodes = 0;
-	ValueType sumMaxBorderNodesPerc = 0;
-	ValueType sumAvgBorderNodesPerc = 0;
+	ValueType sumMaxDiameter = 0;
+	ValueType sumAvgDiameter = 0;
 	ValueType sumTimeSpMV = 0;
 	ValueType sumTimeComm = 0;
 	
@@ -569,15 +569,15 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
 		sumTotBnd += thisMetric.totalBoundaryNodes ;
 		sumMaxCommVol +=  thisMetric.maxCommVolume;
 		sumTotCommVol += thisMetric.totalCommVolume;
-		sumMaxBorderNodesPerc += thisMetric.maxBorderNodesPercent;
-		sumAvgBorderNodesPerc += thisMetric.avgBorderNodesPercent;
+		sumMaxDiameter += thisMetric.maxBlockDiameter;
+		sumAvgDiameter += thisMetric.avgBlockDiameter;
 		sumTimeSpMV += thisMetric.timeSpMV;
 		sumTimeComm += thisMetric.timeComm;
 	}
 	
 	if( comm->getRank()==0 ){
 		out << "gather" << std::endl;
-		out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm " << std::endl;
+		out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxDiameter avgDiameter timeSpMV timeComm " << std::endl;
 		
 		out << std::setprecision(2) << std::fixed;
 			//<<  ValueType(sumKmeans)/numRuns<< "  " <<  ValueType(sumLocalRef)/numRuns<< ",  "  
@@ -590,31 +590,11 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
 			<<  ValueType(sumMaxCommVol)/numRuns<< " " \
 			<<  ValueType(sumTotCommVol)/numRuns<< " ";
 			out << std::setprecision(8) << std::fixed;
-			out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< " " \
-			<< ValueType(sumAvgBorderNodesPerc)/numRuns  <<" "\
+			out <<  ValueType(sumMaxDiameter)/numRuns<< " " \
+			<< ValueType(sumAvgDiameter)/numRuns  <<" "\
 			<< ValueType(sumTimeSpMV)/numRuns << " "\
 			<< ValueType(sumTimeComm)/numRuns \
 			<< std::endl;
-		
-		
-		
-		/*
-		out <<  ValueType(sumKmeans)/numRuns<< " " \
-			<<  ValueType(sumPrelimanry)/numRuns<< " " \
-			<<  ValueType(sumLocalRef)/numRuns<< " " \
-			<<  ValueType(sumFinalTime)/numRuns<< " " \
-			<<  ValueType(sumPreliminaryCut)/numRuns<< " " \
-			<<  ValueType(sumFinalCut)/numRuns<< " " \
-			<<  ValueType(sumImbalace)/numRuns<< " " \
-			<<  ValueType(sumMaxBnd)/numRuns<< " " \
-			<<  ValueType(sumTotBnd)/numRuns<< " " \
-			<<  ValueType(sumMaxCommVol)/numRuns<< " " \
-			<<  ValueType(sumTotCommVol)/numRuns<< " ";
-			out << std::setprecision(6) << std::fixed;
-			out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< " " \
-			<<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
-			<< std::endl;        
-			*/
 	}
 	
 }
