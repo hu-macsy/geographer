@@ -353,9 +353,9 @@ DenseVector<IndexType> assignBlocks(
 	const IndexType dim = coordinates.size();
 	const scai::dmemo::DistributionPtr dist = nodeWeights.getDistributionPtr();
 	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
-	//const IndexType localN = nodeWeights.getLocalValues().size();
+//	const IndexType localN = nodeWeights.getLocalValues().size();
 	const IndexType k = targetBlockSizes.size();
-
+//PRINT(*comm << ": " << localN );
 	assert(influence.size() == k);
 
 	//compute assignment and balance
@@ -412,6 +412,7 @@ DenseVector<IndexType> assignBlocks(
 	//iterate if necessary to achieve balance
 	do
 	{
+		std::chrono::time_point<std::chrono::high_resolution_clock> balanceStart = std::chrono::high_resolution_clock::now();
 		SCAI_REGION( "KMeans.assignBlocks.balanceLoop" );
 		std::vector<IndexType> blockWeights(k,0);
 		IndexType totalComps = 0;
@@ -487,6 +488,11 @@ DenseVector<IndexType> assignBlocks(
 				}
 				blockWeights[wAssignment[i]] += rWeights[i];
 			}
+if (settings.verbose) {
+std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
+ValueType time = balanceTime.count() ;
+ std::cout<< comm->getRank()<< ": time " << time << std::endl;
+}
 			comm->synchronize();
 		}
 
@@ -569,9 +575,9 @@ DenseVector<IndexType> assignBlocks(
 			auto pair = std::minmax_element(influence.begin(), influence.end());
 			const ValueType influenceSpread = *pair.second / *pair.first;
 			auto oldprecision = std::cout.precision(3);
-			if (comm->getRank() == 0) std::cout << "Iter " << iter << ", loop: " << 100*ValueType(takenLoops) / currentLocalN << "%, average comparisons: "
+			/*if (comm->getRank() == 0)*/  std::cout << comm->getRank() <<": Iter " << iter << ", loop: " << 100*ValueType(takenLoops) / currentLocalN << "%, average comparisons: "
 					<< averageComps << ", balanced blocks: " << 100*ValueType(balancedBlocks) / k << "%, influence spread: " << influenceSpread
-					<< ", imbalance : " << imbalance << std::endl;
+					<< ", imbalance : " << imbalance <<  std::endl;
 			std::cout.precision(oldprecision);
 		}
 	} while (imbalance > settings.epsilon - 1e-12 && iter < settings.balanceIterations);

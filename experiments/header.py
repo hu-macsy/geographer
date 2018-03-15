@@ -316,7 +316,7 @@ def parseOutFileForGeographer( outFile ):
 	
 #######################################################################
 
-def outFileString( exp, i, tool):
+def outFileString( exp, i, tool, outDir):
 	if i>exp.size:
 		print("WARNING: request for experiment run " + str(i) + " but experiment " +str(exp.ID) +" has size only " +str(exp.size) )
 		return ""
@@ -328,7 +328,7 @@ def outFileString( exp, i, tool):
 	outFile = os.path.basename(exp.graphs[i]).split('.')[0] + "_k" + str(exp.k[i]) +"_"+ tool + ".info"
 	#print(outFile)
 	
-	return os.path.join( toolsPath, tool , outFile)
+	return os.path.join( outDir, tool , outFile)
 
 #######################################################################
 

@@ -109,7 +109,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
 	//TODO: why <IndexType,ValueType> is needed here??
 	//std::vector<std::vector<ValueType> > centers = KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>( k, maxCoords, settings);
-
 	
 	return computePartition(coordinates, k, nodeWeights, blockSizes, centers, settings);
 }
@@ -238,7 +237,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 
 	const IndexType maxIterations = settings.maxKMeansIterations;
 	do {
-
+		std::chrono::time_point<std::chrono::high_resolution_clock> iterStart = std::chrono::high_resolution_clock::now();
 		if (iter < samplingRounds) {
 			lastIndex = firstIndex + samples[iter];
 			std::sort(firstIndex, lastIndex);//sorting not really necessary, but increases locality
@@ -326,10 +325,16 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 				balanced = false;
 			}
 		}
-
 		if (comm->getRank() == 0) {
-			std::cout << "i: " << iter << ", delta: " << delta << std::endl;
+			std::cout << "i: " << iter << ", delta: " << delta  << std::endl;
 		}
+if (settings.verbose) {
+std::chrono::duration<ValueType,std::ratio<1>> iterTime = std::chrono::high_resolution_clock::now() - iterStart;			
+ValueType time = iterTime.count() ;
+std::cout<< "\t"<<comm->getRank() <<": " << time << std::endl;
+}
+			
+		
 		if(delta==0)
 			break;
 		iter++;

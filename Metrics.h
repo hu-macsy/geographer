@@ -197,7 +197,7 @@ struct Metrics{
 		// vector for multiplication
 		scai::lama::DenseVector<ValueType> x ( graph.getColDistributionPtr(), 1.0 );
 		scai::lama::DenseVector<ValueType> y ( graph.getRowDistributionPtr(), 0.0 );
-		graph.setCommunicationKind( scai::lama::Matrix::SyncKind::SYNCHRONOUS );
+		graph.setCommunicationKind( scai::lama::Matrix::SyncKind::ASYNCHRONOUS );
 		comm->synchronize();
 		// perfom the actual multiplication
 		std::chrono::time_point<std::chrono::system_clock> beforeSpMVTime = std::chrono::system_clock::now();

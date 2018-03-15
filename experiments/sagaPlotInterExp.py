@@ -54,8 +54,8 @@ def createInterExpPlots( wantedExp, wantedTools):
 		
 			## skip certain metrics
 			## or handle differently
-			if metricName=="imbalance":				
-				continue
+			#if metricName=="imbalance":				
+			#	continue
 			'''
 			if metricName=="timeTotal":
 				timeTmeans = getGeomMeanForMetric( metricValues, metricName, wantedTools, 0)
@@ -127,8 +127,9 @@ def createInterExpPlots( wantedExp, wantedTools):
 				plotF.write( outF2  +", k= " + str(exp.k[i]) +"\\\\")
 				
 		plotF.write("\n\\begin{figure}\n")
-		plotMeanForAllTool( geoMeanForAllExps, metricNames, numMetrics, wantedTools, plotF, "Geometric")
-		plotF.write("\\caption{Geometric mean for all metrics and all tools for different experiments:" + str(exp.ID) +" with base tool: " + wantedTools[0] +"}\n\\end{figure}\n\n")	
+		#plotMeanForAllTool( geoMeanForAllExps, metricNames, numMetrics, wantedTools, plotF, "Geometric")
+		plotBarMeanForAllTool( geoMeanForAllExps, metricNames, numMetrics, wantedTools, plotF)
+		plotF.write("\\caption{Geometric mean for all metrics and all tools for different experiments with base tool: " + wantedTools[0] +"}\n\\end{figure}\n\n")	
 		#plotF.write("\n\n\\clearpage\n\n")
 		plotF.write("\\end{document}")
 		

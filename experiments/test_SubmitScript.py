@@ -30,21 +30,21 @@ import argparse
 # choose with which tool to submit the experiments
 
 	
-def submitExp2( exp, tool ):
+def submitExp( exp, tool, outDir ):
 
 	if tool=="Geographer":
-		submitGeographer_noGather(exp, "graph")
+		submitGeographer(exp, "graph", outDir)
 	elif tool=="geoKmeans":
-		submitGeographer_noGather(exp, "geoKmeans")
+		submitGeographer(exp, "geoKmeans", outDir)
 	elif tool=="geoSfc":
-		submitGeographer_noGather(exp, "geoSfc")
+		submitGeographer(exp, "geoSfc", outDir)
 	else:
-		submitCompetitor( exp, tool)
+		submitCompetitor( exp, tool, outDir)
 
 
 #---------------------------------------------------------------------------------------------		
 
-def submitGeographer_noGather(exp, version):
+def submitGeographer(exp, version, outDir):
 		
 	for path in exp.paths:
 		if not os.path.exists( path ) :
@@ -72,7 +72,11 @@ def submitGeographer_noGather(exp, version):
 			print("Version given: " + version + " is not implemented.\nAborting...");
 			exit(-1)
 
-		outFile = outFileString( exp, i, tool)
+		if not os.path.exists( os.path.join( outDir, tool) ):
+			print("WARNING: Output directory " + os.path.join( outDir, tool) +" does not exist. Creating directory " + os.path.join( outDir, tool))
+			os.makedirs( os.path.join( outDir, tool) )
+			
+		outFile = outFileString( exp, i, tool, outDir)
 		
 		if outFile=="":
 			print( "outFile is empty for tool " + tool + " and experiment " + str(exp.ID) + "\n. Skippong job ...")
@@ -104,24 +108,26 @@ def submitGeographer_noGather(exp, version):
 		print(commandString)
 		
 		submitFilename = "llsub-"+os.path.basename(exp.graphs[i]).split('.')[0]+"_k"+str(exp.k[i])+"_"+version+".cmd"
-		submitfile = createLLSubmitFile( os.path.join( toolsPath, "tmp"), submitFilename, commandString, "00:20:00", int(exp.k[i]) )
+		submitfile = createLLSubmitFile( os.path.join( outDir, "tmp"), submitFilename, commandString, "00:20:00", int(exp.k[i]) )
 		#print( submitfile )
 		call(["llsubmit", submitfile])
 		
 #---------------------------------------------------------------------------------------------		
 
-def submitAllCompetitors( exp ):
+def submitAllCompetitors( exp, outDir):
 	for i in range(0,exp.size):
 		
 		graphName = os.path.basename(exp.graphs[i]).split('.')[0]
 		submitFlag = 0
 		
 		for tool in allCompetitors:
-			if not os.path.exists( os.path.join( toolsPath, tool) ):
-				print("WARNING: Output directory " + os.path.join( toolsPath, tool) +" does not exist, experiment NOT submited.\n Aborting...")
-				exit(-1)
-			#outFile = os.path.join( toolsPath, tool, graphName)
-			outFile = outFileString( exp, i, tool)
+			if not os.path.exists( os.path.join( outDir, tool) ):
+				print("WARNING: Output directory " + os.path.join( outDir, tool) +" does not exist. Creating directory " + os.path.join( outDir, tool))
+				os.makedirs( os.path.join( outDir, tool) )
+				#print("WARNING: Output directory " + os.path.join( outDir, tool) +" does not exist, experiment NOT submited.\n Aborting...")
+				#exit(-1)
+			#outFile = os.path.join( outDir, tool, graphName)
+			outFile = outFileString( exp, i, tool, outDir)
 		
 			if os.path.exists( outFile ):
 				submitFlag += 1
@@ -133,7 +139,7 @@ def submitAllCompetitors( exp ):
 		params = " --epsilon=" + str(epsilon)			
 		params += " --dimensions=" + exp.dimension
 		params += " --fileFormat="+ exp.fileFormat
-		params += " --outPath=" + toolsPath +"/"
+		params += " --outPath=" + outDir +"/"
 		params += " --graphName=" + graphName 
 		
 		if exp.coordFormat!=-1:
@@ -150,23 +156,23 @@ def submitAllCompetitors( exp ):
 		commandString = allCompetitorsExe + " --graphFile " + exp.paths[i] + params
 		print(commandString)
 		submitFilename = "llsub-"+ os.path.basename(exp.graphs[i]).split('.')[0]+"_k"+str(exp.k[i])+"_allCompetitors.cmd"
-		submitfile = createLLSubmitFile( os.path.join( toolsPath, "tmp") , submitFilename, commandString, "00:20:00", int(exp.k[i]) )
+		submitfile = createLLSubmitFile( os.path.join( outDir, "tmp") , submitFilename, commandString, "00:20:00", int(exp.k[i]) )
 		call(["llsubmit", submitfile])
 
 #---------------------------------------------------------------------------------------------		
 
-def submitAllRepart( exp ):
+def submitAllRepart( exp, outDir ):
 	for i in range(0,exp.size):
 		
 		graphName = os.path.basename(exp.graphs[i]).split('.')[0]
 		submitFlag = 0
 		
 		for tool in allCompetitors:
-			if not os.path.exists( os.path.join( toolsPath, tool) ):
-				print("WARNING: Output directory " + os.path.join( toolsPath, tool) +" does not exist, experiment NOT submited.\n Aborting...")
+			if not os.path.exists( os.path.join( outDir, tool) ):
+				print("WARNING: Output directory " + os.path.join( outDir, tool) +" does not exist, experiment NOT submited.\n Aborting...")
 				exit(-1)
-			#outFile = os.path.join( toolsPath, tool, graphName)
-			outFile = outFileString( exp, i, tool)
+			#outFile = os.path.join( outDir, tool, graphName)
+			outFile = outFileString( exp, i, tool, outDir)
 		
 			if os.path.exists( outFile ):
 				submitFlag += 1
@@ -178,7 +184,7 @@ def submitAllRepart( exp ):
 		params = " --epsilon=" + str(epsilon)			
 		params += " --dimensions=" + exp.dimension
 		params += " --fileFormat="+ exp.fileFormat
-		params += " --outPath=" + toolsPath +"/"
+		params += " --outPath=" + outDir +"/"
 		params += " --graphName=" + graphName 
 		
 		if exp.coordFormat!=-1:
@@ -195,24 +201,24 @@ def submitAllRepart( exp ):
 		commandString = repartAllExe + " --graphFile " + exp.paths[i] + params
 		print(commandString)
 		submitFilename = "llsub-"+ os.path.basename(exp.graphs[i]).split('.')[0]+"_k"+str(exp.k[i])+"_repartAll.cmd"
-		submitfile = createLLSubmitFile( os.path.join( toolsPath, "tmp") , submitFilename, commandString, "00:20:00", int(exp.k[i]) )
+		submitfile = createLLSubmitFile( os.path.join( outDir, "tmp") , submitFilename, commandString, "00:20:00", int(exp.k[i]) )
 		call(["llsubmit", submitfile])
 
 #---------------------------------------------------------------------------------------------	
-def submitCompetitor(exp, tool):	
+def submitCompetitor(exp, tool, outDir):	
 	
 	for i in range(0,exp.size):
 		
 		params = ""
 							
-		outFile = outFileString( exp, i, tool)
+		outFile = outFileString( exp, i, tool, outDir)
 		
 		if outFile=="":
 			print( "outFile is empty for tool " + tool + " and experiment " + str(exp.ID) + "\n. Skippong job ...")
 			return -1
 		
-		if not os.path.exists( os.path.join( toolsPath, tool) ):
-			print("WARNING: Output directory " + os.path.join( toolsPath, tool) +" does not exist, experiment NOT submited.\n Aborting...")
+		if not os.path.exists( os.path.join( outDir, tool) ):
+			print("WARNING: Output directory " + os.path.join( outDir, tool) +" does not exist, experiment NOT submited.\n Aborting...")
 			exit(-1)
 		
 		if os.path.exists( outFile ):
@@ -237,7 +243,7 @@ def submitCompetitor(exp, tool):
 		commandString = competitorsExe + " --tool " + tool + " --graphFile " + exp.paths[i] + params + " --outFile="+outFile
 
 		submitFilename = "llsub-"+ os.path.basename(exp.graphs[i]).split('.')[0]+"_k"+str(exp.k[i])+"_" + tool+".cmd"
-		submitfile = createLLSubmitFile( os.path.join( toolsPath, "tmp") , submitFilename, commandString, "00:10:00", int(exp.k[i]) )
+		submitfile = createLLSubmitFile( os.path.join( outDir, "tmp") , submitFilename, commandString, "00:10:00", int(exp.k[i]) )
 		#call(["llsubmit", submitfile])
 		
 
@@ -254,7 +260,7 @@ if __name__=="__main__":
 	parser.add_argument('--tools','-t' , type=str , nargs='*', default="Geographer", help='Name of the tools. It can be: Geographer, parMetisGraph, parMetisGeom.')
 	parser.add_argument('--configFile','-c', default="SaGa.config", help='The configuration file. ')
 	parser.add_argument('--wantedExp', '-we', type=int, nargs='*', metavar='exp', help='A subset of the experiments that will be submited.')
-	#parse.add_argument('--runDirName')
+	parser.add_argument('--outDir', '-o', type=str, help='Optional folder to store output. If none is given then the default is used as specified in the header/config file.')
 
 	args = parser.parse_args()
 	#print(args)
@@ -262,9 +268,6 @@ if __name__=="__main__":
 	wantedExp = args.wantedExp
 	configFile = args.configFile
 	wantedTools = args.tools
-
-	#if wantedTools[0]=="all":
-	#	wantedTools = allTools[1:]
 		
 	for tool in wantedTools:
 		if tool=="all":
@@ -282,6 +285,18 @@ if __name__=="__main__":
 		exit(-1)
 	else:
 		print("Collecting information from configuration file: " + configFile )
+			
+	outDir = "-"
+	
+	if args.outDir:
+		outDir = args.outDir
+		if not os.path.exists(outDir):
+			os.makedirs(outDir)
+		# this is needed to store the submit file
+		if not os.path.exists( os.path.join(outDir, "tmp") ):
+			os.makedirs(  os.path.join(outDir, "tmp")  )
+	else:
+		outDir = toolsPath
 
 	#
 	# parse config file
@@ -343,8 +358,8 @@ if __name__=="__main__":
 			
 		for e in wantedExp:	
 			exp = allExperiments[e]
-			submitAllCompetitors( exp )	
-			#submitAllRepart( exp )
+			submitAllCompetitors( exp, outDir )	
+			#submitAllRepart( exp, outDir)
 			
 		exit(0)
 		
@@ -356,18 +371,14 @@ if __name__=="__main__":
 			confirm= raw_input("Please type Y/y or N/n: ")	
 			
 		if str(confirm)=='N' or str(confirm)=='n':
-				#call( ["rm -rf", runDir] )
 				print("Not submitting experiments...")
 				continue
 				#exit(0)
-
-		# create the run directory and gather file
-		#run = getRunNumber(basisPath)
 			
 		for e in wantedExp:	
 			exp = allExperiments[e]
 
-			submitExp2( exp, tool )
+			submitExp( exp, tool, outDir )
 
 	print("Exiting submit script")
 	exit(0)
