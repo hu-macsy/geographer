@@ -207,9 +207,12 @@ int main(int argc, char** argv) {
 				//debug
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 				("verbose", "Increase output.")
-                ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
                 ("storeInfo", "Store timing and ohter metrics in file.")
                 ("writePartition", "Writes the partition in the outFile.partition file")
+                // evaluation
+                ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
+                ("computeDiameter", "Compute Diameter of resulting block files.")
+                ("maxDiameterRounds", value<IndexType>(&settings.maxDiameterRounds)->default_value(settings.maxDiameterRounds), "abort diameter algorithm after that many BFS rounds")
 				;
 
         //------------------------------------------------
@@ -320,6 +323,8 @@ int main(int argc, char** argv) {
     settings.erodeInfluence = vm.count("erodeInfluence");
     settings.tightenBounds = vm.count("tightenBounds");
     settings.manhattanDistance = vm.count("manhattanDistance");
+    settings.computeDiameter = vm.count("computeDiameter");
+
     writePartition = vm.count("writePartition");
     if( writePartition ){
         settings.writeInFile = true;

@@ -25,7 +25,16 @@ namespace ITI {
 namespace GraphUtils {
 
 template<typename IndexType, typename ValueType>
-IndexType getFarthestLocalNode(const scai::lama::CSRSparseMatrix<ValueType> graph, std::vector<IndexType> seedNodes);
+IndexType getFarthestLocalNode(const scai::lama::CSRSparseMatrix<ValueType> &graph, std::vector<IndexType> seedNodes);
+
+/**
+ * Perform a BFS on the local nodes only.
+ */
+template<typename IndexType, typename ValueType>
+std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &graph, IndexType u);
+
+template<typename IndexType, typename ValueType>
+IndexType getLocalBlockDiameter(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u, IndexType lowerBound, const IndexType k, IndexType maxRounds);
 
 /**
  * This method takes a (possibly distributed) partition and computes its global cut.

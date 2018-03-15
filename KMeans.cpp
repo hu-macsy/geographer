@@ -268,10 +268,15 @@ std::vector<std::vector<ValueType> > findCenters(
 	for (IndexType d = 0; d < dim; d++) {
 		for (IndexType j = 0; j < k; j++) {
 			ValueType weightRatio = (ValueType(weightSum[j]) / totalWeight[j]);
-			//if no points in cluster, set it to left upper corner. TODO: find better way to seed new cluster.
+
 			ValueType weightedCoord = weightSum[j] == 0 ? 0 : result[d][j] * weightRatio;
 			result[d][j] = weightedCoord;
 			assert(std::isfinite(result[d][j]));
+
+			// make empty clusters explicit
+			if (totalWeight[j] == 0) {
+			    result[d][j] = NAN;
+			}
 		}
 		comm->sumImpl(result[d].data(), result[d].data(), k, scai::common::TypeTraits<ValueType>::stype);
 	}
