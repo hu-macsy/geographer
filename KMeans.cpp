@@ -174,7 +174,7 @@ template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findLocalCenters(	const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights) {
 		
 	const IndexType dim = coordinates.size();
-	const IndexType n = coordinates[0].size();
+	//const IndexType n = coordinates[0].size();
 	const IndexType localN = coordinates[0].getLocalValues().size();
 	
 	// get sum of local weights 

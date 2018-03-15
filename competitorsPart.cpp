@@ -91,6 +91,7 @@ int main(int argc, char** argv) {
 		
 		("tool", value<std::string>(&tool), "The tool to partition with.")
         
+		("computeDiameter", value<bool>(&settings.computeDiameter)->default_value(true), "Compute Diameter of resulting block files.")
         ("writePartition", "Writes the partition in the outFile.partition file")
         ("outFile", value<std::string>(&settings.outFile), "write result partition into file")
         ("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")

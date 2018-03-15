@@ -334,8 +334,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 				balanced = false;
 			}
 		}
+
 		if (comm->getRank() == 0) {
-			std::cout << "i: " << iter << ", delta: " << delta  << std::endl;
+			std::cout << "i: " << iter << ", delta: " << delta << std::endl;
 		}
 if (settings.verbose) {
 std::chrono::duration<ValueType,std::ratio<1>> iterTime = std::chrono::high_resolution_clock::now() - iterStart;			
@@ -343,9 +344,6 @@ ValueType time = iterTime.count() ;
 std::cout<< "\t"<<comm->getRank() <<": " << time << std::endl;
 }
 			
-		
-		if(delta==0)
-			break;
 		iter++;
 	} while (iter < samplingRounds || (iter < maxIterations && (delta > threshold || !balanced)));
 	return result;
