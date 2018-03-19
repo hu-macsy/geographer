@@ -219,6 +219,7 @@ struct Metrics{
 
 	std::pair<IndexType,IndexType> getDiameter( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, struct Settings settings ){
 		
+		std::chrono::time_point<std::chrono::high_resolution_clock> diameterStart = std::chrono::high_resolution_clock::now();
 		IndexType maxBlockDiameter = 0;
 		IndexType avgBlockDiameter = 0;
 		
@@ -248,6 +249,9 @@ PRINT(*comm << ": "<< localDiameter);
 				PRINT0("\tWARNING: Not computing diameter, not all vertices are in same block everywhere");
 			}
 		}
+		std::chrono::duration<ValueType,std::ratio<1>> diameterTime = std::chrono::high_resolution_clock::now() - diameterStart; 
+		ValueType time = comm->max( diameterTime.count() );
+		PRINT0("time to get the diameter: " <<  time );
 		return std::make_pair( maxBlockDiameter, avgBlockDiameter);
 	}
 //---------------------------------------------------------------------------

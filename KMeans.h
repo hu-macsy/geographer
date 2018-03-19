@@ -233,11 +233,10 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	bool balanced = false;
 	const ValueType threshold = 0.002*diagonalLength;//TODO: take global point density into account
 
-//PRINT0("threshold= " << threshold << " , samplingRounds= " << samplingRounds);	
+	//PRINT0("threshold= " << threshold << " , samplingRounds= " << samplingRounds);	
 
 	const IndexType maxIterations = settings.maxKMeansIterations;
-	do {
-PRINT( *comm );			
+	do {		
 		std::chrono::time_point<std::chrono::high_resolution_clock> iterStart = std::chrono::high_resolution_clock::now();
 		if (iter < samplingRounds) {
 			lastIndex = firstIndex + samples[iter];
@@ -253,7 +252,7 @@ PRINT( *comm );
 
 		Settings balanceSettings = settings;
 		//balanceSettings.balanceIterations = 0;//iter >= samplingRounds ? settings.balanceIterations : 0;
-PRINT(*comm <<": " << *firstIndex << " -- " << *lastIndex );
+
 		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, balanceSettings);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
@@ -296,7 +295,7 @@ PRINT(*comm <<": " << *firstIndex << " -- " << *lastIndex );
 		const double deltaSq = delta*delta;
 		const double maxInfluence = *std::max_element(influence.begin(), influence.end());
 		//const double minInfluence = *std::min_element(influence.begin(), influence.end());
-if (settings.verbose) PRINT(*comm);	
+
 		{
 			SCAI_REGION( "KMeans.computePartition.updateBounds" );
 			for (auto it = firstIndex; it != lastIndex; it++) {
@@ -346,15 +345,18 @@ if (settings.verbose) PRINT(*comm);
 		if (comm->getRank() == 0) {
 			std::cout << "i: " << iter << ", delta: " << delta << std::endl;
 		}
-if (settings.verbose) {
-std::chrono::duration<ValueType,std::ratio<1>> iterTime = std::chrono::high_resolution_clock::now() - iterStart;			
-ValueType time = iterTime.count() ;
-std::cout<< "\t"<<comm->getRank() <<": " << time << std::endl;
-}
-			
 		iter++;
+		
+		if (settings.verbose) {
+			std::chrono::duration<ValueType,std::ratio<1>> iterTime = std::chrono::high_resolution_clock::now() - iterStart;			
+			ValueType time = iterTime.count() ;
+			std::cout<< "\t"<<comm->getRank() <<": " << time << " , balanced: "<< balanced << ", iter= "<< iter<< " , samplingRounds: " << samplingRounds;
+
+			std::cout << " , while cond: "<< (iter < samplingRounds || (iter < maxIterations && (delta > threshold || !balanced)) )  << std::endl;
+		}
+		
 	} while (iter < samplingRounds || (iter < maxIterations && (delta > threshold || !balanced)));
-PRINT( *comm );	
+
 	return result;
 }
 

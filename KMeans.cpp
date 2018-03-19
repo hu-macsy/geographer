@@ -493,11 +493,13 @@ DenseVector<IndexType> assignBlocks(
 				}
 				blockWeights[wAssignment[i]] += rWeights[i];
 			}
+/*
 if (settings.verbose) {
 std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
 ValueType time = balanceTime.count() ;
  std::cout<< comm->getRank()<< ": time " << time << std::endl;
 }
+*/
 			comm->synchronize();
 		}
 
@@ -557,7 +559,7 @@ ValueType time = balanceTime.count() ;
 				lowerBoundNextCenter[i] *= minRatio - 1e-12;//TODO: compute separate min ratio with respect to bounding box, only update that.
 			}
 		}
-if (settings.verbose) PRINT(*comm);
+
 		//update possible closest centers
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.filterCenters" );
@@ -587,7 +589,7 @@ if (settings.verbose) PRINT(*comm);
 		}
 	} while (imbalance > settings.epsilon - 1e-12 && iter < settings.balanceIterations);
 	//std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
-if (settings.verbose) PRINT(*comm);
+
 	return assignment;
 }
 
