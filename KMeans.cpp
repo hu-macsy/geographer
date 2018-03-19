@@ -622,7 +622,7 @@ PRINT(*comm<<": " << *newDistribution);
 		tmpPartition.getLocalValues()[i]= comm->getRank();
 	}
 	tmpPartition.redistribute( graph.getRowDistributionPtr() );
-	ITI::aux<IndexType,ValueType>::print2DGrid( graph, tmpPartition );
+	//ITI::aux<IndexType,ValueType>::print2DGrid( graph, tmpPartition );
 }
 	
 
