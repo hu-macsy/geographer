@@ -531,7 +531,7 @@ TEST_F (FileIOTest, testWritePartitionCentral){
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, uniformWeights, settings, metrics);
     
 
-    metrics.getMetrics( graph, partition, uniformWeights, settings);
+    metrics.getAllMetrics( graph, partition, uniformWeights, settings);
     metrics.print( std::cout );
     
     FileIO<IndexType, ValueType>::writePartitionCentral( partition, file+"_k_"+std::to_string(k)+".part");

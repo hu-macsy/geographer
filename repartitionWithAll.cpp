@@ -21,6 +21,11 @@
 
 #include <scai/dmemo/BlockDistribution.hpp>
 
+
+//WARNING and TODO: error if Wrappers.h is the last include !!
+#include "Wrappers.h"
+
+
 #include "FileIO.h"
 #include "GraphUtils.h"
 #include "KMeans.h"
@@ -28,7 +33,7 @@
 #include "MeshGenerator.h"
 #include "Repartition.h"
 #include "Settings.h"
-#include "Wrappers.h"
+
 
 
 void getImbalancedDistribution(

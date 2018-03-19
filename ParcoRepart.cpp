@@ -193,14 +193,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 if (!settings.repartition || comm->getSize() != settings.numBlocks) {
                     DenseVector<IndexType> tempResult;
                     
-                    if( settings.initialMigration == InitialPartitioningMethods::SFC){
+                    if (settings.initialMigration == InitialPartitioningMethods::SFC) {
                         tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, migrationSettings);
                         initMigrationPtr = tempResult.getDistributionPtr();
-                    } else if ( settings.initialMigration == InitialPartitioningMethods::Multisection){
+                    } else if (settings.initialMigration == InitialPartitioningMethods::Multisection) {
                         DenseVector<ValueType> convertedWeights(nodeWeights);
                         tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, migrationSettings);
                         initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
-                    } else if ( settings.initialMigration == InitialPartitioningMethods::KMeans){
+                    } else if (settings.initialMigration == InitialPartitioningMethods::KMeans) {
                         DenseVector<ValueType> convertedWeights(nodeWeights.getDistributionPtr(), 1);
                         std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );
                         tempResult = ITI::KMeans::computePartition(coordinates, migrationSettings.numBlocks, convertedWeights, migrationBlockSizes, migrationSettings);
@@ -488,7 +488,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         
         int typesize;
         MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
-        assert(typesize == sizeof(sort_pair));
+        //assert(typesize == sizeof(sort_pair)); //not valid for int_double, presumably due to padding
         
         const IndexType maxLocalN = comm->max(localN);
         std::vector<sort_pair> localPairs(maxLocalN);

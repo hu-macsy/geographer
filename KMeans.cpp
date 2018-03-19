@@ -360,7 +360,6 @@ DenseVector<IndexType> assignBlocks(
 	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 //	const IndexType localN = nodeWeights.getLocalValues().size();
 	const IndexType k = targetBlockSizes.size();
-//PRINT(*comm << ": " << localN );
 	assert(influence.size() == k);
 
 	//compute assignment and balance
@@ -493,17 +492,14 @@ DenseVector<IndexType> assignBlocks(
 				}
 				blockWeights[wAssignment[i]] += rWeights[i];
 			}
-/*
-if (settings.verbose) {
-std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
-ValueType time = balanceTime.count() ;
- std::cout<< comm->getRank()<< ": time " << time << std::endl;
-}
-*/
+			if (settings.verbose) {
+			std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
+			ValueType time = balanceTime.count() ;
+			 std::cout<< comm->getRank()<< ": time " << time << std::endl;
+			}
 			comm->synchronize();
 		}
 
-		//if (iter == settings.balanceIterations) continue;
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.blockWeightSum" );
 			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<IndexType>::stype);
@@ -630,7 +626,7 @@ PRINT(*comm<<": " << *newDistribution);
 		tmpPartition.getLocalValues()[i]= comm->getRank();
 	}
 	tmpPartition.redistribute( graph.getRowDistributionPtr() );
-	ITI::aux<IndexType,ValueType>::print2DGrid( graph, tmpPartition );
+	//ITI::aux<IndexType,ValueType>::print2DGrid( graph, tmpPartition );
 }
 	
 

@@ -254,33 +254,33 @@ int main(int argc, char** argv) {
 	}
 	int parMetisGeom=0	;
 	
-	//PRINT0(tool.substr(0,8) << " __ " << tool.substr(0,6) );
+	// TODO: use an enum type from
+	
+	ITI::Tool thisTool;
 	
 	if( tool.substr(0,8)=="parMetis"){
-		if 		( tool=="parMetisGraph"){	parMetisGeom = 0;	}
-		else if ( tool=="parMetisGeom"){	parMetisGeom = 1;	}
-		else if	( tool=="parMetisSfc"){		parMetisGeom = 2;	}
-		
-		partition = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coords, nodeWeights, nodeWeightsUse, parMetisGeom, settings, metrics);
+		if 		( tool=="parMetisGraph"){	thisTool = ITI::Tool::parMetisGraph; }
+		else if ( tool=="parMetisGeom"){	thisTool = ITI::Tool::parMetisGeom;	}
+		else if	( tool=="parMetisSfc"){		thisTool = ITI::Tool::parMetisSFC;	}
 	}else if (tool.substr(0,6)=="zoltan"){
 		std::string algo;
-		if		( tool=="zoltanRcb"){	algo = "rcb";	}
-		else if ( tool=="zoltanRib"){	algo = "rib";	}
-		else if ( tool=="zoltanMJ"){	algo = "multijagged";}
-		else if ( tool=="zoltanHsfc"){	algo = "hsfc";	}
-		
-		partition = ITI::Wrappers<IndexType,ValueType>::zoltanPartition ( graph, coords, nodeWeights, nodeWeightsUse, algo, settings, metrics);
+		if		( tool=="zoltanRcb"){	thisTool = ITI::Tool::zoltanRCB;	}
+		else if ( tool=="zoltanRib"){	thisTool = ITI::Tool::zoltanRIB;	}
+		else if ( tool=="zoltanMJ"){	thisTool = ITI::Tool::zoltanMJ;		}
+		else if ( tool=="zoltanHsfc"){	thisTool = ITI::Tool::zoltanSFC;	}
 	}else{
 		std::cout<< "Tool "<< tool <<" not supported.\nAborting..."<<std::endl;
 		return -1;
 	}
+
+	partition = ITI::Wrappers<IndexType,ValueType>::partition ( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
 	
 	PRINT0("time to convert to get the partition: " <<  metrics.timeFinalPartition );
 	
 	// partition has the the same distribution as the graph rows 
 	SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
 	
-    metrics.getMetrics( graph, partition, nodeWeights, settings );
+    metrics.getAllMetrics( graph, partition, nodeWeights, settings );
     
         
     //---------------------------------------------------------------

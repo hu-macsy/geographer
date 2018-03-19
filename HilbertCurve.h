@@ -12,8 +12,6 @@
 #include <scai/lama/Vector.hpp>
 #include <scai/dmemo/Distribution.hpp>
 
-//#include <scai/common/SCAITypes.hpp>
-
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 
 #include <assert.h>
@@ -21,9 +19,7 @@
 #include <climits>
 #include <queue>
 
-#ifndef SETTINGS_H
 #include "Settings.h"
-#endif
 
 #include "RBC/Sort/SQuick.hpp"
 
@@ -93,10 +89,11 @@ namespace ITI {
 			*
 			* @return A point in the unit square [0,1]^2.
 			*/
-			static DenseVector<ValueType> Hilbert2DIndex2Point(ValueType index, IndexType recursionDepth);
-			
-			static std::vector<ValueType> Hilbert2DIndex2PointVec(ValueType index, IndexType recursionDepth);
+			static std::vector<ValueType> Hilbert2DIndex2Point(ValueType index, IndexType recursionDepth);
 
+			static std::vector<ValueType> Hilbert2DIndex2PointVec(ValueType index, IndexType recursionDepth);
+			
+			
 			/**
 			* Given an index between 0 and 1 returns a point in 3 dimensions along the hilbert curve based on
 			* the recursion depth. Mostly for test reasons.
@@ -105,13 +102,13 @@ namespace ITI {
 			*
 			* @return A point in the unit cube [0,1]^3
 			*/
-			static DenseVector<ValueType> Hilbert3DIndex2Point(ValueType index, IndexType recursionDepth);
+			static std::vector<ValueType> Hilbert3DIndex2Point(ValueType index, IndexType recursionDepth);
 			
 			static std::vector<ValueType> Hilbert3DIndex2PointVec(ValueType index, IndexType recursionDepth);
 			
 			/*Get the hilbert indices sorted. Every PE will own its part of the hilbert indices
 			 */			
-			static std::vector<sort_pair> getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates);
+			static std::vector<sort_pair> getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates);			
 
 	};
 }//namespace ITI

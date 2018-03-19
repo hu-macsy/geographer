@@ -15,11 +15,9 @@
 #include <chrono>
 
 #include "quadtree/QuadNodeCartesianEuclid.h"
-#include "GraphUtils.h"
-#ifndef SETTINGS_H
 #include "Settings.h"
-#endif
-
+#include "GraphUtils.h"
+#include "HilbertCurve.h"
 
 using scai::lama::DenseVector;
 
@@ -135,6 +133,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	const IndexType dim = coordinates.size();
 	assert(dim > 0);
 	const IndexType localN = nodeWeights.getLocalValues().size();
+	const IndexType globalN = nodeWeights.size();
 	assert(nodeWeights.getLocalValues().size() == coordinates[0].getLocalValues().size());
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -187,8 +186,8 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 
 	//prepare sampling
 	std::vector<IndexType> localIndices(localN);
-	typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
-	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
+	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
+	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();;
 	std::iota(firstIndex, lastIndex, 0);
 	
 
@@ -197,22 +196,15 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	IndexType samplingRounds = 0;
 	std::vector<IndexType> samples;
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
-	if (localN > minNodes) {
-		std::chrono::time_point<std::chrono::high_resolution_clock> reorderStart = std::chrono::high_resolution_clock::now();
+	if (comm->all(localN > minNodes)) {
 		ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
-		//localIndices = ITI::GraphUtils::indexReorderCantor(localN);
-		std::chrono::duration<ValueType,std::ratio<1>> reorderTime = std::chrono::high_resolution_clock::now() - reorderStart;
-		ValueType time = comm->max( reorderTime.count() );
-		PRINT0("\tmax time to reorder indices= " << time);
-		
-		samplingRounds = std::ceil(std::log2(ValueType(localN) / minNodes))+1;
+
+		samplingRounds = std::ceil(std::log2(ValueType(globalN / (settings.minSamplingNodes*k))))+1;
+
 		samples.resize(samplingRounds);
 		samples[0] = minNodes;
 	}
 
-	firstIndex = localIndices.begin();
-	lastIndex = localIndices.end();
-	
 	if (samplingRounds > 0 && settings.verbose) {
 		if (comm->getRank() == 0) std::cout << "Starting with " << samplingRounds << " sampling rounds." << std::endl;
 	}
@@ -236,7 +228,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	//PRINT0("threshold= " << threshold << " , samplingRounds= " << samplingRounds);	
 
 	const IndexType maxIterations = settings.maxKMeansIterations;
-	do {		
+	do {
 		std::chrono::time_point<std::chrono::high_resolution_clock> iterStart = std::chrono::high_resolution_clock::now();
 		if (iter < samplingRounds) {
 			lastIndex = firstIndex + samples[iter];
@@ -252,7 +244,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 
 		Settings balanceSettings = settings;
 		//balanceSettings.balanceIterations = 0;//iter >= samplingRounds ? settings.balanceIterations : 0;
-
 		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, balanceSettings);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
@@ -295,7 +286,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		const double deltaSq = delta*delta;
 		const double maxInfluence = *std::max_element(influence.begin(), influence.end());
 		//const double minInfluence = *std::min_element(influence.begin(), influence.end());
-
 		{
 			SCAI_REGION( "KMeans.computePartition.updateBounds" );
 			for (auto it = firstIndex; it != lastIndex; it++) {

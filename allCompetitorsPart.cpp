@@ -28,7 +28,7 @@
 #include "MeshGenerator.h"
 #include "Wrappers.h"
 
-#include <parmetis.h>
+//#include <parmetis.h>
 
 /*
 void printCompetitorMetrics(struct Metrics metrics, std::ostream& out){

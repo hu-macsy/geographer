@@ -7,7 +7,6 @@
 
 #include "HilbertCurve.h"
 
-#include "RBC/Sort/SQuick.hpp"
 
 namespace ITI{
 
@@ -348,51 +347,24 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
 
 //-------------------------------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
-DenseVector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(ValueType index, IndexType level){
+std::vector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(ValueType index, IndexType level){
 	SCAI_REGION( "HilbertCurve.Hilbert2DIndex2Point" )
-	DenseVector<ValueType>  p(2,0), ret(2,0);
+    std::vector<ValueType>  p(2,0), ret(2,0);
 	ValueType r;
 	IndexType q;
-        if(index>1){
-            throw std::runtime_error("Index: " + std::to_string(index) +" for hilbert curve must be >0 and <1");
-        }
-	if(level==0)
-		return ret;
-	else{
+    if(index>1 || index < 0){
+        throw std::runtime_error("Index: " + std::to_string(index) +" for hilbert curve must be >0 and <1");
+    }
+
+	if (level > 0) {
 		q=int(4*index);
     		r= 4*index-q;
 		p = HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(r, level-1);
 		switch(q){
-			case 0: ret.setValue(0, p(1)/2);	ret.setValue(1, p(0)/2);	return ret;
-			case 1: ret.setValue(0, p(0)/2);	ret.setValue(1, p(1)/2 +0.5);	return ret;
-			case 2: ret.setValue(0, p(0)/2 +0.5);	ret.setValue(1, p(1)/2 +0.5);	return ret;
-			case 3: ret.setValue(0, 1-p(1)/2);	ret.setValue(1, 0.5-p(0)/2);	return ret;
-		}
-	}
-	return ret;
-}
-
-//-------------------------------------------------------------------------------------------------
-template<typename IndexType, typename ValueType>
-std::vector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2PointVec(ValueType index, IndexType level){
-	SCAI_REGION( "HilbertCurve.Hilbert2DIndex2Point" )
-	std::vector<ValueType>  p(2,0), ret(2,0);
-	ValueType r;
-	IndexType q;
-        if(index>1){
-            throw std::runtime_error("Index: " + std::to_string(index) +" for hilbert curve must be >0 and <1");
-        }
-	if(level==0)
-		return ret;
-	else{
-		q=int(4*index);
-    		r= 4*index-q;
-		p = HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2PointVec(r, level-1);
-		switch(q){
-			case 0: ret[0]=p[1]/2;		ret[1]=p[0]/2;	return ret;
-			case 1: ret[0]=p[0]/2;		ret[1]=p[1]/2 +0.5;	return ret;
-			case 2: ret[0]=p[0]/2 +0.5;	ret[1]=p[1]/2 +0.5;	return ret;
-			case 3: ret[0]=1-p[1]/2;	ret[1]=0.5-p[0]/2;	return ret;
+			case 0: ret = {p[1]/2,      p[0]/2}; break;
+			case 1: ret = {p[0]/2,      p[1]/2 + 0.5}; break;
+			case 2: ret = {p[0]/2+0.5,  p[1]/2 + 0.5}; break;
+			case 3: ret = {-p[1]/2+1,   -p[0]/2 + 0.5}; break;
 		}
 	}
 	return ret;
@@ -506,30 +478,28 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const*
 */
 
 template<typename IndexType, typename ValueType>
-DenseVector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point(ValueType index, IndexType level){
+std::vector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point(ValueType index, IndexType level){
 	SCAI_REGION( "HilbertCurve.Hilbert3DIndex2Point" )
 	
-	DenseVector<ValueType>  p(3,0), ret(3,0);
+    std::vector<ValueType>  p(3,0), ret(3,0);
 	ValueType r;
 	IndexType q;
 	
-	if(level==0)
-		return ret;
-	else{		
+	if (level > 0) {
 		q=int(8*index); 
     		r= 8*index-q;
 		if( (q==0) && r==0 ) return ret;
 		p = HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point(r, level-1);
 
-		switch(q){
-			case 0: ret.setValue(0, p(1)/2);	ret.setValue(1, p(2)/2);	ret.setValue(2, p(0)/2);	return ret;
-			case 1: ret.setValue(0, p(2)/2);	ret.setValue(1, 0.5+p(0)/2);	ret.setValue(2, p(1)/2);	return ret;
-			case 2: ret.setValue(0, 0.5+p(2)/2);	ret.setValue(1, 0.5+p(0)/2);	ret.setValue(2, p(1)/2);	return ret;
-			case 3: ret.setValue(0, 1-p(0)/2);	ret.setValue(1, 0.5-p(1)/2);	ret.setValue(2, -p(2)/2);	return ret;
-			case 4: ret.setValue(0, 1-p(0)/2);	ret.setValue(1, 0.5-p(1)/2);	ret.setValue(2, 0.5+p(2)/2);	return ret;
-			case 5: ret.setValue(0, 1-p(2)/2);	ret.setValue(1, 0.5+p(0)/2);	ret.setValue(2, 1-p(1)/2);	return ret;
-			case 6: ret.setValue(0, 0.5-p(2)/2);	ret.setValue(1, 0.5+p(0)/2);	ret.setValue(2, 1-p(1)/2);	return ret;
-			case 7: ret.setValue(0, p(1)/2);	ret.setValue(1, 0.5-p(2)/2);	ret.setValue(2, 1-p(0)/2);	return ret;			
+        switch(q){
+            case 0: ret = {p[1]/2,   p[2]/2,     p[0]/2};  break;
+            case 1: ret = {p[2]/2,   0.5+p[0]/2,     p[1]/2};  break;
+            case 2: ret = {0.5+p[2]/2,   0.5+p[0]/2,     p[1]/2};  break;
+            case 3: ret = {1-p[0]/2,     0.5-p[1]/2,     p[2]/2};  break;
+            case 4: ret = {1-p[0]/2,     0.5-p[1]/2,     0.5+p[2]/2};  break;
+            case 5: ret = {1-p[2]/2,     0.5+p[0]/2,     1-p[1]/2};    break;
+            case 6: ret = {0.5-p[2]/2,   0.5+p[0]/2,     1-p[1]/2};    break;
+            case 7: ret = {p[1]/2,   0.5-p[2]/2,     1-p[0]/2};    break;
 		}
 	}
 	return ret;
@@ -547,7 +517,33 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::HilbertIndex2PointVec
 	
 	throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
 }
+//-------------------------------------------------------------------------------------------------
 
+template<typename IndexType, typename ValueType>
+std::vector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2PointVec(ValueType index, IndexType level){
+	SCAI_REGION( "HilbertCurve.Hilbert2DIndex2Point" )
+	std::vector<ValueType>  p(2,0), ret(2,0);
+	ValueType r;
+	IndexType q;
+        if(index>1){
+            throw std::runtime_error("Index: " + std::to_string(index) +" for hilbert curve must be >0 and <1");
+        }
+	if(level==0)
+		return ret;
+	else{
+		q=int(4*index);
+    		r= 4*index-q;
+		p = HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2PointVec(r, level-1);
+		switch(q){
+			case 0: ret[0]=p[1]/2;		ret[1]=p[0]/2;	return ret;
+			case 1: ret[0]=p[0]/2;		ret[1]=p[1]/2 +0.5;	return ret;
+			case 2: ret[0]=p[0]/2 +0.5;	ret[1]=p[1]/2 +0.5;	return ret;
+			case 3: ret[0]=1-p[1]/2;	ret[1]=0.5-p[0]/2;	return ret;
+		}
+	}
+	return ret;
+}
+//-------------------------------------------------------------------------------------------------
 
 /*
 * Given a 3D point it returns its index in [0,1] on the hilbert curve based on the level depth.
