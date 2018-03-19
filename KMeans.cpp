@@ -256,9 +256,6 @@ DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType> >& 
 	return assignment;
 }
 
-//	std::vector<ValueType> upperBoundToOwnCenter(localN);
-//std::vector<ValueType> lowerBoundToNextCenter(localN, 0);
-
 template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(
 		const std::vector<std::vector<ValueType> >& coordinates,
@@ -415,7 +412,6 @@ DenseVector<IndexType> assignBlocks(
 			comm->synchronize();
 		}
 
-		if (iter == settings.balanceIterations) continue;
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.blockWeightSum" );
 			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<IndexType>::stype);
