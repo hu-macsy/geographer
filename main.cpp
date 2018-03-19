@@ -329,12 +329,6 @@ int main(int argc, char** argv) {
     if( writePartition ){
         settings.writeInFile = true;
     }
-    
-    scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
-    std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
-    
-
-    DenseVector<ValueType> nodeWeights;
 
     srand(vm["seed"].as<double>());
 
@@ -360,6 +354,11 @@ int main(int argc, char** argv) {
     // generate or read graph and coordinates
     //
     
+    scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
+    std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
+	scai::lama::DenseVector<ValueType> nodeWeights;		//the weights for each node
+	
+	
     if (vm.count("graphFile")) {
     	std::string graphFile = vm["graphFile"].as<std::string>();
         settings.fileName = graphFile;
@@ -696,11 +695,10 @@ int main(int argc, char** argv) {
         //
         // Get metrics
         //
-        
-        
+                
         std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
-        metricsVec[r].getMetrics( graph, partition, nodeWeights, settings );
+        metricsVec[r].getAllMetrics( graph, partition, nodeWeights, settings );
         
         std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
         

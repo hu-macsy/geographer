@@ -237,6 +237,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 
 	const IndexType maxIterations = settings.maxKMeansIterations;
 	do {
+PRINT( *comm );			
 		std::chrono::time_point<std::chrono::high_resolution_clock> iterStart = std::chrono::high_resolution_clock::now();
 		if (iter < samplingRounds) {
 			lastIndex = firstIndex + samples[iter];
@@ -252,11 +253,18 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 
 		Settings balanceSettings = settings;
 		//balanceSettings.balanceIterations = 0;//iter >= samplingRounds ? settings.balanceIterations : 0;
+PRINT(*comm <<": " << *firstIndex << " -- " << *lastIndex );
 		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, balanceSettings);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
-		std::vector<std::vector<ValueType> > newCenters = findCenters(coordinates, result, k, firstIndex, lastIndex, nodeWeights);
-
+		
+		std::vector<std::vector<ValueType> > newCenters;
+		if( settings.repartition){
+			newCenters = centers;
+		}else{
+			newCenters = findCenters(coordinates, result, k, firstIndex, lastIndex, nodeWeights);
+		}
+		
 		//keep centroids of empty blocks at their last known position
 		for (IndexType j = 0; j < k; j++) {
 		    for (int d = 0; d < dim; d++) {
@@ -288,7 +296,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		const double deltaSq = delta*delta;
 		const double maxInfluence = *std::max_element(influence.begin(), influence.end());
 		//const double minInfluence = *std::min_element(influence.begin(), influence.end());
-
+if (settings.verbose) PRINT(*comm);	
 		{
 			SCAI_REGION( "KMeans.computePartition.updateBounds" );
 			for (auto it = firstIndex; it != lastIndex; it++) {
@@ -346,6 +354,7 @@ std::cout<< "\t"<<comm->getRank() <<": " << time << std::endl;
 			
 		iter++;
 	} while (iter < samplingRounds || (iter < maxIterations && (delta > threshold || !balanced)));
+PRINT( *comm );	
 	return result;
 }
 

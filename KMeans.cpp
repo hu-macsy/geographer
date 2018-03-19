@@ -501,7 +501,7 @@ ValueType time = balanceTime.count() ;
 			comm->synchronize();
 		}
 
-		if (iter == settings.balanceIterations) continue;
+		//if (iter == settings.balanceIterations) continue;
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.blockWeightSum" );
 			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<IndexType>::stype);
@@ -557,7 +557,7 @@ ValueType time = balanceTime.count() ;
 				lowerBoundNextCenter[i] *= minRatio - 1e-12;//TODO: compute separate min ratio with respect to bounding box, only update that.
 			}
 		}
-
+if (settings.verbose) PRINT(*comm);
 		//update possible closest centers
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.filterCenters" );
@@ -587,7 +587,7 @@ ValueType time = balanceTime.count() ;
 		}
 	} while (imbalance > settings.epsilon - 1e-12 && iter < settings.balanceIterations);
 	//std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
-
+if (settings.verbose) PRINT(*comm);
 	return assignment;
 }
 

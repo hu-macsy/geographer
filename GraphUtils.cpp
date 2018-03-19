@@ -337,8 +337,8 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 	if (weighted) {
 		//get global weight sum
 		weightSum = comm->sum(weightSum);
-		//optSize = std::ceil(weightSum / k + (maxWeight - minWeight));
-                optSize = std::ceil(ValueType(weightSum) / k );
+		optSize = std::ceil(weightSum / k + (maxWeight - minWeight));
+        //optSize = std::ceil(ValueType(weightSum) / k );
 	} else {
 		optSize = std::ceil(ValueType(globalN) / k);
 	}

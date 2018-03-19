@@ -18,6 +18,7 @@ parMetisExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/parMetisExe"
 competitorsExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/competitorsExe"
 allCompetitorsExe = "/home/hpc/pr87si/di36qin/parco-repart/Implementation/allCompetitorsExe"
 repartAllExe =  "/home/hpc/pr87si/di36qin/parco-repart/Implementation/repartitionWithAll"
+repartKmeans =  "/home/hpc/pr87si/di36qin/parco-repart/Implementation/repartKmeans"
 
 # other paths
 basisPath = os.path.expanduser("~/parco-repart/Implementation/experiments/")
@@ -25,8 +26,8 @@ competitorsPath = os.path.join( basisPath, "competitors" )
 toolsPath = os.path.join( basisPath, "tools" )
 plotsPath = os.path.join( basisPath, "plots" )
 
-METRIC_NAMES = ['timeTotal', 'finalCut', 'imbalance', 'maxBnd', 'totBnd', 'maxCommVol', 'totCommVol', 'maxBndPercnt', 'avgBndPercnt', 'timeSpMV', 'timeComm']
-METRIC_VALUES = [ 'seconds', 'number of edges', 'ratio', 'number of vertices', 'number of vertices', 'number of vertices', 'number of vertices', 'ratio', 'ratio', 'seconds', 'seconds']
+METRIC_NAMES = ['timeTotal', 'finalCut', 'imbalance', 'maxBnd', 'totBnd', 'maxCommVol', 'totCommVol', 'maxDiameter', 'avgDiameter', 'timeSpMV', 'timeComm']
+METRIC_VALUES = [ 'seconds', 'number of edges', 'ratio', 'number of vertices', 'number of vertices', 'number of vertices', 'number of vertices', 'number of vertices', 'number of vertices', 'seconds', 'seconds']
 NUM_METRICS = len(METRIC_NAMES)
 
 # global settings for all 

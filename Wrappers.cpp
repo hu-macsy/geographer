@@ -13,7 +13,82 @@ IndexType HARD_TIME_LIMIT= 600; 	// hard limit in seconds to stop execution if e
 
 namespace ITI {
 
+template<typename IndexType, typename ValueType>
+scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
+	const scai::lama::CSRSparseMatrix<ValueType> &graph,
+	const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
+	const scai::lama::DenseVector<ValueType> &nodeWeights, 
+	bool nodeWeightsFlag,
+	Tool tool,
+	struct Settings &settings,
+	struct Metrics &metrics	){
+
+	switch( tool){
+		case Tool::parMetisGraph:
+			return metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 0, settings, metrics);
+		
+		case Tool::parMetisGeom:
+			return metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 1, settings, metrics);
+			
+		case Tool::parMetisSFC:
+			return metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 2, settings, metrics);
+			
+		case Tool::zoltanRIB:
+			return zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rib", settings, metrics);
+		
+		case Tool::zoltanRCB:
+			return zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rcb", settings, metrics);
+		
+		case Tool::zoltanMJ:
+			return zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "multijagged", settings, metrics);
+			
+		case Tool::zoltanSFC:
+			return zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "hsfc", settings, metrics);
+			
+		default:
+			throw std::runtime_error("Wrong tool given to partition.\nAborting...");
+			return scai::lama::DenseVector<IndexType>(graph.getLocalNumRows(), -1 );
+	}
+}
+//-----------------------------------------------------------------------------------------	
+
+template<typename IndexType, typename ValueType>
+scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::repartition (
+	const scai::lama::CSRSparseMatrix<ValueType> &graph,
+	const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
+	const scai::lama::DenseVector<ValueType> &nodeWeights, 
+	bool nodeWeightsFlag,
+	Tool tool,
+	struct Settings &settings,
+	struct Metrics &metrics){
 	
+	switch( tool){
+		// for repartition, metis uses the same function
+		case Tool::parMetisGraph:		
+		case Tool::parMetisGeom:			
+		case Tool::parMetisSFC:
+			return metisRepartition( graph, coordinates, nodeWeights, nodeWeightsFlag, settings, metrics);
+			
+		case Tool::zoltanRIB:
+			return zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rib", settings, metrics);
+		
+		case Tool::zoltanRCB:
+			return zoltanRepartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rcb", settings, metrics);
+		
+		case Tool::zoltanMJ:
+			return zoltanRepartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "multijagged", settings, metrics);
+			
+		case Tool::zoltanSFC:
+			return zoltanRepartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "hsfc", settings, metrics);
+			
+		default:
+			throw std::runtime_error("Wrong tool given to repartition.\nAborting...");
+			return scai::lama::DenseVector<IndexType>(graph.getLocalNumRows(), -1 );
+	}
+}
+//-----------------------------------------------------------------------------------------	
+
+
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartition (
 	const scai::lama::CSRSparseMatrix<ValueType> &graph,
@@ -235,7 +310,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
             metisRet = ParMETIS_V3_PartGeomKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ndims, xyzLocal, &ncon, &nparts, tpwgts, &ubvec, options, &edgecut, partKway, &metisComm );  
         }else if( parMetisGeom==2 ){
 			metisRet = ParMETIS_V3_PartGeom( vtxDist, &ndims, xyzLocal, partKway, &metisComm ); 
-		}else{
+		}else { // parMetisGeom==3 
 			//repartition
 			
 			//TODO: check if vsize is correct 
@@ -470,7 +545,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 		globalIds[i] = offset++;
 	
 	//set node weights
-	std::vector<ValueType> localUnitWeight;
+	std::vector<ValueType> localUnitWeight(localN);
 	
 	if( nodeWeightsFlag ){
 		scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights.getLocalValues() );
@@ -551,7 +626,6 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 	return partitionZoltan;
 		
 	}
-	
 
 //---------------------------------------------------------------------------------------	
 		

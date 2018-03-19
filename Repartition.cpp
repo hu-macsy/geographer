@@ -24,15 +24,14 @@
 #include "HilbertCurve.h"
 #include "KMeans.h"
 
+//TODO: get rid of dependacy with wrappers
+//#include "Wrappers.h"
 
 //#include "RBC/Sort/SQuick.hpp"
 
 using scai::lama::Scalar;
 
 namespace ITI {
-
-//template <typename IndexType, typename ValueType>
-//class Repartition{
 	
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<ValueType> Repartition<IndexType,ValueType>::sNW( const std::vector<DenseVector<ValueType> >& coordinates, const IndexType seed, const ValueType diverg, const IndexType dimensions){
@@ -57,8 +56,8 @@ scai::lama::DenseVector<ValueType> Repartition<IndexType,ValueType>::sNW( const 
 		maxCoords[d] = coordinates[d].max().Scalar::getValue<ValueType>();
 		//std::uniform_real_distribution<ValueType> dist(minCoord[d], maxCoord[d]);
 		std::uniform_real_distribution<ValueType> dist( 0, maxCoords[d]);
-		center[d] = dist( generator );
-		//center[d] = maxCoords[d]/2.0;
+		//center[d] = dist( generator );
+		center[d] = maxCoords[d]/2.0;
 //PRINT(*comm << ": cent["<< d <<"]= " << center[d]);
 		
 	}
@@ -112,9 +111,77 @@ scai::lama::DenseVector<ValueType> Repartition<IndexType,ValueType>::sNW( const 
 }
 //-----------------------------------------------------------------------------------------------------
 
+/*
+//TODO: adapt to also support initial node weights
 
+template<typename IndexType, typename ValueType>
+void Repartition<IndexType,ValueType>::getImbalancedDistribution(
+	scai::lama::CSRSparseMatrix<ValueType> &graph,
+	std::vector<scai::lama::DenseVector<ValueType>> &coords, 
+	scai::lama::DenseVector<ValueType> &nodeWeights,
+	ITI::Tool tool,
+	struct Settings &settings,
+	struct Metrics &metrics){
+	
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	
+	// nodeWeights have the same distribution as the coordinates
+	const IndexType seed = 0;
+	ValueType diverg = 1;	//with 0=> unit weigths, larger numbers create more divergence for the weigths
+	IndexType dimensions = settings.dimensions;
+	
+	scai::lama::DenseVector<IndexType> firstPartition;
+	scai::lama::DenseVector<ValueType> imbaNodeWeights;
+	
+	ValueType imbalance = 0;
+	
+	do{
+		// set node weights to create artificial imbalance
+		imbaNodeWeights = ITI::Repartition<IndexType,ValueType>::sNW( coords, seed, diverg, dimensions);
+		bool nodeWeightsFlag = true;
+		
+		if( tool==ITI::Tool::geoKmeans or tool==ITI::Tool::geographer){
+			//TODO: assuming uniform block sizes
+			const IndexType globalN = graph.getNumRows();
+			const std::vector<IndexType> blockSizes(settings.numBlocks, globalN/settings.numBlocks);
+			firstPartition = ITI::KMeans::computePartition ( coords, settings.numBlocks, imbaNodeWeights, blockSizes, settings);
+		}
+		else{
+			firstPartition = ITI::Wrappers<IndexType,ValueType>::partition ( graph, coords, imbaNodeWeights, nodeWeightsFlag, tool, settings, metrics);
+		}
+		
+		imbalance = ITI::GraphUtils::computeImbalance(firstPartition, settings.numBlocks, nodeWeights);
+		PRINT0("diverg= " << diverg<< " , first partition imbalance= " << imbalance);
+		diverg += 0.1;
+	}while( imbalance<0.2 and diverg<4);
+	//TODO: check that these are OK
+	
+	{
+		//get the distribution from the partition
+		scai::dmemo::DistributionPtr firstDist = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( firstPartition.getDistribution(), firstPartition.getLocalValues() ) );
+		
+		SCAI_ASSERT_ERROR( imbaNodeWeights.getDistributionPtr()->isEqual( graph.getRowDistribution() ), "nodeWeights->distribution and graph.getRowDistribution do not agree.");
+		SCAI_ASSERT_ERROR( imbaNodeWeights.getDistributionPtr()->isEqual( coords[0].getDistribution() ), "nodeWeights->distribution and coords[0].getDistribution do not agree.");
+		
+		scai::dmemo::DistributionPtr defaultDist = imbaNodeWeights.getDistributionPtr();
+		scai::dmemo::Redistributor prepareRedist( firstDist, defaultDist );
+		
+		//distribute graph, node weights and coordinates to mimic an imbalanced simulation
+		//TODO: what about nodeweights? now, just use uniform nodeweights for the repartition
+		scai::dmemo::DistributionPtr columnDist = graph.getColDistributionPtr();
+		graph.redistribute( prepareRedist, columnDist );
+		
+		for(IndexType i=0; i<dimensions; i++){
+			coords[i].redistribute( prepareRedist );
+		}
+		
+		nodeWeights.redistribute( prepareRedist );
+	}
+	
+	}
+*/	
+//-----------------------------------------------------------------------------------------------------
 
-//} //namespace Repartition
 
 //to force instantiation
 template class Repartition<IndexType, ValueType>;

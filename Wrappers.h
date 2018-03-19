@@ -33,12 +33,60 @@
 
 namespace ITI {
 
-        
+
 template <typename IndexType, typename ValueType>
 class Wrappers {
 
 public:
+	//TODO: different interface for methods that do not require coordinates
 	
+	/** Returns a partition with one of the supported tools
+	 * 
+	 * @param[in] graph The adjacency matrix of the graph of size NxN
+	 * @param[in] coordinates The coordinates of the mesh. Not always needed by all tools
+	 * @param[in] nodeWeights Weights for every node, used only is nodeWeightFlag is true
+	 * @param[in] nodeWeightsFlag If true the node weigts are used, if false they are ignored
+	 * @param[in] tool One of the supported tools.
+	 * @param[in] settings A Settings structure to pass various settings
+	 * @param[out] metrics Structure to store/return timing info
+	 * 
+	 * @return A DenseVector of size N with the partition calcualted: 0<= return[i] < k with the block that point i belongs to
+	 */
+	static scai::lama::DenseVector<IndexType> partition(
+		const scai::lama::CSRSparseMatrix<ValueType> &graph,
+		const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
+		const scai::lama::DenseVector<ValueType> &nodeWeights, 
+		bool nodeWeightsFlag,
+		Tool tool,
+		struct Settings &settings,
+		struct Metrics &metrics
+	);
+	
+	/** Returns a partition with one of the supported tools based on the current distribution of the data.
+	 * 
+	 * @param[in] graph The adjacency matrix of the graph of size NxN
+	 * @param[in] coordinates The coordinates of the mesh. Not always needed by all tools
+	 * @param[in] nodeWeights Weights for every node, used only is nodeWeightFlag is true
+	 * @param[in] nodeWeightsFlag If true the node weigts are used, if false they are ignored
+	 * @param[in] tool One of the supported tools.
+	 * @param[in] settings A Settings structure to pass various settings
+	 * @param[out] metrics Structure to store/return timing info
+	 * 
+	 * @return A DenseVector of size N with the partition calcualted: 0<= return[i] < k with the block that point i belongs to
+	 */
+	static scai::lama::DenseVector<IndexType> repartition (
+		const scai::lama::CSRSparseMatrix<ValueType> &graph,
+		const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
+		const scai::lama::DenseVector<ValueType> &nodeWeights, 
+		bool nodeWeightsFlag,
+		Tool tool,
+		struct Settings &settings,
+		struct Metrics &metrics
+	);	
+
+	
+private:
+
 	//metis wrapper
 	
 	/** Returns a partition with one of the metis methods
@@ -76,12 +124,7 @@ public:
 		struct Settings &settings,
 		struct Metrics &metrics);	
 
-/*	//TODO: or create function like that?
-	static scai::lama::DenseVector<IndexType> parmetisGraphPartition
-	static scai::lama::DenseVector<IndexType> parmetisGeomPartition
-	static scai::lama::DenseVector<IndexType> parmetisSfcPartition
-	static scai::lama::DenseVector<IndexType> parmetiRepartition
-*/	
+	
 	// zoltan wrappers
 	
 	static scai::lama::DenseVector<IndexType> zoltanPartition (
@@ -101,9 +144,7 @@ public:
 		std::string algo,
 		struct Settings &settings,
 		struct Metrics &metrics);
-	
-private:
-	
+		
 	static scai::lama::DenseVector<IndexType> zoltanCore (
 		const scai::lama::CSRSparseMatrix<ValueType> &graph,
 		const std::vector<scai::lama::DenseVector<ValueType>> &coords, 

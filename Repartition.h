@@ -40,5 +40,15 @@ namespace ITI {
 		 * @param[in] dimensions The dimension of the coordinates.
 		 */
 		static scai::lama::DenseVector<ValueType> sNW(  const std::vector<scai::lama::DenseVector<ValueType> >& coordinates, const IndexType seed, const ValueType diverg, const IndexType dimensions);
-	};
+		
+		
+		static void getImbalancedDistribution(
+			scai::lama::CSRSparseMatrix<ValueType> &graph,
+			std::vector<scai::lama::DenseVector<ValueType>> &coords, 
+			scai::lama::DenseVector<ValueType> &nodeWeights,
+			ITI::Tool tool,
+			struct Settings &settings,
+			struct Metrics &metrics);
+		};
+	
 }

@@ -132,7 +132,7 @@ int main(int argc, char** argv) {
 	("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
 	("multiLevelRounds", value<IndexType>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
 	
-	("computeDiameter", value<bool>(&settings.computeDiameter)->default_value(true), "Compute Diameter of resulting block files.")
+	("computeDiameter", value<bool>(&settings.computeDiameter)->default_value(true), "Compute diameter of resulting block files.")
 	("blockSizesFile", value<std::string>(&blockSizesFile) , " file to read the block sizes for every block")
 	("writePartition", "Writes the partition in the outFile.partition file")
 	("outFile", value<std::string>(&settings.outFile), "write result partition into file")
@@ -188,13 +188,7 @@ int main(int argc, char** argv) {
 		std::cout << "machine char not valid" << std::endl;
 		machine = "machine char not valid";
 	}
-	
-	scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
-	std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
-	scai::lama::DenseVector<ValueType> nodeWeights;     // node weights
-	
-	std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
-	
+		
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType thisPE = comm->getRank();
 	
@@ -213,14 +207,22 @@ int main(int argc, char** argv) {
 		}
 		std::cout<< "commit:"<< version<<  " input:"<< inputstring << std::endl;
 	}
+		
+	scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
+	std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
+	scai::lama::DenseVector<ValueType> nodeWeights;     // node weights
 	
-	std::string graphFile;
+    //---------------------------------------------------------
+    //
+    // generate or read graph and coordinates
+    //
 	
 	if (vm.count("graphFile")) {
 		if ( thisPE== 0){
             std::cout<< "input: graphFile" << std::endl;
         }
-    	graphFile = vm["graphFile"].as<std::string>();
+    	std::string  graphFile = vm["graphFile"].as<std::string>();
+		settings.fileName = graphFile;
     	std::string coordFile;
     	if (vm.count("coordFile")) {
     		coordFile = vm["coordFile"].as<std::string>();
@@ -290,7 +292,9 @@ int main(int argc, char** argv) {
         }
         
         N = settings.numX * settings.numY * settings.numZ;
-        
+        	
+		std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions
+		
         maxCoord[0] = settings.numX;
         maxCoord[1] = settings.numY;
         maxCoord[2] = settings.numZ;
@@ -524,7 +528,7 @@ int main(int argc, char** argv) {
 	metrics.numBlocks = settings.numBlocks;
 	
 	metrics.timeFinalPartition = comm->max( partitionTime.count() );
-	metrics.getMetrics( graph, partition, nodeWeights, settings );
+	metrics.getAllMetrics( graph, partition, nodeWeights, settings );
 	
 	//
     // Reporting output to std::cout and/or outFile
@@ -589,7 +593,7 @@ int main(int argc, char** argv) {
         if( settings.outFile!="-" ){
             partOutFile = settings.outFile + ".partition";
         }else if( vm.count("graphFile") ){
-            partOutFile = graphFile + ".partition";
+            partOutFile = settings.fileName + ".partition";
         }else if( vm.count("generate") ){
             partOutFile = "generate_"+ std::to_string(settings.numX)+ ".partition";
         }

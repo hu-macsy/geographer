@@ -23,51 +23,94 @@
 
 #include "FileIO.h"
 #include "GraphUtils.h"
-#include "Settings.h"
+#include "KMeans.h"
 #include "Metrics.h"
 #include "MeshGenerator.h"
-#include "Wrappers.h"
 #include "Repartition.h"
-#include "KMeans.h"
-
-//#include <parmetis.h>
-
-/*
-void printCompetitorMetrics(struct Metrics metrics, std::ostream& out){
-	out << "gather" << std::endl;
-	out << "timeTotal finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt" << std::endl;
-    out << metrics.timeFinalPartition<< " " \
-		<< metrics.finalCut << " "\
-		<< metrics.finalImbalance << " "\
-		<< metrics.maxBoundaryNodes << " "\
-		<< metrics.totalBoundaryNodes << " "\
-		<< metrics.maxCommVolume << " "\
-		<< metrics.totalCommVolume << " ";
-	out << std::setprecision(6) << std::fixed;
-	out <<  metrics.maxBorderNodesPercent << " " \
-		<<  metrics.avgBorderNodesPercent \
-		<< std::endl; 
-}
-*/
+#include "Settings.h"
+#include "Wrappers.h"
 
 
-
-extern "C"{
-	void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);	
-}
-
+void getImbalancedDistribution(
+	scai::lama::CSRSparseMatrix<ValueType> &graph,
+	std::vector<scai::lama::DenseVector<ValueType>> &coords, 
+	scai::lama::DenseVector<ValueType> &nodeWeights,
+	ITI::Tool tool,
+	struct Settings &settings){
+	
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	
+	// nodeWeights have the same distribution as the coordinates
+	const IndexType seed = 0;
+	ValueType diverg = 1;	//with 0=> unit weigths, larger numbers create more divergence for the weigths
+	IndexType dimensions = settings.dimensions;
+	
+	scai::lama::DenseVector<IndexType> firstPartition;
+	scai::lama::DenseVector<ValueType> imbaNodeWeights;
+	
+	ValueType imbalance = 0;
+	
+	do{
+		// set node weights to create artificial imbalance
+		imbaNodeWeights = ITI::Repartition<IndexType,ValueType>::sNW( coords, seed, diverg, dimensions);
+		bool nodeWeightsFlag = true;
+		
+		if( tool==ITI::Tool::geoKmeans or tool==ITI::Tool::geographer){
+			//TODO: assuming uniform block sizes
+			const IndexType globalN = graph.getNumRows();
+			const std::vector<IndexType> blockSizes(settings.numBlocks, globalN/settings.numBlocks);
+			firstPartition = ITI::KMeans::computePartition ( coords, settings.numBlocks, imbaNodeWeights, blockSizes, settings);
+			diverg += 0.1;
+		}
+		else{
+			struct Metrics metrics;
+			firstPartition = ITI::Wrappers<IndexType,ValueType>::partition ( graph, coords, imbaNodeWeights, nodeWeightsFlag, tool, settings, metrics);
+			diverg += 0.3;
+		}
+		
+		imbalance = ITI::GraphUtils::computeImbalance(firstPartition, settings.numBlocks, nodeWeights);
+		PRINT0("diverg= " << diverg<< " , first partition imbalance= " << imbalance);
+		
+	}while( imbalance<0.2 and diverg<4);
+	//TODO: check that these are OK
+	
+	{
+		//get the distribution from the partition
+		scai::dmemo::DistributionPtr firstDist = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( firstPartition.getDistribution(), firstPartition.getLocalValues() ) );
+		
+		SCAI_ASSERT_ERROR( imbaNodeWeights.getDistributionPtr()->isEqual( graph.getRowDistribution() ), "nodeWeights->distribution and graph.getRowDistribution do not agree.");
+		SCAI_ASSERT_ERROR( imbaNodeWeights.getDistributionPtr()->isEqual( coords[0].getDistribution() ), "nodeWeights->distribution and coords[0].getDistribution do not agree.");
+		
+		scai::dmemo::DistributionPtr defaultDist = imbaNodeWeights.getDistributionPtr();
+		scai::dmemo::Redistributor prepareRedist( firstDist, defaultDist );
+		
+		//distribute graph, node weights and coordinates to mimic an imbalanced simulation
+		//TODO: what about nodeweights? now, just use uniform nodeweights for the repartition
+		scai::dmemo::DistributionPtr columnDist = graph.getColDistributionPtr();
+		graph.redistribute( prepareRedist, columnDist );
+		
+		for(IndexType i=0; i<dimensions; i++){
+			coords[i].redistribute( prepareRedist );
+		}
+		
+		nodeWeights.redistribute( prepareRedist );
+	}
+	
+	}
 
 //------------------------------------------------------------------------------------------------------------
 
-void printMetricsShortRepart(struct Metrics metrics, std::string tool, std::ostream& out){
+void printMetricsShortRepart(struct Metrics metrics, /* std::string tool,*/ std::ostream& out){
 	
 	//std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
 	//std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
 	//out << "date and time: " << std::ctime(&timeNow); //<< std::endl;
 	//out << "numBlocks= " << metrics.numBlocks << std::endl;
-	out << "tool " << tool << std::endl;
+	
+	//out << "tool " << tool << std::endl;
+	
 	out << "gather" << std::endl;
-	out << "timeTotal finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm" << std::endl;
+	out << "timeTotal finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxDiameter avgDiameter timeSpMV timeComm" << std::endl;
     out << metrics.timeFinalPartition<< " " \
 		<< metrics.finalCut << " "\
 		<< metrics.finalImbalance << " "\
@@ -76,8 +119,8 @@ void printMetricsShortRepart(struct Metrics metrics, std::string tool, std::ostr
 		<< metrics.maxCommVolume << " "\
 		<< metrics.totalCommVolume << " ";
 	out << std::setprecision(8) << std::fixed;
-	out << metrics.maxBorderNodesPercent << " " \
-		<< metrics.avgBorderNodesPercent << " " \
+	out << metrics.maxBlockDiameter << " " \
+		<< metrics.avgBlockDiameter << " " \
 		<< metrics.timeSpMV << " "\
 		<< metrics.timeComm \
 		<< std::endl; 
@@ -272,83 +315,17 @@ int main(int argc, char** argv) {
 	//	add node weights to get first partition and redistribute graph ans coordinates accordingly
 	//
 	
-	{
-		// use some tool to partition with the node weights
-		struct Metrics beforeMetrics(1);
-		beforeMetrics.numBlocks = settings.numBlocks;
-		bool nodeWeightsFlag = true;
-		ValueType imbalance = 0;
-		scai::lama::DenseVector<IndexType> firstPartition;
-		scai::lama::DenseVector<ValueType> imbaNodeWeights;
-		
-		// uniform node weights - only used to measure imbalance
-		scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
-		
-		// nodeWeights have the same distribution as the coordinates
-		const IndexType seed = 0;
-		ValueType diverg = 1;	//with 0=> unit weigths, larger numbers create more divergence for the weigths
-		
-		do{
-			imbaNodeWeights = ITI::Repartition<IndexType,ValueType>::sNW( coords, seed, diverg, dimensions);
-			
-			ValueType tmpE = settings.epsilon;
-			settings.epsilon = 0.1;		// to give imbalanced partitions
-			
-			int parMetisVersion = 1;	//0: only graph, 1: graph+geometry, 2: only geometry (sfc)
-			firstPartition = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coords, imbaNodeWeights, nodeWeightsFlag, parMetisVersion, settings, beforeMetrics);
-			/*
-			//TODO: assuming uniform block sizes
-			const IndexType globalN = graph.getNumRows();
-			const std::vector<IndexType> blockSizes(settings.numBlocks, globalN/settings.numBlocks);
-			firstPartition = ITI::KMeans::computePartition ( coords, settings.numBlocks, imbaNodeWeights, blockSizes, settings);
-			*/
-			settings.epsilon = tmpE;
-			
-			imbalance = ITI::GraphUtils::computeImbalance(firstPartition, settings.numBlocks, nodeWeights);
-			PRINT0("diverg= " << diverg<< " , first partition imbalance= " << imbalance);
-			diverg += 0.1;
-		}while( imbalance<0.2 and diverg<4);
-		//TODO: check that these are OK
-		
-		{
-			//get the distribution from the partition
-			scai::dmemo::DistributionPtr firstDist = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( firstPartition.getDistribution(), firstPartition.getLocalValues() ) );
-			
-			SCAI_ASSERT_ERROR( imbaNodeWeights.getDistributionPtr()->isEqual( graph.getRowDistribution() ), "nodeWeights->distribution and graph.getRowDistribution do not agree.");
-			SCAI_ASSERT_ERROR( imbaNodeWeights.getDistributionPtr()->isEqual( coords[0].getDistribution() ), "nodeWeights->distribution and coords[0].getDistribution do not agree.");
-			
-			scai::dmemo::DistributionPtr defaultDist = imbaNodeWeights.getDistributionPtr();
-			scai::dmemo::Redistributor prepareRedist( firstDist, defaultDist );
-			
-			//distribute graph and coordinates to mimic an imbalanced simulation
-			//TODO: what about nodeweights? now, just use uniform nodeweights for the repartition
-			scai::dmemo::DistributionPtr columnDist = graph.getColDistributionPtr();
-			graph.redistribute( prepareRedist, columnDist );
-			
-			for(IndexType i=0; i<dimensions; i++){
-				coords[i].redistribute( prepareRedist );
-			}
-		}
-	}
+
 	
-	// calculate and print imbalance		
-	IndexType localN = graph.getRowDistributionPtr()->getLocalSize(); // the new localN after redistributing
-	//PRINT(*comm<<": " << localN);		
-	const IndexType maxLocalN = comm->max(localN);
-	const IndexType minLocalN = comm->min(localN);
-	const ValueType optSize = ValueType(N)/comm->getSize();
-	
-	ValueType imbalance = ValueType( maxLocalN - optSize)/optSize;
-	PRINT0("\tpartition before: minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", distribution imbalance= " << imbalance);
-	
-	
-	std::string repartFile = outPath+ +"repartition/"+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_allTools.info";
+	/*
+	//std::string repartFile = outPath+ +"repartition/"+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_allTools.info";
 	
 	if ( storeInfo and thisPE==0 ){
 		std::ofstream outF( repartFile, std::ios::out);
 		outF << "Repartitioning graph " << graphName << std::endl;
 		outF << "\tpartition before: minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", distribution imbalance= " << imbalance << std::endl << std::endl;
 	}
+	*/
 	
 	//------------------------------------------------------------
 	//
@@ -360,85 +337,92 @@ int main(int argc, char** argv) {
 	//		general distribution. Must reindex vertices for parMetis
 	//
 	
-	//std::vector<std::string> allTools = {"zoltanRcb", "zoltanRib", "zoltanMJ", "zoltanHsfc", "geoKmeans" };
-	std::vector<std::string> allTools = { "geoKmeans" };
+	std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRIB, ITI::Tool::zoltanRCB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC};
+	//std::vector<std::string> allTools = { "geoKmeans" };
 	
 	for( int t=0; t<allTools.size(); t++){
 		
-		std::string thisTool = allTools[t];
-	
-		// get the partition and metrics
+		//std::string thisTool = allTools[t];
+		ITI::Tool thisTool = allTools[t];
+		
+		//------------------------------------------------------------------------------
 		//
-		scai::lama::DenseVector<IndexType> partition;
+		// get first imbalanced distribution with the same tool
+		//
+		//
+		// set uniform node weights
+		
+		scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
+		SCAI_ASSERT_EQ_ERROR(nodeWeights.getLocalValues().size(), graph.getRowDistributionPtr()->getLocalSize(), "Nodeweights size mismatch.");
+		
+		// if usign unit weights, set flag for wrappers
+		bool nodeWeightsUse = false;
+		settings.repeatTimes = 1;
+		IndexType localN;  // the new localN after redistributing
+		{
+			// use some tool to partition with the node weights
+			//struct Metrics firstPartMetrics(1);
+			//firstPartMetrics.numBlocks = settings.numBlocks;
+			
+			struct Settings firstPartSettings = settings;
+			firstPartSettings.epsilon = 0.1;
+			
+			// uniform node weights - only used to measure imbalance
+			//scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
+			
+			getImbalancedDistribution( graph, coords, nodeWeights, thisTool, firstPartSettings);
+			
+			// calculate and print imbalance		
+			localN = graph.getRowDistributionPtr()->getLocalSize();
+			//PRINT(*comm<<": " << localN);		
+			const IndexType maxLocalN = comm->max(localN);
+			const IndexType minLocalN = comm->min(localN);
+			const ValueType optSize = ValueType(N)/comm->getSize();
+			
+			ValueType imbalance = ValueType( maxLocalN - optSize)/optSize;
+			PRINT0("\tpartition before: minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", distribution imbalance= " << imbalance);
+		}
+			
+		SCAI_ASSERT_EQ_ERROR(nodeWeights.getLocalValues().size(), graph.getRowDistributionPtr()->getLocalSize(), "Nodeweights size mismatch.");
+		SCAI_ASSERT_EQ_ERROR(nodeWeights.getLocalValues().size(), coords[0].getDistributionPtr()->getLocalSize(), "Nodeweights size mismatch.");
 		
 		// the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
 		struct Metrics metrics(1);
 		metrics.numBlocks = settings.numBlocks;
-		
-		// uniform node weights
-		scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
-		SCAI_ASSERT_EQ_ERROR(nodeWeights.getLocalValues().size(), localN, "Nodeweights size mismatch.");
-		
-		// if usign unit weights, set flag for wrappers
-		bool nodeWeightsUse = false;
-		
-		settings.repeatTimes = 1;
+				
 		
 		//WARNING: in order for the SaGa scripts to work this must be done as in Saga/header.py::outFileSting
 		//create the outFile for this tool
 		//settings.outFile = outPath+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ thisTool + ".info";
 		if( storeInfo){
-			settings.outFile = outPath+ thisTool+"/"+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ thisTool + ".info";
+			settings.outFile = outPath+ ITI::tool2string(thisTool)+"/"+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ ITI::tool2string(thisTool) + ".info";
 		}else{
 			settings.outFile ="-";
 		}
 		//PRINT0( "\n" << settings.outFile << "\n");
-		
-/*		
-		{
+			
+		{	// check if output file exists, if yes do not repartiotion with this tool so not to overwrite file
 			std::ifstream f(settings.outFile);
 			if( f.good() and storeInfo ){
 				comm->synchronize();	// maybe not needed
-				PRINT0("\n\tWARNING: File " << settings.outFile << " allready exists. Skipping partition with " << thisTool);
+				PRINT0("\n\tWARNING: File " << settings.outFile << " allready exists. Skipping repartition with " << ITI::tool2string(thisTool) );
 				continue;
 			}
 		}
-*/		
-		if( thisTool=="parMetis"){
-			//partition = ITI::Wrappers<IndexType,ValueType>::metisRepartition ( graph, coords, nodeWeights, nodeWeightsUse, settings, metrics);
-			int parMetisGeom=1;
-			partition = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coords, nodeWeights, nodeWeightsUse, parMetisGeom, settings, metrics);
-			
-		}else if (thisTool.substr(0,6)=="zoltan"){
-			std::string algo;
-			if		( thisTool=="zoltanRcb"){	algo = "rcb";	}
-			else if ( thisTool=="zoltanRib"){	algo = "rib";	}
-			else if ( thisTool=="zoltanMJ"){	algo = "multijagged";}
-			else if ( thisTool=="zoltanHsfc"){	algo = "hsfc";	}
-			
-			partition = ITI::Wrappers<IndexType,ValueType>::zoltanRepartition ( graph, coords, nodeWeights, nodeWeightsUse, algo, settings, metrics);
-		}else if( thisTool=="geoKmeans" ){
-			settings.verbose = true;
-			settings.balanceIterations = 5;
-			settings.minSamplingNodes = std::min( IndexType(2000), minLocalN/8 );
-			PRINT0("samplingNodes= "<< settings.minSamplingNodes );
-			std::chrono::time_point<std::chrono::high_resolution_clock> repartStart = std::chrono::high_resolution_clock::now();
-			partition = ITI::KMeans::computeRepartition<IndexType,ValueType>( coords, nodeWeights, settings);
-			//partition = ITI::KMeans::computeRepartition( coords, nodeWeights, settings);
-			std::chrono::duration<ValueType,std::ratio<1>> repartTime = std::chrono::high_resolution_clock::now() - repartStart;
-			ValueType time = comm->max( repartTime.count() );
-			metrics.timeFinalPartition = time;
-		}else{
-			std::cout<< "Tool "<< thisTool <<" not supported.\nAborting..."<<std::endl;
-			return -1;
-		}
+
+		scai::lama::DenseVector<IndexType> partition = ITI::Wrappers<IndexType,ValueType>::repartition ( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
 		
 		PRINT0("time to get the partition: " <<  metrics.timeFinalPartition );
 		
 		// partition has the the same distribution as the graph rows 
 		SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
 		
-		metrics.getMetrics( graph, partition, nodeWeights, settings );
+		metrics.getAllMetrics( graph, partition, nodeWeights, settings );
+		
+		scai::dmemo::DistributionPtr newDist = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );	
+		scai::dmemo::DistributionPtr oldDist = graph.getRowDistributionPtr();
+
+		metrics.redistributionVol( newDist, oldDist);
 		
 		//-----------------------------------------------------
 		//
@@ -452,36 +436,24 @@ int main(int argc, char** argv) {
 		
 		
 		if( thisPE==0 ){
-			std::cout << "Finished tool " << thisTool << std::endl;
 			if( vm.count("generate") ){
 				std::cout << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon;
 			}else{
 				std::cout << std::endl << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon;
 			}
-			std::cout << "\033[1;36m";
-			std::cout << "\n >>>> " << thisTool;
+			std::cout << "Finished tool \033[1;36m";
+			std::cout << "\n >>>> " <<  ITI::tool2string(thisTool);
 			std::cout<<  "\033[0m" << std::endl;
-
-			printMetricsShortRepart( metrics, thisTool, std::cout);
+			
+			printMetricsShortRepart( metrics, std::cout);
 			
 			// write in a file
-			if( storeInfo /*settings.outFile!="-"*/ ){
-				// typically, write a file per tool
-				//std::ofstream outF( settings.outFile, std::ios::out);
-				// for repartitioning we will store all in one file
-				//settings.outFile = outPath+ +"repartition/"+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_allTools.info";
-				std::ofstream outF( repartFile, std::ios::app);
+			if( settings.outFile!="-" ){
+				std::ofstream outF( settings.outFile, std::ios::out);
 				if(outF.is_open()){
-					outF << "Running "/* << __FILE__ << */" for tool " << thisTool << std::endl;
-					/*
-					if( vm.count("generate") ){
-						outF << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
-					}else{
-						outF << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
-					}
-					*/
 					//metrics.print( outF ); 
-					printMetricsShortRepart( metrics, thisTool, outF);
+					outF << "tool " <<  ITI::tool2string(thisTool) << std::endl;
+					printMetricsShort( metrics, outF);
 					outF << std::endl;
 					std::cout<< "Output information written to file " << settings.outFile << std::endl;
 				}else{
@@ -489,10 +461,6 @@ int main(int argc, char** argv) {
 				}       
 			}
 		}
-/*		
-memusage(&total, &used, &free, &buffers, &cached);	
-printf("\nMEM: avail: %ld , used: %ld , free: %ld , buffers: %ld , file cache: %ld \n\n",total,used,free,buffers, cached);
-*/		
 	} // for allTools.size()
      
 	std::chrono::duration<ValueType> totalTimeLocal = std::chrono::system_clock::now() - startTime;

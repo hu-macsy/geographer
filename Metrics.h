@@ -122,8 +122,19 @@ struct Metrics{
 
 	out.precision(oldprecision);
 	}
+//---------------------------------------------------------------------------
 	
-	void getMetrics( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
+	void getAllMetrics(scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
+		
+		getEasyMetrics( graph, partition, nodeWeights, settings );
+		
+		int numIter = 100;
+		getRedistRequiredMetrics( graph, partition, settings, numIter );
+		
+	}
+//---------------------------------------------------------------------------
+
+	void getEasyMetrics( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
 		
 		finalCut = ITI::GraphUtils::computeCut(graph, partition, true);
 		finalImbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
@@ -168,13 +179,15 @@ struct Metrics{
 		avgBorderNodesPercent = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(settings.numBlocks));
 		
 		// get SpMV and schedule time
-		int numIter = 100;
-		timeSpMV = -1;
+		//int numIter = 100;
+		//timeSpMV = -1;
 
-		timeSpMV = getSpMVtime( graph, partition, numIter)/numIter;		
-		timeComm = getCommScheduleTime( graph, partition, numIter)/numIter;
+		//timeSpMV = getSpMVtime( graph, partition, numIter)/numIter;		
+		//timeComm = getCommScheduleTime( graph, partition, numIter)/numIter;
 		
 		//get diameter
+		std::tie( maxBlockDiameter, avgBlockDiameter ) = getDiameter(graph, partition, settings);
+		/*
 		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 		const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
 		const IndexType localN = dist->getLocalSize();
@@ -195,21 +208,59 @@ struct Metrics{
 				IndexType localDiameter = ITI::GraphUtils::getLocalBlockDiameter<IndexType, ValueType>(graph, localN/2, 0, 0, maxRounds);
 				maxBlockDiameter = comm->max(localDiameter);
 				avgBlockDiameter = comm->sum(localDiameter) / comm->getSize();
+			}else{
+				PRINT0("\tWARNING: Not computing diameter, not all vertices are in same block everywhere");
 			}
 		}
+		*/
 	}
+//---------------------------------------------------------------------------
+
+
+	std::pair<IndexType,IndexType> getDiameter( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, struct Settings settings ){
+		
+		IndexType maxBlockDiameter = 0;
+		IndexType avgBlockDiameter = 0;
+		
+		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+		const IndexType localN = dist->getLocalSize();
+		
+		if (settings.numBlocks == comm->getSize() && settings.computeDiameter) {
+			//maybe possible to compute diameter
+			bool allLocalNodesInSameBlock;
+			{
+				scai::hmemo::ReadAccess<IndexType> rPart(partition.getLocalValues());
+				auto result = std::minmax_element(rPart.get(), rPart.get()+localN);
+PRINT(*comm<< ": "<< *result.first << " __ " << *result.second);
+				allLocalNodesInSameBlock = ((*result.first) == (*result.second));
+			}
+			if (comm->all(allLocalNodesInSameBlock)) {
+				IndexType maxRounds = settings.maxDiameterRounds;
+				if (maxRounds < 0) {
+					maxRounds = localN;
+				}
+				IndexType localDiameter = ITI::GraphUtils::getLocalBlockDiameter<IndexType, ValueType>(graph, localN/2, 0, 0, maxRounds);
+PRINT(*comm << ": "<< localDiameter);
+				maxBlockDiameter = comm->max(localDiameter);
+				avgBlockDiameter = comm->sum(localDiameter) / comm->getSize();
+			}else{
+				PRINT0("\tWARNING: Not computing diameter, not all vertices are in same block everywhere");
+			}
+		}
+		return std::make_pair( maxBlockDiameter, avgBlockDiameter);
+	}
+//---------------------------------------------------------------------------
 	
 	
-	ValueType getSpMVtime( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, const IndexType repeatTimes ){
+	void getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, struct Settings settings, const IndexType repeatTimes ){
 	
 		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 		const IndexType N = graph.getNumRows();
-		
-		PRINT0("starting SpMV...");
-		
+				
 		// the original row and  column distributions
-		const scai::dmemo::DistributionPtr initRowDistPtr = graph.getRowDistributionPtr();
-		const scai::dmemo::DistributionPtr initColDistPtr = graph.getColDistributionPtr();
+		//const scai::dmemo::DistributionPtr initRowDistPtr = graph.getRowDistributionPtr();
+		//const scai::dmemo::DistributionPtr initColDistPtr = graph.getColDistributionPtr();
 		
 		//get the distribution from the partition
 		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
@@ -217,7 +268,12 @@ struct Metrics{
 		std::chrono::time_point<std::chrono::system_clock> beforeRedistribution = std::chrono::system_clock::now();
 		// redistribute graph according to partition distribution
 		//graph.redistribute( distFromPartition, initColDistPtr);
-		graph.redistribute( distFromPartition, distFromPartition);		
+		
+		//distribute only rows for the diameter calculation
+		
+		scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( graph.getNumRows() ));
+		scai::lama::CSRSparseMatrix<ValueType> copyGraph( graph, distFromPartition, noDistPtr);
+		//graph.redistribute( distFromPartition, distFromPartition);		
 		
 		std::chrono::duration<ValueType> redistributionTime =  std::chrono::system_clock::now() - beforeRedistribution;
 		
@@ -226,7 +282,7 @@ struct Metrics{
 		PRINT0("time to redistribute: " << time);		
 		
 		const IndexType localN = distFromPartition->getLocalSize();
-		SCAI_ASSERT_EQ_ERROR( localN, graph.getLocalNumRows(), "Distribution mismatch")
+		SCAI_ASSERT_EQ_ERROR( localN, copyGraph.getLocalNumRows(), "Distribution mismatch")
 		
 		const IndexType maxLocalN = comm->max(localN);
 		const IndexType minLocalN = comm->min(localN);
@@ -234,34 +290,110 @@ struct Metrics{
 		
 		ValueType imbalance = ValueType( maxLocalN - optSize)/optSize;
 		PRINT0("minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", imbalance= " << imbalance);
-		
-		// get the SpMV 
-		
-		// vector for multiplication
-		scai::lama::DenseVector<ValueType> x ( graph.getColDistributionPtr(), 1.0 );
-		scai::lama::DenseVector<ValueType> y ( graph.getRowDistributionPtr(), 0.0 );
-		graph.setCommunicationKind( scai::lama::Matrix::SyncKind::ASYNCHRONOUS );
-		comm->synchronize();
-		// perfom the actual multiplication
-		std::chrono::time_point<std::chrono::system_clock> beforeSpMVTime = std::chrono::system_clock::now();
-		for(IndexType r=0; r<repeatTimes; r++){
-			//y = laplacian *x +y;
-			y = graph *x +y;
+						
+		// diameter
+		if( maxBlockDiameter==0 or avgBlockDiameter==0){
+			scai::lama::DenseVector<IndexType> copyPartition( partition, distFromPartition );	
+			//scai::lama::DenseVector<IndexType> tmpPart( distFromPartition, comm->getRank() );
+			std::tie( maxBlockDiameter, avgBlockDiameter ) = getDiameter(copyGraph, copyPartition, settings);
 		}
-		comm->synchronize();
-		std::chrono::duration<ValueType> SpMVTime = std::chrono::system_clock::now() - beforeSpMVTime;
-		//PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
 		
-		time = comm->max(SpMVTime.count());
-		ValueType minTime = comm->min( SpMVTime.count() );
-		PRINT0("max time for " << repeatTimes <<" SpMVs: " << time << " , min time " << minTime);
-	
+		// redistribute for SpMV and commTime
+		copyGraph.redistribute( distFromPartition, distFromPartition );	
+		
+		// SpMV 
+		{
+			PRINT0("starting SpMV...");
+			// vector for multiplication
+			scai::lama::DenseVector<ValueType> x ( copyGraph.getColDistributionPtr(), 1.0 );
+			scai::lama::DenseVector<ValueType> y ( copyGraph.getRowDistributionPtr(), 0.0 );
+			copyGraph.setCommunicationKind( scai::lama::Matrix::SyncKind::ASYNCHRONOUS );
+			comm->synchronize();
+			
+			// perfom the actual multiplication
+			std::chrono::time_point<std::chrono::system_clock> beforeSpMVTime = std::chrono::system_clock::now();
+			for(IndexType r=0; r<repeatTimes; r++){
+				//y = laplacian *x +y;
+				y = copyGraph *x +y;
+			}
+			comm->synchronize();
+			std::chrono::duration<ValueType> SpMVTime = std::chrono::system_clock::now() - beforeSpMVTime;
+			//PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
+			
+			time = comm->max(SpMVTime.count());
+			timeSpMV = time/repeatTimes;
+			
+			ValueType minTime = comm->min( SpMVTime.count() );
+			PRINT0("max time for " << repeatTimes <<" SpMVs: " << time << " , min time " << minTime);
+		}
+		
+		//TODO: maybe extract this time from the actual SpMV above
+		// comm time in SpMV
+		{
+			PRINT0("starting comm shcedule...");
+			const scai::dmemo::Halo& matrixHalo = copyGraph.getHalo();
+			const scai::dmemo::CommunicationPlan& sendPlan  = matrixHalo.getProvidesPlan();
+			const scai::dmemo::CommunicationPlan& recvPlan  = matrixHalo.getRequiredPlan();
+			
+			//PRINT(*comm << ": " << 	sendPlan.size() << " ++ " << sendPlan << " ___ " << recvPlan);
+			scai::hmemo::HArray<ValueType> sendData( sendPlan.totalQuantity(), 1.0 );
+			scai::hmemo::HArray<ValueType> recvData;
+			
+			comm->synchronize();
+			std::chrono::time_point<std::chrono::system_clock> beforeCommTime = std::chrono::system_clock::now();
+			for ( IndexType i = 0; i < repeatTimes; ++i ){
+				comm->exchangeByPlan( recvData, recvPlan, sendData, sendPlan );
+			}
+			//comm->synchronize();
+			std::chrono::duration<ValueType> commTime = std::chrono::system_clock::now() - beforeCommTime;
+			
+			//PRINT(*comm << ": "<< sendPlan );		
+			time = comm->max(commTime.count());
+			timeComm = time/repeatTimes;
+			
+			ValueType minTime = comm->min( commTime.count() );
+			PRINT0("max time for " << repeatTimes <<" communications: " << time << " , min time " << minTime);
+		}
+		
 		//redistibute back to initial distributions
-		graph.redistribute( initRowDistPtr, initColDistPtr );
+		//graph.redistribute( initRowDistPtr, initColDistPtr );
 		
-		return time;
 	}
 
+	/* Calculate the volume, aka the data, tha will be exchanged when redistributing from oldDist to newDist.
+	 */
+	void redistributionVol( const scai::dmemo::DistributionPtr newDist , const scai::dmemo::DistributionPtr oldDist){
+		
+		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		
+		//get the distribution from the partition
+		//scai::dmemo::DistributionPtr newDist = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );	
+		//scai::dmemo::DistributionPtr oldDist = graph.getRowDistributionPtr();
+		scai::dmemo::Redistributor prepareRedist( newDist, oldDist );	
+				
+		// redistribution load
+		scai::hmemo::HArray<IndexType> sourceIndices = prepareRedist.getHaloSourceIndexes();
+		scai::hmemo::HArray<IndexType> targetIndices = prepareRedist.getHaloTargetIndexes();
+		IndexType thisSourceSize = prepareRedist.getHaloSourceSize();
+		IndexType thisTargetSize = prepareRedist.getHaloTargetSize();
+		PRINT(*comm<< ": "<< thisSourceSize);
+		PRINT(*comm<< ": "<< thisTargetSize);
+
+		IndexType globTargetSize = comm->sum( thisTargetSize);
+		IndexType globSourceSize = comm->sum( thisSourceSize);
+		SCAI_ASSERT_EQ_ERROR( globSourceSize, globTargetSize, "Mismatch in total migartion volume.");
+		//PRINT0("globTargetSize= " << globTargetSize);
+		//PRINT0("globSourceSize= " << globSourceSize);
+		PRINT0("total migration volume= " << globSourceSize);
+		
+		IndexType maxTargetSize = comm->max( thisTargetSize);
+		IndexType maxSourceSize = comm->max( thisSourceSize);
+		PRINT0("maxTargetSize= " << maxTargetSize);
+		PRINT0("maxSourceSize= " << maxSourceSize);
+	}
+	
+	
+	//TODO: deprecated version, remove
 	ValueType getCommScheduleTime( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, const IndexType repeatTimes){
 			
 		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();

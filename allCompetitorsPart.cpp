@@ -69,9 +69,6 @@ int main(int argc, char** argv) {
 	ITI::Format coordFormat;
 	std::string outPath;
 	std::string graphName;
-	
-	//WARNING: removed parmetis sfc
-	std::vector<std::string> allTools = {"zoltanRcb", "zoltanRib", "zoltanMJ", "zoltanHsfc", /*"parMetisSfc",*/ "parMetisGeom", "parMetisGraph" };
     
 	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
 	
@@ -244,9 +241,14 @@ int main(int argc, char** argv) {
 	// start main for loop for all tools
 	//
 	
+	//WARNING: 1) removed parmetis sfc
+	//WARNING: 2) parMetisGraph should be last because it often crashes
+	std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRIB, ITI::Tool::zoltanRCB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph };
+	
 	for( int t=0; t<allTools.size(); t++){
 		
-		std::string thisTool = allTools[t];
+		//std::string thisTool = allTools[t];
+		ITI::Tool thisTool = allTools[t];
 	
 		// get the partition and metrics
 		//
@@ -273,7 +275,7 @@ int main(int argc, char** argv) {
 		//create the outFile for this tool
 		//settings.outFile = outPath+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ thisTool + ".info";
 		if( storeInfo){
-			settings.outFile = outPath+ thisTool+"/"+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ thisTool + ".info";
+			settings.outFile = outPath+ ITI::tool2string(thisTool)+"/"+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ ITI::tool2string(thisTool) + ".info";
 		}else{
 			settings.outFile ="-";
 		}
@@ -282,11 +284,14 @@ int main(int argc, char** argv) {
 			std::ifstream f(settings.outFile);
 			if( f.good() and storeInfo ){
 				comm->synchronize();	// maybe not needed
-				PRINT0("\n\tWARNING: File " << settings.outFile << " allready exists. Skipping partition with " << thisTool);
+				PRINT0("\n\tWARNING: File " << settings.outFile << " allready exists. Skipping partition with " << ITI::tool2string(thisTool));
 				continue;
 			}
 		}
 		
+		partition = ITI::Wrappers<IndexType,ValueType>::partition ( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
+		
+/*		
 		if( thisTool.substr(0,8)=="parMetis"){
 			if 		( thisTool=="parMetisGraph"){	parMetisGeom = 0;	}
 			else if ( thisTool=="parMetisGeom"){	parMetisGeom = 1;	}
@@ -306,13 +311,13 @@ int main(int argc, char** argv) {
 			std::cout<< "Tool "<< thisTool <<" not supported.\nAborting..."<<std::endl;
 			return -1;
 		}
-		
+*/		
 		PRINT0("time to get the partition: " <<  metrics.timeFinalPartition );
 		
 		// partition has the the same distribution as the graph rows 
 		SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
 		
-		metrics.getMetrics( graph, partition, nodeWeights, settings );
+		metrics.getAllMetrics( graph, partition, nodeWeights, settings );
 		
 		//---------------------------------------------------------------
 		//
@@ -327,14 +332,14 @@ int main(int argc, char** argv) {
 		}
 		
 		if( thisPE==0 ){
-			std::cout << "Finished tool" << thisTool << std::endl;
 			if( vm.count("generate") ){
 				std::cout << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon;
 			}else{
 				std::cout << std::endl << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon;
 			}
+			std::cout << "Finished tool" << std::endl;
 			std::cout << "\033[1;36m";
-			std::cout << "\n >>>> " << thisTool;
+			std::cout << "\n >>>> " << ITI::tool2string(thisTool);
 			std::cout<<  "\033[0m" << std::endl;
 
 			printMetricsShort( metrics, std::cout);
@@ -343,7 +348,7 @@ int main(int argc, char** argv) {
 			if( settings.outFile!="-" ){
 				std::ofstream outF( settings.outFile, std::ios::out);
 				if(outF.is_open()){
-					outF << "Running " << __FILE__ << " for tool " << thisTool << std::endl;
+					outF << "Running " << __FILE__ << " for tool " << ITI::tool2string(thisTool) << std::endl;
 					if( vm.count("generate") ){
 						outF << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
 					}else{

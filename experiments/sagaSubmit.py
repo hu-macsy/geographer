@@ -33,11 +33,13 @@ import argparse
 def submitExp( exp, tool, outDir ):
 
 	if tool=="Geographer":
-		submitGeographer(exp, "graph", outDir)
+		submitGeographer(exp, "Geographer", outDir)
 	elif tool=="geoKmeans":
 		submitGeographer(exp, "geoKmeans", outDir)
 	elif tool=="geoSfc":
 		submitGeographer(exp, "geoSfc", outDir)
+	elif tool=="repartKmeans"
+		submitGeographer(exp, "repartKmeans", outDir)
 	else:
 		submitCompetitor( exp, tool, outDir)
 
@@ -55,23 +57,24 @@ def submitGeographer(exp, version, outDir):
 	
 	for i in range(0,exp.size):
 		
-		if version=="graph":
+		if version=="Geographer":
 			# set parameters for every experiment
 			params = defaultSettings()
 			executable = geoExe
-			tool = "Geographer"
 		elif version=="geoKmeans":
 			executable = initialExe
 			params = " --initialPartition=3"
-			tool = version
 		elif version=="geoSfc":
 			executable = initialExe
 			params = " --initialPartition=0"
-			tool = version
+		elif version=="repartKmeans":
+			executable = repartKmeans
 		else:
 			print("Version given: " + version + " is not implemented.\nAborting...");
 			exit(-1)
 
+		tool = version
+		
 		if not os.path.exists( os.path.join( outDir, tool) ):
 			print("WARNING: Output directory " + os.path.join( outDir, tool) +" does not exist. Creating directory " + os.path.join( outDir, tool))
 			os.makedirs( os.path.join( outDir, tool) )
