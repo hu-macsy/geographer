@@ -16,6 +16,7 @@
 #include "quadtree/QuadNodeCartesianEuclid.h"
 #include "Settings.h"
 #include "GraphUtils.h"
+#include "HilbertCurve.h"
 
 using scai::lama::DenseVector;
 

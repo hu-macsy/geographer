@@ -14,7 +14,7 @@
 #include <scai/dmemo/GenBlockDistribution.hpp>
 
 #include "KMeans.h"
-#include "HilbertCurve.h"
+
 
 namespace ITI {
 namespace KMeans {
