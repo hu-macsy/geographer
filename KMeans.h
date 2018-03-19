@@ -106,6 +106,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	const IndexType dim = coordinates.size();
 	assert(dim > 0);
 	const IndexType localN = nodeWeights.getLocalValues().size();
+	const IndexType globalN = nodeWeights.size();
 	assert(nodeWeights.getLocalValues().size() == coordinates[0].getLocalValues().size());
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -167,10 +168,10 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	IndexType samplingRounds = 0;
 	std::vector<IndexType> samples;
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
-	if (localN > minNodes) {
+	if (comm->all(localN > minNodes)) {
 		ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
 
-		samplingRounds = std::ceil(std::log2(ValueType(localN) / minNodes))+1;
+		samplingRounds = std::ceil(std::log2(ValueType(globalN / (settings.minSamplingNodes*k))))+1;
 		samples.resize(samplingRounds);
 		samples[0] = minNodes;
 	}
