@@ -15,7 +15,6 @@
 
 #include "KMeans.h"
 #include "HilbertCurve.h"
-#include "AuxiliaryFunctions.h"
 
 namespace ITI {
 namespace KMeans {
@@ -24,7 +23,8 @@ using scai::lama::Scalar;
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCentersSFC(
-		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords, Settings settings) {
+		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords,
+		const std::vector<ValueType> &maxCoords, Settings settings) {
 
 	SCAI_REGION( "KMeans.findInitialCentersSFC" );
 	const IndexType localN = coordinates[0].getLocalValues().size();
@@ -46,12 +46,7 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 	}
 
 	//get local hilbert indices
-	/*
-	std::vector<ValueType> sfcIndices(localN);
-	for (IndexType i = 0; i < localN; i++) {
-		sfcIndices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(convertedCoords[i].data(), dimensions, settings.sfcResolution, minCoords, maxCoords);
-	}
-	*/
+
 	std::vector<ValueType> sfcIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector( coordinates, settings.sfcResolution, settings.dimensions);
 	SCAI_ASSERT_EQ_ERROR( sfcIndices.size(), localN, "wrong local number of indices (?) ");
 
@@ -360,7 +355,7 @@ DenseVector<IndexType> assignBlocks(
 	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 //	const IndexType localN = nodeWeights.getLocalValues().size();
 	const IndexType k = targetBlockSizes.size();
-//PRINT(*comm << ": " << localN );
+
 	assert(influence.size() == k);
 
 	//compute assignment and balance
@@ -493,15 +488,14 @@ DenseVector<IndexType> assignBlocks(
 				}
 				blockWeights[wAssignment[i]] += rWeights[i];
 			}
-if (settings.verbose) {
-std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
-ValueType time = balanceTime.count() ;
- std::cout<< comm->getRank()<< ": time " << time << std::endl;
-}
+			if (settings.verbose) {
+			std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
+			ValueType time = balanceTime.count() ;
+			 std::cout<< comm->getRank()<< ": time " << time << std::endl;
+			}
 			comm->synchronize();
 		}
 
-		//if (iter == settings.balanceIterations) continue;
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.blockWeightSum" );
 			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<IndexType>::stype);
@@ -557,7 +551,7 @@ ValueType time = balanceTime.count() ;
 				lowerBoundNextCenter[i] *= minRatio - 1e-12;//TODO: compute separate min ratio with respect to bounding box, only update that.
 			}
 		}
-if (settings.verbose) PRINT(*comm);
+
 		//update possible closest centers
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.filterCenters" );
@@ -587,7 +581,7 @@ if (settings.verbose) PRINT(*comm);
 		}
 	} while (imbalance > settings.epsilon - 1e-12 && iter < settings.balanceIterations);
 	//std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
-if (settings.verbose) PRINT(*comm);
+
 	return assignment;
 }
 
@@ -755,12 +749,9 @@ std::vector<std::vector<ValueType> > findLocalCenters(const std::vector<DenseVec
 template std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly( const IndexType k,  const std::vector<ValueType> &maxCoords, Settings settings);
 
 template std::vector<std::vector<ValueType> > findInitialCenters(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights);
-
-template std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<IndexType> &partition, const IndexType k, std::vector<IndexType>::iterator firstIndex, std::vector<IndexType>::iterator lastIndex, const DenseVector<ValueType> &nodeWeights);
-
-template DenseVector<IndexType> assignBlocks(
-		const std::vector<std::vector<ValueType>> &coordinates,
-		const std::vector<std::vector<ValueType> > &centers,
+template std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<IndexType> &partition, const IndexType k,
+        std::vector<IndexType>::iterator firstIndex, std::vector<IndexType>::iterator lastIndex, const DenseVector<ValueType> &nodeWeights);
+template DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &coordinates, const std::vector<std::vector<ValueType> > &centers,
         std::vector<IndexType>::iterator firstIndex, std::vector<IndexType>::iterator lastIndex,
         const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment, const std::vector<IndexType> &blockSizes, const SpatialCell &boundingBox,
         std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter, std::vector<ValueType> &influence, Settings settings);
@@ -772,6 +763,5 @@ template DenseVector<IndexType> getPartitionWithSFCCoords(const scai::lama::CSRS
 template DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings);
 
 }
-
 
 } /* namespace ITI */

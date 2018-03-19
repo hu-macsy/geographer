@@ -9,17 +9,13 @@
 
 #include <vector>
 #include <numeric>
-#include <cmath>
 #include <scai/lama/DenseVector.hpp>
 #include <scai/tracing.hpp>
 #include <chrono>
 
 #include "quadtree/QuadNodeCartesianEuclid.h"
-#include "GraphUtils.h"
-#ifndef SETTINGS_H
 #include "Settings.h"
-#endif
-
+#include "GraphUtils.h"
 
 using scai::lama::DenseVector;
 
@@ -85,7 +81,6 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 /**
  * Implementations
  */
-
 template<typename ValueType>
 std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates) {
 	const int dim = coordinates.size();
@@ -100,7 +95,8 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 
 //wrapper for initial partitioning
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const Settings settings) {
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights,
+		const std::vector<IndexType> &blockSizes, const Settings settings) {
 	std::vector<ValueType> minCoords, maxCoords;
 	std::tie(minCoords, maxCoords) = getLocalMinMaxCoords(coordinates);
 	for(int d=0; d<settings.dimensions; d++){
@@ -124,7 +120,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<std::vector<ValueType> > initialCenters = findCenters(coordinates, previous, k,	indices.begin(), indices.end(), nodeWeights);
 	return computePartition(coordinates, k, nodeWeights, blockSizes, initialCenters, settings);
 }
-
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights,
@@ -187,10 +182,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 
 	//prepare sampling
 	std::vector<IndexType> localIndices(localN);
-	typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
-	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
+	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
+	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();;
 	std::iota(firstIndex, lastIndex, 0);
-	
 
 	IndexType minNodes = settings.minSamplingNodes*blocksPerProcess;
 	assert(minNodes > 0);
@@ -198,21 +192,13 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<IndexType> samples;
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
 	if (localN > minNodes) {
-		std::chrono::time_point<std::chrono::high_resolution_clock> reorderStart = std::chrono::high_resolution_clock::now();
 		ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
-		//localIndices = ITI::GraphUtils::indexReorderCantor(localN);
-		std::chrono::duration<ValueType,std::ratio<1>> reorderTime = std::chrono::high_resolution_clock::now() - reorderStart;
-		ValueType time = comm->max( reorderTime.count() );
-		PRINT0("\tmax time to reorder indices= " << time);
-		
+
 		samplingRounds = std::ceil(std::log2(ValueType(localN) / minNodes))+1;
 		samples.resize(samplingRounds);
 		samples[0] = minNodes;
 	}
 
-	firstIndex = localIndices.begin();
-	lastIndex = localIndices.end();
-	
 	if (samplingRounds > 0 && settings.verbose) {
 		if (comm->getRank() == 0) std::cout << "Starting with " << samplingRounds << " sampling rounds." << std::endl;
 	}
@@ -232,13 +218,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	ValueType delta = 0;
 	bool balanced = false;
 	const ValueType threshold = 0.002*diagonalLength;//TODO: take global point density into account
-
-//PRINT0("threshold= " << threshold << " , samplingRounds= " << samplingRounds);	
-
 	const IndexType maxIterations = settings.maxKMeansIterations;
 	do {
-PRINT( *comm );			
-		std::chrono::time_point<std::chrono::high_resolution_clock> iterStart = std::chrono::high_resolution_clock::now();
+
 		if (iter < samplingRounds) {
 			lastIndex = firstIndex + samples[iter];
 			std::sort(firstIndex, lastIndex);//sorting not really necessary, but increases locality
@@ -247,13 +229,11 @@ PRINT( *comm );
 				adjustedBlockSizes[j] = ValueType(blockSizes[j]) * ratio;
 			}
 		} else {
-			//SCAI_ASSERT_EQ_ERROR( *lastIndex, localIndices.back(), "Index mismatch");
 			assert(lastIndex == localIndices.end());
 		}
 
 		Settings balanceSettings = settings;
 		//balanceSettings.balanceIterations = 0;//iter >= samplingRounds ? settings.balanceIterations : 0;
-PRINT(*comm <<": " << *firstIndex << " -- " << *lastIndex );
 		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, balanceSettings);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
@@ -296,7 +276,7 @@ PRINT(*comm <<": " << *firstIndex << " -- " << *lastIndex );
 		const double deltaSq = delta*delta;
 		const double maxInfluence = *std::max_element(influence.begin(), influence.end());
 		//const double minInfluence = *std::min_element(influence.begin(), influence.end());
-if (settings.verbose) PRINT(*comm);	
+
 		{
 			SCAI_REGION( "KMeans.computePartition.updateBounds" );
 			for (auto it = firstIndex; it != lastIndex; it++) {
@@ -316,6 +296,7 @@ if (settings.verbose) PRINT(*comm);
 					lowerBoundNextCenter[i] = 0;
 				} else {
 					ValueType diff = (-2*delta*pureSqrt + deltaSq)*(maxInfluence + 1e-10);
+                                        //TODO: assertion fails for small graphs
 					assert(diff <= 0);
 					lowerBoundNextCenter[i] += diff;
 					if (!(lowerBoundNextCenter[i] > 0)) lowerBoundNextCenter[i] = 0;
@@ -346,15 +327,8 @@ if (settings.verbose) PRINT(*comm);
 		if (comm->getRank() == 0) {
 			std::cout << "i: " << iter << ", delta: " << delta << std::endl;
 		}
-if (settings.verbose) {
-std::chrono::duration<ValueType,std::ratio<1>> iterTime = std::chrono::high_resolution_clock::now() - iterStart;			
-ValueType time = iterTime.count() ;
-std::cout<< "\t"<<comm->getRank() <<": " << time << std::endl;
-}
-			
 		iter++;
 	} while (iter < samplingRounds || (iter < maxIterations && (delta > threshold || !balanced)));
-PRINT( *comm );	
 	return result;
 }
 

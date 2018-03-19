@@ -488,7 +488,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         
         int typesize;
         MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
-        assert(typesize == sizeof(sort_pair));
+        //assert(typesize == sizeof(sort_pair)); //not valid for int_double, presumably due to padding
         
         const IndexType maxLocalN = comm->max(localN);
         std::vector<sort_pair> localPairs(maxLocalN);
