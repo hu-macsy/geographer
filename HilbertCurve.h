@@ -21,6 +21,8 @@
 
 #include "Settings.h"
 
+#include "RBC/Sort/SQuick.hpp"
+
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
 using scai::lama::DenseVector;
@@ -89,6 +91,9 @@ namespace ITI {
 			*/
 			static std::vector<ValueType> Hilbert2DIndex2Point(ValueType index, IndexType recursionDepth);
 
+			static std::vector<ValueType> Hilbert2DIndex2PointVec(ValueType index, IndexType recursionDepth);
+			
+			
 			/**
 			* Given an index between 0 and 1 returns a point in 3 dimensions along the hilbert curve based on
 			* the recursion depth. Mostly for test reasons.
@@ -98,6 +103,12 @@ namespace ITI {
 			* @return A point in the unit cube [0,1]^3
 			*/
 			static std::vector<ValueType> Hilbert3DIndex2Point(ValueType index, IndexType recursionDepth);
+			
+			static std::vector<ValueType> Hilbert3DIndex2PointVec(ValueType index, IndexType recursionDepth);
+			
+			/*Get the hilbert indices sorted. Every PE will own its part of the hilbert indices
+			 */			
+			static std::vector<sort_pair> getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates);			
 
 	};
 }//namespace ITI

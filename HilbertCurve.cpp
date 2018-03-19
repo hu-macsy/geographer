@@ -7,7 +7,6 @@
 
 #include "HilbertCurve.h"
 
-#include "RBC/Sort/SQuick.hpp"
 
 namespace ITI{
 
@@ -279,7 +278,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::HilbertIndex2PointVec
 	
 	throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
 }
-
+//-------------------------------------------------------------------------------------------------
 
 /*
 * Given a 3D point it returns its index in [0,1] on the hilbert curve based on the level depth.

@@ -374,24 +374,8 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
   }
 
 }
-	
-//-----------------------------------------------------------------
-//
-//Creates random coordinates for n points in 3D and test the new.
-//
-TEST_F(HilbertCurveTest, testRandom_Distributed_3D) {
-  const IndexType dimensions = 3;
-  const IndexType N = 200000;
-  const IndexType recursionDepth = 19;
-  
-  scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-  scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-  std::vector<DenseVector<ValueType>> coordinates(dimensions);
-  for(IndexType i=0; i<dimensions; i++){ 
-      coordinates[i].allocate(dist);
-      coordinates[i] = static_cast<ValueType>( 0 );
-  }
 
+  
 INSTANTIATE_TEST_CASE_P(InstantiationName,
                         HilbertCurveTest,
                         testing::Values(2,3));

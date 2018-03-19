@@ -534,7 +534,7 @@ TEST_F(auxTest, testBenchKMeansSFCCoords){
 	partitionSFC.redistribute( dist );
 	struct Metrics metrics1(1);
 	
-	metrics1.getMetrics( graph, partitionSFC, uniformWeights, settings );
+	metrics1.getAllMetrics( graph, partitionSFC, uniformWeights, settings );
 	printMetricsShort( metrics1, std::cout );
 	
 	ITI::aux<IndexType,ValueType>::print2DGrid(graph, partitionSFC  );
@@ -561,7 +561,7 @@ TEST_F(auxTest, testBenchKMeansSFCCoords){
 	
 	struct Metrics metrics2(1);
 	
-	metrics2.getMetrics( graph, partitionOrig, uniformWeights, settings );
+	metrics2.getAllMetrics( graph, partitionOrig, uniformWeights, settings );
 	printMetricsShort( metrics2, std::cout );
 	
 	ITI::aux<IndexType,ValueType>::print2DGrid(graph, partitionOrig  );
