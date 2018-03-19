@@ -192,7 +192,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	IndexType samplingRounds = 0;
 	std::vector<IndexType> samples;
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
-	if (localN > minNodes) {
+	if (comm->all(localN > minNodes)) {
 		ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
 
 		samplingRounds = std::ceil(std::log2(ValueType(globalN / (settings.minSamplingNodes*k))))+1;
