@@ -226,7 +226,8 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 
 
 TEST_F(KMeansTest, testPartitionWithNodeWeights) {
-	std::string fileName = "Grid32x32";
+	//std::string fileName = "Grid32x32";
+	std::string fileName = "bubbles-00010.graph";
 	std::string graphFile = graphPath + fileName;
 	std::string coordFile = graphFile + ".xyz";
 	const IndexType dimensions = 2;
@@ -259,7 +260,7 @@ TEST_F(KMeansTest, testPartitionWithNodeWeights) {
 	}
 	
 	const IndexType seed = 0;
-	ValueType diverg = 0.5;
+	ValueType diverg = 0.8;
 		
 	scai::lama::DenseVector<ValueType> imbaNodeWeights = ITI::Repartition<IndexType,ValueType>::sNW( coords, seed, diverg, dimensions);
 	
@@ -267,7 +268,13 @@ TEST_F(KMeansTest, testPartitionWithNodeWeights) {
 	ValueType minWeight = imbaNodeWeights.min().Scalar::getValue<ValueType>();
 	PRINT0("maxWeight= "<< maxWeight << " , minWeight= "<< minWeight);
 
-	settings.verbose = true;
+	const IndexType localN = graph.getLocalNumRows();
+	
+	//settings.verbose = true;
+	settings.maxKMeansIterations = 30;
+	settings.balanceIterations = 10;
+	settings.minSamplingNodes = localN;
+	
 	scai::lama::DenseVector<IndexType> imbaPartition = ITI::KMeans::computePartition ( coords, settings.numBlocks, imbaNodeWeights, blockSizes, settings);
 	
 	metrics.getEasyMetrics( graph, imbaPartition, imbaNodeWeights, settings );

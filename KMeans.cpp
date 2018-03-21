@@ -403,9 +403,10 @@ DenseVector<IndexType> assignBlocks(
 		for (Iterator it = firstIndex; it != lastIndex; it++) {
 			localSampleWeightSum += rWeights[*it];
 		}
+//PRINT(*comm << ": "<< localSampleWeightSum );		
 	}
 	const ValueType totalWeightSum = comm->sum(localSampleWeightSum);
-	const IndexType optSize = std::ceil(totalWeightSum / k );
+	ValueType optSize = std::ceil(totalWeightSum / k );
 
 	ValueType imbalance;
 	IndexType iter = 0;
@@ -418,7 +419,7 @@ DenseVector<IndexType> assignBlocks(
 	{
 		std::chrono::time_point<std::chrono::high_resolution_clock> balanceStart = std::chrono::high_resolution_clock::now();
 		SCAI_REGION( "KMeans.assignBlocks.balanceLoop" );
-		std::vector<IndexType> blockWeights(k,0);
+		std::vector<ValueType> blockWeights(k,0.0);
 		IndexType totalComps = 0;
 		IndexType skippedLoops = 0;
 		IndexType balancedBlocks = 0;
@@ -495,17 +496,26 @@ DenseVector<IndexType> assignBlocks(
 			if (settings.verbose) {
 			std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
 			ValueType time = balanceTime.count() ;
-			 std::cout<< comm->getRank()<< ": time " << time << std::endl;
+			std::cout<< comm->getRank()<< ": time " << time << std::endl;
 			}
 			comm->synchronize();
 		}
-
+//if( comm->getRank()==0 ) aux<IndexType,ValueType>::printVector( blockWeights );
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.blockWeightSum" );
-			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<IndexType>::stype);
+			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<ValueType>::stype);
 		}
-		IndexType maxBlockWeight = *std::max_element(blockWeights.begin(), blockWeights.end());
+		
+		ValueType maxBlockWeight = *std::max_element(blockWeights.begin(), blockWeights.end());
+//IndexType optSize = std::ceil(maxBlockWeight / k );		
 		imbalance = (ValueType(maxBlockWeight - optSize)/ optSize);//TODO: adapt for block sizes
+
+if( comm->getRank()==0 ) aux<IndexType,ValueType>::printVector( blockWeights );
+//PRINT0("maxBlockWeight= " << maxBlockWeight <<" , optSize= " << optSize);
+//ValueType totBlockWeight = std::accumulate(blockWeights.begin(), blockWeights.end(), 0);
+
+//PRINT0("totalWeightSum= " << totalWeightSum << ", totBlockWeight= " << totBlockWeight);
+PRINT0("\t\t\t\t\t\timbalance= " << imbalance);
 
 		std::vector<ValueType> oldInfluence = influence;
 
