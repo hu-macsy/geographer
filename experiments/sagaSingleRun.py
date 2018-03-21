@@ -6,12 +6,12 @@ import argparse
 
 from submitFileWrapper_Supermuc import *
 #from test_SubmitScript import submitAllCompetitors, submitExp2
-from test_SubmitScript import submitExp2, submitAllCompetitors
+from sagaSubmit import submitExp, submitAllCompetitors
 from header import *
 
 
 parser = argparse.ArgumentParser(description='Submit jobs in Supermuc batch job system  for the selected tools for a signle file and one or more values of k (appropriate for one experiment run was forgotten or crashed)')
-parser.add_argument('--tools','-t' , type=str , nargs='*', default="Geographer", help='Name of the tools. It can be: Geographer, parMetisGraph, parMetisGeom.')
+parser.add_argument('--tools','-t' , type=str , nargs='*', default=["Geographer"], help='Name of the tools. It can be: Geographer, parMetisGraph, parMetisGeom.')
 #parser.add_argument('--configFile','-c', default="SaGa.config", help='The configuration file. ')
 #parser.add_argument('--wantedExp', '-we', type=int, nargs='*', metavar='exp', help='A subset of the experiments that will be submited.')
 
@@ -115,7 +115,7 @@ if wantedTools[0]=="all":
 		print("Not submitting experiments, aborting...")
 		exit(0)
 
-	submitAllCompetitors( exp )	
+	submitAllCompetitors( exp, outDir )	
 		
 	exit(0)
 	

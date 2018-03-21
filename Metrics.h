@@ -44,6 +44,10 @@ struct Metrics{
 
 	IndexType maxBlockDiameter = 0;
 	IndexType avgBlockDiameter = 0;
+
+	// used for redistribution
+	IndexType maxRedistVol = 0;
+	IndexType totRedistVol = 0;
 	
 	// various other needed info
 	IndexType numBlocks = -1;
@@ -134,6 +138,17 @@ struct Metrics{
 	}
 //---------------------------------------------------------------------------
 
+	void getRedistMetrics( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
+		
+		getAllMetrics( graph, partition, nodeWeights, settings);
+		
+		scai::dmemo::DistributionPtr newDist = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );	
+		scai::dmemo::DistributionPtr oldDist = graph.getRowDistributionPtr();
+		
+		std::tie( maxRedistVol, totRedistVol ) = getRedistributionVol( newDist, oldDist);
+		
+	}
+//---------------------------------------------------------------------------
 	void getEasyMetrics( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
 		
 		finalCut = ITI::GraphUtils::computeCut(graph, partition, true);
@@ -178,41 +193,9 @@ struct Metrics{
 		maxBorderNodesPercent = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
 		avgBorderNodesPercent = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(settings.numBlocks));
 		
-		// get SpMV and schedule time
-		//int numIter = 100;
-		//timeSpMV = -1;
-
-		//timeSpMV = getSpMVtime( graph, partition, numIter)/numIter;		
-		//timeComm = getCommScheduleTime( graph, partition, numIter)/numIter;
-		
 		//get diameter
 		std::tie( maxBlockDiameter, avgBlockDiameter ) = getDiameter(graph, partition, settings);
-		/*
-		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-		const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-		const IndexType localN = dist->getLocalSize();
 		
-		if (settings.numBlocks == comm->getSize() && settings.computeDiameter) {
-			//maybe possible to compute diameter
-			bool allLocalNodesInSameBlock;
-			{
-				scai::hmemo::ReadAccess<IndexType> rPart(partition.getLocalValues());
-				auto result = std::minmax_element(rPart.get(), rPart.get()+localN);
-				allLocalNodesInSameBlock = ((*result.first) == (*result.second));
-			}
-			if (comm->all(allLocalNodesInSameBlock)) {
-				IndexType maxRounds = settings.maxDiameterRounds;
-				if (maxRounds < 0) {
-					maxRounds = localN;
-				}
-				IndexType localDiameter = ITI::GraphUtils::getLocalBlockDiameter<IndexType, ValueType>(graph, localN/2, 0, 0, maxRounds);
-				maxBlockDiameter = comm->max(localDiameter);
-				avgBlockDiameter = comm->sum(localDiameter) / comm->getSize();
-			}else{
-				PRINT0("\tWARNING: Not computing diameter, not all vertices are in same block everywhere");
-			}
-		}
-		*/
 	}
 //---------------------------------------------------------------------------
 
@@ -233,7 +216,7 @@ struct Metrics{
 			{
 				scai::hmemo::ReadAccess<IndexType> rPart(partition.getLocalValues());
 				auto result = std::minmax_element(rPart.get(), rPart.get()+localN);
-PRINT(*comm<< ": "<< *result.first << " __ " << *result.second);
+//PRINT(*comm<< ": "<< *result.first << " __ " << *result.second);
 				allLocalNodesInSameBlock = ((*result.first) == (*result.second));
 			}
 			if (comm->all(allLocalNodesInSameBlock)) {
@@ -242,7 +225,7 @@ PRINT(*comm<< ": "<< *result.first << " __ " << *result.second);
 					maxRounds = localN;
 				}
 				IndexType localDiameter = ITI::GraphUtils::getLocalBlockDiameter<IndexType, ValueType>(graph, localN/2, 0, 0, maxRounds);
-PRINT(*comm << ": "<< localDiameter);
+//PRINT(*comm << ": "<< localDiameter);
 				maxBlockDiameter = comm->max(localDiameter);
 				avgBlockDiameter = comm->sum(localDiameter) / comm->getSize();
 			}else{
@@ -270,14 +253,13 @@ PRINT(*comm << ": "<< localDiameter);
 		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
 		
 		std::chrono::time_point<std::chrono::system_clock> beforeRedistribution = std::chrono::system_clock::now();
-		// redistribute graph according to partition distribution
-		//graph.redistribute( distFromPartition, initColDistPtr);
-		
-		//distribute only rows for the diameter calculation
+
+		// redistribute graph according to partition distribution		
+		// distribute only rows for the diameter calculation
 		
 		scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( graph.getNumRows() ));
 		scai::lama::CSRSparseMatrix<ValueType> copyGraph( graph, distFromPartition, noDistPtr);
-		//graph.redistribute( distFromPartition, distFromPartition);		
+			
 		
 		std::chrono::duration<ValueType> redistributionTime =  std::chrono::system_clock::now() - beforeRedistribution;
 		
@@ -366,7 +348,7 @@ PRINT(*comm << ": "<< localDiameter);
 
 	/* Calculate the volume, aka the data, tha will be exchanged when redistributing from oldDist to newDist.
 	 */
-	void redistributionVol( const scai::dmemo::DistributionPtr newDist , const scai::dmemo::DistributionPtr oldDist){
+	std::pair<IndexType,IndexType> getRedistributionVol( const scai::dmemo::DistributionPtr newDist , const scai::dmemo::DistributionPtr oldDist){
 		
 		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 		
@@ -380,20 +362,18 @@ PRINT(*comm << ": "<< localDiameter);
 		scai::hmemo::HArray<IndexType> targetIndices = prepareRedist.getHaloTargetIndexes();
 		IndexType thisSourceSize = prepareRedist.getHaloSourceSize();
 		IndexType thisTargetSize = prepareRedist.getHaloTargetSize();
-		PRINT(*comm<< ": "<< thisSourceSize);
-		PRINT(*comm<< ": "<< thisTargetSize);
 
 		IndexType globTargetSize = comm->sum( thisTargetSize);
 		IndexType globSourceSize = comm->sum( thisSourceSize);
 		SCAI_ASSERT_EQ_ERROR( globSourceSize, globTargetSize, "Mismatch in total migartion volume.");
-		//PRINT0("globTargetSize= " << globTargetSize);
-		//PRINT0("globSourceSize= " << globSourceSize);
-		PRINT0("total migration volume= " << globSourceSize);
+		//PRINT0("total migration volume= " << globSourceSize);
 		
 		IndexType maxTargetSize = comm->max( thisTargetSize);
 		IndexType maxSourceSize = comm->max( thisSourceSize);
-		PRINT0("maxTargetSize= " << maxTargetSize);
-		PRINT0("maxSourceSize= " << maxSourceSize);
+		//PRINT0("maxTargetSize= " << maxTargetSize);
+		//PRINT0("maxSourceSize= " << maxSourceSize);
+		
+		return std::make_pair( std::max(maxTargetSize,maxSourceSize), globSourceSize);
 	}
 	
 	
@@ -484,6 +464,31 @@ inline void printMetricsShort(struct Metrics metrics, std::ostream& out){
 	out << metrics.maxBlockDiameter << " " \
 		<< metrics.avgBlockDiameter << " " \
 		<< metrics.timeSpMV << " "\
+		<< metrics.timeComm \
+		<< std::endl; 
+}
+
+//------------------------------------------------------------------------------------------------------------
+
+inline void printRedistMetricsShort(struct Metrics metrics, std::ostream& out){
+	
+	std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
+	std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
+	out << "date and time: " << std::ctime(&timeNow); //<< std::endl;
+	out << "numBlocks= " << metrics.numBlocks << std::endl;
+	out << "gather" << std::endl;
+	out << "timeTotal finalCut imbalance maxCommVol totCommVol maxRedistVol totRedistVol maxDiameter avgDiameter timeSpMV timeComm" << std::endl;
+	out << metrics.timeFinalPartition<< " " \
+		<< metrics.finalCut << " "\
+		<< metrics.finalImbalance << " "\
+		<< metrics.maxCommVolume << " "\
+		<< metrics.totalCommVolume << " " \
+		<< metrics.maxRedistVol << " "\
+		<< metrics.totRedistVol << " " \
+		<< metrics.maxBlockDiameter << " " \
+		<< metrics.avgBlockDiameter << " ";
+	out << std::setprecision(8) << std::fixed;
+	out	<< metrics.timeSpMV << " "\
 		<< metrics.timeComm \
 		<< std::endl; 
 }

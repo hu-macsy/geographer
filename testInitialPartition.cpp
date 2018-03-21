@@ -471,8 +471,9 @@ int main(int argc, char** argv) {
 				PRINT0("time to redistribute coordinates: " << time);
 				
 				//
-				//settings.minSamplingNodes = 100;
-				//
+				const IndexType localN = graph.getLocalNumRows();
+				//settings.minSamplingNodes = std::max<IndexType>( IndexType(200), N/(k*50) );
+				settings.minSamplingNodes = localN;
 				//
 
 				partition = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeights, blockSizes, settings);     

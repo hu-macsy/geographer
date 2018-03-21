@@ -88,12 +88,13 @@ def createLLSubmitFile( path, filename, commandString, walltime, processors):
 		raise ValueError("Number of processors "+ str(processors) +" could not be divided into less than 28 processes per node.")
 
 	fullPath = os.path.join( path, filename)
+	parPath = os.path.abspath( os.path.dirname(path) )
 
 	with open(fullPath, 'w') as f:
 		f.write("#! /bin/bash"+"\n")
 		#f.write("#@ shell = /usr/bin/bash"+"\n")
 		f.write("#@ job_type = parallel"+"\n")
-		f.write("#@ initialdir="+JOB_DIR+"/jobOutputs \n")
+		f.write("#@ initialdir="+parPath+"/jobOutputs \n")
 		f.write("#@ job_name ="+jobName+"\n")
 		f.write("#@ class = "+classstring+"\n")
 		f.write("#@ node_usage = not_shared"+"\n")

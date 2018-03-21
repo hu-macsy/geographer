@@ -331,7 +331,7 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 		subsetSizes[partID] += weight;
 		weightSum += weight;
 	}
-
+PRINT(*comm << ": " << ", local node weightSum= " << weightSum);
 	ValueType optSize;
 	
 	if (weighted) {

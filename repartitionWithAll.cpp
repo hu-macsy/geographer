@@ -54,8 +54,13 @@ void getImbalancedDistribution(
 	scai::lama::DenseVector<ValueType> imbaNodeWeights;
 	
 	ValueType imbalance = 0;
+	ValueType divergTop = 10;
+	ValueType divergBot = 0;
 	
 	do{
+		PRINT0("divergTop= " << divergTop << " , divergBot= " << divergBot);
+		diverg = (divergTop+divergBot)/2.0;
+		
 		// set node weights to create artificial imbalance
 		imbaNodeWeights = ITI::Repartition<IndexType,ValueType>::sNW( coords, seed, diverg, dimensions);
 		bool nodeWeightsFlag = true;
@@ -65,18 +70,24 @@ void getImbalancedDistribution(
 			const IndexType globalN = graph.getNumRows();
 			const std::vector<IndexType> blockSizes(settings.numBlocks, globalN/settings.numBlocks);
 			firstPartition = ITI::KMeans::computePartition ( coords, settings.numBlocks, imbaNodeWeights, blockSizes, settings);
-			diverg += 0.1;
+			//diverg += 0.1;
 		}
 		else{
 			struct Metrics metrics;
 			firstPartition = ITI::Wrappers<IndexType,ValueType>::partition ( graph, coords, imbaNodeWeights, nodeWeightsFlag, tool, settings, metrics);
-			diverg += 0.3;
+			//diverg += 0.3;
 		}
 		
 		imbalance = ITI::GraphUtils::computeImbalance(firstPartition, settings.numBlocks, nodeWeights);
 		PRINT0("diverg= " << diverg<< " , first partition imbalance= " << imbalance);
 		
-	}while( imbalance<0.2 and diverg<4);
+		if( imbalance<0.2){
+			divergBot = diverg;
+		}
+		if( imbalance>0.25){
+			divergTop = diverg;
+		}
+	}while( (imbalance<0.2 or imbalance>0.25) and std::abs(divergTop-divergBot)>0.05);
 	//TODO: check that these are OK
 	
 	{
@@ -104,8 +115,8 @@ void getImbalancedDistribution(
 	}
 
 //------------------------------------------------------------------------------------------------------------
-
-void printMetricsShortRepart(struct Metrics metrics, /* std::string tool,*/ std::ostream& out){
+/*
+void printMetricsShortRepart(struct Metrics metrics, std::ostream& out){
 	
 	//std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
 	//std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
@@ -130,7 +141,7 @@ void printMetricsShortRepart(struct Metrics metrics, /* std::string tool,*/ std:
 		<< metrics.timeComm \
 		<< std::endl; 
 }
-
+*/
 
 //---------------------------------------------------------------------------------------------
 
@@ -213,8 +224,9 @@ int main(int argc, char** argv) {
 		std::cout<< "Must give parameter outPath to store metrics.\nAborting..." << std::endl;
 		return -1;
 	}
-             
-    //-----------------------------------------
+	
+	
+	//-----------------------------------------
     //
     // read the input graph or generate
     //
@@ -350,6 +362,26 @@ int main(int argc, char** argv) {
 		//std::string thisTool = allTools[t];
 		ITI::Tool thisTool = allTools[t];
 		
+		//WARNING: in order for the SaGa scripts to work this must be done as in Saga/header.py::outFileSting
+		//create the outFile for this tool
+		//settings.outFile = outPath+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ thisTool + ".info";
+		if( storeInfo){
+			settings.outFile = outPath+ ITI::tool2string(thisTool)+"/"+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ ITI::tool2string(thisTool) + ".info";
+		}else{
+			settings.outFile ="-";
+		}
+				
+		//PRINT0( "\n" << settings.outFile << "\n");
+			
+		{	// check if output file exists, if yes do not repartiotion with this tool so not to overwrite file
+			std::ifstream f(settings.outFile);
+			if( f.good() and storeInfo ){
+				comm->synchronize();	// maybe not needed
+				PRINT0("\n\tWARNING: File " << settings.outFile << " allready exists. Skipping repartition with " << ITI::tool2string(thisTool) );
+				continue;
+			}
+		}
+		
 		//------------------------------------------------------------------------------
 		//
 		// get first imbalanced distribution with the same tool
@@ -386,6 +418,19 @@ int main(int argc, char** argv) {
 			
 			ValueType imbalance = ValueType( maxLocalN - optSize)/optSize;
 			PRINT0("\tpartition before: minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", distribution imbalance= " << imbalance);
+			
+			// write info for the imbalanced partition in file	
+			if ( storeInfo and thisPE==0 ){
+				std::ofstream outF( settings.outFile, std::ios::out);
+				outF << "\tPartition before:"<< std::endl;
+				outF << "minLocalN= " << minLocalN << std::endl;
+				outF << "maxLocalN= " << maxLocalN << std::endl;
+				outF << "imbalance= " << imbalance << std::endl;
+				outF << std::endl;
+				
+				//printMetricsShort( beforeMetrics, outF);
+			}
+			
 		}
 			
 		SCAI_ASSERT_EQ_ERROR(nodeWeights.getLocalValues().size(), graph.getRowDistributionPtr()->getLocalSize(), "Nodeweights size mismatch.");
@@ -394,26 +439,6 @@ int main(int argc, char** argv) {
 		// the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
 		struct Metrics metrics(1);
 		metrics.numBlocks = settings.numBlocks;
-				
-		
-		//WARNING: in order for the SaGa scripts to work this must be done as in Saga/header.py::outFileSting
-		//create the outFile for this tool
-		//settings.outFile = outPath+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ thisTool + ".info";
-		if( storeInfo){
-			settings.outFile = outPath+ ITI::tool2string(thisTool)+"/"+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ ITI::tool2string(thisTool) + ".info";
-		}else{
-			settings.outFile ="-";
-		}
-		//PRINT0( "\n" << settings.outFile << "\n");
-			
-		{	// check if output file exists, if yes do not repartiotion with this tool so not to overwrite file
-			std::ifstream f(settings.outFile);
-			if( f.good() and storeInfo ){
-				comm->synchronize();	// maybe not needed
-				PRINT0("\n\tWARNING: File " << settings.outFile << " allready exists. Skipping repartition with " << ITI::tool2string(thisTool) );
-				continue;
-			}
-		}
 
 		scai::lama::DenseVector<IndexType> partition = ITI::Wrappers<IndexType,ValueType>::repartition ( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
 		
@@ -422,12 +447,14 @@ int main(int argc, char** argv) {
 		// partition has the the same distribution as the graph rows 
 		SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
 		
-		metrics.getAllMetrics( graph, partition, nodeWeights, settings );
-		
+		// metrics
+		metrics.getRedistMetrics( graph, partition, nodeWeights, settings );
+		/*
 		scai::dmemo::DistributionPtr newDist = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );	
 		scai::dmemo::DistributionPtr oldDist = graph.getRowDistributionPtr();
 
-		metrics.redistributionVol( newDist, oldDist);
+		metrics.getRedistributionVol( newDist, oldDist);
+		*/
 		
 		//-----------------------------------------------------
 		//
@@ -450,15 +477,15 @@ int main(int argc, char** argv) {
 			std::cout << "\n >>>> " <<  ITI::tool2string(thisTool);
 			std::cout<<  "\033[0m" << std::endl;
 			
-			printMetricsShortRepart( metrics, std::cout);
+			printRedistMetricsShort( metrics, std::cout);
 			
 			// write in a file
 			if( settings.outFile!="-" ){
-				std::ofstream outF( settings.outFile, std::ios::out);
+				std::ofstream outF( settings.outFile, std::ios::app);
 				if(outF.is_open()){
 					//metrics.print( outF ); 
 					outF << "tool " <<  ITI::tool2string(thisTool) << std::endl;
-					printMetricsShort( metrics, outF);
+					printRedistMetricsShort( metrics, outF);
 					outF << std::endl;
 					std::cout<< "Output information written to file " << settings.outFile << std::endl;
 				}else{

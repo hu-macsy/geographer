@@ -289,29 +289,9 @@ int main(int argc, char** argv) {
 			}
 		}
 		
+		//get the partition
 		partition = ITI::Wrappers<IndexType,ValueType>::partition ( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
 		
-/*		
-		if( thisTool.substr(0,8)=="parMetis"){
-			if 		( thisTool=="parMetisGraph"){	parMetisGeom = 0;	}
-			else if ( thisTool=="parMetisGeom"){	parMetisGeom = 1;	}
-			else if	( thisTool=="parMetisSfc"){		parMetisGeom = 2;	}
-			
-			partition = ITI::Wrappers<IndexType,ValueType>::metisPartition ( graph, coords, nodeWeights, nodeWeightsUse, parMetisGeom, settings, metrics);
-
-		}else if (thisTool.substr(0,6)=="zoltan"){
-			std::string algo;
-			if		( thisTool=="zoltanRcb"){	algo = "rcb";	}
-			else if ( thisTool=="zoltanRib"){	algo = "rib";	}
-			else if ( thisTool=="zoltanMJ"){	algo = "multijagged";}
-			else if ( thisTool=="zoltanHsfc"){	algo = "hsfc";	}
-			
-			partition = ITI::Wrappers<IndexType,ValueType>::zoltanPartition ( graph, coords, nodeWeights, nodeWeightsUse, algo, settings, metrics);
-		}else{
-			std::cout<< "Tool "<< thisTool <<" not supported.\nAborting..."<<std::endl;
-			return -1;
-		}
-*/		
 		PRINT0("time to get the partition: " <<  metrics.timeFinalPartition );
 		
 		// partition has the the same distribution as the graph rows 
@@ -337,7 +317,7 @@ int main(int argc, char** argv) {
 			}else{
 				std::cout << std::endl << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon;
 			}
-			std::cout << "Finished tool" << std::endl;
+			std::cout << "\nFinished tool" << std::endl;
 			std::cout << "\033[1;36m";
 			std::cout << "\n >>>> " << ITI::tool2string(thisTool);
 			std::cout<<  "\033[0m" << std::endl;

@@ -227,6 +227,11 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 
 	//PRINT0("threshold= " << threshold << " , samplingRounds= " << samplingRounds);	
 
+	//
+	//IndexType balanceIter = 5;
+	//ValueType balanceEpsilon = 0.1;
+	//
+	
 	const IndexType maxIterations = settings.maxKMeansIterations;
 	do {
 		std::chrono::time_point<std::chrono::high_resolution_clock> iterStart = std::chrono::high_resolution_clock::now();
@@ -243,17 +248,16 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		}
 
 		Settings balanceSettings = settings;
+		//balanceEpsilon -= 0.01;
+		//balanceSettings.epsilon = std::max( settings.epsilon, balanceEpsilon);
 		//balanceSettings.balanceIterations = 0;//iter >= samplingRounds ? settings.balanceIterations : 0;
+		//balanceSettings.balanceIterations = std::max(settings.balanceIterations, balanceIter++);
 		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, balanceSettings);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
 		
-		std::vector<std::vector<ValueType> > newCenters;
-		if( settings.repartition){
-			newCenters = centers;
-		}else{
-			newCenters = findCenters(coordinates, result, k, firstIndex, lastIndex, nodeWeights);
-		}
+		std::vector<std::vector<ValueType> > newCenters = findCenters(coordinates, result, k, firstIndex, lastIndex, nodeWeights);
+		
 		
 		//keep centroids of empty blocks at their last known position
 		for (IndexType j = 0; j < k; j++) {
@@ -336,7 +340,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 			std::cout << "i: " << iter << ", delta: " << delta << std::endl;
 		}
 		iter++;
-		
+/*		
 		if (settings.verbose) {
 			std::chrono::duration<ValueType,std::ratio<1>> iterTime = std::chrono::high_resolution_clock::now() - iterStart;			
 			ValueType time = iterTime.count() ;
@@ -344,7 +348,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 
 			std::cout << " , while cond: "<< (iter < samplingRounds || (iter < maxIterations && (delta > threshold || !balanced)) )  << std::endl;
 		}
-		
+*/		
 	} while (iter < samplingRounds || (iter < maxIterations && (delta > threshold || !balanced)));
 
 	return result;

@@ -130,7 +130,7 @@ def addHarmMeanInfo( metricValues, metricName, toolNames, baseToolId, plotF):
 #		metricValues[i][j] = a list with values for tool i and metric j	,			size = num_of_metrics
 #		metricValues[i][j][l] = the value for tool i, metric j, for exp.k[l] ,		size = size_of_experiment
 		
-def createPlotsForExp(exp, toolNames, metricNames, metricValues):
+def createPlotsForExp(exp, toolNames, metricNames, metricValues, outDir ):
 	
 	numMetrics = len(metricNames)
 	#numMetrics =NUM_METRICS
@@ -164,7 +164,7 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues):
 	for i in sorted(plotID):
 		plotFileName += str(i)
 
-	plotFile = os.path.join( plotsPath, plotFileName);
+	plotFile = os.path.join( outDir, plotFileName);
 	
 	# check if file already exists
 	if os.path.exists(plotFile + ".tex"):
@@ -322,7 +322,7 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues):
 
 #---------------------------------------------------------------------------------------------		
 
-def createMeanPlotsForAllExp( wantedExp, wantedTools, outDir):
+def createMeanPlotsForAllExp( wantedExp, wantedTools, gatherDir, outDir):
 	
 	numExp = len(wantedExp)
 	
@@ -340,7 +340,7 @@ def createMeanPlotsForAllExp( wantedExp, wantedTools, outDir):
 		plotFileName+=str(exp.ID)
 	
 	plotFileName += ".tex"
-	plotFile = os.path.join( plotsPath, plotFileName);
+	plotFile = os.path.join( outDir, plotFileName);
 		
 	if os.path.exists(plotFile + ".tex"):
 		print("WARNING: Plot file " + plotFile + " already exists and will be overwriten.")
@@ -367,7 +367,7 @@ def createMeanPlotsForAllExp( wantedExp, wantedTools, outDir):
 		
 		metricValues= []
 		for tool in wantedTools:
-			metricNames, metricValuesTmp = gatherExpTool( exp, tool, outDir )
+			metricNames, metricValuesTmp = gatherExpTool( exp, tool, gatherDir )
 			metricValues.append( metricValuesTmp)
 			
 			
@@ -471,7 +471,7 @@ def createCsv(exp, toolNames, metricNames, metricValues):
 #---------------------------------------------------------------------------------------------		
 # gather info for an experiment for a tool
 
-def gatherExpTool( exp, tool, outDir ):
+def gatherExpTool( exp, tool, gatherDir ):
 	
 	if not tool in allTools:
 		print("Wrong tool name: " + str(tool) +". Choose from: ") 
@@ -488,10 +488,10 @@ def gatherExpTool( exp, tool, outDir ):
 		#
 		#exp.printExp()
 		
-		gatherFile = outFileString( exp, i, tool, outDir)
+		gatherFile = outFileString( exp, i, tool, gatherDir)
 		
-		if not os.path.exists( os.path.join( outDir, tool) ):
-			print("### ERROR: directory to gather information " + os.path.join( outDir, tool) + " does not exist.\nAborting..." )
+		if not os.path.exists( os.path.join( gatherDir, tool) ):
+			print("### ERROR: directory to gather information " + os.path.join( gatherDir, tool) + " does not exist.\nAborting..." )
 			exit(-1)
 
 		if not os.path.exists( gatherFile ):
@@ -534,13 +534,15 @@ if __name__=="__main__":
 	parser.add_argument('--tools','-t' , type=str , nargs='*', default="Geographer", help='Name of the tools. It can be: ' + str(allTools) )
 	parser.add_argument('--configFile','-c', default="SaGa.config", help='The configuration file. ')
 	parser.add_argument('--wantedExp', '-we', type=int, nargs='*', metavar='exp', help='A subset of the experiments that will be submited.')
-	parser.add_argument('--outDir', '-o', type=str, help='Optional folder to store output. If none is given then the default is used as specified in the header/config file.\nDefault now is' + toolsPath)
+	parser.add_argument('--gatherDir', '-g', type=str, default=toolsPath, help='Optional folder to gather output. If none is given then the default is used as specified in the header/config file.\nDefault now is' + toolsPath)
+	parser.add_argument('--outDir', '-o', type=str, default=plotsPath, help='Optional folder to store output. If none is given then the default is used as specified in the header/config file.\nDefault now is' + plotsPath)
 	
 	args = parser.parse_args()
 
 	wantedExpIDs = args.wantedExp
 	configFile = args.configFile
 	wantedTools = args.tools
+	gatherDir = args.gatherDir
 
 	if wantedTools[0]=="all":
 		wantedTools = allTools[1:]		# skipping Geographer
@@ -559,18 +561,20 @@ if __name__=="__main__":
 	else:
 		print("Collecting information from configuration file: " + configFile )
 
+	if args.gatherDir:
+		if not os.path.exists(gatherDir):
+			print("Directory to gather info is missing.\nAborting...");
+			exit(-1)
+
 	outDir = "-"
 	
 	if args.outDir:
 		outDir = args.outDir
 		if not os.path.exists(outDir):
 			os.makedirs(outDir)
-		# this is needed to store the submit file
-		if not os.path.exists( os.path.join(outDir, "tmp") ):
-			os.makedirs(  os.path.join(outDir, "tmp")  )
 	else:
-		outDir = toolsPath
-		
+		outDir = plotsPath
+				
 		
 	#
 	# parse config file
@@ -607,7 +611,7 @@ if __name__=="__main__":
 			#metricValues is list of lists, or a 2D matrix:
 			#	metricValues[i] = a list of size exp.size for metric i
 			#	metricValues[i][j] = the value of metric i for experiment run j
-			metricNames, metricValues = gatherExpTool( exp, tool, outDir )
+			metricNames, metricValues = gatherExpTool( exp, tool, gatherDir )
 			
 			# this means that gatherExpTool actually found the files to gather
 			if not metricNames==[]:
@@ -618,9 +622,9 @@ if __name__=="__main__":
 			#print(metricNames)
 			#print(metricValues)
 		
-		createPlotsForExp(exp, foundTools, metricNames, allMetricsForAllTools)
+		createPlotsForExp(exp, foundTools, metricNames, allMetricsForAllTools, outDir)
 		
-	createMeanPlotsForAllExp( wantedExp, wantedTools, outDir)
+	createMeanPlotsForAllExp( wantedExp, wantedTools, gatherDir, outDir)
 		
 	exit(0)
 

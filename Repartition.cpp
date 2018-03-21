@@ -102,7 +102,7 @@ scai::lama::DenseVector<ValueType> Repartition<IndexType,ValueType>::sNW( const 
 				wWeights[i]= distance;
 			}
 			*/
-			wWeights[i]= std::pow(2.0/(1+normDist), diverg );
+			wWeights[i]= 1+std::pow(2.0/(1+normDist), diverg );
 //PRINT(*comm << ": " << wWeights[i] );
 		}
 	}
@@ -110,9 +110,7 @@ scai::lama::DenseVector<ValueType> Repartition<IndexType,ValueType>::sNW( const 
 	return nodeWeights;
 }
 //-----------------------------------------------------------------------------------------------------
-
 /*
-//TODO: adapt to also support initial node weights
 
 template<typename IndexType, typename ValueType>
 void Repartition<IndexType,ValueType>::getImbalancedDistribution(
@@ -120,8 +118,7 @@ void Repartition<IndexType,ValueType>::getImbalancedDistribution(
 	std::vector<scai::lama::DenseVector<ValueType>> &coords, 
 	scai::lama::DenseVector<ValueType> &nodeWeights,
 	ITI::Tool tool,
-	struct Settings &settings,
-	struct Metrics &metrics){
+	struct Settings &settings){
 	
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	
@@ -145,14 +142,17 @@ void Repartition<IndexType,ValueType>::getImbalancedDistribution(
 			const IndexType globalN = graph.getNumRows();
 			const std::vector<IndexType> blockSizes(settings.numBlocks, globalN/settings.numBlocks);
 			firstPartition = ITI::KMeans::computePartition ( coords, settings.numBlocks, imbaNodeWeights, blockSizes, settings);
+			diverg += 0.1;
 		}
 		else{
+			struct Metrics metrics;
 			firstPartition = ITI::Wrappers<IndexType,ValueType>::partition ( graph, coords, imbaNodeWeights, nodeWeightsFlag, tool, settings, metrics);
+			diverg += 0.3;
 		}
 		
 		imbalance = ITI::GraphUtils::computeImbalance(firstPartition, settings.numBlocks, nodeWeights);
 		PRINT0("diverg= " << diverg<< " , first partition imbalance= " << imbalance);
-		diverg += 0.1;
+		
 	}while( imbalance<0.2 and diverg<4);
 	//TODO: check that these are OK
 	
@@ -179,7 +179,7 @@ void Repartition<IndexType,ValueType>::getImbalancedDistribution(
 	}
 	
 	}
-*/	
+*/
 //-----------------------------------------------------------------------------------------------------
 
 

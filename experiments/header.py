@@ -87,8 +87,7 @@ def defaultSettings():
 	tieBreakingStrategy = 1
 	repeatTimes = 5	
 	
-	retString = " --epsilon=" + str(epsilon)
-	retString += " --minBorderNodes="+str(minBorderNodes)
+	retString = " --minBorderNodes="+str(minBorderNodes)
 	retString += " --stopAfterNoGainRounds="+str(stopAfterNoGainRounds)
 	retString += " --minGainForNextGlobalRound="+str(minGainForNextGlobalRound)
 	retString += " --multiLevelRounds="+str(multiLevelRounds)
@@ -99,6 +98,7 @@ def defaultSettings():
 	#retString += " --coordFile=" + coordFile
 	retString += " --repeatTimes="+ str(repeatTimes)
 	retString += " --storeInfo"
+	#retString += " --epsilon=" + str(epsilon)
 	
 	return retString
 

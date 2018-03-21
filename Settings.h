@@ -91,16 +91,16 @@ static std::string tool2string( Tool t){
 			return "parMetisSFC";
 			
 		case Tool::zoltanRIB:
-			return "zoltanRIB";
+			return "zoltanRib";
 		
 		case Tool::zoltanRCB:
-			return "zoltanRCB";
+			return "zoltanRcb";
 		
 		case Tool::zoltanMJ:
 			return "zoltanMJ";
 			
 		case Tool::zoltanSFC:
-			return "zoltanSFC";
+			return "zoltanHsfc";
 			
 		default:
 			throw std::runtime_error("Wrong tool given to convert to string.\nAborting...");
@@ -185,7 +185,7 @@ struct Settings{
     
     //calculate expensive performance metrics?
     bool computeDiameter = false;
-    IndexType maxDiameterRounds = 10;
+    IndexType maxDiameterRounds = 3;
 
     //
     // print settings

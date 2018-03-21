@@ -38,7 +38,7 @@ def submitExp( exp, tool, outDir ):
 		submitGeographer(exp, "geoKmeans", outDir)
 	elif tool=="geoSfc":
 		submitGeographer(exp, "geoSfc", outDir)
-	elif tool=="repartKmeans"
+	elif tool=="repartKmeans":
 		submitGeographer(exp, "repartKmeans", outDir)
 	else:
 		submitCompetitor( exp, tool, outDir)
@@ -52,10 +52,12 @@ def submitGeographer(exp, version, outDir):
 		if not os.path.exists( path ) :
 			print("WARNING: " + path + " does not exist.")
 			
-	params = "-1"
-	tool = "-1"
+	
+	tool = version
 	
 	for i in range(0,exp.size):
+		
+		params = ""
 		
 		if version=="Geographer":
 			# set parameters for every experiment
@@ -69,11 +71,12 @@ def submitGeographer(exp, version, outDir):
 			params = " --initialPartition=0"
 		elif version=="repartKmeans":
 			executable = repartKmeans
+			tool = "geoKmeans"
 		else:
 			print("Version given: " + version + " is not implemented.\nAborting...");
 			exit(-1)
 
-		tool = version
+
 		
 		if not os.path.exists( os.path.join( outDir, tool) ):
 			print("WARNING: Output directory " + os.path.join( outDir, tool) +" does not exist. Creating directory " + os.path.join( outDir, tool))
@@ -164,50 +167,6 @@ def submitAllCompetitors( exp, outDir):
 
 #---------------------------------------------------------------------------------------------		
 
-def submitAllRepart( exp, outDir ):
-	for i in range(0,exp.size):
-		
-		graphName = os.path.basename(exp.graphs[i]).split('.')[0]
-		submitFlag = 0
-		
-		for tool in allCompetitors:
-			if not os.path.exists( os.path.join( outDir, tool) ):
-				print("WARNING: Output directory " + os.path.join( outDir, tool) +" does not exist, experiment NOT submited.\n Aborting...")
-				exit(-1)
-			#outFile = os.path.join( outDir, tool, graphName)
-			outFile = outFileString( exp, i, tool, outDir)
-		
-			if os.path.exists( outFile ):
-				submitFlag += 1
-		'''
-		if submitFlag == NUM_COMPETITORS:
-			print("\t\tWARNING: The graph: " + exp.graphs[i] + " for k=" + str(exp.k[i]) +" has an outFile for all tools, job NOT submitted.")
-			continue
-		'''	
-		params = " --epsilon=" + str(epsilon)			
-		params += " --dimensions=" + exp.dimension
-		params += " --fileFormat="+ exp.fileFormat
-		params += " --outPath=" + outDir +"/"
-		params += " --graphName=" + graphName 
-		
-		if exp.coordFormat!=-1:
-			params += " --coordFormat="+ str(exp.coordFormat)
-		
-		if  exp.coordPaths is not None and len( exp.coordPaths)>0:
-			if exp.coordPaths[i]!="-":
-				params += " --coordFile=" + exp.coordPaths[i]
-		
-		if not os.path.exists( repartAllExe):
-			print("Executable " + repartAllExe + " does not exist.\nSkiping job submission")
-			return -1
-
-		commandString = repartAllExe + " --graphFile " + exp.paths[i] + params
-		print(commandString)
-		submitFilename = "llsub-"+ os.path.basename(exp.graphs[i]).split('.')[0]+"_k"+str(exp.k[i])+"_repartAll.cmd"
-		submitfile = createLLSubmitFile( os.path.join( outDir, "tmp") , submitFilename, commandString, "00:20:00", int(exp.k[i]) )
-		call(["llsubmit", submitfile])
-
-#---------------------------------------------------------------------------------------------	
 def submitCompetitor(exp, tool, outDir):	
 	
 	for i in range(0,exp.size):
@@ -298,9 +257,14 @@ if __name__=="__main__":
 		# this is needed to store the submit file
 		if not os.path.exists( os.path.join(outDir, "tmp") ):
 			os.makedirs(  os.path.join(outDir, "tmp")  )
+		# this is where the outputs are stored
+		if not os.path.exists( os.path.join( outDir, "jobOutputs") ):
+			os.makedirs(  os.path.join( outDir, "jobOutputs")  )
 	else:
 		outDir = toolsPath
-
+	
+	outDir = os.path.abspath(outDir)
+	
 	#
 	# parse config file
 	#
