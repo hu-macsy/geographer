@@ -127,16 +127,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 
 	//std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
 
-	QuadNodeCartesianEuclid boundingBox(minCoords, maxCoords);
-	if (settings.verbose) {
-		std::cout << "Process " << comm->getRank() << ": ( ";
-		for (auto coord : minCoords) std::cout << coord << " ";
-		std::cout << ") , ( ";
-		for (auto coord : maxCoords) std::cout << coord << " ";
-		std::cout << ")";
-		std::cout << ", " << localN << " nodes, " << nodeWeights.getLocalValues().sum() << " total weight";
-		std::cout << std::endl;
-	}
+
 
 	std::vector<ValueType> globalMinCoords(dim);
 	std::vector<ValueType> globalMaxCoords(dim);
@@ -145,11 +136,27 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 
 	ValueType diagonalLength = 0;
 	ValueType volume = 1;
+	ValueType localVolume = 1;
 	for (IndexType d = 0; d < dim; d++) {
 		const ValueType diff = globalMaxCoords[d] - globalMinCoords[d];
+		const ValueType localDiff = maxCoords[d] - minCoords[d];
 		diagonalLength += diff*diff;
 		volume *= diff;
+		localVolume *= localDiff;
 	}
+
+	QuadNodeCartesianEuclid boundingBox(minCoords, maxCoords);
+    if (settings.verbose) {
+        std::cout << "Process " << comm->getRank() << ": ( ";
+        for (auto coord : minCoords) std::cout << coord << " ";
+        std::cout << ") , ( ";
+        for (auto coord : maxCoords) std::cout << coord << " ";
+        std::cout << ")";
+        std::cout << ", " << localN << " nodes, " << nodeWeights.getLocalValues().sum() << " total weight";
+        std::cout << ", volume ratio " << localVolume / (volume / p);
+        std::cout << std::endl;
+    }
+
 	diagonalLength = std::sqrt(diagonalLength);
 	const ValueType expectedBlockDiameter = pow(volume / k, 1.0/dim);
 
