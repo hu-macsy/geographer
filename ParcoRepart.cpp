@@ -129,8 +129,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		throw std::runtime_error( "Distributions should be equal.");
 	}
 
-	if (nodeWeights.size() != 0)
-
 	SCAI_REGION_END("ParcoRepart.partitionGraph.inputCheck")
 	{
 		SCAI_REGION("ParcoRepart.synchronize")
