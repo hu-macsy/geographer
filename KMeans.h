@@ -125,10 +125,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		maxCoords[d] = *std::max_element(convertedCoords[d].begin(), convertedCoords[d].end());
 	}
 
-	//std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
-
-
-
 	std::vector<ValueType> globalMinCoords(dim);
 	std::vector<ValueType> globalMaxCoords(dim);
 	comm->minImpl(globalMinCoords.data(), minCoords.data(), dim, scai::common::TypeTraits<ValueType>::stype);
