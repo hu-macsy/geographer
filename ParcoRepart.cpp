@@ -222,6 +222,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                        
                     scai::dmemo::Redistributor prepareRedist(initMigrationPtr, nodeWeights.getDistributionPtr());
 
+                    std::chrono::time_point<std::chrono::system_clock> afterRedistConstruction =  std::chrono::system_clock::now();
+
+                    std::chrono::duration<double> redist = (afterRedistConstruction - beforeMigration);
+                    metrics.timeConstructRedistributor[rank] = redist.count();
+
                     if (nodesUnweighted) {
                         nodeWeightCopy = DenseVector<ValueType>(initMigrationPtr, nodeWeights.getLocalValues()[0]);
                     } else {
@@ -298,15 +303,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         
         
         if( settings.outFile!="-" and settings.writeInFile ){
-            
             FileIO<IndexType, ValueType>::writePartitionParallel( result, settings.outFile+"_initPart.partition" );
-
-            /*
-            // the file should already exist, we just append
-            std::ofstream outF( settings.outFile, std::ios::app);
-            outF << std::setprecision(3) << std::fixed;
-            outF << "        " << timeToCalcInitMigration << "  ,  " << timeForFirstRedistribution << "  ,  " << timeForKmeans << "  ,  "<< timeForSecondRedistr << "  ,  " << timeForInitPart << ",         "  << cut << " ,  "<< imbalance <<std::endl;
-            */
         }
         
         

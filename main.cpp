@@ -40,10 +40,11 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
     IndexType numRuns = metricsVec.size();
     
     if( comm->getRank()==0 ){
-        out << "# times, input, migrAlgo, 1distr, kmeans, 2redis, prelim, localRef, total,    prel cut, finalcut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg  " << std::endl;
+        out << "# times, input, migrAlgo, constRedist, 1distr, kmeans, 2redis, prelim, localRef, total,    prel cut, finalcut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg  " << std::endl;
     }
 
     ValueType sumMigrAlgo = 0;
+    ValueType sumConstructRedist = 0;
     ValueType sumFirstDistr = 0;
     ValueType sumKmeans = 0;
     ValueType sumSecondDistr = 0;
@@ -70,6 +71,7 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
         
         // for these time we have one measurement per PE and must make a max
         ValueType maxTimeMigrationAlgo = *std::max_element( thisMetric.timeMigrationAlgo.begin(), thisMetric.timeMigrationAlgo.end() );
+        ValueType maxTimeConstructRedist = *std::max_element( thisMetric.timeConstructRedistributor.begin(), thisMetric.timeConstructRedistributor.end() );
         ValueType maxTimeFirstDistribution = *std::max_element( thisMetric.timeFirstDistribution.begin(), thisMetric.timeFirstDistribution.end() );
         ValueType maxTimeKmeans = *std::max_element( thisMetric.timeKmeans.begin(), thisMetric.timeKmeans.end() );
         ValueType maxTimeSecondDistribution = *std::max_element( thisMetric.timeSecondDistribution.begin(), thisMetric.timeSecondDistribution.end() );
@@ -81,7 +83,7 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
         
         if( comm->getRank()==0 ){
             out << std::setprecision(2) << std::fixed;
-            out<< run << " ,       "<< thisMetric.inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << ",  "<< timeFinal << " , \t "\
+            out<< run << " ,       "<< thisMetric.inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeConstructRedist << ", " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << ",  "<< timeFinal << " , \t "\
             << thisMetric.preliminaryCut << ",  "<< thisMetric.finalCut << ",  " << thisMetric.finalImbalance << ",    "  \
             // << thisMetric.maxBlockGraphDegree << ",  " << thisMetric.totalBlockGraphEdges << " ," 
             << thisMetric.maxBoundaryNodes << ", " << thisMetric.totalBoundaryNodes << ",    " \
@@ -92,6 +94,7 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
         }
         
         sumMigrAlgo += maxTimeMigrationAlgo;
+        sumConstructRedist += maxTimeConstructRedist;
         sumFirstDistr += maxTimeFirstDistribution;
         sumKmeans += maxTimeKmeans;
         sumSecondDistr += maxTimeSecondDistribution;
@@ -115,6 +118,7 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
         out << "average,  "\
             <<  ValueType (metricsVec[0].inputTime)<< ",  "\
             <<  ValueType(sumMigrAlgo)/numRuns<< ",  " \
+            <<  ValueType(sumConstructRedist)/numRuns<< ",  " \
             <<  ValueType(sumFirstDistr)/numRuns<< ",  " \
             <<  ValueType(sumKmeans)/numRuns<< ",  " \
             <<  ValueType(sumSecondDistr)/numRuns<< ",  " \

@@ -10,11 +10,13 @@ struct Metrics{
     // timing results
     //
     std::vector<ValueType>  timeMigrationAlgo;
+    std::vector<ValueType>  timeConstructRedistributor;
     std::vector<ValueType>  timeFirstDistribution;
     std::vector<ValueType>  timeKmeans;
     std::vector<ValueType>  timeSecondDistribution;
     std::vector<ValueType>  timePreliminary;
     
+
     ValueType inputTime;
     ValueType timeFinalPartition;
     ValueType reportTime;
@@ -46,6 +48,7 @@ struct Metrics{
     
     Metrics( IndexType k) {
         timeMigrationAlgo.resize(k);
+        timeConstructRedistributor.resize(k);
         timeFirstDistribution.resize(k);
         timeKmeans.resize(k);
         timeSecondDistribution.resize(k);
@@ -66,6 +69,7 @@ struct Metrics{
         
         // for these time we have one measurement per PE and must make a max
         ValueType maxTimeMigrationAlgo = *std::max_element( timeMigrationAlgo.begin(), timeMigrationAlgo.end() );
+        ValueType maxTimeConstructRedist = *std::max_element( timeConstructRedistributor.begin(), timeConstructRedistributor.end() );
         ValueType maxTimeFirstDistribution = *std::max_element( timeFirstDistribution.begin(), timeFirstDistribution.end() );
         ValueType maxTimeKmeans = *std::max_element( timeKmeans.begin(), timeKmeans.end() );
         ValueType maxTimeSecondDistribution = *std::max_element( timeSecondDistribution.begin(), timeSecondDistribution.end() );
@@ -79,7 +83,7 @@ struct Metrics{
         }else if (maxBlockGraphDegree==0 ){
             out << " ### WARNING: possibly not all metrics calculated ###" << std::endl;
         }
-        out << "# times: input, migrAlgo , 1redistr , k-means , 2redistr , prelim, localRef, total";
+        out << "# times: input, migrAlgo , constRedist, 1redistr , k-means , 2redistr , prelim, localRef, total";
         out << ", metrics:  prel cut, cut, imbalance, maxCommVol, totalCommVol, maxDiameter, avgDiameter" << std::endl;
 
         auto oldprecision = out.precision();
@@ -89,6 +93,7 @@ struct Metrics{
         //times
         out << inputTime    << ", ";
         out << maxTimeMigrationAlgo << ", ";
+        out << maxTimeConstructRedist << ", ";
         out << maxTimeFirstDistribution << ", ";
         out << maxTimeKmeans    << ", ";
         out << maxTimeSecondDistribution    << ", ";
