@@ -129,6 +129,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		throw std::runtime_error( "Distributions should be equal.");
 	}
 
+	bool nodesUnweighted;
+    if (nodeWeights.size() == 0) {
+        nodeWeights = DenseVector<ValueType>(inputDist, 1);
+        nodesUnweighted = true;
+    } else {
+        nodesUnweighted = (nodeWeights.max() == nodeWeights.min());
+    }
+
 	SCAI_REGION_END("ParcoRepart.partitionGraph.inputCheck")
 	{
 		SCAI_REGION("ParcoRepart.synchronize")
@@ -138,10 +146,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition")
         // get an initial partition
         DenseVector<IndexType> result;
-        if (nodeWeights.size() == 0) {
-        	nodeWeights = DenseVector<ValueType>(inputDist, 1);
-        }
         
+
         assert(nodeWeights.getDistribution().isEqual(*inputDist));
         
         
@@ -215,7 +221,13 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                     std::chrono::time_point<std::chrono::system_clock> beforeMigration =  std::chrono::system_clock::now();
                        
                     scai::dmemo::Redistributor prepareRedist(initMigrationPtr, nodeWeights.getDistributionPtr());
-                    nodeWeightCopy.redistribute(prepareRedist);
+
+                    if (nodesUnweighted) {
+                        nodeWeightCopy = DenseVector<ValueType>(initMigrationPtr, nodeWeights.getLocalValues()[0]);
+                    } else {
+                        nodeWeightCopy.redistribute(prepareRedist);
+                    }
+
                     for (IndexType d = 0; d < dimensions; d++) {
                         coordinateCopy[d].redistribute(prepareRedist);
                     }
