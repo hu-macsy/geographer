@@ -243,16 +243,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                         SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans.sort")
                         MPI_Comm mpi_comm = MPI_COMM_WORLD;//maybe cast the communicator ptr to a MPI communicator and get getMPIComm()?
                         SQuick::sort<sort_pair>(mpi_comm, localPairs, -1);//could also do this with just the hilbert index - as a valueType
-                        IndexType newLocalN = localPairs.size();
-
-                        PRINT0(std::to_string(localN) + " old local values " + std::to_string(newLocalN) + " new ones.");
+                        //IndexType newLocalN = localPairs.size();
 
                         migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
                         metrics.timeMigrationAlgo[rank]  = migrationCalculation.count();
 
                         std::chrono::time_point<std::chrono::system_clock> beforeMigration =  std::chrono::system_clock::now();
 
-                        assert(newLocalN > 0);
+                        assert(localPairs.size() > 0);
                         sort_pair minLocalIndex = localPairs[0];
 
                         std::vector<ValueType> sendThresholds(comm->getSize(), minLocalIndex.value);
@@ -309,19 +307,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                         recvPlan.allocateTranspose(sendPlan, *comm);
                         SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans.communicationPlan")
 
+                        IndexType newLocalN = recvPlan.totalQuantity();
+                        //SCAI_ASSERT_EQ_ERROR(recvPlan.totalQuantity(), newLocalN, "wrong size of recv plan");
+                        PRINT0(std::to_string(localN) + " old local values " + std::to_string(newLocalN) + " new ones.");
 
-                        SCAI_ASSERT_EQ_ERROR(recvPlan.totalQuantity(), newLocalN, "wrong size of recv plan");
-
-                        //get new distribution
-                        scai::utilskernel::LArray<IndexType> indexTransport(newLocalN);
-                        {
-                            scai::hmemo::WriteAccess<IndexType> wIndices(indexTransport);
-                            for (IndexType i = 0; i < newLocalN; i++) {
-                                wIndices[i] = localPairs[i].index;
-                            }
-                        }
-                        scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
-                        SCAI_ASSERT_EQUAL(newDist->getLocalSize(), newLocalN, "wrong size of new distribution");
 
                         //transmit indices, allowing for resorting of the received values
                         std::vector<IndexType> sendIndices(localN);
@@ -336,6 +325,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                         }
                         std::vector<IndexType> recvIndices(newLocalN);
                         comm->exchangeByPlan(recvIndices.data(), recvPlan, sendIndices.data(), sendPlan);
+
+                        //get new distribution
+                        scai::utilskernel::LArray<IndexType> indexTransport(newLocalN, recvIndices.data());
+
+                        scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
+                        SCAI_ASSERT_EQUAL(newDist->getLocalSize(), newLocalN, "wrong size of new distribution");
 
                         for (IndexType i = 0; i < newLocalN; i++) {
                             SCAI_ASSERT_VALID_INDEX_DEBUG(recvIndices[i], globalN, "invalid index");
@@ -401,7 +396,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
                         migrationTime = std::chrono::system_clock::now() - beforeMigration;
                         metrics.timeFirstDistribution[rank]  = migrationTime.count();
-
 
                     } else {
 
