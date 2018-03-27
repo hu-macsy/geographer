@@ -197,53 +197,244 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                     DenseVector<IndexType> tempResult;
                     
                     if (settings.initialMigration == InitialPartitioningMethods::SFC) {
-                        tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, migrationSettings);
-                        initMigrationPtr = tempResult.getDistributionPtr();
-                    } else if (settings.initialMigration == InitialPartitioningMethods::Multisection) {
-                        DenseVector<ValueType> convertedWeights(nodeWeights);
-                        tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, migrationSettings);
-                        initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
-                    } else if (settings.initialMigration == InitialPartitioningMethods::KMeans) {
-                        DenseVector<ValueType> convertedWeights(nodeWeights.getDistributionPtr(), 1);
-                        std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );;
-                        tempResult = ITI::KMeans::computePartition(coordinates, migrationSettings.numBlocks, convertedWeights, migrationBlockSizes, migrationSettings);
-                        initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
-                    } else if (settings.initialMigration == InitialPartitioningMethods::None) {
-                        //nothing to do
-                        initMigrationPtr = inputDist;
+
+                        /*
+                         * TODO:
+                         * after all the branches have been merged, replace the copy-pasted code with a call to
+                         * HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
+                         */
+                        std::vector<ValueType> hilbertIndices(localN);
+                        std::vector<std::vector<ValueType>> points(localN, std::vector<ValueType>(settings.dimensions,0));
+                        std::vector<ValueType> minCoords(settings.dimensions);
+                        std::vector<ValueType> maxCoords(settings.dimensions);
+
+                        for (IndexType d = 0; d < settings.dimensions; d++) {
+                            minCoords[d] = coordinates[d].min().Scalar::getValue<ValueType>();
+                            maxCoords[d] = coordinates[d].max().Scalar::getValue<ValueType>();
+                            assert(std::isfinite(minCoords[d]));
+                            assert(std::isfinite(maxCoords[d]));
+                            scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
+                            for (IndexType i = 0; i < localN; i++) {
+                                points[i][d] = rCoords[i];
+                            }
+                        }
+
+                        for (IndexType i = 0; i < localN; i++) {
+                            hilbertIndices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(points[i].data(), settings.dimensions, settings.sfcResolution, minCoords, maxCoords);
+                        }
+
+                        /**
+                         * fill sort pair
+                         */
+                        scai::utilskernel::LArray<IndexType> myGlobalIndices(localN, 0);
+                        inputDist->getOwnedIndexes(myGlobalIndices);
+                        std::vector<sort_pair> localPairs(localN);
+                        {
+                            scai::hmemo::ReadAccess<IndexType> rIndices(myGlobalIndices);
+                            for (IndexType i = 0; i < localN; i++) {
+                                localPairs[i].value = hilbertIndices[i];
+                                localPairs[i].index = rIndices[i];
+                            }
+                        }
+
+                        MPI_Comm mpi_comm = MPI_COMM_WORLD;//maybe cast the communicator ptr to a MPI communicator and get getMPIComm()?
+                        SQuick::sort<sort_pair>(mpi_comm, localPairs, -1);//could also do this with just the hilbert index - as a valueType
+                        IndexType newLocalN = localPairs.size();
+
+                        PRINT0(std::to_string(localN) + " old local values " + std::to_string(newLocalN) + " new ones.");
+
+                        migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
+                        metrics.timeMigrationAlgo[rank]  = migrationCalculation.count();
+
+                        std::chrono::time_point<std::chrono::system_clock> beforeMigration =  std::chrono::system_clock::now();
+
+                        assert(newLocalN > 0);
+                        sort_pair minLocalIndex = localPairs[0];
+
+                        std::vector<ValueType> sendThresholds(comm->getSize(), minLocalIndex.value);
+                        std::vector<ValueType> recvThresholds(comm->getSize());
+
+                        static_assert(std::is_same<ValueType, double>::value, "assuming ValueType double. Change this assertion and following line.");
+                        MPI_Datatype MPI_ValueType = MPI_DOUBLE; //TODO: properly template this
+
+                        PRINT0("Setting local threshold to " + std::to_string(minLocalIndex.value));
+
+
+                        MPI_Alltoall(sendThresholds.data(), 1,  MPI_ValueType,
+                                         recvThresholds.data(), 1, MPI_ValueType,
+                                         mpi_comm);//TODO: replace this monstrosity with a proper call to LAMA
+                        //comm->all2all(recvThresholds.data(), sendTresholds.data());//TODO: maybe speed up with hypercube
+
+                        PRINT0(std::to_string(recvThresholds[0]) + " < hilbert indices < " + std::to_string(recvThresholds[comm->getSize()-1]) + ".");
+
+
+                        // merge to get quantities //Problem: nodes are not sorted according to their hilbert indices, so accesses are not aligned.
+                        // Need to sort before and after communication
+                        assert(std::is_sorted(recvThresholds.begin(), recvThresholds.end()));
+
+                        std::vector<IndexType> permutation(localN);
+                        std::iota(permutation.begin(), permutation.end(), 0);
+                        std::sort(permutation.begin(), permutation.end(), [&](IndexType i, IndexType j){return hilbertIndices[i] < hilbertIndices[j];});
+
+                        //now sorting hilbert indices themselves, no longer needed
+                        std::sort(hilbertIndices.begin(), hilbertIndices.end());
+
+                        std::vector<IndexType> quantities(comm->getSize(), 0);
+
+                        {
+                            IndexType p = 0;
+                            for (IndexType i = 0; i < localN; i++) {
+                                //increase target block counter if threshold is reached. Skip empty blocks if necessary.
+                                while (p+1 < comm->getSize() && recvThresholds[p+1] <= hilbertIndices[i]) {//TODO: check this more thoroughly when you are awake
+                                    p++;
+                                }
+                                assert(p < comm->getSize());
+
+                                quantities[p]++;
+                            }
+                        }
+
+                        SCAI_ASSERT_EQ_ERROR(std::accumulate(quantities.begin(), quantities.end(), 0), localN, "wrong send quantities");
+
+                        // allocate sendPlan
+                        scai::dmemo::CommunicationPlan sendPlan(quantities.data(), comm->getSize());
+                        SCAI_ASSERT_EQ_ERROR(sendPlan.totalQuantity(), localN, "wrong size of send plan")
+
+                        // allocate recvPlan - either with allocateTranspose, or directly
+                        scai::dmemo::CommunicationPlan recvPlan;
+                        recvPlan.allocateTranspose(sendPlan, *comm);
+
+                        SCAI_ASSERT_EQ_ERROR(recvPlan.totalQuantity(), newLocalN, "wrong size of recv plan");
+
+                        //get new distribution
+                        scai::utilskernel::LArray<IndexType> indexTransport(newLocalN);
+                        {
+                            scai::hmemo::WriteAccess<IndexType> wIndices(indexTransport);
+                            for (IndexType i = 0; i < newLocalN; i++) {
+                                wIndices[i] = localPairs[i].index;
+                            }
+                            std::sort(wIndices.get(), wIndices.get()+newLocalN);
+                        }
+                        scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
+                        SCAI_ASSERT_EQUAL(newDist->getLocalSize(), newLocalN, "wrong size of new distribution");
+
+                        //transmit indices, allowing for resorting of the received values
+                        std::vector<IndexType> sendIndices(localN);
+                        scai::hmemo::ReadAccess<IndexType> rIndices(myGlobalIndices);
+                        for (IndexType i = 0; i < localN; i++) {
+                            assert(permutation[i] < localN);
+                            assert(permutation[i] >= 0);
+                            sendIndices[i] = rIndices[permutation[i]];
+                        }
+                        std::vector<IndexType> recvIndices(newLocalN);
+                        comm->exchangeByPlan(recvIndices.data(), recvPlan, sendIndices.data(), sendPlan);
+
+                        for (IndexType i = 0; i < newLocalN; i++) {
+                            SCAI_ASSERT_VALID_INDEX_ERROR(recvIndices[i], globalN, "invalid index");
+                        }
+
+                        PRINT0("Exchanged indices.");
+
+                        {
+                            //TODO: this might be expensive
+                            //scai::hmemo::ReadAccess<IndexType> rNewIndices(indexTransport);
+                            //SCAI_ASSERT_ERROR(std::is_permutation(recvIndices.begin(), recvIndices.end(), rNewIndices.get()), "index mismatch");
+                        }
+
+
+                        // for each dimension: define DenseVector with new distribution, get write access to local values, call exchangeByPlan
+                        std::vector<ValueType> sendBuffer(localN);
+                        std::vector<ValueType> recvBuffer(newLocalN);
+                        
+                        PRINT0("Allocated Buffers.");
+
+                        for (IndexType d = 0; d < settings.dimensions; d++) {
+                            scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
+                            for (IndexType i = 0; i < localN; i++) {//TODO:maybe extract into lambda?
+                                sendBuffer[i] = rCoords[permutation[i]];//TODO: how to make this more cache-friendly? (Probably by using pairs and sorting them.)
+                            }
+                            PRINT0("Filled send buffer for coordinates of axis " + std::to_string(d));
+
+                            comm->exchangeByPlan(recvBuffer.data(), recvPlan, sendBuffer.data(), sendPlan);
+                            PRINT0("Exchanged coordinates for axis " + std::to_string(d));
+                            coordinateCopy[d] = DenseVector<ValueType> (newDist, 0);
+                            scai::hmemo::WriteAccess<ValueType> wCoords(coordinateCopy[d].getLocalValues());
+                            assert(wCoords.size() == newLocalN);
+                            for (IndexType i = 0; i < newLocalN; i++) {
+                                wCoords[newDist->global2local(recvIndices[i])] = recvBuffer[i];
+                            }
+                            PRINT0("Permuted received coordinates for axis " + std::to_string(d));
+                        }
+
+                        // same for node weights
+                        nodeWeightCopy = DenseVector<ValueType> (newDist, 1);
+                        if (!nodesUnweighted) {
+                            scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
+
+                            for (IndexType i = 0; i < localN; i++) {
+                                sendBuffer[i] = rWeights[permutation[i]];//TODO: how to make this more cache-friendly? (Probably by using pairs and sorting them.)
+                            }
+
+                            comm->exchangeByPlan(recvBuffer.data(), recvPlan, sendBuffer.data(), sendPlan);
+                            scai::hmemo::WriteAccess<ValueType> wWeights(nodeWeightCopy.getLocalValues());
+                            for (IndexType i = 0; i < newLocalN; i++) {
+                                wWeights[newDist->global2local(recvIndices[i])] = recvBuffer[i];
+                            }
+                        }
+
+                        PRINT0("Exchanged weights.");
+
+                        migrationTime = std::chrono::system_clock::now() - beforeMigration;
+                        metrics.timeFirstDistribution[rank]  = migrationTime.count();
+
+
                     } else {
-                        throw std::logic_error("Method not yet supported for preparing for K-Means");
-                    }
-                      
-                    migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
-                    metrics.timeMigrationAlgo[rank]  = migrationCalculation.count();
-                    
-                    std::chrono::time_point<std::chrono::system_clock> beforeMigration =  std::chrono::system_clock::now();
-                       
-                    scai::dmemo::Redistributor prepareRedist(initMigrationPtr, nodeWeights.getDistributionPtr());
 
-                    std::chrono::time_point<std::chrono::system_clock> afterRedistConstruction =  std::chrono::system_clock::now();
+                        if (settings.initialMigration == InitialPartitioningMethods::Multisection) {
+                            DenseVector<ValueType> convertedWeights(nodeWeights);
+                            tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, migrationSettings);
+                            initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
+                        } else if (settings.initialMigration == InitialPartitioningMethods::KMeans) {
+                            DenseVector<ValueType> convertedWeights(nodeWeights.getDistributionPtr(), 1);
+                            std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );;
+                            tempResult = ITI::KMeans::computePartition(coordinates, migrationSettings.numBlocks, convertedWeights, migrationBlockSizes, migrationSettings);
+                            initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
+                        } else if (settings.initialMigration == InitialPartitioningMethods::None) {
+                            //nothing to do
+                            initMigrationPtr = inputDist;
+                        } else {
+                            throw std::logic_error("Method not yet supported for preparing for K-Means");
+                        }
 
-                    std::chrono::duration<double> redist = (afterRedistConstruction - beforeMigration);
-                    metrics.timeConstructRedistributor[rank] = redist.count();
+                        migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
+                        metrics.timeMigrationAlgo[rank]  = migrationCalculation.count();
 
-                    if (nodesUnweighted) {
-                        nodeWeightCopy = DenseVector<ValueType>(initMigrationPtr, nodeWeights.getLocalValues()[0]);
-                    } else {
-                        nodeWeightCopy.redistribute(prepareRedist);
-                    }
+                        std::chrono::time_point<std::chrono::system_clock> beforeMigration =  std::chrono::system_clock::now();
 
-                    for (IndexType d = 0; d < dimensions; d++) {
-                        coordinateCopy[d].redistribute(prepareRedist);
+                        scai::dmemo::Redistributor prepareRedist(initMigrationPtr, nodeWeights.getDistributionPtr());
+
+                        std::chrono::time_point<std::chrono::system_clock> afterRedistConstruction =  std::chrono::system_clock::now();
+
+                        std::chrono::duration<double> redist = (afterRedistConstruction - beforeMigration);
+                        metrics.timeConstructRedistributor[rank] = redist.count();
+
+                        if (nodesUnweighted) {
+                            nodeWeightCopy = DenseVector<ValueType>(initMigrationPtr, nodeWeights.getLocalValues()[0]);
+                        } else {
+                            nodeWeightCopy.redistribute(prepareRedist);
+                        }
+
+                        for (IndexType d = 0; d < dimensions; d++) {
+                            coordinateCopy[d].redistribute(prepareRedist);
+                        }
+                        if (settings.repartition) {
+                            previous.redistribute(prepareRedist);
+                        }
+
+                        migrationTime = std::chrono::system_clock::now() - beforeMigration;
+                        metrics.timeFirstDistribution[rank]  = migrationTime.count();
                     }
-                    if (settings.repartition) {
-                        previous.redistribute(prepareRedist);
-                    }
-                    
-                    migrationTime = std::chrono::system_clock::now() - beforeMigration;
-                    metrics.timeFirstDistribution[rank]  = migrationTime.count();
                 }
-            
             }
             
             const ValueType weightSum = nodeWeights.sum().Scalar::getValue<ValueType>();
