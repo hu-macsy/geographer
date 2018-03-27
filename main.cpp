@@ -360,10 +360,11 @@ int main(int argc, char** argv) {
 		std::cout << "Cannot both load coordinates from file with --coordFile or generate them with --useDiffusionCoords." << std::endl;
 		return 126;
 	}
+
 	if( vm.count("cutsPerDim") ) {
-            SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
-            SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
-        }
+		SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
+		SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
+	}
         
 	if( vm.count("initialMigration") ){
 
@@ -399,14 +400,18 @@ int main(int argc, char** argv) {
 	}
 	
 	if( settings.storeInfo && settings.outFile=="-" ) {
-            if (comm->getRank() == 0) {
-                std::cout<< "Option to store information used but no output file given to write to. Specify an output file using the option --outFile. Aborting." << std::endl;
-            }
-            return 126;
-        }
+		if (comm->getRank() == 0) {
+			std::cout<< "Option to store information used but no output file given to write to. Specify an output file using the option --outFile. Aborting." << std::endl;
+		}
+		return 126;
+	}
 
 	if (!vm.count("influenceExponent")) {
 	    settings.influenceExponent = 1.0/settings.dimensions;
+	}
+
+	if (vm.count("manhattanDistance")) {
+		throw std::logic_error("Manhattan distance not yet implemented");
 	}
 
     //--------------------------------------------------------
