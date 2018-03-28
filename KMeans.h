@@ -207,6 +207,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 			lastIndex = firstIndex + samples[iter];
 			std::sort(firstIndex, lastIndex);//sorting not really necessary, but increases locality
 			ValueType ratio = ValueType(comm->sum(samples[iter])) / globalN;
+			assert(ratio <= 1);
 			for (IndexType j = 0; j < k; j++) {
 				adjustedBlockSizes[j] = ValueType(blockSizes[j]) * ratio;
 			}
