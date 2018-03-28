@@ -174,7 +174,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	if (comm->all(localN > minNodes)) {
 		ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
 
-		samplingRounds = std::ceil(std::log2(ValueType(globalN / (settings.minSamplingNodes*k))))+1;
+		samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNodes*k)))+1;
 		samples.resize(samplingRounds);
 		samples[0] = minNodes;
 	}
@@ -188,7 +188,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	}
 
 	if (samplingRounds > 0) {
-		assert(samples[samplingRounds-1] == localN);
+	    if (localN >= globalN / ValueType(k)) {
+	        SCAI_ASSERT_EQUAL_DEBUG(samples[samplingRounds-1], localN);
+	    }
 	}
 
 
