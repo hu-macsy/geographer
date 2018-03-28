@@ -98,20 +98,19 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 
 //wrapper for initial partitioning
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const Settings settings) {
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights,
+		const std::vector<IndexType> &blockSizes, const Settings settings) {
 	std::vector<ValueType> minCoords, maxCoords;
 	std::tie(minCoords, maxCoords) = getLocalMinMaxCoords(coordinates);
 	for(int d=0; d<settings.dimensions; d++){
 		SCAI_ASSERT_NE_ERROR( minCoords[d], maxCoords[d], "min=max for dimension "<< d << ", this will cause problems to the hilbert index. localN= " << coordinates[0].getLocalValues().size() );
 	}
 	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
-	//TODO: why <IndexType,ValueType> is needed here??
-	//std::vector<std::vector<ValueType> > centers = KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>( k, maxCoords, settings);
-	
+
 	return computePartition(coordinates, k, nodeWeights, blockSizes, centers, settings);
 }
 
-//wrapper for repartitioinng
+//wrapper for repartitioning
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings) {
 	const IndexType localN = nodeWeights.getLocalValues().size();
@@ -122,7 +121,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<std::vector<ValueType> > initialCenters = findCenters(coordinates, previous, k,	indices.begin(), indices.end(), nodeWeights);
 	return computePartition(coordinates, k, nodeWeights, blockSizes, initialCenters, settings);
 }
-
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights,
@@ -152,19 +150,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		maxCoords[d] = *std::max_element(convertedCoords[d].begin(), convertedCoords[d].end());
 	}
 
-	//std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
-
-	QuadNodeCartesianEuclid boundingBox(minCoords, maxCoords);
-	if (settings.verbose) {
-		std::cout << "Process " << comm->getRank() << ": ( ";
-		for (auto coord : minCoords) std::cout << coord << " ";
-		std::cout << ") , ( ";
-		for (auto coord : maxCoords) std::cout << coord << " ";
-		std::cout << ")";
-		std::cout << ", " << localN << " nodes, " << nodeWeights.getLocalValues().sum() << " total weight";
-		std::cout << std::endl;
-	}
-
 	std::vector<ValueType> globalMinCoords(dim);
 	std::vector<ValueType> globalMaxCoords(dim);
 	comm->minImpl(globalMinCoords.data(), minCoords.data(), dim, scai::common::TypeTraits<ValueType>::stype);
@@ -172,11 +157,27 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 
 	ValueType diagonalLength = 0;
 	ValueType volume = 1;
+	ValueType localVolume = 1;
 	for (IndexType d = 0; d < dim; d++) {
 		const ValueType diff = globalMaxCoords[d] - globalMinCoords[d];
+		const ValueType localDiff = maxCoords[d] - minCoords[d];
 		diagonalLength += diff*diff;
 		volume *= diff;
+		localVolume *= localDiff;
 	}
+
+	QuadNodeCartesianEuclid boundingBox(minCoords, maxCoords);
+    if (settings.verbose) {
+        std::cout << "Process " << comm->getRank() << ": ( ";
+        for (auto coord : minCoords) std::cout << coord << " ";
+        std::cout << ") , ( ";
+        for (auto coord : maxCoords) std::cout << coord << " ";
+        std::cout << ")";
+        std::cout << ", " << localN << " nodes, " << nodeWeights.getLocalValues().sum() << " total weight";
+        std::cout << ", volume ratio " << localVolume / (volume / p);
+        std::cout << std::endl;
+    }
+
 	diagonalLength = std::sqrt(diagonalLength);
 	const ValueType expectedBlockDiameter = pow(volume / k, 1.0/dim);
 
@@ -189,7 +190,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
 	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();;
 	std::iota(firstIndex, lastIndex, 0);
-	
 
 	IndexType minNodes = settings.minSamplingNodes*blocksPerProcess;
 	assert(minNodes > 0);
@@ -199,8 +199,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	if (comm->all(localN > minNodes)) {
 		ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
 
-		samplingRounds = std::ceil(std::log2(ValueType(globalN / (settings.minSamplingNodes*k))))+1;
-
+		samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNodes*k)))+1;
 		samples.resize(samplingRounds);
 		samples[0] = minNodes;
 	}
@@ -214,7 +213,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	}
 
 	if (samplingRounds > 0) {
-		assert(samples[samplingRounds-1] == localN);
+	    if (localN >= globalN / ValueType(k)) {
+	        SCAI_ASSERT_EQUAL_DEBUG(samples[samplingRounds-1], localN);
+	    }
 	}
 
 
@@ -224,14 +225,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	ValueType delta = 0;
 	bool balanced = false;
 	const ValueType threshold = 0.002*diagonalLength;//TODO: take global point density into account
-
-	//PRINT0("threshold= " << threshold << " , samplingRounds= " << samplingRounds);	
-
-	//
-	//IndexType balanceIter = 5;
-	//ValueType balanceEpsilon = 0.1;
-	//
-	
 	const IndexType maxIterations = settings.maxKMeansIterations;
 	do {
 		std::chrono::time_point<std::chrono::high_resolution_clock> iterStart = std::chrono::high_resolution_clock::now();
@@ -255,10 +248,8 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, balanceSettings);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
-		
 		std::vector<std::vector<ValueType> > newCenters = findCenters(coordinates, result, k, firstIndex, lastIndex, nodeWeights);
-		
-		
+
 		//keep centroids of empty blocks at their last known position
 		for (IndexType j = 0; j < k; j++) {
 		    for (int d = 0; d < dim; d++) {
@@ -309,6 +300,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 					lowerBoundNextCenter[i] = 0;
 				} else {
 					ValueType diff = (-2*delta*pureSqrt + deltaSq)*(maxInfluence + 1e-10);
+                                        //TODO: assertion fails for small graphs
 					assert(diff <= 0);
 					lowerBoundNextCenter[i] += diff;
 					if (!(lowerBoundNextCenter[i] > 0)) lowerBoundNextCenter[i] = 0;
@@ -335,15 +327,16 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 				balanced = false;
 			}
 		}
-PRINT0("balanced= " << balanced);
+
 		if (comm->getRank() == 0) {
 			std::cout << "i: " << iter << ", delta: " << delta << std::endl;
 		}
 		iter++;
-		
+/*		
+		// if only cares about balance and running time, exit loop when balance is reached
 		if( settings.repartition and balanced )
 			break;
-/*		
+		
 		if (settings.verbose) {
 			std::chrono::duration<ValueType,std::ratio<1>> iterTime = std::chrono::high_resolution_clock::now() - iterStart;			
 			ValueType time = iterTime.count() ;

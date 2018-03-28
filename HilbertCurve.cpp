@@ -10,7 +10,7 @@
 
 namespace ITI{
 
-template<typename IndexType, typename ValueType>
+template<typename IndexType, typename ValueType>//TODO: template this to help branch prediction
 ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords){
     SCAI_REGION( "HilbertCurve.getHilbertIndex_newVersion")
 

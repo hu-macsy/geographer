@@ -10,37 +10,38 @@
 #include "GraphUtils.h"
 
 struct Metrics{
-	
-	// timing results
-	//
-	std::vector<ValueType>  timeMigrationAlgo;
-	std::vector<ValueType>  timeFirstDistribution;
-	std::vector<ValueType>  timeKmeans;
-	std::vector<ValueType>  timeSecondDistribution;
-	std::vector<ValueType>  timePreliminary;
-	
-	ValueType inputTime = -1;
+    
+    // timing results
+    //
+    std::vector<ValueType>  timeMigrationAlgo;
+	std::vector<ValueType>  timeConstructRedistributor;
+    std::vector<ValueType>  timeFirstDistribution;
+    std::vector<ValueType>  timeKmeans;
+    std::vector<ValueType>  timeSecondDistribution;
+    std::vector<ValueType>  timePreliminary;
+    
+   	ValueType inputTime = -1;
 	ValueType timeFinalPartition = -1;
 	ValueType reportTime = -1 ;
 	ValueType timeTotal = -1;
 	ValueType timeSpMV = -1;
 	ValueType timeComm = -1;
-	
-	//metrics, each for every time we repeat the algo
-	//
-	ValueType preliminaryCut = 0;
-	ValueType preliminaryImbalance = 0;
-	
-	ValueType finalCut = 0;
-	ValueType finalImbalance = 0;
-	IndexType maxBlockGraphDegree= 0;
-	IndexType totalBlockGraphEdges= 0;
-	IndexType maxCommVolume= 0;
-	IndexType totalCommVolume= 0;
-	IndexType maxBoundaryNodes= 0;
-	IndexType totalBoundaryNodes= 0;
-	ValueType maxBorderNodesPercent= 0;
-	ValueType avgBorderNodesPercent= 0;
+    
+    //metrics, each for every time we repeat the algo
+    //
+    ValueType preliminaryCut = 0;
+    ValueType preliminaryImbalance = 0;
+    
+    ValueType finalCut = 0;
+    ValueType finalImbalance = 0;
+    IndexType maxBlockGraphDegree= 0;
+    IndexType totalBlockGraphEdges= 0;
+    IndexType maxCommVolume= 0;
+    IndexType totalCommVolume= 0;
+    IndexType maxBoundaryNodes= 0;
+    IndexType totalBoundaryNodes= 0;
+    ValueType maxBorderNodesPercent= 0;
+    ValueType avgBorderNodesPercent= 0;
 
 	IndexType maxBlockDiameter = 0;
 	IndexType avgBlockDiameter = 0;

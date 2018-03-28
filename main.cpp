@@ -49,7 +49,6 @@
 //----------------------------------------------------------------------------
 /*
 namespace ITI {
-
 	std::istream& operator>>(std::istream& in, Format& format)
 	{
 		std::string token;
@@ -138,7 +137,6 @@ std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method)
     return out;
 }
 
-//void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);	
 
 
 int main(int argc, char** argv) {
@@ -295,14 +293,18 @@ int main(int argc, char** argv) {
 	}
 	
 	if( settings.storeInfo && settings.outFile=="-" ) {
-            if (comm->getRank() == 0) {
-                std::cout<< "Option to store information used but no output file given to write to. Specify an output file using the option --outFile. Aborting." << std::endl;
-            }
-            return 126;
-        }
+		if (comm->getRank() == 0) {
+			std::cout<< "Option to store information used but no output file given to write to. Specify an output file using the option --outFile. Aborting." << std::endl;
+		}
+		return 126;
+	}
 
 	if (!vm.count("influenceExponent")) {
 	    settings.influenceExponent = 1.0/settings.dimensions;
+	}
+
+	if (vm.count("manhattanDistance")) {
+		throw std::logic_error("Manhattan distance not yet implemented");
 	}
 
     //--------------------------------------------------------
@@ -614,14 +616,6 @@ int main(int argc, char** argv) {
     
     std::vector<struct Metrics> metricsVec;
     
-	/*
-	//TODO: used ifort -nofor-main ... to compile but does not link properly
-	size_t total=-1,used=-1,free=-1,buffers=-1, cached=-1;
-	memusage(&total, &used, &free, &buffers, &cached);
-	printf("%ld %ld %ld %ld %ld \n", total,used,free,buffers, cached);
-	*/
-	
-	
     //------------------------------------------------------------
     //
     // partition the graph
@@ -727,7 +721,7 @@ int main(int argc, char** argv) {
     
     settings.print( std::cout, comm );
     if (comm->getRank() == 0) {
-		std::cout << "Running " << __FILE__ << std::endl;
+	std::cout << "Running " << __FILE__ << std::endl;
         std::cout<<  "\033[1;36m";
     }
     printVectorMetrics( metricsVec, std::cout );
