@@ -722,10 +722,6 @@ int main(int argc, char** argv) {
 
     }
 
-    if( comm->getRank() ==0){
-          settings.print(std::cout, comm);
-    }
-    
     std::vector<struct Metrics> metricsVec;
     
     //------------------------------------------------------------
@@ -831,8 +827,6 @@ int main(int argc, char** argv) {
     //
     // writing results in a file and std::cout
     //
-    
-    settings.print( std::cout, comm );
     if (comm->getRank() == 0) {
         std::cout<<  "\033[1;36m";
     }
