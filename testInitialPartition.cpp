@@ -461,16 +461,16 @@ int main(int argc, char** argv) {
 					weightSum = N;
 				}
 				const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
-				
+/*				
 				scai::dmemo::Redistributor prepareRedist(  tempResult.getDistributionPtr() , coordinates[0].getDistributionPtr());
 				std::chrono::duration<double> redistribTime1 = std::chrono::system_clock::now() - beforeRedist;
 				time = comm->max( redistribTime1.count() );
 				PRINT0("time to construct redistributor: " << time);
-				
+*/				
 				std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
 				for (IndexType d = 0; d < dimensions; d++) {
-					//coordinateCopy[d].redistribute( tempResult.getDistributionPtr() );
-					coordinateCopy[d].redistribute(prepareRedist);
+					coordinateCopy[d].redistribute( tempResult.getDistributionPtr() );
+					//coordinateCopy[d].redistribute(prepareRedist);
 				}
 				std::chrono::duration<double> redistribTime = std::chrono::system_clock::now() - beforeRedist;
 				time = comm->max( redistribTime.count() );
@@ -478,8 +478,8 @@ int main(int argc, char** argv) {
 				
 				//
 				const IndexType localN = graph.getLocalNumRows();
-				//settings.minSamplingNodes = std::max<IndexType>( IndexType(200), N/(k*50) );
-				settings.minSamplingNodes = localN;
+				settings.minSamplingNodes = std::max<IndexType>( IndexType(500), N/(k*20) );
+				//settings.minSamplingNodes = localN;
 				//
 				
 				partition = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeights, blockSizes, settings);     
