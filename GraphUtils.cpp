@@ -60,11 +60,13 @@ scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType
     DenseVector<IndexType> result(blockDist,0);
     blockDist->getOwnedIndexes(result.getLocalValues());
 
+    SCAI_ASSERT_EQUAL_ERROR(result.sum().Scalar::getValue<IndexType>(), globalN*(globalN-1)/2);
+
     scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(graph);
     scai::utilskernel::LArray<IndexType> haloData;
     comm->updateHalo( haloData, result.getLocalValues(), partHalo );
 
-    const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
+    CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
     {
         scai::hmemo::ReadAccess<IndexType> rHalo(haloData);
         scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
@@ -74,10 +76,12 @@ scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType
             IndexType localNeighbor = inputDist->global2local(oldNeighborID);
             if (localNeighbor != nIndex) {
                 ja[i] = rResult[localNeighbor];
+                assert(blockDist->isLocal(ja[i]));
             } else {
                 IndexType haloIndex = partHalo.global2halo(oldNeighborID);
                 assert(haloIndex != nIndex);
                 ja[i] = rHalo[haloIndex];
+                assert(!blockDist->isLocal(ja[i]));
             }
         }
     }
@@ -1165,7 +1169,7 @@ scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vec
 
 //-----------------------------------------------------------------------------------
 
-
+template scai::lama::DenseVector<IndexType> reindex(CSRSparseMatrix<ValueType> &graph);
 template IndexType getFarthestLocalNode(const CSRSparseMatrix<ValueType> &graph, std::vector<IndexType> seedNodes);
 template std::vector<IndexType> localBFS(const CSRSparseMatrix<ValueType> &graph, IndexType u);
 template IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const IndexType u, IndexType lowerBound, const IndexType k, IndexType maxRounds);
