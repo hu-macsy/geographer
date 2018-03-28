@@ -505,9 +505,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         if( settings.outFile!="-" and settings.writeInFile ){
             FileIO<IndexType, ValueType>::writePartitionParallel( result, settings.outFile+"_initPart.partition" );
         }
+
         
-        
-        if (comm->getSize() == k) {
+        if (comm->getSize() == k && !settings.noRefinement) {
             SCAI_REGION("ParcoRepart.partitionGraph.initialRedistribution")
             /**
              * redistribute to prepare for local refinement
@@ -567,7 +567,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
         } else {
             result.redistribute(inputDist);
-            if (comm->getRank() == 0) {
+            if (comm->getRank() == 0 && !settings.noRefinement) {
                 std::cout << "Local refinement only implemented for one block per process. Called with " << comm->getSize() << " processes and " << k << " blocks." << std::endl;
             }
         }

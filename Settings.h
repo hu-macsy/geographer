@@ -72,6 +72,7 @@ struct Settings{
     std::vector<IndexType> cutsPerDim;
 
     //tuning parameters for multiLevel heuristic
+    bool noRefinement = false;
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
     IndexType pixeledSideLen = 10;
