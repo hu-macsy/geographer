@@ -18,6 +18,9 @@ namespace ITI {
 namespace GraphUtils {
 
 template<typename IndexType, typename ValueType>
+scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType> &graph);
+
+template<typename IndexType, typename ValueType>
 IndexType getFarthestLocalNode(const scai::lama::CSRSparseMatrix<ValueType> &graph, std::vector<IndexType> seedNodes);
 
 /**

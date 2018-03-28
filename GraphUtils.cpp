@@ -13,6 +13,7 @@
 #include <scai/hmemo/WriteAccess.hpp>
 #include <scai/dmemo/Halo.hpp>
 #include <scai/dmemo/HaloBuilder.hpp>
+#include <scai/dmemo/GenBlockDistribution.hpp>
 
 #include "GraphUtils.h"
 
@@ -29,6 +30,61 @@ using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
 using scai::lama::Scalar;
 using scai::lama::CSRStorage;
+
+template<typename IndexType, typename ValueType>
+scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType> &graph) {
+    const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
+
+    const IndexType localN = inputDist->getLocalSize();
+    const IndexType globalN = inputDist->getGlobalSize();
+    const IndexType p = comm->getSize();
+    IndexType allLocalSizes[p];
+    comm->gather(allLocalSizes, 1, 0, &localN);
+
+    //compute prefix sum of offsets.
+    std::vector<IndexType> offsetPrefixSum(p+1, 0);
+    if (comm->getRank() == 0) {
+        //shift begin of output by one, since the first offset is 0
+        std::partial_sum(allLocalSizes, allLocalSizes+p, offsetPrefixSum.begin()+1);
+    }
+
+    //remove last value, since it would be the offset for the p+1th processor
+    offsetPrefixSum.resize(p);
+
+    //communicate offsets
+    IndexType myOffset[1];
+    comm->scatter(myOffset, 1, 0, offsetPrefixSum.data());
+
+    scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
+    DenseVector<IndexType> result(blockDist,0);
+    blockDist->getOwnedIndexes(result.getLocalValues());
+
+    scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(graph);
+    scai::utilskernel::LArray<IndexType> haloData;
+    comm->updateHalo( haloData, result.getLocalValues(), partHalo );
+
+    const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
+    {
+        scai::hmemo::ReadAccess<IndexType> rHalo(haloData);
+        scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
+        scai::hmemo::WriteAccess<IndexType> ja( localStorage.getJA() );
+        for (IndexType i = 0; i < ja.size(); i++) {
+            IndexType oldNeighborID = ja[i];
+            IndexType localNeighbor = inputDist->global2local(oldNeighborID);
+            if (localNeighbor != nIndex) {
+                ja[i] = rResult[localNeighbor];
+            } else {
+                IndexType haloIndex = partHalo.global2halo(oldNeighborID);
+                assert(haloIndex != nIndex);
+                ja[i] = rHalo[haloIndex];
+            }
+        }
+    }
+
+    return result;
+}
+
 
 template<typename IndexType, typename ValueType>
 IndexType getFarthestLocalNode(const scai::lama::CSRSparseMatrix<ValueType> &graph, std::vector<IndexType> seedNodes) {
