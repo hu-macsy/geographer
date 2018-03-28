@@ -34,14 +34,15 @@
 #include "Repartition.h"
 #include "Settings.h"
 
-
+/*
 
 void getImbalancedDistribution(
 	scai::lama::CSRSparseMatrix<ValueType> &graph,
 	std::vector<scai::lama::DenseVector<ValueType>> &coords, 
 	scai::lama::DenseVector<ValueType> &nodeWeights,
 	ITI::Tool tool,
-	struct Settings &settings){
+	struct Settings &settings,
+	struct Metrics &metrics){
 	
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	
@@ -73,7 +74,6 @@ void getImbalancedDistribution(
 			//diverg += 0.1;
 		}
 		else{
-			struct Metrics metrics;
 			firstPartition = ITI::Wrappers<IndexType,ValueType>::partition ( graph, coords, imbaNodeWeights, nodeWeightsFlag, tool, settings, metrics);
 			//diverg += 0.3;
 		}
@@ -110,9 +110,12 @@ void getImbalancedDistribution(
 		}
 		
 		nodeWeights.redistribute( prepareRedist );
+		firstPartition.redistribute( prepareRedist);	//needed to get metrics
+
 	}
-	
-	}
+	metrics.getEasyMetrics( graph, firstPartition, nodeWeights, settings );	
+}
+*/
 
 //------------------------------------------------------------------------------------------------------------
 /*
@@ -327,22 +330,42 @@ int main(int argc, char** argv) {
 	printf("MEM: avail: %ld , used: %ld , free: %ld , buffers: %ld , file cache: %ld \n",total,used,free,buffers, cached);
 	*/
 
-	//----------------------------------------------------------
+	
+	
+	//------------------------------------------------------------------------------
 	//
-	//	add node weights to get first partition and redistribute graph ans coordinates accordingly
+	// get first imbalanced distribution with the same tool
 	//
+	//
+	// set uniform node weights
 	
-
+	scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
+	SCAI_ASSERT_EQ_ERROR(nodeWeights.getLocalValues().size(), graph.getRowDistributionPtr()->getLocalSize(), "Nodeweights size mismatch.");
 	
-	/*
-	//std::string repartFile = outPath+ +"repartition/"+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_allTools.info";
+	// if usign unit weights, set flag for wrappers
+	bool nodeWeightsUse = false;
+	settings.repeatTimes = 1;
+	IndexType localN;  // the new localN after redistributing
+	struct Metrics firstPartMetrics(1);
 	
-	if ( storeInfo and thisPE==0 ){
-		std::ofstream outF( repartFile, std::ios::out);
-		outF << "Repartitioning graph " << graphName << std::endl;
-		outF << "\tpartition before: minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", distribution imbalance= " << imbalance << std::endl << std::endl;
-	}
-	*/
+	struct Settings firstPartSettings = settings;
+	firstPartSettings.epsilon = 0.2;
+	
+	// uniform node weights - only used to measure imbalance
+	//scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
+	
+	ITI::Repartition<IndexType,ValueType>::getImbalancedDistribution( graph, coords, nodeWeights, ITI::Tool::parMetisGeom, firstPartSettings, firstPartMetrics);
+	
+	// calculate and print imbalance		
+	localN = graph.getRowDistributionPtr()->getLocalSize();
+	//PRINT(*comm<<": " << localN);		
+	const IndexType maxLocalN = comm->max(localN);
+	const IndexType minLocalN = comm->min(localN);
+	const ValueType optSize = ValueType(N)/comm->getSize();
+	
+	ValueType imbalance = ValueType( maxLocalN - optSize)/optSize;
+	PRINT0("\tpartition before: minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", distribution imbalance= " << imbalance);
+	
 	
 	//------------------------------------------------------------
 	//
@@ -361,7 +384,7 @@ int main(int argc, char** argv) {
 		
 		//std::string thisTool = allTools[t];
 		ITI::Tool thisTool = allTools[t];
-		
+//PRINT( *comm << " : " << ITI::tool2string(thisTool) );		
 		//WARNING: in order for the SaGa scripts to work this must be done as in Saga/header.py::outFileSting
 		//create the outFile for this tool
 		//settings.outFile = outPath+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ thisTool + ".info";
@@ -370,18 +393,35 @@ int main(int argc, char** argv) {
 		}else{
 			settings.outFile ="-";
 		}
-				
-		//PRINT0( "\n" << settings.outFile << "\n");
-			
-		{	// check if output file exists, if yes do not repartiotion with this tool so not to overwrite file
+		//bool skipTool = false;
+		// check if output file exists, if yes do not repartiotion with this tool so not to overwrite file
+		//if( thisPE==0 )
+		{
 			std::ifstream f(settings.outFile);
+//PRINT( *comm<< ": "<< ITI::tool2string(thisTool) << ", f.good= " << f.good() );
 			if( f.good() and storeInfo ){
-				comm->synchronize();	// maybe not needed
 				PRINT0("\n\tWARNING: File " << settings.outFile << " allready exists. Skipping repartition with " << ITI::tool2string(thisTool) );
 				continue;
 			}
 		}
 		
+		comm->synchronize();
+		
+		// write info for the imbalanced partition in file	
+		if ( storeInfo and thisPE==0 ){
+			std::ofstream outF( settings.outFile, std::ios::out);
+			outF << "\tPartition before:"<< std::endl;
+			outF << "minLocalN= " << minLocalN << std::endl;
+			outF << "maxLocalN= " << maxLocalN << std::endl;
+			outF << "imbalance= " << imbalance << std::endl;
+			outF << std::endl;
+			
+			printMetricsShort( firstPartMetrics, outF);
+			outF<< std::endl<< std::endl;
+			printMetricsShort( firstPartMetrics, std::cout);
+		}
+		
+/*		
 		//------------------------------------------------------------------------------
 		//
 		// get first imbalanced distribution with the same tool
@@ -396,18 +436,16 @@ int main(int argc, char** argv) {
 		bool nodeWeightsUse = false;
 		settings.repeatTimes = 1;
 		IndexType localN;  // the new localN after redistributing
+		struct Metrics firstPartMetrics(1);
+		
 		{
-			// use some tool to partition with the node weights
-			//struct Metrics firstPartMetrics(1);
-			//firstPartMetrics.numBlocks = settings.numBlocks;
-			
 			struct Settings firstPartSettings = settings;
 			firstPartSettings.epsilon = 0.1;
 			
 			// uniform node weights - only used to measure imbalance
 			//scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
 			
-			getImbalancedDistribution( graph, coords, nodeWeights, thisTool, firstPartSettings);
+			ITI::Repartition<IndexType,ValueType>::getImbalancedDistribution( graph, coords, nodeWeights, ITI::Tool::parMetisGeom, firstPartSettings, firstPartMetrics);
 			
 			// calculate and print imbalance		
 			localN = graph.getRowDistributionPtr()->getLocalSize();
@@ -428,11 +466,14 @@ int main(int argc, char** argv) {
 				outF << "imbalance= " << imbalance << std::endl;
 				outF << std::endl;
 				
-				//printMetricsShort( beforeMetrics, outF);
+				if( thisPE==0 ){
+					printMetricsShort( firstPartMetrics, outF);
+					outF<< std::endl<< std::endl;
+					printMetricsShort( firstPartMetrics, std::cout);
+				}
 			}
-			
 		}
-			
+*/			
 		SCAI_ASSERT_EQ_ERROR(nodeWeights.getLocalValues().size(), graph.getRowDistributionPtr()->getLocalSize(), "Nodeweights size mismatch.");
 		SCAI_ASSERT_EQ_ERROR(nodeWeights.getLocalValues().size(), coords[0].getDistributionPtr()->getLocalSize(), "Nodeweights size mismatch.");
 		
@@ -449,12 +490,7 @@ int main(int argc, char** argv) {
 		
 		// metrics
 		metrics.getRedistMetrics( graph, partition, nodeWeights, settings );
-		/*
-		scai::dmemo::DistributionPtr newDist = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );	
-		scai::dmemo::DistributionPtr oldDist = graph.getRowDistributionPtr();
 
-		metrics.getRedistributionVol( newDist, oldDist);
-		*/
 		
 		//-----------------------------------------------------
 		//
@@ -465,7 +501,6 @@ int main(int argc, char** argv) {
 		std::string machine;
 		gethostname(machineChar, 255);
 		machine = std::string(machineChar);
-		
 		
 		if( thisPE==0 ){
 			if( vm.count("generate") ){
@@ -493,6 +528,7 @@ int main(int argc, char** argv) {
 				}       
 			}
 		}
+//PRINT( *comm << " : " << ITI::tool2string(thisTool) );		
 	} // for allTools.size()
      
 	std::chrono::duration<ValueType> totalTimeLocal = std::chrono::system_clock::now() - startTime;

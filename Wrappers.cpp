@@ -531,7 +531,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 	}else{
 		params.set("partitioning_approach", "partition");
 	}
-
+//PRINT( *comm );
 	//TODO:	params.set("partitioning_objective", "minimize_cut_edge_count");
 	//		or something else, check at 
 	//		https://trilinos.org/docs/r12.12/packages/zoltan2/doc/html/z2_parameters.html
@@ -543,7 +543,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 	//TODO: can also be taken from the distribution?
 	for (size_t i=0; i < localN; i++)
 		globalIds[i] = offset++;
-	
+//PRINT( *comm );	
 	//set node weights
 	std::vector<ValueType> localUnitWeight(localN);
 	
@@ -557,18 +557,19 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 	}
 	std::vector<const ValueType *>weightVec(1);
 	weightVec[0] = localUnitWeight.data();
-	
+
 	std::vector<int> weightStrides(1);
 	weightStrides[0] = 1;
 	
 	//create the problem and solve it
 	inputAdapter_t *ia= new inputAdapter_t(localN, globalIds, coordVec, 
                                          coordStrides, weightVec, weightStrides);
-  
+
 	Zoltan2::PartitioningProblem<inputAdapter_t> *problem =
            new Zoltan2::PartitioningProblem<inputAdapter_t>(ia, &params);	
 		   
-	if( comm->getRank()==0 ) std::cout<< "About to call zoltan, algo " << algo << std::endl;
+	if( comm->getRank()==0 )
+		std::cout<< "About to call zoltan, algo " << algo << std::endl;
 	
 	int repeatTimes = settings.repeatTimes;
 	double sumPartTime = 0.0;

@@ -19,6 +19,7 @@ parser.add_argument('--tools','-t' , type=str , nargs='*', default="Geographer",
 parser.add_argument('--xT', type=str, nargs='*', help="Name of tool to exclude, Works only with --tools=all.")
 parser.add_argument('--configFile','-c', default="SaGa.config", help='The configuration file. ')
 parser.add_argument('--wantedExp', '-we', type=int, nargs='*', metavar='exp', help='A subset of the experiments that will be submited.')
+parser.add_argument('--gatherDir', '-g', type=str, default=toolsPath, help='Optional folder to gather output. If none is given then the default is used as specified in the header/config file.\nDefault now is' + toolsPath)
 
 args = parser.parse_args()
 
@@ -26,6 +27,7 @@ wantedExpIDs = args.wantedExp
 configFile = args.configFile
 wantedTools = args.tools
 excludeTools = args.xT
+gatherDir = args.gatherDir
 
 if wantedTools[0]=="all":
 	wantedTools= []
@@ -47,6 +49,11 @@ if not os.path.exists(configFile):
 else:
 	print("Collecting information from configuration file: " + configFile )
 
+if args.gatherDir:
+	if not os.path.exists(gatherDir):
+		print("Directory to gather info is missing.\nAborting...");
+		exit(-1)
+		
 #
 # parse config file
 #
@@ -86,7 +93,7 @@ for exp in wantedExp:
 		#print ("Start checking files for tool " + tool)		
 		
 		for i in range(0, exp.size):	
-			gatherFile = outFileString( exp, i, tool)
+			gatherFile = outFileString( exp, i, tool, gatherDir)
 		
 			if not os.path.exists( os.path.join( toolsPath, tool) ):
 				print("### ERROR: directory to gather information " + os.path.join( toolsPath, tool) + " does not exist.\nAborting..." )

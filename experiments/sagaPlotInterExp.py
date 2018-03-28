@@ -2,7 +2,7 @@ from submitFileWrapper_Supermuc import *
 from header import*
 from inspect import currentframe, getframeinfo
 from meansHeader import *
-from test_GatherScriptForTool import gatherExpTool
+from sagaGather import gatherExpTool
 
 import os
 import math
@@ -11,7 +11,7 @@ import re
 import sys
 import argparse
 
-def createInterExpPlots( wantedExp, wantedTools):
+def createInterExpPlots( wantedExp, wantedTools,gatherDir, outDir, repartMetrics):
 	
 	numExp = len(wantedExp)
 	numTools = len(wantedTools)
@@ -30,7 +30,7 @@ def createInterExpPlots( wantedExp, wantedTools):
 		
 		metricValues= []
 		for tool in wantedTools:
-			metricNames, metricValuesTmp = gatherExpTool( exp, tool )
+			metricNames, metricValuesTmp = gatherExpTool( exp, tool, gatherDir, repartMetrics)
 			metricValues.append( metricValuesTmp)
 		
 		numMetrics = len(metricNames)
@@ -48,22 +48,21 @@ def createInterExpPlots( wantedExp, wantedTools):
 		# 		for tool i and metric j. The same for the harmonic mean
 		geoMeanMatrix = []
 		validMetrics = 0
+		metricNamesShort = []
 		
 		for m in range(0, numMetrics):
 			metricName = metricNames[m]
 		
-			## skip certain metrics
-			## or handle differently
-			#if metricName=="imbalance":				
-			#	continue
-			'''
-			if metricName=="timeTotal":
-				timeTmeans = getGeomMeanForMetric( metricValues, metricName, wantedTools, 0)
-				plotF.write("Values for metric timeTotal: ")
-				for t in range(0, len(timeTmeans)):
-					plotF.write(wantedTools[t]+"= " + str(timeTmeans[t])+" , ")
-			'''
-			geoMeanMatrix.append( getGeomMeanForMetric( metricValues, metricName, wantedTools, 0) )
+			#exclude metrics from the plot-for-all
+			excludedMetrics=[ "timeTotal", "imbalance", "maxBnd", "totBnd", 'maxBndPercnt', 'avgBndPercnt']
+						
+			if metricName in excludedMetrics:
+				print("Not calculating for metric " + metricName)
+				continue
+			
+			metricNamesShort.append( metricName )
+			
+			geoMeanMatrix.append( getGeomMeanForMetric( metricValues, metricName, m, wantedTools, 0) )
 			validMetrics += 1
 			
 		# initialize if it is the first experiment or multiply else
@@ -96,7 +95,7 @@ def createInterExpPlots( wantedExp, wantedTools):
 		plotFileName+=str(exp.ID)
 	
 	plotFileName += ".tex"
-	plotFile = os.path.join( plotsPath, plotFileName);
+	plotFile = os.path.join( outDir, plotFileName);
 	
 	if os.path.exists(plotFile + ".tex"):
 		print("WARNING: Plot file " + plotFile + " already exists and will be overwriten.")
@@ -127,8 +126,8 @@ def createInterExpPlots( wantedExp, wantedTools):
 				plotF.write( outF2  +", k= " + str(exp.k[i]) +"\\\\")
 				
 		plotF.write("\n\\begin{figure}\n")
-		#plotMeanForAllTool( geoMeanForAllExps, metricNames, numMetrics, wantedTools, plotF, "Geometric")
-		plotBarMeanForAllTool( geoMeanForAllExps, metricNames, numMetrics, wantedTools, plotF)
+		#plotMeanForAllTool( geoMeanForAllExps, metricNamesShort, numMetrics, wantedTools, plotF, "Geometric")
+		plotBarMeanForAllTool( geoMeanForAllExps, metricNamesShort, numMetrics, wantedTools, plotF)
 		plotF.write("\\caption{Geometric mean for all metrics and all tools for different experiments with base tool: " + wantedTools[0] +"}\n\\end{figure}\n\n")	
 		#plotF.write("\n\n\\clearpage\n\n")
 		plotF.write("\\end{document}")
@@ -144,12 +143,16 @@ parser = argparse.ArgumentParser(description='Gather output information from fil
 parser.add_argument('--tools','-t' , type=str , nargs='*', default="Geographer", help='Name of the tools. It can be: Geographer, parMetisGraph, parMetisGeom.')
 parser.add_argument('--configFile','-c', default="SaGa.config", help='The configuration file. ')
 parser.add_argument('--wantedExp', '-we', type=int, nargs='*', metavar='exp', help='A subset of the experiments that will be submited.')
+parser.add_argument('--gatherDir', '-g', type=str, default=toolsPath, help='Optional folder to gather output. If none is given then the default is used as specified in the header/config file.\nDefault now is' + toolsPath)
+parser.add_argument('--repartMetrics', '-rm', type=bool, default=False, help="Flag to use metrics for repartition")
 
 args = parser.parse_args()
 
 wantedExpIDs = args.wantedExp
 configFile = args.configFile
+gatherDir = os.path.abspath( args.gatherDir)
 wantedTools = args.tools
+repartMetrics = args.repartMetrics
 
 if wantedTools[0]=="all":
 	wantedTools = allTools[1:]		# skipping Geographer
@@ -167,6 +170,9 @@ if not os.path.exists(configFile):
 	exit(-1)
 else:
 	print("Collecting information from configuration file: " + configFile )
+
+
+outDir = os.path.join( gatherDir, "plots" )
 
 #
 # parse config file
@@ -190,4 +196,4 @@ else:
 		if i in wantedExpIDs:
 			wantedExp.append( allExperiments[i] )
 
-createInterExpPlots( wantedExp, wantedTools)
+createInterExpPlots( wantedExp, wantedTools, gatherDir, outDir, repartMetrics)

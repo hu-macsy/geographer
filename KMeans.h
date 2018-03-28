@@ -102,7 +102,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<ValueType> minCoords, maxCoords;
 	std::tie(minCoords, maxCoords) = getLocalMinMaxCoords(coordinates);
 	for(int d=0; d<settings.dimensions; d++){
-		SCAI_ASSERT_NE_ERROR( minCoords[d], maxCoords[d], "min=max for dimension "<< d << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
+		SCAI_ASSERT_NE_ERROR( minCoords[d], maxCoords[d], "min=max for dimension "<< d << ", this will cause problems to the hilbert index. localN= " << coordinates[0].getLocalValues().size() );
 	}
 	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
 	//TODO: why <IndexType,ValueType> is needed here??
@@ -111,7 +111,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	return computePartition(coordinates, k, nodeWeights, blockSizes, centers, settings);
 }
 
-//wrapper for repartitioning
+//wrapper for repartitioinng
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings) {
 	const IndexType localN = nodeWeights.getLocalValues().size();
@@ -335,11 +335,14 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 				balanced = false;
 			}
 		}
-
+PRINT0("balanced= " << balanced);
 		if (comm->getRank() == 0) {
 			std::cout << "i: " << iter << ", delta: " << delta << std::endl;
 		}
 		iter++;
+		
+		if( settings.repartition and balanced )
+			break;
 /*		
 		if (settings.verbose) {
 			std::chrono::duration<ValueType,std::ratio<1>> iterTime = std::chrono::high_resolution_clock::now() - iterStart;			
@@ -349,7 +352,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 			std::cout << " , while cond: "<< (iter < samplingRounds || (iter < maxIterations && (delta > threshold || !balanced)) )  << std::endl;
 		}
 */		
-	} while (iter < samplingRounds || (iter < maxIterations && (delta > threshold || !balanced)));
+	} while (iter < samplingRounds or (iter < maxIterations && (delta > threshold || !balanced)) );
 
 	return result;
 }

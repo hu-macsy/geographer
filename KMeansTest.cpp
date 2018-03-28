@@ -3,6 +3,8 @@
 #include "KMeans.h"
 #include "AuxiliaryFunctions.h"
 
+#include "Repartition.h"
+
 #include "gtest/gtest.h"
 
 
@@ -221,6 +223,67 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 		}
 	}
 }
+
+
+TEST_F(KMeansTest, testPartitionWithNodeWeights) {
+	//std::string fileName = "Grid32x32";
+	std::string fileName = "bubbles-00010.graph";
+	std::string graphFile = graphPath + fileName;
+	std::string coordFile = graphFile + ".xyz";
+	const IndexType dimensions = 2;
+
+	//load graph and coords
+	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+	const IndexType globalN = graph.getNumRows();
+	std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), globalN, dimensions);
+
+	const IndexType k = comm->getSize();
+		
+	const std::vector<IndexType> blockSizes(k, globalN/k);
+	
+	scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+
+	
+	struct Settings settings;
+	settings.dimensions = dimensions;
+	settings.numBlocks = k;
+	settings.minSamplingNodes = unitNodeWeights.getLocalValues().size()/20;
+	
+	scai::lama::DenseVector<IndexType> firstPartition = ITI::KMeans::computePartition ( coords, settings.numBlocks, unitNodeWeights, blockSizes, settings);
+	
+	struct Metrics metrics(1);
+	metrics.getEasyMetrics( graph, firstPartition, unitNodeWeights, settings );
+	if(comm->getRank()==0){
+		printMetricsShort( metrics, std::cout);
+	}
+	
+	const IndexType seed = 0;
+	ValueType diverg = 0.8;
+		
+	scai::lama::DenseVector<ValueType> imbaNodeWeights = ITI::Repartition<IndexType,ValueType>::sNW( coords, seed, diverg, dimensions);
+	
+	ValueType maxWeight = imbaNodeWeights.max().Scalar::getValue<ValueType>();
+	ValueType minWeight = imbaNodeWeights.min().Scalar::getValue<ValueType>();
+	PRINT0("maxWeight= "<< maxWeight << " , minWeight= "<< minWeight);
+
+	const IndexType localN = graph.getLocalNumRows();
+	
+	//settings.verbose = true;
+	settings.maxKMeansIterations = 30;
+	settings.balanceIterations = 10;
+	settings.minSamplingNodes = localN;
+	
+	scai::lama::DenseVector<IndexType> imbaPartition = ITI::KMeans::computePartition ( coords, settings.numBlocks, imbaNodeWeights, blockSizes, settings);
+	
+	metrics.getEasyMetrics( graph, imbaPartition, imbaNodeWeights, settings );
+	if(comm->getRank()==0){
+		printMetricsShort( metrics, std::cout);
+	}
+	
+}
+
 
 
 }

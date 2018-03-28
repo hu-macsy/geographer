@@ -153,7 +153,8 @@ IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const I
     ecc[u] = *std::max_element(distances.begin(), distances.end());
 
     if (localN > 1) {
-        assert(ecc[u] > 0);
+        //assert(ecc[u] > 0);
+		SCAI_ASSERT_GT_ERROR( ecc[u], 0, "Wrong eccentricity value");
     }
 
     if (ecc[u] > localN) {
@@ -331,7 +332,8 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 		subsetSizes[partID] += weight;
 		weightSum += weight;
 	}
-PRINT(*comm << ": " << ", local node weightSum= " << weightSum);
+	//PRINT(*comm << ": " << ", local node weightSum= " << weightSum);
+	
 	ValueType optSize;
 	
 	if (weighted) {

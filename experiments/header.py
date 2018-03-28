@@ -257,8 +257,9 @@ def parseOutFile( outFile ):
 		print ("WARNING: File "+outFile+" does not exist.\nSkipping...");
 		return [-1]*NUM_METRICS, [-1]*NUM_METRICS, -1
 		#exit(-1)
-	#else:
-		#print ("Parsing outFile: " + outFile)
+	
+	print ("Parsing outFile: " + outFile)
+	
 	n = -1
 		
 	with open(outFile) as f:
@@ -273,6 +274,8 @@ def parseOutFile( outFile ):
 			tokens = line.split()
 			if len(tokens)==0:
 				tokens = "0"
+			if line=="":
+				break
 			#print(tokens)
 			#if tokens[0]=="numBlocks=":
 			#	n = tokens[1]	
@@ -290,6 +293,59 @@ def parseOutFile( outFile ):
 		
 	return metricNames, metricValues, n
 		
+		
+#TODO: remove this function and deal with repartitio file properly
+#	 (it happens because keyword "gather" appears two times in the repartition files...)
+def parseRepartFile( outFile ):
+	
+	if not os.path.exists(outFile):
+		print ("WARNING: File "+outFile+" does not exist.\nSkipping...");
+		return [-1]*NUM_METRICS, [-1]*NUM_METRICS, -1
+		#exit(-1)
+	#else:
+		#print ("Parsing outFile: " + outFile)
+	n = -1
+	gatherCnt=0
+	
+	with open(outFile) as f:
+		line = f.readline()
+		tokens = line.split()
+		
+		# for the first gather do not do anything
+		if tokens[0]=="gather":
+			gatherCnt += 1
+		#
+		
+		if len(tokens)==0:	#found an empty line
+			tokens = "0"
+			#print(len(tokens))
+		while tokens[0]!="gather" or gatherCnt!=2:
+			line = f.readline();
+			tokens = line.split()
+			if len(tokens)==0:
+				tokens = "0"
+			if line=="":
+				break
+			if tokens[0]=="gather":
+				gatherCnt += 1
+			#print(tokens)
+			#if tokens[0]=="numBlocks=":
+			#	n = tokens[1]	
+		
+		metricNames = f.readline().split()
+		line = f.readline()
+		metricValues = [ float(x) for x in line.split()]
+		
+		
+		# in case metrics are less than NUM_METRICS, fill the rest with -1
+		for i in range(len(metricValues), NUM_METRICS):
+			metricValues.append(-1)
+			metricNames.append("-")
+		print(metricNames)
+		print(metricValues)
+		
+	return metricNames, metricValues, n
+				
 #######################################################################
 # Special routine only for Geographers metric
 # parses an outFile and returns the metric name found and the actual metric values

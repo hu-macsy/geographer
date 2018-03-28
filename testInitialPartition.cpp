@@ -445,7 +445,9 @@ int main(int argc, char** argv) {
 				
 				std::chrono::duration<double> sfcPartTime = std::chrono::system_clock::now() - beforeTmp;
 				ValueType time = comm->max( sfcPartTime.count() );
-				PRINT0("time to get the sfc indices: " << time);
+				PRINT0("time to get the sfc partition: " << time);
+				
+				std::chrono::time_point<std::chrono::system_clock> beforeRedist	=std::chrono::system_clock::now() ;
 				
 				if( not uniformWeights){	
 					scai::hmemo::HArray<IndexType> localWeightsInt( rowDistPtr->getLocalSize(), 1 );
@@ -460,11 +462,15 @@ int main(int argc, char** argv) {
 				}
 				const std::vector<IndexType> blockSizes(settings.numBlocks, weightSum/settings.numBlocks);
 				
-				std::chrono::time_point<std::chrono::system_clock> beforeRedist	=std::chrono::system_clock::now() ;
-				// WARNING: getting an error in KMeans.h, try to redistribute coordinates
+				scai::dmemo::Redistributor prepareRedist(  tempResult.getDistributionPtr() , coordinates[0].getDistributionPtr());
+				std::chrono::duration<double> redistribTime1 = std::chrono::system_clock::now() - beforeRedist;
+				time = comm->max( redistribTime1.count() );
+				PRINT0("time to construct redistributor: " << time);
+				
 				std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
 				for (IndexType d = 0; d < dimensions; d++) {
-					coordinateCopy[d].redistribute( tempResult.getDistributionPtr() );
+					//coordinateCopy[d].redistribute( tempResult.getDistributionPtr() );
+					coordinateCopy[d].redistribute(prepareRedist);
 				}
 				std::chrono::duration<double> redistribTime = std::chrono::system_clock::now() - beforeRedist;
 				time = comm->max( redistribTime.count() );
@@ -475,7 +481,7 @@ int main(int argc, char** argv) {
 				//settings.minSamplingNodes = std::max<IndexType>( IndexType(200), N/(k*50) );
 				settings.minSamplingNodes = localN;
 				//
-
+				
 				partition = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeights, blockSizes, settings);     
 				std::chrono::duration<double> thisPartitionTime = std::chrono::system_clock::now() - beforeTmp;
 				time  = comm->max( thisPartitionTime.count() );

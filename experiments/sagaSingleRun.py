@@ -16,21 +16,23 @@ parser.add_argument('--tools','-t' , type=str , nargs='*', default=["Geographer"
 #parser.add_argument('--wantedExp', '-we', type=int, nargs='*', metavar='exp', help='A subset of the experiments that will be submited.')
 
 parser.add_argument('--fileName','-f', help='The file/graph to be partitioned.')
-parser.add_argument('--numBlocks','-k', type=int, nargs='*', help='The number of blocks/parts to partition to.')
 parser.add_argument('--fileFormat', '-ff', help='The format of the file given.')
+parser.add_argument('--coordName','-c', help='The coordinates file of the graph to be partitioned.')
+parser.add_argument('--coordFormat', '-cf', help='The format of the coordinates file given.')
 parser.add_argument('--dimensions', '-d', help='The dimensions of the coordinates.')
+parser.add_argument('--numBlocks','-k', type=int, nargs='*', help='The number of blocks/parts to partition to.')
 parser.add_argument('--outDir', '-o', type=str, help='Optional folder to store output. If none is given then the default is used as specified in the header/config file.')
 
 args = parser.parse_args()
 print(args)
 
 fileName = args.fileName
-numPEs = args.numBlocks
 fileFormat = args.fileFormat
+coordName = args.coordName
+coordFormat = args.coordFormat
 dimensions = args.dimensions
+numPEs = args.numBlocks
 wantedTools = args.tools
-
-#coordFormat = 0
 
 
 initialPartition = 3
@@ -76,6 +78,8 @@ if coordFormat==0:
 	coordEnding=".graph.xyz"
 elif coordFormat==6:
 	coordEnding=".bgf.xyz"
+elif coordFormat==1:
+	coordEnding=".xyz"
 else:
 	print("Unknown file format "+ str(fileFormat)+ ", aborting.")
 	exit(-1)
@@ -93,13 +97,17 @@ exp = experiment()
 exp.expType = 2
 exp.dimension = dimensions
 exp.fileFormat = fileFormat
+exp.coordFormat = coordFormat
 exp.ID = -1
 exp.k = numPEs
 exp.size = size
 
 exp.paths = [fileName]*size
+#exp.coordPaths = [coordName]*size
 print( os.path.basename(fileName) )
+#print( os.path.basename(coordName) )
 exp.graphs = [ os.path.basename(fileName) ] * size
+exp.coordPaths =[ os.path.abspath(coordName) ] * size
 
 exp.printExp()
 

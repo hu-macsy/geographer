@@ -206,7 +206,7 @@ def submitCompetitor(exp, tool, outDir):
 
 		submitFilename = "llsub-"+ os.path.basename(exp.graphs[i]).split('.')[0]+"_k"+str(exp.k[i])+"_" + tool+".cmd"
 		submitfile = createLLSubmitFile( os.path.join( outDir, "tmp") , submitFilename, commandString, "00:10:00", int(exp.k[i]) )
-		#call(["llsubmit", submitfile])
+		call(["llsubmit", submitfile])
 		
 
 

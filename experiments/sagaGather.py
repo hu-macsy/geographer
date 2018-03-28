@@ -21,15 +21,10 @@ import argparse
 
 #addRelativePlot( exp, ... , "timeSpMV", plotF)
 
-def addRelativePlot( exp, metricValues, metricName, toolNames, baseToolId, plotF):
-	for m in range(0, NUM_METRICS):
-		if metricName==METRIC_NAMES[m]:
-			break;
+def addRelativePlot( exp, metricValues, metricName, metricPos, toolNames, baseToolId, plotF):
 	
-	if m==NUM_METRICS:
-		print("ERROR: metric " + metricName + " was not found")
-		return -1
-	# now m is the index of the wanted metric
+	# m is the index of the wanted metric
+	m = metricPos
 	
 	if baseToolId >= len(toolNames):
 		print("ERROR: tool ID given " +  str(baseToolId) +" is too big, must be < " + str(len(toolNames)) )
@@ -71,7 +66,7 @@ def addRelativePlot( exp, metricValues, metricName, toolNames, baseToolId, plotF
 					plotF.write("("+str(exp.k[i])+", "+ str(0) + ")\n")	
 				else:
 					plotF.write("("+str(exp.k[i])+", "+ str(thisToolMetrics[m][i]/metricValues[baseToolId][m][i]) + ")\n")	
-				#print( metricValues[baseToolId][m][i] )
+				print( metricValues[baseToolId][m][i] )
 			else:
 				plotF.write("("+str(exp.k[i])+", nan)\n")
 		
@@ -79,14 +74,14 @@ def addRelativePlot( exp, metricValues, metricName, toolNames, baseToolId, plotF
 		plotF.write("\\addlegendentry{"+thisToolName+"}\n")
 		
 	plotF.write("\\end{axis}\n\\end{tikzpicture}\n")
-	#plotF.write("\\caption{Metric: "+ metricName+" relative to "+ toolNames[baseToolId] +"}\n\n")		
+
 
 #---------------------------------------------------------------------------------------------	
 
-def addGeoMeanInfo( metricValues, metricName, toolNames, baseToolId, plotF):
+def addGeoMeanInfo( metricValues, metricName, metricPos, toolNames, baseToolId, plotF):
 	
 	# one metric, for all tools
-	geoMeanForAllTools = getGeomMeanForMetric( metricValues, metricName, toolNames, baseToolId)
+	geoMeanForAllTools = getGeomMeanForMetric( metricValues, metricName, metricPos, toolNames, baseToolId)
 	
 	if geoMeanForAllTools[0] == -1:
 		print("Skipping the geometric mean for metric " + metricName);
@@ -106,10 +101,10 @@ def addGeoMeanInfo( metricValues, metricName, toolNames, baseToolId, plotF):
 
 #---------------------------------------------------------------------------------------------	
 
-def addHarmMeanInfo( metricValues, metricName, toolNames, baseToolId, plotF):
+def addHarmMeanInfo( metricValues, metricName, metricPos, toolNames, baseToolId, plotF):
 	
 	# one metric, for all tools
-	harmMeanForAllTools = getHarmMeanForMetric( metricValues, metricName, toolNames, baseToolId)
+	harmMeanForAllTools = getHarmMeanForMetric( metricValues, metricName, metricPos, toolNames, baseToolId)
 	
 	if harmMeanForAllTools[0] == -1:
 		print("Skipping the harmonic mean for metric " + metricName);
@@ -238,11 +233,18 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues, outDir ):
 		# for all metrics
 		for m in range(0, numMetrics):
 			metricName = metricNames[m]
-			print(">>> to plot for metric " + metricName)
 			## TODO:
 			## maybe skip some metrics for brevity??
 			## for example imbalance
-			##
+			
+			#exclude metrics from the plot-for-all
+			excludedMetrics=["imbalance", "maxBnd", "totBnd", 'maxBndPercnt', 'avgBndPercnt']
+						
+			if metricName in excludedMetrics:
+				print("Not calculating for metric " + metricName)
+				continue
+			
+			print(">>> to plot for metric " + metricName)
 			
 			plotF.write("\n\n\\begin{figure}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel=k, ylabel= "+ METRIC_VALUES[m] +", legend style={at={(1.5,0.7)}},xmode = log, ymode=log, log basis x= 2, xtick={")
 			for x in range(0, len(exp.k)-1 ):
@@ -278,27 +280,17 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues, outDir ):
 				
 			plotF.write("\\end{axis}\n\\end{tikzpicture}\n")
 			
-			#plotF.write("\\caption{Metric: "+ metricName+"}\n\n")
-			
-			addRelativePlot( exp, metricValues, metricName, toolNames, 0, plotF )
+			addRelativePlot( exp, metricValues, metricName, m, toolNames, 0, plotF )
 			plotF.write("\\caption{Metric: "+ metricName+"}\n\\end{figure}\n\n")
 			
 			# write the geom and harm mean as text
-			addGeoMeanInfo( metricValues, metricName, toolNames, 0, plotF) 
-			addHarmMeanInfo( metricValues, metricName, toolNames, 0, plotF)
+			addGeoMeanInfo( metricValues, metricName, m, toolNames, 0, plotF) 
+			addHarmMeanInfo( metricValues, metricName, m, toolNames, 0, plotF)
 						
-			#exclude metrics from the plot-for-all
-			excludedMetrics=["imbalance", "maxBnd", "totBnd", 'maxBndPercnt', 'avgBndPercnt']
-						
-			if metricName in excludedMetrics:
-				print("Not calculating for metric " + metricName)
-				#metricNamesShort.remove(metricName)
-				continue
-			
 			metricNamesShort.append( metricName )
 			
-			geoMeanMatrix.append( getGeomMeanForMetric( metricValues, metricName, toolNames, 0) )
-			harmMeanMatrix.append( getHarmMeanForMetric( metricValues, metricName, toolNames, 0) )
+			geoMeanMatrix.append( getGeomMeanForMetric( metricValues, metricName, m, toolNames, 0) )
+			harmMeanMatrix.append( getHarmMeanForMetric( metricValues, metricName, m, toolNames, 0) )
 						
 			plotF.write("\\clearpage\n\n")
 		
@@ -322,7 +314,7 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues, outDir ):
 
 #---------------------------------------------------------------------------------------------		
 
-def createMeanPlotsForAllExp( wantedExp, wantedTools, gatherDir, outDir):
+def createMeanPlotsForAllExp( wantedExp, wantedTools, gatherDir, outDir, repartMetrics):
 	
 	numExp = len(wantedExp)
 	
@@ -358,16 +350,12 @@ def createMeanPlotsForAllExp( wantedExp, wantedTools, gatherDir, outDir):
 		#TODO: add all the files?
 		
 		plotF.write("\\clearpage\n\n")
-	
-	
-	#for e in range(0, numExp):
-	#		exp = wantedExp[e]
 
 	for exp in wantedExp:	
 		
 		metricValues= []
 		for tool in wantedTools:
-			metricNames, metricValuesTmp = gatherExpTool( exp, tool, gatherDir )
+			metricNames, metricValuesTmp = gatherExpTool( exp, tool, gatherDir, repartMetrics )
 			metricValues.append( metricValuesTmp)
 			
 			
@@ -392,6 +380,7 @@ def createMeanPlotsForAllExp( wantedExp, wantedTools, gatherDir, outDir):
 		# 		for tool i and metric j. The same for the harmonic mean
 		geoMeanMatrix = []
 		harmMeanMatrix = []
+		metricNamesShort = []
 		
 		plotF= open(plotFile,'a')
 		
@@ -403,13 +392,22 @@ def createMeanPlotsForAllExp( wantedExp, wantedTools, gatherDir, outDir):
 			#if metricName=="imbalance":				
 				#continue
 			if metricName=="timeTotal":
-				timeTmeans = getGeomMeanForMetric( metricValues, metricName, wantedTools, 0)
+				timeTmeans = getGeomMeanForMetric( metricValues, metricName, m, wantedTools, 0)
 				plotF.write("Values for metric timeTotal: ")
 				for t in range(0, len(timeTmeans)):
 					plotF.write(wantedTools[t]+"= " + str(timeTmeans[t])+" , ")
 					
-			geoMeanMatrix.append( getGeomMeanForMetric( metricValues, metricName, wantedTools, 0) )
-			harmMeanMatrix.append( getHarmMeanForMetric( metricValues, metricName, wantedTools, 0) )
+			#exclude metrics from the plot-for-all
+			excludedMetrics=["imbalance", "maxBnd", "totBnd", 'maxBndPercnt', 'avgBndPercnt']
+						
+			if metricName in excludedMetrics:
+				print("Not calculating for metric " + metricName)
+				continue
+			
+			metricNamesShort.append( metricName )
+			
+			geoMeanMatrix.append( getGeomMeanForMetric( metricValues, metricName, m, wantedTools, 0) )
+			harmMeanMatrix.append( getHarmMeanForMetric( metricValues, metricName, m, wantedTools, 0) )
 		
 		
 		plotF.write("\n\nPlots for experiment with id:" + str(exp.ID) + " containing instances:\\\\")
@@ -428,8 +426,8 @@ def createMeanPlotsForAllExp( wantedExp, wantedTools, gatherDir, outDir):
 			
 		plotF.write("\n\\begin{figure}\n")
 		#plotMeanForAllTool( geoMeanMatrix, metricNames, numMetrics, wantedTools, plotF, "Geometric")
-		plotBarMeanForAllTool( geoMeanMatrix, metricNames, numMetrics, wantedTools, plotF)
-		#plotMeanForAllTool( harmMeanMatrix, metricNames, numMetrics, wantedTools, plotF, "Harmonic")
+		plotBarMeanForAllTool( geoMeanMatrix, metricNamesShort, len(metricNamesShort), wantedTools, plotF)
+		#plotMeanForAllTool( harmMeanMatrix, metricNamesShort, len(metricNamesShort), wantedTools, plotF, "Harmonic")
 		plotF.write("\\caption{Geometric mean for all metrics and all tools for experiment:" + str(exp.ID) +" with base tool: " + wantedTools[0] +"}\n\\end{figure}\n\n")	
 		plotF.write("\n\n\\clearpage\n\n")
 		plotF.close()
@@ -471,7 +469,7 @@ def createCsv(exp, toolNames, metricNames, metricValues):
 #---------------------------------------------------------------------------------------------		
 # gather info for an experiment for a tool
 
-def gatherExpTool( exp, tool, gatherDir ):
+def gatherExpTool( exp, tool, gatherDir , repartMetrics ):
 	
 	if not tool in allTools:
 		print("Wrong tool name: " + str(tool) +". Choose from: ") 
@@ -502,7 +500,13 @@ def gatherExpTool( exp, tool, gatherDir ):
 			if tool=="Geographer":
 				metricNames, metricValuesTmp, k = parseOutFileForGeographer( gatherFile )
 			else:
-				metricNames, metricValuesTmp, k = parseOutFile( gatherFile )
+				#TODO: this is awful, fix properly (it happens because keyword "gather" appears two times
+				#in the repartition files...)
+				if repartMetrics:
+					metricNames, metricValuesTmp, k = parseRepartFile( gatherFile )
+				else:
+					metricNames, metricValuesTmp, k = parseOutFile( gatherFile )
+				
 	
 		#print( str(len(metricValuesTmp)) )
 		
@@ -535,15 +539,17 @@ if __name__=="__main__":
 	parser.add_argument('--configFile','-c', default="SaGa.config", help='The configuration file. ')
 	parser.add_argument('--wantedExp', '-we', type=int, nargs='*', metavar='exp', help='A subset of the experiments that will be submited.')
 	parser.add_argument('--gatherDir', '-g', type=str, default=toolsPath, help='Optional folder to gather output. If none is given then the default is used as specified in the header/config file.\nDefault now is' + toolsPath)
-	parser.add_argument('--outDir', '-o', type=str, default=plotsPath, help='Optional folder to store output. If none is given then the default is used as specified in the header/config file.\nDefault now is' + plotsPath)
+	parser.add_argument('--outDir', '-o', type=str, help='Optional folder to store output. If none is given then the default is used as specified in the header/config file.\nDefault now is' + plotsPath)
+	parser.add_argument('--repartMetrics', '-rm', type=bool, default=False, help="Flag to use metrics for repartition")
 	
 	args = parser.parse_args()
 
 	wantedExpIDs = args.wantedExp
 	configFile = args.configFile
 	wantedTools = args.tools
-	gatherDir = args.gatherDir
-
+	gatherDir = os.path.abspath( args.gatherDir)
+	repartMetrics = args.repartMetrics
+	
 	if wantedTools[0]=="all":
 		wantedTools = allTools[1:]		# skipping Geographer
 		
@@ -573,8 +579,9 @@ if __name__=="__main__":
 		if not os.path.exists(outDir):
 			os.makedirs(outDir)
 	else:
-		outDir = plotsPath
-				
+		#outDir = plotsPath
+		outDir = os.path.join( gatherDir, "plots" )
+
 		
 	#
 	# parse config file
@@ -611,7 +618,7 @@ if __name__=="__main__":
 			#metricValues is list of lists, or a 2D matrix:
 			#	metricValues[i] = a list of size exp.size for metric i
 			#	metricValues[i][j] = the value of metric i for experiment run j
-			metricNames, metricValues = gatherExpTool( exp, tool, gatherDir )
+			metricNames, metricValues = gatherExpTool( exp, tool, gatherDir, repartMetrics )
 			
 			# this means that gatherExpTool actually found the files to gather
 			if not metricNames==[]:
@@ -624,7 +631,7 @@ if __name__=="__main__":
 		
 		createPlotsForExp(exp, foundTools, metricNames, allMetricsForAllTools, outDir)
 		
-	createMeanPlotsForAllExp( wantedExp, wantedTools, gatherDir, outDir)
+	createMeanPlotsForAllExp( wantedExp, wantedTools, gatherDir, outDir, repartMetrics)
 		
 	exit(0)
 

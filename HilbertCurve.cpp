@@ -138,7 +138,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
 			maxCoords[dim] = coordinates[dim].max().Scalar::getValue<ValueType>();
 			assert(std::isfinite(minCoords[dim]));
 			assert(std::isfinite(maxCoords[dim]));
-			SCAI_ASSERT(maxCoords[dim] > minCoords[dim], "Wrong coordinates.");
+			SCAI_ASSERT_GT_ERROR(maxCoords[dim], minCoords[dim], "Wrong coordinates.");
 		}
     }
     
@@ -171,7 +171,6 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
 			integerIndex = 0;
 			for (IndexType j = 0; j < recursionDepth; j++) {
 				int subSquare;
-				//two dimensions only, for now
 				if (scaledPoint[0] < 0.5) {
 					if (scaledPoint[1] < 0.5) {
 						subSquare = 0;

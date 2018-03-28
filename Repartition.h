@@ -21,6 +21,9 @@
 #include "Settings.h"
 #endif
 
+//WARNING and TODO: error if Wrappers.h is the last include !!
+#include "Wrappers.h"
+
 
 //using namespace scai::lama;
 //using scai::dmemo::Halo;
@@ -49,6 +52,6 @@ namespace ITI {
 			ITI::Tool tool,
 			struct Settings &settings,
 			struct Metrics &metrics);
-		};
+	};
 	
 }
