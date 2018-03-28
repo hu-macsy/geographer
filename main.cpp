@@ -286,6 +286,7 @@ int main(int argc, char** argv) {
 				("seed", value<double>()->default_value(time(NULL)), "random seed, default is current time")
 				//multi-level and local refinement
 				("initialPartition", value<InitialPartitioningMethods>(&settings.initialPartition), "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means' or 3) and multisection ('MultiSection' or 4). SFC, Spectral and K-Means are most stable.")
+				("noRefinement", "skip local refinement steps")
 				("multiLevelRounds", value<IndexType>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
 				("minBorderNodes", value<IndexType>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
 				("stopAfterNoGainRounds", value<IndexType>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
@@ -311,7 +312,7 @@ int main(int argc, char** argv) {
 				//debug
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 				("verbose", "Increase output.")
-                ("storeInfo", "Store timing and ohter metrics in file.")
+                ("storeInfo", "Store timing and other metrics in file.")
                 ("writePartition", "Writes the partition in the outFile.partition file")
                 // evaluation
                 ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
@@ -414,6 +415,8 @@ int main(int argc, char** argv) {
 		throw std::logic_error("Manhattan distance not yet implemented");
 	}
 
+
+
     //--------------------------------------------------------
     //
     // initialize
@@ -437,6 +440,7 @@ int main(int argc, char** argv) {
     settings.tightenBounds = vm.count("tightenBounds");
     settings.manhattanDistance = vm.count("manhattanDistance");
     settings.computeDiameter = vm.count("computeDiameter");
+    settings.noRefinement = vm.count("noRefinement");
 
     writePartition = vm.count("writePartition");
     if( writePartition ){
