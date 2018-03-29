@@ -243,7 +243,7 @@ IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const I
         }   else {
             upperBound = 2*(i-1);
         }
-        //std::cout << "proc " << comm->getRank() << ", i: " << i << ", lb:" << lowerBound << ", ub:" << upperBound << std::endl;
+
         i -= 1;
     }
     return lowerBound;

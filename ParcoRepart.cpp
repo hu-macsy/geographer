@@ -506,15 +506,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             FileIO<IndexType, ValueType>::writePartitionParallel( result, settings.outFile+"_initPart.partition" );
         }
 
-        
-        if (comm->getSize() == k && !settings.noRefinement) {
+        if (comm->getSize() == k) {
             SCAI_REGION("ParcoRepart.partitionGraph.initialRedistribution")
             /**
              * redistribute to prepare for local refinement
              */
             std::chrono::time_point<std::chrono::system_clock> beforeSecondRedistributiom =  std::chrono::system_clock::now();
             
-            scai::dmemo::Redistributor resultRedist(result.getLocalValues(), result.getDistributionPtr());
+            scai::dmemo::Redistributor resultRedist(result.getLocalValues(), result.getDistributionPtr());//TODO: Wouldn't it be faster to use a GeneralDistribution here?
             result = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
             
             scai::dmemo::Redistributor redistributor(resultRedist.getTargetDistributionPtr(), input.getRowDistributionPtr());
@@ -561,10 +560,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             
             //IndexType numRefinementRounds = 0;
             
-            SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
-            scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(input);
-            ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, halo, settings);
-            SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
+            if (!settings.noRefinement) {
+                SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
+                scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(input);
+                ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, halo, settings);
+                SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
+            }
         } else {
             result.redistribute(inputDist);
             if (comm->getRank() == 0 && !settings.noRefinement) {
