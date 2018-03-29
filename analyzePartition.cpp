@@ -181,8 +181,6 @@ int main(int argc, char** argv) {
     	throw std::runtime_error("Illegal minimum block ID in partition:" + std::to_string(part.min().Scalar::getValue<IndexType>()));
     }
 
-    Metrics metrics(1);
-    metrics.getMetrics( graph, part, nodeWeights, settings );
 
     if (settings.computeDiameter) {
     	scai::dmemo::CommunicatorPtr comm = rowDistPtr->getCommunicatorPtr();
@@ -193,18 +191,11 @@ int main(int argc, char** argv) {
     		scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(N, part.getLocalValues(), comm));
     		graph.redistribute(newDist, noDistPtr);
     		part.redistribute(newDist);
-
-    		IndexType localN = newDist->getLocalSize();
-    		IndexType maxRounds = settings.maxDiameterRounds;
-            if (maxRounds < 0) {
-                maxRounds = localN;
-            }
-
-            IndexType localDiameter = ITI::GraphUtils::getLocalBlockDiameter<IndexType, ValueType>(graph, localN/2, 0, 0, maxRounds);
-            metrics.maxBlockDiameter = comm->max(localDiameter);
-            metrics.avgBlockDiameter = comm->sum(localDiameter) / comm->getSize();
     	}
     }
+
+    Metrics metrics(1);
+    metrics.getMetrics( graph, part, nodeWeights, settings );
     
     metrics.print(std::cout);//TODO: adapt this
 }
