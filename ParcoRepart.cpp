@@ -507,7 +507,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         }
 
         
-        if (comm->getSize() == k && !settings.noRefinement) {
+        if (comm->getSize() == k) {
             SCAI_REGION("ParcoRepart.partitionGraph.initialRedistribution")
             /**
              * redistribute to prepare for local refinement
@@ -561,10 +561,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             
             //IndexType numRefinementRounds = 0;
             
-            SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
-            scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(input);
-            ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, halo, settings);
-            SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
+            if (!settings.noRefinement) {
+                SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
+                scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(input);
+                ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, halo, settings);
+                SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
+            }
         } else {
             result.redistribute(inputDist);
             if (comm->getRank() == 0 && !settings.noRefinement) {
