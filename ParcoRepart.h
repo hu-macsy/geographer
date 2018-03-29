@@ -32,7 +32,7 @@ namespace ITI {
 	class ParcoRepart {
 		public:
 			/**
-	 		* Partitions the given input graph with a space-filling curve and (in future versions) local refinement
+	 		* Partitions the given input graph
 	 		*
 	 		* @param[in] input Adjacency matrix of the input graph
 	 		* @param[in] coordinates Node positions
@@ -66,6 +66,8 @@ namespace ITI {
 			static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings);
 
 			static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+
+			static void hilbertRedistribution(std::vector<DenseVector<ValueType> >& coordinates, DenseVector<ValueType>& nodeWeights, Settings settings, struct Metrics& metrics);
 
 			/*
 			 * Get an initial partition using the morton curve and measuring density per square.
