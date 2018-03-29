@@ -187,7 +187,7 @@ int main(int argc, char** argv) {
     	if (comm->getSize() != settings.numBlocks) {
     		std::cout << "Can only compute diameter if number of processes is equal to number of blocks." << std::endl;
     	} else {
-    		scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(part.getLocalValues(), comm));
+    		scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(part.getDistribution(), part.getLocalValues()));
     		graph.redistribute(newDist, noDistPtr);
     		part.redistribute(newDist);
     	}
