@@ -590,28 +590,5 @@ TEST_F (FileIOTest, testreadOFFCentral){
     PRINT( graph.getNumValues() << " _ " << graph.getNumRows() << " @ " << graph.getNumColumns() );
 }
 //-------------------------------------------------------------------------------------------------
-/*
-TEST_F (FileIOTest, testreadPartition){
-    std::string file = graphPath+ "example.partition";
-    
-        IndexType numVertices;
-    {
-        std::ifstream f(file);
-        if(f.fail())
-            throw std::runtime_error("File "+ file + " failed.");
-        
-        std::string line;
-        std::getline(f, line);
-        if( line[0]=='%' ){
-            std::stringstream ss;
-            ss.str( line );
-            ss >> numVertices >> numFaces >> numEdges;
-    }
-    scai::lama::DenseVector<IndexType> partition = ITI::FileIO::readPartition( file,
-    
-}
-
-*/
-    
 
 } /* namespace ITI */
