@@ -43,20 +43,13 @@ struct Metrics{
 
     
     //constructor
-    //
-    Metrics(){}
-    
-    Metrics( IndexType k) {
-        timeMigrationAlgo.resize(k);
-        timeConstructRedistributor.resize(k);
-        timeFirstDistribution.resize(k);
-        timeKmeans.resize(k);
-        timeSecondDistribution.resize(k);
-        timePreliminary.resize(k);
+    Metrics( IndexType k = 1) {
+        initialize(k);
     }
     
     void initialize(IndexType k ){
         timeMigrationAlgo.resize(k);
+        timeConstructRedistributor.resize(k);
         timeFirstDistribution.resize(k);
         timeKmeans.resize(k);
         timeSecondDistribution.resize(k);
