@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <numeric>
 
 #include <scai/lama.hpp>
 #include "GraphUtils.h"
