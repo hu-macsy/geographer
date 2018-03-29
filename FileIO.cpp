@@ -1622,8 +1622,6 @@ DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::st
     while( line[0]== '%'){
        std::getline(file, line);
     }
-    std::stringstream ss;
-    ss.str( line );
     
 	//get local range
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -1642,11 +1640,14 @@ DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::st
 	std::vector<IndexType> localPart;
 
 	for (IndexType i = 0; i < localN; i++) {
-		bool read = !std::getline(file, line).fail();
-		if (!read) {
-			throw std::runtime_error("In FileIO.cpp, line " + std::to_string(__LINE__) +": Unexpected end of file " + filename + ". Was the number of nodes correct?");
-	    }
-		localPart.push_back(std::stoi(line));
+	    localPart.push_back(std::stoi(line));
+
+		if (i < localN-1) {
+		    bool read = !std::getline(file, line).fail();
+		    if (!read) {
+                throw std::runtime_error("In FileIO.cpp, line " + std::to_string(__LINE__) +": Reading line " + std::to_string(i+beginLocalRange) + " of " + filename + " failed. Was the number of nodes correct?");
+            }
+		}
 	}
 
 	scai::hmemo::HArray<IndexType> hLocal(localPart.size(), localPart.data());
