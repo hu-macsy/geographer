@@ -72,9 +72,7 @@ struct Metrics{
         ValueType timeLocalRef = timeFinalPartition - maxTimePreliminary;
         
         //TODO: this is quite ugly. Refactor as dictionary with key-value-pairs, much more extensible.
-        if( maxBlockGraphDegree==-1 ){
-            out << " ### WARNING: setting dummy value -1 for expensive (and not used) metrics max and total blockGraphDegree ###" << std::endl;
-        }else if (maxBlockGraphDegree==0 ){
+        if (maxBlockDiameter ==0 ){
             out << " ### WARNING: possibly not all metrics calculated ###" << std::endl;
         }
         out << "# times: input, migrAlgo , constRedist, 1redistr , k-means , 2redistr , prelim, localRef, total";
@@ -173,7 +171,10 @@ struct Metrics{
                 IndexType localDiameter = ITI::GraphUtils::getLocalBlockDiameter<IndexType, ValueType>(graph, localN/2, 0, 0, maxRounds);
                 maxBlockDiameter = comm->max(localDiameter);
                 avgBlockDiameter = comm->sum(localDiameter) / comm->getSize();
+            } else {
+                std::cout << "Distribution not aligned to partition, cannot compute diameter." << std::endl;
             }
+
 
         }
 
