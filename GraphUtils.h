@@ -5,8 +5,7 @@
  *      Author: moritzl
  */
 
-#ifndef GRAPHUTILS_H_
-#define GRAPHUTILS_H_
+#pragma once
 
 #include <set>
 
@@ -187,4 +186,3 @@ static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_rand
 } /*namespace GraphUtils*/
 
 } /* namespace ITI */
-#endif /* GRAPHUTILS_H_ */

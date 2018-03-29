@@ -33,19 +33,24 @@ TEST_F(GraphUtilsTest, testReindexCut){
     //get sfc partition
     Settings settings;
     settings.numBlocks = k;
-    DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(coords[0].getDistributionPtr(), 1);
-    DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::hilbertPartition(coords, uniformWeights, settings);
+    settings.noRefinement = true;
+    DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));    
 
-    //redistribute and get first cut
-    graph.redistribute(partition.getDistributionPtr(), noDistPointer);
+    //get first cut
     ValueType initialCut = GraphUtils::computeCut<IndexType, ValueType>(graph, partition, true);
     ASSERT_GE(initialCut, 0);
+    ValueType sumNonLocalInitial = ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(graph, true);
 
     //now reindex and get second cut
-    DenseVector<IndexType> indexMap = GraphUtils::reindex<IndexType, ValueType>(graph);
-    DenseVector<IndexType> reIndexedPartition = DenseVector<IndexType>(indexMap.getDistributionPtr(), partition.getLocalValues());
-    ValueType secondCut = GraphUtils::computeCut<IndexType, ValueType>(graph, partition, true);
+    GraphUtils::reindex<IndexType, ValueType>(graph);
+    ValueType sumNonLocalAfterReindexing = ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(graph, true);
+    EXPECT_EQ(sumNonLocalInitial, sumNonLocalAfterReindexing);
+
+    DenseVector<IndexType> reIndexedPartition = DenseVector<IndexType>(graph.getRowDistributionPtr(), partition.getLocalValues());
+    ASSERT_TRUE(reIndexedPartition.getDistributionPtr()->isEqual(*graph.getRowDistributionPtr()));
+
+    ValueType secondCut = GraphUtils::computeCut<IndexType, ValueType>(graph, reIndexedPartition, true);
 
     EXPECT_EQ(initialCut, secondCut);
 }

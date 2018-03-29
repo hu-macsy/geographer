@@ -39,22 +39,6 @@ scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType
     const IndexType localN = inputDist->getLocalSize();
     const IndexType globalN = inputDist->getGlobalSize();
     const IndexType p = comm->getSize();
-    IndexType allLocalSizes[p];
-    comm->gather(allLocalSizes, 1, 0, &localN);
-
-    //compute prefix sum of offsets.
-    std::vector<IndexType> offsetPrefixSum(p+1, 0);
-    if (comm->getRank() == 0) {
-        //shift begin of output by one, since the first offset is 0
-        std::partial_sum(allLocalSizes, allLocalSizes+p, offsetPrefixSum.begin()+1);
-    }
-
-    //remove last value, since it would be the offset for the p+1th processor
-    offsetPrefixSum.resize(p);
-
-    //communicate offsets
-    IndexType myOffset[1];
-    comm->scatter(myOffset, 1, 0, offsetPrefixSum.data());
 
     scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
     DenseVector<IndexType> result(blockDist,0);
@@ -85,6 +69,8 @@ scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType
             }
         }
     }
+
+    graph.setDistributionPtr(blockDist);
 
     return result;
 }
