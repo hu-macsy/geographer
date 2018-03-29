@@ -308,6 +308,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                         SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans.communicationPlan")
 
                         IndexType newLocalN = recvPlan.totalQuantity();
+                        SCAI_ASSERT_EQ_DEBUG(comm->sum(newLocalN), globalN, "distribution mismatch");
                         //SCAI_ASSERT_EQ_ERROR(recvPlan.totalQuantity(), newLocalN, "wrong size of recv plan");
                         PRINT0(std::to_string(localN) + " old local values " + std::to_string(newLocalN) + " new ones.");
 
