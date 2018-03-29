@@ -506,7 +506,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             FileIO<IndexType, ValueType>::writePartitionParallel( result, settings.outFile+"_initPart.partition" );
         }
 
-        
         if (comm->getSize() == k) {
             SCAI_REGION("ParcoRepart.partitionGraph.initialRedistribution")
             /**
@@ -514,7 +513,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
              */
             std::chrono::time_point<std::chrono::system_clock> beforeSecondRedistributiom =  std::chrono::system_clock::now();
             
-            scai::dmemo::Redistributor resultRedist(result.getLocalValues(), result.getDistributionPtr());
+            scai::dmemo::Redistributor resultRedist(result.getLocalValues(), result.getDistributionPtr());//TODO: Wouldn't it be faster to use a GeneralDistribution here?
             result = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
             
             scai::dmemo::Redistributor redistributor(resultRedist.getTargetDistributionPtr(), input.getRowDistributionPtr());
