@@ -401,25 +401,25 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
 
 TEST_F (ParcoRepartTest, testBorders_Distributed) {
     std::string file = graphPath + "Grid32x32";
-    std::ifstream f(file);
     IndexType dimensions= 2;
-    IndexType N, edges;
-    f >> N >> edges; 
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     // for now local refinement requires k = P
     IndexType k = comm->getSize();
     //
-    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
-    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+    IndexType globalN = graph.getNumRows();
+
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, globalN) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(globalN));
+
     graph.redistribute(dist, noDistPointer);
     
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), globalN, dimensions);
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
-    EXPECT_EQ(edges, (graph.getNumValues())/2 );   
     
     struct Settings settings;
     settings.numBlocks= k;
@@ -431,9 +431,8 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     
     // get partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
-    ASSERT_EQ(N, partition.size());
+    ASSERT_EQ(globalN, partition.size());
   
-
     //get the border nodes
     scai::lama::DenseVector<IndexType> border(dist, 0);
     border = GraphUtils::getBorderNodes( graph , partition);
@@ -448,7 +447,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     
     // print
     int numX= 32, numY= 32;         // 2D grid dimensions
-    ASSERT_EQ(N, numX*numY);
+    ASSERT_EQ(globalN, numX*numY);
     IndexType partViz[numX][numY];   
     IndexType bordViz[numX][numY]; 
     for(int i=0; i<numX; i++)
