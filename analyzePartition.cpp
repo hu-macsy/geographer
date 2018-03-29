@@ -181,11 +181,12 @@ int main(int argc, char** argv) {
     	throw std::runtime_error("Illegal minimum block ID in partition:" + std::to_string(part.min().Scalar::getValue<IndexType>()));
     }
 
+    scai::dmemo::CommunicatorPtr comm = rowDistPtr->getCommunicatorPtr();
     if (settings.computeDiameter) {
-    	scai::dmemo::CommunicatorPtr comm = rowDistPtr->getCommunicatorPtr();
-
     	if (comm->getSize() != settings.numBlocks) {
-    		std::cout << "Can only compute diameter if number of processes is equal to number of blocks." << std::endl;
+            if (comm->getRank() == 0) {
+                std::cout << "Can only compute diameter if number of processes is equal to number of blocks." << std::endl;
+            }
     	} else {
     		scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(part.getDistribution(), part.getLocalValues()));
     		graph.redistribute(newDist, noDistPtr);
@@ -196,5 +197,7 @@ int main(int argc, char** argv) {
     Metrics metrics(1);
     metrics.getMetrics( graph, part, nodeWeights, settings );
     
-    metrics.print(std::cout);//TODO: adapt this
+    if (comm->getRank() == 0) {
+        metrics.print(std::cout);//TODO: adapt this
+    }
 }
