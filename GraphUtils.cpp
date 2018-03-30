@@ -982,7 +982,7 @@ scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSpars
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
     const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
     
-    // there are k blocks in the partition so the adjecency matrix for the block graph has dimensions [k x k]
+    // there are k blocks in the partition so the adjacency matrix for the block graph has dimensions [k x k]
     scai::dmemo::DistributionPtr distRowBlock ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, k) );  
     scai::dmemo::DistributionPtr distColBlock ( new scai::dmemo::NoDistribution( k ));
     

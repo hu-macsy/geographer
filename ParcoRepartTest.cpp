@@ -433,7 +433,6 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     // get partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
     ASSERT_EQ(globalN, partition.size());
-    comm->synchronize();
 
     scai::dmemo::DistributionPtr newDist = graph.getRowDistributionPtr();
     scai::dmemo::DistributionPtr partDist = partition.getDistributionPtr();
@@ -582,6 +581,8 @@ TEST_F (ParcoRepartTest, testPEGraphBlockGraph_k_equal_p_Distributed) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
+    //settings.noRefinement = true;
+    settings.initialPartition = InitialPartitioningMethods::None;
     struct Metrics metrics(settings.numBlocks);
     
     scai::lama::DenseVector<IndexType> partition(dist, -1);
