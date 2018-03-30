@@ -425,6 +425,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
+    settings.multiLevelRounds = 3;
     //settings.initialPartition = InitialPartitioningMethods::Multisection;
     settings.initialPartition = InitialPartitioningMethods::KMeans;
     struct Metrics metrics(settings.numBlocks);
@@ -432,13 +433,18 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     // get partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
     ASSERT_EQ(globalN, partition.size());
+    comm->synchronize();
+
+    scai::dmemo::DistributionPtr newDist = graph.getRowDistributionPtr();
+    scai::dmemo::DistributionPtr partDist = partition.getDistributionPtr();
+    IndexType newLocalN = newDist->getLocalSize();
+    ASSERT_TRUE( newDist->isEqual( *partDist ) );
   
     //get the border nodes
-    scai::lama::DenseVector<IndexType> border(dist, 0);
-    border = GraphUtils::getBorderNodes( graph , partition);
+    scai::lama::DenseVector<IndexType> border = GraphUtils::getBorderNodes( graph , partition);
     
     const scai::hmemo::ReadAccess<IndexType> localBorder(border.getLocalValues());
-    for(IndexType i=0; i<dist->getLocalSize(); i++){
+    for(IndexType i=0; i<newDist->getLocalSize(); i++){
         EXPECT_GE(localBorder[i] , 0);
         EXPECT_LE(localBorder[i] , 1);
     }
