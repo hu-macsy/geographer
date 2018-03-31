@@ -217,13 +217,13 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     for (IndexType i = 0; i < newLocalN; i++) {
         SCAI_ASSERT_VALID_INDEX_DEBUG(recvIndices[i], globalN, "invalid index");
     }
-    PRINT0("Exchanged indices.");
+
     {
         SCAI_REGION("ParcoRepart.hilbertRedistribution.redistribute");
         // for each dimension: define DenseVector with new distribution, get write access to local values, call exchangeByPlan
         std::vector<ValueType> sendBuffer(localN);
         std::vector<ValueType> recvBuffer(newLocalN);
-        PRINT0("Allocated Buffers.");
+
         for (IndexType d = 0; d < settings.dimensions; d++) {
             {
                 SCAI_REGION("ParcoRepart.hilbertRedistribution.redistribute.permute");
@@ -232,10 +232,8 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
                     sendBuffer[i] = rCoords[permutation[i]]; //TODO: how to make this more cache-friendly? (Probably by using pairs and sorting them.)
                 }
             }
-            PRINT0("Filled send buffer for coordinates of axis " + std::to_string(d));
 
             comm->exchangeByPlan(recvBuffer.data(), recvPlan, sendBuffer.data(), sendPlan);
-            PRINT0("Exchanged coordinates for axis " + std::to_string(d));
             coordinates[d] = DenseVector<ValueType>(newDist, 0);
             {
                 SCAI_REGION("ParcoRepart.hilbertRedistribution.redistribute.permute");
@@ -246,7 +244,6 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
                             recvBuffer[i];
                 }
             }
-            PRINT0("Permuted received coordinates for axis " + std::to_string(d));
         }
         // same for node weights
         if (nodesUnweighted) {
@@ -270,7 +267,6 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
                 }
             }
         }
-        PRINT0("Exchanged weights.");
     }
     migrationTime = std::chrono::system_clock::now() - beforeMigration;
     metrics.timeFirstDistribution[rank] = migrationTime.count();

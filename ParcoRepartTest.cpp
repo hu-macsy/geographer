@@ -43,14 +43,15 @@ TEST_F(ParcoRepartTest, testHilbertRedistribution) {
     settings.dimensions = 2;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    const IndexType k = comm->getSize();
+    settings.numBlocks = comm->getSize();
 
     scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     const IndexType N = graph.getNumRows();
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, settings.dimensions);
     scai::lama::DenseVector<ValueType> nodeWeights(graph.getRowDistributionPtr(), 1);
 
-    Metrics metrics(k);
+    std::vector<DenseVector<ValueType>> coordCopy(coords);
+    Metrics metrics(settings.numBlocks);
 
     //check sums
     std::vector<ValueType> coordSum(settings.dimensions);
@@ -59,18 +60,27 @@ TEST_F(ParcoRepartTest, testHilbertRedistribution) {
         coordSum[d] = coords[d].sum().Scalar::getValue<ValueType>();
     }
 
-    const DenseVector<IndexType> part = ParcoRepart<IndexType, ValueType>::hilbertPartition(coords, settings);
-
-
-
     ParcoRepart<IndexType, ValueType>::hilbertRedistribution(coords, nodeWeights, settings, metrics);
 
+    //check checksum
     for (IndexType d = 0; d < settings.dimensions; d++) {
         EXPECT_NEAR(coordSum[d], coords[d].sum().Scalar::getValue<ValueType>(), 0.001);
     }
 
+    //TODO: check that a redistribution happened, i.e. that the hilbert indices of local points are grouped together.
 
+    for (IndexType d = 0; d < settings.dimensions; d++) {
+        coords[d].redistribute(coordCopy[d].getDistributionPtr());
+        ASSERT_TRUE(coords[d].getDistributionPtr()->isEqual(coordCopy[d].getDistribution()));
 
+        scai::hmemo::ReadAccess<ValueType> rCoords(coords[d].getLocalValues());
+        scai::hmemo::ReadAccess<ValueType> rCoordsCopy(coordCopy[d].getLocalValues());
+        ASSERT_EQ(rCoords.size(), rCoordsCopy.size());
+
+        for (IndexType i = 0; i < rCoords.size(); i++) {
+            EXPECT_EQ(rCoords[i], rCoordsCopy[i]);
+        }
+    }
 }
 
 TEST_F(ParcoRepartTest, testInitialPartition){
