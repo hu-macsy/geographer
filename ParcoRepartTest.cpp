@@ -36,6 +36,43 @@ class ParcoRepartTest : public ::testing::Test {
 
 };
 
+TEST_F(ParcoRepartTest, testHilbertRedistribution) {
+    std::string fileName = "bigtrace-00000.graph";
+    std::string file = graphPath + fileName;
+    Settings settings;
+    settings.dimensions = 2;
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const IndexType k = comm->getSize();
+
+    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+    const IndexType N = graph.getNumRows();
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, settings.dimensions);
+    scai::lama::DenseVector<ValueType> nodeWeights(graph.getRowDistributionPtr(), 1);
+
+    Metrics metrics(k);
+
+    //check sums
+    std::vector<ValueType> coordSum(settings.dimensions);
+
+    for (IndexType d = 0; d < settings.dimensions; d++) {
+        coordSum[d] = coords[d].sum().Scalar::getValue<ValueType>();
+    }
+
+    const DenseVector<IndexType> part = ParcoRepart<IndexType, ValueType>::hilbertPartition(coords, settings);
+
+
+
+    ParcoRepart<IndexType, ValueType>::hilbertRedistribution(coords, nodeWeights, settings, metrics);
+
+    for (IndexType d = 0; d < settings.dimensions; d++) {
+        EXPECT_NEAR(coordSum[d], coords[d].sum().Scalar::getValue<ValueType>(), 0.001);
+    }
+
+
+
+}
+
 TEST_F(ParcoRepartTest, testInitialPartition){
     std::string fileName = "bigtrace-00000.graph";
     std::string file = graphPath + fileName;
