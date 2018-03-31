@@ -241,17 +241,15 @@ ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
 
+	scai::dmemo::CommunicatorPtr comm = partDist->getCommunicatorPtr();
+	if( comm->getRank()==0 ){
+        std::cout<<"Computing the cut...";
+	}
+
 	const IndexType n = inputDist->getGlobalSize();
 	const IndexType localN = inputDist->getLocalSize();
 	const Scalar maxBlockScalar = part.max();
 	const IndexType maxBlockID = maxBlockScalar.getValue<IndexType>();
-
-    scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
-    
-     
-	if( comm->getRank()==0 ){
-        std::cout<<"Computing the cut..." << std::endl;
-    }
     
 	if (partDist->getLocalSize() != localN) {
 		throw std::runtime_error("partition has " + std::to_string(partDist->getLocalSize()) + " local values, but matrix has " + std::to_string(localN));
@@ -306,7 +304,11 @@ ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<
             result = inputDist->getCommunicatorPtr()->sum(result);
         }
 
-  return result / 2; //counted each edge from both sides
+    if( comm->getRank()==0 ){
+        std::cout<<" done" << std::endl;
+    }
+
+    return result / 2; //counted each edge from both sides
 }
 
 //---------------------------------------------------------------------------------------
@@ -321,9 +323,11 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
     scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
     
     if( comm->getRank()==0 ){
-        std::cout<<"Computing the imbalance..." << std::endl;
+        std::cout<<"Computing the imbalance...";
     }
     
+    SCAI_ASSERT_EQ_ERROR(weighted, comm->any(weighted), "inconsistent input!");
+
 	ValueType minWeight, maxWeight;
 	if (weighted) {
 		assert(weightsSize == globalN);
@@ -377,19 +381,32 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 	} else {
 		optSize = std::ceil(ValueType(globalN) / k);
 	}
-        std::vector<ValueType> globalSubsetSizes(k);
-	if (!part.getDistribution().isReplicated()) {
+
+    std::vector<ValueType> globalSubsetSizes(k);
+    const bool isReplicated = part.getDistribution().isReplicated();
+    SCAI_ASSERT_EQ_ERROR(isReplicated, comm->any(isReplicated), "inconsistent distribution!");
+
+    if (isReplicated) {
+        SCAI_ASSERT_EQUAL_ERROR(localN, globalN);
+    }
+
+	if (!isReplicated) {
             //sum block sizes over all processes
             comm->sumImpl( globalSubsetSizes.data() , subsetSizes.data(), k, scai::common::TypeTraits<ValueType>::stype);
-	}else{
+	} else {
             globalSubsetSizes = subsetSizes;
-        }
+    }
 
 	ValueType maxBlockSize = *std::max_element(globalSubsetSizes.begin(), globalSubsetSizes.end());
 
-        if (!weighted) {
-		assert(maxBlockSize >= optSize);
+    if (!weighted) {
+            assert(maxBlockSize >= optSize);
 	}
+
+    if( comm->getRank()==0 ){
+        std::cout<<" done" << std::endl;
+    }
+
 	return (ValueType(maxBlockSize - optSize)/ optSize);
 }
 //---------------------------------------------------------------------------------------
@@ -965,7 +982,7 @@ scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSpars
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
     const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
     
-    // there are k blocks in the partition so the adjecency matrix for the block graph has dimensions [k x k]
+    // there are k blocks in the partition so the adjacency matrix for the block graph has dimensions [k x k]
     scai::dmemo::DistributionPtr distRowBlock ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, k) );  
     scai::dmemo::DistributionPtr distColBlock ( new scai::dmemo::NoDistribution( k ));
     
