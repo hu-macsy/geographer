@@ -1434,7 +1434,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 		localPairs[2*i].first = v1;
 		localPairs[2*i].second = v2;
 		
-		//insert also reversed edge to keep matric symmetric
+		//insert also reversed edge to keep matrix symmetric
 		localPairs[2*i+1].first = v2;
 		localPairs[2*i+1].second = v1;
 		
