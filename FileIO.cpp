@@ -243,7 +243,7 @@ void FileIO<IndexType, ValueType>::writeVTKCentral_ver2 (const CSRSparseMatrix<V
     }
     f << std::endl;
     
-    f.close();    
+    f.close();
 }
 //-------------------------------------------------------------------------------------------------
 /*Given the vector of the coordinates and their dimension, writes them in file "filename".

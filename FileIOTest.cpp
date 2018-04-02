@@ -112,7 +112,7 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
 
     comm->synchronize();
 
-    // read new graph from the new file we just written
+    // read new graph from the new file we just wrote
     CSRSparseMatrix<ValueType> Graph2 = FileIO<IndexType, ValueType>::readGraph( fileTo );
 
     // check that the two graphs are identical
@@ -239,9 +239,17 @@ TEST_F(FileIOTest, testWriteCoordsDistributed){
 TEST_F(FileIOTest, testReadCoordsOcean) {
 	std::string graphFile = graphPath + "fesom_core2.graph";
 	std::string coordFile = graphPath + "node2d_core2.out";
+	const IndexType n = 126858;
 
 	std::vector<DenseVector<ValueType> > coords = FileIO<IndexType, ValueType>::readCoordsOcean(coordFile, 2);
-	EXPECT_EQ(126858, coords[0].size());
+	EXPECT_EQ(n, coords[0].size());
+
+	for (IndexType d = 0; d < 2; d++) {
+	    scai::hmemo::ReadAccess<ValueType> rCoords(coords[d].getLocalValues());
+	    for (IndexType i = 0; i < n; i++ ) {
+	        EXPECT_TRUE(std::isfinite(rCoords[i]));
+        }
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -256,6 +264,50 @@ TEST_F(FileIOTest, testReadQuadTree){
 	//IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
 	//std::cout << "Read Quadtree with " << edgeList.size() << " nodes and " << m << " edges." << std::endl;
 }
+
+//-------------------------------------------------------------------------------------------------
+
+TEST_F(FileIOTest, testReadBinaryEdgeList) {
+    std::string filename = graphPath + "delaunay-3D-12.edgelist";
+
+    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(filename, ITI::Format::BINARYEDGELIST);
+
+    scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+
+    const IndexType n = graph.getNumRows();
+    const IndexType localN = dist->getLocalSize();
+    EXPECT_EQ(4096, n);
+    EXPECT_TRUE(graph.isConsistent());
+    EXPECT_EQ(n, graph.getNumColumns());
+
+    //check degree symmetry
+    std::vector<IndexType> inDegree(n);
+    std::vector<IndexType> outDegree(n);
+    scai::hmemo::ReadAccess<IndexType> ia(graph.getLocalStorage().getJA());
+    scai::hmemo::ReadAccess<IndexType> ja(graph.getLocalStorage().getJA());
+
+    for (IndexType i = 0; i < graph.getLocalNumRows(); i++) {
+        const IndexType globalI = dist->local2global(i);//this can be optimized
+        outDegree[globalI] = ia[i+1] - ia[i];
+    }
+
+    for (IndexType i = 0; i < ja.size(); i++) {
+        inDegree[ja[i]]++;
+    }
+
+    comm->sumImpl(outDegree.data(), outDegree.data(), n, scai::common::TypeTraits<IndexType>::stype);
+    comm->sumImpl(inDegree.data(), inDegree.data(), n, scai::common::TypeTraits<IndexType>::stype);
+
+    for (IndexType i = 0; i < n; i++) {
+        EXPECT_EQ(inDegree[i], outDegree[i]);
+    }
+
+    //check actual symmetry
+    EXPECT_TRUE(graph.checkSymmetry());
+
+}
+
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadGraphBinary){
