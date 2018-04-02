@@ -247,7 +247,7 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
         }
         // same for node weights
         if (nodesUnweighted) {
-            nodeWeights = DenseVector<ValueType>(newDist, 0);
+            nodeWeights = DenseVector<ValueType>(newDist, 1);
         }
         else {
             {
