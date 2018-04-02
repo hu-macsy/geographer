@@ -83,6 +83,7 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 			IndexType permutedIndex = localIndices[localIndex];
 			assert(permutedIndex < localN);
 			assert(permutedIndex >= 0);
+			if (settings.verbose) std::cout << "Process " << rank << ", selected node with sfc index " << sfcIndices[permutedIndex] << std::endl;
 			for (IndexType d = 0; d < settings.dimensions; d++) {
 				result[d][j] = convertedCoords[permutedIndex][d];
 			}

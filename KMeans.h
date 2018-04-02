@@ -78,8 +78,14 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights,
 		const std::vector<IndexType> &blockSizes, const Settings settings) {
-	std::vector<ValueType> minCoords, maxCoords;
-	std::tie(minCoords, maxCoords) = getLocalMinMaxCoords(coordinates);
+
+    std::vector<ValueType> minCoords(settings.dimensions);
+    std::vector<ValueType> maxCoords(settings.dimensions);
+    for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+        minCoords[dim] = coordinates[dim].min().scai::lama::Scalar::getValue<ValueType>();
+        maxCoords[dim] = coordinates[dim].max().scai::lama::Scalar::getValue<ValueType>();
+    }
+
 	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
 
 	return computePartition(coordinates, k, nodeWeights, blockSizes, centers, settings);
