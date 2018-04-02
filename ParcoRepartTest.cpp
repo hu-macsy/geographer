@@ -23,6 +23,7 @@
 #include "ParcoRepart.h"
 #include "gtest/gtest.h"
 #include "AuxiliaryFunctions.h"
+#include "HilbertCurve.h"
 
 
 using namespace scai;
@@ -36,7 +37,7 @@ class ParcoRepartTest : public ::testing::Test {
 
 };
 
-TEST_F(ParcoRepartTest, testHilbertRedistribution) {
+TEST_F(ParcoRepartTest, testHilbertRedistribution) {//maybe move hilbertRedistribution somewhere else?
     std::string fileName = "bigtrace-00000.graph";
     std::string file = graphPath + fileName;
     Settings settings;
@@ -67,9 +68,64 @@ TEST_F(ParcoRepartTest, testHilbertRedistribution) {
         EXPECT_NEAR(coordSum[d], coords[d].sum().Scalar::getValue<ValueType>(), 0.001);
     }
 
-    //TODO: check that a redistribution happened, i.e. that the hilbert indices of local points are grouped together.
+    //check distribution equality
+    for (IndexType d = 0; d < settings.dimensions; d++) {
+        EXPECT_TRUE(coords[d].getDistribution().isEqual(nodeWeights.getDistribution()));
+    }
+
+    const IndexType newLocalN = nodeWeights.getDistributionPtr()->getLocalSize();
+
+    /**
+     *  check that a redistribution happened, i.e. that the hilbert indices of local points are grouped together.
+     */
+    std::vector<ValueType> minCoords(settings.dimensions);
+    std::vector<ValueType> maxCoords(settings.dimensions);
+    for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+        minCoords[dim] = coords[dim].min().Scalar::getValue<ValueType>();
+        maxCoords[dim] = coords[dim].max().Scalar::getValue<ValueType>();
+        assert(std::isfinite(minCoords[dim]));
+        assert(std::isfinite(maxCoords[dim]));
+        ASSERT_GE(maxCoords[dim], minCoords[dim]);
+    }
+
+    //convert coordinates, switch inner and outer order
+    std::vector<std::vector<ValueType> > convertedCoords(newLocalN);
+    for (IndexType i = 0; i < newLocalN; i++) {
+        convertedCoords[i].resize(settings.dimensions);
+    }
 
     for (IndexType d = 0; d < settings.dimensions; d++) {
+        scai::hmemo::ReadAccess<ValueType> rAccess(coords[d].getLocalValues());
+        assert(rAccess.size() == newLocalN);
+        for (IndexType i = 0; i < newLocalN; i++) {
+            convertedCoords[i][d] = rAccess[i];
+        }
+    }
+
+    //get local hilbert indices
+    const IndexType size = comm->getSize();
+    const IndexType rank = comm->getRank();
+    std::vector<ValueType> minLocalSFCIndex(size);
+    std::vector<ValueType> maxLocalSFCIndex(size);
+
+    std::vector<ValueType> sfcIndices(newLocalN);
+    for (IndexType i = 0; i < newLocalN; i++) {
+        sfcIndices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(convertedCoords[i].data(), settings.dimensions, settings.sfcResolution, minCoords, maxCoords);
+    }
+
+    minLocalSFCIndex[rank] = *std::min_element(sfcIndices.begin(), sfcIndices.end());
+    maxLocalSFCIndex[rank] = *std::max_element(sfcIndices.begin(), sfcIndices.end());
+
+    comm->sumImpl(minLocalSFCIndex.data(), minLocalSFCIndex.data(), size, scai::common::TypeTraits<ValueType>::stype);
+    comm->sumImpl(maxLocalSFCIndex.data(), maxLocalSFCIndex.data(), size, scai::common::TypeTraits<ValueType>::stype);
+
+    ASSERT_LE(minLocalSFCIndex[rank], maxLocalSFCIndex[rank]);
+    if (rank + 1 < size) {
+        EXPECT_LE(maxLocalSFCIndex[rank], minLocalSFCIndex[rank+1]);
+    }
+
+    for (IndexType d = 0; d < settings.dimensions; d++) {
+        //redistribute back and check for equality
         coords[d].redistribute(coordCopy[d].getDistributionPtr());
         ASSERT_TRUE(coords[d].getDistributionPtr()->isEqual(coordCopy[d].getDistribution()));
 
