@@ -594,23 +594,18 @@ TEST_F (FileIOTest, testreadOFFCentral){
 TEST_F (FileIOTest, testreadEdgeListDistributed){
 	
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	
-	//TODO: can this be done using googletest avoiding the big if??
-	if( comm->getSize()!= 4){
-		PRINT0("\n\t\t\tWARNING: This test only works for k=4.Aborting");
-	}else{
-	
-		std::string file = graphPath + "tmp4/out";
-		
-		scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readEdgeListDistributed( file );
-		
-		SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
-		EXPECT_TRUE( graph.checkSymmetry() );
-		SCAI_ASSERT_EQ_ERROR(  graph.getNumRows(), graph.getNumColumns() , "Matric is not square");
-		
-		// only for graph: graphPath + "tmp4/out"
-		SCAI_ASSERT_EQ_ERROR( graph.getNumRows(), 16, "for files tmp4/out N must be 16");
-	}
+	ASSERT_EQ(comm->getSize(), 4);
+
+    std::string file = graphPath + "tmp4/out";
+
+    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readEdgeListDistributed( file );
+
+    ASSERT_TRUE( graph.isConsistent());
+    EXPECT_TRUE( graph.checkSymmetry() );
+    EXPECT_EQ(  graph.getNumRows(), graph.getNumColumns()) << "Matrix is not square";
+
+    // only for graph: graphPath + "tmp4/out"
+    EXPECT_EQ( graph.getNumRows(), 16) << "for files tmp4/out N must be 16";
 }
 
 } /* namespace ITI */
