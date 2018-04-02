@@ -1166,10 +1166,14 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 	    }
 	}
 
+	IndexType maxEncounteredNode = 0;
+
 	//convert to edge lists
 	for (ULLI i = 0; i < endLocalRange - beginLocalRange; i++) {
 	    IndexType v1 = binaryEdges[2*i];
 	    IndexType v2 = binaryEdges[2*i+1];
+	    maxEncounteredNode = std::max(maxEncounteredNode, v1);
+	    maxEncounteredNode = std::max(maxEncounteredNode, v2);
 
 	    if (v1 >= globalN) {
             throw std::runtime_error("Process " + std::to_string(rank) + ": Illegal node id " + std::to_string(v1) + " in edge list for " + std::to_string(globalN) + " nodes.");
@@ -1180,6 +1184,12 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
         }
 
         edgeList.push_back( std::make_pair( v1, v2) );
+	}
+
+	maxEncounteredNode = comm->max(maxEncounteredNode);
+	if (maxEncounteredNode < globalN/2 && comm->getRank() == 0) {
+	    std::cout << "Warning: More than half of all nodes are isolated!" << std::endl;
+	    std::cout << "Max encountered node: " << maxEncounteredNode << std::endl;
 	}
     
     scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils::edgeList2CSR<IndexType, ValueType>( edgeList );
