@@ -76,6 +76,7 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 		result[d].resize(k);
 	}
 
+	const IndexType rank = comm->getRank();
 	for (IndexType j = 0; j < k; j++) {
 		IndexType localIndex = blockDist->global2local(wantedIndices[j]);
 		if (localIndex != nIndex) {
