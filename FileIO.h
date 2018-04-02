@@ -22,9 +22,6 @@
 #include <set>
 #include <memory>
 
-#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-#define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-
 
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
@@ -39,9 +36,9 @@ namespace ITI {
          *                            coordinates. If the coordinates are in 2D the last number is 0.
          * MATRIXMARKET format: for graphs: we use the function readFromFile (or readFromSingleFile) 
          *                            provided by LAMA.
-         *                for coordiantes: first line has two numbers, the number of points N and
+         *                for coordinates: first line has two numbers, the number of points N and
          *                            the dimension d. Then next N*d lines contain the coordinates
-         *                            for the poitns: every d lines are the coordinates for a point.
+         *                            for the points: every d lines are the coordinates for a point.
         */
 
         
@@ -122,14 +119,29 @@ public:
 	 */
 	static scai::lama::CSRSparseMatrix<ValueType> readGraphBinary(const std::string filename);
         
+	/*Every PE reads its part of the file. The file contains all the edges of the graph: each line has two numbers indicating
+	 * the vertices of the edge. 
+	 * 0 1
+	 * 0 2				0 - 1 - 3 - 4
+	 * 3 1				  \    /  
+	 * 4 3				    2 
+	 * 3 2
+	 */
+	static scai::lama::CSRSparseMatrix<ValueType> readEdgeList(const std::string filename, const bool binary = false);
+	
+	
+	/* Edge list format but now there are k files, one for each PE
+	 * */
+	static scai::lama::CSRSparseMatrix<ValueType> readEdgeListDistributed(const std::string filename);
+	
 	/* Reads the coordinates from file "filename" and returns then in a vector of DenseVector
 	 */
 	static std::vector<DenseVector<ValueType>> readCoords ( std::string filename, IndexType numberOfCoords, IndexType dimension, Format = Format::METIS);
-
-        /**
-         * 
-         */
-        static std::vector<DenseVector<ValueType>> readCoordsBinary( std::string filename, const IndexType numberOfPoints, const IndexType dimension);
+	
+	/**
+     * 
+    */
+	static std::vector<DenseVector<ValueType>> readCoordsBinary( std::string filename, const IndexType numberOfPoints, const IndexType dimension);
         
         
 	/*
@@ -184,6 +196,11 @@ public:
     /** Read graph and coordinates from a OFF file. Coordinates are (usually) in 3D.
     */
     static void readOFFTriangularCentral( scai::lama::CSRSparseMatrix<ValueType>& graph, std::vector<DenseVector<ValueType>>& coords, const std::string filename);
+
+	
+    /** Read graph and coordinates from a dom.geo file of the ALYA tool. Coordinates are (usually) in 3D.
+	*/
+    static void readAlyaCentral( scai::lama::CSRSparseMatrix<ValueType>& graph, std::vector<DenseVector<ValueType>>& coords, const IndexType N, const IndexType dimensions, const std::string filename);
 
 private:
 	/**

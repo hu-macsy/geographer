@@ -8,9 +8,16 @@
 #pragma once
 
 #include <set>
+#include <tuple>
 
 #include <scai/lama/matrix/CSRSparseMatrix.hpp>
+#include <scai/dmemo/Distribution.hpp>
+#include <scai/dmemo/BlockDistribution.hpp>
+#include <scai/dmemo/GeneralDistribution.hpp>
+
+#ifndef SETTINGS_H
 #include "Settings.h"
+#endif
 
 namespace ITI {
 
@@ -95,14 +102,21 @@ scai::lama::DenseVector<IndexType> getBorderNodes( const scai::lama::CSRSparseMa
  *
  */
 template<typename IndexType, typename ValueType>
-std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part);
+std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const struct Settings settings);
 
 /* Computes the communication volume for every block. 
  * TODO: Should the result is gathered in the root PE and not be replicated?
  * */
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> computeCommVolume( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part /*, const IndexType root*/ );
+std::vector<IndexType> computeCommVolume( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part , const IndexType numBlocks );
 
+/**Computes the communication volume, boundary and inner nodes in one pass to save time.
+ * 
+ * @return A tuple with three vectors each od size numBlocks: first vector is the communication volume, second is the number of boundary nodes and third
+ * the number of inner nodes pre block.
+ */
+template<typename IndexType, typename ValueType>
+std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType>> computeCommBndInner( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType numBlocks);
 
 /** Returns the edges of the block graph only for the local part. Eg. if blocks 1 and 2 are local
  * in this processor it finds the edge (1,2) ( and the edge (2,1)).
@@ -165,9 +179,21 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::lama::CSRSparseMa
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::Halo& halo);
 
+template<typename IndexType, typename ValueType>
+scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
+	
+template <typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> getLaplacian( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vector<std::set<IndexType>> adjList);
+scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>>& adjList);
+
+/** Get an vector of the local edges, sorts the edges and constructs the local part of CSR sparse matrix.
+ * @param[in,out] edgeList The local list of edges for this PE. The edge list is sorted and redistributed also.
+ * @return The distributed adjacency matrix.
+ */
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>>& edgeList );
 
 //taken from https://stackoverflow.com/a/9345144/494085
 template<class BidiIter >
@@ -182,6 +208,7 @@ static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_rand
     }
     return begin;
 }
+
 
 } /*namespace GraphUtils*/
 

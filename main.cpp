@@ -31,115 +31,6 @@
 #include "SpectralPartition.h"
 #include "GraphUtils.h"
 
-
-
-void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
-    
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    
-    IndexType numRuns = metricsVec.size();
-    
-    if( comm->getRank()==0 ){
-        out << "# times, input, migrAlgo, constRedist, 1distr, kmeans, 2redis, prelim, localRef, total,    prel cut, finalcut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg  " << std::endl;
-    }
-
-    ValueType sumMigrAlgo = 0;
-    ValueType sumConstructRedist = 0;
-    ValueType sumFirstDistr = 0;
-    ValueType sumKmeans = 0;
-    ValueType sumSecondDistr = 0;
-    ValueType sumPrelimanry = 0; 
-    ValueType sumLocalRef = 0; 
-    ValueType sumFinalTime = 0;
-    
-    IndexType sumPreliminaryCut = 0;
-    IndexType sumFinalCut = 0;
-    ValueType sumImbalace = 0;
-    IndexType sumMaxBnd = 0;
-    IndexType sumTotBnd = 0;
-    IndexType sumMaxCommVol = 0;
-    IndexType sumTotCommVol = 0;
-    IndexType maxBoundaryNodes = 0;
-    IndexType totalBoundaryNodes = 0;
-    ValueType sumMaxBorderNodesPerc = 0;
-    ValueType sumAvgBorderNodesPerc = 0;
-
-    for(IndexType run=0; run<numRuns; run++){
-        Metrics thisMetric = metricsVec[ run ];
-        
-        SCAI_ASSERT_EQ_ERROR(thisMetric.timeMigrationAlgo.size(), comm->getSize(), "Wrong vector size" );
-        
-        // for these time we have one measurement per PE and must make a max
-        ValueType maxTimeMigrationAlgo = *std::max_element( thisMetric.timeMigrationAlgo.begin(), thisMetric.timeMigrationAlgo.end() );
-        ValueType maxTimeConstructRedist = *std::max_element( thisMetric.timeConstructRedistributor.begin(), thisMetric.timeConstructRedistributor.end() );
-        ValueType maxTimeFirstDistribution = *std::max_element( thisMetric.timeFirstDistribution.begin(), thisMetric.timeFirstDistribution.end() );
-        ValueType maxTimeKmeans = *std::max_element( thisMetric.timeKmeans.begin(), thisMetric.timeKmeans.end() );
-        ValueType maxTimeSecondDistribution = *std::max_element( thisMetric.timeSecondDistribution.begin(), thisMetric.timeSecondDistribution.end() );
-        ValueType maxTimePreliminary = *std::max_element( thisMetric.timePreliminary.begin(), thisMetric.timePreliminary.end() );
-        
-        // these times are global, no need to max
-        ValueType timeFinal = thisMetric.timeFinalPartition;
-        ValueType timeLocalRef = timeFinal - maxTimePreliminary;
-        
-        if( comm->getRank()==0 ){
-            out << std::setprecision(2) << std::fixed;
-            out<< run << " ,       "<< thisMetric.inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeConstructRedist << ", " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << ",  "<< timeFinal << " , \t "\
-            << thisMetric.preliminaryCut << ",  "<< thisMetric.finalCut << ",  " << thisMetric.finalImbalance << ",    "  \
-            // << thisMetric.maxBlockGraphDegree << ",  " << thisMetric.totalBlockGraphEdges << " ," 
-            << thisMetric.maxBoundaryNodes << ", " << thisMetric.totalBoundaryNodes << ",    " \
-            << thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << ",    ";
-            out << std::setprecision(6) << std::fixed;
-            out << thisMetric.maxBorderNodesPercent << ",  " << thisMetric.avgBorderNodesPercent \
-            << std::endl;
-        }
-        
-        sumMigrAlgo += maxTimeMigrationAlgo;
-        sumConstructRedist += maxTimeConstructRedist;
-        sumFirstDistr += maxTimeFirstDistribution;
-        sumKmeans += maxTimeKmeans;
-        sumSecondDistr += maxTimeSecondDistribution;
-        sumPrelimanry += maxTimePreliminary;
-        sumLocalRef += timeLocalRef;
-        sumFinalTime += timeFinal;
-        
-        sumPreliminaryCut += thisMetric.preliminaryCut;
-        sumFinalCut += thisMetric.finalCut;
-        sumImbalace += thisMetric.finalImbalance;
-        sumMaxBnd += thisMetric.maxBoundaryNodes  ;
-        sumTotBnd += thisMetric.totalBoundaryNodes ;
-        sumMaxCommVol +=  thisMetric.maxCommVolume;
-        sumTotCommVol += thisMetric.totalCommVolume;
-        sumMaxBorderNodesPerc += thisMetric.maxBorderNodesPercent;
-        sumAvgBorderNodesPerc += thisMetric.avgBorderNodesPercent;
-    }
-    
-    if( comm->getRank()==0 ){
-        out << std::setprecision(2) << std::fixed;
-        out << "average,  "\
-            <<  ValueType (metricsVec[0].inputTime)<< ",  "\
-            <<  ValueType(sumMigrAlgo)/numRuns<< ",  " \
-            <<  ValueType(sumConstructRedist)/numRuns<< ",  " \
-            <<  ValueType(sumFirstDistr)/numRuns<< ",  " \
-            <<  ValueType(sumKmeans)/numRuns<< ",  " \
-            <<  ValueType(sumSecondDistr)/numRuns<< ",  " \
-            <<  ValueType(sumPrelimanry)/numRuns<< ",  " \
-            <<  ValueType(sumLocalRef)/numRuns<< ",  " \
-            <<  ValueType(sumFinalTime)/numRuns<< ", \t " \
-            <<  ValueType(sumPreliminaryCut)/numRuns<< ",  " \
-            <<  ValueType(sumFinalCut)/numRuns<< ",  " \
-            <<  ValueType(sumImbalace)/numRuns<< ",    " \
-            <<  ValueType(sumMaxBnd)/numRuns<< ",  " \
-            <<  ValueType(sumTotBnd)/numRuns<< ",    " \
-            <<  ValueType(sumMaxCommVol)/numRuns<< ", " \
-            <<  ValueType(sumTotCommVol)/numRuns<< ",    ";
-            out << std::setprecision(6) << std::fixed;
-            out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
-            <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
-            << std::endl;
-    }
-    
-}
-
 /**
  *  Examples of use:
  * 
@@ -154,7 +45,9 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
  */
 
 //----------------------------------------------------------------------------
+/*
 namespace ITI {
+
 	std::istream& operator>>(std::istream& in, Format& format)
 	{
 		std::string token;
@@ -200,7 +93,7 @@ namespace ITI {
 		return out;
 	}
 }
-
+*/
 
 std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
 {
@@ -243,6 +136,7 @@ std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method)
     return out;
 }
 
+//void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);	
 
 
 int main(int argc, char** argv) {
@@ -728,6 +622,14 @@ int main(int argc, char** argv) {
 
     std::vector<struct Metrics> metricsVec;
     
+	/*
+	//TODO: used ifort -nofor-main ... to compile but does not link properly
+	size_t total=-1,used=-1,free=-1,buffers=-1, cached=-1;
+	memusage(&total, &used, &free, &buffers, &cached);
+	printf("%ld %ld %ld %ld %ld \n", total,used,free,buffers, cached);
+	*/
+	
+	
     //------------------------------------------------------------
     //
     // partition the graph
@@ -832,6 +734,7 @@ int main(int argc, char** argv) {
     // writing results in a file and std::cout
     //
     if (comm->getRank() == 0) {
+		std::cout << "Running " << __FILE__ << std::endl;
         std::cout<<  "\033[1;36m";
     }
     printVectorMetrics( metricsVec, std::cout );
@@ -841,13 +744,14 @@ int main(int argc, char** argv) {
     
     if( settings.storeInfo && settings.outFile!="-" ) {
         if( comm->getRank()==0){
-            std::ofstream outF( settings.outFile+".info", std::ios::out);
+            std::ofstream outF( settings.outFile, std::ios::out);
             if(outF.is_open()){
+				outF << "Running " << __FILE__ << std::endl;
                 settings.print( outF, comm);
                 printVectorMetrics( metricsVec, outF ); 
                 std::cout<< "Output information written to file " << settings.outFile << " in total time " << totalT << std::endl;
             }else{
-                std::cout<< "Could not open file " << settings.outFile << " informations not stored"<< std::endl;
+                std::cout<< "Could not open file " << settings.outFile << " information not stored"<< std::endl;
             }            
         }
     }    
@@ -909,7 +813,7 @@ int main(int argc, char** argv) {
       
         
     //this is needed for supermuc
-//    std::exit(0);   
+    std::exit(0);   
     
     return 0;
 }

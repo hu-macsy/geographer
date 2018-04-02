@@ -24,13 +24,12 @@
 #include "LocalRefinement.h"
 #include "SpectralPartition.h"
 #include "GraphUtils.h"
+#include "AuxiliaryFunctions.h"
 
 #include "gtest/gtest.h"
 
 #include <boost/filesystem.hpp>
 
-#include "GraphUtils.h"
-#include "AuxiliaryFunctions.h"
 
 
 using namespace scai;
@@ -225,7 +224,7 @@ TEST_F (auxTest,testGetBorderAndInnerNodes){
     std::vector<IndexType> numBorderNodes;
     std::vector<IndexType> numInnerNodes;
     
-    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition);
+    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition, settings);
     
     //assertions - prints
     SCAI_ASSERT_EQ_ERROR( numBorderNodes.size(), k, "Size of numBorderNodes is wrong");
@@ -270,12 +269,12 @@ TEST_F (auxTest,testComputeCommVolume){
     
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
     
-    std::vector<IndexType> commVolume = ITI::GraphUtils::computeCommVolume( graph, partition );
+    std::vector<IndexType> commVolume = ITI::GraphUtils::computeCommVolume( graph, partition, k );
         
     std::vector<IndexType> numBorderNodes;
     std::vector<IndexType> numInnerNodes;
     
-    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition);
+    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition, settings);
     
     SCAI_ASSERT_EQ_ERROR( commVolume.size(), numBorderNodes.size(), "size mismatch");
     
@@ -317,6 +316,33 @@ TEST_F (auxTest,testGraphMaxDegree){
             EXPECT_EQ( maxDegree, N);
         }
     }
+}
+//-----------------------------------------------------------------
+ 
+TEST_F (auxTest,testEdgeList2CSR){
+	
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	const IndexType thisPE = comm->getRank();
+	const IndexType numPEs = comm->getSize();
+	
+    const IndexType localM = 10;	
+	const IndexType N = numPEs * 4;
+	std::vector< std::pair<IndexType, IndexType>> localEdgeList( localM );
+
+	srand( std::time(NULL)*thisPE );
+	
+    for(int i=0; i<localM; i++){
+		//IndexType v1 = i;
+		IndexType v1 = (rand())%N;
+		IndexType v2 = (v1+rand())%N;
+		localEdgeList[i] = std::make_pair( v1, v2 );
+		//PRINT(thisPE << ": inserting edge " << v1 << " - " << v2 );
+	}
+	
+	scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils::edgeList2CSR<IndexType, ValueType>( localEdgeList );
+	
+	SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
+	EXPECT_TRUE( graph.checkSymmetry() );
 }
 //-----------------------------------------------------------------
 

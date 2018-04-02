@@ -117,7 +117,7 @@ static void printVector( std::vector<T> v){
     for(int i=0; i<v.size(); i++){
         std::cout<< v[i] << ", ";
     }
-    std::cout<< "\b\b\b\n" << std::endl;
+    std::cout<< "\b\b\n" << std::endl;
 }
 
 //------------------------------------------------------------------------------

@@ -14,6 +14,7 @@
 #include <fstream>
 #include <chrono>
 #include <numeric>
+#include <algorithm>
  
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -48,6 +49,10 @@ void printCompetitorMetrics(struct Metrics metrics, std::ostream& out){
 */
 
 
+//scai::lama::DenseVector callTool( std::String tool)'
+	
+	
+
 
 //---------------------------------------------------------------------------------------------
 
@@ -57,9 +62,14 @@ int main(int argc, char** argv) {
 	options_description desc("Supported options");
 
 	struct Settings settings;
-    int parMetisGeom = 0;			//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
+    //int parMetisGeom = 0;			//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
     bool writePartition = false;
+	std::string tool;
+	
+	std::vector<std::string> allTools = {"parMetisGraph", "parMetisGeom", "parMetisSfc", "zoltanRcb", "zoltanRib", "zoltanMJ", "zoltanHsfc"};
     
+	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+	
 	desc.add_options()
 		("help", "display options")
 		("version", "show version")
@@ -76,7 +86,9 @@ int main(int argc, char** argv) {
 		("dimensions", value<IndexType>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 		("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
         ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
-        ("geom", value<int>(&parMetisGeom), "use ParMetisGeomKway, with coordinates. Default is parmetisKway (no coordinates)")
+        //("geom", value<int>(&parMetisGeom), "use ParMetisGeomKway, with coordinates. Default is parmetisKway (no coordinates)")
+		
+		("tool", value<std::string>(&tool), "The tool to partition with.")
         
         ("writePartition", "Writes the partition in the outFile.partition file")
         ("outFile", value<std::string>(&settings.outFile), "write result partition into file")
@@ -92,7 +104,8 @@ int main(int argc, char** argv) {
     writePartition = vm.count("writePartition");
 	bool writeDebugCoordinates = settings.writeDebugCoordinates;
 	
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	const IndexType thisPE = comm->getRank();
     IndexType N;
 	
 	if (vm.count("help")) {
@@ -113,17 +126,12 @@ int main(int argc, char** argv) {
         settings.numBlocks = comm->getSize();
     }
 
-    if( comm->getRank()==0 ){
-        std::cout << "\033[1;31m";
-        std::cout << "IndexType size: " << sizeof(IndexType) << " , ValueType size: "<< sizeof(ValueType) << std::endl;
-        if( sizeof(IndexType)!=sizeof(idx_t) ){
-            std::cout<< "WARNING: IndexType size= " << sizeof(IndexType) << " and idx_t size=" << sizeof(idx_t) << "  do not agree, this may cause problems " << std::endl;
-        }
-        if( sizeof(ValueType)!=sizeof(real_t) ){
-            std::cout<< "WARNING: IndexType size= " << sizeof(IndexType) << " and idx_t size=" << sizeof(idx_t) << "  do not agree, this may cause problems " << std::endl;
-        }
-        std::cout<<"\033[0m";
-    }
+	if( not (std::find(allTools.begin(), allTools.end(), tool)!=allTools.end()) ){
+		std::cout<< "The given tool: "<< tool <<" is not supported. Chose one from:" << std::endl;
+		std::for_each( allTools.begin(), allTools.end(), [](std::string s){ std::cout<< s << " "; } );
+		std::cout<< "Aborting..." << std::endl;
+		return -1;
+	}
              
     //-----------------------------------------
     //
@@ -155,15 +163,14 @@ int main(int argc, char** argv) {
                 
         SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
         SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
-        
-        if(parMetisGeom!=0 or settings.writeDebugCoordinates ){
-            if (vm.count("fileFormat")) {
-                coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
-            } else {
-                coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
-            }
-            SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size() , coords[1].getLocalValues().size(), "coordinates not of same size" );
-        }
+        		
+        //read the coordinates file
+		if (vm.count("fileFormat")) {
+			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
+		} else {
+			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
+		}
+		SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size() , coords[1].getLocalValues().size(), "coordinates not of same size" );
         
     } else if(vm.count("generate")){
         if (settings.dimensions != 3) {
@@ -219,28 +226,46 @@ int main(int argc, char** argv) {
     
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
 
-	//--------------------------------------------
+	//--------------------------------------------------------------------------
 	//
 	// get the partition and metrics
 	//
+	scai::lama::DenseVector<IndexType> partition;
 	
 	// the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
 	struct Metrics metrics(1);
+	metrics.numBlocks = settings.numBlocks;
 	
     // uniform node weights
     scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
 	
 	settings.repeatTimes = 5;
+	int parMetisGeom=0	;
 	
-	DenseVector<IndexType> partitionKway = ITI::Wrappers<IndexType,ValueType>::metisWrapper ( graph, coords, nodeWeights, parMetisGeom, settings, metrics);
+	//PRINT0(tool.substr(0,8) << " __ " << tool.substr(0,6) );
 	
-	//DenseVector<IndexType> partitionKway = ITI::Wrappers<IndexType,ValueType>::zoltanWrapper ( graph, coords, nodeWeights, zoltanAlgo, settings, metrics);
+	if( tool.substr(0,8)=="parMetis"){
+		if 		( tool=="parMetisGraph"){	parMetisGeom = 0;	}
+		else if ( tool=="parMetisGeom"){	parMetisGeom = 1;	}
+		else if	( tool=="parMetisSfc"){		parMetisGeom = 2;	}
+		
+		partition = ITI::Wrappers<IndexType,ValueType>::metisWrapper ( graph, coords, nodeWeights, parMetisGeom, settings, metrics);
+	}else if (tool.substr(0,6)=="zoltan"){
+		std::string algo;
+		if		( tool=="zoltanRcb"){	algo = "rcb";	}
+		else if ( tool=="zoltanRib"){	algo = "rib";	}
+		else if ( tool=="zoltanMJ"){	algo = "multijagged";}
+		else if ( tool=="zoltanHsfc"){	algo = "hsfc";	}
+		
+		partition = ITI::Wrappers<IndexType,ValueType>::zoltanWrapper ( graph, coords, nodeWeights, algo, settings, metrics);
+	}else{
+		std::cout<< "Tool "<< tool <<" not supported.\nAborting..."<<std::endl;
+		return -1;
+	}
 	
-	//metrics.timeFinalPartition = avgKwayTime;
-	PRINT0("time for partition: " <<  metrics.timeFinalPartition );
+	PRINT0("time to convert to get the partition: " <<  metrics.timeFinalPartition );
 	
-	
-    metrics.getMetrics( graph, partitionKway, nodeWeights, settings );
+    metrics.getMetrics( graph, partition, nodeWeights, settings );
     
         
     //---------------------------------------------------------------
@@ -255,35 +280,30 @@ int main(int argc, char** argv) {
         machine = std::string(machineChar);
     }
     
-    if(comm->getRank()==0){
-		std::cout << "Running " << __FILE__ << std::endl;
+    if( thisPE==0 ){
+		std::cout << "Finished " << __FILE__ << std::endl;
         if( vm.count("generate") ){
             std::cout << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon;
         }else{
             std::cout << std::endl << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon;
         }
         std::cout << "\033[1;36m";
-        
-        if( parMetisGeom ){
-            std::cout << std::endl << "ParMETIS_V3_PartGeomKway: "<< std::endl;
-        }else{
-            std::cout << std::endl << "ParMETIS_V3_PartKway: " << std::endl;
-        }
+		std::cout << "\n >>>> " << tool;
         std::cout<<  " \033[0m" << std::endl;
 
-        metrics.print( std::cout );
+        printMetricsShort( metrics, std::cout);
         
         // write in a file
         if( settings.outFile!="-" ){
             std::ofstream outF( settings.outFile, std::ios::out);
             if(outF.is_open()){
-				outF << "Running " << __FILE__ << std::endl;
+				outF << "Running " << __FILE__ << " for tool " << tool << std::endl;
                 if( vm.count("generate") ){
                     outF << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
                 }else{
                     outF << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
                 }
-
+                outF << "numBlocks= " << settings.numBlocks << std::endl;
                 //metrics.print( outF ); 
 				printMetricsShort( metrics, outF);
                 std::cout<< "Output information written to file " << settings.outFile << std::endl;
@@ -293,23 +313,20 @@ int main(int argc, char** argv) {
         }
     }
     
-    // the code below writes the output coordinates in one file per processor for visualization purposes.
-    //=================
 
-    // WARNING: the function writePartitionCentral redistributes the coordinates
+    // WARNING: the function writePartitionCentral redistributes the partition vector
     if( writePartition ){
-        if( parMetisGeom ){    
-            std::cout<<" write partition" << std::endl;
-            ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partitionKway, settings.outFile+"_parMetisGeom_k_"+std::to_string(settings.numBlocks)+".partition");    
-        }else{
-            std::cout<<" write partition" << std::endl;
-            ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partitionKway, settings.outFile+"_parMetisGraph_k_"+std::to_string(settings.numBlocks)+".partition");    
-        }
+		std::string partFile = settings.outFile+ tool + "_k" + std::to_string(settings.numBlocks)+".partition";
+		if(thisPE==0) std::cout<<"About to write partition" << std::endl;
+		ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partition, partFile );    	// redistributes the partition
+		if(thisPE==0) std::cout<<"Partitiom written in file " << partFile << std::endl;       
     }
-
+    
+    // the code below writes the output coordinates in one file per processor for visualization purposes.
+    
     //settings.writeDebugCoordinates = 0;
-    if (settings.writeDebugCoordinates and parMetisGeom) {
-        scai::dmemo::DistributionPtr metisDistributionPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partitionKway.getDistribution(), partitionKway.getLocalValues() ) );
+    if ( writeDebugCoordinates ) {
+        scai::dmemo::DistributionPtr metisDistributionPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
         scai::dmemo::Redistributor prepareRedist(metisDistributionPtr, coords[0].getDistributionPtr());
         
 		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
@@ -317,16 +334,18 @@ int main(int argc, char** argv) {
 			coords[dim].redistribute( prepareRedist );
 		}
         
-        std::string destPath;
-        if( parMetisGeom){
-            destPath = "partResults/parMetisGeom/blocks_" + std::to_string(settings.numBlocks) ;
-        }else{
-            destPath = "partResults/parMetis/blocks_" + std::to_string(settings.numBlocks) ;
-        }
+        std::string destPath= "partResults/" + tool +"/blocks_" + std::to_string(settings.numBlocks) ;
+        
         boost::filesystem::create_directories( destPath );   		
 		ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coords, N, settings.dimensions, destPath + "/metisResult");
     }
 	        
+	std::chrono::duration<ValueType> totalTimeLocal = std::chrono::system_clock::now() - startTime;
+	ValueType totalTime = comm->max( totalTimeLocal.count() );
+	if( thisPE==0 ){
+		std::cout<<"Exiting file " << __FILE__ << " , total time= " << totalTime <<  std::endl;
+	}
+	
     //this is needed for supermuc
     std::exit(0);   
 	

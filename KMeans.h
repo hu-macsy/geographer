@@ -84,6 +84,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
     for (IndexType dim = 0; dim < settings.dimensions; dim++) {
         minCoords[dim] = coordinates[dim].min().scai::lama::Scalar::getValue<ValueType>();
         maxCoords[dim] = coordinates[dim].max().scai::lama::Scalar::getValue<ValueType>();
+		SCAI_ASSERT_NE_ERROR( minCoords[dim], maxCoords[dim], "min=max for dimension "<< dim << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
     }
 
 	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
@@ -279,7 +280,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 					lowerBoundNextCenter[i] = 0;
 				} else {
 					ValueType diff = (-2*delta*pureSqrt + deltaSq)*(maxInfluence + 1e-10);
-                                        //TODO: assertion fails for small graphs
 					assert(diff <= 0);
 					lowerBoundNextCenter[i] += diff;
 					if (!(lowerBoundNextCenter[i] > 0)) lowerBoundNextCenter[i] = 0;

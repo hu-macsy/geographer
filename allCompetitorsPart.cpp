@@ -14,6 +14,7 @@
 #include <fstream>
 #include <chrono>
 #include <numeric>
+#include <algorithm>
  
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -49,6 +50,11 @@ void printCompetitorMetrics(struct Metrics metrics, std::ostream& out){
 
 
 
+extern "C"{
+	void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);	
+}
+
+
 //---------------------------------------------------------------------------------------------
 
 int main(int argc, char** argv) {
@@ -57,9 +63,16 @@ int main(int argc, char** argv) {
 	options_description desc("Supported options");
 
 	struct Settings settings;
-    int parMetisGeom = 0;			//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
+    //int parMetisGeom = 0;			//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
     bool writePartition = false;
+	bool storeInfo = true;
+	std::string outPath;
+	std::string graphName;
+	
+	std::vector<std::string> allTools = {"zoltanRcb", "zoltanRib", "zoltanMJ", "zoltanHsfc", "parMetisSfc", "parMetisGeom", "parMetisGraph" };
     
+	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+	
 	desc.add_options()
 		("help", "display options")
 		("version", "show version")
@@ -76,10 +89,13 @@ int main(int argc, char** argv) {
 		("dimensions", value<IndexType>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 		("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
         ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
-        ("geom", value<int>(&parMetisGeom), "use ParMetisGeomKway, with coordinates. Default is parmetisKway (no coordinates)")
         
+		//TODO: parse the string to get these info automatically
+		("outPath", value<std::string>(&outPath), "write result partition into file")
+		("graphName", value<std::string>(&graphName), "this is needed to create the correct outFile for every tool. Must be the graphFile with the path and the ending")
+		
+		("storeInfo", value<bool>(&storeInfo), "is this is false then no outFile is produced")
         ("writePartition", "Writes the partition in the outFile.partition file")
-        ("outFile", value<std::string>(&settings.outFile), "write result partition into file")
         ("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 		;
         
@@ -92,7 +108,8 @@ int main(int argc, char** argv) {
     writePartition = vm.count("writePartition");
 	bool writeDebugCoordinates = settings.writeDebugCoordinates;
 	
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	const IndexType thisPE = comm->getRank();
     IndexType N;
 	
 	if (vm.count("help")) {
@@ -113,17 +130,10 @@ int main(int argc, char** argv) {
         settings.numBlocks = comm->getSize();
     }
 
-    if( comm->getRank()==0 ){
-        std::cout << "\033[1;31m";
-        std::cout << "IndexType size: " << sizeof(IndexType) << " , ValueType size: "<< sizeof(ValueType) << std::endl;
-        if( sizeof(IndexType)!=sizeof(idx_t) ){
-            std::cout<< "WARNING: IndexType size= " << sizeof(IndexType) << " and idx_t size=" << sizeof(idx_t) << "  do not agree, this may cause problems " << std::endl;
-        }
-        if( sizeof(ValueType)!=sizeof(real_t) ){
-            std::cout<< "WARNING: IndexType size= " << sizeof(IndexType) << " and idx_t size=" << sizeof(idx_t) << "  do not agree, this may cause problems " << std::endl;
-        }
-        std::cout<<"\033[0m";
-    }
+    if( !vm.count("outPath") ){
+		std::cout<< "Must give parameter outPath to store metrics.\nAborting..." << std::endl;
+		return -1;
+	}
              
     //-----------------------------------------
     //
@@ -155,15 +165,14 @@ int main(int argc, char** argv) {
                 
         SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
         SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
-        
-        if(parMetisGeom!=0 or settings.writeDebugCoordinates ){
-            if (vm.count("fileFormat")) {
-                coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
-            } else {
-                coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
-            }
-            SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size() , coords[1].getLocalValues().size(), "coordinates not of same size" );
-        }
+        		
+        //read the coordinates file
+		if (vm.count("fileFormat")) {
+			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
+		} else {
+			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
+		}
+		SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size() , coords[1].getLocalValues().size(), "coordinates not of same size" );
         
     } else if(vm.count("generate")){
         if (settings.dimensions != 3) {
@@ -218,115 +227,132 @@ int main(int argc, char** argv) {
     }
     
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+	/*
+	//TODO: must compile with mpicc and module mpi.ibm/1.4 and NOT mpi.ibm/1.4_gcc
+	size_t total=-1,used=-1,free=-1,buffers=-1, cached=-1;
+	memusage(&total, &used, &free, &buffers, &cached);	
+	printf("MEM: avail: %ld , used: %ld , free: %ld , buffers: %ld , file cache: %ld \n",total,used,free,buffers, cached);
+	*/
 
-	//--------------------------------------------
+	//---------------------------------------------------------------------------------
 	//
-	// get the partition and metrics
+	// start main for loop for all tools
 	//
 	
-	// the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
-	struct Metrics metrics(1);
+	for( int t=0; t<allTools.size(); t++){
+		
+		std::string thisTool = allTools[t];
 	
-    // uniform node weights
-    scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
-	
-	settings.repeatTimes = 5;
-	
-	DenseVector<IndexType> partitionKway = ITI::Wrappers<IndexType,ValueType>::metisWrapper ( graph, coords, nodeWeights, parMetisGeom, settings, metrics);
-	
-	//DenseVector<IndexType> partitionKway = ITI::Wrappers<IndexType,ValueType>::zoltanWrapper ( graph, coords, nodeWeights, zoltanAlgo, settings, metrics);
-	
-	//metrics.timeFinalPartition = avgKwayTime;
-	PRINT0("time for partition: " <<  metrics.timeFinalPartition );
-	
-	
-    metrics.getMetrics( graph, partitionKway, nodeWeights, settings );
-    
-        
-    //---------------------------------------------------------------
-    //
-    // Reporting output to std::cout
-    //
-    
-    char machineChar[255];
-    std::string machine;
-    gethostname(machineChar, 255);
-    if (machineChar) {
-        machine = std::string(machineChar);
-    }
-    
-    if(comm->getRank()==0){
-		std::cout << "Running " << __FILE__ << std::endl;
-        if( vm.count("generate") ){
-            std::cout << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon;
-        }else{
-            std::cout << std::endl << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon;
-        }
-        std::cout << "\033[1;36m";
-        
-        if( parMetisGeom ){
-            std::cout << std::endl << "ParMETIS_V3_PartGeomKway: "<< std::endl;
-        }else{
-            std::cout << std::endl << "ParMETIS_V3_PartKway: " << std::endl;
-        }
-        std::cout<<  " \033[0m" << std::endl;
-
-        metrics.print( std::cout );
-        
-        // write in a file
-        if( settings.outFile!="-" ){
-            std::ofstream outF( settings.outFile, std::ios::out);
-            if(outF.is_open()){
-				outF << "Running " << __FILE__ << std::endl;
-                if( vm.count("generate") ){
-                    outF << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
-                }else{
-                    outF << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
-                }
-
-                //metrics.print( outF ); 
-				printMetricsShort( metrics, outF);
-                std::cout<< "Output information written to file " << settings.outFile << std::endl;
-            }else{
-                std::cout<< "Could not open file " << settings.outFile << " informations not stored"<< std::endl;
-            }       
-        }
-    }
-    
-    // the code below writes the output coordinates in one file per processor for visualization purposes.
-    //=================
-
-    // WARNING: the function writePartitionCentral redistributes the coordinates
-    if( writePartition ){
-        if( parMetisGeom ){    
-            std::cout<<" write partition" << std::endl;
-            ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partitionKway, settings.outFile+"_parMetisGeom_k_"+std::to_string(settings.numBlocks)+".partition");    
-        }else{
-            std::cout<<" write partition" << std::endl;
-            ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partitionKway, settings.outFile+"_parMetisGraph_k_"+std::to_string(settings.numBlocks)+".partition");    
-        }
-    }
-
-    //settings.writeDebugCoordinates = 0;
-    if (settings.writeDebugCoordinates and parMetisGeom) {
-        scai::dmemo::DistributionPtr metisDistributionPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partitionKway.getDistribution(), partitionKway.getLocalValues() ) );
-        scai::dmemo::Redistributor prepareRedist(metisDistributionPtr, coords[0].getDistributionPtr());
-        
-		for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-			SCAI_ASSERT_EQ_ERROR( coords[dim].size(), N, "Wrong coordinates size for coord "<< dim);
-			coords[dim].redistribute( prepareRedist );
+		// get the partition and metrics
+		//
+		scai::lama::DenseVector<IndexType> partition;
+		
+		// the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
+		struct Metrics metrics(1);
+		metrics.numBlocks = settings.numBlocks;
+		
+		// uniform node weights
+		scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
+		
+		settings.repeatTimes = 5;
+		int parMetisGeom=0	;
+		
+		//WARNING: in order for the SaGa scripts to work this must be done as in Saga/header.py::outFileSting
+		//create the outFile for this tool
+		//settings.outFile = outPath+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ thisTool + ".info";
+		if( storeInfo){
+			settings.outFile = outPath+ thisTool+"/"+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ thisTool + ".info";
+		}else{
+			settings.outFile ="-";
 		}
-        
-        std::string destPath;
-        if( parMetisGeom){
-            destPath = "partResults/parMetisGeom/blocks_" + std::to_string(settings.numBlocks) ;
-        }else{
-            destPath = "partResults/parMetis/blocks_" + std::to_string(settings.numBlocks) ;
-        }
-        boost::filesystem::create_directories( destPath );   		
-		ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coords, N, settings.dimensions, destPath + "/metisResult");
-    }
-	        
+		//PRINT0( "\n" << settings.outFile << "\n");
+		{
+			std::ifstream f(settings.outFile);
+			if( f.good() and storeInfo ){
+				comm->synchronize();	// maybe not needed
+				PRINT0("\n\tWARNING: File " << settings.outFile << " allready exists. Skipping partition with " << thisTool);
+				continue;
+			}
+		}
+		
+		if( thisTool.substr(0,8)=="parMetis"){
+			if 		( thisTool=="parMetisGraph"){	parMetisGeom = 0;	}
+			else if ( thisTool=="parMetisGeom"){	parMetisGeom = 1;	}
+			else if	( thisTool=="parMetisSfc"){		parMetisGeom = 2;	}
+			
+			partition = ITI::Wrappers<IndexType,ValueType>::metisWrapper ( graph, coords, nodeWeights, parMetisGeom, settings, metrics);
+		}else if (thisTool.substr(0,6)=="zoltan"){
+			std::string algo;
+			if		( thisTool=="zoltanRcb"){	algo = "rcb";	}
+			else if ( thisTool=="zoltanRib"){	algo = "rib";	}
+			else if ( thisTool=="zoltanMJ"){	algo = "multijagged";}
+			else if ( thisTool=="zoltanHsfc"){	algo = "hsfc";	}
+			
+			partition = ITI::Wrappers<IndexType,ValueType>::zoltanWrapper ( graph, coords, nodeWeights, algo, settings, metrics);
+		}else{
+			std::cout<< "Tool "<< thisTool <<" not supported.\nAborting..."<<std::endl;
+			return -1;
+		}
+		
+		PRINT0("time to get the partition: " <<  metrics.timeFinalPartition );
+		
+		metrics.getMetrics( graph, partition, nodeWeights, settings );
+		
+		//---------------------------------------------------------------
+		//
+		// Reporting output to std::cout
+		//
+		
+		char machineChar[255];
+		std::string machine;
+		gethostname(machineChar, 255);
+		if (machineChar) {
+			machine = std::string(machineChar);
+		}
+		
+		if( thisPE==0 ){
+			std::cout << "Finished tool" << thisTool << std::endl;
+			if( vm.count("generate") ){
+				std::cout << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon;
+			}else{
+				std::cout << std::endl << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon;
+			}
+			std::cout << "\033[1;36m";
+			std::cout << "\n >>>> " << thisTool;
+			std::cout<<  "\033[0m" << std::endl;
+
+			printMetricsShort( metrics, std::cout);
+			
+			// write in a file
+			if( settings.outFile!="-" ){
+				std::ofstream outF( settings.outFile, std::ios::out);
+				if(outF.is_open()){
+					outF << "Running " << __FILE__ << " for tool " << thisTool << std::endl;
+					if( vm.count("generate") ){
+						outF << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
+					}else{
+						outF << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
+					}
+
+					//metrics.print( outF ); 
+					printMetricsShort( metrics, outF);
+					std::cout<< "Output information written to file " << settings.outFile << std::endl;
+				}else{
+					std::cout<< "\n\tWARNING: Could not open file " << settings.outFile << " informations not stored.\n"<< std::endl;
+				}       
+			}
+		}
+/*		
+memusage(&total, &used, &free, &buffers, &cached);	
+printf("\nMEM: avail: %ld , used: %ld , free: %ld , buffers: %ld , file cache: %ld \n\n",total,used,free,buffers, cached);
+*/		
+	} // for allTools.size()
+     
+	std::chrono::duration<ValueType> totalTimeLocal = std::chrono::system_clock::now() - startTime;
+	ValueType totalTime = comm->max( totalTimeLocal.count() );
+	if( thisPE==0 ){
+		std::cout<<"Exiting file " << __FILE__ << " , total time= " << totalTime <<  std::endl;
+	}
     //this is needed for supermuc
     std::exit(0);   
 	

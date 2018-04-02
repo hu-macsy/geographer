@@ -19,9 +19,13 @@
 #include <memory>
 #include <cstdlib>
 #include <chrono>
+#include <time.h>
+#include <algorithm>
+#include <stdlib.h>
 
 #include "MeshGenerator.h"
 #include "FileIO.h"
+#include "Diffusion.h"
 #include "ParcoRepart.h"
 #include "Settings.h"
 #include "Metrics.h"
@@ -31,6 +35,7 @@
 #include "MultiSection.h"
 #include "KMeans.h"
 #include "GraphUtils.h"
+#include "Wrappers.h"
 
 /**
  *  Examples of use:
@@ -96,8 +101,8 @@ int main(int argc, char** argv) {
         //ITI::Format ff = ITI::Format::METIS;
         std::string blockSizesFile;
         bool writePartition = false;
-        
-		//std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+        IndexType repeatTimes = 1;
+		IndexType partAlgo = 0;
 		
         desc.add_options()
             ("help", "display options")
@@ -114,7 +119,10 @@ int main(int argc, char** argv) {
             ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
             ("minBorderNodes", value<IndexType>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
             ("stopAfterNoGainRounds", value<IndexType>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
-            ("initialPartition",  value<InitialPartitioningMethods> (&settings.initialPartition), "Parameter for different initial partition: 0 or 'SFC' for the hilbert space filling curve, 1 or 'Pixel' for the pixeled method, 2 or 'Spectral' for spectral parition, 3 or 'KMeans' for Kmeans and 4 or 'MultiSection' for Multisection")
+            //("initialPartition",  value<InitialPartitioningMethods> (&settings.initialPartition), "Parameter for different initial partition: 0 or 'SFC' for the hilbert space filling curve, 1 or 'Pixel' for the pixeled method, 2 or 'Spectral' for spectral parition, 3 or 'KMeans' for Kmeans and 4 or 'MultiSection' for Multisection")
+			
+			("partAlgo", value<IndexType>(&partAlgo),"The algorithm to be used for partitioning")
+			
             ("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
             ("cutsPerDim", value<std::vector<IndexType>>(&settings.cutsPerDim)->multitoken(), "If msOption=2, then provide d values that define the number of cuts per dimension.")
             ("pixeledSideLen", value<IndexType>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
@@ -124,6 +132,7 @@ int main(int argc, char** argv) {
             ("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
             ("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
             ("multiLevelRounds", value<IndexType>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
+			("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the SpMV process.")
             ("blockSizesFile", value<std::string>(&blockSizesFile) , " file to read the block sizes for every block")
             ("writePartition", "Writes the partition in the outFile.partition file")
             ("outFile", value<std::string>(&settings.outFile), "write result partition into file")
@@ -191,7 +200,7 @@ int main(int argc, char** argv) {
          */
         std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
         
-        if ( thisPE == 0){
+        if ( thisPE== 0){
             std::string inputstring;
             if (vm.count("graphFile")) {
 				inputstring = vm["graphFile"].as<std::string>();
@@ -206,7 +215,7 @@ int main(int argc, char** argv) {
     std::string graphFile;
 	
     if (vm.count("graphFile")) {
-        if ( thisPE== 0){
+        if ( thisPE == 0){
             std::cout<< "input: graphFile" << std::endl;
         }
     	graphFile = vm["graphFile"].as<std::string>();
@@ -223,7 +232,7 @@ int main(int argc, char** argv) {
             throw std::runtime_error("File "+ graphFile + " failed.");
         }
         
-        if ( thisPE == 0)
+        if ( thisPE== 0)
         {
             std::cout<< "Reading from file \""<< graphFile << "\" for the graph and \"" << coordFile << "\" for coordinates"<< std::endl;
             std::cout<< "File format: " << settings.fileFormat << std::endl;
@@ -260,7 +269,7 @@ int main(int argc, char** argv) {
         scai::hmemo::HArray<ValueType> localWeights( rowDistPtr->getLocalSize(), 1 );
         nodeWeights.swap( localWeights, rowDistPtr );
 
-        if (thisPE== 0) {
+        if (comm->getRank() == 0) {
             std::cout << "Read " << N << " points." << std::endl;
             std::cout << "Read coordinates." << std::endl;
             std::cout << "On average there are about " << N/comm->getSize() << " points per PE."<<std::endl;
@@ -268,7 +277,7 @@ int main(int argc, char** argv) {
 
     }
     else if(vm.count("generate")){
-        if ( thisPE == 0){
+        if (thisPE==0){
             std::cout<< "input: generate" << std::endl;
         }
         if (settings.dimensions == 2) {
@@ -308,7 +317,7 @@ int main(int argc, char** argv) {
         IndexType nodes= graph.getNumRows();
         IndexType edges= graph.getNumValues()/2;	
         
-        if( thisPE==0 ){
+        if(comm->getRank()==0){
             std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
         }
         
@@ -337,7 +346,8 @@ int main(int argc, char** argv) {
         settings.numBlocks = comm->getSize();
     }
     
-    //----------
+    PRINT0("Got input");
+    //------------------------------------------------------------------------------------------
     
     scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
     scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
@@ -349,7 +359,6 @@ int main(int argc, char** argv) {
     settings.useGeometricTieBreaking = IndexType(1);
     settings.pixeledSideLen = IndexType ( std::min(settings.numBlocks, IndexType(100) ) );
     
-	/*
     std::string destPath = "./partResults/testInitial/blocks_"+std::to_string(settings.numBlocks)+"/";
     boost::filesystem::create_directories( destPath );   
     
@@ -357,7 +366,7 @@ int main(int argc, char** argv) {
     std::string logFile = destPath + "results_" + graphFile.substr(found+1)+ ".log";
     std::ofstream logF(logFile);
     std::ifstream f(graphFile);
-    */
+    
     
     settings.print( std::cout , comm );
         
@@ -379,8 +388,15 @@ int main(int argc, char** argv) {
     IndexType initialPartition = static_cast<IndexType> (settings.initialPartition);
     
     comm->synchronize();
+	
+	struct Metrics metrics(1);
+	
+	//----------------------------------------------------------------
+	//
+	// partition with the chosen algorithm
+	//
     
-    switch( initialPartition ){
+    switch( partAlgo ){	
         case 0:{  //------------------------------------------- hilbert/sfc
            
             beforeInitialTime =  std::chrono::system_clock::now();
@@ -403,6 +419,10 @@ int main(int argc, char** argv) {
         case 1:{  //------------------------------------------- pixeled
   
             beforeInitialTime =  std::chrono::system_clock::now();
+			
+			settings.pixeledSideLen = std::pow(2, dimensions)*k;
+			
+			
             PRINT0( "Get a pixeled partition");
             
             // get a pixelPartition
@@ -448,22 +468,14 @@ int main(int argc, char** argv) {
 				coordinateCopy[d].redistribute( tempResult.getDistributionPtr() );
 			}
 			//
-			int repeatTimes = 5;
 			beforeInitialTime =  std::chrono::system_clock::now();
 
-			for(int r=0 ; r< repeatTimes; r++){
-				std::chrono::time_point<std::chrono::system_clock> beforeTmp = std::chrono::system_clock::now();
-				partition = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeights, blockSizes, settings);     
-				std::chrono::duration<double> thisPartitionTime = std::chrono::system_clock::now() - beforeTmp;
-				ValueType time  = comm->max( thisPartitionTime.count() );
-				PRINT0("Time for run " << r << " is " << time);
-			}
+			partition = ITI::KMeans::computePartition(coordinateCopy, settings.numBlocks, nodeWeights, blockSizes, settings);      
 				
-			partitionTime =  (std::chrono::system_clock::now() - beforeInitialTime)/repeatTimes;
+			partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
 				
 			// must repartition graph according to the new partition/distribution
-			graph.redistribute( partition.getDistributionPtr() , noDistPtr );
-            rowDistPtr = graph.getRowDistributionPtr();
+			//graph.redistribute( partition.getDistributionPtr() , noDistPtr );
 			
             assert( partition.size() == N);
             assert( coordinates[0].size() == N);
@@ -488,18 +500,123 @@ int main(int argc, char** argv) {
             assert( coordinates[0].size() == N);
             break;   
         }
+		case 5 : { 	//--------------------------------------- parmetis
+			
+			int parMetisGeom = 0; 		//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
+			settings.repeatTimes = 1;
+			
+			beforeInitialTime =  std::chrono::system_clock::now();
+			// get parMetis parition
+			partition = ITI::Wrappers<IndexType,ValueType>::metisWrapper ( graph, coordinates, nodeWeights, parMetisGeom, settings, metrics);
+			partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
+			
+			//settings.repeatTimes = repeatTimes;
+			
+			break;
+		}
+		case 6:{
+			settings.repeatTimes = 1;
+			//TODO: fix to get algo as an input parameter
+			std::string zoltanAlgo = "rcb";
+			beforeInitialTime =  std::chrono::system_clock::now();
+			// get zoltan parition
+			partition = ITI::Wrappers<IndexType,ValueType>::zoltanWrapper ( graph, coordinates, nodeWeights, zoltanAlgo, settings, metrics);
+			partitionTime =  std::chrono::system_clock::now() - beforeInitialTime;
+			
+			break;
+		}
         default:{
             PRINT0("Value "<< initialPartition << " for option initialPartition not supported" );
             break;
         }
     }
     
+    ValueType time = 0;
+	
+	time = comm->max( partitionTime.count() );
+	PRINT0("time to convert data and get partition: " << time);
+
+	//get the distribution from the partition
+	scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
+	
+	std::chrono::time_point<std::chrono::system_clock> beforeRedistribution;
+	//
+	// redistribute according to the new distribution
+	//
+	//WARNING: is this needed or not???
+	graph.redistribute( distFromPartition, graph.getColDistributionPtr());
+	partition.redistribute( distFromPartition );
+	nodeWeights.redistribute( distFromPartition );
+	//TODO: redistribute also coordinates?	probably not needed	
+	
+	std::chrono::duration<double> redistributionTime =  std::chrono::system_clock::now() - beforeRedistribution;
+	
+	time = comm->max( redistributionTime.count() );
+	PRINT0("time to redistribute: " << time);
+	
+	rowDistPtr = graph.getRowDistributionPtr();
+	
+	
+	//----------------------------------------------------------------
+    //
+    // perform the SpMV
+    //
+    
+    
+    // the graph is distributed here based on the algorithm we chose
+    IndexType localN = rowDistPtr->getLocalSize();
+	PRINT(" localN for "<< thisPE << " = " << localN);
+	
+	std::chrono::time_point<std::chrono::system_clock> beforeLaplacian = std::chrono::system_clock::now();
+	
+    // the laplacian has the same row and column distributios as the (now partitioned) graph
+	
+    scai::lama::CSRSparseMatrix<ValueType> laplacian = SpectralPartition<IndexType, ValueType>::getLaplacian( graph );
+	//scai::lama::CSRSparseMatrix<ValueType> laplacian = Diffusion<IndexType, ValueType>::constructLaplacian( graph );
+
+	SCAI_ASSERT( laplacian.getRowDistributionPtr()->isEqual( graph.getRowDistribution() ), "Row distributions do not agree" );
+	SCAI_ASSERT( laplacian.getColDistributionPtr()->isEqual( graph.getColDistribution() ), "Column distributions do not agree" );
+	
+	std::chrono::duration<ValueType> laplacianTime = std::chrono::system_clock::now() - beforeLaplacian;
+	time = comm->max(laplacianTime.count());
+	PRINT0("time to get the laplacian: " << time );
+	
+		
+	// vector for multiplication
+	scai::lama::DenseVector<ValueType> x ( graph.getColDistributionPtr(), 3.3 );
+	//graph.purge();
+	
+	// perfom the actual multiplication
+	std::chrono::time_point<std::chrono::system_clock> beforeSpMVTime = std::chrono::system_clock::now();
+	for(IndexType r=0; r<repeatTimes; r++){
+		DenseVector<ValueType> result( laplacian * x );
+		//DenseVector<ValueType> result( graph * x );
+	}
+	std::chrono::duration<ValueType> SpMVTime = std::chrono::system_clock::now() - beforeSpMVTime;
+	PRINT(" SpMV time for PE "<< thisPE << " = " << SpMVTime.count() );
+	
+	time = comm->max(SpMVTime.count());
+	PRINT0("time for " << repeatTimes <<" SpMVs: " << time );
+	
+	/*
+	for(int i=0; i<localN; i++){
+		PRINT(*comm << ": " << rowDistPtr->local2global(i) );
+	}
+    */
+	
+	
+	ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
+	
+	if( thisPE==0 )
+		std::cout<<"imbalance = " << imbalance << std::endl;
+	
+	/*
     //
     // Get metrics
     //
     
-    struct Metrics metrics(1);
-	metrics.numBlocks = settings.numBlocks;
+    
+    
 	
 	metrics.timeFinalPartition = comm->max( partitionTime.count() );
 	metrics.getMetrics( graph, partition, nodeWeights, settings );
@@ -508,7 +625,7 @@ int main(int argc, char** argv) {
     // Reporting output to std::cout and/or outFile
 	//
 	
-    if ( thisPE == 0) {
+    if (comm->getRank() == 0) {
 		//metrics.print( std::cout );
 		std::cout << "Running " << __FILE__ << std::endl;
 		printMetricsShort( metrics, std::cout);
@@ -523,7 +640,7 @@ int main(int argc, char** argv) {
                     outF << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
                 }
                 settings.print( outF, comm );
-
+                //outF << "numBlocks= " << settings.numBlocks << std::endl;
                 //metrics.print( outF ); 
 				printMetricsShort( metrics, outF);
                 std::cout<< "Output information written to file " << settings.outFile << std::endl;
@@ -533,54 +650,8 @@ int main(int argc, char** argv) {
 		}
 		
     }
-    
-    // the code below writes the output coordinates in one file per processor for visualization purposes.
-    //=================
-    
-    if (settings.writeDebugCoordinates) {
-        
-        if(comm->getSize() != k){
-            PRINT("Cannot print local coords into file as numBlocks must be equal numPEs.");
-            return 0;
-        }
-        /**
-         * redistribute so each PE writes its block
-         */
-        scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( *rowDistPtr, partition.getLocalValues() ) );
-        assert(newDist->getGlobalSize() == N);
-        partition.redistribute( newDist);
-        
-        for (IndexType d = 0; d < dimensions; d++) {
-            coordinates[d].redistribute(newDist);  
-            assert( coordinates[d].size() == N);
-            assert( coordinates[d].getLocalValues().size() == newDist->getLocalSize() );
-        }
-
-        std::string destPath = "partResults/testInitial_"+std::to_string(initialPartition) +"/blocks_" + std::to_string(settings.numBlocks) ;
-        
-        boost::filesystem::create_directories( destPath );   
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, destPath + "/debugResult");
-    }
-    
-    if( writePartition ){
-        std::string partOutFile;
-        if( settings.outFile!="-" ){
-            partOutFile = settings.outFile + ".partition";
-        }else if( vm.count("graphFile") ){
-            partOutFile = graphFile + ".partition";
-        }else if( vm.count("generate") ){
-            partOutFile = "generate_"+ std::to_string(settings.numX)+ ".partition";
-        }
-        // write partition in file
-        ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partition, partOutFile );        
-    }
-    
-    std::chrono::duration<ValueType> totalTimeLocal = std::chrono::system_clock::now() - startTime;
-	ValueType totalTime = comm->max( totalTimeLocal.count() );
-	if( thisPE==0 ){
-		std::cout<<"Exiting file " << __FILE__ << " , total time= " << totalTime <<  std::endl;
-	}
-	
+	*/
+    MPI_Finalize();
     std::exit(0);
 	return 0;
 }

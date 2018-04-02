@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <numeric>
-
+#include <math.h>
 #include <scai/lama.hpp>
+#include <chrono>
+
 #include "GraphUtils.h"
 
 struct Metrics{
@@ -17,11 +19,12 @@ struct Metrics{
     std::vector<ValueType>  timeSecondDistribution;
     std::vector<ValueType>  timePreliminary;
     
-
-    ValueType inputTime;
-    ValueType timeFinalPartition;
-    ValueType reportTime;
-    ValueType timeTotal;
+    ValueType inputTime = -1;
+    ValueType timeFinalPartition = -1;
+    ValueType reportTime = -1 ;
+    ValueType timeTotal = -1;
+	ValueType timeSpMV = -1;
+	ValueType timeComm = -1;
     
     //metrics, each for every time we repeat the algo
     //
@@ -42,6 +45,8 @@ struct Metrics{
     IndexType maxBlockDiameter = 0;
     IndexType avgBlockDiameter = 0;
 
+	// various other needed info
+	IndexType numBlocks = -1;
     
     //constructor
     Metrics( IndexType k = 1) {
@@ -104,9 +109,9 @@ struct Metrics{
         out << maxBlockDiameter << ", ";
         out << avgBlockDiameter << ", ";
 
-        out << std::setprecision(6) << std::fixed;
-        //out << maxBorderNodesPercent << ", ";
-        //out << avgBorderNodesPercent << ", ";
+        out << std::setprecision(8) << std::fixed;
+        out << timeSpMV << ", ";
+        out << timeComm << ", ";
         out << std::endl;
 
         out.precision(oldprecision);
@@ -127,25 +132,36 @@ struct Metrics{
         totalBlockGraphEdges = -1;
 
         // communication volume
-        std::vector<IndexType> commVolume = ITI::GraphUtils::computeCommVolume( graph, partition );
-        
+        //std::vector<IndexType> commVolume = ITI::GraphUtils::computeCommVolume( graph, partition, settings.numBlocks);
+		// 3 vector each of size numBlocks
+        std::vector<IndexType> commVolume;
+        std::vector<IndexType> numBorderNodesPerBlock;  
+        std::vector<IndexType> numInnerNodesPerBlock;
+		
+		// TODO: can re returned in an auto, check if it is faster
+		// it is a bit uglier but saves time
+		std::tie( commVolume, numBorderNodesPerBlock, numInnerNodesPerBlock ) = \
+				 ITI::GraphUtils::computeCommBndInner( graph, partition, settings.numBlocks );
+		
         maxCommVolume = *std::max_element( commVolume.begin(), commVolume.end() );
         totalCommVolume = std::accumulate( commVolume.begin(), commVolume.end(), 0 );
         
-        // 2 vectors of size k
-        std::vector<IndexType> numBorderNodesPerBlock;  
-        std::vector<IndexType> numInnerNodesPerBlock;
-        
-        std::tie( numBorderNodesPerBlock, numInnerNodesPerBlock ) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition);
+        //std::tie( numBorderNodesPerBlock, numInnerNodesPerBlock ) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition, settings);
         
         //TODO: are num of boundary nodes needed ????         
         maxBoundaryNodes = *std::max_element( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end() );
         totalBoundaryNodes = std::accumulate( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end(), 0 );
         
         std::vector<ValueType> percentBorderNodesPerBlock( settings.numBlocks, 0);
-    
+		SCAI_ASSERT_EQ_ERROR( settings.numBlocks, numBorderNodesPerBlock.size(), "Vector size mismatch.");
+		SCAI_ASSERT_EQ_ERROR( settings.numBlocks, numInnerNodesPerBlock.size(), "Vector size mismatch.");
+		
         for(IndexType i=0; i<settings.numBlocks; i++){
             percentBorderNodesPerBlock[i] = (ValueType (numBorderNodesPerBlock[i]))/(numBorderNodesPerBlock[i]+numInnerNodesPerBlock[i]);
+			if( std::isnan(percentBorderNodesPerBlock[i]) ){
+					PRINT("\n\t\t\t WARNING: found NaN value for percentBnd for block " << i <<", probably is has no vertices.\n\n");
+			}
+			//PRINT( percentBorderNodesPerBlock[i] );
         }
         
         maxBorderNodesPercent = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
@@ -178,6 +194,430 @@ struct Metrics{
 
         }
 
+        if (settings.numBlocks == comm->getSize()) {
+            int numIter = 100;
+            timeSpMV = getSpMVtime( graph, partition, numIter)/numIter;
 
+            timeComm = getCommScheduleTime( graph, partition, numIter)/numIter;
+        }
     }
+    
+    
+	ValueType getSpMVtime( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, const IndexType repeatTimes ){
+	
+		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		const IndexType N = graph.getNumRows();
+		
+		PRINT0("starting SpMV...");
+		
+		// the original row and  column distributions
+		const scai::dmemo::DistributionPtr initRowDistPtr = graph.getRowDistributionPtr();
+		const scai::dmemo::DistributionPtr initColDistPtr = graph.getColDistributionPtr();
+		
+		//get the distribution from the partition
+		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
+		
+		std::chrono::time_point<std::chrono::system_clock> beforeRedistribution = std::chrono::system_clock::now();
+		// redistribute graph according to partition distribution
+		//graph.redistribute( distFromPartition, initColDistPtr);
+		graph.redistribute( distFromPartition, distFromPartition);		
+		
+		std::chrono::duration<ValueType> redistributionTime =  std::chrono::system_clock::now() - beforeRedistribution;
+		
+		ValueType time = 0;
+		time = comm->max( redistributionTime.count() );
+		PRINT0("time to redistribute: " << time);		
+		
+		const IndexType localN = distFromPartition->getLocalSize();
+		SCAI_ASSERT_EQ_ERROR( localN, graph.getLocalNumRows(), "Distribution mismatch")
+		
+		const IndexType maxLocalN = comm->max(localN);
+		const IndexType minLocalN = comm->min(localN);
+		const ValueType optSize = ValueType(N)/comm->getSize();
+		
+		ValueType imbalance = ValueType( maxLocalN - optSize)/optSize;
+		PRINT0("minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", imbalance= " << imbalance);
+		
+		// get the SpMV 
+		
+		// vector for multiplication
+		scai::lama::DenseVector<ValueType> x ( graph.getColDistributionPtr(), 1.0 );
+		scai::lama::DenseVector<ValueType> y ( graph.getRowDistributionPtr(), 0.0 );
+		graph.setCommunicationKind( scai::lama::Matrix::SyncKind::SYNCHRONOUS );
+		comm->synchronize();
+		// perfom the actual multiplication
+		std::chrono::time_point<std::chrono::system_clock> beforeSpMVTime = std::chrono::system_clock::now();
+		for(IndexType r=0; r<repeatTimes; r++){
+			//y = laplacian *x +y;
+			y = graph *x +y;
+		}
+		comm->synchronize();
+		std::chrono::duration<ValueType> SpMVTime = std::chrono::system_clock::now() - beforeSpMVTime;
+		//PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
+		
+		time = comm->max(SpMVTime.count());
+		ValueType minTime = comm->min( SpMVTime.count() );
+		PRINT0("max time for " << repeatTimes <<" SpMVs: " << time << " , min time " << minTime);
+	
+		//redistibute back to initial distributions
+		graph.redistribute( initRowDistPtr, initColDistPtr );
+		
+		return time;
+	}
+
+	ValueType getCommScheduleTime( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, const IndexType repeatTimes){
+			
+		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		const IndexType N = graph.getNumRows();
+		
+		PRINT0("starting comm shcedule...");
+		
+		// the original row and  column distributions
+		const scai::dmemo::DistributionPtr initRowDistPtr = graph.getRowDistributionPtr();
+		const scai::dmemo::DistributionPtr initColDistPtr = graph.getColDistributionPtr();
+		
+		//get the distribution from the partition
+		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
+		
+		std::chrono::time_point<std::chrono::system_clock> beforeRedistribution = std::chrono::system_clock::now();
+		// redistribute graph according to partition distribution
+		//graph.redistribute( distFromPartition, initColDistPtr);
+		graph.redistribute( distFromPartition, distFromPartition);
+		std::chrono::duration<ValueType> redistributionTime =  std::chrono::system_clock::now() - beforeRedistribution;
+		
+		ValueType time = 0;
+		time = comm->max( redistributionTime.count() );
+		PRINT0("time to redistribute: " << time);
+	
+		const IndexType localN = distFromPartition->getLocalSize();
+		SCAI_ASSERT_EQ_ERROR( localN, graph.getLocalNumRows(), "Distribution mismatch")
+		
+		const IndexType maxLocalN = comm->max(localN);
+		const IndexType minLocalN = comm->min(localN);
+		const ValueType optSize = ValueType(N)/comm->getSize();
+		
+		ValueType imbalance = ValueType( maxLocalN - optSize)/optSize;
+		PRINT0("minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", imbalance= " << imbalance);
+		
+		const scai::dmemo::Halo& matrixHalo = graph.getHalo();
+		const scai::dmemo::CommunicationPlan& sendPlan  = matrixHalo.getProvidesPlan();
+		const scai::dmemo::CommunicationPlan& recvPlan  = matrixHalo.getRequiredPlan();
+		
+//PRINT(*comm << ": " << 	sendPlan.size() << " ++ " << sendPlan << " ___ " << recvPlan);
+		scai::hmemo::HArray<ValueType> sendData( sendPlan.totalQuantity(), 1.0 );
+		scai::hmemo::HArray<ValueType> recvData;
+		
+		comm->synchronize();
+		std::chrono::time_point<std::chrono::system_clock> beforeCommTime = std::chrono::system_clock::now();
+		for ( IndexType i = 0; i < repeatTimes; ++i ){
+			comm->exchangeByPlan( recvData, recvPlan, sendData, sendPlan );
+		}
+		//comm->synchronize();
+		std::chrono::duration<ValueType> commTime = std::chrono::system_clock::now() - beforeCommTime;
+		
+//PRINT(*comm << ": "<< sendPlan );		
+		time = comm->max(commTime.count());
+		
+		ValueType minTime = comm->min( commTime.count() );
+		PRINT0("max time for " << repeatTimes <<" communications: " << time << " , min time " << minTime);
+	
+		//redistibute back to initial distributions
+		graph.redistribute( initRowDistPtr, initColDistPtr );
+		
+		return time;
+	}
+
 };
+
+//------------------------------------------------------------------------------------------------------------
+
+inline void printMetricsShort(struct Metrics metrics, std::ostream& out){
+	
+	std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
+	std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
+	out << "date and time: " << std::ctime(&timeNow) << std::endl;
+	out << "numBlocks= " << metrics.numBlocks << std::endl;
+	out << "gather" << std::endl;
+	out << "timeTotal finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm" << std::endl;
+    out << metrics.timeFinalPartition<< " " \
+		<< metrics.finalCut << " "\
+		<< metrics.finalImbalance << " "\
+		<< metrics.maxBoundaryNodes << " "\
+		<< metrics.totalBoundaryNodes << " "\
+		<< metrics.maxCommVolume << " "\
+		<< metrics.totalCommVolume << " ";
+	out << std::setprecision(8) << std::fixed;
+	out << metrics.maxBorderNodesPercent << " " \
+		<< metrics.avgBorderNodesPercent << " " \
+		<< metrics.timeSpMV << " "\
+		<< metrics.timeComm \
+		<< std::endl; 
+}
+
+//-------------------------------------------------------------------------------------------------------------
+
+
+inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::ostream& out){
+    
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    
+    IndexType numRuns = metricsVec.size();
+    
+    if( comm->getRank()==0 ){
+		std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
+		std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
+		out << "date and time: " << std::ctime(&timeNow) << std::endl;
+		out << "numBlocks= " << metricsVec[0].numBlocks << std::endl;
+        out << "# times, input, migrAlgo, 1distr, kmeans, 2redis, prelim, localRef, total,    prel cut, finalcut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg   timeSpMV timeComm" << std::endl;
+    }
+
+    ValueType sumMigrAlgo = 0;
+    ValueType sumFirstDistr = 0;
+    ValueType sumKmeans = 0;
+    ValueType sumSecondDistr = 0;
+    ValueType sumPrelimanry = 0; 
+    ValueType sumLocalRef = 0; 
+    ValueType sumFinalTime = 0;
+    
+    IndexType sumPreliminaryCut = 0;
+    IndexType sumFinalCut = 0;
+    ValueType sumImbalace = 0;
+    IndexType sumMaxBnd = 0;
+    IndexType sumTotBnd = 0;
+    IndexType sumMaxCommVol = 0;
+    IndexType sumTotCommVol = 0;
+    IndexType maxBoundaryNodes = 0;
+    IndexType totalBoundaryNodes = 0;
+    ValueType sumMaxBorderNodesPerc = 0;
+    ValueType sumAvgBorderNodesPerc = 0;
+
+	ValueType sumTimeSpMV = 0;
+	ValueType sumTimeComm = 0;
+	
+    for(IndexType run=0; run<numRuns; run++){
+        Metrics thisMetric = metricsVec[ run ];
+        
+        SCAI_ASSERT_EQ_ERROR(thisMetric.timeMigrationAlgo.size(), comm->getSize(), "Wrong vector size" );
+        
+        // for these time we have one measurement per PE and must make a max
+        ValueType maxTimeMigrationAlgo = *std::max_element( thisMetric.timeMigrationAlgo.begin(), thisMetric.timeMigrationAlgo.end() );
+        ValueType maxTimeFirstDistribution = *std::max_element( thisMetric.timeFirstDistribution.begin(), thisMetric.timeFirstDistribution.end() );
+        ValueType maxTimeKmeans = *std::max_element( thisMetric.timeKmeans.begin(), thisMetric.timeKmeans.end() );
+        ValueType maxTimeSecondDistribution = *std::max_element( thisMetric.timeSecondDistribution.begin(), thisMetric.timeSecondDistribution.end() );
+        ValueType maxTimePreliminary = *std::max_element( thisMetric.timePreliminary.begin(), thisMetric.timePreliminary.end() );
+        
+        // these times are global, no need to max
+        ValueType timeFinal = thisMetric.timeFinalPartition;
+        ValueType timeLocalRef = timeFinal - maxTimePreliminary;
+        
+        if( comm->getRank()==0 ){
+            out << std::setprecision(2) << std::fixed;
+            out<< run << " ,       "<< thisMetric.inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << ",  "<< timeFinal << " , \t "\
+            << thisMetric.preliminaryCut << ",  "<< thisMetric.finalCut << ",  " << thisMetric.finalImbalance << ",    "  \
+            // << thisMetric.maxBlockGraphDegree << ",  " << thisMetric.totalBlockGraphEdges << " ," 
+            << thisMetric.maxBoundaryNodes << ", " << thisMetric.totalBoundaryNodes << ",    " \
+            << thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << ",    ";
+            out << std::setprecision(8) << std::fixed;
+            out << thisMetric.maxBorderNodesPercent << ",  " << thisMetric.avgBorderNodesPercent<< ", " \
+            << thisMetric.timeSpMV << std::endl;
+        }
+        
+        sumMigrAlgo += maxTimeMigrationAlgo;
+        sumFirstDistr += maxTimeFirstDistribution;
+        sumKmeans += maxTimeKmeans;
+        sumSecondDistr += maxTimeSecondDistribution;
+        sumPrelimanry += maxTimePreliminary;
+        sumLocalRef += timeLocalRef;
+        sumFinalTime += timeFinal;
+        
+        sumPreliminaryCut += thisMetric.preliminaryCut;
+        sumFinalCut += thisMetric.finalCut;
+        sumImbalace += thisMetric.finalImbalance;
+        sumMaxBnd += thisMetric.maxBoundaryNodes  ;
+        sumTotBnd += thisMetric.totalBoundaryNodes ;
+        sumMaxCommVol +=  thisMetric.maxCommVolume;
+        sumTotCommVol += thisMetric.totalCommVolume;
+        sumMaxBorderNodesPerc += thisMetric.maxBorderNodesPercent;
+        sumAvgBorderNodesPerc += thisMetric.avgBorderNodesPercent;
+		
+		sumTimeSpMV += thisMetric.timeSpMV;
+		sumTimeComm += thisMetric.timeComm;
+    }
+    
+    if( comm->getRank()==0 ){
+        out << std::setprecision(2) << std::fixed;
+        out << "average,  "\
+            <<  ValueType (metricsVec[0].inputTime)<< ",  "\
+            <<  ValueType(sumMigrAlgo)/numRuns<< ",  " \
+            <<  ValueType(sumFirstDistr)/numRuns<< ",  " \
+            <<  ValueType(sumKmeans)/numRuns<< ",  " \
+            <<  ValueType(sumSecondDistr)/numRuns<< ",  " \
+            <<  ValueType(sumPrelimanry)/numRuns<< ",  " \
+            <<  ValueType(sumLocalRef)/numRuns<< ",  " \
+            <<  ValueType(sumFinalTime)/numRuns<< ", \t " \
+            <<  ValueType(sumPreliminaryCut)/numRuns<< ",  " \
+            <<  ValueType(sumFinalCut)/numRuns<< ",  " \
+            <<  ValueType(sumImbalace)/numRuns<< ",    " \
+            <<  ValueType(sumMaxBnd)/numRuns<< ",  " \
+            <<  ValueType(sumTotBnd)/numRuns<< ",    " \
+            <<  ValueType(sumMaxCommVol)/numRuns<< ", " \
+            <<  ValueType(sumTotCommVol)/numRuns<< ",    ";
+            out << std::setprecision(8) << std::fixed;
+            out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
+            << ValueType(sumAvgBorderNodesPerc)/numRuns << ", " \
+            << ValueType(sumTimeSpMV)/numRuns << ", " \
+            << ValueType(sumTimeComm)/numRuns \
+            << std::endl;
+            
+        out << std::setprecision(2) << std::fixed;
+        out << "gather" << std::endl;
+        out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm" << std::endl;
+        out <<  ValueType(sumKmeans)/numRuns<< " " \
+            <<  ValueType(sumPrelimanry)/numRuns<< " " \
+            <<  ValueType(sumLocalRef)/numRuns<< " " \
+            <<  ValueType(sumFinalTime)/numRuns<< " " \
+            <<  ValueType(sumPreliminaryCut)/numRuns<< " " \
+            <<  ValueType(sumFinalCut)/numRuns<< " " \
+            <<  ValueType(sumImbalace)/numRuns<< " " \
+            <<  ValueType(sumMaxBnd)/numRuns<< " " \
+            <<  ValueType(sumTotBnd)/numRuns<< " " \
+            <<  ValueType(sumMaxCommVol)/numRuns<< " " \
+            <<  ValueType(sumTotCommVol)/numRuns<< " ";
+            out << std::setprecision(8) << std::fixed;
+            out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< " " \
+            <<  ValueType(sumAvgBorderNodesPerc)/numRuns << " " \
+            << ValueType(sumTimeSpMV)/numRuns << " " \
+            << ValueType(sumTimeComm)/numRuns \
+            << std::endl;        
+    }
+    
+}
+
+
+//-------------------------------------------------------------------------------------------------------------
+
+
+inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, std::ostream& out){
+    
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    
+    IndexType numRuns = metricsVec.size();
+    
+    if( comm->getRank()==0 ){
+		std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
+		std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
+		out << "date and time: " << std::ctime(&timeNow) << std::endl;
+		out << "numBlocks= " << metricsVec[0].numBlocks << std::endl;
+        out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm" << std::endl;
+    }
+
+    //ValueType sumKmeans = 0;
+    //ValueType sumPrelimanry = 0; 
+    //ValueType sumLocalRef = 0; 
+    ValueType sumFinalTime = 0;
+    
+    IndexType sumFinalCut = 0;
+    ValueType sumImbalace = 0;
+    IndexType sumMaxBnd = 0;
+    IndexType sumTotBnd = 0;
+    IndexType sumMaxCommVol = 0;
+    IndexType sumTotCommVol = 0;
+    IndexType maxBoundaryNodes = 0;
+    IndexType totalBoundaryNodes = 0;
+    ValueType sumMaxBorderNodesPerc = 0;
+    ValueType sumAvgBorderNodesPerc = 0;
+	ValueType sumTimeSpMV = 0;
+	ValueType sumTimeComm = 0;
+	
+    for(IndexType run=0; run<numRuns; run++){
+        Metrics thisMetric = metricsVec[ run ];
+        
+        SCAI_ASSERT_EQ_ERROR(thisMetric.timeMigrationAlgo.size(), comm->getSize(), "Wrong vector size" );
+        
+        // for these time we have one measurement per PE and must make a max
+        //ValueType maxTimeKmeans = *std::max_element( thisMetric.timeKmeans.begin(), thisMetric.timeKmeans.end() );
+        //ValueType maxTimeSecondDistribution = *std::max_element( thisMetric.timeSecondDistribution.begin(), thisMetric.timeSecondDistribution.end() );
+        //ValueType maxTimePreliminary = *std::max_element( thisMetric.timePreliminary.begin(), thisMetric.timePreliminary.end() );
+        
+        // these times are global, no need to max
+        //ValueType timeLocalRef = timeFinal - maxTimePreliminary;
+		ValueType timeFinal = thisMetric.timeFinalPartition;
+        
+        if( comm->getRank()==0 ){
+            out << std::setprecision(2) << std::fixed;
+            //out<< run <<  maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << ",  ";
+            out << timeFinal << "  ";
+            //<< thisMetric.preliminaryCut << ",  "
+			out << thisMetric.finalCut << "  " << thisMetric.finalImbalance << "  "  \
+            << thisMetric.maxBoundaryNodes << " " << thisMetric.totalBoundaryNodes << "  " \
+            << thisMetric.maxCommVolume << "  " << thisMetric.totalCommVolume << " ";
+            out << std::setprecision(8) << std::fixed;
+            out << thisMetric.maxBorderNodesPercent << " " << thisMetric.avgBorderNodesPercent << " "\
+            << thisMetric.timeSpMV << " " \
+            << thisMetric.timeComm \
+            << std::endl;
+        }
+        
+        //sumKmeans += maxTimeKmeans;
+        //sumPrelimanry += maxTimePreliminary;
+        //sumLocalRef += timeLocalRef;
+        sumFinalTime += timeFinal;
+        
+        sumFinalCut += thisMetric.finalCut;
+        sumImbalace += thisMetric.finalImbalance;
+        sumMaxBnd += thisMetric.maxBoundaryNodes  ;
+        sumTotBnd += thisMetric.totalBoundaryNodes ;
+        sumMaxCommVol +=  thisMetric.maxCommVolume;
+        sumTotCommVol += thisMetric.totalCommVolume;
+        sumMaxBorderNodesPerc += thisMetric.maxBorderNodesPercent;
+        sumAvgBorderNodesPerc += thisMetric.avgBorderNodesPercent;
+		sumTimeSpMV += thisMetric.timeSpMV;
+		sumTimeComm += thisMetric.timeComm;
+    }
+    
+    if( comm->getRank()==0 ){
+        out << "gather" << std::endl;
+        out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm " << std::endl;
+		
+        out << std::setprecision(2) << std::fixed;
+            //<<  ValueType(sumKmeans)/numRuns<< "  " \
+            //<<  ValueType(sumLocalRef)/numRuns<< ",  "  
+        out <<  ValueType(sumFinalTime)/numRuns<< " " \
+            //<<  ValueType(sumPreliminaryCut)/numRuns<< ",  " 
+            <<  ValueType(sumFinalCut)/numRuns<< " " \
+            <<  ValueType(sumImbalace)/numRuns<< " " \
+            <<  ValueType(sumMaxBnd)/numRuns<< " " \
+            <<  ValueType(sumTotBnd)/numRuns<< " " \
+            <<  ValueType(sumMaxCommVol)/numRuns<< " " \
+            <<  ValueType(sumTotCommVol)/numRuns<< " ";
+            out << std::setprecision(8) << std::fixed;
+            out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< " " \
+            << ValueType(sumAvgBorderNodesPerc)/numRuns  <<" "\
+            << ValueType(sumTimeSpMV)/numRuns << " "\
+            << ValueType(sumTimeComm)/numRuns \
+            << std::endl;
+		
+		
+        
+		/*
+        out <<  ValueType(sumKmeans)/numRuns<< " " \
+            <<  ValueType(sumPrelimanry)/numRuns<< " " \
+            <<  ValueType(sumLocalRef)/numRuns<< " " \
+            <<  ValueType(sumFinalTime)/numRuns<< " " \
+            <<  ValueType(sumPreliminaryCut)/numRuns<< " " \
+            <<  ValueType(sumFinalCut)/numRuns<< " " \
+            <<  ValueType(sumImbalace)/numRuns<< " " \
+            <<  ValueType(sumMaxBnd)/numRuns<< " " \
+            <<  ValueType(sumTotBnd)/numRuns<< " " \
+            <<  ValueType(sumMaxCommVol)/numRuns<< " " \
+            <<  ValueType(sumTotCommVol)/numRuns<< " ";
+            out << std::setprecision(6) << std::fixed;
+            out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< " " \
+            <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
+            << std::endl;        
+			*/
+    }
+    
+}
+
+
