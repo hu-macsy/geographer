@@ -1150,7 +1150,6 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 
 	//read in edges
 	if (binary) {
-	    std::vector<ULLI> binaryEdges(2*(endLocalRange-beginLocalRange));
 	    file.read( (char *)(binaryEdges.data()), (2*(endLocalRange-beginLocalRange))*sizeof(ULLI) );
 	} else {
 	    for (ULLI i = 0; i < endLocalRange - beginLocalRange; i++) {
