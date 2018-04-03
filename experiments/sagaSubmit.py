@@ -116,7 +116,7 @@ def submitGeographer(exp, version, outDir):
 		submitFilename = "llsub-"+os.path.basename(exp.graphs[i]).split('.')[0]+"_k"+str(exp.k[i])+"_"+version+".cmd"
 		submitfile = createLLSubmitFile( os.path.join( outDir, "tmp"), submitFilename, commandString, "00:20:00", int(exp.k[i]) )
 		#print( submitfile )
-		call(["llsubmit", submitfile])
+		#call(["llsubmit", submitfile])
 		
 #---------------------------------------------------------------------------------------------		
 
