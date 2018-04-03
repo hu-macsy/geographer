@@ -219,7 +219,6 @@ struct Metrics{
 			{
 				scai::hmemo::ReadAccess<IndexType> rPart(partition.getLocalValues());
 				auto result = std::minmax_element(rPart.get(), rPart.get()+localN);
-//PRINT(*comm<< ": "<< *result.first << " __ " << *result.second);
 				allLocalNodesInSameBlock = ((*result.first) == (*result.second));
 			}
 			if (comm->all(allLocalNodesInSameBlock)) {
@@ -228,7 +227,7 @@ struct Metrics{
 					maxRounds = localN;
 				}
 				IndexType localDiameter = ITI::GraphUtils::getLocalBlockDiameter<IndexType, ValueType>(graph, localN/2, 0, 0, maxRounds);
-//PRINT(*comm << ": "<< localDiameter);
+				//PRINT(*comm << ": "<< localDiameter);
 				maxBlockDiameter = comm->max(localDiameter);
 				avgBlockDiameter = comm->sum(localDiameter) / comm->getSize();
 			}else{
@@ -247,11 +246,7 @@ struct Metrics{
 	
 		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 		const IndexType N = graph.getNumRows();
-				
-		// the original row and  column distributions
-		//const scai::dmemo::DistributionPtr initRowDistPtr = graph.getRowDistributionPtr();
-		//const scai::dmemo::DistributionPtr initColDistPtr = graph.getColDistributionPtr();
-		
+	
 		//get the distribution from the partition
 		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
 		
@@ -302,7 +297,6 @@ struct Metrics{
 			// perfom the actual multiplication
 			std::chrono::time_point<std::chrono::system_clock> beforeSpMVTime = std::chrono::system_clock::now();
 			for(IndexType r=0; r<repeatTimes; r++){
-				//y = laplacian *x +y;
 				y = copyGraph *x +y;
 			}
 			comm->synchronize();
@@ -349,15 +343,13 @@ struct Metrics{
 		
 	}
 
-	/* Calculate the volume, aka the data, tha will be exchanged when redistributing from oldDist to newDist.
+	/* Calculate the volume, aka the data that will be exchanged when redistributing from oldDist to newDist.
 	 */
 	std::pair<IndexType,IndexType> getRedistributionVol( const scai::dmemo::DistributionPtr newDist , const scai::dmemo::DistributionPtr oldDist){
 		
 		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 		
 		//get the distribution from the partition
-		//scai::dmemo::DistributionPtr newDist = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );	
-		//scai::dmemo::DistributionPtr oldDist = graph.getRowDistributionPtr();
 		scai::dmemo::Redistributor prepareRedist( newDist, oldDist );	
 				
 		// redistribution load
@@ -419,7 +411,6 @@ struct Metrics{
 		const scai::dmemo::CommunicationPlan& sendPlan  = matrixHalo.getProvidesPlan();
 		const scai::dmemo::CommunicationPlan& recvPlan  = matrixHalo.getRequiredPlan();
 		
-//PRINT(*comm << ": " << 	sendPlan.size() << " ++ " << sendPlan << " ___ " << recvPlan);
 		scai::hmemo::HArray<ValueType> sendData( sendPlan.totalQuantity(), 1.0 );
 		scai::hmemo::HArray<ValueType> recvData;
 		
@@ -431,7 +422,7 @@ struct Metrics{
 		//comm->synchronize();
 		std::chrono::duration<ValueType> commTime = std::chrono::system_clock::now() - beforeCommTime;
 		
-//PRINT(*comm << ": "<< sendPlan );		
+		//PRINT(*comm << ": "<< sendPlan );		
 		time = comm->max(commTime.count());
 		
 		ValueType minTime = comm->min( commTime.count() );
@@ -528,10 +519,7 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
 	IndexType sumTotBnd = 0;
 	IndexType sumMaxCommVol = 0;
 	IndexType sumTotCommVol = 0;
-	//IndexType maxBoundaryNodes = 0;
-	//IndexType totalBoundaryNodes = 0;
 	
-	//TODO: repalce with diameter
 	ValueType sumMaxDiameter = 0;
 	ValueType sumAvgDiameter = 0;
 
@@ -615,7 +603,7 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
 			
 		out << std::setprecision(2) << std::fixed;
 		out << "gather" << std::endl;
-		out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt timeSpMV timeComm" << std::endl;
+		out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxDiameter avgDiameter timeSpMV timeComm" << std::endl;
 		out <<  ValueType(sumKmeans)/numRuns<< " " \
 			<<  ValueType(sumPrelimanry)/numRuns<< " " \
 			<<  ValueType(sumLocalRef)/numRuns<< " " \
@@ -655,9 +643,6 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
 		out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxDiameter avgDiameter timeSpMV timeComm" << std::endl;
 	}
 
-	//ValueType sumKmeans = 0;
-	//ValueType sumPrelimanry = 0; 
-	//ValueType sumLocalRef = 0; 
 	ValueType sumFinalTime = 0;
 	
 	IndexType sumFinalCut = 0;
@@ -666,8 +651,6 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
 	IndexType sumTotBnd = 0;
 	IndexType sumMaxCommVol = 0;
 	IndexType sumTotCommVol = 0;
-	//IndexType maxBoundaryNodes = 0;
-	//IndexType totalBoundaryNodes = 0;
 	ValueType sumMaxDiameter = 0;
 	ValueType sumAvgDiameter = 0;
 	ValueType sumTimeSpMV = 0;
@@ -678,13 +661,7 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
 		
 		SCAI_ASSERT_EQ_ERROR(thisMetric.timeMigrationAlgo.size(), comm->getSize(), "Wrong vector size" );
 		
-		// for these time we have one measurement per PE and must make a max
-		//ValueType maxTimeKmeans = *std::max_element( thisMetric.timeKmeans.begin(), thisMetric.timeKmeans.end() );
-		//ValueType maxTimeSecondDistribution = *std::max_element( thisMetric.timeSecondDistribution.begin(), thisMetric.timeSecondDistribution.end() );
-		//ValueType maxTimePreliminary = *std::max_element( thisMetric.timePreliminary.begin(), thisMetric.timePreliminary.end() );
-		
 		// these times are global, no need to max
-		//ValueType timeLocalRef = timeFinal - maxTimePreliminary;
 		ValueType timeFinal = thisMetric.timeFinalPartition;
 		
 		if( comm->getRank()==0 ){
@@ -696,15 +673,12 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
 			<< thisMetric.maxBoundaryNodes << " " << thisMetric.totalBoundaryNodes << "  " \
 			<< thisMetric.maxCommVolume << "  " << thisMetric.totalCommVolume << " ";
 			out << std::setprecision(8) << std::fixed;
-			out << thisMetric.maxBorderNodesPercent << " " << thisMetric.avgBorderNodesPercent << " "\
+			out << thisMetric.maxBlockDiameter << " " << thisMetric.avgBlockDiameter << " "\
 			<< thisMetric.timeSpMV << " " \
 			<< thisMetric.timeComm \
 			<< std::endl;
 		}
 		
-		//sumKmeans += maxTimeKmeans;
-		//sumPrelimanry += maxTimePreliminary;
-		//sumLocalRef += timeLocalRef;
 		sumFinalTime += timeFinal;
 		
 		sumFinalCut += thisMetric.finalCut;
@@ -723,7 +697,7 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
 		out << "gather" << std::endl;
 		out << "timeTotal finalcut imbalance maxBnd totalBnd maxCommVol totalCommVol maxDiameter avgDiameter timeSpMV timeComm " << std::endl;
 		
-		out << std::setprecision(2) << std::fixed;
+		out << std::setprecision(6) << std::fixed;
 			//<<  ValueType(sumKmeans)/numRuns<< "  " <<  ValueType(sumLocalRef)/numRuns<< ",  "  
 		out <<  ValueType(sumFinalTime)/numRuns<< " " \
 			//<<  ValueType(sumPreliminaryCut)/numRuns<< ",  " 

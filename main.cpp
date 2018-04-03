@@ -32,117 +32,6 @@
 #include "GraphUtils.h"
 
 
-
-<<<<<<< Temporary merge branch 1
-=======
-void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
-    
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    
-    IndexType numRuns = metricsVec.size();
-    
-    if( comm->getRank()==0 ){
-        out << "# times, input, migrAlgo, constRedist, 1distr, kmeans, 2redis, prelim, localRef, total,    prel cut, finalcut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg  " << std::endl;
-    }
-
-    ValueType sumMigrAlgo = 0;
-    ValueType sumConstructRedist = 0;
-    ValueType sumFirstDistr = 0;
-    ValueType sumKmeans = 0;
-    ValueType sumSecondDistr = 0;
-    ValueType sumPrelimanry = 0; 
-    ValueType sumLocalRef = 0; 
-    ValueType sumFinalTime = 0;
-    
-    IndexType sumPreliminaryCut = 0;
-    IndexType sumFinalCut = 0;
-    ValueType sumImbalace = 0;
-    IndexType sumMaxBnd = 0;
-    IndexType sumTotBnd = 0;
-    IndexType sumMaxCommVol = 0;
-    IndexType sumTotCommVol = 0;
-    IndexType maxBoundaryNodes = 0;
-    IndexType totalBoundaryNodes = 0;
-    ValueType sumMaxBorderNodesPerc = 0;
-    ValueType sumAvgBorderNodesPerc = 0;
-
-    for(IndexType run=0; run<numRuns; run++){
-        Metrics thisMetric = metricsVec[ run ];
-        
-        SCAI_ASSERT_EQ_ERROR(thisMetric.timeMigrationAlgo.size(), comm->getSize(), "Wrong vector size" );
-        
-        // for these time we have one measurement per PE and must make a max
-        ValueType maxTimeMigrationAlgo = *std::max_element( thisMetric.timeMigrationAlgo.begin(), thisMetric.timeMigrationAlgo.end() );
-        ValueType maxTimeConstructRedist = *std::max_element( thisMetric.timeConstructRedistributor.begin(), thisMetric.timeConstructRedistributor.end() );
-        ValueType maxTimeFirstDistribution = *std::max_element( thisMetric.timeFirstDistribution.begin(), thisMetric.timeFirstDistribution.end() );
-        ValueType maxTimeKmeans = *std::max_element( thisMetric.timeKmeans.begin(), thisMetric.timeKmeans.end() );
-        ValueType maxTimeSecondDistribution = *std::max_element( thisMetric.timeSecondDistribution.begin(), thisMetric.timeSecondDistribution.end() );
-        ValueType maxTimePreliminary = *std::max_element( thisMetric.timePreliminary.begin(), thisMetric.timePreliminary.end() );
-        
-        // these times are global, no need to max
-        ValueType timeFinal = thisMetric.timeFinalPartition;
-        ValueType timeLocalRef = timeFinal - maxTimePreliminary;
-        
-        if( comm->getRank()==0 ){
-            out << std::setprecision(2) << std::fixed;
-            out<< run << " ,       "<< thisMetric.inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeConstructRedist << ", " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << ",  "<< timeFinal << " , \t "\
-            << thisMetric.preliminaryCut << ",  "<< thisMetric.finalCut << ",  " << thisMetric.finalImbalance << ",    "  \
-            // << thisMetric.maxBlockGraphDegree << ",  " << thisMetric.totalBlockGraphEdges << " ," 
-            << thisMetric.maxBoundaryNodes << ", " << thisMetric.totalBoundaryNodes << ",    " \
-            << thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << ",    ";
-            out << std::setprecision(6) << std::fixed;
-            out << thisMetric.maxBorderNodesPercent << ",  " << thisMetric.avgBorderNodesPercent \
-            << std::endl;
-        }
-        
-        sumMigrAlgo += maxTimeMigrationAlgo;
-        sumConstructRedist += maxTimeConstructRedist;
-        sumFirstDistr += maxTimeFirstDistribution;
-        sumKmeans += maxTimeKmeans;
-        sumSecondDistr += maxTimeSecondDistribution;
-        sumPrelimanry += maxTimePreliminary;
-        sumLocalRef += timeLocalRef;
-        sumFinalTime += timeFinal;
-        
-        sumPreliminaryCut += thisMetric.preliminaryCut;
-        sumFinalCut += thisMetric.finalCut;
-        sumImbalace += thisMetric.finalImbalance;
-        sumMaxBnd += thisMetric.maxBoundaryNodes  ;
-        sumTotBnd += thisMetric.totalBoundaryNodes ;
-        sumMaxCommVol +=  thisMetric.maxCommVolume;
-        sumTotCommVol += thisMetric.totalCommVolume;
-        sumMaxBorderNodesPerc += thisMetric.maxBorderNodesPercent;
-        sumAvgBorderNodesPerc += thisMetric.avgBorderNodesPercent;
-    }
-    
-    if( comm->getRank()==0 ){
-        out << std::setprecision(2) << std::fixed;
-        out << "average,  "\
-            <<  ValueType (metricsVec[0].inputTime)<< ",  "\
-            <<  ValueType(sumMigrAlgo)/numRuns<< ",  " \
-            <<  ValueType(sumConstructRedist)/numRuns<< ",  " \
-            <<  ValueType(sumFirstDistr)/numRuns<< ",  " \
-            <<  ValueType(sumKmeans)/numRuns<< ",  " \
-            <<  ValueType(sumSecondDistr)/numRuns<< ",  " \
-            <<  ValueType(sumPrelimanry)/numRuns<< ",  " \
-            <<  ValueType(sumLocalRef)/numRuns<< ",  " \
-            <<  ValueType(sumFinalTime)/numRuns<< ", \t " \
-            <<  ValueType(sumPreliminaryCut)/numRuns<< ",  " \
-            <<  ValueType(sumFinalCut)/numRuns<< ",  " \
-            <<  ValueType(sumImbalace)/numRuns<< ",    " \
-            <<  ValueType(sumMaxBnd)/numRuns<< ",  " \
-            <<  ValueType(sumTotBnd)/numRuns<< ",    " \
-            <<  ValueType(sumMaxCommVol)/numRuns<< ", " \
-            <<  ValueType(sumTotCommVol)/numRuns<< ",    ";
-            out << std::setprecision(6) << std::fixed;
-            out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
-            <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
-            << std::endl;
-    }
-    
-}
-
->>>>>>> Temporary merge branch 2
 /**
  *  Examples of use:
  * 
@@ -157,55 +46,7 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
  */
 
 //----------------------------------------------------------------------------
-/*
-namespace ITI {
 
-	std::istream& operator>>(std::istream& in, Format& format)
-	{
-		std::string token;
-		in >> token;
-		if (token == "AUTO" or token == "0")
-			format = ITI::Format::AUTO ;
-		else if (token == "METIS" or token == "1")
-			format = ITI::Format::METIS;
-		else if (token == "ADCIRC" or token == "2")
-			format = ITI::Format::ADCIRC;
-		else if (token == "OCEAN" or token == "3")
-			format = ITI::Format::OCEAN;
-        else if (token == "MATRIXMARKET" or token == "4")
-			format = ITI::Format::MATRIXMARKET;
-		else if (token == "TEEC" or token == "5")
-			format = ITI::Format::TEEC;
-        else if (token == "BINARY" or token == "6")
-			format = ITI::Format::BINARY;
-		else
-			in.setstate(std::ios_base::failbit);
-		return in;
-	}
-
-	std::ostream& operator<<(std::ostream& out, Format method)
-	{
-		std::string token;
-
-		if (method == ITI::Format::AUTO)
-			token = "AUTO";
-		else if (method == ITI::Format::METIS)
-			token = "METIS";
-		else if (method == ITI::Format::ADCIRC)
-			token = "ADCIRC";
-		else if (method == ITI::Format::OCEAN)
-			token = "OCEAN";
-		else if (method == ITI::Format::MATRIXMARKET)
-			token = "MATRIXMARKET";
-		else if (method == ITI::Format::TEEC)
-			token = "TEEC";
-        else if (method == ITI::Format::BINARY)
-            token == "BINARY";
-		out << token;
-		return out;
-	}
-}
-*/
 
 std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
 {
@@ -322,7 +163,7 @@ int main(int argc, char** argv) {
                 ("writePartition", "Writes the partition in the outFile.partition file")
                 // evaluation
                 ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
-                ("computeDiameter", "Compute Diameter of resulting block files.")
+                ("noComputeDiameter", "Compute Diameter of resulting block files.")
                 ("maxDiameterRounds", value<IndexType>(&settings.maxDiameterRounds)->default_value(settings.maxDiameterRounds), "abort diameter algorithm after that many BFS rounds")
 				;
 
@@ -443,8 +284,13 @@ int main(int argc, char** argv) {
     settings.erodeInfluence = vm.count("erodeInfluence");
     settings.tightenBounds = vm.count("tightenBounds");
     settings.manhattanDistance = vm.count("manhattanDistance");
-    settings.computeDiameter = vm.count("computeDiameter");
-
+	settings.noRefinement = vm.count("noRefinement");
+	if( vm.count("noComputeDiameter") ){
+		settings.computeDiameter = false;
+	}else{
+		settings.computeDiameter = true;
+	}
+	 
     writePartition = vm.count("writePartition");
     if( writePartition ){
         settings.writeInFile = true;
@@ -862,7 +708,13 @@ int main(int argc, char** argv) {
             if(outF.is_open()){
 				outF << "Running " << __FILE__ << std::endl;
                 settings.print( outF, comm);
-                printVectorMetrics( metricsVec, outF ); 
+				
+				if( settings.noRefinement)
+					printVectorMetricsShort( metricsVec, outF ); 
+				else
+					printVectorMetrics( metricsVec, outF ); 
+				
+				//printVectorMetrics( metricsVec, outF ); 
                 std::cout<< "Output information written to file " << settings.outFile << " in total time " << totalT << std::endl;
             }else{
                 std::cout<< "Could not open file " << settings.outFile << " information not stored"<< std::endl;
