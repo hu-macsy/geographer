@@ -1085,7 +1085,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
         bool success=false;
 
         if( comm->getRank()==0 ){
-            std::cout <<  "Reading binary edge list ..."  << std::endl;
+            std::cout <<  "Reading binary edge list ...";
         }
 
         if(file) {
@@ -1100,6 +1100,10 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 
          globalN = header[0];
          globalM = header[1];
+
+         if (comm->getRank() == 0) {
+             std::cout << " expecting " << globalN << " nodes and " << globalM << " edges." << std::endl;
+         }
 
     } else {
         //skip the first lines that have comments starting with '%'
@@ -1135,7 +1139,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 
 	//seek own part of file
 	if (binary) {
-	    const ULLI startPos = (headerSize+beginLocalRange)*(sizeof(ULLI));
+	    const ULLI startPos = (headerSize+2*beginLocalRange)*(sizeof(ULLI));
 	    file.seekg(startPos);
 	} else {
 	    // scroll to own part of file
@@ -1166,6 +1170,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 	}
 
 	IndexType maxEncounteredNode = 0;
+	IndexType maxFirstNode = 0;
 
 	//convert to edge lists
 	for (ULLI i = 0; i < endLocalRange - beginLocalRange; i++) {
@@ -1173,6 +1178,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 	    IndexType v2 = binaryEdges[2*i+1];
 	    maxEncounteredNode = std::max(maxEncounteredNode, v1);
 	    maxEncounteredNode = std::max(maxEncounteredNode, v2);
+	    maxFirstNode = std::max(maxFirstNode, v1);
 
 	    if (v1 >= globalN) {
             throw std::runtime_error("Process " + std::to_string(rank) + ": Illegal node id " + std::to_string(v1) + " in edge list for " + std::to_string(globalN) + " nodes.");
@@ -1184,6 +1190,10 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 
         edgeList.push_back( std::make_pair( v1, v2) );
 	}
+
+
+//	    std::cout << "Process " << comm->getRank() << ": maxFirstNode " << maxFirstNode << std::endl;
+
 
 	maxEncounteredNode = comm->max(maxEncounteredNode);
 	if (maxEncounteredNode < globalN/2 && comm->getRank() == 0) {
