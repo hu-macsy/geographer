@@ -77,6 +77,201 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
     return partitionGraph(input, coordinates, nodeWeights, previous, settings, metrics);
 
 }
+
+template<typename IndexType, typename ValueType>
+void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseVector<ValueType> >& coordinates, DenseVector<ValueType>& nodeWeights, Settings settings, struct Metrics& metrics) {
+    SCAI_REGION_START("ParcoRepart.hilbertRedistribution.sfc")
+    /*
+     * TODO:
+     * after all the branches have been merged, replace the copy-pasted code with a call to
+     * HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
+     */
+    scai::dmemo::DistributionPtr inputDist = coordinates[0].getDistributionPtr();
+    scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
+    const IndexType localN = inputDist->getLocalSize();
+    const IndexType globalN = inputDist->getGlobalSize();
+    const IndexType rank = comm->getRank();
+
+    std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
+
+    bool nodesUnweighted = (nodeWeights.max() == nodeWeights.min());
+
+    std::chrono::duration<double> migrationCalculation, migrationTime;
+
+
+    std::vector<ValueType> hilbertIndices(localN);
+    std::vector<std::vector<ValueType> > points(localN, std::vector<ValueType>(settings.dimensions, 0));
+    std::vector<ValueType> minCoords(settings.dimensions);
+    std::vector<ValueType> maxCoords(settings.dimensions);
+    for (IndexType d = 0; d < settings.dimensions; d++) {
+        minCoords[d] = coordinates[d].min().Scalar::getValue<ValueType>();
+        maxCoords[d] = coordinates[d].max().Scalar::getValue<ValueType>();
+        assert(std::isfinite(minCoords[d]));
+        assert(std::isfinite(maxCoords[d]));
+        scai::hmemo::ReadAccess<ValueType> rCoords(
+                coordinates[d].getLocalValues());
+        for (IndexType i = 0; i < localN; i++) {
+            points[i][d] = rCoords[i];
+        }
+    }
+    for (IndexType i = 0; i < localN; i++) {
+        hilbertIndices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(
+                points[i].data(), settings.dimensions, settings.sfcResolution,
+                minCoords, maxCoords);
+    }
+    SCAI_REGION_END("ParcoRepart.hilbertRedistribution.sfc")
+    SCAI_REGION_START("ParcoRepart.hilbertRedistribution.sort")
+    /**
+     * fill sort pair
+     */
+    scai::utilskernel::LArray<IndexType> myGlobalIndices(localN, 0);
+    inputDist->getOwnedIndexes(myGlobalIndices);
+    std::vector<sort_pair> localPairs(localN);
+    {
+        scai::hmemo::ReadAccess<IndexType> rIndices(myGlobalIndices);
+        for (IndexType i = 0; i < localN; i++) {
+            localPairs[i].value = hilbertIndices[i];
+            localPairs[i].index = rIndices[i];
+        }
+    }
+
+    MPI_Comm mpi_comm = MPI_COMM_WORLD; //maybe cast the communicator ptr to a MPI communicator and get getMPIComm()?
+    SQuick::sort<sort_pair>(mpi_comm, localPairs, -1); //could also do this with just the hilbert index - as a valueType
+    //IndexType newLocalN = localPairs.size();
+    migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
+    metrics.timeMigrationAlgo[rank] = migrationCalculation.count();
+    std::chrono::time_point < std::chrono::system_clock > beforeMigration = std::chrono::system_clock::now();
+    assert(localPairs.size() > 0);
+    SCAI_REGION_END("ParcoRepart.hilbertRedistribution.sort")
+
+    sort_pair minLocalIndex = localPairs[0];
+    std::vector<ValueType> sendThresholds(comm->getSize(), minLocalIndex.value);
+    std::vector<ValueType> recvThresholds(comm->getSize());
+
+    MPI_Datatype MPI_ValueType = MPI_DOUBLE; //TODO: properly template this
+    PRINT0("Setting local threshold to " + std::to_string(minLocalIndex.value));
+    MPI_Alltoall(sendThresholds.data(), 1, MPI_ValueType, recvThresholds.data(),
+            1, MPI_ValueType, mpi_comm); //TODO: replace this monstrosity with a proper call to LAMA
+    //comm->all2all(recvThresholds.data(), sendTresholds.data());//TODO: maybe speed up with hypercube
+    PRINT0(std::to_string(recvThresholds[0]) + " < hilbert indices < " + std::to_string(recvThresholds[comm->getSize() - 1])
+                    + ".");
+    // merge to get quantities //Problem: nodes are not sorted according to their hilbert indices, so accesses are not aligned.
+    // Need to sort before and after communication
+    assert(std::is_sorted(recvThresholds.begin(), recvThresholds.end()));
+    std::vector<IndexType> permutation(localN);
+    std::iota(permutation.begin(), permutation.end(), 0);
+    std::sort(permutation.begin(), permutation.end(), [&](IndexType i, IndexType j){return hilbertIndices[i] < hilbertIndices[j];});
+
+    //now sorting hilbert indices themselves
+    std::sort(hilbertIndices.begin(), hilbertIndices.end());
+    std::vector<IndexType> quantities(comm->getSize(), 0);
+    {
+        IndexType p = 0;
+        for (IndexType i = 0; i < localN; i++) {
+            //increase target block counter if threshold is reached. Skip empty blocks if necessary.
+            while (p + 1 < comm->getSize()
+                    && recvThresholds[p + 1] <= hilbertIndices[i]) { //TODO: check this more thoroughly when you are awake
+                p++;
+            }
+            assert(p < comm->getSize());
+
+            quantities[p]++;
+        }
+    }
+
+    SCAI_REGION_START("ParcoRepart.hilbertRedistribution.communicationPlan")
+    // allocate sendPlan
+    scai::dmemo::CommunicationPlan sendPlan(quantities.data(), comm->getSize());
+    SCAI_ASSERT_EQ_ERROR(sendPlan.totalQuantity(), localN,
+            "wrong size of send plan")
+    // allocate recvPlan - either with allocateTranspose, or directly
+    scai::dmemo::CommunicationPlan recvPlan;
+    recvPlan.allocateTranspose(sendPlan, *comm);
+    IndexType newLocalN = recvPlan.totalQuantity();
+    SCAI_REGION_END("ParcoRepart.hilberRedistribution.communicationPlan")
+
+    PRINT0(std::to_string(localN) + " old local values "
+                    + std::to_string(newLocalN) + " new ones.");
+    //transmit indices, allowing for resorting of the received values
+    std::vector<IndexType> sendIndices(localN);
+    {
+        SCAI_REGION("ParcoRepart.hilbertRedistribution.permute");
+        scai::hmemo::ReadAccess<IndexType> rIndices(myGlobalIndices);
+        for (IndexType i = 0; i < localN; i++) {
+            assert(permutation[i] < localN);
+            assert(permutation[i] >= 0);
+            sendIndices[i] = rIndices[permutation[i]];
+        }
+    }
+    std::vector<IndexType> recvIndices(newLocalN);
+    comm->exchangeByPlan(recvIndices.data(), recvPlan, sendIndices.data(),
+            sendPlan);
+    //get new distribution
+    scai::utilskernel::LArray<IndexType> indexTransport(newLocalN,
+            recvIndices.data());
+    scai::dmemo::DistributionPtr newDist(
+            new scai::dmemo::GeneralDistribution(globalN, indexTransport,
+                    comm));
+    SCAI_ASSERT_EQUAL(newDist->getLocalSize(), newLocalN,
+            "wrong size of new distribution");
+    for (IndexType i = 0; i < newLocalN; i++) {
+        SCAI_ASSERT_VALID_INDEX_DEBUG(recvIndices[i], globalN, "invalid index");
+    }
+
+    {
+        SCAI_REGION("ParcoRepart.hilbertRedistribution.redistribute");
+        // for each dimension: define DenseVector with new distribution, get write access to local values, call exchangeByPlan
+        std::vector<ValueType> sendBuffer(localN);
+        std::vector<ValueType> recvBuffer(newLocalN);
+
+        for (IndexType d = 0; d < settings.dimensions; d++) {
+            {
+                SCAI_REGION("ParcoRepart.hilbertRedistribution.redistribute.permute");
+                scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
+                for (IndexType i = 0; i < localN; i++) { //TODO:maybe extract into lambda?
+                    sendBuffer[i] = rCoords[permutation[i]]; //TODO: how to make this more cache-friendly? (Probably by using pairs and sorting them.)
+                }
+            }
+
+            comm->exchangeByPlan(recvBuffer.data(), recvPlan, sendBuffer.data(), sendPlan);
+            coordinates[d] = DenseVector<ValueType>(newDist, 0);
+            {
+                SCAI_REGION("ParcoRepart.hilbertRedistribution.redistribute.permute");
+                scai::hmemo::WriteAccess<ValueType> wCoords(coordinates[d].getLocalValues());
+                assert(wCoords.size() == newLocalN);
+                for (IndexType i = 0; i < newLocalN; i++) {
+                    wCoords[newDist->global2local(recvIndices[i])] =
+                            recvBuffer[i];
+                }
+            }
+        }
+        // same for node weights
+        if (nodesUnweighted) {
+            nodeWeights = DenseVector<ValueType>(newDist, 1);
+        }
+        else {
+            {
+                SCAI_REGION("ParcoRepart.hilbertRedistribution.redistribute.permute");
+                scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
+                for (IndexType i = 0; i < localN; i++) {
+                    sendBuffer[i] = rWeights[permutation[i]]; //TODO: how to make this more cache-friendly? (Probably by using pairs and sorting them.)
+                }
+            }
+            comm->exchangeByPlan(recvBuffer.data(), recvPlan, sendBuffer.data(), sendPlan);
+            nodeWeights = DenseVector<ValueType>(newDist, 0);
+            {
+                SCAI_REGION("ParcoRepart.hilbertRedistribution.redistribute.permute");
+                scai::hmemo::WriteAccess<ValueType> wWeights(nodeWeights.getLocalValues());
+                for (IndexType i = 0; i < newLocalN; i++) {
+                    wWeights[newDist->global2local(recvIndices[i])] = recvBuffer[i];
+                }
+            }
+        }
+    }
+    migrationTime = std::chrono::system_clock::now() - beforeMigration;
+    metrics.timeFirstDistribution[rank] = migrationTime.count();
+}
+
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, DenseVector<IndexType>& previous, Settings settings,struct Metrics& metrics)
 {
@@ -197,206 +392,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                     
                     if (settings.initialMigration == InitialPartitioningMethods::SFC) {
 
-                        SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans.sfc")
-                        /*
-                         * TODO:
-                         * after all the branches have been merged, replace the copy-pasted code with a call to
-                         * HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
-                         */
-                        std::vector<ValueType> hilbertIndices(localN);
-                        std::vector<std::vector<ValueType>> points(localN, std::vector<ValueType>(settings.dimensions,0));
-                        std::vector<ValueType> minCoords(settings.dimensions);
-                        std::vector<ValueType> maxCoords(settings.dimensions);
-
-                        for (IndexType d = 0; d < settings.dimensions; d++) {
-                            minCoords[d] = coordinates[d].min().Scalar::getValue<ValueType>();
-                            maxCoords[d] = coordinates[d].max().Scalar::getValue<ValueType>();
-                            assert(std::isfinite(minCoords[d]));
-                            assert(std::isfinite(maxCoords[d]));
-                            scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
-                            for (IndexType i = 0; i < localN; i++) {
-                                points[i][d] = rCoords[i];
-                            }
-                        }
-
-                        for (IndexType i = 0; i < localN; i++) {
-                            hilbertIndices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(points[i].data(), settings.dimensions, settings.sfcResolution, minCoords, maxCoords);
-                        }
-
-                        /**
-                         * fill sort pair
-                         */
-                        scai::utilskernel::LArray<IndexType> myGlobalIndices(localN, 0);
-                        inputDist->getOwnedIndexes(myGlobalIndices);
-                        std::vector<sort_pair> localPairs(localN);
-                        {
-                            scai::hmemo::ReadAccess<IndexType> rIndices(myGlobalIndices);
-                            for (IndexType i = 0; i < localN; i++) {
-                                localPairs[i].value = hilbertIndices[i];
-                                localPairs[i].index = rIndices[i];
-                            }
-                        }
-
-                        SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans.sfc")
-
-                        SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans.sort")
-                        MPI_Comm mpi_comm = MPI_COMM_WORLD;//maybe cast the communicator ptr to a MPI communicator and get getMPIComm()?
-                        SQuick::sort<sort_pair>(mpi_comm, localPairs, -1);//could also do this with just the hilbert index - as a valueType
-                        //IndexType newLocalN = localPairs.size();
-
-                        migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
-                        metrics.timeMigrationAlgo[rank]  = migrationCalculation.count();
-
-                        std::chrono::time_point<std::chrono::system_clock> beforeMigration =  std::chrono::system_clock::now();
-
-                        assert(localPairs.size() > 0);
-                        sort_pair minLocalIndex = localPairs[0];
-
-                        std::vector<ValueType> sendThresholds(comm->getSize(), minLocalIndex.value);
-                        std::vector<ValueType> recvThresholds(comm->getSize());
-
-                        static_assert(std::is_same<ValueType, double>::value, "assuming ValueType double. Change this assertion and following line.");
-                        MPI_Datatype MPI_ValueType = MPI_DOUBLE; //TODO: properly template this
-
-                        PRINT0("Setting local threshold to " + std::to_string(minLocalIndex.value));
-
-                        SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans.sort")
-
-                        MPI_Alltoall(sendThresholds.data(), 1,  MPI_ValueType,
-                                         recvThresholds.data(), 1, MPI_ValueType,
-                                         mpi_comm);//TODO: replace this monstrosity with a proper call to LAMA
-                        //comm->all2all(recvThresholds.data(), sendTresholds.data());//TODO: maybe speed up with hypercube
-
-                        PRINT0(std::to_string(recvThresholds[0]) + " < hilbert indices < " + std::to_string(recvThresholds[comm->getSize()-1]) + ".");
-
-
-                        // merge to get quantities //Problem: nodes are not sorted according to their hilbert indices, so accesses are not aligned.
-                        // Need to sort before and after communication
-                        assert(std::is_sorted(recvThresholds.begin(), recvThresholds.end()));
-
-                        std::vector<IndexType> permutation(localN);
-                        std::iota(permutation.begin(), permutation.end(), 0);
-                        std::sort(permutation.begin(), permutation.end(), [&](IndexType i, IndexType j){return hilbertIndices[i] < hilbertIndices[j];});
-
-                        SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans.communicationPlan")
-                        //now sorting hilbert indices themselves
-                        std::sort(hilbertIndices.begin(), hilbertIndices.end());
-
-                        std::vector<IndexType> quantities(comm->getSize(), 0);
-
-                        {
-                            IndexType p = 0;
-                            for (IndexType i = 0; i < localN; i++) {
-                                //increase target block counter if threshold is reached. Skip empty blocks if necessary.
-                                while (p+1 < comm->getSize() && recvThresholds[p+1] <= hilbertIndices[i]) {//TODO: check this more thoroughly when you are awake
-                                    p++;
-                                }
-                                assert(p < comm->getSize());
-
-                                quantities[p]++;
-                            }
-                        }
-
-                        // allocate sendPlan
-                        scai::dmemo::CommunicationPlan sendPlan(quantities.data(), comm->getSize());
-                        SCAI_ASSERT_EQ_ERROR(sendPlan.totalQuantity(), localN, "wrong size of send plan")
-
-                        // allocate recvPlan - either with allocateTranspose, or directly
-                        scai::dmemo::CommunicationPlan recvPlan;
-                        recvPlan.allocateTranspose(sendPlan, *comm);
-                        SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans.communicationPlan")
-
-                        IndexType newLocalN = recvPlan.totalQuantity();
-                        //SCAI_ASSERT_EQ_ERROR(recvPlan.totalQuantity(), newLocalN, "wrong size of recv plan");
-                        PRINT0(std::to_string(localN) + " old local values " + std::to_string(newLocalN) + " new ones.");
-
-
-                        //transmit indices, allowing for resorting of the received values
-                        std::vector<IndexType> sendIndices(localN);
-                        {
-                            SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans.permute");
-                            scai::hmemo::ReadAccess<IndexType> rIndices(myGlobalIndices);
-                            for (IndexType i = 0; i < localN; i++) {
-                                assert(permutation[i] < localN);
-                                assert(permutation[i] >= 0);
-                                sendIndices[i] = rIndices[permutation[i]];
-                            }
-                        }
-                        std::vector<IndexType> recvIndices(newLocalN);
-                        comm->exchangeByPlan(recvIndices.data(), recvPlan, sendIndices.data(), sendPlan);
-
-                        //get new distribution
-                        scai::utilskernel::LArray<IndexType> indexTransport(newLocalN, recvIndices.data());
-
-                        scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
-                        SCAI_ASSERT_EQUAL(newDist->getLocalSize(), newLocalN, "wrong size of new distribution");
-
-                        for (IndexType i = 0; i < newLocalN; i++) {
-                            SCAI_ASSERT_VALID_INDEX_DEBUG(recvIndices[i], globalN, "invalid index");
-                        }
-
-                        PRINT0("Exchanged indices.");
-
-                        {
-                            SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans.redistribute");
-                            // for each dimension: define DenseVector with new distribution, get write access to local values, call exchangeByPlan
-                            std::vector<ValueType> sendBuffer(localN);
-                            std::vector<ValueType> recvBuffer(newLocalN);
-
-                            PRINT0("Allocated Buffers.");
-
-                            for (IndexType d = 0; d < settings.dimensions; d++) {
-                                scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
-                                {
-                                    SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans.redistribute.permute");
-                                    for (IndexType i = 0; i < localN; i++) {//TODO:maybe extract into lambda?
-                                        sendBuffer[i] = rCoords[permutation[i]];//TODO: how to make this more cache-friendly? (Probably by using pairs and sorting them.)
-                                    }
-                                }
-                                PRINT0("Filled send buffer for coordinates of axis " + std::to_string(d));
-
-                                comm->exchangeByPlan(recvBuffer.data(), recvPlan, sendBuffer.data(), sendPlan);
-                                PRINT0("Exchanged coordinates for axis " + std::to_string(d));
-                                coordinateCopy[d] = DenseVector<ValueType> (newDist, 0);
-                                {
-                                    SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans.redistribute.permute");
-                                    scai::hmemo::WriteAccess<ValueType> wCoords(coordinateCopy[d].getLocalValues());
-                                    assert(wCoords.size() == newLocalN);
-                                    for (IndexType i = 0; i < newLocalN; i++) {
-                                        wCoords[newDist->global2local(recvIndices[i])] = recvBuffer[i];
-                                    }
-                                }
-                                PRINT0("Permuted received coordinates for axis " + std::to_string(d));
-                            }
-
-                            // same for node weights
-                            nodeWeightCopy = DenseVector<ValueType> (newDist, 1);
-                            if (!nodesUnweighted) {
-                                scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
-                                {
-                                    SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans.redistribute.permute");
-                                    for (IndexType i = 0; i < localN; i++) {
-                                        sendBuffer[i] = rWeights[permutation[i]];//TODO: how to make this more cache-friendly? (Probably by using pairs and sorting them.)
-                                    }
-                                }
-
-                                comm->exchangeByPlan(recvBuffer.data(), recvPlan, sendBuffer.data(), sendPlan);
-                                {
-                                    SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans.redistribute.permute");
-                                    scai::hmemo::WriteAccess<ValueType> wWeights(nodeWeightCopy.getLocalValues());
-                                    for (IndexType i = 0; i < newLocalN; i++) {
-                                        wWeights[newDist->global2local(recvIndices[i])] = recvBuffer[i];
-                                    }
-                                }
-                            }
-
-                            PRINT0("Exchanged weights.");
-                        }
-
-                        migrationTime = std::chrono::system_clock::now() - beforeMigration;
-                        metrics.timeFirstDistribution[rank]  = migrationTime.count();
-
-                    } else {
+                        hilbertRedistribution(coordinateCopy, nodeWeightCopy, settings, metrics);
+                        } else {
 
                         if (settings.initialMigration == InitialPartitioningMethods::Multisection) {
                             DenseVector<ValueType> convertedWeights(nodeWeights);
@@ -435,6 +432,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                         for (IndexType d = 0; d < dimensions; d++) {
                             coordinateCopy[d].redistribute(prepareRedist);
                         }
+
                         if (settings.repartition) {
                             previous.redistribute(prepareRedist);
                         }
@@ -512,8 +510,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             outF << "        " << timeToCalcInitMigration << "  ,  " << timeForFirstRedistribution << "  ,  " << timeForKmeans << "  ,  "<< timeForSecondRedistr << "  ,  " << timeForInitPart << ",         "  << cut << " ,  "<< imbalance <<std::endl;
             */
         }
-        
-        
+
         if (comm->getSize() == k) {
             SCAI_REGION("ParcoRepart.partitionGraph.initialRedistribution")
             /**
@@ -521,7 +518,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
              */
             std::chrono::time_point<std::chrono::system_clock> beforeSecondRedistributiom =  std::chrono::system_clock::now();
             
-            scai::dmemo::Redistributor resultRedist(result.getLocalValues(), result.getDistributionPtr());
+            scai::dmemo::Redistributor resultRedist(result.getLocalValues(), result.getDistributionPtr());//TODO: Wouldn't it be faster to use a GeneralDistribution here?
             result = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
             
             scai::dmemo::Redistributor redistributor(resultRedist.getTargetDistributionPtr(), input.getRowDistributionPtr());
@@ -568,13 +565,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             
             //IndexType numRefinementRounds = 0;
             
-            SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
-            scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(input);
-            ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, halo, settings);
-            SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
+            if (!settings.noRefinement) {
+                SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
+                scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(input);
+                ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, halo, settings);
+                SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
+            }
         } else {
             result.redistribute(inputDist);
-            if (comm->getRank() == 0) {
+            if (comm->getRank() == 0 && !settings.noRefinement) {
                 std::cout << "Local refinement only implemented for one block per process. Called with " << comm->getSize() << " processes and " << k << " blocks." << std::endl;
             }
         }

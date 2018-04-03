@@ -27,10 +27,6 @@
 #include "Settings.h"
 #include "FileIO.h"
 
-typedef double ValueType;
-typedef int IndexType;
-
-
 /* Generates points around some areas of interest, inserts them in a quad tree and gets a graph from the quad tree.
  * The number od nodes of the graph is not guaranteed. 
  * 

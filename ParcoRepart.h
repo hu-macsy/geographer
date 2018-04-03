@@ -18,12 +18,9 @@
 #include <boost/graph/edge_coloring.hpp>
 #include <boost/graph/properties.hpp>
 
+#include "Settings.h"
 #include "Metrics.h"
 #include "FileIO.h"
-#ifndef SETTINGS_H
-#include "Settings.h"
-#endif
-
 
 using namespace scai::lama;
 using scai::dmemo::Halo;
@@ -35,7 +32,7 @@ namespace ITI {
 	class ParcoRepart {
 		public:
 			/**
-	 		* Partitions the given input graph with a space-filling curve and (in future versions) local refinement
+	 		* Partitions the given input graph
 	 		*
 	 		* @param[in] input Adjacency matrix of the input graph
 	 		* @param[in] coordinates Node positions
@@ -69,6 +66,8 @@ namespace ITI {
 			static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings);
 
 			static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+
+			static void hilbertRedistribution(std::vector<DenseVector<ValueType> >& coordinates, DenseVector<ValueType>& nodeWeights, Settings settings, struct Metrics& metrics);
 
 			/*
 			 * Get an initial partition using the morton curve and measuring density per square.

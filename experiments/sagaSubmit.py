@@ -64,8 +64,9 @@ def submitGeographer(exp, version, outDir):
 			params = defaultSettings()
 			executable = geoExe
 		elif version=="geoKmeans":
-			executable = initialExe
-			params = " --initialPartition=3"
+			#executable = initialExe
+			executable = geoExe
+			params = " --initialPartition=3 --noRefinement"
 		elif version=="geoSfc":
 			executable = initialExe
 			params = " --initialPartition=0"
@@ -102,8 +103,7 @@ def submitGeographer(exp, version, outDir):
 			if exp.coordPaths[i]!="-":
 				params += " --coordFile=" + exp.coordPaths[i]
 		
-		params += " --outFile="+ outFile
-		
+		params += " --storeInfo --outFile="+ outFile
 		
 		if not os.path.exists( executable):
 			print("Executable " + executable + " does not exist.\nSkiping job submission")
@@ -116,7 +116,7 @@ def submitGeographer(exp, version, outDir):
 		submitFilename = "llsub-"+os.path.basename(exp.graphs[i]).split('.')[0]+"_k"+str(exp.k[i])+"_"+version+".cmd"
 		submitfile = createLLSubmitFile( os.path.join( outDir, "tmp"), submitFilename, commandString, "00:20:00", int(exp.k[i]) )
 		#print( submitfile )
-		#call(["llsubmit", submitfile])
+		call(["llsubmit", submitfile])
 		
 #---------------------------------------------------------------------------------------------		
 
@@ -275,12 +275,13 @@ if __name__=="__main__":
 	#
 
 	for exp in allExperiments:
-		'''	
+		#TODO: check if graph and coord file exist
+		'''
 		for path in exp.paths:
 			#graphPath =  os.path.join(inPath, graph)
 			if not os.path.exists( path ) :
 				print("WARNING: " + path + " does not exist.")
-		'''		
+		'''
 		for i in range(0, exp.size):
 			if int(exp.k[i])/16 != int(int(exp.k[i])/16):
 				print("WARNING: k= " + exp.k[i] + " is not a multiple of 16")
@@ -326,7 +327,6 @@ if __name__=="__main__":
 		for e in wantedExp:	
 			exp = allExperiments[e]
 			submitAllCompetitors( exp, outDir )	
-			#submitAllRepart( exp, outDir)
 			
 		exit(0)
 		

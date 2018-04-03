@@ -1044,26 +1044,6 @@ ValueType MeshGenerator<IndexType, ValueType>::dist3DSquared(std::tuple<IndexTyp
   ValueType distanceSquared = distX*distX+distY*distY+distZ*distZ;
   return distanceSquared;
 }
-
-//-------------------------------------------------------------------------------------------------
-
-template<typename IndexType, typename ValueType>
-void MeshGenerator<IndexType, ValueType>::createDelaunay3D_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<IndexType> numPoints) {
-	/*
-	Statistics stats;
-	PGeneratorConfig generator_config;
-	
-	generator_config.generator = "rdg_3d";
-	
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	
-	Delaunay3D gen( generator_config, comm->getRank() );
-	gen.generate();
-	*/
-		
-}
-
-	
 /*
 //-------------------------------------------------------------------------------------------------
 // Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position

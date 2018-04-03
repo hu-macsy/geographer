@@ -15,10 +15,8 @@
 #include <boost/lexical_cast.hpp>
 
 #include "quadtree/QuadTreeCartesianEuclid.h"
-#include "GraphUtils.h"
-#ifndef SETTINGS_H
 #include "Settings.h"
-#endif
+#include "GraphUtils.h"
 
 #include <vector>
 #include <set>
@@ -129,7 +127,7 @@ public:
 	 * 4 3				    2 
 	 * 3 2
 	 */
-	static scai::lama::CSRSparseMatrix<ValueType> readEdgeList(const std::string filename);
+	static scai::lama::CSRSparseMatrix<ValueType> readEdgeList(const std::string filename, const bool binary = false);
 	
 	
 	/* Edge list format but now there are k files, one for each PE

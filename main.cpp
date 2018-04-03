@@ -33,6 +33,116 @@
 
 
 
+<<<<<<< Temporary merge branch 1
+=======
+void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
+    
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    
+    IndexType numRuns = metricsVec.size();
+    
+    if( comm->getRank()==0 ){
+        out << "# times, input, migrAlgo, constRedist, 1distr, kmeans, 2redis, prelim, localRef, total,    prel cut, finalcut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg  " << std::endl;
+    }
+
+    ValueType sumMigrAlgo = 0;
+    ValueType sumConstructRedist = 0;
+    ValueType sumFirstDistr = 0;
+    ValueType sumKmeans = 0;
+    ValueType sumSecondDistr = 0;
+    ValueType sumPrelimanry = 0; 
+    ValueType sumLocalRef = 0; 
+    ValueType sumFinalTime = 0;
+    
+    IndexType sumPreliminaryCut = 0;
+    IndexType sumFinalCut = 0;
+    ValueType sumImbalace = 0;
+    IndexType sumMaxBnd = 0;
+    IndexType sumTotBnd = 0;
+    IndexType sumMaxCommVol = 0;
+    IndexType sumTotCommVol = 0;
+    IndexType maxBoundaryNodes = 0;
+    IndexType totalBoundaryNodes = 0;
+    ValueType sumMaxBorderNodesPerc = 0;
+    ValueType sumAvgBorderNodesPerc = 0;
+
+    for(IndexType run=0; run<numRuns; run++){
+        Metrics thisMetric = metricsVec[ run ];
+        
+        SCAI_ASSERT_EQ_ERROR(thisMetric.timeMigrationAlgo.size(), comm->getSize(), "Wrong vector size" );
+        
+        // for these time we have one measurement per PE and must make a max
+        ValueType maxTimeMigrationAlgo = *std::max_element( thisMetric.timeMigrationAlgo.begin(), thisMetric.timeMigrationAlgo.end() );
+        ValueType maxTimeConstructRedist = *std::max_element( thisMetric.timeConstructRedistributor.begin(), thisMetric.timeConstructRedistributor.end() );
+        ValueType maxTimeFirstDistribution = *std::max_element( thisMetric.timeFirstDistribution.begin(), thisMetric.timeFirstDistribution.end() );
+        ValueType maxTimeKmeans = *std::max_element( thisMetric.timeKmeans.begin(), thisMetric.timeKmeans.end() );
+        ValueType maxTimeSecondDistribution = *std::max_element( thisMetric.timeSecondDistribution.begin(), thisMetric.timeSecondDistribution.end() );
+        ValueType maxTimePreliminary = *std::max_element( thisMetric.timePreliminary.begin(), thisMetric.timePreliminary.end() );
+        
+        // these times are global, no need to max
+        ValueType timeFinal = thisMetric.timeFinalPartition;
+        ValueType timeLocalRef = timeFinal - maxTimePreliminary;
+        
+        if( comm->getRank()==0 ){
+            out << std::setprecision(2) << std::fixed;
+            out<< run << " ,       "<< thisMetric.inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeConstructRedist << ", " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << ",  "<< timeFinal << " , \t "\
+            << thisMetric.preliminaryCut << ",  "<< thisMetric.finalCut << ",  " << thisMetric.finalImbalance << ",    "  \
+            // << thisMetric.maxBlockGraphDegree << ",  " << thisMetric.totalBlockGraphEdges << " ," 
+            << thisMetric.maxBoundaryNodes << ", " << thisMetric.totalBoundaryNodes << ",    " \
+            << thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << ",    ";
+            out << std::setprecision(6) << std::fixed;
+            out << thisMetric.maxBorderNodesPercent << ",  " << thisMetric.avgBorderNodesPercent \
+            << std::endl;
+        }
+        
+        sumMigrAlgo += maxTimeMigrationAlgo;
+        sumConstructRedist += maxTimeConstructRedist;
+        sumFirstDistr += maxTimeFirstDistribution;
+        sumKmeans += maxTimeKmeans;
+        sumSecondDistr += maxTimeSecondDistribution;
+        sumPrelimanry += maxTimePreliminary;
+        sumLocalRef += timeLocalRef;
+        sumFinalTime += timeFinal;
+        
+        sumPreliminaryCut += thisMetric.preliminaryCut;
+        sumFinalCut += thisMetric.finalCut;
+        sumImbalace += thisMetric.finalImbalance;
+        sumMaxBnd += thisMetric.maxBoundaryNodes  ;
+        sumTotBnd += thisMetric.totalBoundaryNodes ;
+        sumMaxCommVol +=  thisMetric.maxCommVolume;
+        sumTotCommVol += thisMetric.totalCommVolume;
+        sumMaxBorderNodesPerc += thisMetric.maxBorderNodesPercent;
+        sumAvgBorderNodesPerc += thisMetric.avgBorderNodesPercent;
+    }
+    
+    if( comm->getRank()==0 ){
+        out << std::setprecision(2) << std::fixed;
+        out << "average,  "\
+            <<  ValueType (metricsVec[0].inputTime)<< ",  "\
+            <<  ValueType(sumMigrAlgo)/numRuns<< ",  " \
+            <<  ValueType(sumConstructRedist)/numRuns<< ",  " \
+            <<  ValueType(sumFirstDistr)/numRuns<< ",  " \
+            <<  ValueType(sumKmeans)/numRuns<< ",  " \
+            <<  ValueType(sumSecondDistr)/numRuns<< ",  " \
+            <<  ValueType(sumPrelimanry)/numRuns<< ",  " \
+            <<  ValueType(sumLocalRef)/numRuns<< ",  " \
+            <<  ValueType(sumFinalTime)/numRuns<< ", \t " \
+            <<  ValueType(sumPreliminaryCut)/numRuns<< ",  " \
+            <<  ValueType(sumFinalCut)/numRuns<< ",  " \
+            <<  ValueType(sumImbalace)/numRuns<< ",    " \
+            <<  ValueType(sumMaxBnd)/numRuns<< ",  " \
+            <<  ValueType(sumTotBnd)/numRuns<< ",    " \
+            <<  ValueType(sumMaxCommVol)/numRuns<< ", " \
+            <<  ValueType(sumTotCommVol)/numRuns<< ",    ";
+            out << std::setprecision(6) << std::fixed;
+            out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
+            <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
+            << std::endl;
+    }
+    
+}
+
+>>>>>>> Temporary merge branch 2
 /**
  *  Examples of use:
  * 
@@ -49,6 +159,7 @@
 //----------------------------------------------------------------------------
 /*
 namespace ITI {
+
 	std::istream& operator>>(std::istream& in, Format& format)
 	{
 		std::string token;
@@ -137,6 +248,7 @@ std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method)
     return out;
 }
 
+//void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);	
 
 
 int main(int argc, char** argv) {
@@ -180,6 +292,7 @@ int main(int argc, char** argv) {
 				("seed", value<double>()->default_value(time(NULL)), "random seed, default is current time")
 				//multi-level and local refinement
 				("initialPartition", value<InitialPartitioningMethods>(&settings.initialPartition), "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means' or 3) and multisection ('MultiSection' or 4). SFC, Spectral and K-Means are most stable.")
+				("noRefinement", "skip local refinement steps")
 				("multiLevelRounds", value<IndexType>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
 				("minBorderNodes", value<IndexType>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
 				("stopAfterNoGainRounds", value<IndexType>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
@@ -205,7 +318,7 @@ int main(int argc, char** argv) {
 				//debug
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 				("verbose", "Increase output.")
-                ("storeInfo", "Store timing and ohter metrics in file.")
+                ("storeInfo", "Store timing and other metrics in file.")
                 ("writePartition", "Writes the partition in the outFile.partition file")
                 // evaluation
                 ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
@@ -254,10 +367,11 @@ int main(int argc, char** argv) {
 		std::cout << "Cannot both load coordinates from file with --coordFile or generate them with --useDiffusionCoords." << std::endl;
 		return 126;
 	}
+
 	if( vm.count("cutsPerDim") ) {
-            SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
-            SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
-        }
+		SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
+		SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
+	}
         
 	if( vm.count("initialMigration") ){
 
@@ -317,8 +431,12 @@ int main(int argc, char** argv) {
     char machineChar[255];
     std::string machine;
     gethostname(machineChar, 255);
-	machine = std::string(machineChar);
-	settings.machine = machine;
+    if (machineChar) {
+    	machine = std::string(machineChar);
+        settings.machine = machine;
+    } else {
+    	std::cout << "machine char not valid" << std::endl;
+    }
 
     settings.verbose = vm.count("verbose");
     settings.storeInfo = vm.count("storeInfo");
@@ -616,6 +734,14 @@ int main(int argc, char** argv) {
     
     std::vector<struct Metrics> metricsVec;
     
+	/*
+	//TODO: used ifort -nofor-main ... to compile but does not link properly
+	size_t total=-1,used=-1,free=-1,buffers=-1, cached=-1;
+	memusage(&total, &used, &free, &buffers, &cached);
+	printf("%ld %ld %ld %ld %ld \n", total,used,free,buffers, cached);
+	*/
+	
+	
     //------------------------------------------------------------
     //
     // partition the graph
@@ -689,7 +815,8 @@ int main(int argc, char** argv) {
         //
         // Get metrics
         //
-                
+        
+        
         std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
         metricsVec[r].getAllMetrics( graph, partition, nodeWeights, settings );

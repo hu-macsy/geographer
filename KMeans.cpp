@@ -15,7 +15,6 @@
 
 #include "KMeans.h"
 #include "HilbertCurve.h"
-#include "AuxiliaryFunctions.h"
 
 namespace ITI {
 namespace KMeans {
@@ -24,7 +23,8 @@ using scai::lama::Scalar;
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCentersSFC(
-		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords, Settings settings) {
+		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords,
+		const std::vector<ValueType> &maxCoords, Settings settings) {
 
 	SCAI_REGION( "KMeans.findInitialCentersSFC" );
 	const IndexType localN = coordinates[0].getLocalValues().size();
@@ -336,9 +336,6 @@ DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType> >& 
 	return assignment;
 }
 
-//	std::vector<ValueType> upperBoundToOwnCenter(localN);
-//std::vector<ValueType> lowerBoundToNextCenter(localN, 0);
-
 template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(
 		const std::vector<std::vector<ValueType> >& coordinates,
@@ -360,6 +357,7 @@ DenseVector<IndexType> assignBlocks(
 	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 //	const IndexType localN = nodeWeights.getLocalValues().size();
 	const IndexType k = targetBlockSizes.size();
+
 	assert(influence.size() == k);
 
 	//compute assignment and balance
@@ -511,13 +509,6 @@ DenseVector<IndexType> assignBlocks(
 	
 		imbalance = (ValueType(maxBlockWeight - optSize)/ optSize);//TODO: adapt for block sizes
 
-//if( comm->getRank()==0 ) aux<IndexType,ValueType>::printVector( blockWeights );
-//PRINT0("maxBlockWeight= " << maxBlockWeight <<" , optSize= " << optSize);
-
-ValueType totBlockWeight = std::accumulate(blockWeights.begin(), blockWeights.end(), 0);
-//PRINT0("totalWeightSum= " << totalWeightSum << ", totBlockWeight= " << totBlockWeight);
-//PRINT0("\t\t\t\t\t\timbalance= " << imbalance);
-
 		std::vector<ValueType> oldInfluence = influence;
 
 		double minRatio = std::numeric_limits<double>::max();
@@ -589,14 +580,14 @@ ValueType totBlockWeight = std::accumulate(blockWeights.begin(), blockWeights.en
 			auto pair = std::minmax_element(influence.begin(), influence.end());
 			const ValueType influenceSpread = *pair.second / *pair.first;
 			auto oldprecision = std::cout.precision(3);
-			/*if (comm->getRank() == 0)*/  std::cout << comm->getRank() <<": Iter " << iter << ", loop: " << 100*ValueType(takenLoops) / currentLocalN << "%, average comparisons: "
+			if (comm->getRank() == 0) std::cout << "Iter " << iter << ", loop: " << 100*ValueType(takenLoops) / currentLocalN << "%, average comparisons: "
 					<< averageComps << ", balanced blocks: " << 100*ValueType(balancedBlocks) / k << "%, influence spread: " << influenceSpread
-					<< ", imbalance : " << imbalance <<  std::endl;
+					<< ", imbalance : " << imbalance << std::endl;
 			std::cout.precision(oldprecision);
 		}
-	} while (imbalance > settings.epsilon - 1e-12 and iter < settings.balanceIterations);
+	} while (imbalance > settings.epsilon - 1e-12 && iter < settings.balanceIterations);
 	//std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
-PRINT0("\t\t\t\t\t\timbalance= " << imbalance);
+
 	return assignment;
 }
 
@@ -781,6 +772,5 @@ template DenseVector<IndexType> getPartitionWithSFCCoords(const scai::lama::CSRS
 template DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings);
 
 }
-
 
 } /* namespace ITI */

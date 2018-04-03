@@ -9,7 +9,6 @@
 
 #include <vector>
 #include <numeric>
-#include <cmath>
 #include <scai/lama/DenseVector.hpp>
 #include <scai/tracing.hpp>
 #include <chrono>
@@ -237,7 +236,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 				adjustedBlockSizes[j] = ValueType(blockSizes[j]) * ratio;
 			}
 		} else {
-			//SCAI_ASSERT_EQ_ERROR( *lastIndex, localIndices.back(), "Index mismatch");
 			assert(lastIndex == localIndices.end());
 		}
 

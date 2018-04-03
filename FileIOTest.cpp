@@ -111,7 +111,7 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
 
     comm->synchronize();
 
-    // read new graph from the new file we just written
+    // read new graph from the new file we just wrote
     CSRSparseMatrix<ValueType> Graph2 = FileIO<IndexType, ValueType>::readGraph( fileTo );
 
     // check that the two graphs are identical
@@ -238,9 +238,17 @@ TEST_F(FileIOTest, testWriteCoordsDistributed){
 TEST_F(FileIOTest, testReadCoordsOcean) {
 	std::string graphFile = graphPath + "fesom_core2.graph";
 	std::string coordFile = graphPath + "node2d_core2.out";
+	const IndexType n = 126858;
 
 	std::vector<DenseVector<ValueType> > coords = FileIO<IndexType, ValueType>::readCoordsOcean(coordFile, 2);
-	EXPECT_EQ(126858, coords[0].size());
+	EXPECT_EQ(n, coords[0].size());
+
+	for (IndexType d = 0; d < 2; d++) {
+	    scai::hmemo::ReadAccess<ValueType> rCoords(coords[d].getLocalValues());
+	    for (IndexType i = 0; i < n; i++ ) {
+	        EXPECT_TRUE(std::isfinite(rCoords[i]));
+        }
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -255,6 +263,50 @@ TEST_F(FileIOTest, testReadQuadTree){
 	//IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
 	//std::cout << "Read Quadtree with " << edgeList.size() << " nodes and " << m << " edges." << std::endl;
 }
+
+//-------------------------------------------------------------------------------------------------
+
+TEST_F(FileIOTest, testReadBinaryEdgeList) {
+    std::string filename = graphPath + "delaunay-3D-12.edgelist";
+
+    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(filename, ITI::Format::BINARYEDGELIST);
+
+    scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+
+    const IndexType n = graph.getNumRows();
+    const IndexType localN = dist->getLocalSize();
+    EXPECT_EQ(4096, n);
+    EXPECT_TRUE(graph.isConsistent());
+    EXPECT_EQ(n, graph.getNumColumns());
+
+    //check degree symmetry
+    std::vector<IndexType> inDegree(n);
+    std::vector<IndexType> outDegree(n);
+    scai::hmemo::ReadAccess<IndexType> ia(graph.getLocalStorage().getIA());
+    scai::hmemo::ReadAccess<IndexType> ja(graph.getLocalStorage().getJA());
+
+    for (IndexType i = 0; i < graph.getLocalNumRows(); i++) {
+        const IndexType globalI = dist->local2global(i);//this can be optimized
+        outDegree[globalI] = ia[i+1] - ia[i];
+    }
+
+    for (IndexType i = 0; i < ja.size(); i++) {
+        inDegree[ja[i]]++;
+    }
+
+    comm->sumImpl(outDegree.data(), outDegree.data(), n, scai::common::TypeTraits<IndexType>::stype);
+    comm->sumImpl(inDegree.data(), inDegree.data(), n, scai::common::TypeTraits<IndexType>::stype);
+
+    for (IndexType i = 0; i < n; i++) {
+        EXPECT_EQ(inDegree[i], outDegree[i]);
+    }
+
+    //check actual symmetry
+    //EXPECT_TRUE(graph.checkSymmetry());
+
+}
+
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadGraphBinary){
@@ -593,47 +645,18 @@ TEST_F (FileIOTest, testreadOFFCentral){
 TEST_F (FileIOTest, testreadEdgeListDistributed){
 	
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	
-	//TODO: can this be done using googletest avoiding the big if??
-	if( comm->getSize()!= 4){
-		PRINT0("\n\t\t\tWARNING: This test only works for k=4.Aborting");
-	}else{
-	
-		std::string file = graphPath + "tmp4/out";
-		
-		scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readEdgeListDistributed( file );
-		
-		SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
-		EXPECT_TRUE( graph.checkSymmetry() );
-		SCAI_ASSERT_EQ_ERROR(  graph.getNumRows(), graph.getNumColumns() , "Matric is not square");
-		
-		// only for graph: graphPath + "tmp4/out"
-		SCAI_ASSERT_EQ_ERROR( graph.getNumRows(), 16, "for files tmp4/out N must be 16");
-	}
-}
+	ASSERT_EQ(comm->getSize(), 4);
 
-/*
-TEST_F (FileIOTest, testreadPartition){
-    std::string file = graphPath+ "example.partition";
-    
-        IndexType numVertices;
-    {
-        std::ifstream f(file);
-        if(f.fail())
-            throw std::runtime_error("File "+ file + " failed.");
-        
-        std::string line;
-        std::getline(f, line);
-        if( line[0]=='%' ){
-            std::stringstream ss;
-            ss.str( line );
-            ss >> numVertices >> numFaces >> numEdges;
-    }
-    scai::lama::DenseVector<IndexType> partition = ITI::FileIO::readPartition( file,
-    
-}
+    std::string file = graphPath + "tmp4/out";
 
-*/
-    
+    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readEdgeListDistributed( file );
+
+    ASSERT_TRUE( graph.isConsistent());
+    EXPECT_TRUE( graph.checkSymmetry() );
+    EXPECT_EQ(  graph.getNumRows(), graph.getNumColumns()) << "Matrix is not square";
+
+    // only for graph: graphPath + "tmp4/out"
+    EXPECT_EQ( graph.getNumRows(), 16) << "for files tmp4/out N must be 16";
+}
 
 } /* namespace ITI */

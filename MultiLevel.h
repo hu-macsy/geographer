@@ -19,9 +19,7 @@
 
 #include "ParcoRepart.h"
 #include "LocalRefinement.h"
-#ifndef SETTINGS_H
 #include "Settings.h"
-#endif
 
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;

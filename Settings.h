@@ -12,8 +12,7 @@ typedef long int IndexType;
 typedef double ValueType;
 
 namespace ITI{
-	
-enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5, BINARY = 6, EDGELIST = 7, EDGELISTDIST = 8};
+enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5, BINARY = 6, EDGELIST = 7, BINARYEDGELIST = 8, EDGELISTDIST = 9};
 
 inline std::istream& operator>>(std::istream& in, Format& format){
 	std::string token;
@@ -34,7 +33,9 @@ inline std::istream& operator>>(std::istream& in, Format& format){
         format = ITI::Format::BINARY;
 	else if (token == "EDGELIST" or token == "7")
         format = ITI::Format::EDGELIST;
-	else if (token == "EDGELISTDIST" or token == "8")
+	else if (token == "BINARYEDGELIST" or token == "8")
+	    format = ITI::Format::BINARYEDGELIST;
+	else if (token == "EDGELISTDIST" or token == "9")
 	    format = ITI::Format::EDGELISTDIST;
 	else
 		in.setstate(std::ios_base::failbit);
@@ -62,6 +63,8 @@ inline std::ostream& operator<<(std::ostream& out, Format method){
         token == "EDGELISTDIST";
 	else if (method == ITI::Format::EDGELIST)
 	    token == "EDGELIST";
+	else if (method == ITI::Format::BINARYEDGELIST)
+	    token == "BINARYEDGELIST";
 	out << token;
 	return out;
 }
@@ -173,6 +176,7 @@ struct Settings{
     IndexType pixeledSideLen = 10;
 
     //tuning parameters for multiLevel heuristic
+    bool noRefinement = false;
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
 
