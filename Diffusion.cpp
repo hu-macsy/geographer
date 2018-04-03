@@ -211,7 +211,7 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructFJLTMatrix(
 	}
 	DIAStorage<ValueType> dstor(origDimension, origDimension, HArray<IndexType>( { 0 } ), randomDiagonal );
 	DIASparseMatrix<ValueType>D( std::move( dstor ) );
-	DenseMatrix<ValueType> Ddense(D);
+	auto Ddense = scai::lama::convert<DenseMatrix<ValueType>>(D);
 
 	auto PH = scai::lama::eval<DenseMatrix<ValueType>>(P*H);
 	auto denseTemp = scai::lama::eval<DenseMatrix<ValueType>>(PH*Ddense);

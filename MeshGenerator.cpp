@@ -231,7 +231,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseM
     // create the coordinates
        
     // get the local part of the coordinates vectors
-    std::vector<scai::utilskernel::LArray<ValueType>* > localCoords(3);
+    std::vector<HArray<ValueType>* > localCoords(3);
     
     for(IndexType i=0; i<3; i++){
         localCoords[i] = &coords[i].getLocalValues();
@@ -345,7 +345,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseM
     {
         SCAI_REGION( "MeshGenerator.createStructured3DMesh_dist.swap_assign" )
         localMatrix.swap( csrIA, csrJA, csrValues );
-        adjM.assign(localMatrix , adjM.getRowDistributionPtr() , adjM.getColDistributionPtr() );
+        adjM.assignDistribute(localMatrix , adjM.getRowDistributionPtr() , adjM.getColDistributionPtr() );
     }
 }
 //-------------------------------------------------------------------------------------------------
@@ -377,7 +377,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(CSRSparseM
     // create the coordinates
        
     // get the local part of the coordinates vectors
-    std::vector<scai::utilskernel::LArray<ValueType>* > localCoords(2);
+    std::vector<HArray<ValueType>* > localCoords(2);
     
     for(IndexType i=0; i<2; i++){
         localCoords[i] = &coords[i].getLocalValues();
@@ -483,7 +483,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(CSRSparseM
     {
         SCAI_REGION( "MeshGenerator.createStructured3DMesh_dist.swap_assign" )
         localMatrix.swap( csrIA, csrJA, csrValues );
-        adjM.assign(localMatrix , adjM.getRowDistributionPtr() , adjM.getColDistributionPtr() );
+        adjM.assignDistribute(localMatrix , adjM.getRowDistributionPtr() , adjM.getColDistributionPtr() );
     }
 }
 //-------------------------------------------------------------------------------------------------
@@ -519,7 +519,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
     // create the coordinates
        
     // get the local part of the coordinates vectors
-    std::vector<scai::utilskernel::LArray<ValueType>* > localCoords(3);
+    std::vector<HArray<ValueType>* > localCoords(3);
 
     for(IndexType i=0; i<3; i++){
         localCoords[i] = &coords[i].getLocalValues();
@@ -895,7 +895,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
     {
         SCAI_REGION( "MeshGenerator.createRandomStructured3DMesh_dist.swap_assign" )
         localMatrix.swap( csrIA, csrJA, csrValues );
-        adjM.assign(localMatrix , adjM.getRowDistributionPtr() , adjM.getColDistributionPtr() );
+        adjM.assignDistribute(localMatrix , adjM.getRowDistributionPtr() , adjM.getColDistributionPtr() );
     }
     
     //SCAI_REGION_END("MeshGenerator.createRandomStructured3DMesh_dist.setAdjacencyMatrix");
@@ -988,7 +988,7 @@ void MeshGenerator<IndexType, ValueType>::graphFromQuadtree(CSRSparseMatrix<Valu
 	// copy from vector to DenseVector
 	for(int d=0; d<dimension; d++){
 		SCAI_REGION("MeshGenerator.createQuadMesh.copyToDenseVector");
-		scai::utilskernel::LArray<ValueType> localValues(n, coordsV[d].data());
+		HArray<ValueType> localValues(n, coordsV[d].data());
 		coords[d] = DenseVector<ValueType>(localValues);
 	}
 }
@@ -1020,7 +1020,7 @@ std::vector<DenseVector<ValueType>> MeshGenerator<IndexType, ValueType>::randomP
 template<typename IndexType, typename ValueType>
 Scalar MeshGenerator<IndexType, ValueType>::dist3D(DenseVector<ValueType> p1, DenseVector<ValueType> p2){
   SCAI_REGION( "MeshGenerator.dist3D" )
-  Scalar res0, res1, res2, res;
+  ValueType res0, res1, res2, res;
   res0= p1.getValue(0)-p2.getValue(0);
   res0= res0*res0;
   res1= p1.getValue(1)-p2.getValue(1);

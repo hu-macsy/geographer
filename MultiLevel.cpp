@@ -4,7 +4,7 @@
 #include "GraphUtils.h"
 
 using scai::lama::Scalar;
-using scai::utilskernel::LArray;
+using scai::hmemo::HArray;
 
 namespace ITI{
     
@@ -67,7 +67,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 		DenseVector<ValueType> coarseWeights = sumToCoarse(nodeWeights, fineToCoarseMap);
 
 		Halo coarseHalo;
-		scai::utilskernel::LArray<IndexType> haloData;
+		scai::hmemo::HArray<IndexType> haloData;
 		comm->updateHalo(haloData, fineToCoarseMap.getLocalValues(), halo);
 		scai::dmemo::HaloBuilder::coarsenHalo(coarseGraph.getRowDistribution(), halo, fineToCoarseMap.getLocalValues(), haloData, coarseHalo);
 
@@ -216,11 +216,11 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
 
     DenseVector<ValueType> localWeightCopy(nodeWeights);
 
-    scai::utilskernel::LArray<IndexType> preserved(localN, 1);
+    scai::hmemo::HArray<IndexType> preserved(localN, 1);
 
     std::vector<IndexType> localFineToCoarse(localN);
 
-    scai::utilskernel::LArray<IndexType> globalIndices;
+    scai::hmemo::HArray<IndexType> globalIndices;
     distPtr->getOwnedIndexes(globalIndices);
     scai::hmemo::ReadAccess<IndexType> rIndex(globalIndices);
 
@@ -345,8 +345,8 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
             values.release();
 
             //scai::lama::CSRStorage<ValueType> localStorage(1, comm->getSize(), numNeighbors, ia, ja, values);;
-            LArray<IndexType> lJA(newJA.size(), newJA.data());
-            LArray<ValueType> lValues(newValues.size(), newValues.data());
+            HArray<IndexType> lJA(newJA.size(), newJA.data());
+            HArray<ValueType> lValues(newValues.size(), newValues.data());
             graph.getLocalStorage() = CSRStorage<ValueType>(localN, globalN, std::move( newIA ), std::move( lJA ), std::move( lValues ));
         }
     }
@@ -359,7 +359,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     DenseVector<IndexType> blockFineToCoarse = computeGlobalPrefixSum(distPreserved, IndexType(-1) );
     const IndexType newGlobalN = blockFineToCoarse.max() + 1;
     fineToCoarse = DenseVector<IndexType>(distPtr, blockFineToCoarse.getLocalValues());
-    const IndexType newLocalN = preserved.sum();
+    const IndexType newLocalN = scai::utilskernel::HArrayUtils::sum(preserved);
 
     //set new indices for contracted nodes
     {
@@ -377,7 +377,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     SCAI_REGION_END("MultiLevel.coarsen.newGlobalIndices")
 
     //build halo of new global indices
-    scai::utilskernel::LArray<IndexType> haloData;
+    HArray<IndexType> haloData;
     comm->updateHalo(haloData, fineToCoarse.getLocalValues(), halo);
 
     //create new coarsened CSR matrix
@@ -442,7 +442,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     scai::hmemo::HArray<ValueType> csrValues(newValues.size(), newValues.data());
 
     //create distribution object for coarse graph
-    scai::utilskernel::LArray<IndexType> myGlobalIndices(fineToCoarse.getLocalValues());
+    HArray<IndexType> myGlobalIndices(fineToCoarse.getLocalValues());
     scai::hmemo::WriteAccess<IndexType> wIndices(myGlobalIndices);
     assert(wIndices.size() == localN);
     std::sort(wIndices.get(), wIndices.get() + localN);
@@ -510,11 +510,12 @@ DenseVector<T> MultiLevel<IndexType, ValueType>::computeGlobalPrefixSum(const De
     comm->scatter(myOffset, 1, 0, offsetPrefixSum.data());
 
     //get results by adding local sums and offsets
-    DenseVector<T> result(input.getDistributionPtr());
-    scai::hmemo::WriteOnlyAccess<T> wResult(result.getLocalValues(), localN);
+    HArray<T> localResult;
+    scai::hmemo::WriteOnlyAccess<T> wResult(localResult, localN);
     for (IndexType i = 0; i < localN; i++) {
     	wResult[i] = localPrefixSum[i] + myOffset[0] + globalOffset;
     }
+    DenseVector<T> result(input.getDistributionPtr(), std::move(localResult));
 
     return result;
 }
@@ -529,10 +530,10 @@ scai::dmemo::DistributionPtr MultiLevel<IndexType, ValueType>::projectToFine(sca
 	IndexType coarseLocalN = coarseDist->getLocalSize();
 	scai::dmemo::CommunicatorPtr comm = fineDist->getCommunicatorPtr();
 
-	scai::utilskernel::LArray<IndexType> myCoarseGlobalIndices;
+	HArray<IndexType> myCoarseGlobalIndices;
 	coarseDist->getOwnedIndexes(myCoarseGlobalIndices);
 
-	scai::utilskernel::LArray<IndexType> owners(coarseLocalN);
+	HArray<IndexType> owners(coarseLocalN);
 	dist->computeOwners(owners, myCoarseGlobalIndices);
 
 	//get send quantities and array
@@ -566,7 +567,7 @@ scai::dmemo::DistributionPtr MultiLevel<IndexType, ValueType>::projectToFine(sca
         
 	recvPlan.allocateTranspose( sendPlan, *comm );
 
-	scai::utilskernel::LArray<IndexType> newValues;
+	HArray<IndexType> newValues;
 
 	IndexType newLocalSize = recvPlan.totalQuantity();
 
@@ -594,7 +595,7 @@ scai::dmemo::DistributionPtr MultiLevel<IndexType, ValueType>::projectToCoarse(c
 	const IndexType fineLocalN = fineDist->getLocalSize();
 
 	//get set of coarse local indices, without repetitions
-	scai::utilskernel::LArray<IndexType> myCoarseGlobalIndices(fineToCoarse.getLocalValues());
+	HArray<IndexType> myCoarseGlobalIndices(fineToCoarse.getLocalValues());
 	scai::hmemo::WriteAccess<IndexType> wIndices(myCoarseGlobalIndices);
 	assert(wIndices.size() == fineLocalN);
 	std::sort(wIndices.get(), wIndices.get() + fineLocalN);
@@ -775,7 +776,7 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
      */
     for (IndexType dim = 0; dim < dimensions; dim++) {
         //get local parts of coordinates
-        const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
+        const HArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
         for (IndexType i = 0; i < localN; i++) {
             ValueType coord = localPartOfCoords[i];
             if (coord > maxCoords[dim]) maxCoords[dim] = coord;
@@ -843,7 +844,7 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
     
     // get halo for the non-local coordinates
     scai::dmemo::Halo coordHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(adjM);
-    std::vector<scai::utilskernel::LArray<ValueType>> coordHaloData(dimensions);
+    std::vector<HArray<ValueType>> coordHaloData(dimensions);
     for(int d=0; d<dimensions; d++){        
         comm->updateHalo( coordHaloData[d], coordinates[d].getLocalValues(), coordHalo );
     }

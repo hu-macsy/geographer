@@ -68,8 +68,8 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 	std::vector<ValueType> minCoords(dim);
 	std::vector<ValueType> maxCoords(dim);
 	for (int d = 0; d < dim; d++) {
-		minCoords[d] = coordinates[d].getLocalValues().min();//.Scalar::getValue<ValueType>();
-		maxCoords[d] = coordinates[d].getLocalValues().max();//.Scalar::getValue<ValueType>();
+		minCoords[d] = scai::utilskernel::HArrayUtils::min(coordinates[d].getLocalValues());
+		maxCoords[d] = scai::utilskernel::HArrayUtils::max(coordinates[d].getLocalValues());
 	}
 	return {minCoords, maxCoords};
 }
@@ -133,7 +133,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		std::cout << ") , ( ";
 		for (auto coord : maxCoords) std::cout << coord << " ";
 		std::cout << ")";
-		std::cout << ", " << localN << " nodes, " << nodeWeights.getLocalValues().sum() << " total weight";
+		std::cout << ", " << localN << " nodes, " << scai::utilskernel::HArrayUtils::sum(nodeWeights.getLocalValues()) << " total weight";
 		std::cout << std::endl;
 	}
 

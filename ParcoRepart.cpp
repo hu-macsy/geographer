@@ -252,8 +252,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
             metrics.timeKmeans[rank] = kMeansTime.count();
             //timeForKmeans = ValueType ( comm->max(kMeansTime.count() ));
-            assert(result.getLocalValues().min() >= 0);
-            assert(result.getLocalValues().max() < k);
+            assert(scai::utilskernel::HArrayUtils::min(result.getLocalValues()) >= 0);
+            assert(scai::utilskernel::HArrayUtils::max(result.getLocalValues()) < k);
 
             if (settings.verbose) {
                 ValueType totKMeansTime = ValueType( comm->max(kMeansTime.count()) );
@@ -426,7 +426,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
      *	create space filling curve indices.
      */
     
-    scai::lama::DenseVector<ValueType> hilbertIndices(coordDist);
+    // SCAI-TB ToDo: build vector from local data + distribution after generation of local data
+
+    scai::lama::DenseVector<ValueType> hilbertIndices(coordDist, 0);
  
     {
         SCAI_REGION("ParcoRepart.hilbertPartition.spaceFillingCurve");
@@ -548,7 +550,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     	assert(!coordDist->isReplicated() && comm->getSize() == k);
         SCAI_REGION( "ParcoRepart.hilbertPartition.createDistribution" );
 
-        scai::utilskernel::LArray<IndexType> indexTransport(newLocalIndices.size(), newLocalIndices.data());
+        scai::hmemo::HArray<IndexType> indexTransport(newLocalIndices.size(), newLocalIndices.data());
         assert(comm->sum(indexTransport.size()) == globalN);
         scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
         

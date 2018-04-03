@@ -4,7 +4,7 @@
 #include "LocalRefinement.h"
 #include "GraphUtils.h"
 
-using scai::lama::Scalar;
+using scai::hmemo::HArray;
 
 namespace ITI{
 
@@ -125,7 +125,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
 		scai::dmemo::Halo graphHalo;
 		CSRStorage<ValueType> haloMatrix;
-		scai::utilskernel::LArray<ValueType> nodeWeightHaloData;
+		HArray<ValueType> nodeWeightHaloData;
 
 		if (partner != comm->getRank()) {
 			//processor is active this round
@@ -149,7 +149,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			//swap size of border region and total block size.
 			IndexType blockSize = part.getDistributionPtr()->getLocalSize();
 
-			const ValueType blockWeightSum = nodeWeights.getLocalValues().sum();
+			const ValueType blockWeightSum = scai::utilskernel::HArrayUtils::sum(nodeWeights.getLocalValues());
 
 			IndexType swapField[5];
 			swapField[0] = interfaceNodes.size();
@@ -243,7 +243,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			 */
 			std::vector<ValueType> borderNodeWeights = {};
 			if (nodesWeighted) {
-				const scai::utilskernel::LArray<ValueType>& localWeights = nodeWeights.getLocalValues();
+				const HArray<ValueType>& localWeights = nodeWeights.getLocalValues();
 				assert(localWeights.size() == localN);
 				comm->updateHalo( nodeWeightHaloData, localWeights, graphHalo );
 				borderNodeWeights.resize(borderRegionSize,-1);
@@ -394,7 +394,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.redistribute" )
 
 				SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.redistribute.generalDistribution" )
-				scai::utilskernel::LArray<IndexType> indexTransport(myGlobalIndices.size(), myGlobalIndices.data());
+				HArray<IndexType> indexTransport(myGlobalIndices.size(), myGlobalIndices.data());
 				scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
 				SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.redistribute.generalDistribution" )
 
@@ -426,8 +426,8 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 					SCAI_REGION( "LocalRefinement.distributedFMStep.loop.updateBlockDistances" )
 
 					for (IndexType dim = 0; dim < coordinates.size(); dim++) {
-						scai::utilskernel::LArray<ValueType>& localCoords = coordinates[dim].getLocalValues();
-						scai::utilskernel::LArray<ValueType> haloData;
+						HArray<ValueType>& localCoords = coordinates[dim].getLocalValues();
+						HArray<ValueType> haloData;
 						comm->updateHalo( haloData, localCoords, graphHalo );
 						redistributeFromHalo<ValueType>(coordinates[dim], newDistribution, graphHalo, haloData);
 					}
@@ -474,7 +474,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 	const bool edgesWeighted = nodesWeighted;//TODO: adapt this, change interface
 
 	if (edgesWeighted) {
-		ValueType maxWeight = input.getLocalStorage().getValues().max();
+		ValueType maxWeight = scai::utilskernel::HArrayUtils::max(input.getLocalStorage().getValues());
 		if (maxWeight == 0) {
 			throw std::runtime_error("Edges were given as weighted, but maximum weight is zero.");
 		}
@@ -889,8 +889,6 @@ template<typename T>
 void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, scai::dmemo::Halo& halo, scai::hmemo::HArray<T>& haloData) {
 	SCAI_REGION( "LocalRefinement.redistributeFromHalo.Vector" )
 
-	using scai::utilskernel::LArray;
-
 	scai::dmemo::DistributionPtr oldDist = input.getDistributionPtr();
 	const IndexType newLocalN = newDist->getLocalSize();
 	const IndexType oldLocalN = oldDist->getLocalSize();
@@ -906,7 +904,7 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(DenseVecto
 
 	IndexType oldLocalI = 0;
 
-	LArray<T> newLocalValues(newLocalN);
+	HArray<T> newLocalValues(newLocalN);
 
 	{
 		scai::hmemo::ReadAccess<T> rOldLocalValues(input.getLocalValues());
@@ -936,8 +934,6 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 	SCAI_REGION( "LocalRefinement.redistributeFromHalo" )
 
 	scai::dmemo::DistributionPtr oldDist = matrix.getRowDistributionPtr();
-
-	using scai::utilskernel::LArray;
 
 	const IndexType sourceNumRows = oldDist->getLocalSize();
 	const IndexType targetNumRows = newDist->getLocalSize();
@@ -1042,12 +1038,12 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 	{
 		SCAI_REGION( "LocalRefinement.redistributeFromHalo.copy" )
 		//copying JA array from local matrix and halo
-		scai::utilskernel::TransferUtils::copyV( targetJA, targetIA, LArray<IndexType>(numLocalIndices, localTargetIndices.data()), localStorage.getJA(), localStorage.getIA(), LArray<IndexType>(numLocalIndices, localSourceIndices.data()) );
-		scai::utilskernel::TransferUtils::copyV( targetJA, targetIA, LArray<IndexType>(additionalLocalNodes.size(), additionalLocalNodes.data()), haloStorage.getJA(), haloStorage.getIA(), LArray<IndexType>(numHaloIndices, localHaloIndices.data()) );
+		scai::utilskernel::TransferUtils::copyV( targetJA, targetIA, HArray<IndexType>(numLocalIndices, localTargetIndices.data()), localStorage.getJA(), localStorage.getIA(), HArray<IndexType>(numLocalIndices, localSourceIndices.data()) );
+		scai::utilskernel::TransferUtils::copyV( targetJA, targetIA, HArray<IndexType>(additionalLocalNodes.size(), additionalLocalNodes.data()), haloStorage.getJA(), haloStorage.getIA(), HArray<IndexType>(numHaloIndices, localHaloIndices.data()) );
 
 		//copying Values array from local matrix and halo
-		scai::utilskernel::TransferUtils::copyV( targetValues, targetIA, LArray<IndexType>(numLocalIndices, localTargetIndices.data()), localStorage.getValues(), localStorage.getIA(), LArray<IndexType>(numLocalIndices, localSourceIndices.data()) );
-		scai::utilskernel::TransferUtils::copyV( targetValues, targetIA, LArray<IndexType>(additionalLocalNodes.size(), additionalLocalNodes.data()), haloStorage.getValues(), haloStorage.getIA(), LArray<IndexType>(numHaloIndices, localHaloIndices.data()) );
+		scai::utilskernel::TransferUtils::copyV( targetValues, targetIA, HArray<IndexType>(numLocalIndices, localTargetIndices.data()), localStorage.getValues(), localStorage.getIA(), HArray<IndexType>(numLocalIndices, localSourceIndices.data()) );
+		scai::utilskernel::TransferUtils::copyV( targetValues, targetIA, HArray<IndexType>(additionalLocalNodes.size(), additionalLocalNodes.data()), haloStorage.getValues(), haloStorage.getIA(), HArray<IndexType>(numHaloIndices, localHaloIndices.data()) );
 	}
 
 	{
@@ -1243,9 +1239,9 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distancesFrom
 
 	std::vector<ValueType> geometricCenter(dimensions);
 	for (IndexType dim = 0; dim < dimensions; dim++) {
-		const scai::utilskernel::LArray<ValueType>& localValues = coordinates[dim].getLocalValues();
+		const HArray<ValueType>& localValues = coordinates[dim].getLocalValues();
 		assert(localValues.size() == localN);
-		geometricCenter[dim] = localValues.sum() / localN;
+		geometricCenter[dim] = scai::utilskernel::HArrayUtils::sum(localValues) / localN;
 	}
 
 	std::vector<ValueType> result(localN);

@@ -126,7 +126,7 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
     // get local max
     for (IndexType dim = 0; dim < dimensions; dim++) {
         //get local parts of coordinates
-        const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
+        const scai::hmemo::HArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
         for (IndexType i = 0; i < localN; i++) {
             ValueType coord = localPartOfCoords[i];
             if (coord > maxCoords[dim]) maxCoords[dim] = coord;
@@ -393,13 +393,12 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getD
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
     const IndexType localN = distPtr->getLocalSize();
     
-    scai::lama::DenseVector<IndexType> degreeVector(distPtr);
-    scai::utilskernel::LArray<IndexType>& localDegreeVector = degreeVector.getLocalValues();
+    scai::hmemo::HArray<IndexType> localDegreeVector;
     
     const scai::lama::CSRStorage<ValueType> localAdjM = adjM.getLocalStorage();
     {
         const scai::hmemo::ReadAccess<IndexType> readIA ( localAdjM.getIA() );
-        scai::hmemo::WriteOnlyAccess<IndexType> writeVector( localDegreeVector, localDegreeVector.size()) ;
+        scai::hmemo::WriteOnlyAccess<IndexType> writeVector( localDegreeVector, distPtr->getLocalSize() ) ;
         
         SCAI_ASSERT_EQ_ERROR(readIA.size(), localDegreeVector.size()+1, "Probably wrong distribution");
         
@@ -408,6 +407,8 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getD
         }
     }
     
+    scai::lama::DenseVector<IndexType> degreeVector(distPtr, std::move(localDegreeVector));
+
     return degreeVector;
 }
 

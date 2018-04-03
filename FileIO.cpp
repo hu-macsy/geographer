@@ -10,7 +10,6 @@
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>
 #include <scai/lama/Vector.hpp>
-#include <scai/lama/Scalar.hpp>
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/common/Math.hpp>
 #include <scai/common/Settings.hpp>
@@ -33,7 +32,7 @@
 
 
 using scai::lama::CSRStorage;
-using scai::lama::Scalar;
+using scai::hmemo::HArray;
 
 const IndexType fileTypeVersionNumber= 3;
 
@@ -799,7 +798,7 @@ if( !read) PRINT(*comm << ": " <<  i << " __ " << line << " || " << file.tellg()
 	nodeWeights.resize(numberNodeWeights);
     //std::cout << "Process " << comm->getRank() << " allocated memory for " << numberNodeWeights << " node weights. " << std::endl;
 	for (IndexType i = 0; i < numberNodeWeights; i++) {
-		nodeWeights[i] = DenseVector<ValueType>(dist, scai::utilskernel::LArray<ValueType>(localN, nodeWeightStorage[i].data()));
+		nodeWeights[i] = DenseVector<ValueType>(dist, HArray<ValueType>(localN, nodeWeightStorage[i].data()));
 	}
 
     //std::cout << "Process " << comm->getRank() << " converted node weights. " << std::endl;
@@ -830,9 +829,9 @@ if( !read) PRINT(*comm << ": " <<  i << " __ " << line << " || " << file.tellg()
 
     //assign matrix
     scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, 
-                scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
-    		scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
-    		scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
+                HArray<IndexType>(ia.size(), ia.data()),
+    		HArray<IndexType>(ja.size(), ja.data()),
+    		HArray<ValueType>(values.size(), values.data()));
 
     //std::cout << "Process " << comm->getRank() << " created local storage " << std::endl;
 
@@ -998,9 +997,9 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     //
     
     scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, 
-        scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
-        scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
-        scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
+        HArray<IndexType>(ia.size(), ia.data()),
+        HArray<IndexType>(ja.size(), ja.data()),
+        HArray<ValueType>(values.size(), values.data()));
     
     // block distribution for rows and no distribution for columns
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
@@ -1092,9 +1091,9 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 	}
 
 	//create result vector
-	std::vector<scai::utilskernel::LArray<ValueType> > coords(dimension);
+	std::vector<HArray<ValueType> > coords(dimension);
 	for (IndexType dim = 0; dim < dimension; dim++) {
-		coords[dim] = scai::utilskernel::LArray<ValueType>(localN, 0);
+		coords[dim] = HArray<ValueType>(localN, ValueType(0));
 	}
 
 	//read local range
@@ -1216,9 +1215,9 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
     }
 
     //create result vector
-    std::vector<scai::utilskernel::LArray<ValueType> > coords(dimension);
+    std::vector<HArray<ValueType> > coords(dimension);
     for (IndexType dim = 0; dim < dimension; dim++) {
-    	coords[dim] = scai::utilskernel::LArray<ValueType>(localN, 0);
+    	coords[dim] = HArray<ValueType>(localN, ValueType(0));
     }
 
     //read local range
@@ -1321,9 +1320,9 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
     IndexType highPE = window_size;
 
     //create local part result vector
-    std::vector<scai::utilskernel::LArray<ValueType> > coords(dimension);
+    std::vector<HArray<ValueType> > coords(dimension);
     for (IndexType dim = 0; dim < dimension; dim++) {
-    	coords[dim] = scai::utilskernel::LArray<ValueType>(localN, 0);
+        coords[dim] = HArray<ValueType>(localN, ValueType(0));
     }
 
     while( lowPE<numPEs ){
@@ -1422,9 +1421,9 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsMatr
     }
     
     //create result vector
-    std::vector<scai::utilskernel::LArray<ValueType> > coords(dimensions);
+    std::vector<HArray<ValueType> > coords(dimensions);
     for (IndexType dim = 0; dim < dimensions; dim++) {
-    	coords[dim] = scai::utilskernel::LArray<ValueType>(localN, 0);
+        coords[dim] = HArray<ValueType>(localN, ValueType(0));
     }
     
     //read local range
@@ -1512,9 +1511,9 @@ PRINT( N << " _ " << numFaces << ", numEdges= " << numEdges );
 
     IndexType dimension = 3;
     
-    std::vector<scai::utilskernel::LArray<ValueType> > coordsLA(dimension);
+    std::vector<HArray<ValueType> > coordsLA(dimension);
 	for (IndexType dim = 0; dim < dimension; dim++) {
-		coordsLA[dim] = scai::utilskernel::LArray<ValueType>(N, 0);
+        coordsLA[dim] = HArray<ValueType>(N, ValueType(0));
 	}
 	
 	for(IndexType i=0; i<N; i++){
@@ -1922,8 +1921,8 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
 
 	for (IndexType d = 0; d < dimension; d++) {
 		assert(vCoords[d].size() == numLeaves);
-		scai::utilskernel::LArray<ValueType> localValues(vCoords[d].size(), vCoords[d].data());
-		coords[d] = DenseVector<ValueType>(localValues);
+		HArray<ValueType> localValues(vCoords[d].size(), vCoords[d].data());
+		coords[d] = DenseVector<ValueType>(std::move(localValues));
 	}
     return matrix;
 }

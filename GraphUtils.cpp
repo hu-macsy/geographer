@@ -106,7 +106,7 @@ ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<
 	scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
 	scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(input);
-	scai::utilskernel::LArray<IndexType> haloData;
+	scai::hmemo::HArray<IndexType> haloData;
 	partDist->getCommunicatorPtr()->updateHalo( haloData, localData, partHalo );
 
 	ValueType result = 0;
@@ -392,9 +392,9 @@ DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, c
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
     const IndexType localN = dist->getLocalSize();
-    const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
+    const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
     DenseVector<IndexType> border(dist,0);
-    scai::utilskernel::LArray<IndexType>& localBorder= border.getLocalValues();
+    scai::hmemo::HArray<IndexType>& localBorder= border.getLocalValues();
 
     IndexType globalN = dist->getGlobalSize();
     IndexType max = part.max();
@@ -410,7 +410,7 @@ DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, c
 	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
 	scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
-	scai::utilskernel::LArray<IndexType> haloData;
+	scai::hmemo::HArray<IndexType> haloData;
 	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
 
     for(IndexType i=0; i<localN; i++){    // for all local nodes
@@ -447,7 +447,7 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes(
     
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
     const IndexType localN = dist->getLocalSize();
-    const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
+    const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
 
     IndexType globalN = dist->getGlobalSize();
     IndexType max = part.max();
@@ -469,7 +469,7 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes(
 	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
 	scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
-	scai::utilskernel::LArray<IndexType> haloData;
+	scai::hmemo::HArray<IndexType> haloData;
 	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
 
     for(IndexType i=0; i<localN; i++){    // for all local nodes
@@ -520,7 +520,7 @@ std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM
     
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
     const IndexType localN = dist->getLocalSize();
-    const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
+    const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
 
     IndexType globalN = dist->getGlobalSize();
     IndexType max = part.max();
@@ -540,7 +540,7 @@ std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM
 	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
 	scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
-	scai::utilskernel::LArray<IndexType> haloData;
+	scai::hmemo::HArray<IndexType> haloData;
 	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
 
     for(IndexType i=0; i<localN; i++){    // for all local nodes
@@ -685,7 +685,7 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
     SCAI_REGION_START("ParcoRepart.getLocalBlockGraphEdges.initialise");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
-    const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
+    const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
     IndexType N = adjM.getNumColumns();
     IndexType max = part.max();
    
@@ -803,7 +803,7 @@ scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSpars
     SCAI_REGION("ParcoRepart.getBlockGraph");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-    const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
+    const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
     
     // there are k blocks in the partition so the adjecency matrix for the block graph has dimensions [k x k]
     scai::dmemo::DistributionPtr distRowBlock ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, k) );  
@@ -907,9 +907,9 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::Halo& halo
     const IndexType numNeighbors = neighbors.size();
 
     SCAI_REGION_START("ParcoRepart.getPEGraph.buildMatrix");
-	scai::utilskernel::LArray<IndexType> ia(2, 0, numNeighbors);
-	scai::utilskernel::LArray<IndexType> ja(numNeighbors, neighbors.data());
-	scai::utilskernel::LArray<ValueType> values(edgeCount.size(), edgeCount.data());
+	scai::hmemo::HArray<IndexType> ia(2, 0, numNeighbors);
+	scai::hmemo::HArray<IndexType> ja(numNeighbors, neighbors.data());
+	scai::hmemo::HArray<ValueType> values(edgeCount.size(), edgeCount.data());
 	scai::lama::CSRStorage<ValueType> myStorage(1, comm->getSize(), numNeighbors, ia, ja, values);
 	SCAI_REGION_END("ParcoRepart.getPEGraph.buildMatrix");
 
@@ -930,7 +930,7 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueTy
     const std::vector<IndexType> nonLocalIndices = GraphUtils::nonLocalNeighbors<IndexType, ValueType>(adjM);
     
     SCAI_REGION_START("ParcoRepart.getPEGraph.getOwners");
-    scai::utilskernel::LArray<IndexType> indexTransport(nonLocalIndices.size(), nonLocalIndices.data());
+    scai::hmemo::HArray<IndexType> indexTransport(nonLocalIndices.size(), nonLocalIndices.data());
     // find the PEs that own every non-local index
     scai::hmemo::HArray<IndexType> owners(nonLocalIndices.size() , -1);
     dist->computeOwners( owners, indexTransport);
@@ -950,9 +950,9 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueTy
     scai::dmemo::DistributionPtr noDistPEs (new scai::dmemo::NoDistribution( numPEs ));
 
     SCAI_REGION_START("ParcoRepart.getPEGraph.buildMatrix");
-    scai::utilskernel::LArray<IndexType> ia(2, 0, numNeighbors);
-    scai::utilskernel::LArray<IndexType> ja(numNeighbors, neighborPEs.data());
-    scai::utilskernel::LArray<ValueType> values(numNeighbors, 1);
+    scai::hmemo::HArray<IndexType> ia( { 0, numNeighbors } );
+    scai::hmemo::HArray<IndexType> ja(numNeighbors, neighborPEs.data());
+    scai::hmemo::HArray<ValueType> values(numNeighbors, 1);
     scai::lama::CSRStorage<ValueType> myStorage(1, numPEs, std::move(ia), std::move(ja), std::move(values));
     SCAI_REGION_END("ParcoRepart.getPEGraph.buildMatrix");
     
@@ -981,12 +981,12 @@ scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixNoEgdeWeights( const std::vec
         ia[i+1] = ia[i]+neighbors.size();
     }
     
-    std::vector<IndexType> values(ja.size(), 1);
+    std::vector<ValueType> values(ja.size(), 1);
     
     scai::lama::CSRStorage<ValueType> myStorage( N, N,
-            scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
-            scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
-            scai::utilskernel::LArray<ValueType>(values.size(), values.data())
+            scai::hmemo::HArray<IndexType>(ia.size(), ia.data()),
+            scai::hmemo::HArray<IndexType>(ja.size(), ja.data()),
+            scai::hmemo::HArray<ValueType>(values.size(), values.data())
     );
     
     return scai::lama::CSRSparseMatrix<ValueType>(std::move(myStorage));

@@ -139,9 +139,9 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::setPartit
     const IndexType localN = distPtr->getLocalSize();
     const scai::dmemo::CommunicatorPtr comm = distPtr->getCommunicatorPtr();
     
-    scai::lama::DenseVector<IndexType> partition( distPtr );
+    scai::hmemo::HArray<IndexType> localPartition;
         
-    scai::hmemo::WriteOnlyAccess<IndexType> wLocalPart( partition.getLocalValues() );
+    scai::hmemo::WriteOnlyAccess<IndexType> wLocalPart(localPartition, localN);
     
     for(IndexType i=0; i<localN; i++){
         try{
@@ -153,6 +153,8 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::setPartit
     }
     wLocalPart.release();
     
+    scai::lama::DenseVector<IndexType> partition(distPtr, std::move(localPartition));
+
     return partition;
 }
 //--------------------------------------------------------------------------------------- 
