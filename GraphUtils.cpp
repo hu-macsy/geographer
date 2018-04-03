@@ -1465,7 +1465,6 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	PRINT0("time to sort edges: " << sortTime);
 	
 	//check for isolated nodes and wrong conversions
-	bool foundIsolatedNodes = false;
 	IndexType lastNode = localPairs[0].first;
 	for (int_pair edge : localPairs) {
 	    SCAI_ASSERT_LE_ERROR(edge.first, lastNode + 1, "Gap in sorted node IDs before edge exchange.");
