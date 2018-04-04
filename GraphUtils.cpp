@@ -134,7 +134,7 @@ std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &gr
     assert(u < localN);
     assert(u >= 0);
 
-    std::vector<IndexType> result(localN, std::numeric_limits<IndexType>::infinity());
+    std::vector<IndexType> result(localN, std::numeric_limits<IndexType>::max());
     std::queue<IndexType> queue;
     std::queue<IndexType> alternateQueue;
     std::vector<bool> visited(localN, false);
