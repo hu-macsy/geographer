@@ -188,7 +188,7 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     scai::dmemo::CommunicationPlan recvPlan;
     recvPlan.allocateTranspose(sendPlan, *comm);
     IndexType newLocalN = recvPlan.totalQuantity();
-    SCAI_REGION_END("ParcoRepart.hilberRedistribution.communicationPlan")
+    SCAI_REGION_END("ParcoRepart.hilbertRedistribution.communicationPlan")
 
     PRINT0(std::to_string(localN) + " old local values "
                     + std::to_string(newLocalN) + " new ones.");

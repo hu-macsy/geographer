@@ -3,7 +3,7 @@
 #include "KMeans.h"
 #include "AuxiliaryFunctions.h"
 
-#include "Repartition.h"
+//#include "Repartition.h"
 
 #include "gtest/gtest.h"
 
@@ -224,7 +224,7 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 	}
 }
 
-
+/*
 TEST_F(KMeansTest, testPartitionWithNodeWeights) {
 	//std::string fileName = "Grid32x32";
 	std::string fileName = "bubbles-00010.graph";
@@ -283,7 +283,7 @@ TEST_F(KMeansTest, testPartitionWithNodeWeights) {
 	}
 	
 }
-
+*/
 
 
 }

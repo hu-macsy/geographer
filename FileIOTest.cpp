@@ -99,7 +99,6 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
         SCAI_REGION("testReadAndWriteGraphFromFile.readGraphFromFile");
         Graph = FileIO<IndexType, ValueType>::readGraph(filename);
     }
-    //IndexType N = Graph.getNumColumns();
     EXPECT_EQ(Graph.getNumColumns(), Graph.getNumRows());
     EXPECT_EQ(nodes, Graph.getNumColumns());
     EXPECT_EQ(edges, (Graph.getNumValues())/2 );
@@ -245,7 +244,7 @@ TEST_F(FileIOTest, testReadCoordsOcean) {
 
 	for (IndexType d = 0; d < 2; d++) {
 	    scai::hmemo::ReadAccess<ValueType> rCoords(coords[d].getLocalValues());
-	    for (IndexType i = 0; i < n; i++ ) {
+	    for (IndexType i = 0; i < rCoords.size(); i++ ) {
 	        EXPECT_TRUE(std::isfinite(rCoords[i]));
         }
 	}

@@ -131,15 +131,10 @@ std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &gr
 {
     const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
     const IndexType localN = inputDist->getLocalSize();
-const IndexType globalN = graph.getNumRows();
     assert(u < localN);
     assert(u >= 0);
 
-const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr(); 	
-	
-    //std::vector<IndexType> result(localN, std::numeric_limits<IndexType>::infinity());
-std::vector<IndexType> result(localN, std::numeric_limits<IndexType>::max() );
-//PRINT(*comm << ": max= "<< *std::max_element(result.begin(), result.end()) << " , min= " << *std::min_element(result.begin(), result.end()) << " , has_infinity= " << std::numeric_limits<IndexType>::has_infinity);	
+    std::vector<IndexType> result(localN, std::numeric_limits<IndexType>::max());
     std::queue<IndexType> queue;
     std::queue<IndexType> alternateQueue;
     std::vector<bool> visited(localN, false);
@@ -198,7 +193,7 @@ IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const I
 {
     const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
-const IndexType globalN = graph.getNumRows();
+
     const IndexType localN = inputDist->getLocalSize();
     if (comm->getRank() == 0) {
         std::cout << "Starting Diameter calculation..." << std::endl;
@@ -225,7 +220,6 @@ const IndexType globalN = graph.getNumRows();
 		assert(ecc[u] == std::numeric_limits<IndexType>::max() );		
         return ecc[u];
     }
-    
     IndexType i = ecc[u];
     lowerBound = std::max(ecc[u], lowerBound);
     IndexType upperBound = 2*ecc[u];

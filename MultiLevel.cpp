@@ -596,7 +596,6 @@ scai::dmemo::DistributionPtr MultiLevel<IndexType, ValueType>::projectToCoarse(c
 	std::sort(wIndices.get(), wIndices.get() + fineLocalN);
 	auto newEnd = std::unique(wIndices.get(), wIndices.get() + fineLocalN);
 	wIndices.resize(std::distance(wIndices.get(), newEnd));
-	//IndexType coarseLocalN = wIndices.size();
 	wIndices.release();
 
 	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(newGlobalN, myCoarseGlobalIndices, fineToCoarse.getDistributionPtr()->getCommunicatorPtr()));

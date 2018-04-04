@@ -653,7 +653,7 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
         
         int typesize;
         MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
-        assert(typesize == sizeof(sort_pair));
+        //assert(typesize == sizeof(sort_pair)); does not have to be true anymore due to padding
         
 		
 		//call distributed sort
