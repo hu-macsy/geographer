@@ -99,7 +99,6 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
         SCAI_REGION("testReadAndWriteGraphFromFile.readGraphFromFile");
         Graph = FileIO<IndexType, ValueType>::readGraph(filename);
     }
-    //IndexType N = Graph.getNumColumns();
     EXPECT_EQ(Graph.getNumColumns(), Graph.getNumRows());
     EXPECT_EQ(nodes, Graph.getNumColumns());
     EXPECT_EQ(edges, (Graph.getNumValues())/2 );

@@ -42,7 +42,6 @@ TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     // for now local refinement requires k = P
-    //IndexType k = comm->getSize();
     //
     IndexType N = 40;
     //CSRSparseMatrix<ValueType> graph(N, N);
@@ -73,7 +72,6 @@ TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
     scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
     graph.redistribute( blockDistPtr, noDistPtr);
     
-    //const IndexType localN = blockDistPtr->getLocalSize();
     
     scai::lama::CSRSparseMatrix<ValueType> laplacian = SpectralPartition<IndexType, ValueType>::getLaplacian( graph );
     
@@ -140,7 +138,6 @@ TEST_F(SpectralPartitionTest, testSpectralPartition){
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
-    //const IndexType localN = dist->getLocalSize();
     
     //distrubute graph
     graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 

@@ -209,29 +209,7 @@ static std::tuple<IndexType, IndexType> index2_2DPoint(IndexType index,  std::ve
 
     return std::make_tuple(xIndex, yIndex);
 } 
-
-/*
-static struct Settings settignsFromVm( boost::program_options::variables_map vm, struct Settings settings){
-	
-	if( vm.count("initialMigration") ){
-		if( !(settings.initialMigration==InitialPartitioningMethods::SFC
-				or settings.initialMigration==InitialPartitioningMethods::KMeans
-				or settings.initialMigration==InitialPartitioningMethods::Multisection
-				or settings.initialMigration==InitialPartitioningMethods::None) ){
-			PRINT0("Initial migration supported only for 0:SFCs, 3:k-means, 4:MultiSection or 5:None, invalid option " << settings.initialMigration << " was given");
-			return 126;
-		}
-	}
-}
-
-static void initializeInput( scai::lama::CSRSparseMatrix<ValueType> graph,
-					  std::vector<DenseVector<ValueType>> coordinates,
-					  scai::lama::DenseVector<ValueType> nodeWeights,
-					  variables_map vm,
-					  struct Settings settings){
-}
- */
-
+ 
 }; //class aux
 
 template class aux<IndexType, ValueType>;

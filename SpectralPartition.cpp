@@ -388,7 +388,6 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getD
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-    //const IndexType localN = distPtr->getLocalSize();
     
     scai::lama::DenseVector<IndexType> degreeVector(distPtr);
     scai::utilskernel::LArray<IndexType>& localDegreeVector = degreeVector.getLocalValues();
