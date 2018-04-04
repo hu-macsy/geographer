@@ -278,7 +278,7 @@ int main(int argc, char** argv) {
     } else {
     	std::cout << "machine char not valid" << std::endl;
     }
-
+	
     settings.verbose = vm.count("verbose");
     settings.storeInfo = vm.count("storeInfo");
     settings.erodeInfluence = vm.count("erodeInfluence");

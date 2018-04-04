@@ -207,13 +207,11 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     comm->exchangeByPlan(recvIndices.data(), recvPlan, sendIndices.data(),
             sendPlan);
     //get new distribution
-    scai::utilskernel::LArray<IndexType> indexTransport(newLocalN,
-            recvIndices.data());
+    scai::utilskernel::LArray<IndexType> indexTransport(newLocalN, recvIndices.data());
     scai::dmemo::DistributionPtr newDist(
             new scai::dmemo::GeneralDistribution(globalN, indexTransport,
                     comm));
-    SCAI_ASSERT_EQUAL(newDist->getLocalSize(), newLocalN,
-            "wrong size of new distribution");
+    SCAI_ASSERT_EQUAL(newDist->getLocalSize(), newLocalN, "wrong size of new distribution");
     for (IndexType i = 0; i < newLocalN; i++) {
         SCAI_ASSERT_VALID_INDEX_DEBUG(recvIndices[i], globalN, "invalid index");
     }

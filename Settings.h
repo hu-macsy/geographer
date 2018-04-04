@@ -159,7 +159,7 @@ struct Settings{
     IndexType sfcResolution = 17;
 
     //tuning parameters balanced K-Means
-    IndexType minSamplingNodes = 100;
+    IndexType minSamplingNodes = 1000;
     double influenceExponent = 0.5;
     double influenceChangeCap = 0.1;
     IndexType balanceIterations = 20;

@@ -131,10 +131,15 @@ std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &gr
 {
     const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
     const IndexType localN = inputDist->getLocalSize();
+const IndexType globalN = graph.getNumRows();
     assert(u < localN);
     assert(u >= 0);
 
-    std::vector<IndexType> result(localN, std::numeric_limits<IndexType>::infinity());
+const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr(); 	
+	
+    //std::vector<IndexType> result(localN, std::numeric_limits<IndexType>::infinity());
+std::vector<IndexType> result(localN, std::numeric_limits<IndexType>::max() );
+//PRINT(*comm << ": max= "<< *std::max_element(result.begin(), result.end()) << " , min= " << *std::min_element(result.begin(), result.end()) << " , has_infinity= " << std::numeric_limits<IndexType>::has_infinity);	
     std::queue<IndexType> queue;
     std::queue<IndexType> alternateQueue;
     std::vector<bool> visited(localN, false);
@@ -142,7 +147,8 @@ std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &gr
     queue.push(u);
     result[u] = 0;
     visited[u] = true;
-
+	//IndexType numVisitedNgbrs = 0;
+	
     const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> localIa(localStorage.getIA());
     const scai::hmemo::ReadAccess<IndexType> localJa(localStorage.getJA());
@@ -169,6 +175,7 @@ std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &gr
                     alternateQueue.push(localNeighbor);
                     result[localNeighbor] = round+1;
                     visited[localNeighbor] = true;
+					//++numVisitedNgbrs;
                 }
             }
         }
@@ -176,6 +183,11 @@ std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &gr
         std::swap(queue, alternateQueue);
         //if alternateQueue was empty, queue is now empty and outer loop will abort
     }
+	/* //for debugging TODO: remove if not needed
+	if( numVisitedNgbrs != localN-1 ){
+		PRINT(*comm <<": round= " << round << " , numVisitedNgbrs= " << numVisitedNgbrs);    
+	}
+	*/
     assert(result[u] == 0);
 
     return result;
@@ -186,7 +198,7 @@ IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const I
 {
     const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
-
+const IndexType globalN = graph.getNumRows();
     const IndexType localN = inputDist->getLocalSize();
     if (comm->getRank() == 0) {
         std::cout << "Starting Diameter calculation..." << std::endl;
@@ -199,14 +211,21 @@ IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const I
     ecc[u] = *std::max_element(distances.begin(), distances.end());
 
     if (localN > 1) {
-        //assert(ecc[u] > 0);
-		SCAI_ASSERT_GT_ERROR( ecc[u], 0, "Wrong eccentricity value");
+		/* //debugging, TODO: remove is not needed or add debug flag
+		if( ecc[u]==0 ){
+			PRINT(*comm << ": max= "<< *std::max_element(distances.begin(), distances.end()) << " , min= " << 
+			*std::min_element(distances.begin(), distances.end()) );
+		}
+		*/
+		SCAI_ASSERT_GT_ERROR( ecc[u], 0, *comm << ": Wrong eccentricity value");
     }
 
     if (ecc[u] > localN) {
-        assert(ecc[u] == std::numeric_limits<IndexType>::infinity());
+		//PRINT( *comm <<": ecc[u] > localN :" << ecc[u] << " > " << localN ); 
+		assert(ecc[u] == std::numeric_limits<IndexType>::max() );		
         return ecc[u];
     }
+    
     IndexType i = ecc[u];
     lowerBound = std::max(ecc[u], lowerBound);
     IndexType upperBound = 2*ecc[u];

@@ -79,7 +79,8 @@ int main(int argc, char** argv) {
         ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
 		("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
 		("coordFormat",  value<ITI::Format>(&coordFormat), "format of coordinate file")
-        
+        ("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
+		
         ("generate", "generate random graph. Currently, only uniform meshes are supported.")
         ("numX", value<IndexType>(&settings.numX), "Number of points in x dimension of generated graph")
 		("numY", value<IndexType>(&settings.numY), "Number of points in y dimension of generated graph")
@@ -142,6 +143,7 @@ int main(int argc, char** argv) {
     
     CSRSparseMatrix<ValueType> graph;
     std::vector<DenseVector<ValueType>> coords(settings.dimensions);
+    scai::lama::DenseVector<ValueType> nodeWeights;		//the weights for each node
     
     std::string graphFile;
     
@@ -155,10 +157,13 @@ int main(int argc, char** argv) {
             coordFile = graphFile + ".xyz";
         }
         
+        std::vector<DenseVector<ValueType> > vectorOfNodeWeights;
+		
+		// read the graph
         if (vm.count("fileFormat")) {
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, settings.fileFormat );
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights, settings.fileFormat );
         }else{
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights );
         }
         
         N = graph.getNumRows();
@@ -166,6 +171,19 @@ int main(int argc, char** argv) {
         SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
         SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
         		
+		// set the node weigths
+		IndexType numNodeWeights = vectorOfNodeWeights.size();
+        if (numNodeWeights == 0) {
+			nodeWeights = DenseVector<ValueType>( graph.getRowDistributionPtr() , 1);
+		}
+		else if (numNodeWeights == 1) {
+			nodeWeights = vectorOfNodeWeights[0];
+		} else {
+			IndexType index = vm["nodeWeightIndex"].as<int>();
+			assert(index < numNodeWeights);
+			nodeWeights = vectorOfNodeWeights[index];
+		}
+		
         //read the coordinates file
 		if (vm.count("coordFormat")) {
 			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
@@ -241,6 +259,7 @@ int main(int argc, char** argv) {
 	// start main for loop for all tools
 	//
 	
+	
 	//WARNING: 1) removed parmetis sfc
 	//WARNING: 2) parMetisGraph should be last because it often crashes
 	std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRIB, ITI::Tool::zoltanRCB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph };
@@ -259,9 +278,10 @@ int main(int argc, char** argv) {
 		metrics.numBlocks = settings.numBlocks;
 		
 		// uniform node weights
-		scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
+		//scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
+		
 		// if usign unit weights, set flag for wrappers
-		bool nodeWeightsUse = false;
+		bool nodeWeightsUse = true;
 		
 		// if graph is too big, repeat less times to avoid memory and time problems
 		if( N>std::pow(2,29) ){

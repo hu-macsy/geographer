@@ -78,7 +78,6 @@ def submitGeographer(exp, version, outDir):
 			exit(-1)
 
 
-		
 		if not os.path.exists( os.path.join( outDir, tool) ):
 			print("WARNING: Output directory " + os.path.join( outDir, tool) +" does not exist. Creating directory " + os.path.join( outDir, tool))
 			os.makedirs( os.path.join( outDir, tool) )
@@ -95,6 +94,9 @@ def submitGeographer(exp, version, outDir):
 		params += " --epsilon=" + str(epsilon)
 		params += " --dimensions="+ exp.dimension
 		params += " --fileFormat="+ exp.fileFormat
+		params += " --repeatTimes=" + str(5)
+		#params += " --verbose"
+		#params += " --noComputeDiameter"
 				
 		if exp.coordFormat!=-1:
 			params += " --coordFormat="+ str(exp.coordFormat)

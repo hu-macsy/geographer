@@ -66,7 +66,7 @@ def addRelativePlot( exp, metricValues, metricName, metricPos, toolNames, baseTo
 					plotF.write("("+str(exp.k[i])+", "+ str(0) + ")\n")	
 				else:
 					plotF.write("("+str(exp.k[i])+", "+ str(thisToolMetrics[m][i]/metricValues[baseToolId][m][i]) + ")\n")	
-				print( metricValues[baseToolId][m][i] )
+				#print( metricValues[baseToolId][m][i] )
 			else:
 				plotF.write("("+str(exp.k[i])+", nan)\n")
 		
@@ -295,17 +295,20 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues, outDir ):
 			plotF.write("\\clearpage\n\n")
 		
 		plotF.write("\n\\begin{figure}\n")
-		#plotMeanForAllTool( geoMeanMatrix, metricNames, numMetrics, toolNames, plotF, "Geometric")
 		print( metricNamesShort )
+		
+		# plot for geometric mean
 		plotBarMeanForAllTool( geoMeanMatrix, metricNamesShort, len(metricNamesShort), toolNames, plotF)
 		plotF.write("\\caption{Geometric mean for all metrics and all tools for experiment:" + str(exp.ID) +" with base tool: " + wantedTools[0] +"}\n\\end{figure}\n\n")
-		plotF.write("\n\\begin{figure}\n")
-		#plotMeanForAllTool( harmMeanMatrix, metricNames, numMetrics, toolNames, plotF,"Harmonic")
-		plotBarMeanForAllTool( harmMeanMatrix, metricNamesShort, len(metricNamesShort), toolNames, plotF)
-		plotF.write("\\caption{Harmonic mean for all metrics and all tools for experiment:" + str(exp.ID) +" with base tool: " + wantedTools[0] +"}\n\\end{figure}\n\n")
+		
+		#plot for harmonic mean
+		#plotF.write("\n\\begin{figure}\n")
+		#plotBarMeanForAllTool( harmMeanMatrix, metricNamesShort, len(metricNamesShort), toolNames, plotF)
+		#plotF.write("\\caption{Harmonic mean for all metrics and all tools for experiment:" + str(exp.ID) +" with base tool: " + wantedTools[0] +"}\n\\end{figure}\n\n")
+		
 		plotF.write("\n\n")
 		
-		newNumMetrics = len(geoMeanMatrix)
+		#newNumMetrics = len(geoMeanMatrix)
 
 		plotF.write("\n\n")
 		plotF.write("\\end{document}")

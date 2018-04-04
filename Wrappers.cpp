@@ -117,6 +117,8 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
         }
         std::cout<<"\033[0m";
     }
+    
+    
     //-----------------------------------------------------
     //
     // convert to parMetis data types
@@ -140,22 +142,43 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
 		//get the vtx array
 		
 		IndexType size = comm->getSize();
+		
+		//TODO: generalize for any distribution or throw appropriate message
+		/*
+		//this, obviously, only applies for a block distribution
+		IndexType lb, ub;
+		scai::dmemo::BlockDistribution blockDist(N, comm);
+		blockDist.getLocalRange(lb, ub, N, comm->getRank(), comm->getSize() );
+		PRINT(*comm<< ": "<< lb << " _ "<< ub);
+		*/
+		
+		// get local range of indices
+				
+		IndexType lb2=N+1, ub2=-1;
+		{
+			scai::hmemo::HArray<IndexType> myGlobalIndexes;
+			dist->getOwnedIndexes( myGlobalIndexes );
+			scai::hmemo::ReadAccess<IndexType> rIndices( myGlobalIndexes );
+			SCAI_ASSERT_EQ_ERROR( localN, myGlobalIndexes.size(), "Local size mismatch" );
+			
+			for( int i=0; i<localN; i++){
+				if( rIndices[i]<lb2 ) lb2=rIndices[i];
+				if( rIndices[i]>ub2 ) ub2=rIndices[i];
+			}
+			++ub2;	// we need max+1
+		}
+		//PRINT(*comm<< ": "<< lb2 << " - "<< ub2);
 
 		scai::hmemo::HArray<IndexType> sendVtx(size+1, static_cast<ValueType>( 0 ));
 		scai::hmemo::HArray<IndexType> recvVtx(size+1);
 		
-		IndexType lb, ub;
-		scai::dmemo::BlockDistribution blockDist(N, comm);
-		blockDist.getLocalRange(lb, ub, N, comm->getRank(), comm->getSize() );
-		//PRINT(*comm<< ": "<< lb << " _ "<< ub);
-		
-
+		//TODO: use a sumArray instead of shiftArray
 		for(IndexType round=0; round<comm->getSize(); round++){
 			SCAI_REGION("ParcoRepart.getBlockGraph.shiftArray");
 			{   // write your part 
 				scai::hmemo::WriteAccess<IndexType> sendPartWrite( sendVtx );
 				sendPartWrite[0]=0;
-				sendPartWrite[comm->getRank()+1]=ub;
+				sendPartWrite[comm->getRank()+1]=ub2;
 			}
 			comm->shiftArray(recvVtx , sendVtx, 1);
 			sendVtx.swap(recvVtx);
@@ -208,7 +231,6 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
 		idx_t wgtflag= 0;
 		
 		// vwgt , adjwgt store the weigths of vertices and edges.
-		
 		idx_t* vwgt= NULL;
 		
 		// if node weights are given
@@ -392,7 +414,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
 //-----------------------------------------------------------------------------------------
 	
 //
-//TODO: parMetis assumes that vertices are stores in a consecutive manner. This is not true for a
+//TODO: parMetis assumes that vertices are stored in a consecutive manner. This is not true for a
 //		general distribution. Must reindex vertices for parMetis
 //
 template<typename IndexType, typename ValueType>
@@ -404,8 +426,43 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisRepartit
 	struct Settings &settings,
 	struct Metrics &metrics){
 	
+	// copy graph and reindex
+	scai::lama::CSRSparseMatrix<ValueType> copyGraph = graph;
+	GraphUtils::reindex<IndexType, ValueType>(copyGraph);
+	
+	{// check that inidces are consecutive, TODO: maybe not needed, remove?
+		
+		const scai::dmemo::DistributionPtr dist( copyGraph.getRowDistributionPtr() );
+		//scai::hmemo::HArray<IndexType> myGlobalIndexes;
+		//dist.getOwnedIndexes( myGlobalIndexes );
+		const IndexType globalN = graph.getNumRows();
+		const IndexType localN= dist->getLocalSize();
+		const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+	
+		std::vector<IndexType> myGlobalIndexes(localN);
+		for(IndexType i=0; i<localN; i++){
+			myGlobalIndexes[i] = dist->local2global( i );
+		}
+		
+		std::sort( myGlobalIndexes.begin(), myGlobalIndexes.end() );
+		SCAI_ASSERT_GE_ERROR( myGlobalIndexes[0], 0, "Invalid index");
+		SCAI_ASSERT_LE_ERROR( myGlobalIndexes.back(), globalN, "Invalid index");
+		
+		for(IndexType i=1; i<localN; i++){
+			SCAI_ASSERT_EQ_ERROR( myGlobalIndexes[i], myGlobalIndexes[i-1]+1, *comm << ": Invalid index for local index " << i);
+		}
+		
+		//PRINT(*comm << ": min global ind= " <<  myGlobalIndexes.front() << " , max global ind= " << myGlobalIndexes.back() );
+	}
+	
 	int parMetisVersion = 3; // flag for repartition
-	return Wrappers<IndexType, ValueType>::metisPartition( graph, coords, nodeWeights, nodeWeightsFlag, parMetisVersion, settings, metrics);
+	scai::lama::DenseVector<IndexType> partition = Wrappers<IndexType, ValueType>::metisPartition( copyGraph, coords, nodeWeights, nodeWeightsFlag, parMetisVersion, settings, metrics);
+	
+	//because of the reindexing, we must redistribute the partition
+	partition.redistribute( graph.getRowDistributionPtr() );
+	
+	return partition;
+	//return Wrappers<IndexType, ValueType>::metisPartition( copyGraph, coords, nodeWeights, nodeWeightsFlag, parMetisVersion, settings, metrics);
 }
 	
 	
@@ -531,7 +588,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 	}else{
 		params.set("partitioning_approach", "partition");
 	}
-//PRINT( *comm );
+
 	//TODO:	params.set("partitioning_objective", "minimize_cut_edge_count");
 	//		or something else, check at 
 	//		https://trilinos.org/docs/r12.12/packages/zoltan2/doc/html/z2_parameters.html
@@ -543,7 +600,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 	//TODO: can also be taken from the distribution?
 	for (size_t i=0; i < localN; i++)
 		globalIds[i] = offset++;
-//PRINT( *comm );	
+
 	//set node weights
 	std::vector<ValueType> localUnitWeight(localN);
 	
