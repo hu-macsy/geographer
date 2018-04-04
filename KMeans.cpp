@@ -46,12 +46,6 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 	}
 
 	//get local hilbert indices
-	/*
-	std::vector<ValueType> sfcIndices(localN);
-	for (IndexType i = 0; i < localN; i++) {
-		sfcIndices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(convertedCoords[i].data(), dimensions, settings.sfcResolution, minCoords, maxCoords);
-	}
-	*/
 	std::vector<ValueType> sfcIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector( coordinates, settings.sfcResolution, settings.dimensions);
 	SCAI_ASSERT_EQ_ERROR( sfcIndices.size(), localN, "wrong local number of indices (?) ");
 

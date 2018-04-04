@@ -99,11 +99,15 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights,
 		const std::vector<IndexType> &blockSizes, const Settings settings) {
-	std::vector<ValueType> minCoords, maxCoords;
-	std::tie(minCoords, maxCoords) = getLocalMinMaxCoords(coordinates);
-	for(int d=0; d<settings.dimensions; d++){
-		SCAI_ASSERT_NE_ERROR( minCoords[d], maxCoords[d], "min=max for dimension "<< d << ", this will cause problems to the hilbert index. localN= " << coordinates[0].getLocalValues().size() );
-	}
+
+    std::vector<ValueType> minCoords(settings.dimensions);
+    std::vector<ValueType> maxCoords(settings.dimensions);
+    for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+        minCoords[dim] = coordinates[dim].min().scai::lama::Scalar::getValue<ValueType>();
+        maxCoords[dim] = coordinates[dim].max().scai::lama::Scalar::getValue<ValueType>();
+		SCAI_ASSERT_NE_ERROR( minCoords[dim], maxCoords[dim], "min=max for dimension "<< dim << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
+    }
+
 	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
 
 	return computePartition(coordinates, k, nodeWeights, blockSizes, centers, settings);
@@ -299,7 +303,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 					lowerBoundNextCenter[i] = 0;
 				} else {
 					ValueType diff = (-2*delta*pureSqrt + deltaSq)*(maxInfluence + 1e-10);
-                                        //TODO: assertion fails for small graphs
 					assert(diff <= 0);
 					lowerBoundNextCenter[i] += diff;
 					if (!(lowerBoundNextCenter[i] > 0)) lowerBoundNextCenter[i] = 0;
