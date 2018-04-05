@@ -99,26 +99,7 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     std::chrono::duration<double> migrationCalculation, migrationTime;
 
 
-    std::vector<ValueType> hilbertIndices(localN);
-    std::vector<std::vector<ValueType> > points(localN, std::vector<ValueType>(settings.dimensions, 0));
-    std::vector<ValueType> minCoords(settings.dimensions);
-    std::vector<ValueType> maxCoords(settings.dimensions);
-    for (IndexType d = 0; d < settings.dimensions; d++) {
-        minCoords[d] = coordinates[d].min().Scalar::getValue<ValueType>();
-        maxCoords[d] = coordinates[d].max().Scalar::getValue<ValueType>();
-        assert(std::isfinite(minCoords[d]));
-        assert(std::isfinite(maxCoords[d]));
-        scai::hmemo::ReadAccess<ValueType> rCoords(
-                coordinates[d].getLocalValues());
-        for (IndexType i = 0; i < localN; i++) {
-            points[i][d] = rCoords[i];
-        }
-    }
-    for (IndexType i = 0; i < localN; i++) {
-        hilbertIndices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(
-                points[i].data(), settings.dimensions, settings.sfcResolution,
-                minCoords, maxCoords);
-    }
+    std::vector<ValueType> hilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
     SCAI_REGION_END("ParcoRepart.hilbertRedistribution.sfc")
     SCAI_REGION_START("ParcoRepart.hilbertRedistribution.sort")
     /**
@@ -170,7 +151,7 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
         for (IndexType i = 0; i < localN; i++) {
             //increase target block counter if threshold is reached. Skip empty blocks if necessary.
             while (p + 1 < comm->getSize()
-                    && recvThresholds[p + 1] <= hilbertIndices[i]) { //TODO: check this more thoroughly when you are awake
+                    && recvThresholds[p + 1] <= hilbertIndices[i]) {
                 p++;
             }
             assert(p < comm->getSize());
