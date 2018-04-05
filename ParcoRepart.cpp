@@ -96,9 +96,6 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
 
     bool nodesUnweighted = (nodeWeights.max() == nodeWeights.min());
 
-    std::chrono::duration<double> migrationCalculation, migrationTime;
-
-
     std::vector<ValueType> hilbertIndices(localN);
     std::vector<std::vector<ValueType> > points(localN, std::vector<ValueType>(settings.dimensions, 0));
     std::vector<ValueType> minCoords(settings.dimensions);
@@ -108,8 +105,7 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
         maxCoords[d] = coordinates[d].max().Scalar::getValue<ValueType>();
         assert(std::isfinite(minCoords[d]));
         assert(std::isfinite(maxCoords[d]));
-        scai::hmemo::ReadAccess<ValueType> rCoords(
-                coordinates[d].getLocalValues());
+        scai::hmemo::ReadAccess<ValueType> rCoords( coordinates[d].getLocalValues() );
         for (IndexType i = 0; i < localN; i++) {
             points[i][d] = rCoords[i];
         }
@@ -138,8 +134,9 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     MPI_Comm mpi_comm = MPI_COMM_WORLD; //maybe cast the communicator ptr to a MPI communicator and get getMPIComm()?
     SQuick::sort<sort_pair>(mpi_comm, localPairs, -1); //could also do this with just the hilbert index - as a valueType
     //IndexType newLocalN = localPairs.size();
-    migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
+    std::chrono::duration<double> migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
     metrics.timeMigrationAlgo[rank] = migrationCalculation.count();
+	
     std::chrono::time_point < std::chrono::system_clock > beforeMigration = std::chrono::system_clock::now();
     assert(localPairs.size() > 0);
     SCAI_REGION_END("ParcoRepart.hilbertRedistribution.sort")
@@ -153,8 +150,7 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     MPI_Alltoall(sendThresholds.data(), 1, MPI_ValueType, recvThresholds.data(),
             1, MPI_ValueType, mpi_comm); //TODO: replace this monstrosity with a proper call to LAMA
     //comm->all2all(recvThresholds.data(), sendTresholds.data());//TODO: maybe speed up with hypercube
-    PRINT0(std::to_string(recvThresholds[0]) + " < hilbert indices < " + std::to_string(recvThresholds[comm->getSize() - 1])
-                    + ".");
+    PRINT0(std::to_string(recvThresholds[0]) + " < hilbert indices < " + std::to_string(recvThresholds[comm->getSize() - 1]) + ".");
     // merge to get quantities //Problem: nodes are not sorted according to their hilbert indices, so accesses are not aligned.
     // Need to sort before and after communication
     assert(std::is_sorted(recvThresholds.begin(), recvThresholds.end()));
@@ -266,7 +262,7 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
             }
         }
     }
-    migrationTime = std::chrono::system_clock::now() - beforeMigration;
+    std::chrono::duration<double> migrationTime = std::chrono::system_clock::now() - beforeMigration;
     metrics.timeFirstDistribution[rank] = migrationTime.count();
 }
 
@@ -508,67 +504,72 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             outF << "        " << timeToCalcInitMigration << "  ,  " << timeForFirstRedistribution << "  ,  " << timeForKmeans << "  ,  "<< timeForSecondRedistr << "  ,  " << timeForInitPart << ",         "  << cut << " ,  "<< imbalance <<std::endl;
             */
         }
+        
+        // if noRefinement then these are the times, if we do refinement they will be overwritten
+        partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
+		metrics.timePreliminary[rank] = partitionTime.count();
+		
+        if (comm->getSize() == k) {
+			//WARNING: the results is not redistributed. must redistribute afterwards
+			if(  !settings.noRefinement ) {
+				SCAI_REGION("ParcoRepart.partitionGraph.initialRedistribution")
+				/**
+				* redistribute to prepare for local refinement
+				*/
+				std::chrono::time_point<std::chrono::system_clock> beforeSecondRedistributiom =  std::chrono::system_clock::now();
+				
+				scai::dmemo::Redistributor resultRedist(result.getLocalValues(), result.getDistributionPtr());//TODO: Wouldn't it be faster to use a GeneralDistribution here?
+				result = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
+				
+				scai::dmemo::Redistributor redistributor(resultRedist.getTargetDistributionPtr(), input.getRowDistributionPtr());
+				input.redistribute(redistributor, noDist);
+				if (settings.useGeometricTieBreaking) {
+					for (IndexType d = 0; d < dimensions; d++) {
+						coordinates[d].redistribute(redistributor);
+					}
+				}
+				nodeWeights.redistribute(redistributor);
+				
+				secondRedistributionTime =  std::chrono::system_clock::now() - beforeSecondRedistributiom;
+				//ValueType timeForSecondRedistr = ValueType ( comm->max(secondRedistributionTime.count() ));
+				
+				partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
+				//ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
+				ValueType cut = comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;//TODO: this assumes that the graph is unweighted
+				ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k, nodeWeights);
+				
+				
+				//-----------------------------------------------------------
+				//
+				// output: in std and file
+				//
+				
+				if (settings.verbose ) {
+					ValueType timeToCalcInitMigration = comm->max(migrationCalculation.count()) ;   
+					ValueType timeForFirstRedistribution = comm->max( migrationTime.count() );
+					ValueType timeForKmeans = comm->max( kMeansTime.count() );
+					ValueType timeForSecondRedistr = comm->max( secondRedistributionTime.count() );
+					ValueType timeForInitPart = comm->max( partitionTime.count() );
+					
+					if(comm->getRank() == 0 ){
+					std::cout<< std::endl << "\033[1;32mTiming: migration algo: "<< timeToCalcInitMigration << ", 1st redistr: " << timeForFirstRedistribution << ", only k-means: " << timeForKmeans <<", only 2nd redistr: "<< timeForSecondRedistr <<", total:" << timeForInitPart << std::endl;
+					std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
+					}
+				}
 
-        if (comm->getSize() == k and !settings.noRefinement) {
-            SCAI_REGION("ParcoRepart.partitionGraph.initialRedistribution")
-            /**
-             * redistribute to prepare for local refinement
-             */
-            std::chrono::time_point<std::chrono::system_clock> beforeSecondRedistributiom =  std::chrono::system_clock::now();
-            
-            scai::dmemo::Redistributor resultRedist(result.getLocalValues(), result.getDistributionPtr());//TODO: Wouldn't it be faster to use a GeneralDistribution here?
-            result = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
-            
-            scai::dmemo::Redistributor redistributor(resultRedist.getTargetDistributionPtr(), input.getRowDistributionPtr());
-            input.redistribute(redistributor, noDist);
-            if (settings.useGeometricTieBreaking) {
-                for (IndexType d = 0; d < dimensions; d++) {
-                    coordinates[d].redistribute(redistributor);
-                }
-            }
-            nodeWeights.redistribute(redistributor);
-            
-            secondRedistributionTime =  std::chrono::system_clock::now() - beforeSecondRedistributiom;
-            //ValueType timeForSecondRedistr = ValueType ( comm->max(secondRedistributionTime.count() ));
-            
-            partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
-            //ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
-            ValueType cut = comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;//TODO: this assumes that the graph is unweighted
-            ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k, nodeWeights);
-            
-            
-            //-----------------------------------------------------------
-            //
-            // output: in std and file
-            //
-            
-            if (settings.verbose ) {
-                ValueType timeToCalcInitMigration = comm->max(migrationCalculation.count()) ;   
-                ValueType timeForFirstRedistribution = comm->max( migrationTime.count() );
-                ValueType timeForKmeans = comm->max( kMeansTime.count() );
-                ValueType timeForSecondRedistr = comm->max( secondRedistributionTime.count() );
-                ValueType timeForInitPart = comm->max( partitionTime.count() );
-                
-                if(comm->getRank() == 0 ){
-                std::cout<< std::endl << "\033[1;32mTiming: migration algo: "<< timeToCalcInitMigration << ", 1st redistr: " << timeForFirstRedistribution << ", only k-means: " << timeForKmeans <<", only 2nd redistr: "<< timeForSecondRedistr <<", total:" << timeForInitPart << std::endl;
-                std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
-                }
-            }
+				metrics.timeSecondDistribution[rank] = secondRedistributionTime.count();
+				metrics.timePreliminary[rank] = partitionTime.count();
 
-            metrics.timeSecondDistribution[rank] = secondRedistributionTime.count();
-            metrics.timePreliminary[rank] = partitionTime.count();
-
-            metrics.preliminaryCut = cut;
-            metrics.preliminaryImbalance = imbalance;
-            
-            //IndexType numRefinementRounds = 0;
-            
-            
-			SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
-			scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(input);
-			ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, halo, settings);
-			SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
-            
+				metrics.preliminaryCut = cut;
+				metrics.preliminaryImbalance = imbalance;
+				
+				//IndexType numRefinementRounds = 0;
+							
+				SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
+				scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(input);
+				ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, halo, settings);
+				SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
+			}
         } else {
             result.redistribute(inputDist);
             if (comm->getRank() == 0 && !settings.noRefinement) {

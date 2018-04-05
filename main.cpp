@@ -640,6 +640,10 @@ int main(int argc, char** argv) {
         assert( coordinates[0].size() == N);
         
         std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
+		
+		//WARNING: with the noRefinement flag the partition is not destributed
+		partition.redistribute( rowDistPtr);
+		
         metricsVec[r].finalCut = ITI::GraphUtils::computeCut(graph, partition, true);
         metricsVec[r].finalImbalance = ITI::GraphUtils::computeImbalance<IndexType,ValueType>(partition, settings.numBlocks ,nodeWeights);
         metricsVec[r].inputTime = ValueType ( comm->max(inputTime.count() ));

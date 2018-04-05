@@ -274,8 +274,8 @@ int main(int argc, char** argv) {
 	//		general distribution. Must reindex vertices for parMetis
 	//
 	
-	//std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRIB, ITI::Tool::zoltanRCB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC};
-	std::vector<ITI::Tool> allTools = { ITI::Tool::parMetisGeom };
+	std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRIB, ITI::Tool::zoltanRCB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC};//, ITI::Tool::parMetisGeom };
+	//std::vector<ITI::Tool> allTools = { ITI::Tool::parMetisGeom };
 	
 	for( int t=0; t<allTools.size(); t++){
 		

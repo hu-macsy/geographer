@@ -189,7 +189,7 @@ struct Settings{
     
     //calculate expensive performance metrics?
     bool computeDiameter = false;
-    IndexType maxDiameterRounds = 3;
+    IndexType maxDiameterRounds = 2;
 
     //
     // print settings
