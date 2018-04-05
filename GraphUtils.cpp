@@ -202,7 +202,7 @@ IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const I
     }
 
     if (ecc[u] > localN) {
-        assert(ecc[u] == std::numeric_limits<IndexType>::infinity());
+        SCAI_ASSERT_EQ_ERROR(ecc[u], std::numeric_limits<IndexType>::max(), "invalid ecc value");
         return ecc[u];
     }
     IndexType i = ecc[u];
