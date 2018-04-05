@@ -209,8 +209,9 @@ struct Metrics{
 		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 		const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
 		const IndexType localN = dist->getLocalSize();
+		const IndexType numPEs = comm->getSize();
 		
-		if (settings.numBlocks == comm->getSize() && settings.computeDiameter) {
+		if (settings.numBlocks == numPEs && settings.computeDiameter) {
 			//maybe possible to compute diameter
 			bool allLocalNodesInSameBlock;
 			{
@@ -239,7 +240,13 @@ struct Metrics{
 				
 				//PRINT(*comm << ": "<< localDiameter);
 				maxBlockDiameter = comm->max(localDiameter);
-				avgBlockDiameter = comm->sum(localDiameter) / (comm->getSize()-numDisconBlocks);
+				
+				// in case all blocks are disconnected
+				if( numPEs-numDisconBlocks==0 ){
+					avgBlockDiameter = 0;
+				}else{
+					avgBlockDiameter = comm->sum(localDiameter) / (numPEs-numDisconBlocks);
+				}
 			}else{
 				PRINT0("\tWARNING: Not computing diameter, not all vertices are in same block everywhere");
 			}
@@ -689,10 +696,11 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
 			//<< thisMetric.preliminaryCut << ",  "
 			out << thisMetric.finalCut << "  " << thisMetric.finalImbalance << "  "  \
 			<< thisMetric.maxBoundaryNodes << " " << thisMetric.totalBoundaryNodes << "  " \
-			<< thisMetric.maxCommVolume << "  " << thisMetric.totalCommVolume << " ";
+			<< thisMetric.maxCommVolume << "  " << thisMetric.totalCommVolume << " " \
+			<< thisMetric.maxBlockDiameter << " " << thisMetric.avgBlockDiameter << " "\
+			<< thisMetric.numDisconBlocks << " ";
 			out << std::setprecision(8) << std::fixed;
-			out << thisMetric.maxBlockDiameter << " " << thisMetric.avgBlockDiameter << " "\
-			<< thisMetric.timeSpMV << " " \
+			out << thisMetric.timeSpMV << " " \
 			<< thisMetric.timeComm \
 			<< std::endl;
 		}

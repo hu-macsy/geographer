@@ -172,6 +172,17 @@ int main(int argc, char** argv) {
 		settings.numBlocks= tmpK;
 	}
 	
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	const IndexType thisPE = comm->getRank();
+	
+	if( thisPE ==0 ){
+		std::cout <<"Starting file " << __FILE__ << std::endl;
+		
+		std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
+		std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
+		std::cout << "date and time: " << std::ctime(&timeNow) << std::endl;
+	}
+	
 	IndexType N = -1; 		// total number of points
 	
 	writePartition = vm.count("writePartition");
@@ -189,8 +200,7 @@ int main(int argc, char** argv) {
 		machine = "machine char not valid";
 	}
 		
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	const IndexType thisPE = comm->getRank();
+	
 	
 	/* timing information
 	 */

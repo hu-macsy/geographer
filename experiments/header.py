@@ -26,8 +26,8 @@ competitorsPath = os.path.join( basisPath, "competitors" )
 toolsPath = os.path.join( basisPath, "tools" )
 plotsPath = os.path.join( basisPath, "plots" )
 
-METRIC_NAMES = ['timeTotal', 'finalCut', 'imbalance', 'maxBnd', 'totBnd', 'maxCommVol', 'totCommVol', 'maxDiameter', 'avgDiameter', 'timeSpMV', 'timeComm']
-METRIC_VALUES = [ 'seconds', 'number of edges', 'ratio', 'number of vertices', 'number of vertices', 'number of vertices', 'number of vertices', 'number of vertices', 'number of vertices', 'seconds', 'seconds']
+METRIC_NAMES = ['timeTotal', 'finalCut', 'imbalance', 'maxBnd', 'totBnd', 'maxCommVol', 'totCommVol', 'maxDiameter', 'avgDiameter','numDisconBlocks', 'timeSpMV', 'timeComm']
+METRIC_VALUES = [ 'seconds', 'number of edges', 'ratio', 'number of vertices', 'number of vertices', 'number of vertices', 'number of vertices', 'number of vertices', 'number of vertices', 'number of blocks', 'seconds', 'seconds']
 NUM_METRICS = len(METRIC_NAMES)
 
 # global settings for all 

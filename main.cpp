@@ -266,6 +266,14 @@ int main(int argc, char** argv) {
     //
     // initialize
     //
+    
+    if( comm->getRank() ==0 ){
+		std::cout <<"Starting file " << __FILE__ << std::endl;
+		
+		std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
+		std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
+		std::cout << "date and time: " << std::ctime(&timeNow) << std::endl;
+	}
 	
     IndexType N = -1; 		// total number of points
 

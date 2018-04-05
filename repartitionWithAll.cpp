@@ -117,6 +117,13 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 	
+	if( comm->getRank() ==0 ){
+		std::cout <<"Starting file " << __FILE__ << std::endl;
+		
+		std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
+		std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
+		std::cout << "date and time: " << std::ctime(&timeNow) << std::endl;
+	}
 	
 	//-----------------------------------------
     //
@@ -326,7 +333,7 @@ int main(int argc, char** argv) {
 		// partition has the the same distribution as the graph rows 
 		SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
 		
-metrics.getDiameter(graph, partition, settings);
+//metrics.getDiameter(graph, partition, settings);
 		
 		// metrics
 		metrics.getRedistMetrics( graph, partition, nodeWeights, settings );
