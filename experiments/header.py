@@ -26,7 +26,7 @@ competitorsPath = os.path.join( basisPath, "competitors" )
 toolsPath = os.path.join( basisPath, "tools" )
 plotsPath = os.path.join( basisPath, "plots" )
 
-METRIC_NAMES = ['timeTotal', 'finalCut', 'imbalance', 'maxBnd', 'totBnd', 'maxCommVol', 'totCommVol', 'maxDiameter', 'harmMeanDiam', 'timeSpMV', 'timeComm']
+METRIC_NAMES = ['timeTotal', 'finalCut', 'imbalance', 'maxBnd', 'totBnd', 'maxCommVol', 'totCommVol', 'maxDiameter', 'harmMeanDiam','numDisBlocks', 'timeSpMV', 'timeComm']
 METRIC_VALUES = [ 'seconds', 'number of edges', 'ratio', 'number of vertices', 'number of vertices', 'number of vertices', 'number of vertices', 'number of vertices', 'number of vertices', 'number of blocks', 'seconds', 'seconds']
 NUM_METRICS = len(METRIC_NAMES)
 
@@ -342,8 +342,8 @@ def parseRepartFile( outFile ):
 		for i in range(len(metricValues), NUM_METRICS):
 			metricValues.append(-1)
 			metricNames.append("-")
-		print(metricNames)
-		print(metricValues)
+		#	print(metricNames)
+		#print(metricValues)
 		
 	return metricNames, metricValues, n
 				

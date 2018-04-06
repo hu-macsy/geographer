@@ -520,9 +520,9 @@ def gatherExpTool( exp, tool, gatherDir , repartMetrics ):
 	# convert to traspose so we have a list for every metric		
 	numMetrics = len(metricNames)
 	if len(allMetrics[0])!=numMetrics:
-		print("WARNING: num metrics mismatch in gatherExpTool for tool " + tool+ ", numMetrics = " + str(numMetrics) +", len(allMetrics[0])= " + str(len(allMetrics[0])) )
+		print("### WARNING: num metrics mismatch in gatherExpTool for tool " + tool+ ", numMetrics = " + str(numMetrics) +", len(allMetrics[0])= " + str(len(allMetrics[0])) )
 	if NUM_METRICS!=numMetrics:
-		print("WARNING: num metrics mismatch in gatherExpTool for tool " + tool+ ", numMetrics = " + str(numMetrics) + ", NUM_METRICS= " +str(NUM_METRICS) )
+		print("### WARNING: num metrics mismatch in gatherExpTool for tool " + tool+ ", numMetrics = " + str(numMetrics) + ", NUM_METRICS= " +str(NUM_METRICS) )
 		
 	metricValues = [None]*numMetrics
 	for m in range(0,numMetrics):
@@ -579,12 +579,13 @@ if __name__=="__main__":
 	
 	if args.outDir:
 		outDir = args.outDir
-		if not os.path.exists(outDir):
-			os.makedirs(outDir)
 	else:
 		#outDir = plotsPath
 		outDir = os.path.join( gatherDir, "plots" )
-
+	
+	if not os.path.exists(outDir):
+		print("Creating folder " + outDir )
+		os.makedirs( outDir)
 		
 	#
 	# parse config file

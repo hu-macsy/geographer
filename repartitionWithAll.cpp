@@ -333,8 +333,6 @@ int main(int argc, char** argv) {
 		// partition has the the same distribution as the graph rows 
 		SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
 		
-//metrics.getDiameter(graph, partition, settings);
-		
 		// metrics
 		metrics.getRedistMetrics( graph, partition, nodeWeights, settings );
 

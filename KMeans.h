@@ -240,7 +240,8 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 				adjustedBlockSizes[j] = ValueType(blockSizes[j]) * ratio;
 			}
 		} else {
-			assert(lastIndex == localIndices.end());
+			//assert(lastIndex == localIndices.end());
+			SCAI_ASSERT_EQ_ERROR( lastIndex, localIndices.end(), "Maybe not all indices are considered?");
 		}
 
 		Settings balanceSettings = settings;

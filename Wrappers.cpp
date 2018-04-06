@@ -430,6 +430,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisRepartit
 	scai::lama::CSRSparseMatrix<ValueType> copyGraph = graph;
 	GraphUtils::reindex<IndexType, ValueType>(copyGraph);
 	
+	/*
 	{// check that inidces are consecutive, TODO: maybe not needed, remove?
 		
 		const scai::dmemo::DistributionPtr dist( copyGraph.getRowDistributionPtr() );
@@ -454,9 +455,27 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisRepartit
 		
 		//PRINT(*comm << ": min global ind= " <<  myGlobalIndexes.front() << " , max global ind= " << myGlobalIndexes.back() );
 	}
+	*/
+	
+	//trying Moritz version that also redistributes coordinates
+	const scai::dmemo::DistributionPtr dist( copyGraph.getRowDistributionPtr() );
+	SCAI_ASSERT_NE_ERROR(dist->getBlockDistributionSize(), nIndex, "Reindexed distribution should be a block distribution.");
+	SCAI_ASSERT_EQ_ERROR(graph.getNumRows(), copyGraph.getNumRows(), "Graph sizes must be equal.");
+	
+	std::vector<scai::lama::DenseVector<ValueType>> copyCoords = coords;
+	scai::lama::DenseVector<ValueType> copyNodeWeights = nodeWeights;
+	
+	// TODO: use constuctor to redistribute or a Redistributor
+	for (IndexType d = 0; d < settings.dimensions; d++) {
+	    copyCoords[d].redistribute(dist);
+	}
+	
+	if (nodeWeights.size() > 0) {
+	    copyNodeWeights.redistribute(dist);
+	}
 	
 	int parMetisVersion = 3; // flag for repartition
-	scai::lama::DenseVector<IndexType> partition = Wrappers<IndexType, ValueType>::metisPartition( copyGraph, coords, nodeWeights, nodeWeightsFlag, parMetisVersion, settings, metrics);
+	scai::lama::DenseVector<IndexType> partition = Wrappers<IndexType, ValueType>::metisPartition( copyGraph, copyCoords, copyNodeWeights, nodeWeightsFlag, parMetisVersion, settings, metrics);
 	
 	//because of the reindexing, we must redistribute the partition
 	partition.redistribute( graph.getRowDistributionPtr() );
