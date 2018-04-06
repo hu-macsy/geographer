@@ -201,10 +201,11 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
 	if (comm->all(localN > minNodes)) {
 		ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
-
+//PRINT(*comm << ": localN= " << localN << " ,  minNodes= " << minNodes);
 		samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNodes*k)))+1;
 		samples.resize(samplingRounds);
-		samples[0] = minNodes;
+		//samples[0] = minNodes;
+		samples[0] = std::min( minNodes, localN);
 	}
 
 	if (samplingRounds > 0 && settings.verbose) {
@@ -240,8 +241,12 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 				adjustedBlockSizes[j] = ValueType(blockSizes[j]) * ratio;
 			}
 		} else {
-			//assert(lastIndex == localIndices.end());
-			SCAI_ASSERT_EQ_ERROR( lastIndex, localIndices.end(), "Maybe not all indices are considered?");
+			if(lastIndex != localIndices.end()){
+				PRINT(*comm<< ": localN= "<< localN <<",  lastIndex != localIndices.end(): " << *lastIndex << "  !=  " << *localIndices.end());
+			}
+//PRINT(*comm<< ": " << "lastIndex= " << *lastIndex << " , localIndices.end()= " << *localIndices.end());
+			assert(lastIndex == localIndices.end());
+			//SCAI_ASSERT_EQ_ERROR( lastIndex, localIndices.end(), "Maybe not all indices are considered?");
 		}
 
 		Settings balanceSettings = settings;

@@ -96,6 +96,7 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
 
     bool nodesUnweighted = (nodeWeights.max() == nodeWeights.min());
 
+	/*
     std::vector<ValueType> hilbertIndices(localN);
     std::vector<std::vector<ValueType> > points(localN, std::vector<ValueType>(settings.dimensions, 0));
     std::vector<ValueType> minCoords(settings.dimensions);
@@ -115,6 +116,9 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
                 points[i].data(), settings.dimensions, settings.sfcResolution,
                 minCoords, maxCoords);
     }
+    */
+	std::vector<ValueType> hilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
+	
     SCAI_REGION_END("ParcoRepart.hilbertRedistribution.sfc")
     SCAI_REGION_START("ParcoRepart.hilbertRedistribution.sort")
     /**
@@ -698,8 +702,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
         //assert(typesize == sizeof(sort_pair)); //not valid for int_double, presumably due to padding
         
-        const IndexType maxLocalN = comm->max(localN);
-        std::vector<sort_pair> localPairs(maxLocalN);
+        //const IndexType maxLocalN = comm->max(localN);
+        //std::vector<sort_pair> localPairs(maxLocalN);
+		std::vector<sort_pair> localPairs(localN);
 
         //fill with local values
         long indexSum = 0;//for sanity checks
@@ -715,37 +720,37 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         //TODO: int overflow?
         SCAI_ASSERT_EQ_ERROR(checkSum , (long(globalN)*(long(globalN)-1))/2, "Sorting checksum is wrong (possible IndexType overflow?).");
 
+/*		
         //fill up with dummy values to ensure equal size
         for (IndexType i = localN; i < maxLocalN; i++) {
         	localPairs[i].value = std::numeric_limits<decltype(sort_pair::value)>::max();
         	localPairs[i].index = std::numeric_limits<decltype(sort_pair::index)>::max();
         }
-
+*/
         //call distributed sort
         //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
         MPI_Comm mpi_comm = MPI_COMM_WORLD;
         SQuick::sort<sort_pair>(mpi_comm, localPairs, -1);
 
         //copy indices into array
-        IndexType newLocalN = 0;
-        newLocalIndices.resize(maxLocalN);
-        for (IndexType i = 0; i < maxLocalN; i++) {
+        IndexType newLocalN = localPairs.size();
+        newLocalIndices.resize(newLocalN);
+        for (IndexType i = 0; i < newLocalN; i++) {
         	newLocalIndices[i] = localPairs[i].index;
-        	if (newLocalIndices[i] != std::numeric_limits<decltype(sort_pair::index)>::max()) newLocalN++;
+        	//if (newLocalIndices[i] != std::numeric_limits<decltype(sort_pair::index)>::max()) newLocalN++;
         }
 
         //sort local indices for general distribution
         std::sort(newLocalIndices.begin(), newLocalIndices.end());
-
+/*
         //remove dummy values
         auto startOfDummyValues = std::lower_bound(newLocalIndices.begin(), newLocalIndices.end(), std::numeric_limits<decltype(sort_pair::index)>::max());
         assert(std::all_of(startOfDummyValues, newLocalIndices.end(), [](IndexType index){return index == std::numeric_limits<decltype(sort_pair::index)>::max();}));
         newLocalIndices.resize(std::distance(newLocalIndices.begin(), startOfDummyValues));
-
+*/
         //check size and sanity
-        assert(newLocalN == newLocalIndices.size());
         SCAI_ASSERT_LT_ERROR( *std::max_element(newLocalIndices.begin(), newLocalIndices.end()) , globalN, "Too large index (possible IndexType overflow?).");
-        assert( comm->sum(newLocalIndices.size()) == globalN);
+        SCAI_ASSERT_EQ_ERROR( comm->sum(newLocalIndices.size()), globalN, "distribution mismatch");
 
         //check checksum
         long indexSumAfter = 0;
