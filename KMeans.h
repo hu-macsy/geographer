@@ -192,7 +192,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<IndexType> localIndices(localN);
 	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
 	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();;
-	std::iota(firstIndex, lastIndex, 0);
+	std::iota(localIndices.begin(), localIndices.end(), 0);
 
 	IndexType minNodes = settings.minSamplingNodes*blocksPerProcess;
 	assert(minNodes > 0);
@@ -200,7 +200,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<IndexType> samples;
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
 	if (comm->all(localN > minNodes)) {
-		ITI::GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, localN);
+		ITI::GraphUtils::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
 
 		samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNodes*k)))+1;
 		samples.resize(samplingRounds);
@@ -216,9 +216,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	}
 
 	if (samplingRounds > 0) {
-	    if (localN >= globalN / ValueType(k)) {
-	        SCAI_ASSERT_EQUAL_DEBUG(samples[samplingRounds-1], localN);
-	    }
+	    samples[samplingRounds-1] = localN;
 	}
 
 
@@ -232,14 +230,16 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	do {
 		std::chrono::time_point<std::chrono::high_resolution_clock> iterStart = std::chrono::high_resolution_clock::now();
 		if (iter < samplingRounds) {
-			lastIndex = firstIndex + samples[iter];
-			std::sort(firstIndex, lastIndex);//sorting not really necessary, but increases locality
+		    SCAI_ASSERT_LE_ERROR(samples[iter], localN, "invalid number of samples");
+			lastIndex = localIndices.begin() + samples[iter];
+			std::sort(localIndices.begin(), lastIndex);//sorting not really necessary, but increases locality
 			ValueType ratio = ValueType(comm->sum(samples[iter])) / globalN;
 			assert(ratio <= 1);
 			for (IndexType j = 0; j < k; j++) {
 				adjustedBlockSizes[j] = ValueType(blockSizes[j]) * ratio;
 			}
 		} else {
+		    SCAI_ASSERT_EQ_ERROR(lastIndex - firstIndex, localN, "invalid iterators");
 			assert(lastIndex == localIndices.end());
 		}
 
