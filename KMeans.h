@@ -204,7 +204,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 
 		samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNodes*k)))+1;
 		samples.resize(samplingRounds);
-		samples[0] = minNodes;
+		samples[0] = std::min(minNodes, localN);
 	}
 
 	if (samplingRounds > 0 && settings.verbose) {
