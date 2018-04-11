@@ -29,8 +29,11 @@ namespace ITI{
 //-------------------------------------------------------------------------------------------------
 // coords.size()= 3 , coords[i].size()= N
 // here, N= numPoints[0]*numPoints[1]*numPoints[2]
+
+//TODO: some code duplication with its 2D counterpart, create a core function and 2D/3D wrappers?
+	
 template<typename IndexType, typename ValueType>
-void MeshGenerator<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
+void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_seq(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
     SCAI_REGION( "MeshGenerator.createStructured3DMesh" )
     
     if (coords.size() != 3) {
@@ -79,13 +82,11 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix
         IndexType nnzCounter = 0; // count non-zero elements
         // for every node= for every line of adjM
         for(IndexType i=0; i<N; i++){
-            // connect the point with its 6 (in 3D) neighbours
+            // connect the point with its, at most, 6 (in 3D) neighbours
             // neighbour_node: the index of a neighbour of i, can take negative values
             // but in that case we do not add it
             IndexType ngb_node = 0;      
-            // the number of neighbours for each node. Can be less that 6.
             IndexType numRowElems= 0;
-            //ValueType max_offset =  *max_element(offset.begin(),offset.end());
             
             std::tuple<IndexType, IndexType, IndexType> thisPoint = aux<IndexType,ValueType>::index2_3DPoint( i, numPoints);
             
@@ -134,23 +135,26 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh(CSRSparseMatrix
 }
 //-------------------------------------------------------------------------------------------------
 
+//TODO: code duplication as in createGraphStructured3DMesh_seq
 template<typename IndexType, typename ValueType>
-void MeshGenerator<IndexType, ValueType>::writeGraphStructured3DMesh( std::vector<IndexType> numPoints, const std::string filename) {
+void MeshGenerator<IndexType, ValueType>::writeGraphStructured3DMesh_seq( std::vector<IndexType> numPoints, const std::string filename) {
     SCAI_REGION( "MeshGenerator.writeStructured3DMesh" )
     
     if (numPoints.size() != 3) {
         throw std::runtime_error("Needs three point counts, one for each dimension");
     }
-    
+    std::ofstream f(filename);
+	if(f.fail())
+		throw std::runtime_error("File "+ filename+ " failed.");	
+	
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
+	SCAI_ASSERT_EQ_ERROR( comm->getSize(), 0 , "Function " << __FUNCTION__ <<  " is not distributed, it works only for p=1.");
+
+	//TODO: leave the assertion or the if, not both are needed
     if (comm->getRank() == 0) {//not distributed
-        std::ofstream f(filename);
-        if(f.fail())
-            throw std::runtime_error("File "+ filename+ " failed.");
 
         IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
-
         IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
                                     -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
 
@@ -162,7 +166,6 @@ void MeshGenerator<IndexType, ValueType>::writeGraphStructured3DMesh( std::vecto
             // for every node= for every line of adjM
             for(IndexType i=0; i<N; i++){
                 IndexType ngbIndex = 0;
-
 
                 std::tuple<IndexType, IndexType, IndexType> thisPoint = aux<IndexType,ValueType>::index2_3DPoint( i, numPoints);
                 
@@ -205,6 +208,8 @@ void MeshGenerator<IndexType, ValueType>::writeGraphStructured3DMesh( std::vecto
 //-------------------------------------------------------------------------------------------------
 // coords.size()= 3 , coords[i].size()= N
 // here, N= numPoints[0]*numPoints[1]*numPoints[2]
+
+//TODO: code duplication as in its sequential counterpart
 
 template<typename IndexType, typename ValueType>
 void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
@@ -352,6 +357,9 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseM
 // coords.size()= 3 , coords[i].size()= N
 // here, N= numPoints[0]*numPoints[1]*numPoints[2]
 
+//TODO: not used, deprecate?
+//TODO: some code duplication with its 3D counterpart, create a core function and 2D/3D wrappers?
+
 template<typename IndexType, typename ValueType>
 void MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
     SCAI_REGION( "MeshGenerator.createStructured3DMesh_dist" )
@@ -489,6 +497,9 @@ void MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(CSRSparseM
 //-------------------------------------------------------------------------------------------------
 // coords.size()= 3 , coords[i].size()= N
 // here, N= numPoints[0]*numPoints[1]*numPoints[2]
+
+//TODO: not used, deprate?
+//TODO: similarities with an rgg generator?
 
 template<typename IndexType, typename ValueType>
 void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
@@ -969,6 +980,7 @@ template<typename IndexType, typename ValueType>
     quad.indexSubtree(0);
     graphFromQuadtree(adjM, coords, quad);
 }
+//----------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 void MeshGenerator<IndexType, ValueType>::graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid &quad) {
@@ -1044,26 +1056,7 @@ ValueType MeshGenerator<IndexType, ValueType>::dist3DSquared(std::tuple<IndexTyp
   ValueType distanceSquared = distX*distX+distY*distY+distZ*distZ;
   return distanceSquared;
 }
-/*
-//-------------------------------------------------------------------------------------------------
-// Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
-// of the index in 3D. The return value is not the coordinates of the point!
-template<typename IndexType, typename ValueType>
-std::tuple<IndexType, IndexType, IndexType> MeshGenerator<IndexType, ValueType>::index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints){
-    // a YxZ plane
-    IndexType planeSize= numPoints[1]*numPoints[2];
-    IndexType xIndex = index/planeSize;
-    IndexType yIndex = (index % planeSize) / numPoints[2];
-    IndexType zIndex = (index % planeSize) % numPoints[2];
-    SCAI_ASSERT(xIndex >= 0, xIndex);
-    SCAI_ASSERT(yIndex >= 0, yIndex);
-    SCAI_ASSERT(zIndex >= 0, zIndex);
-    assert(xIndex < numPoints[0]);
-    assert(yIndex < numPoints[1]);
-    assert(zIndex < numPoints[2]);
-    return std::make_tuple(xIndex, yIndex, zIndex);
-}
-*/
+
 //-------------------------------------------------------------------------------------------------
 
 template class MeshGenerator<IndexType, ValueType>;

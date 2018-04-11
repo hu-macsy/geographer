@@ -539,7 +539,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
 
     scai::dmemo::DistributionPtr newDist = graph.getRowDistributionPtr();
     scai::dmemo::DistributionPtr partDist = partition.getDistributionPtr();
-    IndexType newLocalN = newDist->getLocalSize();
+    //IndexType newLocalN = newDist->getLocalSize();
     ASSERT_TRUE( newDist->isEqual( *partDist ) );
   
     //get the border nodes
@@ -806,7 +806,7 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_3D) {
     CSRSparseMatrix<ValueType> graph( N , N); 
     std::vector<DenseVector<ValueType>> coords(3, DenseVector<ValueType>(N, 0));
     
-    MeshGenerator<IndexType, ValueType>::createStructured3DMesh(graph, coords, maxCoord, numPoints);
+    MeshGenerator<IndexType, ValueType>::createStructured3DMesh_seq(graph, coords, maxCoord, numPoints);
     graph.redistribute(dist, noDistPointer); // needed because createStructured3DMesh is not distributed 
     coords[0].redistribute(dist);
     coords[1].redistribute(dist);

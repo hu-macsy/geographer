@@ -640,7 +640,7 @@ TEST_F (FileIOTest, testReadEdgeListDistributed){
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	if( comm->getSize() != 4 ){
 		if( comm->getRank() == 0){
-			std::cout << "\n\t\t### WARNING: this test reads a distributed file and only works for p=4. You should call again with mpirun -n 4 (maybe also with --gtest_filter=*ReadEdgeListDistributed)." << std::endl<< std::endl;
+			std::cout << "\n\t\t### WARNING: this test, " << __FUNCTION__ << " reads a distributed file and only works for p=4. You should call again with mpirun -n 4 (maybe also with --gtest_filter=*ReadEdgeListDistributed)." << std::endl<< std::endl;
 			// TODO: next assertion causes (sometimes?) the tests to hang after they finish
 			//ASSERT_EQ( comm->getSize(), 4) << "Specific number of processors needed for this test: 4";
 			EXPECT_TRUE( false )<< "Specific number of processors needed for this test: 4";
