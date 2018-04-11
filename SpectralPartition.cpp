@@ -44,7 +44,7 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
     SCAI_ASSERT( pixelGraph.isConsistent() == 1 , "Pixeled graph not consistent.");
     
     // get the laplacian of the pixeled graph , since the pixeled graph is replicated so should be the laplacian
-    scai::lama::CSRSparseMatrix<ValueType> laplacian = SpectralPartition<IndexType, ValueType>::getLaplacian( pixelGraph );
+    scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils::constructLaplacian<IndexType, ValueType>(pixelGraph);
     SCAI_ASSERT( laplacian.isConsistent() == 1 , "Laplacian graph not consistent.");
     SCAI_ASSERT( laplacian.getNumRows() == numPixels , "Wrong size of the laplacian.");
     
@@ -172,114 +172,6 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
 }
 //---------------------------------------------------------------------------------------
 
-template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> SpectralPartition<IndexType, ValueType>::getLaplacian( const scai::lama::CSRSparseMatrix<ValueType>& adjM){
-    SCAI_REGION("SpectralPartition.getLaplacian");
-    
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-    
-    const IndexType globalN = distPtr->getGlobalSize();
-    const IndexType localN = distPtr->getLocalSize();
-    
-    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-    
-    // distributed vector of size globalN with the degree for every edge. It has the same distribution as the rowDistribution of adjM
-    scai::lama::DenseVector<IndexType> degreeVector = SpectralPartition<IndexType, ValueType>::getDegreeVector( adjM );
-    SCAI_ASSERT( degreeVector.size() == globalN, "Degree vector global size not correct: " << degreeVector.size() << " , shoulb be " << globalN);
-    SCAI_ASSERT( degreeVector.getLocalValues().size() == localN,"Degree vector local size not correct: " << degreeVector.getLocalValues().size() << " , shoulb be " << localN);
-    
-    // data of the output graph
-    scai::hmemo::HArray<IndexType> laplacianIA;
-    scai::hmemo::HArray<IndexType> laplacianJA;
-    scai::hmemo::HArray<ValueType> laplacianValues;
-    
-    IndexType laplacianNnzValues;
-    {        
-        // get local data of adjM
-        const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-        const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-        const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
-        
-        // local data of degree vector
-        scai::hmemo::ReadAccess<IndexType>  rLocalDegree( degreeVector.getLocalValues() );
-        assert( degreeVector.getLocalValues().size() == localN );
-
-        laplacianNnzValues = values.size() + localN;    // add one element per node/row
-        
-        // data of laplacian graph. laplacian and input are of the same size globalN x globalN
-        scai::hmemo::WriteOnlyAccess<IndexType> wLaplacianIA( laplacianIA , ia.size() );  
-        scai::hmemo::WriteOnlyAccess<IndexType> wLaplacianJA( laplacianJA , laplacianNnzValues );
-        scai::hmemo::WriteOnlyAccess<ValueType> wLaplacianValues( laplacianValues, laplacianNnzValues );
-        
-        IndexType nnzCounter = 0;
-        for(IndexType i=0; i<localN; i++){
-            const IndexType beginCols = ia[i];
-            const IndexType endCols = ia[i+1];
-            assert(ja.size() >= endCols);
-            
-            IndexType globalI = distPtr->local2global(i);
-            IndexType j = beginCols;
-            
-            // the index and value of the diagonal element to be set at the end for every row
-            IndexType diagonalIndex=0;
-            ValueType diagonalValue=0;
-            
-            while( ja[j]< globalI and j<endCols){     //bot-left part of matrix, before diagonal
-                assert(ja[j] >= 0);
-                assert(ja[j] < globalN);
-                
-                wLaplacianJA[nnzCounter] = ja[j];          // same indices
-                wLaplacianValues[nnzCounter] = -values[j]; // opposite values
-                diagonalValue += values[j];
-                ++nnzCounter;
-                assert( nnzCounter < laplacianNnzValues+1);
-                ++j;
-            }
-            // out of while, must insert diagonal element that is the sum of the edges
-            wLaplacianJA[nnzCounter] = globalI;
-            assert( i < rLocalDegree.size() );
-            wLaplacianValues[nnzCounter] = rLocalDegree[i];
-            diagonalIndex = nnzCounter;       
-            ++nnzCounter;
-            
-            // copy the rest of the row
-            while( j<endCols){
-                wLaplacianJA[nnzCounter] = ja[j];          // same indices
-                wLaplacianValues[nnzCounter] = -values[j]; // opposite values
-                diagonalValue += values[j];
-                ++nnzCounter;
-                assert( nnzCounter < laplacianNnzValues+1);
-                ++j;
-            }
-            wLaplacianValues[ diagonalIndex ] = diagonalValue;
-        }
-        
-        //fix ia array , we just added 1 element in every row, so...
-        for(IndexType i=0; i<ia.size(); i++){
-            wLaplacianIA[i] = ia[i] + i;
-        }
-
-    }
-    
-    SCAI_ASSERT_EQ_ERROR(laplacianJA.size(), laplacianValues.size(), "Wrong sizes." );
-    {
-        scai::hmemo::ReadAccess<IndexType> rLaplacianIA( laplacianIA );
-        scai::hmemo::ReadAccess<IndexType> rLaplacianJA( laplacianJA );
-        scai::hmemo::ReadAccess<ValueType> rLaplacianValues( laplacianValues );
-        
-        SCAI_ASSERT_EQ_ERROR(rLaplacianIA[ rLaplacianIA.size()-1] , laplacianJA.size(), "Wrong sizes." );
-    }
-    
-    scai::lama::CSRStorage<ValueType> resultStorage( localN, globalN, laplacianNnzValues, laplacianIA, laplacianJA, laplacianValues);
-    
-    scai::lama::CSRSparseMatrix<ValueType> result(adjM.getRowDistributionPtr() , adjM.getColDistributionPtr() );
-    result.swapLocalStorage( resultStorage );
-    
-    return result;
-
-}
-//---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getFiedlerVector(const scai::lama::CSRSparseMatrix<ValueType>& adjM, ValueType& eigenvalue ){
@@ -288,7 +180,7 @@ scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getF
     IndexType globalN= adjM.getNumRows();
     SCAI_ASSERT_EQ_ERROR( globalN, adjM.getNumColumns(), "Matrix not square, numRows != numColumns");
     
-    scai::lama::CSRSparseMatrix<ValueType> laplacian = SpectralPartition<IndexType, ValueType>::getLaplacian( adjM );
+    scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils::constructLaplacian<IndexType, ValueType>( adjM );
     
     // set u=[ 1+sqrt(n), 1, 1, 1, ... ]
     ValueType n12 = scai::common::Math::sqrt( ValueType( globalN ));
@@ -379,32 +271,6 @@ scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getF
     eigenvalue = lambda.Scalar::getValue<ValueType>();
     
     return t;
-}
-//---------------------------------------------------------------------------------------
-
-template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType>& adjM){
-    SCAI_REGION("SpectralPartition.getDegreeVector");
-    
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-    
-    scai::lama::DenseVector<IndexType> degreeVector(distPtr);
-    scai::utilskernel::LArray<IndexType>& localDegreeVector = degreeVector.getLocalValues();
-    
-    const scai::lama::CSRStorage<ValueType> localAdjM = adjM.getLocalStorage();
-    {
-        const scai::hmemo::ReadAccess<IndexType> readIA ( localAdjM.getIA() );
-        scai::hmemo::WriteOnlyAccess<IndexType> writeVector( localDegreeVector, localDegreeVector.size()) ;
-        
-        SCAI_ASSERT_EQ_ERROR(readIA.size(), localDegreeVector.size()+1, "Probably wrong distribution");
-        
-        for(IndexType i=0; i<readIA.size()-1; i++){
-            writeVector[i] = readIA[i+1] - readIA[i];
-        }
-    }
-    
-    return degreeVector;
 }
 
 //---------------------------------------------------------------------------------------

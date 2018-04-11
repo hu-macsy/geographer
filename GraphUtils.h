@@ -21,17 +21,39 @@ namespace ITI {
 
 namespace GraphUtils {
 
+/**
+ * Reindexes the nodes of the input graph to form a BlockDistribution. No redistribution of the graph happens, only the indices are changed.
+ * After this method is run, the input graph has a BlockDistribution.
+ *
+ * @param[in,out] the graph
+ *
+ * @return A block-distributed vector containing the old indices
+ */
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType> &graph);
 
-template<typename IndexType, typename ValueType>
-IndexType getFarthestLocalNode(const scai::lama::CSRSparseMatrix<ValueType> &graph, std::vector<IndexType> seedNodes);
-
 /**
- * Perform a BFS on the local nodes only.
+ * @brief Perform a BFS on the local subgraph.
+ *
+ * @param graph (may be distributed)
+ * @param u local index of starting node
+ *
+ * @return vector with (local) distance to u for each local node
  */
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &graph, IndexType u);
+
+/**
+ * @brief Computes the diameter of the local subgraph using the iFUB algorithm.
+ *
+ * @param graph
+ * @param u local index of starting node. Should be central.
+ * @param lowerBound of diameter. Can be 0. A good lower bound might speed up the computation
+ * @param k tolerance Algorithm aborts if upperBound - lowerBound <= k
+ * @param maxRounds Maximum number of diameter rounds.
+ *
+ * @return new lower bound
+ */
 
 template<typename IndexType, typename ValueType>
 IndexType getLocalBlockDiameter(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u, IndexType lowerBound, const IndexType k, IndexType maxRounds);
@@ -179,9 +201,6 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::Halo& halo
 
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
-	
-template <typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> getLaplacian( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>>& adjList);
@@ -192,6 +211,38 @@ scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( co
  */
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>>& edgeList );
+
+/**
+ * @brief Construct the Laplacian of the input matrix. May contain parallel communication.
+ *
+ * @param graph Input matrix, must have a (general) block distribution or be replicated.
+ *
+ * @return laplacian with same distribution as input
+ */
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> constructLaplacian(scai::lama::CSRSparseMatrix<ValueType> graph);
+
+/**
+ * @brief Construct a replicated projection matrix for a fast Johnson-Lindenstrauß-Transform
+ *
+ * @param epsilon Desired accuracy of transform
+ * @param n
+ * @param origDimension Dimension of original space
+ *
+ * @return FJLT matrix
+ */
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension);
+
+/**
+ * @brief Construct a replicated Hadamard matrix
+ *
+ * @param d Dimension
+ *
+ * @return Hadamard matrix
+ */
+template<typename IndexType, typename ValueType>
+scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d);
 
 //taken from https://stackoverflow.com/a/9345144/494085
 template<class BidiIter >
@@ -206,23 +257,6 @@ static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_rand
     }
     return begin;
 }
-
-/*
-static std::vector<IndexType> indexReorder(const IndexType maxIndex, const IndexType window){
-	IndexType index = 0;
-	std::vector<IndexType> ret(maxIndex, -1);
-    for( IndexType i=0; i<window; i++){
-		for( IndexType step=0; step<maxIndex; step+=window){
-			//if(step+1>=maxIndex) continue;
-			std::cout<< step+i <<" <> ";
-			ret[index++] = step+i;
-			//if(index>=maxIndex) break;
-			}
-		}
-
-	return ret;
-}
-*/
 
 static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
 	IndexType index = 0;
@@ -253,6 +287,7 @@ static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
 	
 	return ret;
 }
+
 
 
 

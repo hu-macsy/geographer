@@ -28,42 +28,6 @@ class DiffusionTest : public ::testing::Test {
 
 };
 
-TEST_F(DiffusionTest, testConstructLaplacian) {
-	std::string fileName = "bubbles-00010.graph";
-	std::string file = graphPath + fileName;
-	const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
-	const IndexType n = graph.getNumRows();
-    scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
-
-    scai::dmemo::DistributionPtr cyclidCist(new scai::dmemo::CyclicDistribution(n, 10, graph.getRowDistributionPtr()->getCommunicatorPtr()));
-
-	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(graph);
-
-	ASSERT_EQ(L.getRowDistribution(), graph.getRowDistribution());
-	ASSERT_TRUE(L.isConsistent());
-
-    DenseVector<ValueType> x( n, 1 );
-    DenseVector<ValueType> y( L * x );
-
-    ValueType norm = y.maxNorm().Scalar::getValue<ValueType>();
-    EXPECT_EQ(norm,0);
-
-    //test consistency under distributions
-    const CSRSparseMatrix<ValueType> replicatedGraph(graph, noDist, noDist);
-    CSRSparseMatrix<ValueType> LFromReplicated = Diffusion<IndexType, ValueType>::constructLaplacian(replicatedGraph);
-    LFromReplicated.redistribute(L.getRowDistributionPtr(), L.getColDistributionPtr());
-    CSRSparseMatrix<ValueType> diff (LFromReplicated - L);
-    EXPECT_EQ(0, diff.l2Norm().Scalar::getValue<ValueType>());
-}
-
-TEST_F(DiffusionTest, benchConstructLaplacian) {
-	std::string fileName = "bubbles-00010.graph";
-	std::string file = graphPath + fileName;
-	const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
-
-	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(graph);
-}
-
 TEST_F(DiffusionTest, testPotentials) {
     std::string fileName = "bubbles-00010.graph";
     std::string file = graphPath + fileName;
@@ -71,7 +35,7 @@ TEST_F(DiffusionTest, testPotentials) {
     const IndexType n = graph.getNumRows();
     scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
 
-	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(graph);
+	CSRSparseMatrix<ValueType> L = GraphUtils::constructLaplacian<IndexType, ValueType>(graph);
 
 	DenseVector<ValueType> nodeWeights(L.getRowDistributionPtr(),1);
 	DenseVector<ValueType> potentials = Diffusion<IndexType, ValueType>::potentialsFromSource(L, nodeWeights, 0);
@@ -89,7 +53,7 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 	const IndexType localN = inputDist->getLocalSize();
 	scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
 
-	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(graph);
+	CSRSparseMatrix<ValueType> L = GraphUtils::constructLaplacian<IndexType, ValueType>(graph);
 	EXPECT_EQ(L.getRowDistribution(), graph.getRowDistribution());
 
 
@@ -130,7 +94,7 @@ TEST_F(DiffusionTest, testConstructFJLTMatrix) {
 	const ValueType epsilon = 0.1;
 	const IndexType n = 10000;
 	const IndexType origDimension = 20;
-	CSRSparseMatrix<ValueType> fjlt = Diffusion<IndexType, ValueType>::constructFJLTMatrix(epsilon, n, origDimension);
+	CSRSparseMatrix<ValueType> fjlt = GraphUtils::constructFJLTMatrix<IndexType, ValueType>(epsilon, n, origDimension);
 	EXPECT_EQ(origDimension, fjlt.getLocalNumColumns());
 }
 } /* namespace ITI */

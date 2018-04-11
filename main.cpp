@@ -420,7 +420,7 @@ int main(int argc, char** argv) {
         }
         
         if (settings.useDiffusionCoordinates) {
-        	scai::lama::CSRSparseMatrix<ValueType> L = ITI::Diffusion<IndexType, ValueType>::constructLaplacian(graph);
+        	scai::lama::CSRSparseMatrix<ValueType> L = ITI::GraphUtils::constructLaplacian<IndexType, ValueType>(graph);
 
         	std::vector<IndexType> nodeIndices(N);
         	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
