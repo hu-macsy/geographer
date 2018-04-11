@@ -8,9 +8,7 @@
 #include <chrono>
 #include <fstream>
 
-#ifndef SETTINGS_H
 #include "Settings.h"
-#endif
 
 namespace ITI {
 

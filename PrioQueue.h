@@ -5,8 +5,7 @@
  *      Author: Henning Meyerhenke
  */
 
-#ifndef PRIOQUEUE_H_
-#define PRIOQUEUE_H_
+#pragma once
 
 #include <cassert>
 #include <set>
@@ -229,6 +228,3 @@ inline void ITI::PrioQueue<Key, Val>::clear() {
 	pqset.clear();
 	mapValToKey.clear();
 }
-
-
-#endif /* PRIOQUEUE_H_ */

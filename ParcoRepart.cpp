@@ -81,11 +81,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 template<typename IndexType, typename ValueType>
 void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseVector<ValueType> >& coordinates, DenseVector<ValueType>& nodeWeights, Settings settings, struct Metrics& metrics) {
     SCAI_REGION_START("ParcoRepart.hilbertRedistribution.sfc")
-    /*
-     * TODO:
-     * after all the branches have been merged, replace the copy-pasted code with a call to
-     * HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
-     */
     scai::dmemo::DistributionPtr inputDist = coordinates[0].getDistributionPtr();
     scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
     const IndexType localN = inputDist->getLocalSize();
@@ -97,7 +92,6 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     bool nodesUnweighted = (nodeWeights.max() == nodeWeights.min());
 
     std::chrono::duration<double> migrationCalculation, migrationTime;
-
 
     std::vector<ValueType> hilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
     SCAI_REGION_END("ParcoRepart.hilbertRedistribution.sfc")

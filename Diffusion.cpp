@@ -88,9 +88,14 @@ template<typename IndexType, typename ValueType>
 DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(scai::lama::CSRSparseMatrix<ValueType> laplacian, scai::lama::DenseVector<ValueType> nodeWeights, std::vector<IndexType> sources, ValueType eps) {
 	using scai::hmemo::HArray;
 
+    if (!laplacian.getRowDistributionPtr()->isReplicated() or !nodeWeights.getDistributionPtr()->isReplicated()) {
+        throw std::logic_error("Should only be called with replicated input.");
+    }
+
 	const IndexType l = sources.size();
 	const IndexType n = laplacian.getNumRows();
 	const IndexType localN = laplacian.getLocalNumRows();
+
 	HArray<ValueType> resultContainer(localN*l);
 	IndexType offset = 0;
 
@@ -121,15 +126,15 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 	using scai::hmemo::HArray;
 	using std::vector;
 
-	const IndexType n = graph.getNumRows();
+	const IndexType globalN = graph.getNumRows();
 	const IndexType localN = graph.getLocalNumRows();
 
-	if (graph.getNumColumns() != n) {
+	if (graph.getNumColumns() != globalN) {
 		throw std::runtime_error("Matrix must be square to be an adjacency matrix");
 	}
 
 	scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-    scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
+    scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
 
     if (dist->getBlockDistributionSize() == nIndex) {
     	throw std::runtime_error("Only replicated or block distributions supported.");
@@ -155,11 +160,22 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 		}
 	}
 
-	DIASparseMatrix<ValueType> D(dist,noDist);
-	DIAStorage<ValueType> dstor(localN, n, 1, HArray<IndexType>(1,firstIndex), HArray<ValueType>(localN, targetDegree.data()) );
-	D.swapLocalStorage(dstor);
+	CSRSparseMatrix<ValueType> D(dist, noDist);
+	//in the diagonal matrix, each node has one loop
+	scai::hmemo::HArray<IndexType> dIA(localN+1, IndexType(0));
+    scai::utilskernel::HArrayUtils::setSequence(dIA, IndexType(0), IndexType(1), dIA.size());
+    //... to itself
+    scai::hmemo::HArray<IndexType> dJA(localN, IndexType(0));
+    scai::utilskernel::HArrayUtils::setSequence(dJA, firstIndex, IndexType(1), dJA.size());
+    // with the degree as value
+    scai::hmemo::HArray<ValueType> dValues(localN, targetDegree.data());
+
+    CSRStorage<ValueType> dStorage(localN, globalN, localN, dIA, dJA, dValues );
+
+    D.swapLocalStorage(dStorage);
+
 	CSRSparseMatrix<ValueType> result(D-graph);
-	assert(result.getNumValues() == graph.getNumValues() + n);
+	assert(result.getNumValues() == graph.getNumValues() + globalN);
 
 	return result;
 }

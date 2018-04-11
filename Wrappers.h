@@ -19,9 +19,6 @@
 #include <scai/dmemo/BlockDistribution.hpp>
 
 #include "Metrics.h"
-#ifndef SETTINGS_H
-#include "Settings.h"
-#endif
 
 #include <parmetis.h>
 

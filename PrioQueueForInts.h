@@ -5,8 +5,7 @@
  *      Author: Henning
  */
 
-#ifndef BUCKETPQ_H_
-#define BUCKETPQ_H_
+#pragma once
 
 #include <list>
 #include <limits>
@@ -114,4 +113,3 @@ public:
 };
 
 } /* namespace Aux */
-#endif /* BUCKETPQ_H_ */

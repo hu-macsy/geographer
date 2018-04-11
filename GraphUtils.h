@@ -15,9 +15,7 @@
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/dmemo/GeneralDistribution.hpp>
 
-#ifndef SETTINGS_H
 #include "Settings.h"
-#endif
 
 namespace ITI {
 
