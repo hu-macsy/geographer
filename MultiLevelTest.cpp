@@ -312,7 +312,7 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
     //
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file, ITI::Format::BINARY );
     //distrubute graph
     //graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
         

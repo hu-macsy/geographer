@@ -677,7 +677,7 @@ std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM
     //IndexType max = part.max().Scalar::getValue<IndexType>();
     
     // the communication volume per block for this PE
-    std::vector<IndexType> commVolumePerBlock( numBlocks+1, 0 );
+    std::vector<IndexType> commVolumePerBlock( numBlocks, 0 );
     
     
     if( !dist->isEqual( part.getDistribution() ) ){
@@ -697,7 +697,6 @@ std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM
     for(IndexType i=0; i<localN; i++){    // for all local nodes
     	IndexType thisBlock = localPart[i];
         SCAI_ASSERT_LE_ERROR( thisBlock , numBlocks , "Wrong block id." );
-        //bool isBorderNode = false;
         std::set<IndexType> allNeighborBlocks;
         
     	for(IndexType j=ia[i]; j<ia[i+1]; j++){                   // for all the edges of a node
@@ -727,7 +726,7 @@ std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM
     }
 
     // sum local volume
-    comm->sumImpl( commVolumePerBlock.data(), commVolumePerBlock.data(), numBlocks+1, scai::common::TypeTraits<IndexType>::stype); 
+    comm->sumImpl( commVolumePerBlock.data(), commVolumePerBlock.data(), numBlocks, scai::common::TypeTraits<IndexType>::stype); 
 	
 	std::chrono::duration<double> endTime = std::chrono::system_clock::now() - startTime;
 	double totalTime= comm->max(endTime.count() );

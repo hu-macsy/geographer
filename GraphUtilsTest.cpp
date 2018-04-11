@@ -117,4 +117,86 @@ TEST_F(GraphUtilsTest, DISABLED_benchConstructLaplacianBig) {
 
 //--------------------------------------------------------------------------------------- 
 
+TEST_F (GraphUtilsTest, testComputeCommVolumeAndBoundaryNodes){
+ 
+    std::string file = graphPath + "Grid32x32";
+    IndexType dimensions = 2;
+    IndexType N;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    IndexType k =comm->getSize();
+
+    // read graph and coords
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    N= graph.getNumRows();
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+    settings.dimensions = dimensions;
+    settings.minGainForNextRound = 10;
+    settings.storeInfo = false;
+    
+    struct Metrics metrics(settings.numBlocks);
+    
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
+    
+    std::vector<IndexType> commVolume;
+    std::vector<IndexType> numBorderNodes;
+    std::vector<IndexType> numInnerNodes;
+    
+	/*
+	//older version, TODO:remove if these functions are no longer used	
+	commVolume = ITI::GraphUtils::computeCommVolume( graph, partition, k );	
+    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition, settings);
+    */
+	
+	std::tie( commVolume, numBorderNodes, numInnerNodes) = \
+		ITI::GraphUtils::computeCommBndInner( graph, partition, k );
+    
+    SCAI_ASSERT_EQ_ERROR( commVolume.size(), numBorderNodes.size(), "size mismatch");
+    
+    for(int i=0; i< commVolume.size(); i++){
+        if( k<10){
+            PRINT0("block " << i << ": commVol= " << commVolume[i] << " , boundaryNodes= "<< numBorderNodes[i]);
+        }
+        EXPECT_LE( numBorderNodes[i], commVolume[i] ) << "Communication volume must be greater or equal than boundary nodes";
+    }
+    
+}
+
+//--------------------------------------------------------------------------------------- 
+
+
+TEST_F (GraphUtilsTest, testGraphMaxDegree){
+    
+    const IndexType N = 1000;
+    
+    //define distributions
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+
+    //generate random complete matrix
+    scai::lama::CSRSparseMatrix<ValueType> graph(dist, noDistPointer);
+    
+    for( int i=0; i<10; i++){
+        scai::lama::MatrixCreator::fillRandom(graph, i/9.0);
+    
+        IndexType maxDegree;
+        maxDegree = GraphUtils::getGraphMaxDegree<IndexType, ValueType>(graph);
+        //PRINT0("maxDegree= " << maxDegree);
+        
+        EXPECT_LE( maxDegree, N);
+        EXPECT_LE( 0, maxDegree);
+        if ( i==0 ){
+            EXPECT_EQ( maxDegree, 0);
+        }else if( i==9 ){
+            EXPECT_EQ( maxDegree, N);
+        }
+    }
+}
+
+
 } //namespace

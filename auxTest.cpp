@@ -47,7 +47,7 @@ protected:
 
 TEST_F (auxTest, testInitialPartitions){
     
-    std::string fileName = "bigtrace-00000.graph";
+    std::string fileName = "trace-00008.graph";
     std::string file = graphPath + fileName;
     std::ifstream f(file);
     IndexType dimensions= 2;
@@ -199,128 +199,6 @@ TEST_F (auxTest, testInitialPartitions){
 }
 //-----------------------------------------------------------------
 
-TEST_F (auxTest,testGetBorderAndInnerNodes){
- 
-    std::string file = graphPath + "Grid32x32";
-    IndexType dimensions = 2;
-    IndexType N;
-    
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    IndexType k =comm->getSize();
-
-    // read graph and coords
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
-    N= graph.getNumRows();
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
-    
-    struct Settings settings;
-    settings.numBlocks= k;
-    settings.epsilon = 0.2;
-    settings.dimensions = dimensions;
-    settings.minGainForNextRound = 10;
-    settings.storeInfo = false;
-    
-    struct Metrics metrics(settings.numBlocks);
-    
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
-    
-    std::vector<IndexType> numBorderNodes;
-    std::vector<IndexType> numInnerNodes;
-    
-    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition, settings);
-    
-    //assertions - prints
-    SCAI_ASSERT_EQ_ERROR( numBorderNodes.size(), k, "Size of numBorderNodes is wrong");
-    SCAI_ASSERT_EQ_ERROR( numInnerNodes.size(), k, "Size of numInnerNodes is wrong");
-    
-    if( comm->getRank()==0 ){
-        for(int i=0; i<k; i++){
-            std::cout<<"Block " << i << " has " << numBorderNodes[i] << " border nodes and " << numInnerNodes[i] << " inner nodes"<< std::endl;
-        }
-    }
-    
-    IndexType totalBorderNodes = std::accumulate( numBorderNodes.begin(), numBorderNodes.end(), 0);
-    IndexType totalInnerNodes = std::accumulate( numInnerNodes.begin(), numInnerNodes.end(), 0);
-
-    SCAI_ASSERT_EQ_ERROR( totalBorderNodes+totalInnerNodes, N, "Sum of nodes not correct" );
-    
-}
-//-----------------------------------------------------------------
-
-TEST_F (auxTest,testComputeCommVolume){
- 
-    std::string file = graphPath + "Grid32x32";
-    IndexType dimensions = 2;
-    IndexType N;
-    
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    IndexType k =comm->getSize();
-
-    // read graph and coords
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
-    N= graph.getNumRows();
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
-    
-    struct Settings settings;
-    settings.numBlocks= k;
-    settings.epsilon = 0.2;
-    settings.dimensions = dimensions;
-    settings.minGainForNextRound = 10;
-    settings.storeInfo = false;
-    
-    struct Metrics metrics(settings.numBlocks);
-    
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
-    
-    std::vector<IndexType> commVolume = ITI::GraphUtils::computeCommVolume( graph, partition, k );
-        
-    std::vector<IndexType> numBorderNodes;
-    std::vector<IndexType> numInnerNodes;
-    
-    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition, settings);
-    
-    SCAI_ASSERT_EQ_ERROR( commVolume.size(), numBorderNodes.size(), "size mismatch");
-    
-    for(int i=0; i< commVolume.size(); i++){
-        if( k<20){
-            PRINT0("block " << i << ": commVol= " << commVolume[i] << " , boundaryNodes= "<< numBorderNodes[i]);
-        }
-        SCAI_ASSERT_LE_ERROR( numBorderNodes[i], commVolume[i], "Communication volume must be less than boundary nodes")
-    }
-    
-}
-//-----------------------------------------------------------------
- 
-TEST_F (auxTest,testGraphMaxDegree){
-    
-    const IndexType N = 1000;
-    
-    //define distributions
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-
-    //generate random complete matrix
-    scai::lama::CSRSparseMatrix<ValueType> graph(dist, noDistPointer);
-    
-    for( int i=0; i<10; i++){
-        scai::lama::MatrixCreator::fillRandom(graph, i/9.0);
-    
-        IndexType maxDegree;
-        maxDegree = GraphUtils::getGraphMaxDegree<IndexType, ValueType>(graph);
-        //PRINT0("maxDegree= " << maxDegree);
-        
-        EXPECT_LE( maxDegree, N);
-        EXPECT_LE( 0, maxDegree);
-        if ( i==0 ){
-            EXPECT_EQ( maxDegree, 0);
-        }else if( i==9 ){
-            EXPECT_EQ( maxDegree, N);
-        }
-    }
-}
-//-----------------------------------------------------------------
- 
 TEST_F (auxTest,testEdgeList2CSR){
 	
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -495,7 +373,7 @@ TEST_F(auxTest, testBenchIndexReordering){
 	EXPECT_EQ( indexSumFY, indexSumC);
 	
 	
-	//WARNING: integer overload for bigger values
+	//WARNING: integer overflow for bigger values
 	if(M<60000){
 		EXPECT_EQ( indexSumFY, M*(M-1)/2);
 		EXPECT_EQ( indexSumC, M*(M-1)/2);
@@ -505,6 +383,8 @@ TEST_F(auxTest, testBenchIndexReordering){
 
 //-----------------------------------------------------------------
 
+//TODO: 11.04.18, Moritz has started a new branch for that. Remove tests and functions if not needed here
+/*
 TEST_F(auxTest, testBenchKMeansSFCCoords){
 	//std::string fileName = "bubbles-00010.graph";
 	std::string fileName = "Grid32x32";
@@ -565,8 +445,7 @@ TEST_F(auxTest, testBenchKMeansSFCCoords){
 	printMetricsShort( metrics2, std::cout );
 	
 	ITI::aux<IndexType,ValueType>::print2DGrid(graph, partitionOrig  );
-	
 }
-
+*/
 
 }
