@@ -121,7 +121,7 @@ DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(scai:
 
 
 template<typename IndexType, typename ValueType>
-CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(CSRSparseMatrix<ValueType> graph, bool weighted) {
+CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(CSRSparseMatrix<ValueType> graph) {
 	using scai::lama::CSRStorage;
 	using scai::hmemo::HArray;
 	using std::vector;
@@ -156,7 +156,7 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 			if (ja[j] == globalI) {
 				throw std::runtime_error("No self loops allowed.");
 			}
-			targetDegree[i] += weighted ? values[j] : 1;
+			targetDegree[i] += values[j];
 		}
 	}
 
@@ -177,7 +177,7 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 	CSRSparseMatrix<ValueType> result(D-graph);
 	assert(result.getNumValues() == graph.getNumValues() + globalN);
 
-	return graph;
+	return result;
 }
 
 template<typename IndexType, typename ValueType>
