@@ -136,13 +136,6 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
 	scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
     scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
 
-    if (dist->getBlockDistributionSize() == nIndex) {
-    	throw std::runtime_error("Only replicated or block distributions supported.");
-    }
-
-    assert(dist->getBlockDistributionSize() == localN);
-    const IndexType firstIndex = dist->local2global(0);
-
 	const CSRStorage<ValueType>& storage = graph.getLocalStorage();
 	const ReadAccess<IndexType> ia(storage.getIA());
 	const ReadAccess<IndexType> ja(storage.getJA());
@@ -166,7 +159,7 @@ CSRSparseMatrix<ValueType> Diffusion<IndexType, ValueType>::constructLaplacian(C
     scai::utilskernel::HArrayUtils::setSequence(dIA, IndexType(0), IndexType(1), dIA.size());
     //... to itself
     scai::hmemo::HArray<IndexType> dJA(localN, IndexType(0));
-    scai::utilskernel::HArrayUtils::setSequence(dJA, firstIndex, IndexType(1), dJA.size());
+    dist->getOwnedIndexes(dJA);
     // with the degree as value
     scai::hmemo::HArray<ValueType> dValues(localN, targetDegree.data());
 

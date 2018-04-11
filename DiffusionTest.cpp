@@ -6,10 +6,13 @@
  */
 #include <numeric>
 
+
 #include "gtest/gtest.h"
 #include "Diffusion.h"
 #include "MeshGenerator.h"
 #include "FileIO.h"
+
+#include <scai/dmemo/CyclicDistribution.hpp>
 
 namespace ITI {
 
@@ -31,6 +34,8 @@ TEST_F(DiffusionTest, testConstructLaplacian) {
 	const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 	const IndexType n = graph.getNumRows();
     scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
+
+    scai::dmemo::DistributionPtr cyclidCist(new scai::dmemo::CyclicDistribution(n, 10, graph.getRowDistributionPtr()->getCommunicatorPtr()));
 
 	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(graph);
 

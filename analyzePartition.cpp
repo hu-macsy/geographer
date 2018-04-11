@@ -1,3 +1,9 @@
+/**
+ * @file analyzePartition.cpp
+ *
+ * A standalone executable to analyze an existing partition stored in a file.
+ */
+
 #include <boost/program_options.hpp>
 
 #include "FileIO.h"
