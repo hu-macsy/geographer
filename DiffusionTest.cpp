@@ -12,6 +12,8 @@
 #include "MeshGenerator.h"
 #include "FileIO.h"
 
+#include <scai/dmemo/CyclicDistribution.hpp>
+
 namespace ITI {
 
 using scai::lama::CSRSparseMatrix;

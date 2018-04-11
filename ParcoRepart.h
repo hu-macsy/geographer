@@ -110,10 +110,5 @@ namespace ITI {
 			static IndexType getDegreeSum(const CSRSparseMatrix<ValueType> &input, const std::vector<IndexType> &nodes);
 
 			static std::vector<IndexType> neighbourPixels(const IndexType thisPixel,const IndexType sideLen, const IndexType dimensions);
-
-			/**Returns a vector of size N (if adjM is of size NxN) with the degree for every node of
-			* the input graph.
-			*/
-			static scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType> adjM);
 	};
 }

@@ -38,20 +38,19 @@ protected:
         std::string graphPath = "./meshes/";
 };
 
-TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
-    
+TEST_F(SpectralPartitionTest, testFiedlerVector) {
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     // for now local refinement requires k = P
     //
     IndexType N = 40;
     //CSRSparseMatrix<ValueType> graph(N, N);
     scai::lama::SparseAssemblyStorage<ValueType> graphSt(N, N);
-    
+
     srand(time(NULL));
-    
+
     //TODO: this (rarely) can give disconnected graph
     // random graph with weighted edges
-    for(IndexType row=0; row<N; row++){    
+    for(IndexType row=0; row<N; row++){
         for( IndexType j=0; j<rand()%5+6; j++){
             IndexType col= rand()%N;
             if( col==row ) continue;
@@ -60,142 +59,38 @@ TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
             graphSt.setValue(row, col, w);
             graphSt.setValue(col, row, w);
         }
-        
+
         // connect this row with the next one so graph is connected
         graphSt.setValue(row, (row+1)%N, rand()%10 +1);
         graphSt.setValue((row+1)%N, row, rand()%10 +1 );
     }
-    
+
     scai::lama::CSRSparseMatrix<ValueType> graph( graphSt);
 
-    scai::dmemo::DistributionPtr blockDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
-    scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
-    graph.redistribute( blockDistPtr, noDistPtr);
-    
-    
-    scai::lama::CSRSparseMatrix<ValueType> laplacian = SpectralPartition<IndexType, ValueType>::getLaplacian( graph );
-    
-    {   // sum of every row must be 0
-        scai::hmemo::ReadAccess<ValueType> readLaplVal(laplacian.getLocalStorage().getValues() );
-        scai::hmemo::ReadAccess<IndexType> readLaplIA(laplacian.getLocalStorage().getIA() );
-        for( IndexType i=0; i<readLaplIA.size()-1; i++){
-            IndexType rowSum=0;
-            for(IndexType j=readLaplIA[i]; j<readLaplIA[i+1]; j++){
-                SCAI_ASSERT(j < readLaplVal.size(), " index " << j << " too big, must be less than " << readLaplVal.size());
-                rowSum += readLaplVal[j];
-                //PRINT(*comm << ": "<< readLaplVal[j]);
-            }
-            SCAI_ASSERT_EQ_ERROR(rowSum, 0, "Sum for row " << i <<" is "<< rowSum<< " and not 0");
-        }
-    }
-    
+
     ValueType fiedlerEigenvalue = -8;
     scai::lama::DenseVector<ValueType> fiedler;
-    
+
     {   // get the getFiedlerVector function
         std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
         fiedler = SpectralPartition<IndexType, ValueType>::getFiedlerVector( graph, fiedlerEigenvalue );
         PRINT0("time to get fiedler vector: " << ( std::chrono::duration<double> (std::chrono::steady_clock::now() -start) ).count() );
         SCAI_ASSERT( fiedlerEigenvalue >0, "fiedler eigenvalue negative: "<< fiedlerEigenvalue);
     }
-    
+
     //TODO: done in a hurry, add prorper tests, assertions
     //prints - assertion
-    
+
     ValueType fiedlerMax = fiedler.max().Scalar::getValue<ValueType>();
     ValueType fiedlerl1Norm = fiedler.l1Norm().Scalar::getValue<ValueType>();
     ValueType fiedlerl2Norm = fiedler.l2Norm().Scalar::getValue<ValueType>();
     ValueType fiedlerMin = fiedler.min().Scalar::getValue<ValueType>();
-    
+
     PRINT0(fiedler.size() << " , max= " << fiedlerMax << " , min= " << fiedlerMin << " , l1Norm= " << fiedlerl1Norm << " , l2Norm= " << fiedlerl2Norm << " , fiedlerEigenvalue= " << fiedlerEigenvalue);
-    
+
     EXPECT_TRUE( graph.getRowDistributionPtr()->isEqual( fiedler.getDistribution() ) );
-        
 }
 
-TEST_F(SpectralPartitionTest, benchConstructLaplacian) {
-	std::string path = "meshes/hugebubbles/";
-	std::string fileName = "hugebubbles-00000.graph";
-	std::string file = path + fileName;
-	const scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
-
-    scai::lama::CSRSparseMatrix<ValueType> L = SpectralPartition<IndexType, ValueType>::getLaplacian( graph );
-}
-//------------------------------------------------------------------------------
-
-TEST_F(SpectralPartitionTest, testSpectralPartition){
-    //std::string file = "Grid8x8";
-    std::string file = graphPath + "rotation-00000.graph";
-    std::ifstream f(file);
-    IndexType dimensions= 2, k=16;
-    IndexType N, edges;
-    f >> N >> edges; 
-    
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    // for now local refinement requires k = P
-    k = comm->getSize();
-    //
-    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
-    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
-    
-    //distrubute graph
-    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
-        
-
-    //read the array locally and messed the distribution. Left as a remainder.
-    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
-    EXPECT_EQ( edges, (graph.getNumValues())/2 );
-    
-    //reading coordinates
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
-    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
-    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
-    
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
-    
-    scai::lama::DenseVector<IndexType> degreeVector = SpectralPartition<IndexType, ValueType>::getDegreeVector( graph);
-    SCAI_ASSERT_EQ_ERROR( degreeVector.sum() , 2*edges , "Wrong degree vector sum.");
-    
-    
-    scai::lama::CSRSparseMatrix<ValueType> laplacian = SpectralPartition<IndexType, ValueType>::getLaplacian( graph );
-    
-
-    if(laplacian.getNumRows() < 4000 ){
-        EXPECT_TRUE( laplacian.checkSymmetry() );
-    }
-    EXPECT_TRUE( laplacian.isConsistent() );
-    
-    // check that x = (1, 1, ..., 1 ) is eigenvector with eigenvalue 0
-    EXPECT_TRUE( graph.getColDistributionPtr()->isEqual(laplacian.getColDistribution() ) );
-    DenseVector<ValueType> x( graph.getColDistributionPtr(), 1 );
-    DenseVector<ValueType> y( laplacian * x );
-    SCAI_ASSERT_LT_ERROR( y.maxNorm(), Scalar( 1e-8 ), "not a Laplacian matrix" )
-    
-    ValueType diagonalSum=0;
-    for( int r=0; r<laplacian.getNumRows(); r++){
-        for( int c=0; c<laplacian.getNumColumns(); c++){
-            if( r==c )
-                diagonalSum += laplacian.getValue( r, c).Scalar::getValue<ValueType>();
-        }
-    }
-    //PRINT( diagonalSum );
-    EXPECT_EQ( diagonalSum , 2*edges);
-    
-    ValueType sum=0;
-    {
-        scai::hmemo::ReadAccess<ValueType> readLaplVal(laplacian.getLocalStorage().getValues() );
-        for(int i=0; i<laplacian.getLocalStorage().getValues().size(); i++){
-            //need read access
-            sum += readLaplVal[i];
-        }
-    }
-    // PRINT (sum);
-    EXPECT_EQ( sum , 0 );
-
-}
 //------------------------------------------------------------------------------
 
 TEST_F(SpectralPartitionTest, testGetPartition){
@@ -241,8 +136,6 @@ TEST_F(SpectralPartitionTest, testGetPartition){
     EXPECT_EQ(0, spectralPartition.min().getValue<ValueType>());
     EXPECT_EQ(k-1, spectralPartition.max().getValue<ValueType>());
     EXPECT_EQ(graph.getRowDistribution(), spectralPartition.getDistribution());
-       
-    
 }
 //------------------------------------------------------------------------------
 
@@ -298,7 +191,7 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     ValueType eigenEigenValue =0;
     
     // get the laplacian of the pixeled graph , since the pixeled graph is replicated so should be the laplacian
-    scai::lama::CSRSparseMatrix<ValueType> pixelLaplacian = SpectralPartition<IndexType, ValueType>::getLaplacian( pixelGraph );
+    scai::lama::CSRSparseMatrix<ValueType> pixelLaplacian = GraphUtils::constructLaplacian<IndexType, ValueType>( pixelGraph );
     SCAI_ASSERT( pixelLaplacian.isConsistent() == 1 , "Laplacian graph not consistent.");
     SCAI_ASSERT( pixelLaplacian.getNumRows() == numPixels , "Wrong size of the laplacian.");
     ValueType sum=0;

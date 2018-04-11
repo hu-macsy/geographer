@@ -578,7 +578,7 @@ int main(int argc, char** argv) {
 	
     // the laplacian has the same row and column distributios as the (now partitioned) graph
 	
-    scai::lama::CSRSparseMatrix<ValueType> laplacian = SpectralPartition<IndexType, ValueType>::getLaplacian( graph );
+    scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils::constructLaplacian<IndexType, ValueType>( graph );
 	//scai::lama::CSRSparseMatrix<ValueType> laplacian = Diffusion<IndexType, ValueType>::constructLaplacian( graph );
 
 	SCAI_ASSERT( laplacian.getRowDistributionPtr()->isEqual( graph.getRowDistribution() ), "Row distributions do not agree" );

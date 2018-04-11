@@ -62,15 +62,17 @@ TEST_F(GraphUtilsTest, testConstructLaplacian) {
     std::string file = graphPath + fileName;
     const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     const IndexType n = graph.getNumRows();
-    scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
+    scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
 
-    scai::dmemo::DistributionPtr cyclidCist(new scai::dmemo::CyclicDistribution(n, 10, graph.getRowDistributionPtr()->getCommunicatorPtr()));
+    scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
+    scai::dmemo::DistributionPtr cyclidCist(new scai::dmemo::CyclicDistribution(n, 10, comm));
 
     CSRSparseMatrix<ValueType> L = GraphUtils::constructLaplacian<IndexType, ValueType>(graph);
 
     ASSERT_EQ(L.getRowDistribution(), graph.getRowDistribution());
     ASSERT_TRUE(L.isConsistent());
 
+    //test that L*1 = 0
     DenseVector<ValueType> x( n, 1 );
     DenseVector<ValueType> y( L * x );
 
@@ -83,6 +85,9 @@ TEST_F(GraphUtilsTest, testConstructLaplacian) {
     LFromReplicated.redistribute(L.getRowDistributionPtr(), L.getColDistributionPtr());
     CSRSparseMatrix<ValueType> diff (LFromReplicated - L);
     EXPECT_EQ(0, diff.l2Norm().Scalar::getValue<ValueType>());
+
+    //sum is zero
+    EXPECT_EQ(0, comm->sum(L.getLocalStorage().getValues().sum()) );
 }
 
 TEST_F(GraphUtilsTest, benchConstructLaplacian) {
@@ -92,6 +97,16 @@ TEST_F(GraphUtilsTest, benchConstructLaplacian) {
 
     CSRSparseMatrix<ValueType> L = GraphUtils::constructLaplacian<IndexType, ValueType>(graph);
 }
+
+TEST_F(GraphUtilsTest, DISABLED_benchConstructLaplacianBig) {
+    std::string fileName = "hugebubbles-00000.graph";
+    std::string file = graphPath + fileName;
+    const scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+
+    CSRSparseMatrix<ValueType> L = GraphUtils::constructLaplacian<IndexType, ValueType>(graph);
+}
+
+//TODO: test also with edge weights
 
 //--------------------------------------------------------------------------------------- 
 

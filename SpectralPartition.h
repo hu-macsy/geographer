@@ -33,17 +33,6 @@ namespace ITI {
     template <typename IndexType, typename ValueType>
     class SpectralPartition {
         public:
-            /** Returns the degree of every node of the graph.
-             * @param[in] adjM The NxN adjacency matrix of the input graph.
-             * @return A distributed DenseVector of size N with the degree of every node. The DenseVector
-             * has the same distribution as the the rows of adjM.
-             */
-            static scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
-            
-            /** Returns a distributed laplacian matrix.
-             */
-            static scai::lama::CSRSparseMatrix<ValueType> getLaplacian( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
-            
             /** Returns a spectral partition of the input graph
              * @param[in] adjM The adjacency matrix of the input graph to partition.
              * @param[in] coordinates Node positions

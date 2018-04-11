@@ -201,9 +201,6 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::Halo& halo
 
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
-	
-template <typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> getLaplacian( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>>& adjList);

@@ -1236,117 +1236,6 @@ scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseM
     return degreeVector;
 }
 
-//---------------------------------------------------------------------------------------
-
-template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> getLaplacian( const scai::lama::CSRSparseMatrix<ValueType>& adjM){
-    SCAI_REGION("GraphUtils.getLaplacian");
-    
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-    
-    const IndexType globalN = distPtr->getGlobalSize();
-    const IndexType localN = distPtr->getLocalSize();
-    
-    const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-    
-    // distributed vector of size globalN with the degree for every edge. It has the same distribution as the rowDistribution of adjM
-    scai::lama::DenseVector<IndexType> degreeVector = getDegreeVector<IndexType,ValueType>( adjM );
-    SCAI_ASSERT( degreeVector.size() == globalN, "Degree vector global size not correct: " << degreeVector.size() << " , shoulb be " << globalN);
-    SCAI_ASSERT( degreeVector.getLocalValues().size() == localN,"Degree vector local size not correct: " << degreeVector.getLocalValues().size() << " , shoulb be " << localN);
-    
-    // data of the output graph
-    scai::hmemo::HArray<IndexType> laplacianIA;
-    scai::hmemo::HArray<IndexType> laplacianJA;
-    scai::hmemo::HArray<ValueType> laplacianValues;
-    
-    IndexType laplacianNnzValues;
-    {        
-        // get local data of adjM
-        const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-        const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-        const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
-        
-        // local data of degree vector
-        scai::hmemo::ReadAccess<IndexType>  rLocalDegree( degreeVector.getLocalValues() );
-        assert( degreeVector.getLocalValues().size() == localN );
-
-        laplacianNnzValues = values.size() + localN;    // add one element per node/row
-        
-        // data of laplacian graph. laplacian and input are of the same size globalN x globalN
-        scai::hmemo::WriteOnlyAccess<IndexType> wLaplacianIA( laplacianIA , ia.size() );  
-        scai::hmemo::WriteOnlyAccess<IndexType> wLaplacianJA( laplacianJA , laplacianNnzValues );
-        scai::hmemo::WriteOnlyAccess<ValueType> wLaplacianValues( laplacianValues, laplacianNnzValues );
-        
-        IndexType nnzCounter = 0;
-        for(IndexType i=0; i<localN; i++){
-            const IndexType beginCols = ia[i];
-            const IndexType endCols = ia[i+1];
-            assert(ja.size() >= endCols);
-            
-            IndexType globalI = distPtr->local2global(i);
-            IndexType j = beginCols;
-            
-            // the index and value of the diagonal element to be set at the end for every row
-            IndexType diagonalIndex=0;
-            ValueType diagonalValue=0;
-            
-            while( ja[j]< globalI and j<endCols){     //bot-left part of matrix, before diagonal
-                assert(ja[j] >= 0);
-                assert(ja[j] < globalN);
-                
-                wLaplacianJA[nnzCounter] = ja[j];          // same indices
-                wLaplacianValues[nnzCounter] = -values[j]; // opposite values
-                diagonalValue += values[j];
-                ++nnzCounter;
-                assert( nnzCounter < laplacianNnzValues+1);
-                ++j;
-            }
-            // out of while, must insert diagonal element that is the sum of the edges
-            wLaplacianJA[nnzCounter] = globalI;
-            assert( i < rLocalDegree.size() );
-            wLaplacianValues[nnzCounter] = rLocalDegree[i];
-            diagonalIndex = nnzCounter;       
-            ++nnzCounter;
-            
-            // copy the rest of the row
-            while( j<endCols){
-                wLaplacianJA[nnzCounter] = ja[j];          // same indices
-                wLaplacianValues[nnzCounter] = -values[j]; // opposite values
-                diagonalValue += values[j];
-                ++nnzCounter;
-                assert( nnzCounter < laplacianNnzValues+1);
-                ++j;
-            }
-            wLaplacianValues[ diagonalIndex ] = diagonalValue;
-        }
-        
-        //fix ia array , we just added 1 element in every row, so...
-        for(IndexType i=0; i<ia.size(); i++){
-            wLaplacianIA[i] = ia[i] + i;
-        }
-
-    }
-    
-    SCAI_ASSERT_EQ_ERROR(laplacianJA.size(), laplacianValues.size(), "Wrong sizes." );
-    {
-        scai::hmemo::ReadAccess<IndexType> rLaplacianIA( laplacianIA );
-        scai::hmemo::ReadAccess<IndexType> rLaplacianJA( laplacianJA );
-        scai::hmemo::ReadAccess<ValueType> rLaplacianValues( laplacianValues );
-        
-        SCAI_ASSERT_EQ_ERROR(rLaplacianIA[ rLaplacianIA.size()-1] , laplacianJA.size(), "Wrong sizes." );
-    }
-    
-    scai::lama::CSRStorage<ValueType> resultStorage( localN, globalN, laplacianNnzValues, laplacianIA, laplacianJA, laplacianValues);
-    
-    scai::lama::CSRSparseMatrix<ValueType> result(adjM.getRowDistributionPtr() , adjM.getColDistributionPtr() );
-    result.swapLocalStorage( resultStorage );
-    
-    return result;
-
-}
-
-
 //------------------------------------------------------------------------------
 
 
@@ -1753,7 +1642,6 @@ template  std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama
 template scai::lama::CSRSparseMatrix<ValueType> getPEGraph<IndexType,ValueType>( const scai::lama::CSRSparseMatrix<ValueType> &adjM);
 template scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>> &adjList);
 template scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList );
-template scai::lama::CSRSparseMatrix<ValueType> getLaplacian<IndexType,ValueType>( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 template scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 template scai::lama::CSRSparseMatrix<ValueType> constructLaplacian<IndexType, ValueType>(scai::lama::CSRSparseMatrix<ValueType> graph);
 template scai::lama::CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension);
