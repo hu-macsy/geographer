@@ -78,54 +78,6 @@ scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType
     return result;
 }
 
-
-template<typename IndexType, typename ValueType>
-IndexType getFarthestLocalNode(const scai::lama::CSRSparseMatrix<ValueType> &graph, std::vector<IndexType> seedNodes) {
-	/**
-	 * Yet another BFS. This currently has problems with unconnected graphs.
-	 */
-	const IndexType localN = graph.getLocalNumRows();
-	const Distribution& dist = graph.getRowDistribution();
-
-	if (seedNodes.size() == 0) return rand() % localN;
-
-	vector<bool> visited(localN, false);
-	queue<IndexType> bfsQueue;
-
-	for (IndexType seed : seedNodes) {
-		bfsQueue.push(seed);
-		assert(seed >= 0 || seed < localN);
-		visited[seed] = true;
-	}
-
-	const scai::lama::CSRStorage<ValueType>& storage = graph.getLocalStorage();
-	ReadAccess<IndexType> ia(storage.getIA());
-	ReadAccess<IndexType> ja(storage.getJA());
-
-	IndexType nextNode = 0;
-	while (bfsQueue.size() > 0) {
-		nextNode = bfsQueue.front();
-		bfsQueue.pop();
-		visited[nextNode] = true;
-
-		for (IndexType j = ia[nextNode]; j < ia[nextNode+1]; j++) {
-			IndexType localNeighbour = dist.global2local(ja[j]);
-			if (localNeighbour != nIndex && !visited[localNeighbour]) {
-				bfsQueue.push(localNeighbour);
-				visited[localNeighbour] = true;
-			}
-		}
-	}
-
-	//if nodes are unvisited, the graph is unconnected and the unvisited nodes are in fact the farthest
-	for (IndexType v = 0; v < localN; v++) {
-		if (!visited[v]) nextNode = v;
-		break;
-	}
-
-	return nextNode;
-}
-
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u)
 {
@@ -1258,6 +1210,7 @@ scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( co
 
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType>& adjM){
+    //TODO: can't this be simplified by a call to scai::sparsekernel::OpenMPCSRUtils::offsets2sizes?
     SCAI_REGION("GraphUtils.getDegreeVector");
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -1650,7 +1603,6 @@ PRINT0("assembled CSR storage");
 //-----------------------------------------------------------------------------------
 
 template scai::lama::DenseVector<IndexType> reindex(CSRSparseMatrix<ValueType> &graph);
-template IndexType getFarthestLocalNode(const CSRSparseMatrix<ValueType> &graph, std::vector<IndexType> seedNodes);
 template std::vector<IndexType> localBFS(const CSRSparseMatrix<ValueType> &graph, IndexType u);
 template IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const IndexType u, IndexType lowerBound, const IndexType k, IndexType maxRounds);
 template ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool weighted);

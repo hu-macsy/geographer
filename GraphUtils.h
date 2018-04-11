@@ -21,17 +21,39 @@ namespace ITI {
 
 namespace GraphUtils {
 
+/**
+ * Reindexes the nodes of the input graph to form a BlockDistribution. No redistribution of the graph happens, only the indices are changed.
+ * After this method is run, the input graph has a BlockDistribution.
+ *
+ * @param[in,out] the graph
+ *
+ * @return A block-distributed vector containing the old indices
+ */
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType> &graph);
 
-template<typename IndexType, typename ValueType>
-IndexType getFarthestLocalNode(const scai::lama::CSRSparseMatrix<ValueType> &graph, std::vector<IndexType> seedNodes);
-
 /**
- * Perform a BFS on the local nodes only.
+ * @brief Perform a BFS on the local subgraph.
+ *
+ * @param graph (may be distributed)
+ * @param u local index of starting node
+ *
+ * @return vector with (local) distance to u for each local node
  */
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &graph, IndexType u);
+
+/**
+ * @brief Computes the diameter of the local subgraph using the iFUB algorithm.
+ *
+ * @param graph
+ * @param u local index of starting node. Should be central.
+ * @param lowerBound of diameter. Can be 0. A good lower bound might speed up the computation
+ * @param k tolerance Algorithm aborts if upperBound - lowerBound <= k
+ * @param maxRounds Maximum number of diameter rounds.
+ *
+ * @return new lower bound
+ */
 
 template<typename IndexType, typename ValueType>
 IndexType getLocalBlockDiameter(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u, IndexType lowerBound, const IndexType k, IndexType maxRounds);
