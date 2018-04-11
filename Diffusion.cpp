@@ -88,9 +88,14 @@ template<typename IndexType, typename ValueType>
 DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(scai::lama::CSRSparseMatrix<ValueType> laplacian, scai::lama::DenseVector<ValueType> nodeWeights, std::vector<IndexType> sources, ValueType eps) {
 	using scai::hmemo::HArray;
 
+    if (!laplacian.getRowDistributionPtr()->isReplicated() or !nodeWeights.getDistributionPtr()->isReplicated()) {
+        throw std::logic_error("Should only be called with replicated input.");
+    }
+
 	const IndexType l = sources.size();
 	const IndexType n = laplacian.getNumRows();
 	const IndexType localN = laplacian.getLocalNumRows();
+
 	HArray<ValueType> resultContainer(localN*l);
 	IndexType offset = 0;
 

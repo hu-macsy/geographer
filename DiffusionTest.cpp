@@ -79,8 +79,10 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 	std::string fileName = "bubbles-00010.graph";
 	std::string file = graphPath + fileName;
 	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
-	const IndexType n = graph.getNumRows();
-	scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
+	scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
+	const IndexType globalN = inputDist->getGlobalSize();
+	const IndexType localN = inputDist->getLocalSize();
+	scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
 
 	CSRSparseMatrix<ValueType> L = Diffusion<IndexType, ValueType>::constructLaplacian(graph);
 	EXPECT_EQ(L.getRowDistribution(), graph.getRowDistribution());
@@ -88,7 +90,7 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 
 	DenseVector<ValueType> nodeWeights(L.getRowDistributionPtr(),1);
 
-	std::vector<IndexType> nodeIndices(n);
+	std::vector<IndexType> nodeIndices(globalN);
 	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
 
 	//broadcast seed value from root to ensure equal pseudorandom numbers.
@@ -102,13 +104,17 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 	std::vector<IndexType> landmarks(numLandmarks);
 	std::copy(nodeIndices.begin(), nodeIndices.begin()+numLandmarks, landmarks.begin());
 
+	L.redistribute(noDist, noDist);
+	nodeWeights.redistribute(noDist);
+
 	DenseMatrix<ValueType> potentials = Diffusion<IndexType, ValueType>::multiplePotentials(L, nodeWeights, landmarks, 1e-5);
+
 	ASSERT_EQ(numLandmarks, potentials.getNumRows());
-	ASSERT_EQ(n, potentials.getNumColumns());
+	ASSERT_EQ(globalN, potentials.getNumColumns());
 
 	std::vector<DenseVector<ValueType> > convertedCoords(numLandmarks);
 	for (IndexType i = 0; i < numLandmarks; i++) {
-		convertedCoords[i] = DenseVector<ValueType>(n,0);
+		convertedCoords[i] = DenseVector<ValueType>(globalN,0);
 		potentials.getLocalRow(convertedCoords[i].getLocalValues(), i);
 	}
 	FileIO<IndexType, ValueType>::writeCoords(convertedCoords, "diffusion-coords.xyz");
