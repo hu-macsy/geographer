@@ -6,6 +6,8 @@
 #include "FileIO.h"
 #include "GraphUtils.h"
 
+#include <scai/dmemo/CyclicDistribution.hpp>
+
 namespace ITI {
 
 class GraphUtilsTest : public ::testing::Test {
@@ -54,6 +56,43 @@ TEST_F(GraphUtilsTest, testReindexCut){
 
     EXPECT_EQ(initialCut, secondCut);
 }
+
+TEST_F(GraphUtilsTest, testConstructLaplacian) {
+    std::string fileName = "bubbles-00010.graph";
+    std::string file = graphPath + fileName;
+    const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+    const IndexType n = graph.getNumRows();
+    scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
+
+    scai::dmemo::DistributionPtr cyclidCist(new scai::dmemo::CyclicDistribution(n, 10, graph.getRowDistributionPtr()->getCommunicatorPtr()));
+
+    CSRSparseMatrix<ValueType> L = GraphUtils::constructLaplacian<IndexType, ValueType>(graph);
+
+    ASSERT_EQ(L.getRowDistribution(), graph.getRowDistribution());
+    ASSERT_TRUE(L.isConsistent());
+
+    DenseVector<ValueType> x( n, 1 );
+    DenseVector<ValueType> y( L * x );
+
+    ValueType norm = y.maxNorm().Scalar::getValue<ValueType>();
+    EXPECT_EQ(norm,0);
+
+    //test consistency under distributions
+    const CSRSparseMatrix<ValueType> replicatedGraph(graph, noDist, noDist);
+    CSRSparseMatrix<ValueType> LFromReplicated = GraphUtils::constructLaplacian<IndexType, ValueType>(replicatedGraph);
+    LFromReplicated.redistribute(L.getRowDistributionPtr(), L.getColDistributionPtr());
+    CSRSparseMatrix<ValueType> diff (LFromReplicated - L);
+    EXPECT_EQ(0, diff.l2Norm().Scalar::getValue<ValueType>());
+}
+
+TEST_F(GraphUtilsTest, benchConstructLaplacian) {
+    std::string fileName = "bubbles-00010.graph";
+    std::string file = graphPath + fileName;
+    const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+
+    CSRSparseMatrix<ValueType> L = GraphUtils::constructLaplacian<IndexType, ValueType>(graph);
+}
+
 //--------------------------------------------------------------------------------------- 
 
 } //namespace

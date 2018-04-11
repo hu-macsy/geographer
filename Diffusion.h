@@ -24,35 +24,6 @@ public:
 	Diffusion() = default;
 	virtual ~Diffusion() = default;
 
-	/**
-	 * @brief Construct the Laplacian of the input matrix. May contain parallel communication.
-	 *
-	 * @param graph Input matrix, must have a (general) block distribution or be replicated.
-	 *
-	 * @return laplacian with same distribution as input
-	 */
-    static scai::lama::CSRSparseMatrix<ValueType> constructLaplacian(scai::lama::CSRSparseMatrix<ValueType> graph);
-
-    /**
-     * @brief Construct a replicated projection matrix for a fast Johnson-Lindenstrauß-Transform
-     *
-     * @param epsilon Desired accuracy of transform
-     * @param n
-     * @param origDimension Dimension of original space
-     *
-     * @return FJLT matrix
-     */
-    static scai::lama::CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension);
-
-    /**
-     * @brief Construct a replicated Hadamard matrix
-     *
-     * @param d Dimension
-     *
-     * @return Hadamard matrix
-     */
-    static scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d);
-
     /**
      * Computes the potential vector of a diffusion flow in a graph. Calls a linear solver to solve Lx=d for x, where L is the graph laplacian and d the demand vector.
      *

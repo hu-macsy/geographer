@@ -215,6 +215,38 @@ scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( co
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>>& edgeList );
 
+/**
+ * @brief Construct the Laplacian of the input matrix. May contain parallel communication.
+ *
+ * @param graph Input matrix, must have a (general) block distribution or be replicated.
+ *
+ * @return laplacian with same distribution as input
+ */
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> constructLaplacian(scai::lama::CSRSparseMatrix<ValueType> graph);
+
+/**
+ * @brief Construct a replicated projection matrix for a fast Johnson-Lindenstrauß-Transform
+ *
+ * @param epsilon Desired accuracy of transform
+ * @param n
+ * @param origDimension Dimension of original space
+ *
+ * @return FJLT matrix
+ */
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension);
+
+/**
+ * @brief Construct a replicated Hadamard matrix
+ *
+ * @param d Dimension
+ *
+ * @return Hadamard matrix
+ */
+template<typename IndexType, typename ValueType>
+scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d);
+
 //taken from https://stackoverflow.com/a/9345144/494085
 template<class BidiIter >
 static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_random) {
@@ -228,23 +260,6 @@ static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_rand
     }
     return begin;
 }
-
-/*
-static std::vector<IndexType> indexReorder(const IndexType maxIndex, const IndexType window){
-	IndexType index = 0;
-	std::vector<IndexType> ret(maxIndex, -1);
-    for( IndexType i=0; i<window; i++){
-		for( IndexType step=0; step<maxIndex; step+=window){
-			//if(step+1>=maxIndex) continue;
-			std::cout<< step+i <<" <> ";
-			ret[index++] = step+i;
-			//if(index>=maxIndex) break;
-			}
-		}
-
-	return ret;
-}
-*/
 
 static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
 	IndexType index = 0;
@@ -275,6 +290,7 @@ static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
 	
 	return ret;
 }
+
 
 
 
