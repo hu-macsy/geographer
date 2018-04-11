@@ -112,11 +112,11 @@ TEST_F(SpectralPartitionTest, testGetLaplacianWithEdgeWeights){
     EXPECT_TRUE( graph.getRowDistributionPtr()->isEqual( fiedler.getDistribution() ) );
         
 }
+//------------------------------------------------------------------------------
 
 TEST_F(SpectralPartitionTest, benchConstructLaplacian) {
-	std::string path = "meshes/hugebubbles/";
-	std::string fileName = "hugebubbles-00000.graph";
-	std::string file = path + fileName;
+	std::string fileName = "slowrot-00000.graph";
+	std::string file = graphPath + fileName;
 	const scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 
     scai::lama::CSRSparseMatrix<ValueType> L = SpectralPartition<IndexType, ValueType>::getLaplacian( graph );
@@ -200,7 +200,7 @@ TEST_F(SpectralPartitionTest, testSpectralPartition){
 
 TEST_F(SpectralPartitionTest, testGetPartition){
     //std::string file = "Grid32x32";
-    std::string file = graphPath + "trace-00001.graph";
+    std::string file = graphPath + "trace-00008.graph";
     std::ifstream f(file);
     IndexType dimensions= 2;
     IndexType N, edges;
@@ -354,12 +354,15 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     eigenVec.sort(permutation, true);
     fiedler.sort(permutationF, true);
     
+	/*
+	//TODO: check this code and convert to checks
     PRINT0("The permutation should be almost the same or the inverse: ");
     for(int i=0; i<fiedler.size(); i++){
         if( i<10 or i>fiedler.size()-10){
             PRINT0(i<<": "<< permutation.getValue(i).Scalar::getValue<ValueType>() << " + " << permutationF.getValue(i).Scalar::getValue<ValueType>() );
         }
     }
+    */
     
 }
 
