@@ -709,7 +709,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
 
         //sort local indices for general distribution
         std::sort(newLocalIndices.begin(), newLocalIndices.end());
-PRINT(*comm << ": " << newLocalIndices.size() );
+		
         //check size and sanity
         SCAI_ASSERT_LT_ERROR( *std::max_element(newLocalIndices.begin(), newLocalIndices.end()) , globalN, "Too large index (possible IndexType overflow?).");
         SCAI_ASSERT_EQ_ERROR( comm->sum(newLocalIndices.size()), globalN, "distribution mismatch");

@@ -228,7 +228,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	const ValueType threshold = 0.002*diagonalLength;//TODO: take global point density into account
 	const IndexType maxIterations = settings.maxKMeansIterations;
 	do {
-		std::chrono::time_point<std::chrono::high_resolution_clock> iterStart = std::chrono::high_resolution_clock::now();
+		//std::chrono::time_point<std::chrono::high_resolution_clock> iterStart = std::chrono::high_resolution_clock::now();
 		if (iter < samplingRounds) {
 		    SCAI_ASSERT_LE_ERROR(samples[iter], localN, "invalid number of samples");
 			lastIndex = localIndices.begin() + samples[iter];

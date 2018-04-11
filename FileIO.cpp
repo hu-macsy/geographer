@@ -1206,7 +1206,9 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
     return graph;
 }
 //-------------------------------------------------------------------------------------------------
-   
+
+//TODO: handle case where number of files != numPEs
+
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeListDistributed(const std::string prefix){
     SCAI_REGION( "FileIO.readEdgeListDistributed" );

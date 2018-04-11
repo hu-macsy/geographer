@@ -235,7 +235,6 @@ TEST_F(FileIOTest, testWriteCoordsDistributed){
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadCoordsOcean) {
-	std::string graphFile = graphPath + "fesom_core2.graph";
 	std::string coordFile = graphPath + "node2d_core2.out";
 	const IndexType n = 126858;
 
@@ -274,7 +273,7 @@ TEST_F(FileIOTest, testReadBinaryEdgeList) {
     scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 
     const IndexType n = graph.getNumRows();
-    const IndexType localN = dist->getLocalSize();
+    //const IndexType localN = dist->getLocalSize();
     EXPECT_EQ(4096, n);
     EXPECT_TRUE(graph.isConsistent());
     EXPECT_EQ(n, graph.getNumColumns());
@@ -435,14 +434,12 @@ TEST_F(FileIOTest, testWriteCoordsParallel){
     EXPECT_TRUE(coordsOrig[0].getDistributionPtr()->isEqual(*blockDist));
 
     //
-    // write coords in parallel
-    
+    // write coords in parallel    
     std::string outFilename = std::string( file+"_parallel.xyz");
     
     FileIO<IndexType, ValueType>::writeCoordsParallel( coordsOrig, outFilename);
     
-    //now read the coords
-    
+    //now read the coords    
     std::vector<DenseVector<ValueType>> coordsBinary =  FileIO<IndexType, ValueType>::readCoordsBinary( outFilename, N, dimensions);
     
     
@@ -540,8 +537,8 @@ TEST_F(FileIOTest, testReadGraphAndCoordsBinary){
 //-------------------------------------------------------------------------------------------------
 
 TEST_F (FileIOTest, testWritePartitionCentral){
-    std::string file= "biplane9.graph";
-    std::string grFile= "./localMeshes/" +file , coordFile= "./localMeshes/" +file +".xyz";  //graph file and coordinates file
+    std::string file= "trace-00008.graph";
+    std::string grFile= graphPath +file , coordFile= graphPath +file +".xyz";  //graph file and coordinates file
     IndexType dimensions = 2;
     std::fstream f(grFile);
     IndexType N;
@@ -562,14 +559,11 @@ TEST_F (FileIOTest, testWritePartitionCentral){
     settings.epsilon = 0.5;
     settings.dimensions = dimensions;
     settings.initialPartition = InitialPartitioningMethods::KMeans;
-   
-   
-    //settings.fileName = fileName;
     settings.multiLevelRounds = 12;
-    settings.minGainForNextRound= int(k/4);
+    settings.minGainForNextRound= 1;
     // 5% of (approximetely, if at every round you get a 60% reduction in nodes) the nodes of the coarsest graph
     //settings.minBorderNodes = N*std::pow(0.6, settings.multiLevelRounds)/k * 0.05;
-    settings.minBorderNodes = 4*std::sqrt((ValueType(N))/k);
+    settings.minBorderNodes = std::sqrt((ValueType(N))/k);
     settings.coarseningStepsBetweenRefinement = 3;
     settings.stopAfterNoGainRounds = 200;
 
@@ -641,10 +635,18 @@ TEST_F (FileIOTest, testreadOFFCentral){
 }
 //-------------------------------------------------------------------------------------------------
 
-TEST_F (FileIOTest, testreadEdgeListDistributed){
+TEST_F (FileIOTest, testReadEdgeListDistributed){
 	
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	ASSERT_EQ(comm->getSize(), 4);
+	if( comm->getSize() != 4 ){
+		if( comm->getRank() == 0){
+			std::cout << "\n\t\t### WARNING: this test reads a distributed file and only works for p=4. You should call again with mpirun -n 4 (maybe also with --gtest_filter=*ReadEdgeListDistributed)." << std::endl<< std::endl;
+			// TODO: next assertion causes (sometimes?) the tests to hang after they finish
+			//ASSERT_EQ( comm->getSize(), 4) << "Specific number of processors needed for this test: 4";
+			EXPECT_TRUE( false )<< "Specific number of processors needed for this test: 4";
+			
+		}
+	}
 
     std::string file = graphPath + "tmp4/out";
 
@@ -652,7 +654,7 @@ TEST_F (FileIOTest, testreadEdgeListDistributed){
 
     ASSERT_TRUE( graph.isConsistent());
     EXPECT_TRUE( graph.checkSymmetry() );
-    EXPECT_EQ(  graph.getNumRows(), graph.getNumColumns()) << "Matrix is not square";
+    EXPECT_EQ( graph.getNumRows(), graph.getNumColumns()) << "Matrix is not square";
 
     // only for graph: graphPath + "tmp4/out"
     EXPECT_EQ( graph.getNumRows(), 16) << "for files tmp4/out N must be 16";
