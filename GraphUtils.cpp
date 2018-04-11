@@ -41,7 +41,7 @@ scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType
 
     const IndexType localN = inputDist->getLocalSize();
     const IndexType globalN = inputDist->getGlobalSize();
-    const IndexType p = comm->getSize();
+    //const IndexType p = comm->getSize();
 
     scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
     DenseVector<IndexType> result(blockDist,0);
@@ -504,7 +504,7 @@ std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<Value
     const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
     const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-    const IndexType localN = inputDist->getLocalSize();
+    //const IndexType localN = inputDist->getLocalSize();
 
     for (IndexType globalI : candidates) {
         const IndexType localI = inputDist->global2local(globalI);

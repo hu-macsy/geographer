@@ -203,7 +203,7 @@ struct Metrics{
 		
 		std::chrono::time_point<std::chrono::high_resolution_clock> diameterStart = std::chrono::high_resolution_clock::now();
 		IndexType maxBlockDiameter = 0;
-		IndexType avgBlockDiameter = 0;
+		//IndexType avgBlockDiameter = 0;
 		IndexType numDisconBlocks = 0;
 		ValueType harmMeanDiam = 0;
 		
@@ -246,11 +246,14 @@ struct Metrics{
 				maxBlockDiameter = comm->max(localDiameter);
 				
 				// in case all blocks are disconnected
+				//TODO: remove ang diameter, use harmMean diameter
+				/*
 				if( numPEs-numDisconBlocks==0 ){
 					avgBlockDiameter = 0;
 				}else{
 					avgBlockDiameter = comm->sum(localDiameter) / (numPEs-numDisconBlocks);
 				}
+				*/
 			}else{
 				PRINT0("\tWARNING: Not computing diameter, not all vertices are in same block everywhere");
 			}
@@ -455,7 +458,7 @@ struct Metrics{
 		return time;
 	}
 
-};
+}; //struct Metrics
 
 
 //------------------------------------------------------------------------------------------------------------

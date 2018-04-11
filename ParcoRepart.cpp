@@ -292,8 +292,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
 	const IndexType rank = comm->getRank();
 
-	const IndexType localN = inputDist->getLocalSize();
-	const IndexType globalN = inputDist->getGlobalSize();
+	//const IndexType localN = inputDist->getLocalSize();
+	//	const IndexType globalN = inputDist->getGlobalSize();
 
 	if( !coordDist->isEqual( *inputDist) ){
 		throw std::runtime_error( "Distributions should be equal.");
