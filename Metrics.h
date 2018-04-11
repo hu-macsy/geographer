@@ -277,10 +277,10 @@ struct Metrics{
 		// redistribute graph according to partition distribution		
 		// distribute only rows for the diameter calculation
 		
+		//TODO: change NoDist with graph.getColumnDistribution() ?
 		scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( graph.getNumRows() ));
 		scai::lama::CSRSparseMatrix<ValueType> copyGraph( graph, distFromPartition, noDistPtr);
 			
-		
 		std::chrono::duration<ValueType> redistributionTime =  std::chrono::system_clock::now() - beforeRedistribution;
 		
 		ValueType time = 0;

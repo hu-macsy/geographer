@@ -69,7 +69,8 @@ int main(int argc, char** argv) {
 	ITI::Format coordFormat;
 	std::string outPath;
 	std::string graphName;
-    
+    std::string metricsDetail = "all";
+	
 	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
 	
 	desc.add_options()
@@ -96,8 +97,9 @@ int main(int argc, char** argv) {
 		
 		("computeDiameter", value<bool>(&settings.computeDiameter)->default_value(true), "Compute Diameter of resulting block files.")
 		("storeInfo", value<bool>(&storeInfo), "is this is false then no outFile is produced")
+		("metricsDetail", value<std::string>(&metricsDetail), "no: no metrics, easy:cut, imbalance, communication volume and diamter if possible, all: easy + SpMV time and communication time in SpMV")
         //("writePartition", "Writes the partition in the outFile.partition file")
-        //("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
+        ("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 		;
         
 	variables_map vm;
@@ -134,6 +136,15 @@ int main(int argc, char** argv) {
     if( (!vm.count("outPath")) and storeInfo ){
 		std::cout<< "Must give parameter outPath to store metrics.\nAborting..." << std::endl;
 		return -1;
+	}
+	
+	if( vm.count("metricsDetail") ){
+		if( not (metricsDetail=="no" or metricsDetail=="easy" or metricsDetail=="all") ){
+			if(comm->getRank() ==0 ){
+				std::cout<<"WARNING: wrong value for parameter metricsDetail= " << metricsDetail << ". Setting to all" <<std::endl;
+				metricsDetail="all";
+			}
+		}
 	}
 			
     if( comm->getRank() ==0 ){
@@ -270,7 +281,9 @@ int main(int argc, char** argv) {
 	
 	//WARNING: 1) removed parmetis sfc
 	//WARNING: 2) parMetisGraph should be last because it often crashes
-	std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRIB, ITI::Tool::zoltanRCB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph };
+	std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRCB, ITI::Tool::zoltanRIB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisSFC};
+	//std::vector<ITI::Tool> allTools = { ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph };
+	//std::vector<ITI::Tool> allTools = { ITI::Tool::parMetisSFC};
 	
 	for( int t=0; t<allTools.size(); t++){
 		
@@ -325,7 +338,13 @@ int main(int argc, char** argv) {
 		// partition has the the same distribution as the graph rows 
 		SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
 		
-		metrics.getAllMetrics( graph, partition, nodeWeights, settings );
+		
+		if( metricsDetail=="all" ){
+			metrics.getAllMetrics( graph, partition, nodeWeights, settings );
+		}
+        if( metricsDetail=="easy" ){
+			metrics.getEasyMetrics( graph, partition, nodeWeights, settings );
+		}
 		
 		//---------------------------------------------------------------
 		//
@@ -371,6 +390,38 @@ int main(int argc, char** argv) {
 				}       
 			}
 		}
+		
+		// the code below writes the output coordinates in one file per processor for visualization purposes.
+    //=================
+    
+    if (settings.writeDebugCoordinates) {
+		
+		std::vector<DenseVector<ValueType> > coordinateCopy = coords;
+		
+scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );		
+        for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+            assert( coordinateCopy[dim].size() == N);
+            //coordinates[dim].redistribute(partition.getDistributionPtr());
+coordinateCopy[dim].redistribute( distFromPartition );			
+        }
+        
+        std::string destPath = "partResults/" +  ITI::tool2string(thisTool) +"/blocks_" + std::to_string(settings.numBlocks) ;
+        boost::filesystem::create_directories( destPath );   
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, N, settings.dimensions, destPath + "/debugResult");
+        comm->synchronize();
+        
+        //TODO: use something like the code below instead of a NoDistribution
+        //std::vector<IndexType> gatheredPart;
+        //comm->gatherImpl( gatheredPart.data(), N, 0, partition.getLocalValues(), scai::common::TypeTraits<IndexType>::stype );
+        /*
+        scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
+        graph.redistribute( noDistPtr, noDistPtr );
+        partition.redistribute( noDistPtr );
+        for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+            coords[dim].redistribute( noDistPtr );
+        }
+        */
+    }
 /*		
 memusage(&total, &used, &free, &buffers, &cached);	
 printf("\nMEM: avail: %ld , used: %ld , free: %ld , buffers: %ld , file cache: %ld \n\n",total,used,free,buffers, cached);

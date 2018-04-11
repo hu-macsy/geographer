@@ -247,11 +247,17 @@ int main(int argc, char** argv) {
 	struct Settings firstPartSettings = settings;
 	firstPartSettings.epsilon = 0.2;
 	firstPartSettings.computeDiameter = false;
+	ITI::Tool imbalTool;	
 	
-	// uniform node weights - only used to measure imbalance
-	//scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
+	//TODO: parMetisGeom crashes for delaunay2B and big graphs
+	if( N> 1500000000){
+		imbalTool = ITI::Tool::zoltanSFC;
+	}
+	else{
+		imbalTool = ITI::Tool::parMetisGeom;
+	}
 	
-	ITI::Repartition<IndexType,ValueType>::getImbalancedDistribution( graph, coords, nodeWeights, ITI::Tool::parMetisGeom, firstPartSettings, firstPartMetrics);
+	ITI::Repartition<IndexType,ValueType>::getImbalancedDistribution( graph, coords, nodeWeights, imbalTool, firstPartSettings, firstPartMetrics);
 	
 	// calculate and print imbalance		
 	localN = graph.getRowDistributionPtr()->getLocalSize();

@@ -100,6 +100,7 @@ int main(int argc, char** argv) {
         
     bool writePartition = false;
     
+	std::string metricsDetail = "all";
 	std::string blockSizesFile;
 	ITI::Format coordFormat;
     IndexType repeatTimes = 1;
@@ -165,6 +166,7 @@ int main(int argc, char** argv) {
                 ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
                 ("noComputeDiameter", "Compute Diameter of resulting block files.")
                 ("maxDiameterRounds", value<IndexType>(&settings.maxDiameterRounds)->default_value(settings.maxDiameterRounds), "abort diameter algorithm after that many BFS rounds")
+				("metricsDetail", value<std::string>(&metricsDetail), "no: no metrics, easy:cut, imbalance, communication volume and diamter if possible, all: easy + SpMV time and communication time in SpMV")
 				;
 
         //------------------------------------------------
@@ -298,12 +300,21 @@ int main(int argc, char** argv) {
 	}else{
 		settings.computeDiameter = true;
 	}
-	 
+	
     writePartition = vm.count("writePartition");
     if( writePartition ){
         settings.writeInFile = true;
     }
 
+    if( vm.count("metricsDetail") ){
+		if( not (metricsDetail=="no" or metricsDetail=="easy" or metricsDetail=="all") ){
+			if(comm->getRank() ==0 ){
+				std::cout<<"WARNING: wrong value for parameter metricsDetail= " << metricsDetail << ". Setting to all" <<std::endl;
+				metricsDetail="all";
+			}
+		}
+	}
+    
     srand(vm["seed"].as<double>());
 
     /* timing information
@@ -677,8 +688,12 @@ int main(int argc, char** argv) {
         
         std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
-        metricsVec[r].getAllMetrics( graph, partition, nodeWeights, settings );
-        
+		if( metricsDetail=="all" ){
+			metricsVec[r].getAllMetrics( graph, partition, nodeWeights, settings );
+		}
+        if( metricsDetail=="easy" ){
+			metricsVec[r].getEasyMetrics( graph, partition, nodeWeights, settings );
+		}
         std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
         
         
@@ -751,20 +766,26 @@ int main(int argc, char** argv) {
     //=================
     
     if (settings.writeDebugCoordinates) {
+		
+		std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
+		
+//scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(N, comm));
+scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
         for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-            assert( coordinates[dim].size() == N);
-            coordinates[dim].redistribute(partition.getDistributionPtr());
+            assert( coordinateCopy[dim].size() == N);
+            //coordinates[dim].redistribute(graph.getRowDistributionPtr());
+coordinateCopy[dim].redistribute( distFromPartition );
         }
         
         std::string destPath = "partResults/main/blocks_" + std::to_string(settings.numBlocks) ;
         boost::filesystem::create_directories( destPath );   
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, settings.dimensions, destPath + "/debugResult");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, N, settings.dimensions, destPath + "/debugResult");
         comm->synchronize();
         
         //TODO: use something like the code below instead of a NoDistribution
         //std::vector<IndexType> gatheredPart;
         //comm->gatherImpl( gatheredPart.data(), N, 0, partition.getLocalValues(), scai::common::TypeTraits<IndexType>::stype );
-        
+        /*
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
         graph.redistribute( noDistPtr, noDistPtr );
         partition.redistribute( noDistPtr );
@@ -772,7 +793,7 @@ int main(int argc, char** argv) {
             coordinates[dim].redistribute( noDistPtr );
         }
         
-        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();     
+        //scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();     
         
         //TODO: change that in later version, where data are gathered in one PE and are not replicated
         SCAI_ASSERT_ERROR( graph.getRowDistributionPtr()->isReplicated()==1, "Adjacency should be replicated. Aborting...");
@@ -786,7 +807,7 @@ int main(int argc, char** argv) {
                 ITI::FileIO<IndexType,ValueType>::writeVTKCentral_ver2( graph, coordinates, partition, destPath + "/debugResult.vtk" );
             }
         }
-        
+        */
     }
       
         

@@ -54,11 +54,12 @@ def createInterExpPlots( wantedExp, wantedTools,gatherDir, outDir, repartMetrics
 			metricName = metricNames[m]
 		
 			#exclude metrics from the plot-for-all
-			excludedMetrics=[ "timeTotal", "imbalance", "maxBnd", "totBnd", 'maxBndPercnt', 'avgBndPercnt']
+			excludedMetrics=[ "timeTotal", "imbalance", "maxBnd", "totBnd", 'maxBndPercnt', 'avgBndPercnt',  'numDisBlocks' , 'maxDiameter', 'timeSpMV']
 						
 			if metricName in excludedMetrics:
 				print("Not calculating for metric " + metricName)
 				continue
+			print("Calculating for metric " + metricName)
 			
 			metricNamesShort.append( metricName )
 			

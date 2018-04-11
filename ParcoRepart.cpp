@@ -96,29 +96,10 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
 
     bool nodesUnweighted = (nodeWeights.max() == nodeWeights.min());
 
-	/*
-    std::vector<ValueType> hilbertIndices(localN);
-    std::vector<std::vector<ValueType> > points(localN, std::vector<ValueType>(settings.dimensions, 0));
-    std::vector<ValueType> minCoords(settings.dimensions);
-    std::vector<ValueType> maxCoords(settings.dimensions);
-    for (IndexType d = 0; d < settings.dimensions; d++) {
-        minCoords[d] = coordinates[d].min().Scalar::getValue<ValueType>();
-        maxCoords[d] = coordinates[d].max().Scalar::getValue<ValueType>();
-        assert(std::isfinite(minCoords[d]));
-        assert(std::isfinite(maxCoords[d]));
-        scai::hmemo::ReadAccess<ValueType> rCoords( coordinates[d].getLocalValues() );
-        for (IndexType i = 0; i < localN; i++) {
-            points[i][d] = rCoords[i];
-        }
-    }
-    for (IndexType i = 0; i < localN; i++) {
-        hilbertIndices[i] = HilbertCurve<IndexType, ValueType>::getHilbertIndex(
-                points[i].data(), settings.dimensions, settings.sfcResolution,
-                minCoords, maxCoords);
-    }
-    */
-	std::vector<ValueType> hilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
-	
+    std::chrono::duration<double> migrationCalculation, migrationTime;
+
+
+    std::vector<ValueType> hilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
     SCAI_REGION_END("ParcoRepart.hilbertRedistribution.sfc")
     SCAI_REGION_START("ParcoRepart.hilbertRedistribution.sort")
     /**
@@ -138,9 +119,8 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     MPI_Comm mpi_comm = MPI_COMM_WORLD; //maybe cast the communicator ptr to a MPI communicator and get getMPIComm()?
     SQuick::sort<sort_pair>(mpi_comm, localPairs, -1); //could also do this with just the hilbert index - as a valueType
     //IndexType newLocalN = localPairs.size();
-    std::chrono::duration<double> migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
+    migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
     metrics.timeMigrationAlgo[rank] = migrationCalculation.count();
-	
     std::chrono::time_point < std::chrono::system_clock > beforeMigration = std::chrono::system_clock::now();
     assert(localPairs.size() > 0);
     SCAI_REGION_END("ParcoRepart.hilbertRedistribution.sort")
@@ -154,7 +134,8 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     MPI_Alltoall(sendThresholds.data(), 1, MPI_ValueType, recvThresholds.data(),
             1, MPI_ValueType, mpi_comm); //TODO: replace this monstrosity with a proper call to LAMA
     //comm->all2all(recvThresholds.data(), sendTresholds.data());//TODO: maybe speed up with hypercube
-    PRINT0(std::to_string(recvThresholds[0]) + " < hilbert indices < " + std::to_string(recvThresholds[comm->getSize() - 1]) + ".");
+    PRINT0(std::to_string(recvThresholds[0]) + " < hilbert indices < " + std::to_string(recvThresholds[comm->getSize() - 1])
+                    + ".");
     // merge to get quantities //Problem: nodes are not sorted according to their hilbert indices, so accesses are not aligned.
     // Need to sort before and after communication
     assert(std::is_sorted(recvThresholds.begin(), recvThresholds.end()));
@@ -170,7 +151,7 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
         for (IndexType i = 0; i < localN; i++) {
             //increase target block counter if threshold is reached. Skip empty blocks if necessary.
             while (p + 1 < comm->getSize()
-                    && recvThresholds[p + 1] <= hilbertIndices[i]) { //TODO: check this more thoroughly when you are awake
+                    && recvThresholds[p + 1] <= hilbertIndices[i]) {
                 p++;
             }
             assert(p < comm->getSize());
@@ -207,11 +188,13 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     comm->exchangeByPlan(recvIndices.data(), recvPlan, sendIndices.data(),
             sendPlan);
     //get new distribution
-    scai::utilskernel::LArray<IndexType> indexTransport(newLocalN, recvIndices.data());
+    scai::utilskernel::LArray<IndexType> indexTransport(newLocalN,
+            recvIndices.data());
     scai::dmemo::DistributionPtr newDist(
             new scai::dmemo::GeneralDistribution(globalN, indexTransport,
                     comm));
-    SCAI_ASSERT_EQUAL(newDist->getLocalSize(), newLocalN, "wrong size of new distribution");
+    SCAI_ASSERT_EQUAL(newDist->getLocalSize(), newLocalN,
+            "wrong size of new distribution");
     for (IndexType i = 0; i < newLocalN; i++) {
         SCAI_ASSERT_VALID_INDEX_DEBUG(recvIndices[i], globalN, "invalid index");
     }
@@ -266,7 +249,7 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
             }
         }
     }
-    std::chrono::duration<double> migrationTime = std::chrono::system_clock::now() - beforeMigration;
+    migrationTime = std::chrono::system_clock::now() - beforeMigration;
     metrics.timeFirstDistribution[rank] = migrationTime.count();
 }
 
@@ -561,8 +544,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 					}
 				}
 
-				metrics.timeSecondDistribution[rank] = secondRedistributionTime.count();
-				metrics.timePreliminary[rank] = partitionTime.count();
+            metrics.timeSecondDistribution[rank] = secondRedistributionTime.count();
+            metrics.timePreliminary[rank] = partitionTime.count();
 
 				metrics.preliminaryCut = cut;
 				metrics.preliminaryImbalance = imbalance;
@@ -702,9 +685,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
         //assert(typesize == sizeof(sort_pair)); //not valid for int_double, presumably due to padding
         
-        //const IndexType maxLocalN = comm->max(localN);
-        //std::vector<sort_pair> localPairs(maxLocalN);
-		std::vector<sort_pair> localPairs(localN);
+        std::vector<sort_pair> localPairs(localN);
 
         //fill with local values
         long indexSum = 0;//for sanity checks
@@ -720,34 +701,21 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         //TODO: int overflow?
         SCAI_ASSERT_EQ_ERROR(checkSum , (long(globalN)*(long(globalN)-1))/2, "Sorting checksum is wrong (possible IndexType overflow?).");
 
-/*		
-        //fill up with dummy values to ensure equal size
-        for (IndexType i = localN; i < maxLocalN; i++) {
-        	localPairs[i].value = std::numeric_limits<decltype(sort_pair::value)>::max();
-        	localPairs[i].index = std::numeric_limits<decltype(sort_pair::index)>::max();
-        }
-*/
         //call distributed sort
         //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
         MPI_Comm mpi_comm = MPI_COMM_WORLD;
         SQuick::sort<sort_pair>(mpi_comm, localPairs, -1);
 
         //copy indices into array
-        IndexType newLocalN = localPairs.size();
+        IndexType newLocalN = 0;
         newLocalIndices.resize(newLocalN);
         for (IndexType i = 0; i < newLocalN; i++) {
         	newLocalIndices[i] = localPairs[i].index;
-        	//if (newLocalIndices[i] != std::numeric_limits<decltype(sort_pair::index)>::max()) newLocalN++;
         }
 
         //sort local indices for general distribution
         std::sort(newLocalIndices.begin(), newLocalIndices.end());
-/*
-        //remove dummy values
-        auto startOfDummyValues = std::lower_bound(newLocalIndices.begin(), newLocalIndices.end(), std::numeric_limits<decltype(sort_pair::index)>::max());
-        assert(std::all_of(startOfDummyValues, newLocalIndices.end(), [](IndexType index){return index == std::numeric_limits<decltype(sort_pair::index)>::max();}));
-        newLocalIndices.resize(std::distance(newLocalIndices.begin(), startOfDummyValues));
-*/
+
         //check size and sanity
         SCAI_ASSERT_LT_ERROR( *std::max_element(newLocalIndices.begin(), newLocalIndices.end()) , globalN, "Too large index (possible IndexType overflow?).");
         SCAI_ASSERT_EQ_ERROR( comm->sum(newLocalIndices.size()), globalN, "distribution mismatch");

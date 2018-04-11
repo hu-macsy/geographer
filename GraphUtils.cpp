@@ -142,13 +142,11 @@ std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &gr
     queue.push(u);
     result[u] = 0;
     visited[u] = true;
-	//IndexType numVisitedNgbrs = 0;
-	
+
     const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> localIa(localStorage.getIA());
     const scai::hmemo::ReadAccess<IndexType> localJa(localStorage.getJA());
 
-    //bool done = false;
     IndexType round = 0;
     while (!queue.empty()) {
         while (!queue.empty()) {
@@ -170,7 +168,6 @@ std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &gr
                     alternateQueue.push(localNeighbor);
                     result[localNeighbor] = round+1;
                     visited[localNeighbor] = true;
-					//++numVisitedNgbrs;
                 }
             }
         }
@@ -178,11 +175,6 @@ std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &gr
         std::swap(queue, alternateQueue);
         //if alternateQueue was empty, queue is now empty and outer loop will abort
     }
-	/* //for debugging TODO: remove if not needed
-	if( numVisitedNgbrs != localN-1 ){
-		PRINT(*comm <<": round= " << round << " , numVisitedNgbrs= " << numVisitedNgbrs);    
-	}
-	*/
     assert(result[u] == 0);
 
     return result;
@@ -206,18 +198,11 @@ IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const I
     ecc[u] = *std::max_element(distances.begin(), distances.end());
 
     if (localN > 1) {
-		/* //debugging, TODO: remove is not needed or add debug flag
-		if( ecc[u]==0 ){
-			PRINT(*comm << ": max= "<< *std::max_element(distances.begin(), distances.end()) << " , min= " << 
-			*std::min_element(distances.begin(), distances.end()) );
-		}
-		*/
 		SCAI_ASSERT_GT_ERROR( ecc[u], 0, *comm << ": Wrong eccentricity value");
     }
 
     if (ecc[u] > localN) {
-		//PRINT( *comm <<": ecc[u] > localN :" << ecc[u] << " > " << localN ); 
-		assert(ecc[u] == std::numeric_limits<IndexType>::max() );		
+        SCAI_ASSERT_EQ_ERROR(ecc[u], std::numeric_limits<IndexType>::max(), "invalid ecc value");
         return ecc[u];
     }
     IndexType i = ecc[u];
@@ -597,7 +582,6 @@ DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, c
     DenseVector<IndexType> border(dist,0);
     scai::utilskernel::LArray<IndexType>& localBorder= border.getLocalValues();
 
-    //IndexType globalN = dist->getGlobalSize();
     IndexType max = part.max().Scalar::getValue<IndexType>();
 
     if( !dist->isEqual( part.getDistribution() ) ){
@@ -651,7 +635,6 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes	
     const IndexType localN = dist->getLocalSize();
     const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
 
-    //IndexType globalN = dist->getGlobalSize();
     IndexType max = part.max().Scalar::getValue<IndexType>();
 	
 	if(max!=settings.numBlocks-1){
@@ -735,7 +718,6 @@ std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM
     const IndexType localN = dist->getLocalSize();
     const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
 
-    //IndexType globalN = dist->getGlobalSize();
     //IndexType max = part.max().Scalar::getValue<IndexType>();
     
     // the communication volume per block for this PE
@@ -818,7 +800,6 @@ std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType
     const IndexType localN = dist->getLocalSize();
     const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
 
-    //IndexType globalN = dist->getGlobalSize();
 
     // the communication volume per block for this PE
     std::vector<IndexType> commVolumePerBlock( numBlocks, 0 );
@@ -905,7 +886,6 @@ IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM)
 
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = distPtr->getCommunicatorPtr();
-    //const IndexType localN = distPtr->getLocalSize();
     const IndexType globalN = distPtr->getGlobalSize();
     
     {
@@ -970,7 +950,6 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
     const scai::utilskernel::LArray<IndexType>& localPart= part.getLocalValues();
-    //IndexType N = adjM.getNumColumns();
     IndexType max = part.max().Scalar::getValue<IndexType>();
    
     if( !dist->isEqual( part.getDistribution() ) ){
@@ -984,7 +963,6 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
     
     scai::hmemo::HArray<IndexType> nonLocalIndices( dist->getLocalSize() ); 
     scai::hmemo::WriteAccess<IndexType> writeNLI(nonLocalIndices, dist->getLocalSize() );
-    //IndexType actualNeighbours = 0;
 
     const scai::lama::CSRStorage<ValueType> localStorage = adjM.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
@@ -1284,7 +1262,6 @@ scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseM
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-    //const IndexType localN = distPtr->getLocalSize();
     
     scai::lama::DenseVector<IndexType> degreeVector(distPtr);
     scai::utilskernel::LArray<IndexType>& localDegreeVector = degreeVector.getLocalValues();
@@ -1482,11 +1459,8 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	//check for isolated nodes and wrong conversions
 	IndexType lastNode = localPairs[0].first;
 	for (int_pair edge : localPairs) {
-	    double currentNode = edge.first;
-	    IndexType converted(currentNode);
-	    SCAI_ASSERT_LT_ERROR(double(converted) - currentNode, 0.001, "Conversion error with node IDs!");
-	    SCAI_ASSERT_LE_ERROR(converted, lastNode + 1, "Gap in sorted node IDs before edge exchange.");
-	    lastNode = converted;
+	    SCAI_ASSERT_LE_ERROR(edge.first, lastNode + 1, "Gap in sorted node IDs before edge exchange.");
+	    lastNode = edge.first;
 	}
 
 	//PRINT(thisPE << ": "<< localPairs.back().first << " - " << localPairs.back().second << " in total " <<  localPairs.size() );

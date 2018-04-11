@@ -62,14 +62,14 @@ def submitGeographer(exp, version, outDir):
 		if version=="Geographer":
 			# set parameters for every experiment
 			params = defaultSettings()
+			params += " --repeatTimes=5"
 			executable = geoExe
 		elif version=="geoKmeans":
-			#executable = initialExe
 			executable = geoExe
-			params = " --initialPartition=3 --noRefinement"
+			params = " --initialPartition=3 --noRefinement --repeatTimes=5"# --metricsDetail=easy"
 		elif version=="geoSfc":
 			executable = initialExe
-			params = " --initialPartition=0"
+			params = " --initialPartition=0 --repeatTimes=5"
 		elif version=="repartKmeans":
 			executable = repartKmeans
 			tool = "geoKmeans"
@@ -94,7 +94,6 @@ def submitGeographer(exp, version, outDir):
 		params += " --epsilon=" + str(epsilon)
 		params += " --dimensions="+ exp.dimension
 		params += " --fileFormat="+ exp.fileFormat
-		params += " --repeatTimes=" + str(5)
 		#params += " --verbose"
 		#params += " --noComputeDiameter"
 				
@@ -147,8 +146,9 @@ def submitAllCompetitors( exp, outDir):
 		params = " --epsilon=" + str(epsilon)			
 		params += " --dimensions=" + exp.dimension
 		params += " --fileFormat="+ exp.fileFormat
-		params += " --outPath=" + outDir +"/"
+		params += " --outPath=" + outDir + "/"
 		params += " --graphName=" + graphName 
+		#params += " --metricsDetail=easy"
 		
 		if exp.coordFormat!=-1:
 			params += " --coordFormat="+ str(exp.coordFormat)
@@ -192,6 +192,7 @@ def submitCompetitor(exp, tool, outDir):
 		params += " --epsilon=" + str(epsilon)
 		params += " --dimensions=" + exp.dimension
 		params += " --fileFormat="+ exp.fileFormat
+		#params += " --metricsDetail=easy"
 		
 		if exp.coordFormat!=-1:
 			params += " --coordFormat="+ str(exp.coordFormat)

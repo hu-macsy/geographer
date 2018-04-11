@@ -289,7 +289,7 @@ def parseOutFile( outFile ):
 		for i in range(len(metricValues), NUM_METRICS):
 			metricValues.append(-1)
 			metricNames.append("-")
-		print(metricValues)
+		#print(metricValues)
 		
 	return metricNames, metricValues, n
 		

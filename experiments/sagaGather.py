@@ -125,7 +125,7 @@ def addHarmMeanInfo( metricValues, metricName, metricPos, toolNames, baseToolId,
 #		metricValues[i][j] = a list with values for tool i and metric j	,			size = num_of_metrics
 #		metricValues[i][j][l] = the value for tool i, metric j, for exp.k[l] ,		size = size_of_experiment
 		
-def createPlotsForExp(exp, toolNames, metricNames, metricValues, outDir ):
+def createPlotsForExp(exp, toolNames, metricNames, metricValues, gatherDir, outDir ):
 	
 	numMetrics = len(metricNames)
 	#numMetrics =NUM_METRICS
@@ -199,7 +199,7 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues, outDir ):
 			plotF.write(" other\n\n")
 			
 		plotF.write("Data gathered from directory: \n\n")
-		plotF.write( toolsPath +"\n\n")
+		plotF.write( gatherDir +"\n\n")
 		plotF.write("From files: \n\n")
 			
 		for i in range(0,exp.size):
@@ -238,7 +238,7 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues, outDir ):
 			## for example imbalance
 			
 			#exclude metrics from the plot-for-all
-			excludedMetrics=["imbalance", "maxBnd", "totBnd", 'maxBndPercnt', 'avgBndPercnt']
+			excludedMetrics=["imbalance", "maxBnd", "totBnd", 'maxBndPercnt', 'avgBndPercnt', '-']
 						
 			if metricName in excludedMetrics:
 				print("Not calculating for metric " + metricName)
@@ -401,7 +401,7 @@ def createMeanPlotsForAllExp( wantedExp, wantedTools, gatherDir, outDir, repartM
 					plotF.write(wantedTools[t]+"= " + str(timeTmeans[t])+" , ")
 					
 			#exclude metrics from the plot-for-all
-			excludedMetrics=["imbalance", "maxBnd", "totBnd", 'maxBndPercnt', 'avgBndPercnt']
+			excludedMetrics=["imbalance", "maxBnd", "totBnd", 'maxBndPercnt', 'avgBndPercnt', 'numDisBlocks']
 						
 			if metricName in excludedMetrics:
 				print("Not calculating for metric " + metricName)
@@ -633,7 +633,7 @@ if __name__=="__main__":
 			#print(metricNames)
 			#print(metricValues)
 		
-		createPlotsForExp(exp, foundTools, metricNames, allMetricsForAllTools, outDir)
+		createPlotsForExp(exp, foundTools, metricNames, allMetricsForAllTools,gatherDir, outDir)
 		
 	createMeanPlotsForAllExp( wantedExp, wantedTools, gatherDir, outDir, repartMetrics)
 		
