@@ -17,9 +17,6 @@
 #include "AuxiliaryFunctions.h"
 #include "GraphUtils.h"
 #include "Metrics.h"
-#ifndef SETTINGS_H
-#include "Settings.h"
-#endif
 
 //WARNING and TODO: error if Wrappers.h is the last include !!
 #include "Wrappers.h"

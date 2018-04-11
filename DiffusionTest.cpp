@@ -41,7 +41,7 @@ TEST_F(DiffusionTest, testConstructLaplacian) {
     DenseVector<ValueType> y( L * x );
 
     ValueType norm = y.maxNorm().Scalar::getValue<ValueType>();
-    EXPECT_EQ(0,norm);
+    EXPECT_EQ(norm,0);
 
     //test consistency under distributions
     const CSRSparseMatrix<ValueType> replicatedGraph(graph, noDist, noDist);
