@@ -5,8 +5,7 @@
  *      Author: moritzl
  */
 
-#ifndef DIFFUSION_H_
-#define DIFFUSION_H_
+#pragma once
 
 #include <scai/lama.hpp>
 #include <scai/lama/Vector.hpp>
@@ -27,11 +26,10 @@ public:
 	virtual ~Diffusion() = default;
 	static scai::lama::DenseVector<ValueType> potentialsFromSource(scai::lama::CSRSparseMatrix<ValueType> laplacian, scai::lama::DenseVector<ValueType> nodeWeights, IndexType source, ValueType eps=1e-6);
 	static scai::lama::DenseMatrix<ValueType> multiplePotentials(scai::lama::CSRSparseMatrix<ValueType> laplacian, scai::lama::DenseVector<ValueType> nodeWeights, std::vector<IndexType> sources, ValueType eps=1e-6);
-	static scai::lama::CSRSparseMatrix<ValueType> constructLaplacian(scai::lama::CSRSparseMatrix<ValueType>);
+	static scai::lama::CSRSparseMatrix<ValueType> constructLaplacian(scai::lama::CSRSparseMatrix<ValueType>, bool weighted = false);
 
 	static scai::lama::CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension);
 	static scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d);
 };
 
 } /* namespace ITI */
-#endif /* DIFFUSION_H_ */
