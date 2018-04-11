@@ -191,21 +191,11 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     // TODO: now k must be number such that k^(1/d) is an integer, drop this condition, generalize
     const ValueType sqrtK = std::pow( k,  1.0/dim );
 	
-/*	
-	printf("%f __ %f \n", sqrt , std::pow( k,  1.0/dim) );
-	PRINT0( sqrtK << " != " << std::floor(sqrtK) );
-	PRINT0( sqrtK << " != " << std::ceil(sqrtK) );
-	PRINT0( sqrtK << " != " << std::round(sqrtK) );
-*/	
-	//TODO: roundinf and checkin does not work for 3 dimensions
-    if( std::floor(sqrtK)!=sqrtK ){
-/*		
-		const ValueType d = std::pow( 216.0,  1.0/3.0 );	
-		ValueType d2 = 6.000001;
- 		printf(" ---------- %f ---- %d \n", d, int (d) );
-		printf(" ---------- %f ---- %d \n", d2, int (d2) );
-*/		
-		PRINT0( sqrtK << " != " << std::floor(sqrtK) );
+	//TODO: rounding and checking with std::floor does not work for 3 dimensions
+	//TODO: check if std::round is OK
+    //if( std::floor(sqrtK)!=sqrtK ){
+	if( std::abs( std::round(sqrtK) - sqrtK) > 0.000001 ){
+		//PRINT0( sqrtK << " != " << std::round(sqrtK) );
         PRINT0("Input k= "<< k << " and sqrt(k)= "<< sqrtK );
         throw std::logic_error("Number of blocks not a square number");
     }
