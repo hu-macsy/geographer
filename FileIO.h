@@ -2,7 +2,7 @@
  * IO.h
  *
  *  Created on: 15.02.2017
- *      Author: moritzl
+ *      Authors: Moritz v. Looz, Charilaos Tzovas
  */
 
 #pragma once

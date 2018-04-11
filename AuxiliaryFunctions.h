@@ -1,3 +1,8 @@
+/**
+ * A collection of several output and mesh functions.
+ * TODO: maybe split, move the mesh-related functions to MeshGenerator?
+ */
+
 #pragma once
 
 #include <chrono>
@@ -17,10 +22,7 @@ namespace ITI{
 template <typename IndexType, typename ValueType>
 class aux{
 public:
-    /*
-    typedef int IndexType;
-    typedef double ValueType;
-    */
+
 //------------------------------------------------------------------------------   
 
 
