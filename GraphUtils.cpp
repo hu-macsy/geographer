@@ -279,7 +279,9 @@ ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<
 		assert(ja.size() >= endCols);
 
 		const IndexType globalI = inputDist->local2global(i);
-		assert(partDist->isLocal(globalI));
+		//assert(partDist->isLocal(globalI));
+		SCAI_ASSERT_ERROR(partDist->isLocal(globalI), "non-local index, globalI= " << globalI );
+		
 		IndexType thisBlock = partAccess[i];
 
 		for (IndexType j = beginCols; j < endCols; j++) {

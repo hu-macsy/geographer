@@ -812,7 +812,7 @@ coordinateCopy[dim].redistribute( distFromPartition );
       
         
     //this is needed for supermuc
-    std::exit(0);   
+    //std::exit(0);   
     
     return 0;
 }

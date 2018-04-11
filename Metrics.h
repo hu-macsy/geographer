@@ -175,8 +175,6 @@ struct Metrics{
 		maxCommVolume = *std::max_element( commVolume.begin(), commVolume.end() );
 		totalCommVolume = std::accumulate( commVolume.begin(), commVolume.end(), 0 );
 		
-
-		
 		//TODO: are num of boundary nodes needed ????         
 		maxBoundaryNodes = *std::max_element( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end() );
 		totalBoundaryNodes = std::accumulate( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end(), 0 );
