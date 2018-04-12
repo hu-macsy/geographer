@@ -802,9 +802,9 @@ coordinateCopy[dim].redistribute( distFromPartition );
         
         if( comm->getRank()==0 ){
             if( settings.outFile != "-" ){
-                ITI::FileIO<IndexType,ValueType>::writeVTKCentral_ver2( graph, coordinates, partition, settings.outFile+".vtk" );
+                ITI::FileIO<IndexType,ValueType>::writeVTKCentral( graph, coordinates, partition, settings.outFile+".vtk" );
             }else{
-                ITI::FileIO<IndexType,ValueType>::writeVTKCentral_ver2( graph, coordinates, partition, destPath + "/debugResult.vtk" );
+                ITI::FileIO<IndexType,ValueType>::writeVTKCentral( graph, coordinates, partition, destPath + "/debugResult.vtk" );
             }
         }
         */

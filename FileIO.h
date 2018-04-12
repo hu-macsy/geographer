@@ -65,8 +65,6 @@ public:
      */
     static void writeVTKCentral (const CSRSparseMatrix<ValueType> &adjM, const std::vector<DenseVector<ValueType>> &coords, const DenseVector<IndexType> &part, const std::string filename);
     
-    static void writeVTKCentral_ver2 (const CSRSparseMatrix<ValueType> &adjM, const std::vector<DenseVector<ValueType>> &coords, const DenseVector<IndexType> &part, const std::string filename);
-    
 	/** Given the vector of the coordinates and their dimension, writes them in file "filename".
 	 * Coordinates are given as a DenseVector of size dim*numPoints.
 	*/
