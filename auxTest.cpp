@@ -199,33 +199,6 @@ TEST_F (auxTest, testInitialPartitions){
 }
 //-----------------------------------------------------------------
 
-TEST_F (auxTest,testEdgeList2CSR){
-	
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	const IndexType thisPE = comm->getRank();
-	const IndexType numPEs = comm->getSize();
-	
-    const IndexType localM = 10;	
-	const IndexType N = numPEs * 4;
-	std::vector< std::pair<IndexType, IndexType>> localEdgeList( localM );
-
-	srand( std::time(NULL)*thisPE );
-	
-    for(int i=0; i<localM; i++){
-		//IndexType v1 = i;
-		IndexType v1 = (rand())%N;
-		IndexType v2 = (v1+rand())%N;
-		localEdgeList[i] = std::make_pair( v1, v2 );
-		//PRINT(thisPE << ": inserting edge " << v1 << " - " << v2 );
-	}
-	
-	scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils::edgeList2CSR<IndexType, ValueType>( localEdgeList );
-	
-	SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
-	EXPECT_TRUE( graph.checkSymmetry() );
-}
-//-----------------------------------------------------------------
-
 TEST_F (auxTest, testPixelDistance) {
     
     typedef aux<IndexType,ValueType> aux;
@@ -302,30 +275,6 @@ TEST_F(auxTest, testIndex2_2DPoint){
 }
 //-----------------------------------------------------------------
 
-TEST_F(auxTest, testIndexReordering){
-	
-	IndexType M = 1000;
-	for( IndexType maxIndex = 100; maxIndex<M; maxIndex++){
-		//std::vector<IndexType> indices = GraphUtils::indexReorder( maxIndex, maxIndex/3 );
-		std::vector<IndexType> indices = GraphUtils::indexReorderCantor( maxIndex);
-		//std::cout <<std::endl;
-		
-		EXPECT_EQ( indices.size(), maxIndex );
-		
-		IndexType indexSum = std::accumulate( indices.begin(), indices.end(), 0);
-		EXPECT_EQ( indexSum, maxIndex*(maxIndex-1)/2);
-		/*
-		if(maxIndex==15){
-			for(int i=0; i<indices.size(); i++){
-				std::cout<< i <<": " << indices[i]<<std::endl;
-			}
-		}
-		*/
-	}
-	
-}
-
-//-----------------------------------------------------------------
 
 TEST_F(auxTest, testBenchIndexReordering){
 
