@@ -88,17 +88,20 @@ public:
      * */
     template<typename T>
     void writeDenseVectorParallel(const DenseVector<T> &dv, const std::string filename);
+	
+	/*TODO: merge with writeDenseVectorParallel*/
+	void writePartitionParallel(const DenseVector<IndexType> &dv, const std::string filename);
     
     /**
 	 * Writes a partition to file.
 	 * @param[in] part
 	 * @param[in] filename The file's name to write to
 	 */
-	static void writePartitionParallel(const DenseVector<IndexType> &part, const std::string filename);
+	static void writeDenseVectorCentral(DenseVector<IndexType> &part, const std::string filename);
         
 	/** Reads a graph from filename in METIS format and returns the adjacency matrix.
 	 * @param[in] filename The file to read from.
-         * @param[in] fileFormat The type of file to read from. 
+	 * @param[in] fileFormat The type of file to read from. 
 	 * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
 	 */
 	static CSRSparseMatrix<ValueType> readGraph(const std::string filename, Format = Format::METIS);
@@ -188,7 +191,7 @@ public:
     
     /** The partition is redistributed and printed only by root processor.
      */    
-    static void writePartitionCentral( DenseVector<IndexType> &part, const std::string filename);
+    //static void writePartitionCentral( DenseVector<IndexType> &part, const std::string filename);
     
     
     /** Read graph and coordinates from a OFF file. Coordinates are (usually) in 3D.

@@ -499,7 +499,6 @@ void FileIO<IndexType, ValueType>::writeDenseVectorParallel(const DenseVector<T>
 }
 //-------------------------------------------------------------------------------------------------
 
-//TODO: rename this to writeDenseVectorCentral
 template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writeDenseVectorCentral(DenseVector<IndexType> &part, const std::string filename) {
 

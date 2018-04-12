@@ -114,7 +114,7 @@ std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly( const IndexT
 	for (IndexType i = 0; i < k; i++) {
 		ValueType centerHilbInd = i/ValueType(k) + offset;
 //PRINT( centerHilbInd );		
-		centerCoords = HilbertCurve<IndexType,ValueType>::HilbertIndex2PointVec( centerHilbInd, settings.sfcResolution, settings.dimensions);
+		centerCoords = HilbertCurve<IndexType,ValueType>::HilbertIndex2Point( centerHilbInd, settings.sfcResolution, settings.dimensions);
 		SCAI_ASSERT_EQ_ERROR( centerCoords.size(), dimensions, "Wrong dimensions for center.");
 		
 		for (IndexType d = 0; d < dimensions; d++) {
@@ -408,7 +408,7 @@ DenseVector<IndexType> assignBlocks(
 	//iterate if necessary to achieve balance
 	do
 	{
-		std::chrono::time_point<std::chrono::high_resolution_clock> balanceStart = std::chrono::high_resolution_clock::now();
+		//std::chrono::time_point<std::chrono::high_resolution_clock> balanceStart = std::chrono::high_resolution_clock::now();
 		SCAI_REGION( "KMeans.assignBlocks.balanceLoop" );
 		std::vector<ValueType> blockWeights(k,0.0);
 		IndexType totalComps = 0;
@@ -653,7 +653,7 @@ PRINT(*comm<<": " << *newDistribution);
 			std::vector<ValueType> point(2, 0);
 			
 			for(IndexType i=0; i<localN; i++){
-				point = HilbertCurve<IndexType,ValueType>::Hilbert2DIndex2PointVec(localHilbertIndices[i].value, recLevel);
+				point = HilbertCurve<IndexType,ValueType>::HilbertIndex2Point(localHilbertIndices[i].value, recLevel, dimensions);
 				wLocalCoords0[i] = point[0];
 				wLocalCoords1[i] = point[1];
 //PRINT(*comm <<": "<< i << ", hilbert index= "<< localHilbertIndices[i].value << " >> " << point[0] << ", " << point[1]);				
@@ -666,7 +666,7 @@ PRINT(*comm<<": " << *newDistribution);
 			std::vector<ValueType> point(3, 0);
 			
 			for(IndexType i=0; i<localN; i++){
-				point = HilbertCurve<IndexType,ValueType>::Hilbert3DIndex2PointVec(localHilbertIndices[i].value, recLevel);
+				point = HilbertCurve<IndexType,ValueType>::HilbertIndex2Point(localHilbertIndices[i].value, recLevel, dimensions);
 				wLocalCoords0[i] = point[0];
 				wLocalCoords1[i] = point[1];
 				wLocalCoords2[i] = point[2];

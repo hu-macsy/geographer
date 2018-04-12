@@ -536,7 +536,7 @@ TEST_F(FileIOTest, testReadGraphAndCoordsBinary){
 }
 //-------------------------------------------------------------------------------------------------
 
-TEST_F (FileIOTest, testWritePartitionCentral){
+TEST_F (FileIOTest, testWriteDenseVectorCentral){
     std::string file= "trace-00008.graph";
     std::string grFile= graphPath +file , coordFile= graphPath +file +".xyz";  //graph file and coordinates file
     IndexType dimensions = 2;
@@ -579,7 +579,7 @@ TEST_F (FileIOTest, testWritePartitionCentral){
     metrics.getAllMetrics( graph, partition, uniformWeights, settings);
     metrics.print( std::cout );
     
-    FileIO<IndexType, ValueType>::writePartitionCentral( partition, file+"_k_"+std::to_string(k)+".part");
+    FileIO<IndexType, ValueType>::writeDenseVectorCentral( partition, file+"_k_"+std::to_string(k)+".part");
     
 }
 
