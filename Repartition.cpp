@@ -33,36 +33,35 @@ using scai::lama::Scalar;
 
 namespace ITI {
 	
+//TODO?: generalize to use an "object" instead of just a point/center
+	
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<ValueType> Repartition<IndexType,ValueType>::sNW( const std::vector<DenseVector<ValueType> >& coordinates, const IndexType seed, const ValueType diverg, const IndexType dimensions){
+scai::lama::DenseVector<ValueType> Repartition<IndexType,ValueType>::setNodeWeights( const std::vector<DenseVector<ValueType> >& coordinates, const IndexType seed, const ValueType diverg, const IndexType dimensions){
 	
 	const scai::dmemo::DistributionPtr distPtr = coordinates[0].getDistributionPtr();
 	const scai::dmemo::CommunicatorPtr comm = distPtr->getCommunicatorPtr();
 	const IndexType localN = distPtr->getLocalSize();
-	//const IndexType dimensions = settings.dimensions;
-	
-	
-	//1- create objects based on some input param
+
+	//1- create a center based on some input param
 	
 	std::vector<ValueType> center( dimensions, 0);	//one center
 	
-	//WARNING: does this always produces the same sequence of numbers for all PEs?
 	std::default_random_engine generator( seed );
-	
 	std::vector<ValueType> maxCoords(dimensions);
+	std::vector<ValueType> minCoords(dimensions);
 	
 	// set the coordinates of the center and get max
 	for( IndexType d=0; d<dimensions; d++){
 		maxCoords[d] = coordinates[d].max().Scalar::getValue<ValueType>();
-		//std::uniform_real_distribution<ValueType> dist(minCoord[d], maxCoord[d]);
-		std::uniform_real_distribution<ValueType> dist( 0, maxCoords[d]);
+		minCoords[d] = coordinates[d].min().Scalar::getValue<ValueType>();
+		std::uniform_real_distribution<ValueType> dist(minCoord[d], maxCoord[d]);
 		center[d] = dist( generator );
 		//center[d] = maxCoords[d]/2.0;
 		//PRINT(*comm << ": cent["<< d <<"]= " << center[d]);
 	}
 
 	
-	//2- set local node weights that respect the objects
+	//2- set local node weights that respect the center
 	
 	// copy coordinates to a std::vector<std::vector>
 	std::vector< std::vector<ValueType> > localPoints( localN, std::vector<ValueType>(dimensions,0) );
@@ -75,9 +74,8 @@ scai::lama::DenseVector<ValueType> Repartition<IndexType,ValueType>::sNW( const 
 		}
 	}
 	
-	
-	scai::lama::DenseVector<ValueType> nodeWeights( distPtr, 0 );
-	
+	// set the node weigths based on the inverse of their distance from the center
+	scai::lama::DenseVector<ValueType> nodeWeights( distPtr, 0 );	
 	{
 		scai::hmemo::WriteAccess<ValueType> wWeights(nodeWeights.getLocalValues());
 		std::vector<ValueType> point(dimensions);
@@ -119,7 +117,7 @@ void Repartition<IndexType,ValueType>::getImbalancedDistribution(
 	scai::lama::DenseVector<IndexType> firstPartition;
 	scai::lama::DenseVector<ValueType> imbaNodeWeights;
 	
-	// nodeWeights have the same distribution as the coordinates
+	//TODO: imbalance is hard coded now, get it as an input parameter
 	IndexType seed = 0;
 	ValueType imbalance = 0;
 	ValueType diverg = 1;	//with 0=> unit weigths, larger numbers create more divergence for the weigths
@@ -197,7 +195,6 @@ void Repartition<IndexType,ValueType>::getImbalancedDistribution(
 		scai::dmemo::Redistributor prepareRedist( firstDist, defaultDist );
 		
 		//distribute graph, node weights and coordinates to mimic an imbalanced simulation
-		//TODO: what about nodeweights? now, just use uniform nodeweights for the repartition
 		scai::dmemo::DistributionPtr columnDist = graph.getColDistributionPtr();
 		graph.redistribute( prepareRedist, columnDist );
 		

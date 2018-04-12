@@ -87,10 +87,10 @@ public:
     /* Write a DenseVector in parallel in the filename. Each PE, one after another, write its own part.
      * */
     template<typename T>
-    void writeDenseVectorParallel(const DenseVector<T> &dv, const std::string filename);
+    static void writeDenseVectorParallel(const DenseVector<T> &dv, const std::string filename);
 	
 	/*TODO: merge with writeDenseVectorParallel*/
-	void writePartitionParallel(const DenseVector<IndexType> &dv, const std::string filename);
+	static void writePartitionParallel(const DenseVector<IndexType> &dv, const std::string filename);
     
     /**
 	 * Writes a partition to file.

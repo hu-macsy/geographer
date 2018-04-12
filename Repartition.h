@@ -39,8 +39,20 @@ namespace ITI {
 		 * the value more diverse the node weights.
 		 * @param[in] dimensions The dimension of the coordinates.
 		 */
-		static scai::lama::DenseVector<ValueType> sNW(  const std::vector<scai::lama::DenseVector<ValueType> >& coordinates, const IndexType seed, const ValueType diverg, const IndexType dimensions);
+		static scai::lama::DenseVector<ValueType> setNodeWeights(  const std::vector<scai::lama::DenseVector<ValueType> >& coordinates, const IndexType seed, const ValueType diverg, const IndexType dimensions);
 		
+		/** Given the input (graph, coordinates, node weights) and a tool, it produces and imbalanced 
+		 * distribution of the input by repeatedly partitioning with the given tool, with different parameters,
+		 * until it gets an imbalanced partition. After that, all input data are redistributed based on that
+		 * imbalanced partition.
+		 * 
+		 * @param[in,out] graph The adjecency matrix of the graph.
+		 * @param[in,out] coordinates The input coordinates.
+		 * @param[in,out] nodeWeights The weights for each point/vertex.
+		 * @param[in] tool The tool to partition with.
+		 * @param[in] setting A settings struct passing various arguments.
+		 * @param[out] metrics A metrics struct to store different metrics.
+		 */
 		
 		static void getImbalancedDistribution(
 			scai::lama::CSRSparseMatrix<ValueType> &graph,

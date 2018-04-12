@@ -753,7 +753,8 @@ int main(int argc, char** argv) {
     if( settings.outFile!="-" and writePartition ){
         std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
         std::string partOutFile = settings.outFile + ".partition";
-        ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+		ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+        //ITI::FileIO<IndexType, ValueType>::writeDenseVectorParallel<IndexType>( partition, partOutFile );
         //ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partition, partOutFile );
         std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
         if( comm->getRank()==0 ){
@@ -768,13 +769,10 @@ int main(int argc, char** argv) {
     if (settings.writeDebugCoordinates) {
 		
 		std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
-		
-//scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(N, comm));
-scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
+		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
         for (IndexType dim = 0; dim < settings.dimensions; dim++) {
             assert( coordinateCopy[dim].size() == N);
-            //coordinates[dim].redistribute(graph.getRowDistributionPtr());
-coordinateCopy[dim].redistribute( distFromPartition );
+			coordinateCopy[dim].redistribute( distFromPartition );
         }
         
         std::string destPath = "partResults/main/blocks_" + std::to_string(settings.numBlocks) ;
