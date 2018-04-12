@@ -87,6 +87,11 @@ scai::dmemo::Halo buildNeighborHalo(const scai::lama::CSRSparseMatrix<ValueType>
 /**
  * Returns true if the node identified with globalID has a neighbor that is not local on this process.
  * Since this method acquires reading locks on the CSR structure, it might be expensive to call often
+ * 
+ * @param[in] input The adjacency matrix of the graph.
+ * @param[in] globalID The global ID of the vertex to be checked
+ * @return True if the vertex has a neighbor that resides in a differetn PE, false if all the neighbors are local.
+ * 
  */
 template<typename IndexType, typename ValueType>
 bool hasNonLocalNeighbors(const scai::lama::CSRSparseMatrix<ValueType> &input, IndexType globalID);
@@ -109,6 +114,8 @@ std::vector<IndexType> getNodesWithNonLocalNeighbors(const scai::lama::CSRSparse
 
 /**
  * Computes a list of global IDs of nodes which are adjacent to nodes local on this processor, but are themselves not local.
+ * @param[in] input Adjacency matrix of the input graph
+ * @return The vector with the global IDs 
  */
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> nonLocalNeighbors(const scai::lama::CSRSparseMatrix<ValueType>& input);
@@ -199,6 +206,9 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::lama::CSRSparseMa
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::Halo& halo);
 
+/** Get a vector with the degree of every vertex. Each PE will own the part of the dense vector for his own vertices (the returned DenseVector has the same distribution as the adjM row distribution).
+ * @param[in] adjM The adjacency matrix of the input graph.
+ * */
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 
@@ -258,6 +268,11 @@ static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_rand
     return begin;
 }
 
+/**	Reordering a sequence of numbers from 0 to maxIndex.
+ * The order is: maxIndex/2, maxIdnex/4, maxIndex*3/4, maxIndex/8, maxIndex*3/8, maxIndex*5/8, ...
+ * @return The premutated numbers. return.size()=maxIdnex and 0< return[i]< maxIndex.
+ */
+//TODO: verify that it works properly
 static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
 	IndexType index = 0;
 	std::vector<IndexType> ret(maxIndex, -1);
