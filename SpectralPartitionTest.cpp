@@ -127,9 +127,10 @@ TEST_F(SpectralPartitionTest, testGetPartition){
     settings.pixeledSideLen = 16;    // for a 16x16 coarsen graph
     scai::lama::DenseVector<IndexType> spectralPartition = SpectralPartition<IndexType, ValueType>::getPartition( graph, coordinates, settings);
     
-    if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, "SpectralPartition_+trace01");
-    }
+	//TODO: remove code if not needed
+    //if(dimensions==2){
+    //    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, "SpectralPartition_trace01");
+    //}
     //aux::print2DGrid( graph, spectralPartition );
     
     EXPECT_GE(k-1, spectralPartition.getLocalValues().max() );

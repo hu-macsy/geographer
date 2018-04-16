@@ -175,7 +175,7 @@ TEST_F(ParcoRepartTest, testInitialPartition){
     //get sfc partition
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(coords[0].getDistributionPtr(), 1);
     DenseVector<IndexType> hilbertInitialPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition(coords, uniformWeights, settings);
-    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coords, N, dimensions, "hilbertPartition");
+    //ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coords, N, dimensions, "hilbertPartition");
     
     EXPECT_GE(k-1, hilbertInitialPartition.getLocalValues().max() );
     EXPECT_EQ(N, hilbertInitialPartition.size());
@@ -936,7 +936,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
     //check distributions
     assert( partition.getDistribution().isEqual( adjM.getRowDistribution()) );
     // the next assertion fails in "this version" (commit a2fc03ab73f3af420123c491fbf9afb84be4a0c4) because partition 
-    // redistributes the graph nodes so every block is in one PE (k=P) but does NOT redistributes the coordinates.
+    //f redistributes the graph nodes so every block is in one PE (k=P) but does NOT redistributes the coordinates.
     //assert( partition.getDistribution().isEqual( coords[0].getDistribution()) );
     
     //test getBlockGraph
