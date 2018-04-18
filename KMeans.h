@@ -64,15 +64,6 @@ DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &c
 		Settings settings);
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> getPartitionWithSFCCoords(
-		const scai::lama::CSRSparseMatrix<ValueType>& adjM, \
-		const std::vector<DenseVector<ValueType> >& coordinates,\
-		const DenseVector<ValueType> &  nodeWeights,\
-		const Settings settings);
-//TODO: add block weights as an input param?: const std::vector<IndexType> &blockSizes
-
-
-template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings);
 
 /**

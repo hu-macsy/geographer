@@ -533,106 +533,6 @@ DenseVector<IndexType> assignBlocks(
 	return assignment;
 }
 
-
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> getPartitionWithSFCCoords(const scai::lama::CSRSparseMatrix<ValueType>& graph, \
-		const std::vector<DenseVector<ValueType> >& coordinates,\
-		const DenseVector<ValueType> &  nodeWeights,\
-		const Settings settings){
-	
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	
-	// sorted pair of coordinates and global indices
-	std::vector<sort_pair> localHilbertIndices = HilbertCurve<IndexType, ValueType>::getSortedHilbertIndices( coordinates );
-	
-	//create new distribution based on the hilbert indices
-	const IndexType localN = localHilbertIndices.size();
-	std::vector<IndexType> newLocalIndices(localN);
-	
-	const IndexType globalN = comm->sum( localN );
-PRINT( *comm<<": localN= " << localN <<	", globlaN= " << globalN);
-	// copy indices from the hilbert sfc to a vector
-	for(IndexType i=0; i<localN; i++){
-		newLocalIndices[i] = localHilbertIndices[i].index;
-//PRINT0( *comm << ": " << newLocalIndices[i] );
-	}
-	
-	scai::utilskernel::LArray<IndexType> indexTransport(newLocalIndices.size(), newLocalIndices.data());
-	
-	// the new distribution from the hilbert indices
-	scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
-	scai::dmemo::GeneralDistribution generalDist( globalN, indexTransport, comm);
-		
-PRINT(*comm<<": " << *newDistribution);	
-{ 
-	DenseVector<IndexType> tmpPartition( newDistribution, -1);
-	for( int i=0; i< tmpPartition.getLocalValues().size(); i++){
-		tmpPartition.getLocalValues()[i]= comm->getRank();
-	}
-	tmpPartition.redistribute( graph.getRowDistributionPtr() );
-	//ITI::aux<IndexType,ValueType>::print2DGrid( graph, tmpPartition );
-}
-	
-
-
-	const IndexType dimensions = settings.dimensions;
-	
-	std::vector<DenseVector<ValueType>> localCoords( dimensions, DenseVector<ValueType>( newDistribution, 0) );
-	// nodeWeights must also be redistributed, TODO: can be avoided?
-	DenseVector<ValueType> copyNodeWeights = nodeWeights;
-	copyNodeWeights.redistribute( newDistribution );
-	
-	scai::hmemo::HArray<IndexType> localIndices = generalDist.getMyIndexes();
-	scai::hmemo::ReadAccess<IndexType> rlocalInd( localIndices );
-	//for( int i=0; i<newDistribution->getLocalSize(); i++){
-		//PRINT0(*comm <<": local: "<< i<< " , global: " << rlocalInd[i] );
-	//}
-	
-	// convert the hilbert indices to 2D/3D coordinates and copy to a vector<DenseVector>
-	{
-		SCAI_REGION( "KMeans.getPartitionWithSFCCoords.convert2DV" );
-
-		const IndexType recLevel = 16;	//TODO?: maybe change?
-
-		if( dimensions==2){
-			scai::hmemo::WriteAccess<ValueType> wLocalCoords0( localCoords[0].getLocalValues() );
-			scai::hmemo::WriteAccess<ValueType> wLocalCoords1( localCoords[1].getLocalValues() );
-			
-			std::vector<ValueType> point(2, 0);
-			
-			for(IndexType i=0; i<localN; i++){
-				point = HilbertCurve<IndexType,ValueType>::Hilbert2DIndex2PointVec(localHilbertIndices[i].value, recLevel);
-				wLocalCoords0[i] = point[0];
-				wLocalCoords1[i] = point[1];
-//PRINT(*comm <<": "<< i << ", hilbert index= "<< localHilbertIndices[i].value << " >> " << point[0] << ", " << point[1]);				
-			}
-		}else if (dimensions==3){
-			scai::hmemo::WriteAccess<ValueType> wLocalCoords0( localCoords[0].getLocalValues() );
-			scai::hmemo::WriteAccess<ValueType> wLocalCoords1( localCoords[1].getLocalValues() );
-			scai::hmemo::WriteAccess<ValueType> wLocalCoords2( localCoords[2].getLocalValues() );
-			
-			std::vector<ValueType> point(3, 0);
-			
-			for(IndexType i=0; i<localN; i++){
-				point = HilbertCurve<IndexType,ValueType>::Hilbert3DIndex2PointVec(localHilbertIndices[i].value, recLevel);
-				wLocalCoords0[i] = point[0];
-				wLocalCoords1[i] = point[1];
-				wLocalCoords2[i] = point[2];
-			}			
-		}else{
-			PRINT0("Dimensions: " << dimensions << " is not supported.\nAborting...");
-			throw std::runtime_error("Number of dimensions not supported");
-		}
-	}
-	
-	//TODO: assuming uniform block sizes
-	const std::vector<IndexType> blockSizes(settings.numBlocks, globalN/settings.numBlocks);
-	
-	return KMeans::computePartition(localCoords, settings.numBlocks, copyNodeWeights, blockSizes, settings);
-	
-}
-
-
 /**
  */
 //WARNING: we do not use k as repartition assumes k=comm->getSize() and neither blockSizes and we assume
@@ -644,6 +544,7 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 	const IndexType localN = nodeWeights.getLocalValues().size();
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType k = comm->getSize();
+	SCAI_ASSERT_EQ_ERROR(k, settings.numBlocks, "Deriving the previous partition from the distribution cannot work for p == k");
 	
 	// calculate the global weight sum to set the block sizes
 	//TODO: the local weight sums are already calculated in findLocalCenters, maybe extract info from there
@@ -688,8 +589,6 @@ template DenseVector<IndexType> assignBlocks(
         std::vector<IndexType>::iterator firstIndex, std::vector<IndexType>::iterator lastIndex,
         const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment, const std::vector<IndexType> &blockSizes, const SpatialCell &boundingBox,
         std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter, std::vector<ValueType> &influence, Settings settings);
-
-template DenseVector<IndexType> getPartitionWithSFCCoords(const scai::lama::CSRSparseMatrix<ValueType>& adjM, const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings);
 
 template DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings);
 
