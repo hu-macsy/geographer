@@ -124,6 +124,7 @@ namespace ITI {
 			static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
 
 			/** Colors the edges of the graph using max_vertex_degree + 1 colors.
+			 * TODO: This method redistributes the graph. Maybe it should not.
 			 *
 			 * @param[in] adjM The graph with N vertices given as an NxN adjacency matrix.
 			 *
@@ -133,6 +134,7 @@ namespace ITI {
 
 			/** Given the block graph, creates an edge coloring of the graph and returns a communication
 			 *  scheme based on the coloring
+			 *  TODO: This method redistributes the graph. Maybe it should not.
 			 *
 			 * @param[in] adjM The adjacency matrix of a graph.
 			 * @return std::vector.size()= number of colors used for coloring the graph. If D is the
@@ -155,7 +157,7 @@ namespace ITI {
 			static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
 
 			/**
-			 * Sum of weights of local outgoing edges
+			 * @brief Sum of weights of local outgoing edges.
 			 */
 			static ValueType localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input, const bool weighted);
 
