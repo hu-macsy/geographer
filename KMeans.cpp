@@ -544,6 +544,7 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 	const IndexType localN = nodeWeights.getLocalValues().size();
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType k = comm->getSize();
+	SCAI_ASSERT_EQ_ERROR(k, settings.numBlocks, "Deriving the previous partition from the distribution cannot work for p == k");
 	
 	// calculate the global weight sum to set the block sizes
 	//TODO: the local weight sums are already calculated in findLocalCenters, maybe extract info from there
