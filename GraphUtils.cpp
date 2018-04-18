@@ -1211,35 +1211,6 @@ scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( co
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType>& adjM){
-    //TODO: can't this be simplified by a call to scai::sparsekernel::OpenMPCSRUtils::offsets2sizes?
-    SCAI_REGION("GraphUtils.getDegreeVector");
-    
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-    
-    scai::lama::DenseVector<IndexType> degreeVector(distPtr);
-    scai::utilskernel::LArray<IndexType>& localDegreeVector = degreeVector.getLocalValues();
-    
-    const scai::lama::CSRStorage<ValueType> localAdjM = adjM.getLocalStorage();
-    {
-        const scai::hmemo::ReadAccess<IndexType> readIA ( localAdjM.getIA() );
-        scai::hmemo::WriteOnlyAccess<IndexType> writeVector( localDegreeVector, localDegreeVector.size()) ;
-        
-        SCAI_ASSERT_EQ_ERROR(readIA.size(), localDegreeVector.size()+1, "Probably wrong distribution");
-        
-        for(IndexType i=0; i<readIA.size()-1; i++){
-            writeVector[i] = readIA[i+1] - readIA[i];
-        }
-    }
-    
-    return degreeVector;
-}
-
-//------------------------------------------------------------------------------
-
-
-template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList ){
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -1642,7 +1613,6 @@ template  std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama
 template scai::lama::CSRSparseMatrix<ValueType> getPEGraph<IndexType,ValueType>( const scai::lama::CSRSparseMatrix<ValueType> &adjM);
 template scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>> &adjList);
 template scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList );
-template scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 template scai::lama::CSRSparseMatrix<ValueType> constructLaplacian<IndexType, ValueType>(scai::lama::CSRSparseMatrix<ValueType> graph);
 template scai::lama::CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension);
 template scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d);
