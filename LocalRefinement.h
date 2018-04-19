@@ -27,9 +27,38 @@ namespace ITI {
     template <typename IndexType, typename ValueType>
     class LocalRefinement{
     public:
-        
+        /**
+         * Performs a local refinement step using distributed Fiduccia-Mattheyses on the distributed input graph and partition.
+         * Only works if the number of blocks is equal to the number of processes and the partition coincides with the distribution.
+         * When changing the partition during the refinement step, the graph, partition and coordinates are redistributed to match.
+         *
+         * Note: This method is not in use any longer.
+         *
+         * @param[in,out] input Adjacency matrix of the input graph
+         * @param[in,out] part Partition
+         * @param[in,out] coordinates Coordinates of input points, only used for tie-breaking
+         *
+         */
         static std::vector<IndexType> distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
         
+        /**
+         * Performs a local refinement step using distributed Fiduccia-Mattheyses on the distributed input graph and partition.
+         * Only works if the number of blocks is equal to the number of processes and the partition coincides with the distribution.
+         * When changing the partition during the refinement step, the graph, partition and coordinates are redistributed to match.
+         *
+         * The difference to the other method with the same name is that a number of temporary variables are exposed to the caller to enable reusing them.
+         *
+         * @param[in,out] input Adjacency matrix of the input graph
+         * @param[in,out] part Partition
+         * @param[in,out] nodesWithNonLocalNeighbors Nodes that are local to this process, but have neighbors that are not.
+         * @param[in,out] nodeWeights
+         * @param[in,out] coordinates Coordinates of input points, only used for geometric tie-breaking
+         * @param[in,out] distances For each node, distance to block center. Only used for geometric tie-breaking
+         * @param[in,out] origin Indicating for each element, where it originally came from. Is redistributed during refinement, allowing to trace movements.
+         * @param[in] communicationScheme As many elements as rounds, each element is a DenseVector of length p. Indicates the communication partner in each round.
+         * @param[in] settings Settings struct
+         *
+         */
         static std::vector<IndexType> distributedFMStep(
             CSRSparseMatrix<ValueType> &input, 
             DenseVector<IndexType> &part, 
@@ -43,11 +72,13 @@ namespace ITI {
         );
 
         /**
-         * Computes the border region within one block, adjacent to another block
+         * @brief Computes the border region to another block, i.e. those local nodes that have a short distance to it.
+         *
          * @param[in] input Adjacency matrix of the input graph
          * @param[in] part Partition vector
+         * @param[in] nodesWithNonLocalNeighbors Nodes directly adjacent to other blocks
          * @param[in] otherBlock block to which the border region should be adjacent
-         * @param[in] depth Width of the border region, measured in hops
+         * @param[in] minNodes Minimum number nodes in the border region.
          */
         static std::pair<std::vector<IndexType>, std::vector<IndexType>> getInterfaceNodes(
             const CSRSparseMatrix<ValueType> &input, 
@@ -66,8 +97,6 @@ namespace ITI {
         static void redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, scai::dmemo::Halo& halo, scai::hmemo::HArray<T>& haloData);
         
 		static std::vector<ValueType> distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates);
-
-        
 
     private:
         
