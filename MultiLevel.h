@@ -30,25 +30,81 @@ namespace ITI{
     template <typename IndexType, typename ValueType>
     class MultiLevel{
     public:
+        /**
+         * Implementation of the multi-level heuristic.
+         * Performs coarsening, recursive call of multiLevelStep, uncoarsening and local refinement.
+         * Only works if number of blocks is equal to the number of processes and the distribution is aligned with the partition.
+         * Input data are redistributed to match the changed partition.
+         *
+         * @param[in,out] input Adjacency matrix of input graph
+         * @param[in,out] part Partition
+         * @param[in,out] nodeWeights Weights of input points
+         * @param[in,out] coordinates of input points
+         * @param[in] halo for non-local neighbors
+         * @param[in] settings
+         *
+         * @return origin DenseVector that specifies for each element the original process before the multiLevelStep. Only needed when used to speed up redistribution.
+         */
         static DenseVector<IndexType> multiLevelStep(scai::lama::CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const Halo& halo, Settings settings);
+
 
         static DenseVector<IndexType> getFineTargets(const DenseVector<IndexType> &coarseOrigin, const DenseVector<IndexType> &fineToCoarseMap);
 
+        /**
+         * Coarsen the input graph with edge matchings and contractions.
+         * For an input graph with n nodes, the coarse graph will contain roughly 2^{-i}*n nodes, where i is the number of iterations.
+         *
+         * @param[in] inputGraph Adjacency matrix of input graph
+         * @param[in] nodeWeights
+         * @param[in] halo Halo of non-local neighbors
+         * @param[out] coarseGraph Adjacency matrix of coarsened graph
+         * @param[out] fineToCoarse DenseVector with as many entries as uncoarsened nodes. For each uncoarsened node, contains the corresponding coarsened node.
+         * @param[in] iterations Number of contraction iterations
+         */
         static void coarsen(const CSRSparseMatrix<ValueType>& inputGraph, const DenseVector<ValueType> &nodeWeights, const Halo& halo, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations = 1);
 
+        /**
+         * @brief Perform a local maximum matching
+         *
+         * @param[in] graph Adjacency matrix of input graph
+         * @param[in] nodeWeights
+         *
+         * @return vector of edges in maximum matching
+         */
         static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& graph, const DenseVector<ValueType> &nodeWeights);
         
+        /**
+         * @brief Project a fine DenseVector to a coarse DenseVector. Values are interpolated linearly.
+         *
+         * @param[in] input
+         * @param[in] fineToCoarse
+         *
+         * @return coarse representation
+         */
         static DenseVector<ValueType> projectToCoarse(const DenseVector<ValueType>& input, const DenseVector<IndexType>& fineToCoarse);
         
+        /**
+         * @brief Project a fine DenseVector to a coarse DenseVector. Values are summed.
+         *
+         * @param[in] input
+         * @param[in] fineToCoarse
+         *
+         * @return coarse representation
+         */
         static DenseVector<ValueType> sumToCoarse(const DenseVector<ValueType>& input, const DenseVector<IndexType>& fineToCoarse);
         
+        /**
+         * @brief Compute coarse distribution from fineToCoarse map
+         *
+         * @param[in] fineToCoarse
+         *
+         * @return coarse distribution
+         */
         static scai::dmemo::DistributionPtr projectToCoarse(const DenseVector<IndexType>& fineToCoarse);
         
-        static scai::dmemo::DistributionPtr projectToFine(scai::dmemo::DistributionPtr, const DenseVector<IndexType>& fineToCoarse);
-        
-        template<typename T>
-        static DenseVector<T> projectToFine(const DenseVector<T>& input, const DenseVector<IndexType>& fineToCoarse);
-        
+        /**
+         * @brief Compute a global prefix sum of a block-distributed input
+         */
         template<typename T>
         static DenseVector<T> computeGlobalPrefixSum(const DenseVector<T> &input, T offset = 0);
         
