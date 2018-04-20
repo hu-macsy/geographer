@@ -79,7 +79,11 @@ template<typename IndexType, typename ValueType>
 ValueType computeImbalance(const scai::lama::DenseVector<IndexType> &part, IndexType k, const scai::lama::DenseVector<ValueType> &nodeWeights = {});
 
 /**
- * Builds a halo containing all non-local neighbors.
+ * @brief Builds a halo containing all non-local neighbors.
+ *
+ * @param[in] input Adjacency Matrix
+ *
+ * @return Halo
  */
 template<typename IndexType, typename ValueType>
 scai::dmemo::Halo buildNeighborHalo(const scai::lama::CSRSparseMatrix<ValueType> &input);
@@ -97,7 +101,8 @@ template<typename IndexType, typename ValueType>
 bool hasNonLocalNeighbors(const scai::lama::CSRSparseMatrix<ValueType> &input, IndexType globalID);
 
 /**
- * Returns a vector of global indices of nodes which are local on this process, but have neighbors that are not local. They non local neighbors may or may not be in the same block.
+ * Returns a vector of global indices of nodes which are local on this process, but have neighbors that are not local.
+ * These non-local neighbors may or may not be in the same block.
  * No communication required, iterates once over the local adjacency matrix
  * @param[in] input Adjacency matrix of the input graph
  */
@@ -105,9 +110,14 @@ template<typename IndexType, typename ValueType>
 std::vector<IndexType> getNodesWithNonLocalNeighbors(const scai::lama::CSRSparseMatrix<ValueType>& input);
 
 /**
- * Returns a vector of global indices of nodes which are local on this process, but have neighbors that are not local. They non local neighbors may or may not be in the same block.
- * No communication required, iterates once over the local adjacency matrix
+ * Returns a vector of global indices of nodes which are local on this process, but have neighbors that are not local.
+ * This method differs from the other method with the same name by accepting a list of candidates.
+ * Only those are checked for non-local neighbors speeding up the process.
+ *
  * @param[in] input Adjacency matrix of the input graph
+ * @param[in]
+ *
+ * @return vector of nodes with non-local neighbors
  */
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> getNodesWithNonLocalNeighbors(const scai::lama::CSRSparseMatrix<ValueType>& input, const std::set<IndexType>& candidates);
@@ -194,29 +204,36 @@ std::pair<IndexType, IndexType> computeBlockGraphComm( const scai::lama::CSRSpar
 template<typename IndexType, typename ValueType>
 std::pair<IndexType,IndexType> computeCommVolume_p_equals_k( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part);
     
-/**Returns the processor graph. Every processor traverses its local part of adjM: and for every
+/**Returns the process graph. Every processor traverses its local part of adjM: and for every
  * edge (u,v) that one node, say u, is not local it gets the owner processor of u. The returned graph is distributed with a BLOCK distribution.
  *
  * @param[in] adjM The adjacency matrix of the input graph.
- * @return A [#PE x #PE] adjacency matrix of the processor graph.
+ * @return A [#PE x #PE] adjacency matrix of the process graph, distributed with a Block distribution
  */
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM);
 
+/**Returns the process graph, as calculated from the local halos.
+ *
+ *
+ * @param halo Halo objects in which all non-local neighbors are present
+ * @return A [#PE x #PE] adjacency matrix of the process graph, distributed with a Block distribution
+ */
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::Halo& halo);
 
-/** Get a vector with the degree of every vertex. Each PE will own the part of the dense vector for his own vertices (the returned DenseVector has the same distribution as the adjM row distribution).
- * @param[in] adjM The adjacency matrix of the input graph.
- * */
-template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> getDegreeVector( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
-
+/**
+ * @Convert a set of unweighted adjacency lists into a CSR matrix
+ *
+ * @param[in] adjList For each node, a possibly empty set of neighbors
+ * @return The distributed adjacency matrix
+ */
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>>& adjList);
 
-/** Get an vector of the local edges, sorts the edges and constructs the local part of CSR sparse matrix.
- * @param[in,out] edgeList The local list of edges for this PE. The edge list is sorted and redistributed also.
+/** @brief Get a vector of the local edges, sort the edges and construct the local part of CSR sparse matrix.
+ *
+ * @param[in] edgeList The local list of edges for this PE.
  * @return The distributed adjacency matrix.
  */
 template<typename IndexType, typename ValueType>
@@ -255,6 +272,16 @@ template<typename IndexType, typename ValueType>
 scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d);
 
 //taken from https://stackoverflow.com/a/9345144/494085
+
+
+/**
+ * @brief Randomly select elements and move them to the front.
+ *
+ * @param begin Begin of range
+ * @param end End of range
+ * @param num_random Number of selected elements
+ *
+ */
 template<class BidiIter >
 static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_random) {
     size_t left = std::distance(begin, end);

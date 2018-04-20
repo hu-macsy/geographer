@@ -605,25 +605,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     }
     SCAI_ASSERT( blockSizes.size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
     
-    
-    /**
-     * get minimum / maximum of coordinates
-     */
-	/*
-	std::vector<ValueType> minCoords(dimensions);
-    std::vector<ValueType> maxCoords(dimensions);
-    
-    {
-		SCAI_REGION( "ParcoRepart.hilbertPartition.minMax" )
-		for (IndexType dim = 0; dim < dimensions; dim++) {
-			minCoords[dim] = coordinates[dim].min().Scalar::getValue<ValueType>();
-			maxCoords[dim] = coordinates[dim].max().Scalar::getValue<ValueType>();
-			assert(std::isfinite(minCoords[dim]));
-			assert(std::isfinite(maxCoords[dim]));
-			SCAI_ASSERT(maxCoords[dim] > minCoords[dim], "Wrong coordinates.");
-		}
-    }
-    */
     /**
      * Several possibilities exist for choosing the recursion depth.
      * Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
@@ -637,34 +618,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     scai::lama::DenseVector<ValueType> hilbertIndices(coordDist);
 	std::vector<ValueType> localHilberIndices = HilbertCurve<IndexType,ValueType>::getHilbertIndexVector(coordinates, recursionDepth, dimensions);
 	hilbertIndices.assign( scai::hmemo::HArray<ValueType>( localHilberIndices.size(), localHilberIndices.data()) , coordDist);
-	
-	/*
-    {
-        SCAI_REGION("ParcoRepart.hilbertPartition.spaceFillingCurve");
-        // get local part of hilbert indices
-        scai::hmemo::WriteOnlyAccess<ValueType> hilbertIndicesLocal(hilbertIndices.getLocalValues());
-        assert(hilbertIndicesLocal.size() == localN);
-        // get read access to the local part of the coordinates
-        // TODO: should be coordAccess[dimension] but I don't know how ... maybe HArray::acquireReadAccess? (harry)
-        scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
-        scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
-        // this is faulty, if dimensions=2 coordAccess2 is equal to coordAccess1
-        scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[dimensions-1].getLocalValues() );
-        
-        ValueType point[dimensions];
-        for (IndexType i = 0; i < localN; i++) {
-            coordAccess0.getValue(point[0], i);
-            coordAccess1.getValue(point[1], i);
-            // TODO change how I treat different dimensions
-            if(dimensions == 3){
-                coordAccess2.getValue(point[2], i);
-            }
-            ValueType globalHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex( point, dimensions, recursionDepth, minCoords, maxCoords);
-            hilbertIndicesLocal[i] = globalHilbertIndex;
-        }
-    }
-	*/
-	
+
     //TODO: use the blockSizes vector
     //TODO: take into account node weights: just sorting will create imbalanced blocks, not so much in number of node but in the total weight of each block
     
@@ -674,7 +628,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     std::vector<IndexType> newLocalIndices;
     {
         SCAI_REGION( "ParcoRepart.hilbertPartition.sorting" );
-        
+        //TODO: maybe call getSortedHilbertIndices here?
         int typesize;
         MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
         //assert(typesize == sizeof(sort_pair)); //not valid for int_double, presumably due to padding
@@ -1118,6 +1072,7 @@ IndexType ParcoRepart<IndexType, ValueType>::localBlockSize(const DenseVector<In
 	SCAI_REGION( "ParcoRepart.localBlockSize" )
 	IndexType result = 0;
 	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
+	//possibly shorten with std::count(localPart.get(), localPart.get()+localPart.size(), blockID);
 
 	for (IndexType i = 0; i < localPart.size(); i++) {
 		if (localPart[i] == blockID) {
