@@ -23,13 +23,14 @@ using scai::lama::Scalar;
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCentersSFC(
-		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords,
+		const std::vector<DenseVector<ValueType> >& coordinates, const std::vector<ValueType> &minCoords,
 		const std::vector<ValueType> &maxCoords, Settings settings) {
 
 	SCAI_REGION( "KMeans.findInitialCentersSFC" );
 	const IndexType localN = coordinates[0].getLocalValues().size();
 	const IndexType globalN = coordinates[0].size();
 	const IndexType dimensions = settings.dimensions;
+	const IndexType k = settings.numBlocks;
 	
 	//convert coordinates, switch inner and outer order
 	std::vector<std::vector<ValueType> > convertedCoords(localN);
@@ -99,9 +100,10 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 
 
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly( const IndexType k, const std::vector<ValueType> &maxCoords, Settings settings){
+std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(const std::vector<ValueType> &maxCoords, Settings settings){
 	
 	const IndexType dimensions = settings.dimensions;
+	const IndexType k = settings.numBlocks;
 		
 	//set local values in vector, leave non-local values with zero
 	std::vector<std::vector<ValueType> > result(dimensions);
@@ -567,16 +569,16 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 	std::vector<std::vector<ValueType> > initialCenters = findLocalCenters<IndexType,ValueType>(coordinates, nodeWeights);
 	//std::vector<std::vector<ValueType> > initialCenters = findLocalCenters(coordinates, nodeWeights);
 	
-	return computePartition(coordinates, k, nodeWeights, blockSizes, initialCenters, settings);
+	return computePartition(coordinates, nodeWeights, blockSizes, initialCenters, settings);
 }
 
 
 
-template std::vector<std::vector<ValueType> > findInitialCentersSFC( const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords,    const std::vector<ValueType> &maxCoords, Settings settings);
+template std::vector<std::vector<ValueType> > findInitialCentersSFC<IndexType, ValueType>( const std::vector<DenseVector<ValueType> >& coordinates, const std::vector<ValueType> &minCoords,    const std::vector<ValueType> &maxCoords, Settings settings);
 
-std::vector<std::vector<ValueType> > findLocalCenters(const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights);
+template std::vector<std::vector<ValueType> > findLocalCenters<IndexType,ValueType>(const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights);
 
-template std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly( const IndexType k,  const std::vector<ValueType> &maxCoords, Settings settings);
+template std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly<IndexType,ValueType>(const std::vector<ValueType> &maxCoords, Settings settings);
 
 template std::vector<std::vector<ValueType> > findInitialCenters(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights);
 

@@ -24,33 +24,33 @@ namespace ITI {
 namespace KMeans {
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights,
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights,
 		const std::vector<IndexType> &blockSizes, const Settings settings);
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights,
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights,
 		const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings);
 
 /**
  * Compute a partition using balanced k-means.
  */
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights,
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights,
 		const std::vector<IndexType> &blockSizes, std::vector<std::vector<ValueType> > centers, const Settings settings);
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> >  findInitialCentersSFC(
-		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords,
+		const std::vector<DenseVector<ValueType> >& coordinates, const std::vector<ValueType> &minCoords,
 		const std::vector<ValueType> &maxCoords, Settings settings);
 
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly( const IndexType k, const std::vector<ValueType> &maxCoords, Settings settings);
+std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(const std::vector<ValueType> &maxCoords, Settings settings);
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCenters(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights);
 
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType>> findLocalCenters(	const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights);
+std::vector<std::vector<ValueType>> findLocalCenters(const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights);
 
 template<typename IndexType, typename ValueType, typename Iterator>
 std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<IndexType> &partition, const IndexType k,
@@ -87,7 +87,7 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 
 //wrapper for initial partitioning
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights,
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights,
 		const std::vector<IndexType> &blockSizes, const Settings settings) {
 
     std::vector<ValueType> minCoords(settings.dimensions);
@@ -98,28 +98,29 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		SCAI_ASSERT_NE_ERROR( minCoords[dim], maxCoords[dim], "min=max for dimension "<< dim << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
     }
 
-	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC(coordinates, k, minCoords, maxCoords, settings);
+	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC<IndexType,ValueType>(coordinates, minCoords, maxCoords, settings);
 
-	return computePartition(coordinates, k, nodeWeights, blockSizes, centers, settings);
+	return computePartition(coordinates, nodeWeights, blockSizes, centers, settings);
 }
 
 //wrapper for repartitioning
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings) {
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings) {
 	const IndexType localN = nodeWeights.getLocalValues().size();
 	std::vector<IndexType> indices(localN);
 	const typename std::vector<IndexType>::iterator firstIndex = indices.begin();
 	typename std::vector<IndexType>::iterator lastIndex = indices.end();
 	std::iota(firstIndex, lastIndex, 0);
-	std::vector<std::vector<ValueType> > initialCenters = findCenters(coordinates, previous, k,	indices.begin(), indices.end(), nodeWeights);
-	return computePartition(coordinates, k, nodeWeights, blockSizes, initialCenters, settings);
+	std::vector<std::vector<ValueType> > initialCenters = findCenters(coordinates, previous, settings.numBlocks, indices.begin(), indices.end(), nodeWeights);
+	return computePartition(coordinates, nodeWeights, blockSizes, initialCenters, settings);
 }
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights,
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights,
 		const std::vector<IndexType> &blockSizes, std::vector<std::vector<ValueType> > centers, const Settings settings) {
 	SCAI_REGION( "KMeans.computePartition" );
 
+	const IndexType k = settings.numBlocks;
 	std::vector<ValueType> influence(k,1);
 	const IndexType dim = coordinates.size();
 	assert(dim > 0);
