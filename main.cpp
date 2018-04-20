@@ -282,13 +282,10 @@ int main(int argc, char** argv) {
     char machineChar[255];
     std::string machine;
     gethostname(machineChar, 255);
-    if (machineChar) {
-    	machine = std::string(machineChar);
-        settings.machine = machine;
-    } else {
-    	std::cout << "machine char not valid" << std::endl;
-    }
-	
+    
+    machine = std::string(machineChar);
+    settings.machine = machine;
+    
     settings.verbose = vm.count("verbose");
     settings.storeInfo = vm.count("storeInfo");
     settings.erodeInfluence = vm.count("erodeInfluence");
