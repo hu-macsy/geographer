@@ -574,7 +574,6 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 
 template std::vector<std::vector<ValueType> > findInitialCentersSFC( const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const std::vector<ValueType> &minCoords,    const std::vector<ValueType> &maxCoords, Settings settings);
 
-//template std::vector<std::vector<ValueType> > findLocalCenters(const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights);
 std::vector<std::vector<ValueType> > findLocalCenters(const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights);
 
 template std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly( const IndexType k,  const std::vector<ValueType> &maxCoords, Settings settings);

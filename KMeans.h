@@ -2,7 +2,7 @@
  * KMeans.h
  *
  *  Created on: 19.07.2017
- *      Author: moritz
+ *      Author: Moritz von Looz
  */
 
 #pragma once
@@ -31,6 +31,9 @@ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &  nodeWeights,
 		const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings);
 
+/**
+ * Compute a partition using balanced k-means.
+ */
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights,
 		const std::vector<IndexType> &blockSizes, std::vector<std::vector<ValueType> > centers, const Settings settings);

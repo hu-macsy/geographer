@@ -1,5 +1,5 @@
 /*
- * IO.h
+ * FileIO.h
  *
  *  Created on: 15.02.2017
  *      Authors: Moritz v. Looz, Charilaos Tzovas

@@ -2,7 +2,7 @@
  * DiffusionTest.cpp
  *
  *  Created on: 26.06.2017
- *      Author: moritzl
+ *      Author: Moritz von Looz
  */
 #include <numeric>
 

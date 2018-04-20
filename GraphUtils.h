@@ -2,7 +2,7 @@
  * GraphUtils.h
  *
  *  Created on: 29.06.2017
- *      Author: moritzl
+ *      Authors: Moritz von Looz, Charilaos Tzovas
  */
 
 #pragma once

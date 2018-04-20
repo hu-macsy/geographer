@@ -2,7 +2,7 @@
  * Diffusion.cpp
  *
  *  Created on: 26.06.2017
- *      Author: moritzl
+ *      Author: Moritz v. Looz
  */
 #include <assert.h>
 #include <vector>

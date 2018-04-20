@@ -2,7 +2,7 @@
  * IOTest.cpp
  *
  *  Created on: 15.02.2017
- *      Author: moritzl
+ *      Authors: Charilaos Tzovas, Moritz von Looz
  */
 
 #include <scai/lama.hpp>

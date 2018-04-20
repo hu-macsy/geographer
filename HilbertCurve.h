@@ -1,8 +1,8 @@
 /*
- * ParcoReportHilbert.h
+ * HilbertCurve.h
  *
  *  Created on: 15.11.2016
- *      Author: tzovas
+ *      Author: Charilaos Tzovas
  */
 
 #pragma once
