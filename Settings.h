@@ -114,7 +114,7 @@ static std::string tool2string( Tool t){
 }// ITI
 
 
-enum class InitialPartitioningMethods {SFC = 0, Pixel = 1, Spectral = 2, KMeans = 3, Multisection = 4, None = 5};
+enum class InitialPartitioningMethods {SFC = 0, Pixel = 1, Spectral = 2, KMeans = 3, Multisection = 4, MJ = 5, None = 6};
 
 //-----------------------------------------------------------------------------------
 
