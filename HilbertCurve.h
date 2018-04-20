@@ -31,35 +31,80 @@ namespace ITI {
 	template <typename IndexType, typename ValueType>
 	class HilbertCurve {
 		public:
-			/* Wrapper function that calls either the 2D or 3D hilbert curve depending on dimensions.
-			* */
-			static ValueType getHilbertIndex(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
-
-			/* Gets a vector of coordinates (either 2D or 3D) as input and returns a vector with the
-			 * hilbert indices for all coordinates.
-			 */
-			static std::vector<ValueType> getHilbertIndexVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth, const IndexType dimensions);
-			
 			/**
-			* Accepts a point and calculates where along the hilbert curve it lies.
+			* @brief Accepts a 2D/3D point and calculates its hilbert index.
 			*
-			* @param[in] coordinates Node positions. In d dimensions, coordinates of node v are at v*d ... v*d+(d-1).
+			* @param[in] point Node positions. In d dimensions, coordinates of node v are at v*d ... v*d+(d-1).
 	 		* @param[in] dimensions Number of dimensions of coordinates.
-	 		* @param[in] index The index of the points whose hilbert index is desired
 	 		* @param[in] recursionDepth The number of refinement levels the hilbert curve should have
 	 		* @param[in] minCoords A vector containing the minimal value for each dimension
 	 		* @param[in] maxCoords A vector containing the maximal value for each dimension
 			*
 	 		* @return A value in the unit interval [0,1]
-			*/                        
+			*/ 
+			static ValueType getHilbertIndex(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+
+			/** @brief Gets a vector of 2D/3D coordinates and returns a vector with the  hilbert indices for all coordinates.
+			 * 
+			 * @param[in] coordinates The coordinates of all the points
+			 * @param[in] recursionDepth The number of refinement levels the hilbert curve should have
+			 * @param[in] dimensions Number of dimensions of coordinates.
+			 * 
+			 * @return A vector with the hilbert indices for every point. return.size()=coordinates[0].size()
+			 */
+			static std::vector<ValueType> getHilbertIndexVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth, const IndexType dimensions);
+			
+			//
+			//reverse: from hilbert index to 2D/3D point
+			//
+			
+			/**	@brief Given a number between 0 and 1, it returns a 2D/3D point according to the hilbert curve.
+			 * 
+			 * @param[in] index The input index
+			 * @param[in] recursionDepth The number of refinement levels of the hilbert curve
+			 * @param[in] dimensions Number of dimensions of coordinates.
+			 * 
+			 * @return A vector with the points coordinates. return.size()=dimensions
+			 */
+			static std::vector<ValueType> HilbertIndex2Point(const ValueType index, const IndexType recursionDepth, const IndexType dimensions);
+			
+			/**	@brief Given a vector of numbers between 0 and 1, it returns a vector of 2D/3D points according to the hilbert curve.
+			 * 
+			 * @param[in] indices The vector of indices
+			 * @param[in] recursionDepth The number of refinement levels of the hilbert curve
+			 * @param[in] dimensions Number of dimensions of coordinates.
+			 * 
+			 * @return A vector of 2D/3D point coordinates. return.size()=indices.size() and return[i].size()=dimensions
+			 */
+			static std::vector<std::vector<ValueType>> HilbertIndex2PointVec(const std::vector<ValueType> indices, const IndexType recursionDepth, const IndexType dimensions);
+			
+			
+			/** Get the hilbert indices sorted. Every PE will own its part of the hilbert indices.
+			 * Internaly, the sorting algorithm redistributes the returned vector so the local size of coordinates and the returned vector maybe do not agree.
+			 * return[i] is a sort_pair with:
+			 *	return[i].index = global id/index in the distribution of a point p
+			 * 	return[i].value = the hilbert index of point p 
+			 * 
+			 * Example: before sorting, take point p=(x,y) with its global id/index k, thus x=coordinates[0][k], y=coordinates[1][k]. And return[k].index = k, return[k].value = hilbertIndex(p)
+			 * 
+			 * After sorting (this is the returned vector), the pair of point p ended up is some position i.
+			 * So i and k=return[i].index are unrelated
+			 * 
+			 * @param[in] coordinates The coordinates of all the points
+			 * @return A sorted vector based on the hilbert index of each point.
+			 */			
+			static std::vector<sort_pair> getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates);			
+			
+	private:
+			/** @brief Accepts a 2D point and returns is hilbert index.
+			 */
 			static ValueType getHilbertIndex2D(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 		
-			/* Gets a vector of coordinates (either 2D or 3D) as input and returns a vector with the
-			 * hilbert indices for all coordinates.
+			/** @brief Gets a vector of coordinates in 2D as input and returns a vector with the hilbert indices for all coordinates.
 			 */
 			static std::vector<ValueType> getHilbertIndex2DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth);
 			/**
-			*Accepts a point in 3 dimensions and calculates where along the hilbert curve it lies.
+			*@brief Accepts a point in 3 dimensions and calculates where along the hilbert curve it lies.
 			*
 			* @param[in] coordinates Node positions. In d dimensions, coordinates of node v are at v*d ... v*d+(d-1).
 	 		* @param[in] dimensions Number of dimensions of coordinates.
@@ -80,15 +125,7 @@ namespace ITI {
 			//
 			//reverse: from hilbert index to 2D/3D point
 			//
-			
-			/*	Wrapper to get a 2D/3D point from a hilbert index.
-			 */
-			static std::vector<ValueType> HilbertIndex2Point(const ValueType index, const IndexType level, const IndexType dimensions);
-			
-			/*	Wrapper to get a vector of 2D/3D point from a vector of hilbert indices.
-			 */
-			static std::vector<std::vector<ValueType>> HilbertIndex2PointVec(const std::vector<ValueType> indices, const IndexType level, const IndexType dimensions);
-			
+						
 			/**
 			* Given an index between 0 and 1 returns a point in 2 dimensions along the hilbert curve based on
 			* the recursion depth. Mostly for test reasons.
@@ -99,6 +136,14 @@ namespace ITI {
 			*/
 			static std::vector<ValueType> Hilbert2DIndex2Point(const ValueType index, const IndexType recursionDepth );
 
+			/**
+			* Given a vector of indices between 0 and 1 returns a vector of points in 2 dimensions along the hilbert curve based on
+			* the recursion depth. Mostly for test reasons.
+			* @param[in] index The index in the hilbert curve, a number in [0,1].
+			* @param[in] recursionDepth The number of refinement levels the hilbert curve should have
+			*
+			* @return A point in the unit square [0,1]^2.
+			*/
 			static std::vector<std::vector<ValueType>> Hilbert2DIndex2PointVec(const std::vector<ValueType> indices, IndexType recursionDepth);
 			
 			
@@ -114,9 +159,5 @@ namespace ITI {
 			
 			static std::vector<std::vector<ValueType>> Hilbert3DIndex2PointVec(const std::vector<ValueType> indices, IndexType recursionDepth);
 			
-			/*Get the hilbert indices sorted. Every PE will own its part of the hilbert indices
-			 */			
-			static std::vector<sort_pair> getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates);			
-
 	};
 }//namespace ITI

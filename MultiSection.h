@@ -395,19 +395,34 @@ namespace ITI {
     class MultiSection{
     public:
 
-        /* A partition of non-uniform grid.
+        /** @brief A partition of non-uniform grid.
+		 * 
+		 * @param[in] input Adjacency matrix of the input graph
+		 * @param[in] coordinates Coordinates of input points
+		 * @param[in] nodeWeights Optional node weights.
+		 * @param[in] settings Settings struct
+		 * 
+		 * @return Distributed DenseVector of length n, partition[i] contains the block ID of node i
          */
         static scai::lama::DenseVector<IndexType> getPartitionNonUniform( const scai::lama::CSRSparseMatrix<ValueType> &input, const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, struct Settings settings );
         
+		/** @brief Given a tree of rectangles, sets the partition for every point.
+		 * 
+		 * @param[in] root The root of the rectTree, a tree of non-overlapping rectangles
+		 * @param[in] distPtr The pointer of the DistributionPtr
+		 * @param[in] localPoint The points that are local to every processor
+		 * 
+		 * @return A distributed DenseVector of length n, partition[i] contains the block ID of node i
+		 */
         static scai::lama::DenseVector<IndexType> setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr distPtr, const std::vector<std::vector<IndexType>>& localPoints);
         
         
         /** Get a tree of rectangles of a uniform grid with side length sideLen. The rectangles cover the whole grid and 
          * do not overlap.
          * 
-         * @param[in] nodeWeights The weights for each point.
+         * @param[in] nodeWeights Optional node weights.
          * @param[in] sideLen The length of the side of the whole uniform, square grid. The coordinates are from 0 to sideLen-1. Example: if sideLen=2, the points are (0,0),(0,1),(1,0),(1,1)
-         * @param[in] setting A settigns struct passing various arguments.
+         * @param[in] setting Settings struct
          * 
          * @return A pointer to the root of the tree. number of leaves = settings.numBlocks.
          */
@@ -431,14 +446,15 @@ namespace ITI {
         
         //TODO: Let coordinates be of ValueType and round inside the function if needed.
         
-        /** Get a tree of rectangles for a non-uniform grid.
+        /** @brief Get a tree of rectangles for a non-uniform grid.
          * 
          * @param[in] input The adjacency matrix of the input graph.
          * @param[in] coordinates The coordinates of each point of the graph. Here they are of type IndexType for the projections need to be in the integers.
          * @param[in] nodeWeights The weights for each point.
          * @param[in] minCoords The minimum coordinate on each dimensions. minCoords.size()= dimensions
          * @param[in] maxCoords The maximum coordinate on each dimensions. maxCoords.size()= dimensions
-         * @param[in] setting A settings struct passing various arguments.
+         * @param[in] setting Settings struct
+		 * 
          * @return A pointer to the root of the tree. The leaves of the tree are the rewuested rectangles.
          */
         
@@ -450,7 +466,7 @@ namespace ITI {
             const std::vector<ValueType>& maxCoords,
             Settings settings);
         
-        /** Projection for the non-uniform grid case. Coordinates must be Indextype.
+        /** @brief Projection for the non-uniform grid case. Coordinates must be Indextype.
          */
         static std::vector<std::vector<ValueType>> projectionNonUniform( 
             const std::vector<std::vector<IndexType> >& coordinates,
@@ -459,7 +475,7 @@ namespace ITI {
             const std::vector<IndexType>& dimensionToProject,
             Settings settings);
         
-        /** Partitions the given vector into k parts of roughly equal weights.
+        /** @brief Partitions the given vector into k parts of roughly equal weights using a greedy approach.
          *
          * @param[in] array The 1 dimensional array of positive numbers to be partitioned.
          * @param[in] k The number of parts/blocks.
@@ -473,11 +489,35 @@ namespace ITI {
          */
         static std::pair<std::vector<IndexType>,std::vector<ValueType>> partition1DGreedy( const std::vector<ValueType>& array, const IndexType k, Settings settings);
         
+		/** @brief Partitions the given vector into k parts of roughly equal weights.
+		 * 
+		 * @param[in] array The 1 dimensional array of positive numbers to be partitioned.
+         * @param[in] k The number of parts/blocks.
+		 * 
+		 * @return The first returned value is a vector of size k and holds the indices of each part/block: first part is from [return.first[0], return.first[1]) ( not inluding the weight of the last element), second from [return.first[1], return.first[2]) ets. Last part if from return.first[k-1] till return.first.size().
+         * The second vector is of size k and holds the weights of each part.
+		 */
         static std::pair<std::vector<IndexType>,std::vector<ValueType>> partition1DOptimal( const std::vector<ValueType>& array, const IndexType k, Settings settings);   
 
-        static bool probe(const std::vector<ValueType>& prefixSum, const IndexType k, const ValueType target);
+		/** @brief Searches if there is a partition of the input vector into k parts where the maximum weight of a part is <=target.
+		 * @param[in] input A vector of numbers.
+		 * @param[in] k The number of desired blocks
+		 * @param[in] target The maximum allowed weight for every block
+		 * 
+		 * @return True if the partition can be done, false otherwise.
+		 */
+        static bool probe(const std::vector<ValueType>& input, const IndexType k, const ValueType target);
 
-        static std::pair<bool, std::vector<IndexType>> probeAndGetSplitters(const std::vector<ValueType>& prefixSum, const IndexType k, const ValueType target);
+		/** Searches if there is a partition of the input vector into k parts where the maximum weight of a part is <=target. If the desired partition cannot be achieved the vector returned must be ignored.
+		 * 
+		 * @param[in] input A vector of numbers.
+		 * @param[in] k The number of desired blocks
+		 * @param[in] target The maximum allowed weight for every block
+		 * 
+		 * @return return.first is true if the wanted partition can be done and false otherwise
+		 * return.second is a vector with the indices where the vector is partitioned. If the partition cannot be achieved then the vector must be ignored.
+		 */
+        static std::pair<bool, std::vector<IndexType>> probeAndGetSplitters(const std::vector<ValueType>& input, const IndexType k, const ValueType target);
         
         /**Checks if the given index is in the given bounding box. Index corresponds to a uniform matrix given
          * as a 1D array/vector. 
@@ -504,6 +544,8 @@ namespace ITI {
         template<typename T>
         static ValueType getRectangleWeight( const std::vector<scai::lama::DenseVector<T>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
         
+		/* Overloaded version for the non-uniform grid with different type for coordinates.
+         */
         template<typename T>
         static ValueType getRectangleWeight( const std::vector<std::vector<T>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
         

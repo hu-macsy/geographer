@@ -613,7 +613,6 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
             
             ValueType globalHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex( point, dimensions, recursionDepth, minCoords, maxCoords);
 			localPairs[i].value = globalHilbertIndex;
-			//localPairs[i].index = 0; // we do need the index now
         	localPairs[i].index = coordDist->local2global(i);
         }
     }
@@ -636,14 +635,11 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
         SQuick::sort<sort_pair>(mpi_comm, localPairs, -1);
 
         //copy hilbert indices into array
-        //IndexType newLocalN = localPairs.size();
 
         //check size and sanity
-        //SCAI_ASSERT_EQ_ERROR( newLocalN, localPairs.size(), "New local indices mismatch.");
-        //SCAI_ASSERT_LT_ERROR( *std::max_element(newLocalIndices.begin(), newLocalIndices.end()) , globalN, "Too large index (possible IndexType overflow?).");
         SCAI_ASSERT_EQ_ERROR( comm->sum(localPairs.size()), globalN, "Global index mismatch.");
 
-		/*
+		/* TODO: expensive test, remove it and check in a unit test or use a settings.debug flag
         //check checksum
         long indexSumAfter = 0;
         for (IndexType i = 0; i < newLocalN; i++) {
