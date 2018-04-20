@@ -259,7 +259,6 @@ int main(int argc, char** argv) {
             std::cout<< "Generated structured 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
         }
         
-        //nodeWeights = scai::lama::DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
     }else{
     	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;
     	return 126;
@@ -287,7 +286,6 @@ int main(int argc, char** argv) {
 	
 	for( int t=0; t<allTools.size(); t++){
 		
-		//std::string thisTool = allTools[t];
 		ITI::Tool thisTool = allTools[t];
 	
 		// get the partition and metrics
@@ -297,9 +295,6 @@ int main(int argc, char** argv) {
 		// the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
 		struct Metrics metrics(1);
 		metrics.numBlocks = settings.numBlocks;
-		
-		// uniform node weights
-		//scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
 		
 		// if usign unit weights, set flag for wrappers
 		bool nodeWeightsUse = true;

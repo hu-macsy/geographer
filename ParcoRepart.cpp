@@ -359,27 +359,33 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
                 migrationSettings.epsilon = settings.epsilon;
                 //migrationSettings.bisect = true;
                 
-                // the distribution for the initial migration   
-                scai::dmemo::DistributionPtr initMigrationPtr;
                 
                 if (!settings.repartition || comm->getSize() != settings.numBlocks) {
-                    DenseVector<IndexType> tempResult;
+					
+					// the distribution for the initial migration   
+					scai::dmemo::DistributionPtr initMigrationPtr;
                     
                     if (settings.initialMigration == InitialPartitioningMethods::SFC) {
-
                         hilbertRedistribution(coordinateCopy, nodeWeightCopy, settings, metrics);
-                        } else {
-
+					}else {
+						DenseVector<ValueType> convertedWeights(nodeWeights);
+						DenseVector<IndexType> tempResult;
+						
                         if (settings.initialMigration == InitialPartitioningMethods::Multisection) {
-                            DenseVector<ValueType> convertedWeights(nodeWeights);
                             tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, migrationSettings);
-                            initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
                         } else if (settings.initialMigration == InitialPartitioningMethods::KMeans) {
-                            DenseVector<ValueType> convertedWeights(nodeWeights.getDistributionPtr(), 1);
-                            std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );;
+                            std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );
                             tempResult = ITI::KMeans::computePartition(coordinates, migrationSettings.numBlocks, convertedWeights, migrationBlockSizes, migrationSettings);
-                            initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
-                        } else if (settings.initialMigration == InitialPartitioningMethods::None) {
+                        }
+                        //TODO: initial migration with external tools, how to do it to avoid dependance
+                        //of the whole calss to Wrappers.?
+                        //else if (settings.initialMigration == InitialPartitioningMethods::MJ){
+						//	tempResult = ITI::Wrappers<IndexType,ValueType>::partition (input, coordinates, convertedWeights, ITI::Tool::zoltanMJ, migrationSettings, metrics);
+						//}
+						
+						initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
+						
+						if (settings.initialMigration == InitialPartitioningMethods::None) {
                             //nothing to do
                             initMigrationPtr = inputDist;
                         } else {
@@ -477,13 +483,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         
         if( settings.outFile!="-" and settings.writeInFile ){
             FileIO<IndexType, ValueType>::writePartitionParallel( result, settings.outFile+"_initPart.partition" );
-
-            /*
-            // the file should already exist, we just append
-            std::ofstream outF( settings.outFile, std::ios::app);
-            outF << std::setprecision(3) << std::fixed;
-            outF << "        " << timeToCalcInitMigration << "  ,  " << timeForFirstRedistribution << "  ,  " << timeForKmeans << "  ,  "<< timeForSecondRedistr << "  ,  " << timeForInitPart << ",         "  << cut << " ,  "<< imbalance <<std::endl;
-            */
         }
         
         // if noRefinement then these are the times, if we do refinement they will be overwritten
@@ -491,7 +490,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		metrics.timePreliminary[rank] = partitionTime.count();
 		
         if (comm->getSize() == k) {
-			//WARNING: the results is not redistributed. must redistribute afterwards
+			//WARNING: the result  is not redistributed. must redistribute afterwards
 			if(  !settings.noRefinement ) {
 				SCAI_REGION("ParcoRepart.partitionGraph.initialRedistribution")
 				/**
@@ -538,8 +537,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 					}
 				}
 
-            metrics.timeSecondDistribution[rank] = secondRedistributionTime.count();
-            metrics.timePreliminary[rank] = partitionTime.count();
+				metrics.timeSecondDistribution[rank] = secondRedistributionTime.count();
+				metrics.timePreliminary[rank] = partitionTime.count();
 
 				metrics.preliminaryCut = cut;
 				metrics.preliminaryImbalance = imbalance;
@@ -1178,8 +1177,6 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     
     colors = boost::edge_coloring(G, boost::get( boost::edge_bundle, G));
     
-    //scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-
     for (size_t i = 0; i <retG[0].size(); i++) {
         retG[2].push_back( G[ boost::edge( retG[0][i],  retG[1][i], G).first] );
     }
