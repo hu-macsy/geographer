@@ -59,7 +59,6 @@ scai::lama::DenseVector<ValueType> Repartition<IndexType,ValueType>::setNodeWeig
 		//center[d] = maxCoords[d]/2.0;
 		//PRINT(*comm << ": cent["<< d <<"]= " << center[d]);
 	}
-
 	
 	//2- set local node weights that respect the center
 	
@@ -79,12 +78,9 @@ scai::lama::DenseVector<ValueType> Repartition<IndexType,ValueType>::setNodeWeig
 	{
 		scai::hmemo::WriteAccess<ValueType> wWeights(nodeWeights.getLocalValues());
 		std::vector<ValueType> point(dimensions);
-		//ValueType minMax = *std::min_element(maxCoords.begin(), maxCoords.end() );
 		ValueType maxMax = *std::max_element(maxCoords.begin(), maxCoords.end() );
 		ValueType maxDist = maxMax*  std::pow(dimensions,1.0/dimensions);
-		//PRINT0("maxThres= " << maxThres);		
-		//ValueType thresholdTop = minMax/3;
-		//ValueType thresholdBot = minMax/10;
+		
 		for(IndexType i=0; i<localN; i++){
 			point = localPoints[i];
 			ValueType distance = aux<IndexType,ValueType>::pointDistanceL2(center, point);

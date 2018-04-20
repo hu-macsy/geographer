@@ -540,14 +540,10 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 		
 	typedef Zoltan2::BasicUserTypes<ValueType, IndexType, IndexType> myTypes;
 	typedef Zoltan2::BasicVectorAdapter<myTypes> inputAdapter_t;
-	//typedef Zoltan2::EvaluatePartition<inputAdapter_t> quality_t;
-	//typedef inputAdapter_t::part_t part_t;
 	
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
 	const IndexType thisPE = comm->getRank();
-	//const IndexType numPEs = comm->getSize();
-	//const IndexType N = graph.getNumRows();
 	const IndexType numBlocks = settings.numBlocks;
 	 
 	IndexType dimensions = settings.dimensions;
