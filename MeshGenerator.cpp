@@ -462,13 +462,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(CSRSparseM
                 }
        
                 if(ngb_node>=0 && ngb_node<N){
-                    /*
-                        // get the position in the 2D of the neighbouring node
-                	
-                	ValueType distanceSquared = dist3DSquared( thisPoint, ngbPoint);
-                	assert(distanceSquared <= numPoints[0]*numPoints[0]+numPoints[1]*numPoints[1]);
-                    */
-                    //if(distanceSquared <= 1)
+					//if(distanceSquared <= 1)
                     std::tuple<IndexType, IndexType> ngbPoint = aux<IndexType,ValueType>::index2_2DPoint( ngb_node, numPoints);
                     
                     if( std::abs( std::get<0>(ngbPoint)-std::get<0>(thisPoint) )<=1 and std::abs( std::get<1>(ngbPoint)-std::get<1>(thisPoint) )<=1 ){

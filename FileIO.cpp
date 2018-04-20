@@ -1612,8 +1612,6 @@ void  FileIO<IndexType, ValueType>::readOFFTriangularCentral( scai::lama::CSRSpa
     
     ss >> N >> numFaces >> numEdges;
     
-PRINT( N << " _ " << numFaces << ", numEdges= " << numEdges );
-
     //
     // first, read the N 3D coordinates
     //
@@ -1877,8 +1875,6 @@ DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::st
 	IndexType beginLocalRange, endLocalRange;
 	scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
 	const IndexType localN = endLocalRange - beginLocalRange;
-
-	//std::string line;
 
 	//scroll to begin of local range.
 	for (IndexType i = 0; i < beginLocalRange; i++) {
