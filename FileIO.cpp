@@ -54,8 +54,6 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
     IndexType root =0;
-    //IndexType rank = comm->getRank();
-    //IndexType size = comm->getSize();
     scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
         
     IndexType globalN = distPtr->getGlobalSize();
@@ -397,7 +395,7 @@ void FileIO<IndexType, ValueType>::writeInputParallel (const std::vector<DenseVe
 }
 
 //-------------------------------------------------------------------------------------------------
-
+//TODO: unit test
 template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<IndexType> &part, const std::string filename) {
 	SCAI_REGION( "FileIO.writePartitionParallel" );
@@ -430,14 +428,14 @@ void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<Inde
                 for( IndexType i=0; i<localN; i++){                    
                     outfile << dist->local2global(i) << " "<< localPart[i] << std::endl;
                 }
-/* TODO: resolve commented code         
+				/* TODO: resolve commented code         
                 // the last PE maybe has less local values
                 if( p==numPEs-1 ){
                     SCAI_ASSERT_EQ_ERROR( outfile.tellp(), globalN , "While writing coordinates in parallel: Position in file " << filename << " is not correct." );
                 }else{
                     SCAI_ASSERT_EQ_ERROR( outfile.tellp(), localN*(comm->getRank()+1) , "While writing coordinates in parallel: Position in file " << filename << " is not correct for processor " << comm->getRank() );
                 }
-  */              
+				*/              
                 outfile.close();
             }
             comm->synchronize();    //TODO: takes huge time here
@@ -522,11 +520,8 @@ void FileIO<IndexType, ValueType>::writeDenseVectorCentral(DenseVector<IndexType
         for( IndexType i=0; i<globalN; i++){
             f << rPart[i]<< std::endl;
         }
-        
     }    
-    
 }
-
 
 //-------------------------------------------------------------------------------------------------
 /*File "filename" contains a graph in the METIS format. The function reads that graph and transforms
@@ -597,59 +592,59 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
        std::getline(file, line);
     }
     std::stringstream ss( line );
-    std::string item;
-        
-        {
-            //node count and edge count are mandatory. If these fail, std::stoi will raise an error. TODO: maybe wrap into proper error message
-            std::getline(ss, item, ' ');
-            globalN = std::stoll(item);
-            std::getline(ss, item, ' ');
-            globalM = std::stoll(item);
-            
-            if( globalN<=0 or globalM<=0 ){
-                throw std::runtime_error("Negative input, maybe int value is not big enough: globalN= "
-                        + std::to_string(globalN) + " , globalM= " + std::to_string(globalM));
-            }
-            
-            bool readWeightInfo = !std::getline(ss, item, ' ').fail();
-            if (readWeightInfo && item.size() > 0) {
-                //three bits, describing presence of edge weights, vertex weights and vertex sizes
-                int bitmask = std::stoi(item);
-                hasEdgeWeights = bitmask % 10;
-                if ((bitmask / 10) % 10) {
-                    bool readNodeWeightCount = !std::getline(ss, item, ' ').fail();
-                    if (readNodeWeightCount && item.size() > 0) {
-                        numberNodeWeights = std::stoi(item);
-                    } else {
-                        numberNodeWeights = 1;
-                    }
-                }
-            }
-            
-            if (comm->getRank() == 0) {
-                std::cout << "Expecting " << globalN << " nodes and " << globalM << " edges, ";
-                if (!hasEdgeWeights && numberNodeWeights == 0) {
-                    std::cout << "with no edge or node weights."<< std::endl;
-                }
-                else if (hasEdgeWeights && numberNodeWeights == 0) {
-                    std::cout << "with edge weights, but no node weights."<< std::endl;
-                }
-                else if (!hasEdgeWeights && numberNodeWeights > 0) {
-                    std::cout << "with no edge weights, but " << numberNodeWeights << " node weights."<< std::endl;
-                }
-                else {
-                    std::cout << "with edge weights and " << numberNodeWeights << " weights per node."<< std::endl;
-                }
-            }
-        }
-        
+	std::string item;
+	
+	{
+		//node count and edge count are mandatory. If these fail, std::stoi will raise an error. TODO: maybe wrap into proper error message
+		std::getline(ss, item, ' ');
+		globalN = std::stoll(item);
+		std::getline(ss, item, ' ');
+		globalM = std::stoll(item);
+		
+		if( globalN<=0 or globalM<=0 ){
+			throw std::runtime_error("Negative input, maybe int value is not big enough: globalN= "
+			+ std::to_string(globalN) + " , globalM= " + std::to_string(globalM));
+		}
+		
+		bool readWeightInfo = !std::getline(ss, item, ' ').fail();
+		if (readWeightInfo && item.size() > 0) {
+			//three bits, describing presence of edge weights, vertex weights and vertex sizes
+			int bitmask = std::stoi(item);
+			hasEdgeWeights = bitmask % 10;
+			if ((bitmask / 10) % 10) {
+				bool readNodeWeightCount = !std::getline(ss, item, ' ').fail();
+				if (readNodeWeightCount && item.size() > 0) {
+					numberNodeWeights = std::stoi(item);
+				} else {
+					numberNodeWeights = 1;
+				}
+			}
+		}
+		
+		if (comm->getRank() == 0) {
+			std::cout << "Expecting " << globalN << " nodes and " << globalM << " edges, ";
+			if (!hasEdgeWeights && numberNodeWeights == 0) {
+				std::cout << "with no edge or node weights."<< std::endl;
+			}
+			else if (hasEdgeWeights && numberNodeWeights == 0) {
+				std::cout << "with edge weights, but no node weights."<< std::endl;
+			}
+			else if (!hasEdgeWeights && numberNodeWeights > 0) {
+				std::cout << "with no edge weights, but " << numberNodeWeights << " node weights."<< std::endl;
+			}
+			else {
+				std::cout << "with edge weights and " << numberNodeWeights << " weights per node."<< std::endl;
+			}
+		}
+	}
+	
 	const ValueType avgDegree = ValueType(2*globalM) / globalN;
-        
-    //get distribution and local range
-    const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
-    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
-
-    IndexType beginLocalRange, endLocalRange;
+	
+	//get distribution and local range
+	const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
+	const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
+	
+	IndexType beginLocalRange, endLocalRange;
     scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
     const IndexType localN = endLocalRange - beginLocalRange;
     SCAI_ASSERT_LE_ERROR(localN, std::ceil(ValueType(globalN) / comm->getSize()), "localN: " << localN << ", optSize: " << std::ceil(globalN / comm->getSize()));
