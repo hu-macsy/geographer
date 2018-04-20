@@ -883,7 +883,6 @@ bool MultiSection<IndexType, ValueType>::probe(const std::vector<ValueType>& pre
 //---------------------------------------------------------------------------------------
 // Search if there is a partition of the weights array into k parts where the maximum weight of a part is <=target.
 
-//TODO: return also the splitters found
 template<typename IndexType, typename ValueType>
 std::pair<bool,std::vector<IndexType>> MultiSection<IndexType, ValueType>::probeAndGetSplitters(const std::vector<ValueType>& prefixSum, const IndexType k, const ValueType target){
 

@@ -229,7 +229,7 @@ TEST_F(FileIOTest, testWriteCoordsDistributed){
     std::vector<DenseVector<ValueType>> coords2D = FileIO<IndexType, ValueType>::readCoords( coordFile, nodes, dim);
     EXPECT_TRUE(coords2D[0].getDistributionPtr()->isEqual(*distPtr));
     
-    FileIO<IndexType, ValueType>::writeCoordsDistributed( coords2D, nodes, dim, "writeCoordsDist");
+    FileIO<IndexType, ValueType>::writeCoordsDistributed( coords2D, dim, "writeCoordsDist");
     //TODO: delete files after they have been written!
 }
 //-------------------------------------------------------------------------------------------------

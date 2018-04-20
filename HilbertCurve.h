@@ -95,7 +95,7 @@ namespace ITI {
 			 */			
 			static std::vector<sort_pair> getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates);			
 			
-	private:
+	//private:
 			/** @brief Accepts a 2D point and returns is hilbert index.
 			 */
 			static ValueType getHilbertIndex2D(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);

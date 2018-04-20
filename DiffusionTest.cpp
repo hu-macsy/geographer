@@ -50,7 +50,6 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 	scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
 	const IndexType globalN = inputDist->getGlobalSize();
-	const IndexType localN = inputDist->getLocalSize();
 	scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
 
 	CSRSparseMatrix<ValueType> L = GraphUtils::constructLaplacian<IndexType, ValueType>(graph);

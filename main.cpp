@@ -774,7 +774,7 @@ int main(int argc, char** argv) {
         
         std::string destPath = "partResults/main/blocks_" + std::to_string(settings.numBlocks) ;
         boost::filesystem::create_directories( destPath );   
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, N, settings.dimensions, destPath + "/debugResult");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, settings.dimensions, destPath + "/debugResult");
         comm->synchronize();
         
         //TODO: use something like the code below instead of a NoDistribution

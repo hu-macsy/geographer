@@ -232,9 +232,7 @@ template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVector<ValueType>> &coords, const std::string outFilename){
             
     const IndexType dimension = coords.size();
-    if (dimension != 3) {
-        std::cout << "Warning: Binary coordinate reader expects three dimensions." << std::endl;
-    }
+    
     scai::dmemo::DistributionPtr coordDist = coords[0].getDistributionPtr();
     const IndexType globalN = coordDist->getGlobalSize();
     const IndexType localN = coordDist->getLocalSize();
@@ -294,7 +292,7 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVe
 /*Given the vector of the coordinates each PE writes its own part in file "filename".
  */
 template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writeCoordsDistributed(const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const IndexType dimensions, const std::string filename){
+void FileIO<IndexType, ValueType>::writeCoordsDistributed(const std::vector<DenseVector<ValueType>> &coords, const IndexType dimensions, const std::string filename){
     SCAI_REGION( "FileIO.writeCoordsDistributed" )
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -313,7 +311,6 @@ void FileIO<IndexType, ValueType>::writeCoordsDistributed(const std::vector<Dens
     IndexType dimension= coords.size();
 
     assert(coords.size() == dimension );
-    assert(coords[0].size() == numPoints);
     
     IndexType localN = distPtr->getLocalSize();
     
