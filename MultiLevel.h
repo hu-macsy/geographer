@@ -47,7 +47,16 @@ namespace ITI{
          */
         static DenseVector<IndexType> multiLevelStep(scai::lama::CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const Halo& halo, Settings settings);
 
-
+        /**
+         * Given the origin array resulting from a multi-level step on a coarsened graph, compute where local elements on the current level have to be sent to recreate the coarse distribution on the current level.
+         * Involves communication.
+         * Used in uncoarsening to accelerate redistribution.
+         *
+         * @param[in] coarseOrigin
+         * @param[in] fineToCoarseMap
+         *
+         * @return fineTargets
+         */
         static DenseVector<IndexType> getFineTargets(const DenseVector<IndexType> &coarseOrigin, const DenseVector<IndexType> &fineToCoarseMap);
 
         /**
