@@ -77,21 +77,17 @@ namespace ITI {
 			 */
 			static std::vector<ValueType> getHilbertIndex3DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth);
 			
-			/*	Wrapper to to get a hilbert index from a point as a vector based on its dimension.
+			//
+			//reverse: from hilbert index to 2D/3D point
+			//
+			
+			/*	Wrapper to get a 2D/3D point from a hilbert index.
 			 */
-			static std::vector<ValueType> HilbertIndex2PointVec(ValueType index, IndexType level, IndexType dimensions);
+			static std::vector<ValueType> HilbertIndex2Point(const ValueType index, const IndexType level, const IndexType dimensions);
 			
-			
-			/**
-			* Given an index between 0 and 1 returns a point in 2 or 3 dimensions along the hilbert curve based on
-			* the recursion depth. Mostly for test reasons.
-			* @param[in] index The index in the hilbert curve, a number in [0,1].
-			* @param[in] recursionDepth The number of refinement levels the hilbert curve should have
-			*
-			* @return A point in the unit square [0,1]^2.
-			*/
-			
-			static std::vector<ValueType> HilbertIndex2Point(ValueType index, IndexType recursionDepth, IndexType dimensions);
+			/*	Wrapper to get a vector of 2D/3D point from a vector of hilbert indices.
+			 */
+			static std::vector<std::vector<ValueType>> HilbertIndex2PointVec(const std::vector<ValueType> indices, const IndexType level, const IndexType dimensions);
 			
 			/**
 			* Given an index between 0 and 1 returns a point in 2 dimensions along the hilbert curve based on
@@ -101,8 +97,10 @@ namespace ITI {
 			*
 			* @return A point in the unit square [0,1]^2.
 			*/
-			static std::vector<ValueType> Hilbert2DIndex2Point(ValueType index, IndexType recursionDepth);
+			static std::vector<ValueType> Hilbert2DIndex2Point(const ValueType index, const IndexType recursionDepth );
 
+			static std::vector<std::vector<ValueType>> Hilbert2DIndex2PointVec(const std::vector<ValueType> indices, IndexType recursionDepth);
+			
 			
 			/**
 			* Given an index between 0 and 1 returns a point in 3 dimensions along the hilbert curve based on
@@ -112,9 +110,10 @@ namespace ITI {
 			*
 			* @return A point in the unit cube [0,1]^3
 			*/
-			static std::vector<ValueType> Hilbert3DIndex2Point(ValueType index, IndexType recursionDepth);
+			static std::vector<ValueType> Hilbert3DIndex2Point(const ValueType index, const IndexType recursionDepth);
 			
-						
+			static std::vector<std::vector<ValueType>> Hilbert3DIndex2PointVec(const std::vector<ValueType> indices, IndexType recursionDepth);
+			
 			/*Get the hilbert indices sorted. Every PE will own its part of the hilbert indices
 			 */			
 			static std::vector<sort_pair> getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates);			

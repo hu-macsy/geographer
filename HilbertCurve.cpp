@@ -12,15 +12,15 @@ namespace ITI{
 
 template<typename IndexType, typename ValueType>//TODO: template this to help branch prediction
 ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords){
-    SCAI_REGION( "HilbertCurve.getHilbertIndex")
+    SCAI_REGION( "HilbertCurve.getHilbertIndex_newVersion")
 
-    if(dimensions==3) 
-        return HilbertCurve<IndexType, ValueType>::getHilbertIndex3D( point, dimensions, recursionDepth,
-            minCoords, maxCoords);
-    
     if(dimensions==2) 
         return HilbertCurve<IndexType, ValueType>::getHilbertIndex2D( point, dimensions, recursionDepth,
             minCoords, maxCoords);
+		
+    if(dimensions==3) 
+        return HilbertCurve<IndexType, ValueType>::getHilbertIndex3D( point, dimensions, recursionDepth,
+			minCoords, maxCoords);
     
     throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
 }
@@ -185,18 +185,21 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const*
 	return ret;
 
 }
-
 //-------------------------------------------------------------------------------------------------
+
+//
+// versions that take as input all the coordinates and return a vector with the indices
+//
 
 template<typename IndexType, typename ValueType>
 std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndexVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth, const IndexType dimensions) {
-
-	if(dimensions==3) 
-        return HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVector( coordinates, recursionDepth);
-    
+	
     if(dimensions==2) 
         return HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVector( coordinates, recursionDepth);
-    
+	
+	if(dimensions==3) 
+        return HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVector( coordinates, recursionDepth);
+        
     throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
 }
 
@@ -244,7 +247,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
 	unsigned long integerIndex = 0;//TODO: also check whether this data type is long enough
 	const IndexType localN = coordinates[0].getLocalValues().size();
 	
-	// the vector to be returned
+	// the DV to be returned
 	std::vector<ValueType> hilbertIndices(localN,-1);
 	
 	{
@@ -252,11 +255,12 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
 		
 		scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
         scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
+		//scai::hmemo::WriteOnlyAccess<ValueType> hilbertIndices(hilbertIndices.getLocalValues());
 		
 		for (IndexType i = 0; i < localN; i++) {
 			scaledPoint[0] = (coordAccess0[i]-minCoords[0])/dim0Extent;
 			scaledPoint[1] = (coordAccess1[i]-minCoords[1])/dim1Extent;
-		
+			
 			integerIndex = 0;
 			for (IndexType j = 0; j < recursionDepth; j++) {
 				int subSquare;
@@ -343,7 +347,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
 	unsigned long integerIndex = 0;	//TODO: also check whether this data type is long enough
 	const IndexType localN = coordinates[0].getLocalValues().size();
 	
-	// the vector to be returned
+	// the DV to be returned
 	std::vector<ValueType> hilbertIndices(localN,-1);
 	
 	{
@@ -352,12 +356,13 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
 		scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
         scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
 		scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[2].getLocalValues() );
+		//scai::hmemo::WriteOnlyAccess<ValueType> hilbertIndices(hilbertIndices.getLocalValues());
 		
 		for (IndexType i = 0; i < localN; i++) {
 			x = (coordAccess0[i]-minCoords[0])/dim0Extent;
 			y = (coordAccess1[i]-minCoords[1])/dim1Extent;
 			z = (coordAccess2[i]-minCoords[2])/dim2Extent;
-
+			
 			integerIndex = 0;
 			for (IndexType j = 0; j < recursionDepth; j++) {
 				int subSquare;
@@ -428,21 +433,25 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
 }
 //-------------------------------------------------------------------------------------------------
 
+//
+// reverse:  from hilbert index to 2D/3D point
+//
+
 template<typename IndexType, typename ValueType>
-std::vector<ValueType> HilbertCurve<IndexType, ValueType>::HilbertIndex2Point(ValueType index, IndexType level, IndexType dimensions){
+std::vector<ValueType> HilbertCurve<IndexType, ValueType>::HilbertIndex2Point(const ValueType index, const IndexType level, const IndexType dimensions){
 	
-	if( dimensions==2 )
+	if (dimensions==2)
 		return HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(index, level);
 	
-	if( dimensions==3 )
+	if (dimensions==3)
 		return HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point(index, level);
 	
-	throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
+	throw std::logic_error("Hilbert space filling curve only implemented for two or three dimensions");	
 }
-
 //-------------------------------------------------------------------------------------------------
+
 template<typename IndexType, typename ValueType>
-std::vector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(ValueType index, IndexType level){
+std::vector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(const ValueType index, const IndexType level){
 	SCAI_REGION( "HilbertCurve.Hilbert2DIndex2Point" )
     std::vector<ValueType>  p(2,0), ret(2,0);
 	ValueType r;
@@ -472,7 +481,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(
 */
 
 template<typename IndexType, typename ValueType>
-std::vector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point(ValueType index, IndexType level){
+std::vector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point(const ValueType index, const IndexType level){
 	SCAI_REGION( "HilbertCurve.Hilbert3DIndex2Point" )
 	
     std::vector<ValueType>  p(3,0), ret(3,0);
@@ -489,7 +498,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point(
             case 0: ret = {p[1]/2,   p[2]/2,     p[0]/2};  break;
             case 1: ret = {p[2]/2,   0.5+p[0]/2,     p[1]/2};  break;
             case 2: ret = {0.5+p[2]/2,   0.5+p[0]/2,     p[1]/2};  break;
-            case 3: ret = {1-p[0]/2,     0.5-p[1]/2,     -p[2]/2};  break;
+            case 3: ret = {1-p[0]/2,     0.5-p[1]/2,     p[2]/2};  break;
             case 4: ret = {1-p[0]/2,     0.5-p[1]/2,     0.5+p[2]/2};  break;
             case 5: ret = {1-p[2]/2,     0.5+p[0]/2,     1-p[1]/2};    break;
             case 6: ret = {0.5-p[2]/2,   0.5+p[0]/2,     1-p[1]/2};    break;
@@ -497,6 +506,51 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point(
 		}
 	}
 	return ret;
+}
+//-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<ValueType>> HilbertCurve<IndexType, ValueType>::HilbertIndex2PointVec(const std::vector<ValueType> indices, const IndexType level, const IndexType dimensions){
+	
+	if( dimensions==2 )
+		return HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2PointVec(indices, level);
+	
+	if( dimensions==3 )
+		return HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2PointVec(indices, level);
+	
+	throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
+}
+//-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<ValueType>> HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2PointVec(const std::vector<ValueType> indices, const IndexType level){
+	SCAI_REGION( "HilbertCurve.Hilbert2DIndex2PointVec" )
+	std::vector <std::vector<ValueType>> res( indices.size());
+	
+	for( int i=0; i<indices.size(); i++){
+		res[i] = Hilbert2DIndex2Point( indices[i], level);
+	}
+	SCAI_ASSERT_EQ_ERROR( res[0].size(), 2 , "The points should have size 2");
+	
+	return res;
+}
+//-------------------------------------------------------------------------------------------------
+
+/*
+* Given a 3D point it returns its index in [0,1] on the hilbert curve based on the level depth.
+*/
+
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<ValueType>> HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2PointVec(const std::vector<ValueType> indices, const IndexType level){
+	SCAI_REGION( "HilbertCurve.Hilbert3DIndex2PointVec" )
+	std::vector <std::vector<ValueType>> res( indices.size());
+	
+	for( int i=0; i<indices.size(); i++){
+		res[i] = Hilbert3DIndex2Point( indices[i], level);
+	}
+	SCAI_ASSERT_EQ_ERROR( res[0].size(), 3 , "The points should have size 3");
+	
+	return res;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -560,25 +614,45 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
             ValueType globalHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex( point, dimensions, recursionDepth, minCoords, maxCoords);
 			localPairs[i].value = globalHilbertIndex;
 			//localPairs[i].index = 0; // we do need the index now
-			localPairs[i].index = coordDist->local2global(i);
-		}
-	}
+        	localPairs[i].index = coordDist->local2global(i);
+        }
+    }
     
-    /**
-    * now sort the global indices by where they are on the space-filling curve.
-    */
+     /**
+     * now sort the global indices by where they are on the space-filling curve.
+     */
 	 
-	{
+	 {
         SCAI_REGION( "ParcoRepart.getSortedHilbertIndices.sorting" );
         
         int typesize;
         MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
+        //assert(typesize == sizeof(sort_pair)); does not have to be true anymore due to padding
+        
 		
 		//call distributed sort
+        //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
         MPI_Comm mpi_comm = MPI_COMM_WORLD;
         SQuick::sort<sort_pair>(mpi_comm, localPairs, -1);
 
+        //copy hilbert indices into array
+        //IndexType newLocalN = localPairs.size();
+
+        //check size and sanity
+        //SCAI_ASSERT_EQ_ERROR( newLocalN, localPairs.size(), "New local indices mismatch.");
+        //SCAI_ASSERT_LT_ERROR( *std::max_element(newLocalIndices.begin(), newLocalIndices.end()) , globalN, "Too large index (possible IndexType overflow?).");
         SCAI_ASSERT_EQ_ERROR( comm->sum(localPairs.size()), globalN, "Global index mismatch.");
+
+		/*
+        //check checksum
+        long indexSumAfter = 0;
+        for (IndexType i = 0; i < newLocalN; i++) {
+        	indexSumAfter += newLocalIndices[i];
+        }
+
+        const long newCheckSum = comm->sum(indexSumAfter);
+        SCAI_ASSERT( newCheckSum == checkSum, "Old checksum: " << checkSum << ", new checksum: " << newCheckSum );
+		*/
     }
 	 
 	 return localPairs;
