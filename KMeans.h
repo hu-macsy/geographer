@@ -54,10 +54,6 @@ std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<V
 		const Iterator firstIndex, const Iterator lastIndex,
 		const DenseVector<ValueType> &nodeWeights);
 
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType> >& coordinates,
-		const std::vector<std::vector<ValueType> >& centers);
-
 template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &coordinates, const std::vector<std::vector<ValueType> > &centers,
 		const Iterator firstIndex, const Iterator lastIndex,
@@ -66,15 +62,6 @@ DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &c
 		std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter,
 		std::vector<ValueType> &influence,
 		Settings settings);
-
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> getPartitionWithSFCCoords(
-		const scai::lama::CSRSparseMatrix<ValueType>& adjM, \
-		const std::vector<DenseVector<ValueType> >& coordinates,\
-		const DenseVector<ValueType> &  nodeWeights,\
-		const Settings settings);
-//TODO: add block weights as an input param?: const std::vector<IndexType> &blockSizes
-
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings);
@@ -243,12 +230,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 			assert(lastIndex == localIndices.end());
 		}
 
-		Settings balanceSettings = settings;
-		//balanceEpsilon -= 0.01;
-		//balanceSettings.epsilon = std::max( settings.epsilon, balanceEpsilon);
-		//balanceSettings.balanceIterations = 0;//iter >= samplingRounds ? settings.balanceIterations : 0;
-		//balanceSettings.balanceIterations = std::max(settings.balanceIterations, balanceIter++);
-		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, balanceSettings);
+		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, settings);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
 		std::vector<std::vector<ValueType> > newCenters = findCenters(coordinates, result, k, firstIndex, lastIndex, nodeWeights);

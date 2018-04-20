@@ -278,58 +278,6 @@ std::vector<std::vector<ValueType> > findCenters(
 	return result;
 }
 
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType> >& coordinates,
-		const std::vector<std::vector<ValueType> >& centers) {
-
-	const IndexType dim = coordinates.size();
-	assert(dim > 0);
-	assert(centers.size() == dim);
-	//const IndexType n = coordinates[0].size();
-	const IndexType localN = coordinates[0].getLocalValues().size();
-	const IndexType k = centers[0].size();
-
-	DenseVector<IndexType> assignment(coordinates[0].getDistributionPtr(), 0);
-
-	std::vector<std::vector<ValueType>> squaredDistances(k);
-	for (std::vector<ValueType>& sublist : squaredDistances) {
-		sublist.resize(localN, 0);
-	}
-
-	{
-		SCAI_REGION( "KMeans.assignBlocks.squaredDistances" );
-		//compute squared distances. Since only the nearest neighbor is required, we could speed this up with a suitable data structure.
-		for (IndexType d = 0; d < dim; d++) {
-			scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
-			for (IndexType j = 0; j < k; j++) {
-				ValueType centerCoord = centers[d][j];
-				for (IndexType i = 0; i < localN; i++) {
-					ValueType coord = rCoords[i];
-					ValueType dist = std::abs(centerCoord - coord);
-					squaredDistances[j][i] += dist*dist; //maybe use Manhattan distance here? Should align better with grid structure.
-				}
-			}
-		}
-
-		scai::hmemo::WriteAccess<IndexType> wAssignment(assignment.getLocalValues());
-		{
-			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.assign" );
-			for (IndexType i = 0; i < localN; i++) {
-				int bestBlock = 0;
-				int bestValue = squaredDistances[bestBlock][i];
-				for (IndexType j = 0; j < k; j++) {
-					if (squaredDistances[j][i] < bestValue) {
-						bestBlock = j;
-						bestValue = squaredDistances[bestBlock][i];
-					}
-				}
-				wAssignment[i] = bestBlock;
-			}
-		}
-	}
-	return assignment;
-}
-
 template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(
 		const std::vector<std::vector<ValueType> >& coordinates,
@@ -585,7 +533,6 @@ DenseVector<IndexType> assignBlocks(
 	return assignment;
 }
 
-
 /**
  */
 //WARNING: we do not use k as repartition assumes k=comm->getSize() and neither blockSizes and we assume
@@ -597,6 +544,7 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 	const IndexType localN = nodeWeights.getLocalValues().size();
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType k = comm->getSize();
+	SCAI_ASSERT_EQ_ERROR(k, settings.numBlocks, "Deriving the previous partition from the distribution cannot work for p == k");
 	
 	// calculate the global weight sum to set the block sizes
 	//TODO: the local weight sums are already calculated in findLocalCenters, maybe extract info from there
@@ -641,10 +589,6 @@ template DenseVector<IndexType> assignBlocks(
         std::vector<IndexType>::iterator firstIndex, std::vector<IndexType>::iterator lastIndex,
         const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment, const std::vector<IndexType> &blockSizes, const SpatialCell &boundingBox,
         std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter, std::vector<ValueType> &influence, Settings settings);
-
-template DenseVector<IndexType> assignBlocks(const std::vector<DenseVector<ValueType> >& coordinates, const std::vector<std::vector<double> >& centers);
-
-//template DenseVector<IndexType> getPartitionWithSFCCoords(const scai::lama::CSRSparseMatrix<ValueType>& adjM, const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings);
 
 template DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings);
 

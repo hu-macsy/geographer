@@ -627,7 +627,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     std::vector<IndexType> newLocalIndices;
     {
         SCAI_REGION( "ParcoRepart.hilbertPartition.sorting" );
-        
+        //TODO: maybe call getSortedHilbertIndices here?
         int typesize;
         MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
         //assert(typesize == sizeof(sort_pair)); //not valid for int_double, presumably due to padding
@@ -1071,6 +1071,7 @@ IndexType ParcoRepart<IndexType, ValueType>::localBlockSize(const DenseVector<In
 	SCAI_REGION( "ParcoRepart.localBlockSize" )
 	IndexType result = 0;
 	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
+	//possibly shorten with std::count(localPart.get(), localPart.get()+localPart.size(), blockID);
 
 	for (IndexType i = 0; i < localPart.size(); i++) {
 		if (localPart[i] == blockID) {
