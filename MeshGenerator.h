@@ -54,7 +54,7 @@ namespace ITI {
                 static void createOctaTreeMesh_2( scai::lama::CSRSparseMatrix<ValueType> &adjM,  std::vector<DenseVector<ValueType>> &coords, const IndexType numberOfPoints, const ValueType maxCoord);
                 
                 
-                static void writeGraphStructured3DMesh( std::vector<IndexType> numPoints, const std::string filename);
+                static void writeGraphStructured3DMesh_seq( std::vector<IndexType> numPoints, const std::string filename);
                 /** Creates a structed 3D mesh, both the adjacency matrix and the coordinates vectors.
                  * 
                  * @param[out] adjM The adjacency matrix of the output graph. Dimensions are [numPoints[0] x numPoints[1] x numPoints[2]].
@@ -62,7 +62,7 @@ namespace ITI {
                  * @param[in] maxCoord The maximum value a coordinate can have in each dimension, maxCoord.size()=3.
                  * @param[in] numPoints The number of points in every dimension, numPoints.size()=3.
                  */
-                static void createStructured3DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
+                static void createStructured3DMesh_seq(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
                 
                 /** Creates the adjacency matrix and the coordinate vector for a 3D mesh in a distributed way.
                  */

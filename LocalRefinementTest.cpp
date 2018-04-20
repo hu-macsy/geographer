@@ -81,7 +81,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	ValueType initialImbalance = GraphUtils::computeImbalance<IndexType, ValueType>(part, k, uniformWeights);
         
 	// If initial partition is highly imbalanced local refinement cannot fix it.
-	// TODO: should the final partion be balances no matter how imbalanced is the initial one???
+	// TODO: should the final partion be balanced no matter how imbalanced is the initial one???
 	// set as epsilon the initial imbalance
         
 	if(initialImbalance > epsilon){
@@ -103,8 +103,6 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 		coordinates[dim].redistribute(newDistribution);
 	}
 
-	std::vector<IndexType> localBorder = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(graph);
-
 	Settings settings;
 	settings.numBlocks= k;
 	//settings.epsilon = initialImbalance;
@@ -120,9 +118,10 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	DenseVector<ValueType> weights(graph.getRowDistributionPtr(), 1);
 	//WARNING: fillRange does not exist anymore, changed to 1
 	//weights.fillRandom(1,1);
-	// setRandom creates too big numbers and weights.sum() < 0 because (probably) sum does not fit in int
+	// setRandom creates too big numbers and weights.sum() < 0 because (probably) sum does not fit in int?
 	//weights.setRandom(graph.getRowDistributionPtr(), 1);
-	ValueType totalWeight = n*(n+1)/2;
+	//ValueType totalWeight = n*(n+1)/2;
+	ValueType totalWeight = n;	//TODO: assuming unit weights
 	ValueType minNodeWeight = weights.min().Scalar::getValue<IndexType>();
 	ValueType maxNodeWeight = weights.max().Scalar::getValue<IndexType>();
 
@@ -132,6 +131,8 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 		std::cout << "Min node weight: " << minNodeWeight << std::endl;
 	}
 	//DenseVector<IndexType> nonWeights = DenseVector<IndexType>(0, 1);
+	
+	std::vector<IndexType> localBorder = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(graph);
 
 	//get distances
 	std::vector<double> distances = LocalRefinement<IndexType,ValueType>::distancesFromBlockCenter(coordinates);

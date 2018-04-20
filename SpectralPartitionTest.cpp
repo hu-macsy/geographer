@@ -45,12 +45,12 @@ TEST_F(SpectralPartitionTest, testFiedlerVector) {
     IndexType N = 40;
     //CSRSparseMatrix<ValueType> graph(N, N);
     scai::lama::SparseAssemblyStorage<ValueType> graphSt(N, N);
-
+    
     srand(time(NULL));
-
+    
     //TODO: this (rarely) can give disconnected graph
     // random graph with weighted edges
-    for(IndexType row=0; row<N; row++){
+    for(IndexType row=0; row<N; row++){    
         for( IndexType j=0; j<rand()%5+6; j++){
             IndexType col= rand()%N;
             if( col==row ) continue;
@@ -59,43 +59,44 @@ TEST_F(SpectralPartitionTest, testFiedlerVector) {
             graphSt.setValue(row, col, w);
             graphSt.setValue(col, row, w);
         }
-
+        
         // connect this row with the next one so graph is connected
         graphSt.setValue(row, (row+1)%N, rand()%10 +1);
         graphSt.setValue((row+1)%N, row, rand()%10 +1 );
     }
-
+    
     scai::lama::CSRSparseMatrix<ValueType> graph( graphSt);
 
 
     ValueType fiedlerEigenvalue = -8;
     scai::lama::DenseVector<ValueType> fiedler;
-
+    
     {   // get the getFiedlerVector function
         std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
         fiedler = SpectralPartition<IndexType, ValueType>::getFiedlerVector( graph, fiedlerEigenvalue );
         PRINT0("time to get fiedler vector: " << ( std::chrono::duration<double> (std::chrono::steady_clock::now() -start) ).count() );
         SCAI_ASSERT( fiedlerEigenvalue >0, "fiedler eigenvalue negative: "<< fiedlerEigenvalue);
     }
-
+    
     //TODO: done in a hurry, add prorper tests, assertions
     //prints - assertion
-
+    
     ValueType fiedlerMax = fiedler.max().Scalar::getValue<ValueType>();
     ValueType fiedlerl1Norm = fiedler.l1Norm().Scalar::getValue<ValueType>();
     ValueType fiedlerl2Norm = fiedler.l2Norm().Scalar::getValue<ValueType>();
     ValueType fiedlerMin = fiedler.min().Scalar::getValue<ValueType>();
-
+    
     PRINT0(fiedler.size() << " , max= " << fiedlerMax << " , min= " << fiedlerMin << " , l1Norm= " << fiedlerl1Norm << " , l2Norm= " << fiedlerl2Norm << " , fiedlerEigenvalue= " << fiedlerEigenvalue);
-
+    
     EXPECT_TRUE( graph.getRowDistributionPtr()->isEqual( fiedler.getDistribution() ) );
+        
 }
 
 //------------------------------------------------------------------------------
 
 TEST_F(SpectralPartitionTest, testGetPartition){
     //std::string file = "Grid32x32";
-    std::string file = graphPath + "trace-00001.graph";
+    std::string file = graphPath + "trace-00008.graph";
     std::ifstream f(file);
     IndexType dimensions= 2;
     IndexType N, edges;
@@ -126,9 +127,10 @@ TEST_F(SpectralPartitionTest, testGetPartition){
     settings.pixeledSideLen = 16;    // for a 16x16 coarsen graph
     scai::lama::DenseVector<IndexType> spectralPartition = SpectralPartition<IndexType, ValueType>::getPartition( graph, coordinates, settings);
     
-    if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, "SpectralPartition_+trace01");
-    }
+	//TODO: remove code if not needed
+    //if(dimensions==2){
+    //    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, "SpectralPartition_trace01");
+    //}
     //aux::print2DGrid( graph, spectralPartition );
     
     EXPECT_GE(k-1, spectralPartition.getLocalValues().max() );

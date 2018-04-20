@@ -66,7 +66,7 @@ def addRelativePlot( exp, metricValues, metricName, metricPos, toolNames, baseTo
 					plotF.write("("+str(exp.k[i])+", "+ str(0) + ")\n")	
 				else:
 					plotF.write("("+str(exp.k[i])+", "+ str(thisToolMetrics[m][i]/metricValues[baseToolId][m][i]) + ")\n")	
-				print( metricValues[baseToolId][m][i] )
+				#print( metricValues[baseToolId][m][i] )
 			else:
 				plotF.write("("+str(exp.k[i])+", nan)\n")
 		
@@ -125,7 +125,7 @@ def addHarmMeanInfo( metricValues, metricName, metricPos, toolNames, baseToolId,
 #		metricValues[i][j] = a list with values for tool i and metric j	,			size = num_of_metrics
 #		metricValues[i][j][l] = the value for tool i, metric j, for exp.k[l] ,		size = size_of_experiment
 		
-def createPlotsForExp(exp, toolNames, metricNames, metricValues, outDir ):
+def createPlotsForExp(exp, toolNames, metricNames, metricValues, gatherDir, outDir ):
 	
 	numMetrics = len(metricNames)
 	#numMetrics =NUM_METRICS
@@ -199,7 +199,7 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues, outDir ):
 			plotF.write(" other\n\n")
 			
 		plotF.write("Data gathered from directory: \n\n")
-		plotF.write( toolsPath +"\n\n")
+		plotF.write( gatherDir +"\n\n")
 		plotF.write("From files: \n\n")
 			
 		for i in range(0,exp.size):
@@ -238,7 +238,7 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues, outDir ):
 			## for example imbalance
 			
 			#exclude metrics from the plot-for-all
-			excludedMetrics=["imbalance", "maxBnd", "totBnd", 'maxBndPercnt', 'avgBndPercnt']
+			excludedMetrics=["imbalance", "maxBnd", "totBnd", 'maxBndPercnt', 'avgBndPercnt', '-']
 						
 			if metricName in excludedMetrics:
 				print("Not calculating for metric " + metricName)
@@ -295,17 +295,20 @@ def createPlotsForExp(exp, toolNames, metricNames, metricValues, outDir ):
 			plotF.write("\\clearpage\n\n")
 		
 		plotF.write("\n\\begin{figure}\n")
-		#plotMeanForAllTool( geoMeanMatrix, metricNames, numMetrics, toolNames, plotF, "Geometric")
 		print( metricNamesShort )
+		
+		# plot for geometric mean
 		plotBarMeanForAllTool( geoMeanMatrix, metricNamesShort, len(metricNamesShort), toolNames, plotF)
 		plotF.write("\\caption{Geometric mean for all metrics and all tools for experiment:" + str(exp.ID) +" with base tool: " + wantedTools[0] +"}\n\\end{figure}\n\n")
-		plotF.write("\n\\begin{figure}\n")
-		#plotMeanForAllTool( harmMeanMatrix, metricNames, numMetrics, toolNames, plotF,"Harmonic")
-		plotBarMeanForAllTool( harmMeanMatrix, metricNamesShort, len(metricNamesShort), toolNames, plotF)
-		plotF.write("\\caption{Harmonic mean for all metrics and all tools for experiment:" + str(exp.ID) +" with base tool: " + wantedTools[0] +"}\n\\end{figure}\n\n")
+		
+		#plot for harmonic mean
+		#plotF.write("\n\\begin{figure}\n")
+		#plotBarMeanForAllTool( harmMeanMatrix, metricNamesShort, len(metricNamesShort), toolNames, plotF)
+		#plotF.write("\\caption{Harmonic mean for all metrics and all tools for experiment:" + str(exp.ID) +" with base tool: " + wantedTools[0] +"}\n\\end{figure}\n\n")
+		
 		plotF.write("\n\n")
 		
-		newNumMetrics = len(geoMeanMatrix)
+		#newNumMetrics = len(geoMeanMatrix)
 
 		plotF.write("\n\n")
 		plotF.write("\\end{document}")
@@ -398,7 +401,7 @@ def createMeanPlotsForAllExp( wantedExp, wantedTools, gatherDir, outDir, repartM
 					plotF.write(wantedTools[t]+"= " + str(timeTmeans[t])+" , ")
 					
 			#exclude metrics from the plot-for-all
-			excludedMetrics=["imbalance", "maxBnd", "totBnd", 'maxBndPercnt', 'avgBndPercnt']
+			excludedMetrics=["imbalance", "maxBnd", "totBnd", 'maxBndPercnt', 'avgBndPercnt', 'numDisBlocks']
 						
 			if metricName in excludedMetrics:
 				print("Not calculating for metric " + metricName)
@@ -517,9 +520,9 @@ def gatherExpTool( exp, tool, gatherDir , repartMetrics ):
 	# convert to traspose so we have a list for every metric		
 	numMetrics = len(metricNames)
 	if len(allMetrics[0])!=numMetrics:
-		print("WARNING: num metrics mismatch in gatherExpTool for tool " + tool+ ", numMetrics = " + str(numMetrics) +", len(allMetrics[0])= " + str(len(allMetrics[0])) )
+		print("### WARNING: num metrics mismatch in gatherExpTool for tool " + tool+ ", numMetrics = " + str(numMetrics) +", len(allMetrics[0])= " + str(len(allMetrics[0])) )
 	if NUM_METRICS!=numMetrics:
-		print("WARNING: num metrics mismatch in gatherExpTool for tool " + tool+ ", numMetrics = " + str(numMetrics) + ", NUM_METRICS= " +str(NUM_METRICS) )
+		print("### WARNING: num metrics mismatch in gatherExpTool for tool " + tool+ ", numMetrics = " + str(numMetrics) + ", NUM_METRICS= " +str(NUM_METRICS) )
 		
 	metricValues = [None]*numMetrics
 	for m in range(0,numMetrics):
@@ -576,12 +579,13 @@ if __name__=="__main__":
 	
 	if args.outDir:
 		outDir = args.outDir
-		if not os.path.exists(outDir):
-			os.makedirs(outDir)
 	else:
 		#outDir = plotsPath
 		outDir = os.path.join( gatherDir, "plots" )
-
+	
+	if not os.path.exists(outDir):
+		print("Creating folder " + outDir )
+		os.makedirs( outDir)
 		
 	#
 	# parse config file
@@ -629,7 +633,7 @@ if __name__=="__main__":
 			#print(metricNames)
 			#print(metricValues)
 		
-		createPlotsForExp(exp, foundTools, metricNames, allMetricsForAllTools, outDir)
+		createPlotsForExp(exp, foundTools, metricNames, allMetricsForAllTools,gatherDir, outDir)
 		
 	createMeanPlotsForAllExp( wantedExp, wantedTools, gatherDir, outDir, repartMetrics)
 		

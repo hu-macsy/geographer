@@ -351,8 +351,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
             }
             EXPECT_EQ(numEdges, graph.getNumValues() );
             
-            ValueType averageDegree = ValueType( numEdges)/N;
-        
+            //ValueType averageDegree = ValueType( numEdges)/N;        
             //PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);  
         }
         
@@ -394,7 +393,6 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
         
         scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordsDV, settings, metrics);
 
-        ParcoRepart<IndexType, ValueType> repart;
         const ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(partition, k);
         EXPECT_LE(imbalance, epsilon);
 
@@ -601,8 +599,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
 		}
 		EXPECT_EQ(numEdges, graph.getNumValues() );
 
-		ValueType averageDegree = ValueType( numEdges)/N;
-
+		//ValueType averageDegree = ValueType( numEdges)/N;
 		//PRINT("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);
 	}
         
@@ -641,7 +638,6 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         
         ValueType cut , maxCut= N;
         ValueType imbalance;
-        IndexType bestPixelCut=0;
         
         IndexType np = 3;
         scai::dmemo::DistributionPtr bestDist = dist;
@@ -656,7 +652,6 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
             cut = GraphUtils::computeCut<IndexType, ValueType>(graph, sfcPartition, true);
             if (cut<maxCut){
                 maxCut = cut;
-                bestPixelCut = detail;
                 bestDist = sfcPartition.getDistributionPtr();
             }
         }
@@ -668,7 +663,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         }
 
         if(dimension==2){
-            ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordsDV, N, dimension, destPath+"pixel");
+            ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordsDV, dimension, destPath+"pixel");
         }
         
         //redistribute
@@ -682,7 +677,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         graph.redistribute(newDist, noDist);
         hilbertPartition.redistribute(newDist);
 
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordsDV, N, dimension, destPath+"hilbert");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordsDV, dimension, destPath+"hilbert");
                 
         cut = ITI::GraphUtils::computeCut(graph, hilbertPartition, true);
         imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>(hilbertPartition, k);

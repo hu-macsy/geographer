@@ -497,7 +497,8 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 		assert(nodeWeights.size() == veryLocalN);
 	}
 
-	const IndexType firstBlockSize = std::distance(assignedToSecondBlock.begin(), std::lower_bound(assignedToSecondBlock.begin(), assignedToSecondBlock.end(), 1));
+	//TODO: not used variable
+	//const IndexType firstBlockSize = std::distance(assignedToSecondBlock.begin(), std::lower_bound(assignedToSecondBlock.begin(), assignedToSecondBlock.end(), 1));
 
 	//this map provides an index from 0 to b-1 for each of the b indices in borderRegionIDs
 	//globalToVeryLocal[borderRegionIDs[i]] = i

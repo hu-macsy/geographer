@@ -105,7 +105,7 @@ exp.size = size
 exp.paths = [fileName]*size
 #exp.coordPaths = [coordName]*size
 print( os.path.basename(fileName) )
-#print( os.path.basename(coordName) )
+print( os.path.basename(coordName) )
 exp.graphs = [ os.path.basename(fileName) ] * size
 exp.coordPaths =[ os.path.abspath(coordName) ] * size
 

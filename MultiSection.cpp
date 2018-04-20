@@ -166,8 +166,6 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     
     const scai::dmemo::DistributionPtr inputDist = nodeWeights.getDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
-    //const IndexType localN = inputDist->getLocalSize();
-    //const IndexType globalN = inputDist->getGlobalSize();
     
     // for all dimensions i: bBox.bottom[i]<bBox.top[i]
     struct rectangle bBox;
@@ -178,7 +176,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         bBox.top.push_back(sideLen -1); //WARNING: changes rectangle to be [bot, top], not [bot, top)
     }
 
-    // TODO: try to avoid that, probably not needed
+    // TODO: try to avoid that, perhaps not needed
     ValueType totalWeight = nodeWeights.sum().scai::lama::Scalar::getValue<ValueType>();
     //ValueType averageWeight = totalWeight/k;
 
@@ -190,8 +188,12 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     // from k get d numbers such that their product equals k
     // TODO: now k must be number such that k^(1/d) is an integer, drop this condition, generalize
     const ValueType sqrtK = std::pow( k,  1.0/dim );
-
-    if( !(std::floor(sqrtK)==sqrtK) ){
+	
+	//TODO: rounding and checking with std::floor does not work for 3 dimensions
+	//TODO: check if std::round is OK
+    //if( std::floor(sqrtK)!=sqrtK ){
+	if( std::abs( std::round(sqrtK) - sqrtK) > 0.000001 ){
+		//PRINT0( sqrtK << " != " << std::round(sqrtK) );
         PRINT0("Input k= "<< k << " and sqrt(k)= "<< sqrtK );
         throw std::logic_error("Number of blocks not a square number");
     }
@@ -216,8 +218,8 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         SCAI_ASSERT( k && !(k & (k-1)) , "k is not a power of 2 and this is required for now for bisection");  
         numCuts = std::vector<IndexType>( log2(k) , 2 );
     }
-    /*
-     * else if( settings.msOptions==2 ){        
+    /* TODO: actually use cutsPerDim
+	else if( settings.msOptions==2 ){        
         numCuts = settings.cutsPerDim;
     }else{
         std::cout << "Wrong value " << settings.msOptions << " for option msOptions" << std::endl;
@@ -290,7 +292,6 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             IndexType thisChosenDim = chosenDim[l];
             
             // create the new rectangles and add them to the queue
-ValueType dbg_rectW=0.0;
             struct rectangle newRect;
             newRect.bottom = thisRectangle.bottom;
             newRect.top = thisRectangle.top;
@@ -300,8 +301,7 @@ ValueType dbg_rectW=0.0;
                 newRect.bottom[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h];
                 newRect.top[thisChosenDim] = thisRectangle.bottom[thisChosenDim]+part1D[h+1]-1;
                 newRect.weight = weightPerPart[h];
-                root->insert( newRect );
-dbg_rectW += newRect.weight;                
+                root->insert( newRect );               
             }
             
             //last rectangle
@@ -309,13 +309,9 @@ dbg_rectW += newRect.weight;
             newRect.top = thisRectangle.top;
             newRect.weight = weightPerPart.back();
             root->insert( newRect );
-dbg_rectW += newRect.weight;    
-        
 
-//TODO: only for debuging, remove variable dbg_rectW
-SCAI_ASSERT_LE( dbg_rectW-thisRectangle.weight, 0.0000001, "Rectangle weights not correct, their difference is: " << dbg_rectW-thisRectangle.weight);
-//SCAI_ASSERT_EQ_ERROR( dbg_rectW, thisRectangle.weight, "Rectangle weights not correct, their difference is: " << dbg_rectW-thisRectangle.weight);
-
+			//TODO: only for debuging, remove variable dbg_rectW
+			//SCAI_ASSERT_LE( dbg_rectW-thisRectangle.weight, 0.0000001, "Rectangle weights not correct, their difference is: " << dbg_rectW-thisRectangle.weight);
         }
         numLeaves = root->getNumLeaves();
     }
@@ -467,7 +463,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             // TODO: now k must be number such that k^(1/d) is an integer, drop this condition, generalize
             ValueType sqrtK = std::pow( k, 1.0/dim );
             IndexType intSqrtK = sqrtK;
-PRINT( sqrtK << " _ " << intSqrtK );            
+			//PRINT( sqrtK << " _ " << intSqrtK );            
             // TODO/check: sqrtK is not correct, it is -1 but not sure if always
             
             if( std::pow( intSqrtK+1, dim ) == k){
@@ -577,7 +573,7 @@ PRINT( sqrtK << " _ " << intSqrtK );
             ValueType maxWeight = 0;
             
             // create the new rectangles and add them to the queue
-ValueType dbg_rectW=0;
+			//ValueType dbg_rectW=0;
             struct rectangle newRect;
             newRect.bottom = thisRectangle.bottom;
             newRect.top = thisRectangle.top;
@@ -592,7 +588,7 @@ ValueType dbg_rectW=0;
                 if(newRect.weight>maxWeight){
                     maxWeight = newRect.weight;
                 }
-dbg_rectW += newRect.weight;                
+				//dbg_rectW += newRect.weight;                
                 //if(comm->getRank()==0) newRect.print();
             }
             
@@ -606,12 +602,12 @@ dbg_rectW += newRect.weight;
             if(newRect.weight>maxWeight){
                 maxWeight = newRect.weight;
             }        
-dbg_rectW += newRect.weight;    
+			//dbg_rectW += newRect.weight;    
             //if(comm->getRank()==0) newRect.print();            
             //PRINT0("this rect imbalance= " << (maxWeight-optWeight)/optWeight << "  (opt= " << optWeight << " , max= "<< maxWeight << ")" );
 
-//TODO: only for debuging, remove variable dbg_rectW
-SCAI_ASSERT_LE_ERROR( dbg_rectW-thisRectangle.weight, 0.0000001, "Rectangle weights not correct: dbg_rectW-this.weight= " << dbg_rectW - thisRectangle.weight);
+			//TODO: only for debuging, remove variable dbg_rectW
+			//SCAI_ASSERT_LE_ERROR( dbg_rectW-thisRectangle.weight, 0.0000001, "Rectangle weights not correct: dbg_rectW-this.weight= " << dbg_rectW - thisRectangle.weight);
 
         }
         numLeaves = root->getNumLeaves();
@@ -735,8 +731,6 @@ template<typename IndexType, typename ValueType>
 std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1DGreedy( const std::vector<ValueType>& projection, const IndexType k, Settings settings){
     SCAI_REGION("MultiSection.partition1DGreedy");
     
-    //const IndexType dimension = settings.dimensions;
-    
     ValueType totalWeight = std::accumulate(projection.begin(), projection.end(), 0.0);
     ValueType averageWeight = totalWeight/k;
   
@@ -846,64 +840,6 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
     return std::make_pair(partIndices, weightPerPart);
 }
 //---------------------------------------------------------------------------------------
-// Based on algorithm Nicol found in Pinar, Aykanat, 2004, "Fast optimal load balancing algorithms for 1D partitioning"
-//TODO: In the same paper thers is a better, but more complicated, algorithm called Nicol+
-/*
-template<typename IndexType, typename ValueType>
-std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1DMine( const std::vector<ValueType>& nodeWeights, const IndexType k, Settings settings){
-
-    const IndexType N = nodeWeights.size();
-
-    //
-    //create the prefix sum array
-    //
-    std::vector<ValueType> prefixSum( N+1 , 0);
-    
-    prefixSum[0] = 0;// nodeWeights[0];
-    
-    for(IndexType i=1; i<N+1; i++ ){
-        prefixSum[i] = prefixSum[i-1] + nodeWeights[i-1];
-    }
-    
-    const ValueType totalWeight = prefixSum.back();
-    //const ValueType  = totalWeight/k;
-
-    ValueType lowerBound, upperBound;
-    lowerBound = totalWeight/k;         // the optimal average weight
-    upperBound = lowerBound;
-    
-    bool existsPartition = probe(prefixSum, k, upperBound);
-    while( !existsPartition ){
-        lowerBound = upperBound;
-        upperBound *= 2;
-        existsPartition = probe(prefixSum, k, upperBound);
-    }
-        
-    std::vector<ValueType> allRollingSums;
-
-    for(typename std::vector<ValueType>::const_iterator windowBot= nodeWeights.begin(); windowBot!=nodeWeights.end(); windowBot++){
-        for(typename std::vector<ValueType>::const_iterator windowTop= windowBot; windowTop!=nodeWeights.end(); windowTop++){
-            ValueType thisSum = std::accumulate( windowBot, windowTop, 0.0);
-            if( thisSum>=lowerBound and thisSum<=upperBound ){
-                allRollingSums.push_back( thisSum );
-            }
-        }
-    }
-PRINT(lowerBound << " < " << upperBound );        
-    std::sort( allRollingSums.begin(), allRollingSums.end() );
-
-PRINT( allRollingSums.size() );    
-    
-    std::vector<IndexType> partIndices(k, -9);
-    std::vector<ValueType> weightPerPart(k, -9);
-    partIndices[0]=0;
-    
-    
-    return std::make_pair(partIndices, weightPerPart);
-    
-}
-*/
-//---------------------------------------------------------------------------------------
 
 // Search if there is a partition of the weights array into k parts where the maximum weight of a part is <=target.
 
@@ -947,7 +883,6 @@ bool MultiSection<IndexType, ValueType>::probe(const std::vector<ValueType>& pre
 //---------------------------------------------------------------------------------------
 // Search if there is a partition of the weights array into k parts where the maximum weight of a part is <=target.
 
-//TODO: return also the splitters found
 template<typename IndexType, typename ValueType>
 std::pair<bool,std::vector<IndexType>> MultiSection<IndexType, ValueType>::probeAndGetSplitters(const std::vector<ValueType>& prefixSum, const IndexType k, const ValueType target){
 
@@ -1055,8 +990,6 @@ ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vec
             std::vector<T> coords;
             for(int d=0; d<dimension; d++){
                 coords.push_back( coordinates[d].getLocalValues()[i] );
-                //TODO: remove assertion, probably not needed
-                SCAI_ASSERT( coords.back()<=maxCoords[d], "Coordinate too big, coords.back()= " << coords.back() << " , maxCoords[d]= "<< maxCoords[d] );
             }
             if( inBBox(coords, bBox) ){ 
                 localWeight += localWeights[i];

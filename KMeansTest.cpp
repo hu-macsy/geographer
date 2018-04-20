@@ -113,55 +113,6 @@ TEST_F(KMeansTest, testFindCenters) {
 }
 
 
-TEST_F(KMeansTest, testPartitionWithSFCCoords) {
-	//std::string fileName = "bubbles-00010.graph";
-	std::string fileName = "Grid16x16";
-	std::string graphFile = graphPath + fileName;
-	std::string coordFile = graphFile + ".xyz";
-	const IndexType dimensions = 2;
-	
-	//load graph and coords
-	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
-	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
-	const IndexType n = graph.getNumRows();
-	std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
-	
-	DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
-	
-	struct Settings settings;
-	settings.dimensions = dimensions;
-	settings.numBlocks = comm->getSize();
-	
-	{ 
-		DenseVector<IndexType> initialPartition( dist, -1);
-		for( int i=0; i< initialPartition.getLocalValues().size(); i++){
-			initialPartition.getLocalValues()[i]= comm->getRank();
-		}
-		ITI::aux<IndexType,ValueType>::print2DGrid(graph, initialPartition );
-		
-		
-	}
-		
-	DenseVector<IndexType> partition = KMeans::getPartitionWithSFCCoords<IndexType>( graph, coords, uniformWeights, settings);
-	
-	partition.redistribute( dist );
-	
-	//checks
-	
-	scai::hmemo::ReadAccess<IndexType> rPart( partition.getLocalValues() );
-	const IndexType localN = rPart.size();
-	EXPECT_EQ( comm->sum(localN), n);
-	
-	for( IndexType i=0; i<localN; i++){
-		EXPECT_LT( rPart[i], settings.numBlocks);
-		EXPECT_GE( rPart[i], 0);
-		//PRINT(*comm << ": part[ " << dist->local2global(i) << " ] = " << rPart[i]);
-	}
-	ITI::aux<IndexType,ValueType>::print2DGrid(graph, partition );
-	
-}
-
 TEST_F(KMeansTest, testCentersOnlySfc) {
 	std::string fileName = "bubbles-00010.graph";
 	std::string graphFile = graphPath + fileName;
@@ -186,10 +137,10 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 	std::tie(minCoords, maxCoords) = KMeans::getLocalMinMaxCoords(coords);
 	
 	// get centers
-	std::vector<std::vector<ValueType>> centers1 = KMeans::findInitialCentersSFC(coords, k, minCoords, maxCoords, settings);
+	std::vector<std::vector<ValueType>> centers1 = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords, minCoords, maxCoords, settings);
 	
 	settings.sfcResolution = std::log2(k);
-	std::vector<std::vector<ValueType>> centers2 = KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>( k, maxCoords, settings);
+	std::vector<std::vector<ValueType>> centers2 = KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>( maxCoords, settings);
 	
 	EXPECT_EQ( centers1.size(), centers2.size() );
 	EXPECT_EQ( centers1[0].size(), centers2[0].size() );

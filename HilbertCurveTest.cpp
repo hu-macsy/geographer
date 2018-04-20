@@ -31,11 +31,13 @@ using namespace std; //should be avoided, but better here than in header file
 namespace ITI {
 
 class HilbertCurveTest : public ::testing::TestWithParam<int> {
+	friend class ITI::HilbertCurve<IndexType,ValueType>;	
 protected:
-        // the directory of all the meshes used
-        std::string graphPath = "./meshes/";
+	// the directory of all the meshes used
+	std::string graphPath = "./meshes/";
 
 };
+
 
 //-------------------------------------------------------------------------------------------------
 

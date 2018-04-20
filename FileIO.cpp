@@ -54,8 +54,6 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
     IndexType root =0;
-    //IndexType rank = comm->getRank();
-    //IndexType size = comm->getSize();
     scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
         
     IndexType globalN = distPtr->getGlobalSize();
@@ -130,75 +128,11 @@ void FileIO<IndexType, ValueType>::writeGraphDistributed (const CSRSparseMatrix<
     }
     f.close();
 }
+
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writeVTKCentral (const CSRSparseMatrix<ValueType> &adjM, const std::vector<DenseVector<ValueType>> &coords, const DenseVector<IndexType> &part, const std::string filename){
-    SCAI_REGION( "FileIO.writeVTKCentral" )        
-        
-    const IndexType N = adjM.getNumRows();
-    const IndexType dimensions = coords.size();
-    
-    std::ofstream f(filename);
-    if(f.fail())
-        throw std::runtime_error("File "+ filename+ " failed.");
-
-    //------------------------------------------------------
-    // write header
-    
-    f << "# vtk DataFile Version 2.0" << std::endl;
-    f << "Saved graph and partition" << std::endl;
-    f << "ASCII" << std::endl;
-    f << "DATASET UNSTRUCTURED_GRID" << std::endl;
-    
-    //------------------------------------------------------
-    // write 3D coordinates
-    // TODO: use ReadAccess or copy to a vector<vector<>> of size [N,d] and not [d,N] 
-    
-    f << "POINTS " << N << " double" << std::endl;
-    for(int i=0; i<N; i++){
-        for(int d=0; d<dimensions; d++){
-            f<< coords[d].getLocalValues()[i] << " ";
-        }
-        f << std::endl;
-    }
-    
-    //------------------------------------------------------
-    // write the cells, TODO: in this version we have only vertices=points, no cells
-/*    
-    f << std::endl << "CELLS " << N  << " " << N << std::endl; //since here, we have only points
-    for(int i=0; i<N; i++){
-        f << "1 " << i << std::endl;
-    }
-*/    
-    //------------------------------------------------------
-    // write cell types, TODO: in this version we only have points and no cells
-    
-    f << std::endl << "CELL_TYPES "<< N << std::endl;
-    for(int i=0; i<N; i++){
-        f << "1" << std::endl;
-    }
-    
-    //------------------------------------------------------
-    // write the partition    
-    
-    f <<  std::endl << "POINT_DATA " << N << std::endl;
-    // below is the number or variables, aka how many different partitions we have in this file
-    f << "FIELD FieldData 1" <<  std::endl; // TODO: in this version, hardcoded to 1
-    // for(inv v=0; v<number_of_variables; v++){}
-    
-    f << "Partition 1 " << N << " int" << std::endl;
-    for( int i=0; i<N; i++){
-        f << part.getLocalValues()[i] << " ";
-    }
-    f << std::endl;
-    
-    f.close();    
-}
-//-------------------------------------------------------------------------------------------------
-
-template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writeVTKCentral_ver2 (const CSRSparseMatrix<ValueType> &adjM, const std::vector<DenseVector<ValueType>> &coords, const DenseVector<IndexType> &part, const std::string filename){
     SCAI_REGION( "FileIO.writeVTKCentral" )        
         
     const IndexType N = adjM.getNumRows();
@@ -298,9 +232,7 @@ template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVector<ValueType>> &coords, const std::string outFilename){
             
     const IndexType dimension = coords.size();
-    if (dimension != 3) {
-        std::cout << "Warning: Binary coordinate reader expects three dimensions." << std::endl;
-    }
+    
     scai::dmemo::DistributionPtr coordDist = coords[0].getDistributionPtr();
     const IndexType globalN = coordDist->getGlobalSize();
     const IndexType localN = coordDist->getLocalSize();
@@ -360,7 +292,7 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVe
 /*Given the vector of the coordinates each PE writes its own part in file "filename".
  */
 template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writeCoordsDistributed(const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const IndexType dimensions, const std::string filename){
+void FileIO<IndexType, ValueType>::writeCoordsDistributed(const std::vector<DenseVector<ValueType>> &coords, const IndexType dimensions, const std::string filename){
     SCAI_REGION( "FileIO.writeCoordsDistributed" )
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -379,7 +311,6 @@ void FileIO<IndexType, ValueType>::writeCoordsDistributed(const std::vector<Dens
     IndexType dimension= coords.size();
 
     assert(coords.size() == dimension );
-    assert(coords[0].size() == numPoints);
     
     IndexType localN = distPtr->getLocalSize();
     
@@ -411,7 +342,6 @@ void FileIO<IndexType, ValueType>::writeInputParallel (const std::vector<DenseVe
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr coordDistPtr = coords[0].getDistributionPtr();
-    //const IndexType globalN = coordDistPtr->getGlobalSize();
     const IndexType localN = coordDistPtr->getLocalSize();
     const IndexType dimension = coords.size();
     const IndexType numPEs = comm->getSize();
@@ -462,7 +392,7 @@ void FileIO<IndexType, ValueType>::writeInputParallel (const std::vector<DenseVe
 }
 
 //-------------------------------------------------------------------------------------------------
-
+//TODO: unit test
 template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<IndexType> &part, const std::string filename) {
 	SCAI_REGION( "FileIO.writePartitionParallel" );
@@ -495,14 +425,14 @@ void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<Inde
                 for( IndexType i=0; i<localN; i++){                    
                     outfile << dist->local2global(i) << " "<< localPart[i] << std::endl;
                 }
-/*                
+				/* TODO: resolve commented code         
                 // the last PE maybe has less local values
                 if( p==numPEs-1 ){
                     SCAI_ASSERT_EQ_ERROR( outfile.tellp(), globalN , "While writing coordinates in parallel: Position in file " << filename << " is not correct." );
                 }else{
                     SCAI_ASSERT_EQ_ERROR( outfile.tellp(), localN*(comm->getRank()+1) , "While writing coordinates in parallel: Position in file " << filename << " is not correct for processor " << comm->getRank() );
                 }
-  */              
+				*/              
                 outfile.close();
             }
             comm->synchronize();    //TODO: takes huge time here
@@ -565,14 +495,12 @@ void FileIO<IndexType, ValueType>::writeDenseVectorParallel(const DenseVector<T>
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writePartitionCentral(DenseVector<IndexType> &part, const std::string filename) {
+void FileIO<IndexType, ValueType>::writeDenseVectorCentral(DenseVector<IndexType> &part, const std::string filename) {
 
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	scai::dmemo::DistributionPtr dist = part.getDistributionPtr();
 
-    //const IndexType localN = dist->getLocalSize();
     const IndexType globalN = dist->getGlobalSize();
-    //const IndexType numPEs = comm->getSize();
     
     //TODO: change to gather as this way part is replicated in all PEs
     //comm->gatherImpl( localPart.get(), 
@@ -589,11 +517,8 @@ void FileIO<IndexType, ValueType>::writePartitionCentral(DenseVector<IndexType> 
         for( IndexType i=0; i<globalN; i++){
             f << rPart[i]<< std::endl;
         }
-        
     }    
-    
 }
-
 
 //-------------------------------------------------------------------------------------------------
 /*File "filename" contains a graph in the METIS format. The function reads that graph and transforms
@@ -602,8 +527,6 @@ void FileIO<IndexType, ValueType>::writePartitionCentral(DenseVector<IndexType> 
 
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(const std::string filename, Format format) {
-    
-
         
     //then call other function, handling formats with optional node weights
 	std::vector<DenseVector<ValueType>> dummyWeightContainer;
@@ -651,8 +574,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 		if( comm->getRank()==0 ){
 			std::cout<< "Reading from file "<< filename << std::endl;
 		}
-	}
-        
+	}        
         
 	//define variables
 	std::string line;
@@ -667,59 +589,59 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
        std::getline(file, line);
     }
     std::stringstream ss( line );
-    std::string item;
-        
-        {
-            //node count and edge count are mandatory. If these fail, std::stoi will raise an error. TODO: maybe wrap into proper error message
-            std::getline(ss, item, ' ');
-            globalN = std::stoll(item);
-            std::getline(ss, item, ' ');
-            globalM = std::stoll(item);
-            
-            if( globalN<=0 or globalM<=0 ){
-                throw std::runtime_error("Negative input, maybe int value is not big enough: globalN= "
-                        + std::to_string(globalN) + " , globalM= " + std::to_string(globalM));
-            }
-            
-            bool readWeightInfo = !std::getline(ss, item, ' ').fail();
-            if (readWeightInfo && item.size() > 0) {
-                //three bits, describing presence of edge weights, vertex weights and vertex sizes
-                int bitmask = std::stoi(item);
-                hasEdgeWeights = bitmask % 10;
-                if ((bitmask / 10) % 10) {
-                    bool readNodeWeightCount = !std::getline(ss, item, ' ').fail();
-                    if (readNodeWeightCount && item.size() > 0) {
-                        numberNodeWeights = std::stoi(item);
-                    } else {
-                        numberNodeWeights = 1;
-                    }
-                }
-            }
-            
-            if (comm->getRank() == 0) {
-                std::cout << "Expecting " << globalN << " nodes and " << globalM << " edges, ";
-                if (!hasEdgeWeights && numberNodeWeights == 0) {
-                    std::cout << "with no edge or node weights."<< std::endl;
-                }
-                else if (hasEdgeWeights && numberNodeWeights == 0) {
-                    std::cout << "with edge weights, but no node weights."<< std::endl;
-                }
-                else if (!hasEdgeWeights && numberNodeWeights > 0) {
-                    std::cout << "with no edge weights, but " << numberNodeWeights << " node weights."<< std::endl;
-                }
-                else {
-                    std::cout << "with edge weights and " << numberNodeWeights << " weights per node."<< std::endl;
-                }
-            }
-        }
-        
+	std::string item;
+	
+	{
+		//node count and edge count are mandatory. If these fail, std::stoi will raise an error. TODO: maybe wrap into proper error message
+		std::getline(ss, item, ' ');
+		globalN = std::stoll(item);
+		std::getline(ss, item, ' ');
+		globalM = std::stoll(item);
+		
+		if( globalN<=0 or globalM<=0 ){
+			throw std::runtime_error("Negative input, maybe int value is not big enough: globalN= "
+			+ std::to_string(globalN) + " , globalM= " + std::to_string(globalM));
+		}
+		
+		bool readWeightInfo = !std::getline(ss, item, ' ').fail();
+		if (readWeightInfo && item.size() > 0) {
+			//three bits, describing presence of edge weights, vertex weights and vertex sizes
+			int bitmask = std::stoi(item);
+			hasEdgeWeights = bitmask % 10;
+			if ((bitmask / 10) % 10) {
+				bool readNodeWeightCount = !std::getline(ss, item, ' ').fail();
+				if (readNodeWeightCount && item.size() > 0) {
+					numberNodeWeights = std::stoi(item);
+				} else {
+					numberNodeWeights = 1;
+				}
+			}
+		}
+		
+		if (comm->getRank() == 0) {
+			std::cout << "Expecting " << globalN << " nodes and " << globalM << " edges, ";
+			if (!hasEdgeWeights && numberNodeWeights == 0) {
+				std::cout << "with no edge or node weights."<< std::endl;
+			}
+			else if (hasEdgeWeights && numberNodeWeights == 0) {
+				std::cout << "with edge weights, but no node weights."<< std::endl;
+			}
+			else if (!hasEdgeWeights && numberNodeWeights > 0) {
+				std::cout << "with no edge weights, but " << numberNodeWeights << " node weights."<< std::endl;
+			}
+			else {
+				std::cout << "with edge weights and " << numberNodeWeights << " weights per node."<< std::endl;
+			}
+		}
+	}
+	
 	const ValueType avgDegree = ValueType(2*globalM) / globalN;
-        
-    //get distribution and local range
-    const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
-    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
-
-    IndexType beginLocalRange, endLocalRange;
+	
+	//get distribution and local range
+	const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
+	const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
+	
+	IndexType beginLocalRange, endLocalRange;
     scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
     const IndexType localN = endLocalRange - beginLocalRange;
     SCAI_ASSERT_LE_ERROR(localN, std::ceil(ValueType(globalN) / comm->getSize()), "localN: " << localN << ", optSize: " << std::ceil(globalN / comm->getSize()));
@@ -921,7 +843,6 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             //std::cout << "Process " << thisPE << " reading from " << beginLocalRange << " to " << endLocalRange << ", in total, localN= " << localN << " nodes/lines" << std::endl;
             
             ia.resize( localN +1);
-
             
             //
             // read the vertices offsets
@@ -1206,7 +1127,9 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
     return graph;
 }
 //-------------------------------------------------------------------------------------------------
-   
+
+//TODO: handle case where number of files != numPEs
+
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeListDistributed(const std::string prefix){
     SCAI_REGION( "FileIO.readEdgeListDistributed" );
@@ -1509,10 +1432,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
     const UINT endLocalCoords = endLocalRange*maxDimension;
     const UINT localTotalNumOfCoords = localN*maxDimension;
     
-    //TODO: remove one of the assertion (or both)
     SCAI_ASSERT_EQ_ERROR( globalN, comm->sum(localN), "Mismatch in total number of coordinates" );
-    // replaced because globalN*3 can be >2^32
-    //SCAI_ASSERT_EQ_ERROR( globalN*maxDimension, comm->sum(localTotalNumOfCoords), "Mismatch in total number of coordinates" );
     SCAI_ASSERT_EQ_ERROR( globalN, comm->sum(localTotalNumOfCoords)/maxDimension, "Mismatch in total number of coordinates" );
     
     // set like in KaHiP/parallel/prallel_src/app/configuration.h in configuration::standard
@@ -1640,27 +1560,10 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsMatr
 		std::stringstream ss;
 		ss.str( line );
                          
-                ValueType c;
-                ss >> c;
-                coords[i%dimensions][int(i/dimensions)] = c;
-                
+		ValueType c;
+		ss >> c;
+		coords[i%dimensions][int(i/dimensions)] = c;
 //PRINT( *comm << ": " << i%dimensions << " , " << i/dimensions << " :: " << coords[i%dimensions][int(i/dimensions)]  );
-                /*
-		IndexType dim = 0;
-		while (dim < dimensions) {
-			bool read = std::getline(ss, item, ' ');
-			if (!read or item.size() == 0) {
-				throw std::runtime_error("Unexpected end of line. Was the number of dimensions correct?");
-			}
-			ValueType coord = std::stod(item);
-			coords[dim][i] = coord;
-			dim++;
-		}
-		
-		if (dim < dimensions) {
-			throw std::runtime_error("Only " + std::to_string(dim - 1)  + " values found, but " + std::to_string(dimensions) + " expected in line '" + line + "'");
-		}
-		*/
     }
 
     if (endLocalRange == numPoints) {
@@ -1706,8 +1609,6 @@ void  FileIO<IndexType, ValueType>::readOFFTriangularCentral( scai::lama::CSRSpa
     
     ss >> N >> numFaces >> numEdges;
     
-PRINT( N << " _ " << numFaces << ", numEdges= " << numEdges );
-
     //
     // first, read the N 3D coordinates
     //
@@ -1971,8 +1872,6 @@ DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::st
 	IndexType beginLocalRange, endLocalRange;
 	scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
 	const IndexType localN = endLocalRange - beginLocalRange;
-
-	//std::string line;
 
 	//scroll to begin of local range.
 	for (IndexType i = 0; i < beginLocalRange; i++) {

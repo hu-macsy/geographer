@@ -69,7 +69,8 @@ int main(int argc, char** argv) {
 	ITI::Format coordFormat;
 	std::string outPath;
 	std::string graphName;
-    
+    std::string metricsDetail = "all";
+	
 	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
 	
 	desc.add_options()
@@ -79,7 +80,8 @@ int main(int argc, char** argv) {
         ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
 		("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
 		("coordFormat",  value<ITI::Format>(&coordFormat), "format of coordinate file")
-        
+        ("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
+		
         ("generate", "generate random graph. Currently, only uniform meshes are supported.")
         ("numX", value<IndexType>(&settings.numX), "Number of points in x dimension of generated graph")
 		("numY", value<IndexType>(&settings.numY), "Number of points in y dimension of generated graph")
@@ -95,8 +97,9 @@ int main(int argc, char** argv) {
 		
 		("computeDiameter", value<bool>(&settings.computeDiameter)->default_value(true), "Compute Diameter of resulting block files.")
 		("storeInfo", value<bool>(&storeInfo), "is this is false then no outFile is produced")
+		("metricsDetail", value<std::string>(&metricsDetail), "no: no metrics, easy:cut, imbalance, communication volume and diamter if possible, all: easy + SpMV time and communication time in SpMV")
         //("writePartition", "Writes the partition in the outFile.partition file")
-        //("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
+        ("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 		;
         
 	variables_map vm;
@@ -134,6 +137,23 @@ int main(int argc, char** argv) {
 		std::cout<< "Must give parameter outPath to store metrics.\nAborting..." << std::endl;
 		return -1;
 	}
+	
+	if( vm.count("metricsDetail") ){
+		if( not (metricsDetail=="no" or metricsDetail=="easy" or metricsDetail=="all") ){
+			if(comm->getRank() ==0 ){
+				std::cout<<"WARNING: wrong value for parameter metricsDetail= " << metricsDetail << ". Setting to all" <<std::endl;
+				metricsDetail="all";
+			}
+		}
+	}
+			
+    if( comm->getRank() ==0 ){
+		std::cout <<"Starting file " << __FILE__ << std::endl;
+		
+		std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
+		std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
+		std::cout << "date and time: " << std::ctime(&timeNow) << std::endl;
+	}
              
     //-----------------------------------------
     //
@@ -142,6 +162,7 @@ int main(int argc, char** argv) {
     
     CSRSparseMatrix<ValueType> graph;
     std::vector<DenseVector<ValueType>> coords(settings.dimensions);
+    scai::lama::DenseVector<ValueType> nodeWeights;		//the weights for each node
     
     std::string graphFile;
     
@@ -155,10 +176,13 @@ int main(int argc, char** argv) {
             coordFile = graphFile + ".xyz";
         }
         
+        std::vector<DenseVector<ValueType> > vectorOfNodeWeights;
+		
+		// read the graph
         if (vm.count("fileFormat")) {
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, settings.fileFormat );
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights, settings.fileFormat );
         }else{
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile );
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights );
         }
         
         N = graph.getNumRows();
@@ -166,6 +190,19 @@ int main(int argc, char** argv) {
         SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
         SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
         		
+		// set the node weigths
+		IndexType numNodeWeights = vectorOfNodeWeights.size();
+        if (numNodeWeights == 0) {
+			nodeWeights = DenseVector<ValueType>( graph.getRowDistributionPtr() , 1);
+		}
+		else if (numNodeWeights == 1) {
+			nodeWeights = vectorOfNodeWeights[0];
+		} else {
+			IndexType index = vm["nodeWeightIndex"].as<int>();
+			assert(index < numNodeWeights);
+			nodeWeights = vectorOfNodeWeights[index];
+		}
+		
         //read the coordinates file
 		if (vm.count("coordFormat")) {
 			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
@@ -222,7 +259,6 @@ int main(int argc, char** argv) {
             std::cout<< "Generated structured 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
         }
         
-        //nodeWeights = scai::lama::DenseVector<IndexType>(graph.getRowDistributionPtr(), 1);
     }else{
     	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;
     	return 126;
@@ -241,13 +277,15 @@ int main(int argc, char** argv) {
 	// start main for loop for all tools
 	//
 	
+	
 	//WARNING: 1) removed parmetis sfc
 	//WARNING: 2) parMetisGraph should be last because it often crashes
-	std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRIB, ITI::Tool::zoltanRCB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph };
+	std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRCB, ITI::Tool::zoltanRIB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisSFC};
+	//std::vector<ITI::Tool> allTools = { ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph };
+	//std::vector<ITI::Tool> allTools = { ITI::Tool::parMetisSFC};
 	
 	for( int t=0; t<allTools.size(); t++){
 		
-		//std::string thisTool = allTools[t];
 		ITI::Tool thisTool = allTools[t];
 	
 		// get the partition and metrics
@@ -258,10 +296,8 @@ int main(int argc, char** argv) {
 		struct Metrics metrics(1);
 		metrics.numBlocks = settings.numBlocks;
 		
-		// uniform node weights
-		scai::lama::DenseVector<ValueType> nodeWeights = scai::lama::DenseVector<ValueType>( graph.getRowDistributionPtr(), 1);
 		// if usign unit weights, set flag for wrappers
-		bool nodeWeightsUse = false;
+		bool nodeWeightsUse = true;
 		
 		// if graph is too big, repeat less times to avoid memory and time problems
 		if( N>std::pow(2,29) ){
@@ -297,7 +333,13 @@ int main(int argc, char** argv) {
 		// partition has the the same distribution as the graph rows 
 		SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
 		
-		metrics.getAllMetrics( graph, partition, nodeWeights, settings );
+		
+		if( metricsDetail=="all" ){
+			metrics.getAllMetrics( graph, partition, nodeWeights, settings );
+		}
+        if( metricsDetail=="easy" ){
+			metrics.getEasyMetrics( graph, partition, nodeWeights, settings );
+		}
 		
 		//---------------------------------------------------------------
 		//
@@ -343,6 +385,38 @@ int main(int argc, char** argv) {
 				}       
 			}
 		}
+		
+		// the code below writes the output coordinates in one file per processor for visualization purposes.
+    //=================
+    
+    if (settings.writeDebugCoordinates) {
+		
+		std::vector<DenseVector<ValueType> > coordinateCopy = coords;
+		
+scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );		
+        for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+            assert( coordinateCopy[dim].size() == N);
+            //coordinates[dim].redistribute(partition.getDistributionPtr());
+coordinateCopy[dim].redistribute( distFromPartition );			
+        }
+        
+        std::string destPath = "partResults/" +  ITI::tool2string(thisTool) +"/blocks_" + std::to_string(settings.numBlocks) ;
+        boost::filesystem::create_directories( destPath );   
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, N, settings.dimensions, destPath + "/debugResult");
+        comm->synchronize();
+        
+        //TODO: use something like the code below instead of a NoDistribution
+        //std::vector<IndexType> gatheredPart;
+        //comm->gatherImpl( gatheredPart.data(), N, 0, partition.getLocalValues(), scai::common::TypeTraits<IndexType>::stype );
+        /*
+        scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
+        graph.redistribute( noDistPtr, noDistPtr );
+        partition.redistribute( noDistPtr );
+        for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+            coords[dim].redistribute( noDistPtr );
+        }
+        */
+    }
 /*		
 memusage(&total, &used, &free, &buffers, &cached);	
 printf("\nMEM: avail: %ld , used: %ld , free: %ld , buffers: %ld , file cache: %ld \n\n",total,used,free,buffers, cached);

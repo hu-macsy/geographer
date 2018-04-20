@@ -358,11 +358,7 @@ TEST_F(MultiSectionTest, test1DPartitionOptimal){
     std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( nodeWeights, k, settings);
     
     //assertions - prints
-/*    
-for(int i=0; i<part1D.size(); i++){
-    PRINT0(i<< ": " << part1D[i] << " ++ " << weightPerPart[i] );
-}
-  */  
+
     SCAI_ASSERT( part1D.size()==weightPerPart.size() , "Wrong size of returned vectors: part1D.size()= " << part1D.size() << " and weightPerPart.size()= "<< weightPerPart.size());
     
     //PRINT("0: from [0 to" << part1D[0] <<") with weight " <<  weightPerPart[0] );
