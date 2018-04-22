@@ -426,19 +426,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 			std::cout << "i: " << iter << ", delta: " << delta << std::endl;
 		}
 		iter++;
-/*		
-		// if only cares about balance and running time, exit loop when balance is reached
-		if( settings.repartition and balanced )
-			break;
-		
-		if (settings.verbose) {
-			std::chrono::duration<ValueType,std::ratio<1>> iterTime = std::chrono::high_resolution_clock::now() - iterStart;			
-			ValueType time = iterTime.count() ;
-			std::cout<< "\t"<<comm->getRank() <<": " << time << " , balanced: "<< balanced << ", iter= "<< iter<< " , samplingRounds: " << samplingRounds;
-
-			std::cout << " , while cond: "<< (iter < samplingRounds || (iter < maxIterations && (delta > threshold || !balanced)) )  << std::endl;
-		}
-*/		
 	} while (iter < samplingRounds or (iter < maxIterations && (delta > threshold || !balanced)) );
 
 	return result;
