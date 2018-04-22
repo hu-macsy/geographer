@@ -21,7 +21,7 @@ protected:
 
 };
 
-TEST_F(KMeansTest, testFindInitialCenters) {
+TEST_F(KMeansTest, testFindInitialCentersSFC) {
 	std::string fileName = "bubbles-00010.graph";
 	std::string graphFile = graphPath + fileName;
 	std::string coordFile = graphFile + ".xyz";
@@ -34,9 +34,18 @@ TEST_F(KMeansTest, testFindInitialCenters) {
 	DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType p = comm->getSize();
+	Settings settings;
+	settings.numBlocks = k;
 
+    std::vector<ValueType> minCoords(settings.dimensions);
+    std::vector<ValueType> maxCoords(settings.dimensions);
+    for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+        minCoords[dim] = coords[dim].min().scai::lama::Scalar::getValue<ValueType>();
+        maxCoords[dim] = coords[dim].max().scai::lama::Scalar::getValue<ValueType>();
+        SCAI_ASSERT_NE_ERROR( minCoords[dim], maxCoords[dim], "min=max for dimension "<< dim << ", this will cause problems to the hilbert index. local= " << coords[0].getLocalValues().size() );
+    }
 
-	std::vector<std::vector<ValueType> > centers = KMeans::findInitialCenters(coords, k, uniformWeights);
+	std::vector<std::vector<ValueType> > centers = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords,  minCoords, maxCoords, settings);
 
 	//check for size
 	EXPECT_EQ(dimensions, centers.size());

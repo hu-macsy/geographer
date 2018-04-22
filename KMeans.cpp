@@ -101,7 +101,8 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(const std::vector<ValueType> &maxCoords, Settings settings){
-	
+	//This assumes that minCoords is 0!
+    //TODO: change or remove
 	const IndexType dimensions = settings.dimensions;
 	const IndexType k = settings.numBlocks;
 		
@@ -126,49 +127,8 @@ std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(const std::ve
 	return result;
 }
 
-
-template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType> > findInitialCenters(
-		const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights) {
-
-	SCAI_REGION( "KMeans.findInitialCenters" );
-
-	const IndexType dim = coordinates.size();
-	const IndexType n = coordinates[0].size();
-	//const IndexType localN = coordinates[0].getLocalValues().size();
-
-	std::vector<std::vector<ValueType> > result(dim);
-
-	for (IndexType d = 0; d < dim; d++) {
-		result[d].resize(k);
-	}
-
-	std::vector<IndexType> indices(k);
-
-	for (IndexType i = 0; i < k; i++) {
-		indices[i] = i * (n / k);
-	}
-
-	for (IndexType d = 0; d < dim; d++) {
-
-		IndexType i = 0;
-		for (IndexType index : indices) {
-			//yes, this is very expensive, since each call triggers a global communication. However, this needs to be done anyway, if not here then later.
-			result[d][i] = coordinates[d].getValue(index).Scalar::getValue<ValueType>();
-			i++;
-		}
-	}
-
-	//alternative:
-	//sort coordinates according to x coordinate first, then y coordinate. The schizoQuicksort currently only supports one sorting key, have to extend that.
-
-	return result;
-}
-
-
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findLocalCenters(	const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights) {
-		
 	const IndexType dim = coordinates.size();
 	//const IndexType n = coordinates[0].size();
 	const IndexType localN = coordinates[0].getLocalValues().size();
@@ -176,7 +136,7 @@ std::vector<std::vector<ValueType> > findLocalCenters(	const std::vector<DenseVe
 	// get sum of local weights 
 		
 	scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
-	SCAI_ASSERT_EQ_ERROR( rWeights.size(), localN, "Mismatch of nodeWeights and coordinates size. Chech distributions.");
+	SCAI_ASSERT_EQ_ERROR( rWeights.size(), localN, "Mismatch of nodeWeights and coordinates size. Check distributions.");
 	
 	ValueType localWeightSum = 0;
 	for (IndexType i=0; i<localN; i++) {
@@ -535,43 +495,6 @@ DenseVector<IndexType> assignBlocks(
 	return assignment;
 }
 
-/**
- */
-//WARNING: we do not use k as repartition assumes k=comm->getSize() and neither blockSizes and we assume
-// 			that every block has the same size
-
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings) {
-	
-	const IndexType localN = nodeWeights.getLocalValues().size();
-	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	const IndexType k = comm->getSize();
-	SCAI_ASSERT_EQ_ERROR(k, settings.numBlocks, "Deriving the previous partition from the distribution cannot work for p == k");
-	
-	// calculate the global weight sum to set the block sizes
-	//TODO: the local weight sums are already calculated in findLocalCenters, maybe extract info from there
-	ValueType globalWeightSum;
-	
-	{
-		ValueType localWeightSum = 0;
-		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
-		SCAI_ASSERT_EQ_ERROR( rWeights.size(), localN, "Mismatch of nodeWeights and coordinates size. Chech distributions.");
-		
-		for (IndexType i=0; i<localN; i++) {
-			localWeightSum += rWeights[i];
-		}
-	
-		globalWeightSum = comm->sum(localWeightSum);
-	}
-	
-	const std::vector<IndexType> blockSizes(settings.numBlocks, globalWeightSum/settings.numBlocks);
-	
-	std::vector<std::vector<ValueType> > initialCenters = findLocalCenters<IndexType,ValueType>(coordinates, nodeWeights);
-	//std::vector<std::vector<ValueType> > initialCenters = findLocalCenters(coordinates, nodeWeights);
-	
-	return computePartition(coordinates, nodeWeights, blockSizes, initialCenters, settings);
-}
-
 
 
 template std::vector<std::vector<ValueType> > findInitialCentersSFC<IndexType, ValueType>( const std::vector<DenseVector<ValueType> >& coordinates, const std::vector<ValueType> &minCoords,    const std::vector<ValueType> &maxCoords, Settings settings);
@@ -579,8 +502,6 @@ template std::vector<std::vector<ValueType> > findInitialCentersSFC<IndexType, V
 template std::vector<std::vector<ValueType> > findLocalCenters<IndexType,ValueType>(const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights);
 
 template std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly<IndexType,ValueType>(const std::vector<ValueType> &maxCoords, Settings settings);
-
-template std::vector<std::vector<ValueType> > findInitialCenters(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights);
 
 template std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<IndexType> &partition, const IndexType k, std::vector<IndexType>::iterator firstIndex, std::vector<IndexType>::iterator lastIndex, const DenseVector<ValueType> &nodeWeights);
 
@@ -590,8 +511,6 @@ template DenseVector<IndexType> assignBlocks(
         std::vector<IndexType>::iterator firstIndex, std::vector<IndexType>::iterator lastIndex,
         const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment, const std::vector<IndexType> &blockSizes, const SpatialCell &boundingBox,
         std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter, std::vector<ValueType> &influence, Settings settings);
-
-template DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings);
 
 }
 

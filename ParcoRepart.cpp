@@ -379,8 +379,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 						std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );
 						tempResult = ITI::KMeans::computePartition(coordinates, convertedWeights, migrationBlockSizes, migrationSettings);
 					}
-					//TODO: initial migration with external tools, how to do it to avoid dependance
-					//of the whole calss to Wrappers.?
+					//TODO: initial migration with external tools, how to do it to avoid dependence
+					//of the whole class to Wrappers.?
 					//else if (settings.initialMigration == InitialPartitioningMethods::MJ){
 					//	tempResult = ITI::Wrappers<IndexType,ValueType>::partition (input, coordinates, convertedWeights, ITI::Tool::zoltanMJ, migrationSettings, metrics);
 					//}
@@ -440,7 +440,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		
 		std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
 		if (settings.repartition) {
-			result = ITI::KMeans::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
+			result = ITI::KMeans::computeRepartition(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
 		} else {
 			result = ITI::KMeans::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings);
 		}

@@ -23,40 +23,139 @@ using scai::lama::DenseVector;
 namespace ITI {
 namespace KMeans {
 
+/**
+ * @brief Partition a point set using balanced k-means
+ *
+ * Wrapper without initial centers. Calls computePartition with centers derived from a Hilbert Curve
+ *
+ * @param[in] coordinates first level index specifies dimension, second level index the point id
+ * @param[in] nodeWeights
+ * @param[in] blockSizes target block sizes, not maximum sizes
+ * @param[in] settings Settings struct
+ *
+ * @return partition
+ */
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights,
 		const std::vector<IndexType> &blockSizes, const Settings settings);
 
+/**
+ * @brief Repartition a point set using balanced k-means.
+ *
+ * @param[in] coordinates first level index specifies dimension, second level index the point id
+ * @param[in] nodeWeights
+ * @param[in] blockSizes target block sizes, not maximum sizes
+ * @param[in] previous Previous partition
+ * @param[in] settings Settings struct
+ *
+ * @return partition
+ */
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights,
+DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights,
 		const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings);
 
 /**
- * Compute a partition using balanced k-means.
+ * @brief Partition a point set using balanced k-means.
+ *
+ * @param[in] coordinates first level index specifies dimension, second level index the point id
+ * @param[in] nodeWeights
+ * @param[in] blockSizes target block sizes, not maximum sizes
+ * @param[in] centers initial k-means centers
+ * @param[in] settings Settings struct
+ *
+ * @return partition
  */
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights,
 		const std::vector<IndexType> &blockSizes, std::vector<std::vector<ValueType> > centers, const Settings settings);
 
+/**
+ * Find initial centers for k-means by sorting the local points along a space-filling curve.
+ * Assumes that points are already divided globally according to their SFC indices, but the local order was changed to have increasing global node IDs,
+ * as required by the GeneralDistribution constructor.
+ *
+ * @param[in] coordinates
+ * @param[in] minCoords Minimum coordinate in each dimension, lower left point of bounding box (if in 2D)
+ * @param[in] maxCoords Maximum coordinate in each dimension, upper right point of bounding box (if in 2D)
+ * @param[in] settings
+ *
+ * @return coordinates of centers
+ */
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> >  findInitialCentersSFC(
 		const std::vector<DenseVector<ValueType> >& coordinates, const std::vector<ValueType> &minCoords,
 		const std::vector<ValueType> &maxCoords, Settings settings);
 
+/**
+ * @brief Compute initial centers from space-filling curve without considering point positions
+ * TODO: Currently assumes that minCoords = vector<ValueType>(settings.dimensions, 0). This is not always true! Fix or remove.
+ *
+ * @param[in] maxCoords Maximum coordinate in each dimension
+ * @param[in] settings
+ *
+ * @return coordinates of centers
+ */
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(const std::vector<ValueType> &maxCoords, Settings settings);
 
+/**
+ * Compute centers based on the assumption that the partition is equal to the distribution.
+ * Each process then picks the average of mass of its local points.
+ *
+ * @param[in] coordinates
+ * @param[in] nodeWeights
+ *
+ * @return coordinates of centers
+ */
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType> > findInitialCenters(const std::vector<DenseVector<ValueType>> &coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights);
+std::vector<std::vector<ValueType>> findLocalCenters(const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights);
 
-template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType>> findLocalCenters(const std::vector<DenseVector<ValueType> >& coordinates, IndexType k, const DenseVector<ValueType> &nodeWeights);
-
+/**
+ * Find centers of current partition.
+ * To enable random initialization of k-means with a subset of nodes, this function accepts iterators for the first and last local index that should be considered.
+ *
+ * @param[in] coordinates input points
+ * @param[in] partition
+ * @param[in] k number of blocks
+ * @param[in] firstIndex begin of local node indices
+ * @param[in] lastIndex end of local node indices
+ * @param[in] nodeWeights node weights
+ *
+ * @return coordinates of centers
+ */
 template<typename IndexType, typename ValueType, typename Iterator>
 std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<IndexType> &partition, const IndexType k,
 		const Iterator firstIndex, const Iterator lastIndex,
 		const DenseVector<ValueType> &nodeWeights);
 
+/**
+ * Assign points to block with smallest effective distance, adjusted for influence values.
+ * Repeatedly adjusts influence values to adhere to the balance constraint given by settings.epsilon
+ * To enable random initialization with a subset of the points, this function accepts iterators for the first and last local index that should be considered.
+ *
+ * The parameters upperBoundOwnCenter, lowerBoundNextCenter and influence are updated during point assignment.
+ *
+ * In contrast to the paper, the influence value is multiplied with the plain distance to compute the effective distance.
+ * Thus, blocks with higher influence values have larger distances to all points and will receive less points in the next iteration.
+ * Blocks which too few points get a lower influence value to attract more points in the next iteration.
+ *
+ * The returned vector has always as many entries as local points, even if only some of them are non-zero.
+ *
+ * @param[in] coordinates input points
+ * @param[in] centers block centers
+ * @param[in] firstIndex begin of local node indices
+ * @param[in] lastIndex end local node indices
+ * @param[in] nodeWeights node weights
+ * @param[in] previousAssignment previous assignment of points
+ * @param[in] blockSizes target block sizes
+ * @param[in] boundingBox min and max coordinates of local points, used to compute distance bounds
+ * @param[in,out] upperBoundOwnCenter for each point, an upper bound of the effective distance to its own center
+ * @param[in,out] lowerBoundNextCenter for each point, a lower bound of the effective distance to the next-closest center
+ * @param[in,out] influence a multiplier for each block to compute the effective distance
+ * @param[in] settings
+ *
+ * @return assignment of points to blocks
+ */
 template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &coordinates, const std::vector<std::vector<ValueType> > &centers,
 		const Iterator firstIndex, const Iterator lastIndex,
@@ -66,13 +165,14 @@ DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &c
 		std::vector<ValueType> &influence,
 		Settings settings);
 
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings);
-
 /**
  * Implementations
  */
 
+/**
+ * @brief Get local minimum and maximum coordinates
+ * TODO: This isn't used any more! Remove?
+ */
 template<typename ValueType>
 std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates) {
 	const int dim = coordinates.size();
@@ -85,7 +185,6 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 	return {minCoords, maxCoords};
 }
 
-//wrapper for initial partitioning
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights,
 		const std::vector<IndexType> &blockSizes, const Settings settings) {
@@ -103,15 +202,22 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	return computePartition(coordinates, nodeWeights, blockSizes, centers, settings);
 }
 
-//wrapper for repartitioning
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings) {
+DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings) {
 	const IndexType localN = nodeWeights.getLocalValues().size();
-	std::vector<IndexType> indices(localN);
-	const typename std::vector<IndexType>::iterator firstIndex = indices.begin();
-	typename std::vector<IndexType>::iterator lastIndex = indices.end();
-	std::iota(firstIndex, lastIndex, 0);
-	std::vector<std::vector<ValueType> > initialCenters = findCenters(coordinates, previous, settings.numBlocks, indices.begin(), indices.end(), nodeWeights);
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	std::vector<std::vector<ValueType> > initialCenters;
+
+	if (settings.numBlocks == comm->getSize()
+	        && comm->all(previous.getLocalValues().max() == comm->getRank())
+	        && comm->all(previous.getLocalValues().min() == comm->getRank())) {
+	    //partition is equal to distribution
+	    initialCenters = findLocalCenters<IndexType,ValueType>(coordinates, nodeWeights);
+	} else {
+	    std::vector<IndexType> indices(localN);
+	    std::iota(indices.begin(), indices.end(), 0);
+	    initialCenters = findCenters(coordinates, previous, settings.numBlocks, indices.begin(), indices.end(), nodeWeights);
+	}
 	return computePartition(coordinates, nodeWeights, blockSizes, initialCenters, settings);
 }
 
