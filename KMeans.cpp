@@ -98,7 +98,6 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 }
 
 
-
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(const std::vector<ValueType> &maxCoords, Settings settings){
 	//This assumes that minCoords is 0!

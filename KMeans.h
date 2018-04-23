@@ -57,6 +57,8 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 /**
  * @brief Partition a point set using balanced k-means.
  *
+ * This is the main function, others with the same name are wrappers for this one.
+ *
  * @param[in] coordinates first level index specifies dimension, second level index the point id
  * @param[in] nodeWeights
  * @param[in] blockSizes target block sizes, not maximum sizes
@@ -288,15 +290,18 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	//prepare sampling
 	std::vector<IndexType> localIndices(localN);
 	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
-	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();;
+	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
 	std::iota(localIndices.begin(), localIndices.end(), 0);
 
 	IndexType minNodes = settings.minSamplingNodes*blocksPerProcess;
+
 	assert(minNodes > 0);
 	IndexType samplingRounds = 0;
 	std::vector<IndexType> samples;
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
-	if (comm->all(localN > minNodes)) {
+	const bool randomInitialization = comm->all(localN > minNodes);
+
+	if (randomInitialization) {
 		ITI::GraphUtils::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
 
 		samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNodes*k)))+1;
