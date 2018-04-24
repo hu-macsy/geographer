@@ -9,7 +9,6 @@
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>
 #include <scai/lama/Vector.hpp>
-#include <scai/lama/Scalar.hpp>
 #include <scai/dmemo/Distribution.hpp>
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/common/Math.hpp>
@@ -33,14 +32,13 @@
 #include "quadtree/SpatialTree.h"
 #include "quadtree/SpatialCell.h"
 #include "quadtree/QuadTreeCartesianEuclid.h" 
+
 #include "AuxiliaryFunctions.h"
 #include "Settings.h"
 
-#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
-using scai::lama::Scalar;
 
 
 namespace ITI {
@@ -53,7 +51,7 @@ namespace ITI {
                 static void createOctaTreeMesh_2( scai::lama::CSRSparseMatrix<ValueType> &adjM,  std::vector<DenseVector<ValueType>> &coords, const IndexType numberOfPoints, const ValueType maxCoord);
                 
                 
-                static void writeGraphStructured3DMesh( std::vector<IndexType> numPoints, const std::string filename);
+                static void writeGraphStructured3DMesh_seq( std::vector<IndexType> numPoints, const std::string filename);
                 /** Creates a structed 3D mesh, both the adjacency matrix and the coordinates vectors.
                  * 
                  * @param[out] adjM The adjacency matrix of the output graph. Dimensions are [numPoints[0] x numPoints[1] x numPoints[2]].
@@ -61,7 +59,7 @@ namespace ITI {
                  * @param[in] maxCoord The maximum value a coordinate can have in each dimension, maxCoord.size()=3.
                  * @param[in] numPoints The number of points in every dimension, numPoints.size()=3.
                  */
-                static void createStructured3DMesh(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
+                static void createStructured3DMesh_seq(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints);
                 
                 /** Creates the adjacency matrix and the coordinate vector for a 3D mesh in a distributed way.
                  */
@@ -84,7 +82,7 @@ namespace ITI {
                 
                 /* Calculates the 3D distance between two points.
                  */
-                static Scalar dist3D(DenseVector<ValueType> p1, DenseVector<ValueType> p2);
+                static ValueType dist3D(DenseVector<ValueType> p1, DenseVector<ValueType> p2);
                                 
                 static ValueType dist3DSquared(std::tuple<IndexType, IndexType, IndexType> p1, std::tuple<IndexType, IndexType, IndexType> p2);
                 

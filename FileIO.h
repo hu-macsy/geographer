@@ -1,8 +1,8 @@
 /*
- * IO.h
+ * FileIO.h
  *
  *  Created on: 15.02.2017
- *      Author: moritzl
+ *      Authors: Moritz v. Looz, Charilaos Tzovas
  */
 
 #pragma once
@@ -22,9 +22,6 @@
 #include <set>
 #include <memory>
 
-#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-#define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-
 
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
@@ -39,9 +36,9 @@ namespace ITI {
          *                            coordinates. If the coordinates are in 2D the last number is 0.
          * MATRIXMARKET format: for graphs: we use the function readFromFile (or readFromSingleFile) 
          *                            provided by LAMA.
-         *                for coordiantes: first line has two numbers, the number of points N and
+         *                for coordinates: first line has two numbers, the number of points N and
          *                            the dimension d. Then next N*d lines contain the coordinates
-         *                            for the poitns: every d lines are the coordinates for a point.
+         *                            for the points: every d lines are the coordinates for a point.
         */
 
         
@@ -64,53 +61,76 @@ public:
 	 */
 	static void writeGraphDistributed (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
 
-    /* Write graph and partition into a .vtk file. This can be opened by paraview.
+    /** @brief Write graph and partition into a .vtk file. This can be opened by paraview.
+	 * 
+	 * @param[in] adjM The graph with N vertices given as an NxN adjacency matrix.
+	 * @param[in] coordinates Coordinates of input points.
+	 * @param[in] partition The partition of the input graph.
+	 * @param[in] filename The file's name to write to
      */
-    static void writeVTKCentral (const CSRSparseMatrix<ValueType> &adjM, const std::vector<DenseVector<ValueType>> &coords, const DenseVector<IndexType> &part, const std::string filename);
-    
-    static void writeVTKCentral_ver2 (const CSRSparseMatrix<ValueType> &adjM, const std::vector<DenseVector<ValueType>> &coords, const DenseVector<IndexType> &part, const std::string filename);
+    static void writeVTKCentral (const CSRSparseMatrix<ValueType> &adjM, const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<IndexType> &partition, const std::string filename);
     
 	/** Given the vector of the coordinates and their dimension, writes them in file "filename".
 	 * Coordinates are given as a DenseVector of size dim*numPoints.
+	 * 
+	 * @param[in] coordinates The coordinates of the points.
+	 * @param[in] filename The file's name to write to
 	*/
-	static void writeCoords (const std::vector<DenseVector<ValueType>> &coords, const std::string filename);
-
+	static void writeCoords (const std::vector<DenseVector<ValueType>> &coordinates, const std::string filename);
+	
+	/** Given the vector of the coordinates and their dimension, writes them in file "filename".
+	 * One by one the processors open the file and each PE writes its local part of the coordinates.
+	 * Coordinates are given as a DenseVector of size dim*numPoints.
+	 * 
+	 * @param[in] coordinates The coordinates of the points.
+	 * @param[in] filename The file's name to write to
+	*/
     static void writeCoordsParallel(const std::vector<DenseVector<ValueType>> &coords, const std::string filename);
     
-    /* Each PE writes its own part of the coordinates in a separate file.
+    /** @brief Each PE writes its own part of the coordinates in a separate file called filename_X.xyz where X is a number from 0 till the total number of PEs-1.
+	 * @param[in] coordinates The coordinates of the points.
+	 * @param[in] dimensions Number of dimensions of coordinates.
+	 * @param[in] filename The file's name to write to
      * */
-    static void writeCoordsDistributed (const std::vector<DenseVector<ValueType>> &coords, IndexType numPoints, const IndexType dimensions, const std::string filename);
+    static void writeCoordsDistributed (const std::vector<DenseVector<ValueType>> &coords,  const IndexType dimensions, const std::string filename);
 
-    /*Given the vector of the coordinates and the nodeWeights writes them both in a file in the form:
+    /** Given the vector of the coordinates and the nodeWeights writes them both in a file in the form:
     *
     *   cood1 coord2 ... coordD weight
     * 
     * for D dimensions. Each line coresponds to one point/vertex. Each PE, one after another, writes each own part.
+	* 
+	* @param[in] coordinates The coordinates of the points.
+	* @param[in] nodeWeights The weights for each point.
+	* @param[in] filename The file's name to write to
     * */
     static void writeInputParallel (const std::vector<DenseVector<ValueType>> &coords,const scai::lama::DenseVector<ValueType> nodeWeights, const std::string filename);
     
     /* Write a DenseVector in parallel in the filename. Each PE, one after another, write its own part.
      * */
     template<typename T>
-    void writeDenseVectorParallel(const DenseVector<T> &dv, const std::string filename);
+    static void writeDenseVectorParallel(const DenseVector<T> &dv, const std::string filename);
+	
+	/*TODO: merge with writeDenseVectorParallel*/
+	static void writePartitionParallel(const DenseVector<IndexType> &dv, const std::string filename);
     
     /**
 	 * Writes a partition to file.
 	 * @param[in] part
 	 * @param[in] filename The file's name to write to
 	 */
-	static void writePartitionParallel(const DenseVector<IndexType> &part, const std::string filename);
+	static void writeDenseVectorCentral(DenseVector<IndexType> &part, const std::string filename);
         
 	/** Reads a graph from filename in METIS format and returns the adjacency matrix.
 	 * @param[in] filename The file to read from.
-         * @param[in] fileFormat The type of file to read from. 
+	 * @param[in] fileFormat The type of file to read from. 
 	 * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
 	 */
 	static CSRSparseMatrix<ValueType> readGraph(const std::string filename, Format = Format::METIS);
 
 	/** Reads a graph from filename in METIS format and returns the adjacency matrix.
 	 * @param[in] filename The file to read from.
-         * @param[in] fileFormat The type of file to read from.
+	 * @param[in] fileFormat The type of file to read from.
 	 * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
 	 */
 	static CSRSparseMatrix<ValueType> readGraph(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights, Format = Format::METIS);
@@ -122,23 +142,56 @@ public:
 	 */
 	static scai::lama::CSRSparseMatrix<ValueType> readGraphBinary(const std::string filename);
         
-	/* Reads the coordinates from file "filename" and returns then in a vector of DenseVector
+	/*Every PE reads its part of the file. The file contains all the edges of the graph: each line has two numbers indicating
+	 * the vertices of the edge. 
+	 * 0 1
+	 * 0 2				0 - 1 - 3 - 4
+	 * 3 1				  \    /  
+	 * 4 3				    2 
+	 * 3 2
+	 */
+	static scai::lama::CSRSparseMatrix<ValueType> readEdgeList(const std::string filename, const bool binary = false);
+	
+	
+	/** @brief Edge list format but now there are k files, one for each PE
+	 * */
+	static scai::lama::CSRSparseMatrix<ValueType> readEdgeListDistributed(const std::string filename);
+	
+	/** @brief Reads the coordinates from file "filename" and returns then in a vector of DenseVector
+	 * 
+	 * @param[in] filename The file to read from.
+	 * @param[in] numberOfCoords The number of points contained in the file.
+	 * @param[in] dimensions Number of dimensions of coordinates.
+	 * @param[in] Format The format in which the coordinates are stored.
+	 * 
+	 * @return The coordinates
 	 */
 	static std::vector<DenseVector<ValueType>> readCoords ( std::string filename, IndexType numberOfCoords, IndexType dimension, Format = Format::METIS);
-
-        /**
-         * 
-         */
-        static std::vector<DenseVector<ValueType>> readCoordsBinary( std::string filename, const IndexType numberOfPoints, const IndexType dimension);
+	
+	/** @brief  Read coordinates from a binary file
+	 * 
+	 * @param[in] filename The name of the file to read the coordinates from.
+	 * @param[in] numberOfCoords The number of points contained in the file.
+	 * @param[in] dimension The dimension of the points
+	 * 
+	 * @return The coordinates
+     * 
+    */
+	static std::vector<DenseVector<ValueType>> readCoordsBinary( std::string filename, const IndexType numberOfCoords, const IndexType dimension);
         
         
-	/*
-	 * Read Coordinates in Ocean format of Vadym Aizinger
+	/** @brief  Read coordinates in Ocean format of Vadym Aizinger
 	 */
 	static std::vector<DenseVector<ValueType>> readCoordsOcean ( std::string filename, IndexType dimension);
 
-	/*
-	 * Read coordinates in TEEC format
+	/** @brief Read coordinates in TEEC format
+	 * 
+	 * @param[in] filename The name of the file to read the coordinates from.
+	 * @param[in] numberOfCoords The number of points contained in the file.
+	 * @param[in] dimension The dimension of the points
+	 * @param[out] nodeWeights Weights for every coordinate
+	 * 
+	 * @return The coordinates
 	 */
 	static std::vector<DenseVector<ValueType>> readCoordsTEEC ( std::string filename, IndexType numberOfCoords, IndexType dimension, std::vector<DenseVector<ValueType>>& nodeWeights);
 
@@ -178,12 +231,17 @@ public:
     
     /** The partition is redistributed and printed only by root processor.
      */    
-    static void writePartitionCentral( DenseVector<IndexType> &part, const std::string filename);
+    //static void writePartitionCentral( DenseVector<IndexType> &part, const std::string filename);
     
     
     /** Read graph and coordinates from a OFF file. Coordinates are (usually) in 3D.
     */
     static void readOFFTriangularCentral( scai::lama::CSRSparseMatrix<ValueType>& graph, std::vector<DenseVector<ValueType>>& coords, const std::string filename);
+
+	
+    /** Read graph and coordinates from a dom.geo file of the ALYA tool. Coordinates are (usually) in 3D.
+	*/
+    static void readAlyaCentral( scai::lama::CSRSparseMatrix<ValueType>& graph, std::vector<DenseVector<ValueType>>& coords, const IndexType N, const IndexType dimensions, const std::string filename);
 
 private:
 	/**

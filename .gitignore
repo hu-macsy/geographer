@@ -30,3 +30,7 @@ LLRUN.err.*
 scorep-failed*
 scorep-2017*
 *.cmd
+*.gcov
+*.gcno
+*.gcda
+*~

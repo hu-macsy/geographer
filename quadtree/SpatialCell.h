@@ -17,7 +17,7 @@
 #include <queue> 
 
 #include "Point.h"
-#include "../Settings.h"
+//#include "../Settings.h"
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 

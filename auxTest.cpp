@@ -9,13 +9,13 @@
 #include <scai/hmemo/Context.hpp>
 #include <scai/hmemo/HArray.hpp>
 
-#include <scai/utilskernel/LArray.hpp>
 #include <scai/lama/Vector.hpp>
 
 #include <algorithm>
 #include <memory>
 #include <cstdlib>
 #include <numeric>
+#include <chrono>
 
 #include "MeshGenerator.h"
 #include "FileIO.h"
@@ -24,13 +24,14 @@
 #include "LocalRefinement.h"
 #include "SpectralPartition.h"
 #include "GraphUtils.h"
+#include "AuxiliaryFunctions.h"
+#include "KMeans.h"
+#include "Metrics.h"
 
 #include "gtest/gtest.h"
 
 #include <boost/filesystem.hpp>
 
-#include "GraphUtils.h"
-#include "AuxiliaryFunctions.h"
 
 
 using namespace scai;
@@ -45,7 +46,7 @@ protected:
 
 TEST_F (auxTest, testInitialPartitions){
     
-    std::string fileName = "bigtrace-00000.graph";
+    std::string fileName = "trace-00008.graph";
     std::string file = graphPath + fileName;
     std::ifstream f(file);
     IndexType dimensions= 2;
@@ -121,7 +122,7 @@ TEST_F (auxTest, testInitialPartitions){
 	}
 
     if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, destPath+"pixelPart");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"pixelPart");
     }
     //cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
     cut = GraphUtils::computeCut( graph, pixeledPartition);
@@ -134,7 +135,7 @@ TEST_F (auxTest, testInitialPartitions){
 	scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, halo, settings);
     if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, destPath+"finalWithPixel");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"finalWithPixel");
     }
     cut = GraphUtils::computeCut( graph, pixeledPartition);
     imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( pixeledPartition, k);
@@ -166,7 +167,7 @@ TEST_F (auxTest, testInitialPartitions){
 
     //aux::print2DGrid( graph, hilbertPartition );
     if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, destPath+"hilbertPart");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"hilbertPart");
     }
     cut = GraphUtils::computeCut( graph, hilbertPartition);
     imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( hilbertPartition, k);
@@ -179,7 +180,7 @@ TEST_F (auxTest, testInitialPartitions){
 
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, halo, settings);
     if(dimensions==2){
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, destPath+"finalWithHilbert");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"finalWithHilbert");
     }
     cut = GraphUtils::computeCut( graph, hilbertPartition);
     imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( hilbertPartition, k);
@@ -194,129 +195,6 @@ TEST_F (auxTest, testInitialPartitions){
         std::cout<< "Output files written in " << destPath << std::endl;
     }
 
-}
-//-----------------------------------------------------------------
-
-TEST_F (auxTest,testGetBorderAndInnerNodes){
- 
-    std::string file = graphPath + "Grid32x32";
-    IndexType dimensions = 2;
-    IndexType N;
-    
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    IndexType k =comm->getSize();
-
-    // read graph and coords
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
-    N= graph.getNumRows();
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
-    
-    struct Settings settings;
-    settings.numBlocks= k;
-    settings.epsilon = 0.2;
-    settings.dimensions = dimensions;
-    settings.minGainForNextRound = 10;
-    settings.storeInfo = false;
-    
-    struct Metrics metrics(settings.numBlocks);
-    
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
-    
-    std::vector<IndexType> numBorderNodes;
-    std::vector<IndexType> numInnerNodes;
-    
-    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition);
-    
-    //assertions - prints
-    SCAI_ASSERT_EQ_ERROR( numBorderNodes.size(), k, "Size of numBorderNodes is wrong");
-    SCAI_ASSERT_EQ_ERROR( numInnerNodes.size(), k, "Size of numInnerNodes is wrong");
-    
-    if( comm->getRank()==0 ){
-        for(int i=0; i<k; i++){
-            std::cout<<"Block " << i << " has " << numBorderNodes[i] << " border nodes and " << numInnerNodes[i] << " inner nodes"<< std::endl;
-        }
-    }
-    
-    IndexType totalBorderNodes = std::accumulate( numBorderNodes.begin(), numBorderNodes.end(), 0);
-    IndexType totalInnerNodes = std::accumulate( numInnerNodes.begin(), numInnerNodes.end(), 0);
-
-    SCAI_ASSERT_EQ_ERROR( totalBorderNodes+totalInnerNodes, N, "Sum of nodes not correct" );
-    
-}
-//-----------------------------------------------------------------
-
-TEST_F (auxTest,testComputeCommVolume){
- 
-    std::string file = graphPath + "Grid32x32";
-    IndexType dimensions = 2;
-    IndexType N;
-    
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    IndexType k =comm->getSize();
-
-    // read graph and coords
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
-    N= graph.getNumRows();
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
-    
-    struct Settings settings;
-    settings.numBlocks= k;
-    settings.epsilon = 0.2;
-    settings.dimensions = dimensions;
-    settings.minGainForNextRound = 10;
-    settings.storeInfo = false;
-    
-    struct Metrics metrics(settings.numBlocks);
-    
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
-    
-    std::vector<IndexType> commVolume = ITI::GraphUtils::computeCommVolume( graph, partition );
-        
-    std::vector<IndexType> numBorderNodes;
-    std::vector<IndexType> numInnerNodes;
-    
-    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition);
-    
-    SCAI_ASSERT_EQ_ERROR( commVolume.size(), numBorderNodes.size(), "size mismatch");
-    
-    for(int i=0; i< commVolume.size(); i++){
-        if( k<20){
-            PRINT0("block " << i << ": commVol= " << commVolume[i] << " , boundaryNodes= "<< numBorderNodes[i]);
-        }
-        SCAI_ASSERT_LE_ERROR( numBorderNodes[i], commVolume[i], "Communication volume must be less than boundary nodes")
-    }
-    
-}
-//-----------------------------------------------------------------
- 
-TEST_F (auxTest,testGraphMaxDegree){
-    
-    const IndexType N = 1000;
-    const IndexType k = 10;
-
-    //define distributions
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-
-    //generate random complete matrix
-    scai::lama::CSRSparseMatrix<ValueType> graph(dist, noDistPointer);
-    
-    for( int i=0; i<10; i++){
-        scai::lama::MatrixCreator::fillRandom(graph, i/9.0);
-    
-        IndexType maxDegree;
-        maxDegree = GraphUtils::getGraphMaxDegree<IndexType, ValueType>(graph);
-        //PRINT0("maxDegree= " << maxDegree);
-        
-        EXPECT_LE( maxDegree, N);
-        EXPECT_LE( 0, maxDegree);
-        if ( i==0 ){
-            EXPECT_EQ( maxDegree, 0);
-        }else if( i==9 ){
-            EXPECT_EQ( maxDegree, N);
-        }
-    }
 }
 //-----------------------------------------------------------------
 
@@ -394,6 +272,128 @@ TEST_F(auxTest, testIndex2_2DPoint){
         EXPECT_GE(std::get<1>(ind) , 0);
     }
 }
+//-----------------------------------------------------------------
 
+
+TEST_F(auxTest, testBenchIndexReordering){
+
+	IndexType M = 51009;
+	
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();	
+	std::chrono::time_point<std::chrono::high_resolution_clock> FYstart = std::chrono::high_resolution_clock::now();
+	
+	std::vector<IndexType> indices(M);
+	const typename std::vector<IndexType>::iterator firstIndex = indices.begin();
+	typename std::vector<IndexType>::iterator lastIndex = indices.end();
+	std::iota(firstIndex, lastIndex, 0);
+	GraphUtils::FisherYatesShuffle(firstIndex, lastIndex, M);
+	
+	std::chrono::duration<ValueType,std::ratio<1>> FYtime = std::chrono::high_resolution_clock::now() - FYstart;
+	PRINT0("FisherYatesShuffle for " << M <<" points is " << FYtime.count() );
+	
+	for(int i=0; i<M; i++){
+		EXPECT_LT(indices[i],M);
+		EXPECT_GE(indices[i],0);
+	}
+	EXPECT_EQ( indices.size(), M );
+	
+	
+	
+	// cantor reordering
+	std::chrono::time_point<std::chrono::high_resolution_clock> Cstart = std::chrono::high_resolution_clock::now();
+	std::vector<IndexType> indicesCantor(M);
+	indicesCantor = GraphUtils::indexReorderCantor( M );
+		
+	std::chrono::duration<ValueType,std::ratio<1>> Ctime = std::chrono::high_resolution_clock::now() - Cstart;
+	PRINT0("Cantor for " << M <<" points is " << Ctime.count() );
+	
+	for(int i=0; i<M; i++){
+		EXPECT_LT(indicesCantor[i],M);
+		EXPECT_GE(indicesCantor[i],0);
+	}
+	EXPECT_EQ( indices.size(), M );
+	
+	//checks
+	
+	IndexType indexSumFY = std::accumulate( indices.begin(), indices.end(), 0);
+	IndexType indexSumC = std::accumulate( indicesCantor.begin(), indicesCantor.end(), 0);
+	// even with integer oveflow they should be the same, TODO: right?
+	EXPECT_EQ( indexSumFY, indexSumC);
+	
+	
+	//WARNING: integer overflow for bigger values
+	if(M<60000){
+		EXPECT_EQ( indexSumFY, M*(M-1)/2);
+		EXPECT_EQ( indexSumC, M*(M-1)/2);
+	}
+		
+}
+
+//-----------------------------------------------------------------
+
+//TODO: 11.04.18, Moritz has started a new branch for that. Remove tests and functions if not needed here
+/*
+TEST_F(auxTest, testBenchKMeansSFCCoords){
+	//std::string fileName = "bubbles-00010.graph";
+	std::string fileName = "Grid32x32";
+	std::string graphFile = graphPath + fileName;
+	std::string coordFile = graphFile + ".xyz";
+	const IndexType dimensions = 2;
+	
+	//load graph and coords
+	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+	const IndexType n = graph.getNumRows();
+	std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
+	
+	DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
+	
+	struct Settings settings;
+	settings.dimensions = dimensions;
+	settings.numBlocks = comm->getSize();
+		
+	std::chrono::time_point<std::chrono::high_resolution_clock> SFCstart = std::chrono::high_resolution_clock::now();
+	DenseVector<IndexType> partitionSFC = KMeans::getPartitionWithSFCCoords<IndexType>( graph, coords, uniformWeights, settings);
+	std::chrono::duration<ValueType,std::ratio<1>> SFCtime = std::chrono::high_resolution_clock::now() - SFCstart;
+	ValueType time = comm->max( SFCtime.count() );
+	PRINT0("time for the sfc coordinates: " << time );
+	
+	partitionSFC.redistribute( dist );
+	struct Metrics metrics1(1);
+	
+	metrics1.getAllMetrics( graph, partitionSFC, uniformWeights, settings );
+	printMetricsShort( metrics1, std::cout );
+	
+	ITI::aux<IndexType,ValueType>::print2DGrid(graph, partitionSFC  );
+	
+	// get k-means partition by copying and redistributing the original coords
+	
+	std::chrono::time_point<std::chrono::high_resolution_clock> startOrig = std::chrono::high_resolution_clock::now();
+	DenseVector<IndexType> tempResult = ParcoRepart<IndexType, ValueType>::hilbertPartition(coords, settings);
+	
+	std::vector<DenseVector<ValueType> > coordinateCopy = coords;
+	for (IndexType d = 0; d < dimensions; d++) {
+		coordinateCopy[d].redistribute( tempResult.getDistributionPtr() );
+	}
+	
+	const std::vector<IndexType> blockSizes(settings.numBlocks, n/settings.numBlocks);
+	DenseVector<IndexType> partitionOrig = KMeans::computePartition(coordinateCopy, settings.numBlocks, uniformWeights, blockSizes, settings);
+	
+	std::chrono::duration<ValueType,std::ratio<1>> timeOrig = std::chrono::high_resolution_clock::now() - startOrig;
+	time = comm->max( timeOrig.count() );
+	PRINT0("time for the original coordinates: " << time );
+	
+	
+	partitionOrig.redistribute( dist );
+	
+	struct Metrics metrics2(1);
+	
+	metrics2.getAllMetrics( graph, partitionOrig, uniformWeights, settings );
+	printMetricsShort( metrics2, std::cout );
+	
+	ITI::aux<IndexType,ValueType>::print2DGrid(graph, partitionOrig  );
+}
+*/
 
 }

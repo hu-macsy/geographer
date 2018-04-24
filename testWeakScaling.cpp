@@ -9,7 +9,6 @@
 #include <scai/hmemo/Context.hpp>
 #include <scai/hmemo/HArray.hpp>
 
-#include <scai/utilskernel/LArray.hpp>
 #include <scai/lama/Vector.hpp>
 
 #include <boost/algorithm/string.hpp>
@@ -32,41 +31,6 @@
 #include "GraphUtils.h"
 
 //----------------------------------------------------------------------------
-
-namespace ITI {
-	std::istream& operator>>(std::istream& in, Format& format)
-	{
-		std::string token;
-		in >> token;
-		if (token == "AUTO" or token == "0")
-			format = ITI::Format::AUTO ;
-		else if (token == "METIS" or token == "1")
-			format = ITI::Format::METIS;
-		else if (token == "ADCIRC" or token == "2")
-			format = ITI::Format::ADCIRC;
-		else if (token == "OCEAN" or token == "3")
-			format = ITI::Format::OCEAN;
-		else
-			in.setstate(std::ios_base::failbit);
-		return in;
-	}
-
-	std::ostream& operator<<(std::ostream& out, Format& method)
-	{
-		std::string token;
-
-		if (method == ITI::Format::AUTO)
-			token = "AUTO";
-		else if (method == ITI::Format::METIS)
-			token = "METIS";
-		else if (method == ITI::Format::ADCIRC)
-			token = "ADCIRC";
-		else if (method == ITI::Format::OCEAN)
-			token = "OCEAN";
-		out << token;
-		return out;
-	}
-}
 
 std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
 {

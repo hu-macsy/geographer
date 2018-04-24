@@ -9,7 +9,6 @@
 #include <scai/hmemo/Context.hpp>
 #include <scai/hmemo/HArray.hpp>
 
-#include <scai/utilskernel/LArray.hpp>
 #include <scai/lama/Vector.hpp>
 
 #include <algorithm>
@@ -227,7 +226,7 @@ TEST_F(MultiSectionTest, testGetRectangles){
     PRINT0( "minWeight= "<< minWeight << " , maxWeight= "<< maxWeight );
     
     //all points are covered by a rectangle
-    ValueType sumWeight = nodeWeights.sum().Scalar::getValue<ValueType>();
+    ValueType sumWeight = nodeWeights.sum();
     SCAI_ASSERT( totalWeight==sumWeight , "sum of all rectangles weight= "<< totalWeight << " and should be equal the sum of weights= "<< sumWeight);
     // this works even when weights are not 1
     SCAI_ASSERT( totalVolume==N , "total volume= "<< totalVolume << " and should be equal the number of points= "<< N);
@@ -358,11 +357,7 @@ TEST_F(MultiSectionTest, test1DPartitionOptimal){
     std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( nodeWeights, k, settings);
     
     //assertions - prints
-/*    
-for(int i=0; i<part1D.size(); i++){
-    PRINT0(i<< ": " << part1D[i] << " ++ " << weightPerPart[i] );
-}
-  */  
+
     SCAI_ASSERT( part1D.size()==weightPerPart.size() , "Wrong size of returned vectors: part1D.size()= " << part1D.size() << " and weightPerPart.size()= "<< weightPerPart.size());
     
     //PRINT("0: from [0 to" << part1D[0] <<") with weight " <<  weightPerPart[0] );
@@ -372,7 +367,7 @@ for(int i=0; i<part1D.size(); i++){
     PRINT(k-1 << ": from ["<< part1D.back() << " to " << N-1 << "] with weight " << weightPerPart.back() );
     
     ValueType totalWeight = std::accumulate(weightPerPart.begin(), weightPerPart.end(), 0.0);
-    ValueType averageWeight = totalWeight/k;
+    //ValueType averageWeight = totalWeight/k;
         
     SCAI_ASSERT( totalWeight==origTotalWeight, "totalWeight= "<< totalWeight << " should be= "<< origTotalWeight );
     
@@ -410,7 +405,7 @@ TEST_F(MultiSectionTest, test1DPartitionOptimalRandomWeights){
     */
     
     const ValueType origTotalWeight = std::accumulate( nodeWeights.begin(), nodeWeights.end(), 0.0);
-    const ValueType optimalWeight = origTotalWeight/k;
+    //const ValueType optimalWeight = origTotalWeight/k;
     //PRINT0(origTotalWeight << " @@ " << optimalWeight);
     
     std::vector<ValueType> weightPerPart, weightPerPartGreedy, weightPerPartMine;
@@ -895,7 +890,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
     std::vector<std::vector<IndexType>> coords( localN, std::vector<IndexType>( dimensions, 0) );
     {
         for (IndexType d = 0; d < dimensions; d++) {
-            const scai::utilskernel::LArray<IndexType>& localPartOfCoords = coordinates[d].getLocalValues();
+            const scai::hmemo::HArray<IndexType>& localPartOfCoords = coordinates[d].getLocalValues();
             for (IndexType i = 0; i < localN; i++) {
                 coords[i][d] = IndexType (localPartOfCoords[i]);
             }
@@ -981,7 +976,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
     PRINT0( "minWeight= "<< minWeight << " , maxWeight= "<< maxWeight );
     
     //all points are covered by a rectangle
-    ValueType sumWeight = nodeWeights.sum().Scalar::getValue<ValueType>();
+    ValueType sumWeight = nodeWeights.sum();
     SCAI_ASSERT( totalWeight==sumWeight , "sum of all rectangles weight= "<< totalWeight << " and should be equal the sum of weights= "<< sumWeight);
     // this works even when weights are not 1
     SCAI_ASSERT( totalVolume==N , "total volume= "<< totalVolume << " and should be equal the number of points= "<< N);    
@@ -1051,7 +1046,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
         for (IndexType d = 0; d < dimensions; d++) {
             //scaledCoords[d].allocate( dist );
             //scaledCoords[d] = static_cast<ValueType>( 0 );
-            const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
+            const scai::hmemo::HArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
             
             for (IndexType i = 0; i < localN; i++) {
                 ValueType coord = localPartOfCoords[i];
@@ -1070,7 +1065,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
         
         for (IndexType d = 0; d < dimensions; d++) {
             //get local parts of coordinates
-            const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
+            const scai::hmemo::HArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
             
             for (IndexType i = 0; i < localN; i++) {
                 ValueType normalizedCoord = (localPartOfCoords[i] - minCoords[d])/(maxCoords[d]-minCoords[d]);
@@ -1346,7 +1341,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
     if( comm->getRank()==0 ){
         for(int i=0; i<numRows; i++){
             for(int j=0; j<numCols; j++){
-                std::cout<< blockGraph.getValue(i,j).Scalar::getValue<IndexType>() << " ";
+                std::cout<< blockGraph.getValue(i,j) << " ";
             }
             std::cout << std::endl;
         }
@@ -1396,7 +1391,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
     std::vector<std::vector<IndexType>> coordsIndex( localN, std::vector<IndexType>(dimensions,0) );
     {
         for (IndexType d = 0; d < dimensions; d++) {
-            const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
+            const scai::hmemo::HArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
             
             for (IndexType i = 0; i < localN; i++) {
                 coordsIndex[i][d] = localPartOfCoords[i];
@@ -1459,7 +1454,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
     // bBox0 not leaf, bBox1=projections[2], bBox2=projections[0] , bBox3=projections[1]
 
     ValueType totalGridWeight = N;
-    SCAI_ASSERT( totalGridWeight==nodeWeights.sum() , "Wrong sum of node weights: "<< nodeWeights.sum().Scalar::getValue<IndexType>() );
+    SCAI_ASSERT( totalGridWeight==nodeWeights.sum() , "Wrong sum of node weights: "<< nodeWeights.sum() );
     
     for(int d=0; d<dimensions; d++){
         //dim2proj.size() = number of leaves/rectangles
@@ -1494,7 +1489,7 @@ TEST_F(MultiSectionTest, testInbBox){
     IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
-    IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
+    //IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
     
     // for all dimensions i: first[i]<second[i] 
     rectangle bBox;

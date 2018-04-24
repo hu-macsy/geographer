@@ -12,8 +12,6 @@
 #include <scai/hmemo/WriteAccess.hpp>
 #include <scai/hmemo/ReadAccess.hpp>
 
-#include <scai/utilskernel/LArray.hpp>
-
 #include <memory>
 #include <cstdlib>
 #include <fstream>
@@ -155,7 +153,7 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_3D) {
     
     {
     SCAI_REGION("testCreateStructuredMesh_Distributed_3D.check_coords_2")
-    std::vector<scai::utilskernel::LArray<ValueType>> localCoords(3);
+    std::vector<scai::hmemo::HArray<ValueType>> localCoords(3);
     for(IndexType i=0; i<3; i++){
         localCoords[i] = coords[i].getLocalValues();
     }
@@ -239,8 +237,8 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_2D) {
             }
         }
     }
-    IndexType numX= numPoints[0];
-    IndexType numY= numPoints[1];
+    //IndexType numX= numPoints[0];
+    //IndexType numY= numPoints[1];
     
     //PRINT( comm->sum(cntCorners) );
     
@@ -253,7 +251,7 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_2D) {
     
     {
         SCAI_REGION("testCreateStructuredMesh_Distributed_3D.check_coords_2")
-        std::vector<scai::utilskernel::LArray<ValueType>> localCoords(2);
+        std::vector<scai::hmemo::HArray<ValueType>> localCoords(2);
         for(IndexType i=0; i<2; i++){
             localCoords[i] = coords[i].getLocalValues();
         }
@@ -474,16 +472,7 @@ TEST_F(MeshGeneratorTest, testSimpleMeshFromQuadTree_2D){
         ITI::FileIO<IndexType, ValueType>::writeCoords(coords, outCoords);
     }
 }
-//-----------------------------------------------------------------
 
-//dummy/temp test, better be removed
-TEST_F(MeshGeneratorTest, testWriteGridInFile){
-
-    std::vector<IndexType> numPoints (3, 4);
-    
-    ITI::MeshGenerator<IndexType, ValueType>::writeGraphStructured3DMesh( numPoints, "Grid_3D_"+std::to_string(numPoints[0]));
-    
-}
 //-----------------------------------------------------------------
     
 }//namespace ITI

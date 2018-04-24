@@ -2,7 +2,7 @@
  * IOTest.cpp
  *
  *  Created on: 15.02.2017
- *      Author: moritzl
+ *      Authors: Charilaos Tzovas, Moritz von Looz
  */
 
 #include <scai/lama.hpp>
@@ -18,8 +18,6 @@
 #include <scai/hmemo/HArray.hpp>
 #include <scai/hmemo/WriteAccess.hpp>
 #include <scai/hmemo/ReadAccess.hpp>
-
-#include <scai/utilskernel/LArray.hpp>
 
 #include <memory>
 
@@ -85,7 +83,6 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
     std::string file = "slowrot-00000.graph";
     std::string filename= graphPath + file;
     CSRSparseMatrix<ValueType> Graph;
-    IndexType N;    //number of points
 
     std::ifstream f(filename);
     IndexType nodes, edges;
@@ -100,7 +97,6 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
         SCAI_REGION("testReadAndWriteGraphFromFile.readGraphFromFile");
         Graph = FileIO<IndexType, ValueType>::readGraph(filename);
     }
-    N = Graph.getNumColumns();
     EXPECT_EQ(Graph.getNumColumns(), Graph.getNumRows());
     EXPECT_EQ(nodes, Graph.getNumColumns());
     EXPECT_EQ(edges, (Graph.getNumValues())/2 );
@@ -112,7 +108,7 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
 
     comm->synchronize();
 
-    // read new graph from the new file we just written
+    // read new graph from the new file we just wrote
     CSRSparseMatrix<ValueType> Graph2 = FileIO<IndexType, ValueType>::readGraph( fileTo );
 
     // check that the two graphs are identical
@@ -146,7 +142,7 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
 // usually, graph file: "file.graph", coordinates file: "file.graph.xy" or .xyz
 TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     CSRSparseMatrix<ValueType> graph;       //the graph as an adjacency matrix
-    IndexType dim= 2, k= 8, i;
+    IndexType dim= 2, k= 8;
     ValueType epsilon= 0.1;
 
     std::string file= "slowrot-00000.graph";
@@ -231,17 +227,24 @@ TEST_F(FileIOTest, testWriteCoordsDistributed){
     std::vector<DenseVector<ValueType>> coords2D = FileIO<IndexType, ValueType>::readCoords( coordFile, nodes, dim);
     EXPECT_TRUE(coords2D[0].getDistributionPtr()->isEqual(*distPtr));
     
-    FileIO<IndexType, ValueType>::writeCoordsDistributed( coords2D, nodes, dim, "writeCoordsDist");
+    FileIO<IndexType, ValueType>::writeCoordsDistributed( coords2D, dim, "writeCoordsDist");
     //TODO: delete files after they have been written!
 }
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadCoordsOcean) {
-	std::string graphFile = graphPath + "fesom_core2.graph";
 	std::string coordFile = graphPath + "node2d_core2.out";
+	const IndexType n = 126858;
 
 	std::vector<DenseVector<ValueType> > coords = FileIO<IndexType, ValueType>::readCoordsOcean(coordFile, 2);
-	EXPECT_EQ(126858, coords[0].size());
+	EXPECT_EQ(n, coords[0].size());
+
+	for (IndexType d = 0; d < 2; d++) {
+	    scai::hmemo::ReadAccess<ValueType> rCoords(coords[d].getLocalValues());
+	    for (IndexType i = 0; i < rCoords.size(); i++ ) {
+	        EXPECT_TRUE(std::isfinite(rCoords[i]));
+        }
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -256,6 +259,50 @@ TEST_F(FileIOTest, testReadQuadTree){
 	//IndexType m = std::accumulate(edgeList.begin(), edgeList.end(), 0, [](int previous, std::set<std::shared_ptr<SpatialCell> > & edgeSet){return previous + edgeSet.size();});
 	//std::cout << "Read Quadtree with " << edgeList.size() << " nodes and " << m << " edges." << std::endl;
 }
+
+//-------------------------------------------------------------------------------------------------
+
+TEST_F(FileIOTest, testReadBinaryEdgeList) {
+    std::string filename = graphPath + "delaunay-3D-12.edgelist";
+
+    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(filename, ITI::Format::BINARYEDGELIST);
+
+    scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+
+    const IndexType n = graph.getNumRows();
+    //const IndexType localN = dist->getLocalSize();
+    EXPECT_EQ(4096, n);
+    EXPECT_TRUE(graph.isConsistent());
+    EXPECT_EQ(n, graph.getNumColumns());
+
+    //check degree symmetry
+    std::vector<IndexType> inDegree(n);
+    std::vector<IndexType> outDegree(n);
+    scai::hmemo::ReadAccess<IndexType> ia(graph.getLocalStorage().getIA());
+    scai::hmemo::ReadAccess<IndexType> ja(graph.getLocalStorage().getJA());
+
+    for (IndexType i = 0; i < graph.getLocalNumRows(); i++) {
+        const IndexType globalI = dist->local2global(i);//this can be optimized
+        outDegree[globalI] = ia[i+1] - ia[i];
+    }
+
+    for (IndexType i = 0; i < ja.size(); i++) {
+        inDegree[ja[i]]++;
+    }
+
+    comm->sumImpl(outDegree.data(), outDegree.data(), n, scai::common::TypeTraits<IndexType>::stype);
+    comm->sumImpl(inDegree.data(), inDegree.data(), n, scai::common::TypeTraits<IndexType>::stype);
+
+    for (IndexType i = 0; i < n; i++) {
+        EXPECT_EQ(inDegree[i], outDegree[i]);
+    }
+
+    //check actual symmetry
+    //EXPECT_TRUE(graph.checkSymmetry());
+
+}
+
 //-------------------------------------------------------------------------------------------------
 
 TEST_F(FileIOTest, testReadGraphBinary){
@@ -385,14 +432,12 @@ TEST_F(FileIOTest, testWriteCoordsParallel){
     EXPECT_TRUE(coordsOrig[0].getDistributionPtr()->isEqual(*blockDist));
 
     //
-    // write coords in parallel
-    
+    // write coords in parallel    
     std::string outFilename = std::string( file+"_parallel.xyz");
     
     FileIO<IndexType, ValueType>::writeCoordsParallel( coordsOrig, outFilename);
     
-    //now read the coords
-    
+    //now read the coords    
     std::vector<DenseVector<ValueType>> coordsBinary =  FileIO<IndexType, ValueType>::readCoordsBinary( outFilename, N, dimensions);
     
     
@@ -489,9 +534,9 @@ TEST_F(FileIOTest, testReadGraphAndCoordsBinary){
 }
 //-------------------------------------------------------------------------------------------------
 
-TEST_F (FileIOTest, testWritePartitionCentral){
-    std::string file= "biplane9.graph";
-    std::string grFile= "./localMeshes/" +file , coordFile= "./localMeshes/" +file +".xyz";  //graph file and coordinates file
+TEST_F (FileIOTest, testWriteDenseVectorCentral){
+    std::string file= "trace-00008.graph";
+    std::string grFile= graphPath +file , coordFile= graphPath +file +".xyz";  //graph file and coordinates file
     IndexType dimensions = 2;
     std::fstream f(grFile);
     IndexType N;
@@ -512,14 +557,11 @@ TEST_F (FileIOTest, testWritePartitionCentral){
     settings.epsilon = 0.5;
     settings.dimensions = dimensions;
     settings.initialPartition = InitialPartitioningMethods::KMeans;
-   
-   
-    //settings.fileName = fileName;
     settings.multiLevelRounds = 12;
-    settings.minGainForNextRound= int(k/4);
+    settings.minGainForNextRound= 1;
     // 5% of (approximetely, if at every round you get a 60% reduction in nodes) the nodes of the coarsest graph
     //settings.minBorderNodes = N*std::pow(0.6, settings.multiLevelRounds)/k * 0.05;
-    settings.minBorderNodes = 4*std::sqrt((ValueType(N))/k);
+    settings.minBorderNodes = std::sqrt((ValueType(N))/k);
     settings.coarseningStepsBetweenRefinement = 3;
     settings.stopAfterNoGainRounds = 200;
 
@@ -532,10 +574,10 @@ TEST_F (FileIOTest, testWritePartitionCentral){
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, uniformWeights, settings, metrics);
     
 
-    metrics.getMetrics( graph, partition, uniformWeights, settings);
+    metrics.getAllMetrics( graph, partition, uniformWeights, settings);
     metrics.print( std::cout );
     
-    FileIO<IndexType, ValueType>::writePartitionCentral( partition, file+"_k_"+std::to_string(k)+".part");
+    FileIO<IndexType, ValueType>::writeDenseVectorCentral( partition, file+"_k_"+std::to_string(k)+".part");
     
 }
 
@@ -590,28 +632,27 @@ TEST_F (FileIOTest, testreadOFFCentral){
     PRINT( graph.getNumValues() << " _ " << graph.getNumRows() << " @ " << graph.getNumColumns() );
 }
 //-------------------------------------------------------------------------------------------------
-/*
-TEST_F (FileIOTest, testreadPartition){
-    std::string file = graphPath+ "example.partition";
-    
-        IndexType numVertices;
-    {
-        std::ifstream f(file);
-        if(f.fail())
-            throw std::runtime_error("File "+ file + " failed.");
-        
-        std::string line;
-        std::getline(f, line);
-        if( line[0]=='%' ){
-            std::stringstream ss;
-            ss.str( line );
-            ss >> numVertices >> numFaces >> numEdges;
-    }
-    scai::lama::DenseVector<IndexType> partition = ITI::FileIO::readPartition( file,
-    
-}
 
-*/
-    
+TEST_F (FileIOTest, testReadEdgeListDistributed){
+	
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	if( comm->getSize() != 4 ){
+		if( comm->getRank() == 0){
+			std::cout << "\n\t\t### WARNING: this test, " << __FUNCTION__ << " reads a distributed file and only works for p=4. You should call again with mpirun -n 4 (maybe also with --gtest_filter=*ReadEdgeListDistributed)." << std::endl<< std::endl;
+		}		
+	}
+	ASSERT_EQ( comm->getSize(), 4) << "Specific number of processors needed for this test: 4";
+
+    std::string file = graphPath + "tmp4/out";
+
+    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readEdgeListDistributed( file );
+
+    ASSERT_TRUE( graph.isConsistent());
+    EXPECT_TRUE( graph.checkSymmetry() );
+    EXPECT_EQ( graph.getNumRows(), graph.getNumColumns()) << "Matrix is not square";
+
+    // only for graph: graphPath + "tmp4/out"
+    EXPECT_EQ( graph.getNumRows(), 16) << "for files tmp4/out N must be 16";
+}
 
 } /* namespace ITI */

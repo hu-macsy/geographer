@@ -6,8 +6,6 @@
 #include <unistd.h>
 
 #include "FileIO.h"
-//#include "Settings.h"
-
 
 typedef double ValueType;
 typedef int IndexType;

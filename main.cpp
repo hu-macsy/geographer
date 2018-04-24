@@ -31,110 +31,6 @@
 #include "GraphUtils.h"
 
 
-
-void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
-    
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    
-    IndexType numRuns = metricsVec.size();
-    
-    if( comm->getRank()==0 ){
-        out << "# times, input, migrAlgo, 1distr, kmeans, 2redis, prelim, localRef, total,    prel cut, finalcut, imbalance,    maxBnd, totalBnd,    maxCommVol, totalCommVol,    BorNodes max, avg  " << std::endl;
-    }
-
-    ValueType sumMigrAlgo = 0;
-    ValueType sumFirstDistr = 0;
-    ValueType sumKmeans = 0;
-    ValueType sumSecondDistr = 0;
-    ValueType sumPrelimanry = 0; 
-    ValueType sumLocalRef = 0; 
-    ValueType sumFinalTime = 0;
-    
-    IndexType sumPreliminaryCut = 0;
-    IndexType sumFinalCut = 0;
-    ValueType sumImbalace = 0;
-    IndexType sumMaxBnd = 0;
-    IndexType sumTotBnd = 0;
-    IndexType sumMaxCommVol = 0;
-    IndexType sumTotCommVol = 0;
-    IndexType maxBoundaryNodes = 0;
-    IndexType totalBoundaryNodes = 0;
-    ValueType sumMaxBorderNodesPerc = 0;
-    ValueType sumAvgBorderNodesPerc = 0;
-
-    for(IndexType run=0; run<numRuns; run++){
-        Metrics thisMetric = metricsVec[ run ];
-        
-        SCAI_ASSERT_EQ_ERROR(thisMetric.timeMigrationAlgo.size(), comm->getSize(), "Wrong vector size" );
-        
-        // for these time we have one measurement per PE and must make a max
-        ValueType maxTimeMigrationAlgo = *std::max_element( thisMetric.timeMigrationAlgo.begin(), thisMetric.timeMigrationAlgo.end() );
-        ValueType maxTimeFirstDistribution = *std::max_element( thisMetric.timeFirstDistribution.begin(), thisMetric.timeFirstDistribution.end() );
-        ValueType maxTimeKmeans = *std::max_element( thisMetric.timeKmeans.begin(), thisMetric.timeKmeans.end() );
-        ValueType maxTimeSecondDistribution = *std::max_element( thisMetric.timeSecondDistribution.begin(), thisMetric.timeSecondDistribution.end() );
-        ValueType maxTimePreliminary = *std::max_element( thisMetric.timePreliminary.begin(), thisMetric.timePreliminary.end() );
-        
-        // these times are global, no need to max
-        ValueType timeFinal = thisMetric.timeFinalPartition;
-        ValueType timeLocalRef = timeFinal - maxTimePreliminary;
-        
-        if( comm->getRank()==0 ){
-            out << std::setprecision(2) << std::fixed;
-            out<< run << " ,       "<< thisMetric.inputTime << ",  " << maxTimeMigrationAlgo << ",  " << maxTimeFirstDistribution << ",  " << maxTimeKmeans << ",  " << maxTimeSecondDistribution << ",  " << maxTimePreliminary << ",  " << timeLocalRef << ",  "<< timeFinal << " , \t "\
-            << thisMetric.preliminaryCut << ",  "<< thisMetric.finalCut << ",  " << thisMetric.finalImbalance << ",    "  \
-            // << thisMetric.maxBlockGraphDegree << ",  " << thisMetric.totalBlockGraphEdges << " ," 
-            << thisMetric.maxBoundaryNodes << ", " << thisMetric.totalBoundaryNodes << ",    " \
-            << thisMetric.maxCommVolume << ",  " << thisMetric.totalCommVolume << ",    ";
-            out << std::setprecision(6) << std::fixed;
-            out << thisMetric.maxBorderNodesPercent << ",  " << thisMetric.avgBorderNodesPercent \
-            << std::endl;
-        }
-        
-        sumMigrAlgo += maxTimeMigrationAlgo;
-        sumFirstDistr += maxTimeFirstDistribution;
-        sumKmeans += maxTimeKmeans;
-        sumSecondDistr += maxTimeSecondDistribution;
-        sumPrelimanry += maxTimePreliminary;
-        sumLocalRef += timeLocalRef;
-        sumFinalTime += timeFinal;
-        
-        sumPreliminaryCut += thisMetric.preliminaryCut;
-        sumFinalCut += thisMetric.finalCut;
-        sumImbalace += thisMetric.finalImbalance;
-        sumMaxBnd += thisMetric.maxBoundaryNodes  ;
-        sumTotBnd += thisMetric.totalBoundaryNodes ;
-        sumMaxCommVol +=  thisMetric.maxCommVolume;
-        sumTotCommVol += thisMetric.totalCommVolume;
-        sumMaxBorderNodesPerc += thisMetric.maxBorderNodesPercent;
-        sumAvgBorderNodesPerc += thisMetric.avgBorderNodesPercent;
-    }
-    
-    if( comm->getRank()==0 ){
-        out << std::setprecision(2) << std::fixed;
-        out << "average,  "\
-            <<  ValueType (metricsVec[0].inputTime)<< ",  "\
-            <<  ValueType(sumMigrAlgo)/numRuns<< ",  " \
-            <<  ValueType(sumFirstDistr)/numRuns<< ",  " \
-            <<  ValueType(sumKmeans)/numRuns<< ",  " \
-            <<  ValueType(sumSecondDistr)/numRuns<< ",  " \
-            <<  ValueType(sumPrelimanry)/numRuns<< ",  " \
-            <<  ValueType(sumLocalRef)/numRuns<< ",  " \
-            <<  ValueType(sumFinalTime)/numRuns<< ", \t " \
-            <<  ValueType(sumPreliminaryCut)/numRuns<< ",  " \
-            <<  ValueType(sumFinalCut)/numRuns<< ",  " \
-            <<  ValueType(sumImbalace)/numRuns<< ",    " \
-            <<  ValueType(sumMaxBnd)/numRuns<< ",  " \
-            <<  ValueType(sumTotBnd)/numRuns<< ",    " \
-            <<  ValueType(sumMaxCommVol)/numRuns<< ", " \
-            <<  ValueType(sumTotCommVol)/numRuns<< ",    ";
-            out << std::setprecision(6) << std::fixed;
-            out <<  ValueType(sumMaxBorderNodesPerc)/numRuns<< ", " \
-            <<  ValueType(sumAvgBorderNodesPerc)/numRuns  \
-            << std::endl;
-    }
-    
-}
-
 /**
  *  Examples of use:
  * 
@@ -149,52 +45,6 @@ void printVectorMetrics( std::vector<Metrics>& metricsVec, std::ostream& out){
  */
 
 //----------------------------------------------------------------------------
-namespace ITI {
-	std::istream& operator>>(std::istream& in, Format& format)
-	{
-		std::string token;
-		in >> token;
-		if (token == "AUTO" or token == "0")
-			format = ITI::Format::AUTO ;
-		else if (token == "METIS" or token == "1")
-			format = ITI::Format::METIS;
-		else if (token == "ADCIRC" or token == "2")
-			format = ITI::Format::ADCIRC;
-		else if (token == "OCEAN" or token == "3")
-			format = ITI::Format::OCEAN;
-        else if (token == "MATRIXMARKET" or token == "4")
-			format = ITI::Format::MATRIXMARKET;
-		else if (token == "TEEC" or token == "5")
-			format = ITI::Format::TEEC;
-        else if (token == "BINARY" or token == "6")
-			format = ITI::Format::BINARY;
-		else
-			in.setstate(std::ios_base::failbit);
-		return in;
-	}
-
-	std::ostream& operator<<(std::ostream& out, Format method)
-	{
-		std::string token;
-
-		if (method == ITI::Format::AUTO)
-			token = "AUTO";
-		else if (method == ITI::Format::METIS)
-			token = "METIS";
-		else if (method == ITI::Format::ADCIRC)
-			token = "ADCIRC";
-		else if (method == ITI::Format::OCEAN)
-			token = "OCEAN";
-		else if (method == ITI::Format::MATRIXMARKET)
-			token = "MATRIXMARKET";
-		else if (method == ITI::Format::TEEC)
-			token = "TEEC";
-        else if (method == ITI::Format::BINARY)
-            token == "BINARY";
-		out << token;
-		return out;
-	}
-}
 
 
 std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
@@ -238,6 +88,7 @@ std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method)
     return out;
 }
 
+//void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);	
 
 
 int main(int argc, char** argv) {
@@ -248,6 +99,7 @@ int main(int argc, char** argv) {
         
     bool writePartition = false;
     
+	std::string metricsDetail = "all";
 	std::string blockSizesFile;
 	ITI::Format coordFormat;
     IndexType repeatTimes = 1;
@@ -281,6 +133,7 @@ int main(int argc, char** argv) {
 				("seed", value<double>()->default_value(time(NULL)), "random seed, default is current time")
 				//multi-level and local refinement
 				("initialPartition", value<InitialPartitioningMethods>(&settings.initialPartition), "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means' or 3) and multisection ('MultiSection' or 4). SFC, Spectral and K-Means are most stable.")
+				("noRefinement", "skip local refinement steps")
 				("multiLevelRounds", value<IndexType>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
 				("minBorderNodes", value<IndexType>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
 				("stopAfterNoGainRounds", value<IndexType>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
@@ -306,9 +159,13 @@ int main(int argc, char** argv) {
 				//debug
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 				("verbose", "Increase output.")
-                ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
-                ("storeInfo", "Store timing and ohter metrics in file.")
+                ("storeInfo", "Store timing and other metrics in file.")
                 ("writePartition", "Writes the partition in the outFile.partition file")
+                // evaluation
+                ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
+                ("noComputeDiameter", "Compute Diameter of resulting block files.")
+                ("maxDiameterRounds", value<IndexType>(&settings.maxDiameterRounds)->default_value(settings.maxDiameterRounds), "abort diameter algorithm after that many BFS rounds")
+				("metricsDetail", value<std::string>(&metricsDetail), "no: no metrics, easy:cut, imbalance, communication volume and diamter if possible, all: easy + SpMV time and communication time in SpMV")
 				;
 
         //------------------------------------------------
@@ -352,10 +209,11 @@ int main(int argc, char** argv) {
 		std::cout << "Cannot both load coordinates from file with --coordFile or generate them with --useDiffusionCoords." << std::endl;
 		return 126;
 	}
+
 	if( vm.count("cutsPerDim") ) {
-            SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
-            SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
-        }
+		SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
+		SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
+	}
         
 	if( vm.count("initialMigration") ){
 
@@ -391,49 +249,68 @@ int main(int argc, char** argv) {
 	}
 	
 	if( settings.storeInfo && settings.outFile=="-" ) {
-            if (comm->getRank() == 0) {
-                std::cout<< "Option to store information used but no output file given to write to. Specify an output file using the option --outFile. Aborting." << std::endl;
-            }
-            return 126;
-        }
+		if (comm->getRank() == 0) {
+			std::cout<< "Option to store information used but no output file given to write to. Specify an output file using the option --outFile. Aborting." << std::endl;
+		}
+		return 126;
+	}
 
 	if (!vm.count("influenceExponent")) {
 	    settings.influenceExponent = 1.0/settings.dimensions;
+	}
+
+	if (vm.count("manhattanDistance")) {
+		throw std::logic_error("Manhattan distance not yet implemented");
 	}
 
     //--------------------------------------------------------
     //
     // initialize
     //
+    
+    if( comm->getRank() ==0 ){
+		std::cout <<"Starting file " << __FILE__ << std::endl;
+		
+		std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
+		std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
+		std::cout << "date and time: " << std::ctime(&timeNow) << std::endl;
+	}
 	
     IndexType N = -1; 		// total number of points
 
     char machineChar[255];
     std::string machine;
     gethostname(machineChar, 255);
-    if (machineChar) {
-    	machine = std::string(machineChar);
-        settings.machine = machine;
-    } else {
-    	std::cout << "machine char not valid" << std::endl;
-    }
-
+    
+    machine = std::string(machineChar);
+    settings.machine = machine;
+    
     settings.verbose = vm.count("verbose");
     settings.storeInfo = vm.count("storeInfo");
     settings.erodeInfluence = vm.count("erodeInfluence");
     settings.tightenBounds = vm.count("tightenBounds");
     settings.manhattanDistance = vm.count("manhattanDistance");
+	settings.noRefinement = vm.count("noRefinement");
+	if( vm.count("noComputeDiameter") ){
+		settings.computeDiameter = false;
+	}else{
+		settings.computeDiameter = true;
+	}
+	
     writePartition = vm.count("writePartition");
     if( writePartition ){
         settings.writeInFile = true;
     }
-    
-    scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
-    std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
-    
 
-    DenseVector<ValueType> nodeWeights;
-
+    if( vm.count("metricsDetail") ){
+		if( not (metricsDetail=="no" or metricsDetail=="easy" or metricsDetail=="all") ){
+			if(comm->getRank() ==0 ){
+				std::cout<<"WARNING: wrong value for parameter metricsDetail= " << metricsDetail << ". Setting to all" <<std::endl;
+				metricsDetail="all";
+			}
+		}
+	}
+    
     srand(vm["seed"].as<double>());
 
     /* timing information
@@ -458,6 +335,11 @@ int main(int argc, char** argv) {
     // generate or read graph and coordinates
     //
     
+    scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
+    std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
+	scai::lama::DenseVector<ValueType> nodeWeights;		//the weights for each node
+	
+	
     if (vm.count("graphFile")) {
     	std::string graphFile = vm["graphFile"].as<std::string>();
         settings.fileName = graphFile;
@@ -534,7 +416,7 @@ int main(int argc, char** argv) {
         }
         
         if (settings.useDiffusionCoordinates) {
-        	scai::lama::CSRSparseMatrix<ValueType> L = ITI::Diffusion<IndexType, ValueType>::constructLaplacian(graph);
+        	scai::lama::CSRSparseMatrix<ValueType> L = ITI::GraphUtils::constructLaplacian<IndexType, ValueType>(graph);
 
         	std::vector<IndexType> nodeIndices(N);
         	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
@@ -713,6 +595,14 @@ int main(int argc, char** argv) {
     
     std::vector<struct Metrics> metricsVec;
     
+	/*
+	//TODO: used ifort -nofor-main ... to compile but does not link properly
+	size_t total=-1,used=-1,free=-1,buffers=-1, cached=-1;
+	memusage(&total, &used, &free, &buffers, &cached);
+	printf("%ld %ld %ld %ld %ld \n", total,used,free,buffers, cached);
+	*/
+	
+	
     //------------------------------------------------------------
     //
     // partition the graph
@@ -757,6 +647,10 @@ int main(int argc, char** argv) {
         assert( coordinates[0].size() == N);
         
         std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
+		
+		//WARNING: with the noRefinement flag the partition is not destributed
+		partition.redistribute( rowDistPtr);
+		
         metricsVec[r].finalCut = ITI::GraphUtils::computeCut(graph, partition, true);
         metricsVec[r].finalImbalance = ITI::GraphUtils::computeImbalance<IndexType,ValueType>(partition, settings.numBlocks ,nodeWeights);
         metricsVec[r].inputTime = ValueType ( comm->max(inputTime.count() ));
@@ -790,8 +684,12 @@ int main(int argc, char** argv) {
         
         std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
-        metricsVec[r].getMetrics( graph, partition, nodeWeights, settings );
-        
+		if( metricsDetail=="all" ){
+			metricsVec[r].getAllMetrics( graph, partition, nodeWeights, settings );
+		}
+        if( metricsDetail=="easy" ){
+			metricsVec[r].getEasyMetrics( graph, partition, nodeWeights, settings );
+		}
         std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
         
         
@@ -819,6 +717,7 @@ int main(int argc, char** argv) {
     
     settings.print( std::cout, comm );
     if (comm->getRank() == 0) {
+	std::cout << "Running " << __FILE__ << std::endl;
         std::cout<<  "\033[1;36m";
     }
     printVectorMetrics( metricsVec, std::cout );
@@ -828,13 +727,20 @@ int main(int argc, char** argv) {
     
     if( settings.storeInfo && settings.outFile!="-" ) {
         if( comm->getRank()==0){
-            std::ofstream outF( settings.outFile+".info", std::ios::out);
+            std::ofstream outF( settings.outFile, std::ios::out);
             if(outF.is_open()){
+				outF << "Running " << __FILE__ << std::endl;
                 settings.print( outF, comm);
-                printVectorMetrics( metricsVec, outF ); 
+				
+				if( settings.noRefinement)
+					printVectorMetricsShort( metricsVec, outF ); 
+				else
+					printVectorMetrics( metricsVec, outF ); 
+				
+				//printVectorMetrics( metricsVec, outF ); 
                 std::cout<< "Output information written to file " << settings.outFile << " in total time " << totalT << std::endl;
             }else{
-                std::cout<< "Could not open file " << settings.outFile << " informations not stored"<< std::endl;
+                std::cout<< "Could not open file " << settings.outFile << " information not stored"<< std::endl;
             }            
         }
     }    
@@ -843,7 +749,8 @@ int main(int argc, char** argv) {
     if( settings.outFile!="-" and writePartition ){
         std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
         std::string partOutFile = settings.outFile + ".partition";
-        ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+		ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+        //ITI::FileIO<IndexType, ValueType>::writeDenseVectorParallel<IndexType>( partition, partOutFile );
         //ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partition, partOutFile );
         std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
         if( comm->getRank()==0 ){
@@ -856,20 +763,23 @@ int main(int argc, char** argv) {
     //=================
     
     if (settings.writeDebugCoordinates) {
+		
+		std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
+		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
         for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-            assert( coordinates[dim].size() == N);
-            coordinates[dim].redistribute(partition.getDistributionPtr());
+            assert( coordinateCopy[dim].size() == N);
+			coordinateCopy[dim].redistribute( distFromPartition );
         }
         
         std::string destPath = "partResults/main/blocks_" + std::to_string(settings.numBlocks) ;
         boost::filesystem::create_directories( destPath );   
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, settings.dimensions, destPath + "/debugResult");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, settings.dimensions, destPath + "/debugResult");
         comm->synchronize();
         
         //TODO: use something like the code below instead of a NoDistribution
         //std::vector<IndexType> gatheredPart;
         //comm->gatherImpl( gatheredPart.data(), N, 0, partition.getLocalValues(), scai::common::TypeTraits<IndexType>::stype );
-        
+        /*
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
         graph.redistribute( noDistPtr, noDistPtr );
         partition.redistribute( noDistPtr );
@@ -877,7 +787,7 @@ int main(int argc, char** argv) {
             coordinates[dim].redistribute( noDistPtr );
         }
         
-        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();     
+        //scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();     
         
         //TODO: change that in later version, where data are gathered in one PE and are not replicated
         SCAI_ASSERT_ERROR( graph.getRowDistributionPtr()->isReplicated()==1, "Adjacency should be replicated. Aborting...");
@@ -886,17 +796,17 @@ int main(int argc, char** argv) {
         
         if( comm->getRank()==0 ){
             if( settings.outFile != "-" ){
-                ITI::FileIO<IndexType,ValueType>::writeVTKCentral_ver2( graph, coordinates, partition, settings.outFile+".vtk" );
+                ITI::FileIO<IndexType,ValueType>::writeVTKCentral( graph, coordinates, partition, settings.outFile+".vtk" );
             }else{
-                ITI::FileIO<IndexType,ValueType>::writeVTKCentral_ver2( graph, coordinates, partition, destPath + "/debugResult.vtk" );
+                ITI::FileIO<IndexType,ValueType>::writeVTKCentral( graph, coordinates, partition, destPath + "/debugResult.vtk" );
             }
         }
-        
+        */
     }
       
         
     //this is needed for supermuc
-//    std::exit(0);   
+    //std::exit(0);   
     
     return 0;
 }

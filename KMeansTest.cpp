@@ -1,6 +1,9 @@
 #include "FileIO.h"
 
 #include "KMeans.h"
+#include "AuxiliaryFunctions.h"
+
+//#include "Repartition.h"
 
 #include "gtest/gtest.h"
 
@@ -18,7 +21,7 @@ protected:
 
 };
 
-TEST_F(KMeansTest, testFindInitialCenters) {
+TEST_F(KMeansTest, testFindInitialCentersSFC) {
 	std::string fileName = "bubbles-00010.graph";
 	std::string graphFile = graphPath + fileName;
 	std::string coordFile = graphFile + ".xyz";
@@ -31,9 +34,18 @@ TEST_F(KMeansTest, testFindInitialCenters) {
 	DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType p = comm->getSize();
+	Settings settings;
+	settings.numBlocks = k;
 
+    std::vector<ValueType> minCoords(settings.dimensions);
+    std::vector<ValueType> maxCoords(settings.dimensions);
+    for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+        minCoords[dim] = coords[dim].min();
+        maxCoords[dim] = coords[dim].max();
+        SCAI_ASSERT_NE_ERROR( minCoords[dim], maxCoords[dim], "min=max for dimension "<< dim << ", this will cause problems to the hilbert index. local= " << coords[0].getLocalValues().size() );
+    }
 
-	std::vector<std::vector<ValueType> > centers = KMeans::findInitialCenters(coords, k, uniformWeights);
+	std::vector<std::vector<ValueType> > centers = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords,  minCoords, maxCoords, settings);
 
 	//check for size
 	EXPECT_EQ(dimensions, centers.size());
@@ -108,5 +120,130 @@ TEST_F(KMeansTest, testFindCenters) {
 	//get centers
 	centers = KMeans::findCenters(coords, part, k, nodeIndices.begin(), nodeIndices.end(), uniformWeights);
 }
+
+
+TEST_F(KMeansTest, testCentersOnlySfc) {
+	std::string fileName = "bubbles-00010.graph";
+	std::string graphFile = graphPath + fileName;
+	std::string coordFile = graphFile + ".xyz";
+	const IndexType dimensions = 2;
+
+	//load graph and coords
+	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+	const IndexType n = graph.getNumRows();
+	std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
+
+	const IndexType k = comm->getSize();
+	
+	struct Settings settings;
+	settings.dimensions = dimensions;
+	settings.numBlocks = comm->getSize();
+	
+	//get min and max
+	std::vector<ValueType> minCoords, maxCoords;
+	std::tie(minCoords, maxCoords) = KMeans::getLocalMinMaxCoords(coords);
+	
+	// get centers
+	std::vector<std::vector<ValueType>> centers1 = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords, minCoords, maxCoords, settings);
+	
+	settings.sfcResolution = std::log2(k);
+	std::vector<std::vector<ValueType>> centers2 = KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>( maxCoords, settings);
+	
+	EXPECT_EQ( centers1.size(), centers2.size() );
+	EXPECT_EQ( centers1[0].size(), centers2[0].size() );
+	EXPECT_EQ( centers1[0].size(), k);
+	
+	if(comm->getRank()==0){
+		std::cout<<"maxCoords= ";
+		for(int d=0; d<dimensions; d++){
+			std::cout<< maxCoords[d] <<", ";
+		}
+		std::cout<< std::endl;
+		std::cout<<"center1" << std::endl;
+		for( int c=0; c<k; c++){
+			//std::cout<<"center1["<< c << "]= ";
+			std::cout<<"( ";
+			for(int d=0; d<dimensions; d++){
+				std::cout<< centers1[d][c]<< ", ";
+			}
+			std::cout<< "\b\b )" << std::endl;
+		}
+		std::cout<< std::endl;
+		
+		std::cout<<"center2" << std::endl;
+		for( int c=0; c<k; c++){
+			//std::cout<<"center2["<< c << "]= ";
+			std::cout<<"( ";
+			for(int d=0; d<dimensions; d++){
+				std::cout<<  centers2[d][c]*maxCoords[d]<< ", ";
+			}
+			std::cout<< "\b\b )" << std::endl;
+		}
+	}
+}
+
+/*
+TEST_F(KMeansTest, testPartitionWithNodeWeights) {
+	//std::string fileName = "Grid32x32";
+	std::string fileName = "bubbles-00010.graph";
+	std::string graphFile = graphPath + fileName;
+	std::string coordFile = graphFile + ".xyz";
+	const IndexType dimensions = 2;
+
+	//load graph and coords
+	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+	const IndexType globalN = graph.getNumRows();
+	std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), globalN, dimensions);
+
+	const IndexType k = comm->getSize();
+		
+	const std::vector<IndexType> blockSizes(k, globalN/k);
+	
+	scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+
+	
+	struct Settings settings;
+	settings.dimensions = dimensions;
+	settings.numBlocks = k;
+	settings.minSamplingNodes = unitNodeWeights.getLocalValues().size()/20;
+	
+	scai::lama::DenseVector<IndexType> firstPartition = ITI::KMeans::computePartition ( coords, settings.numBlocks, unitNodeWeights, blockSizes, settings);
+	
+	struct Metrics metrics(1);
+	metrics.getEasyMetrics( graph, firstPartition, unitNodeWeights, settings );
+	if(comm->getRank()==0){
+		printMetricsShort( metrics, std::cout);
+	}
+	
+	const IndexType seed = 0;
+	ValueType diverg = 0.8;
+		
+	scai::lama::DenseVector<ValueType> imbaNodeWeights = ITI::Repartition<IndexType,ValueType>::sNW( coords, seed, diverg, dimensions);
+	
+	ValueType maxWeight = imbaNodeWeights.max();
+	ValueType minWeight = imbaNodeWeights.min();
+	PRINT0("maxWeight= "<< maxWeight << " , minWeight= "<< minWeight);
+
+	const IndexType localN = graph.getLocalNumRows();
+	
+	//settings.verbose = true;
+	settings.maxKMeansIterations = 30;
+	settings.balanceIterations = 10;
+	settings.minSamplingNodes = localN;
+	
+	scai::lama::DenseVector<IndexType> imbaPartition = ITI::KMeans::computePartition ( coords, settings.numBlocks, imbaNodeWeights, blockSizes, settings);
+	
+	metrics.getEasyMetrics( graph, imbaPartition, imbaNodeWeights, settings );
+	if(comm->getRank()==0){
+		printMetricsShort( metrics, std::cout);
+	}
+	
+}
+*/
+
 
 }

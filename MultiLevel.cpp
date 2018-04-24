@@ -3,7 +3,6 @@
 #include "MultiLevel.h"
 #include "GraphUtils.h"
 
-using scai::lama::Scalar;
 using scai::hmemo::HArray;
 
 namespace ITI{
@@ -131,7 +130,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 		}
 
 		IndexType numRefinementRounds = 0;
-		IndexType oldCut = 0;
+		//IndexType oldCut = 0;
 
 		ValueType gain = 0;
 		while (numRefinementRounds == 0 || gain >= settings.minGainForNextRound) {
@@ -522,72 +521,6 @@ DenseVector<T> MultiLevel<IndexType, ValueType>::computeGlobalPrefixSum(const De
 //-------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::dmemo::DistributionPtr MultiLevel<IndexType, ValueType>::projectToFine(scai::dmemo::DistributionPtr dist, const DenseVector<IndexType>& fineToCoarse) {
-	SCAI_REGION("MultiLevel.projectToFine");
-	scai::dmemo::DistributionPtr fineDist = fineToCoarse.getDistributionPtr();
-	const IndexType fineLocalN = fineDist->getLocalSize();
-	scai::dmemo::DistributionPtr coarseDist = projectToCoarse(fineToCoarse);
-	IndexType coarseLocalN = coarseDist->getLocalSize();
-	scai::dmemo::CommunicatorPtr comm = fineDist->getCommunicatorPtr();
-
-	HArray<IndexType> myCoarseGlobalIndices;
-	coarseDist->getOwnedIndexes(myCoarseGlobalIndices);
-
-	HArray<IndexType> owners(coarseLocalN);
-	dist->computeOwners(owners, myCoarseGlobalIndices);
-
-	//get send quantities and array
-	std::vector<IndexType> quantities(comm->getSize(), 0);
-	std::vector<std::vector<IndexType> > sendIndices(comm->getSize());
-	{
-		scai::hmemo::ReadAccess<IndexType> rOwners(owners);
-		scai::hmemo::ReadAccess<IndexType> rFineToCoarse(fineToCoarse.getLocalValues());
-		for (IndexType i = 0; i < fineLocalN; i++) {
-			IndexType targetRank = rOwners[coarseDist->global2local(rFineToCoarse[i])];
-			assert(targetRank < comm->getSize());
-			sendIndices[targetRank].push_back(fineDist->local2global(i));
-			quantities[targetRank]++;
-		}
-	}
-
-	std::vector<IndexType> flatIndexVector;
-	for (IndexType i = 0; i < sendIndices.size(); i++) {
-		std::copy(sendIndices[i].begin(), sendIndices[i].end(), std::back_inserter(flatIndexVector));
-	}
-
-	assert(flatIndexVector.size() == fineLocalN);
-        
-        scai::dmemo::CommunicationPlan sendPlan;
-        
-        sendPlan.allocate( quantities.data(), comm->getSize() );
-        
-        assert(sendPlan.totalQuantity() == fineLocalN);
-        
-        scai::dmemo::CommunicationPlan recvPlan;
-        
-	recvPlan.allocateTranspose( sendPlan, *comm );
-
-	HArray<IndexType> newValues;
-
-	IndexType newLocalSize = recvPlan.totalQuantity();
-
-	{
-            scai::hmemo::WriteOnlyAccess<IndexType> recvVals( newValues, newLocalSize );
-            comm->exchangeByPlan( recvVals.get(), recvPlan, flatIndexVector.data(), sendPlan );
-	}
-	assert(comm->sum(newLocalSize) == fineDist->getGlobalSize());
-
-	{
-            scai::hmemo::WriteAccess<IndexType> wValues(newValues);
-            std::sort(wValues.get(), wValues.get()+newLocalSize);
-	}
-
-	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(fineDist->getGlobalSize(), newValues, comm));
-	return newDist;
-}
-//---------------------------------------------------------------------------------------
-
-template<typename IndexType, typename ValueType>
 scai::dmemo::DistributionPtr MultiLevel<IndexType, ValueType>::projectToCoarse(const DenseVector<IndexType>& fineToCoarse) {
 	SCAI_REGION("MultiLevel.projectToCoarse.distribution");
 	const IndexType newGlobalN = fineToCoarse.max() + 1;
@@ -601,7 +534,6 @@ scai::dmemo::DistributionPtr MultiLevel<IndexType, ValueType>::projectToCoarse(c
 	std::sort(wIndices.get(), wIndices.get() + fineLocalN);
 	auto newEnd = std::unique(wIndices.get(), wIndices.get() + fineLocalN);
 	wIndices.resize(std::distance(wIndices.get(), newEnd));
-	IndexType coarseLocalN = wIndices.size();
 	wIndices.release();
 
 	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(newGlobalN, myCoarseGlobalIndices, fineToCoarse.getDistributionPtr()->getCommunicatorPtr()));
@@ -761,7 +693,7 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
     const scai::dmemo::DistributionPtr inputDist = adjM.getRowDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
     
-    IndexType k = settings.numBlocks;
+    //IndexType k = settings.numBlocks;
     const IndexType dimensions = coordinates.size();
     const IndexType localN = inputDist->getLocalSize();
     const IndexType globalN = inputDist->getGlobalSize();

@@ -9,7 +9,6 @@
 #include <scai/hmemo/Context.hpp>
 #include <scai/hmemo/HArray.hpp>
 
-#include <scai/utilskernel/LArray.hpp>
 #include <scai/lama/Vector.hpp>
 
 #include <algorithm>
@@ -244,7 +243,7 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     graph.setRawDenseData( N, N, adjArray.get() );
     EXPECT_TRUE( graph.isConsistent() );
     EXPECT_TRUE( graph.checkSymmetry() );
-    ValueType beforel1Norm = graph.l1Norm().Scalar::getValue<ValueType>();
+    ValueType beforel1Norm = graph.l1Norm();
     IndexType beforeNumValues = graph.getNumValues();
     
     //random partition
@@ -259,7 +258,7 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 
     // node weights = 1
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1.0);
-    //ValueType beforeSumWeigths = uniformWeights.l1Norm().Scalar::getValue<ValueType>();
+    //ValueType beforeSumWeigths = uniformWeights.l1Norm();
     IndexType beforeSumWeights = N;
     
     //coordinates at random and redistribute
@@ -312,7 +311,7 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
     //
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file, ITI::Format::BINARY );
     //distrubute graph
     //graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
         
@@ -364,13 +363,13 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
         if(pixeledGraphSize < 4000){
             EXPECT_TRUE(pixelGraph.checkSymmetry());
         }
-        SCAI_ASSERT_EQ_ERROR( pixelWeights.sum().Scalar::getValue<ValueType>() , N , "should ne equal");
-        EXPECT_LE( pixelGraph.l1Norm().Scalar::getValue<ValueType>()  , edges);
+        SCAI_ASSERT_EQ_ERROR( pixelWeights.sum(), N , "should ne equal");
+        EXPECT_LE( pixelGraph.l1Norm(), edges);
         
         IndexType nnzValues= 2*dimensions*(std::pow(sideLen, dimensions) - std::pow(sideLen, dimensions-1) );
         
         EXPECT_EQ( nnzValues , pixelGraph.getNumValues() );
-        EXPECT_GE( pixelGraph.l1Norm().Scalar::getValue<ValueType>(), 1 );
+        EXPECT_GE( pixelGraph.l1Norm(), 1 );
     }
 }
 

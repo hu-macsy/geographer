@@ -9,6 +9,7 @@ OBJ_CONVERTER = quadTreeConverter.o FileIO.o
 OBJ_DIFFUSIONCOORDS = FileIO.o Diffusion.o diffusionCoords.o
 OBJ_TEST_INITIAL= $(OBJ_COMMON) testInitial.o 
 OBJ_WEAKSCALING= $(OBJ_COMMON) testWeakScaling.o 
+OBJ_XTRAPULP = FileIO.o GraphUtils.o xtrapulpWrapper.cpp MeshGenerator.o
 
 EXECUTABLE_GOOGLETEST=KatanomiTest
 EXECUTABLE_MAIN=Katanomi
@@ -28,8 +29,14 @@ QUICKSORT_INCLUDE=schizoQuicksort/src
 QUICKSORT_LIB=schizoQuicksort/build
 MPI_INCLUDE=/usr/lib/openmpi/include/
 MPI_LIB=/usr/lib/openmpi/lib/
-LFLAGS= -Wl,-rpath=$(SCAI_LIB) -L$(SCAI_LIB) -L$(GTEST_LIB) -L$(QUICKSORT_LIB) -L$(MPI_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lscai_sparsekernel -lscai_solver -lboost_program_options -lboost_filesystem -lboost_system -lquicksort -lparmetis -lmetis
-CCFLAGS= --openmp --std=c++11 -g -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -I$(QUICKSORT_INCLUDE) -I$(MPI_INCLUDE) -DSCAI_TRACE_ON  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR -DBUILD_COMMIT=$(GIT_COMMIT)
+RBC_DIR=./RBC
+
+
+
+
+LFLAGS= -Wl,-rpath=$(SCAI_LIB) -L$(SCAI_LIB) -L$(GTEST_LIB) -L$(RBC_DIR)/build/lib -L$(MPI_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lscai_sparsekernel -lscai_solver -lboost_program_options -lboost_filesystem -lboost_system -lquicksort -lparmetis -lmetis
+
+CCFLAGS= --openmp --std=c++11 -g -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -I$(RCB_DIR)/Sort -I$(QUICKSORT_INCLUDE) -I$(MPI_INCLUDE) -DSCAI_TRACE_ON  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR -DBUILD_COMMIT=$(GIT_COMMIT)
 
 all: main tests metisWrapper lib converter diffusionCoords graphGen testInitial weakScaling
 .PHONY: all
@@ -40,14 +47,79 @@ tests: $(OBJ_GOOGLETEST)
 main: $(OBJ_TEST_MAIN)
 	$(CC) $(CCFLAGS) $(OBJ_TEST_MAIN) -o $(EXECUTABLE_MAIN) $(LFLAGS)
 
-graphGen: $(OBJ_GRAPH_GEN)
-	$(CC) $(CCFLAGS) $(OBJ_GRAPH_GEN) -o $(EXECUTABLE_GRAPH_GEN) $(LFLAGS)
-
-metisWrapper: $(OBJ_COMMON) parMetisPart.cpp
-	$(CC) $(CCFLAGS) -I$(PARMETIS_INCLUDE) $(OBJ_COMMON) parMetisPart.cpp -o metisWrapper -L$(PARMETIS_LIB) -lparmetis $(LFLAGS)
-
 testInitial: $(OBJ_TEST_INITIAL)
 	$(CC) $(CCFLAGS) $(OBJ_TEST_INITIAL) -o $(EXECUTABLE_INITIAL) $(LFLAGS)
+
+testSpMV: $(OBJ_COMMON) testSpMV.o
+	$(CC) $(CCFLAGS) $(OBJ_COMMON) testSpMV.o -o testSpMV $(LFLAGS)
+	
+###### wrappers	
+
+# parmetis
+PARMETIS_LIB= 
+OBJ_PARMETIS = FileIO.o GraphUtils.o MeshGenerator.o Wrappers.o
+PARMETIS_INCLUDE= -I../metis/include -I../parmetis/include
+EXECUTABLE_PARMETIS= parMetis
+
+parMetisPart.o: $(OBJ_PARMETIS)
+	$(CC) $(CCFLAGS) $(PARMETIS_INCLUDE)  -c -o parMetisPart.o parMetisPart.cpp
+
+parMetisWrapper:$(OBJ_COMMON) parMetisPart.o
+	$(CC) $(CCFLAGS) $(PARMETIS_INCLUDE) $(OBJ_PARMETIS) parMetisPart.o -o $(EXECUTABLE_PARMETIS)  $(LFLAGS) -L../parmetis/lib -lparmetis -L../metis/lib
+
+# xtrapulp
+XTRAPULP_INCLUDE= /usr/xtrapulp
+XTRAPULP_LIB= /usr/xtrapulp
+
+xtrapulpWrapper: $(OBJ_XTRAPULP) Wrappers.o
+	$(CC)  $(CCFLAGS) $(OBJ_XTRAPULP)  -o xtrapulpEXE -L$(XTRAPULP_LIB) -lxtrapulp $(LFLAGS)
+
+# zoltan
+ZOLTAN_MAKEFILE_EXPORT=$(HOME)/Code/Trilinos/build/packages/zoltan2/Makefile.export.Zoltan2
+include $(ZOLTAN_MAKEFILE_EXPORT)
+
+zoltanRcb.o: zoltanRcb.cpp Wrappers.cpp
+	$(CC) $(CCFLAGS) $(ZOLTAN2_ALL_INCLUDE_DIRS) -I$(TRILINOS_INCLUDE) $(OBJ_COMMON) -c -o zoltanRcb.o zoltanRcb.cpp
+	
+zoltanWrapper: $(OBJ_ZOLTAN2) zoltanRcb.o Wrappers.o
+	$(CC) $(CCFLAGS) $(Zoltan2_INCLUDE_DIRS) $(OBJ_COMMON) zoltanRcb.o -o zoltanRcbEXE  $(Zoltan2_LIBRARY_DIRS) $(Zoltan2_LIBRARIES) $(LFLAGS)
+
+	
+###### for all wrappers	
+Wrappers.o: Wrappers.cpp
+	$(CC) $(CCFLAGS) $(PARMETIS_INCLUDE) $(ZOLTAN2_ALL_INCLUDE_DIRS) $(XTRAPULP_INCLUDE) -c -o Wrappers.o Wrappers.cpp
+
+	
+COMP_OBJ= FileIO.o MeshGenerator.o Wrappers.o GraphUtils.o
+competitorsPart.o: $(COMP_OBJ) competitorsPart.cpp
+	$(CC) $(CCFLAGS)  $(myZOLTAN2_ALL_INCLUDE_DIRS) -I$(TRILINOS_INCLUDE) -I$(PARMETIS_INCLUDE) -I$(METIS_INCLUDE) -c -o competitorsPart.o competitorsPart.cpp
+
+competitors: $(COMP_OBJ) competitorsPart.o
+	$(CC) $(CCFLAGS) $(COMP_OBJ)  $(myZOLTAN2_ALL_INCLUDE_DIRS) -I$(TRILINOS_INCLUDE) -I$(PARMETIS_INCLUDE) -I$(METIS_INCLUDE)  competitorsPart.o -o competitorsExe $(Zoltan2_LIBRARY_DIRS) $(Zoltan2_LIBRARIES)  $(METIS_LIB)  $(PARMETIS_LIB) $(LFLAGS)
+	
+
+allCompetitorsPart.o: $(COMP_OBJ) allCompetitorsPart.cpp
+	$(CC) $(CCFLAGS)  $(myZOLTAN2_ALL_INCLUDE_DIRS) -I$(TRILINOS_INCLUDE) -I$(PARMETIS_INCLUDE) -I$(METIS_INCLUDE) -c -o allCompetitorsPart.o allCompetitorsPart.cpp
+
+
+allCompetitors: $(COMP_OBJ) allCompetitorsPart.o
+	$(CC) $(CCFLAGS) $(COMP_OBJ)  $(myZOLTAN2_ALL_INCLUDE_DIRS) -I$(TRILINOS_INCLUDE) -I$(PARMETIS_INCLUDE) -I$(METIS_INCLUDE)  allCompetitorsPart.o -o allCompetitorsExe $(Zoltan2_LIBRARY_DIRS) $(Zoltan2_LIBRARIES)  $(METIS_LIB)  $(PARMETIS_LIB) $(LFLAGS) 
+
+
+####### for repartition
+
+repartitionWithAll.o: $(COMP_OBJ) repartitionWithAll.cpp
+	$(CC) $(CCFLAGS)  $(myZOLTAN2_ALL_INCLUDE_DIRS) -I$(TRILINOS_INCLUDE) -I$(PARMETIS_INCLUDE) -I$(METIS_INCLUDE) -c -o repartitionWithAll.o repartitionWithAll.cpp
+
+repartition: $(COMP_OBJ) repartitionWithAll.o
+	$(CC) $(CCFLAGS) $(COMP_OBJ)  $(myZOLTAN2_ALL_INCLUDE_DIRS) -I$(TRILINOS_INCLUDE) -I$(PARMETIS_INCLUDE) -I$(METIS_INCLUDE)  repartitionWithAll.o -o repartitionWithAll $(Zoltan2_LIBRARY_DIRS) $(Zoltan2_LIBRARIES)  $(METIS_LIB)  $(PARMETIS_LIB) $(LFLAGS) 
+
+
+
+###### misc	
+	
+graphGen: $(OBJ_GRAPH_GEN)
+	$(CC) $(CCFLAGS) $(OBJ_GRAPH_GEN) -o $(EXECUTABLE_GRAPH_GEN) $(LFLAGS)
 
 converter: $(OBJ_CONVERTER)
 	$(CC) $(CCFLAGS) $(OBJ_CONVERTER) -o $(EXECUTABLE_CONVERTER) $(LFLAGS)
