@@ -42,7 +42,7 @@ TEST_F(SpectralPartitionTest, testFiedlerVector) {
     //
     IndexType N = 40;
     //CSRSparseMatrix<ValueType> graph(N, N);
-    scai::lama::SparseAssemblyStorage<ValueType> graphSt(N, N);
+    scai::lama::CSRStorage<ValueType> graphSt(N, N);
     
     srand(time(NULL));
     
@@ -131,10 +131,10 @@ TEST_F(SpectralPartitionTest, testGetPartition){
     //}
     //aux::print2DGrid( graph, spectralPartition );
     
-    EXPECT_GE(k-1, spectralPartition.getLocalValues().max() );
+    EXPECT_GE(k-1, scai::utilskernel::HArrayUtils::max(spectralPartition.getLocalValues()) );
     EXPECT_EQ(N, spectralPartition.size());
-    EXPECT_EQ(0, spectralPartition.min().getValue<ValueType>());
-    EXPECT_EQ(k-1, spectralPartition.max().getValue<ValueType>());
+    EXPECT_EQ(0, spectralPartition.min());
+    EXPECT_EQ(k-1, spectralPartition.max());
     EXPECT_EQ(graph.getRowDistribution(), spectralPartition.getDistribution());
 }
 //------------------------------------------------------------------------------
@@ -207,7 +207,7 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     // the Eigen approach for the pixeled graph
        
     
-    DenseVector<ValueType> prod ( pixelGraph*eigenVec);
+    DenseVector<ValueType> prod = scai::lama::eval<DenseVector<ValueType>>( pixelGraph*eigenVec);
     
     // get the fiedler vector for the pixeled graph using LAMA
     ValueType eigenvalue;
@@ -239,8 +239,8 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     
     
     // check 
-    DenseVector<ValueType> prodF (pixelGraph*fiedler);
-    DenseVector<ValueType> prodF2 ( eigenvalue*fiedler);   
+    DenseVector<ValueType> prodF = scai::lama::eval<DenseVector<ValueType>>(pixelGraph*fiedler);
+    DenseVector<ValueType> prodF2 = scai::lama::eval<DenseVector<ValueType>>( eigenvalue*fiedler);
     
     // sort
     scai::lama::DenseVector<IndexType> permutation, permutationF;

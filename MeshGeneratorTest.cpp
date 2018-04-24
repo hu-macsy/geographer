@@ -52,7 +52,7 @@ TEST_F(MeshGeneratorTest, testCreateStructured3DMeshLocalDegreeSymmetry) {
 		scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
 		scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
 
-		scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
+		auto a = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
 		std::vector<ValueType> maxCoord(dimensions, nroot);
 		std::vector<IndexType> numPoints(dimensions, nroot);
 
@@ -89,7 +89,7 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_3D) {
 	  coords[i] = static_cast<ValueType>( 0 );
     }
     
-    scai::lama::CSRSparseMatrix<ValueType> adjM( dist, noDistPointer);
+    auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
     
     // create the adjacency matrix and the coordinates
     MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
@@ -189,7 +189,7 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_2D) {
 	  coords[i] = static_cast<ValueType>( 0 );
     }
     
-    scai::lama::CSRSparseMatrix<ValueType> adjM( dist, noDistPointer);
+    auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
     
     // create the adjacency matrix and the coordinates
     MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(adjM, coords, maxCoord, numPoints);
@@ -281,7 +281,7 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
     PRINT0("Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N );
             
     scai::lama::CSRSparseMatrix<ValueType> adjM;
-    adjM =  scai::lama::CSRSparseMatrix<ValueType>( dist, noDistPointer);
+    adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
         
     std::vector<DenseVector<ValueType>> coords(3);
     for(IndexType i=0; i<3; i++){ 
@@ -349,7 +349,7 @@ TEST_F(MeshGeneratorTest, testWriteMetis_Dist_3D){
 	  coords[i] = static_cast<ValueType>( 0 );
     }
     
-    scai::lama::CSRSparseMatrix<ValueType> adjM( dist, noDistPointer);
+    auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
     
     // create the adjacency matrix and the coordinates
     MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);

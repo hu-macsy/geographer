@@ -177,9 +177,9 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
   
   DenseVector<ValueType> indices(N, 0);
   {
-    scai::hmemo::WriteAccess<ValueType> wIndices(indices);
-    scai::hmemo::ReadAccess<ValueType> rCoord0(coords[0]);
-    scai::hmemo::ReadAccess<ValueType> rCoord1(coords[1]);
+    scai::hmemo::WriteAccess<ValueType> wIndices(indices.getLocalValues());
+    scai::hmemo::ReadAccess<ValueType> rCoord0(coords[0].getLocalValues());
+    scai::hmemo::ReadAccess<ValueType> rCoord1(coords[1].getLocalValues());
     for (IndexType i = 0; i < N; i++){
       ValueType point[2];
       point[0] = rCoord0[i];
@@ -344,7 +344,7 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
 
  //the hilbert indices initiated with the dummy value 19
  DenseVector<ValueType> hilbertIndex(dist, 19);
- DenseVector<IndexType> perm(dist);
+ DenseVector<IndexType> perm(dist, 0);
 
  std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
  std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());

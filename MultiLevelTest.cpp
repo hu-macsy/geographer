@@ -176,7 +176,7 @@ TEST_F (MultiLevelTest, testComputeGlobalPrefixSum) {
 	}
 
 	//test for a DenseVector consisting of zeros and ones
-	DenseVector<IndexType> mixedVector(dist);
+	DenseVector<IndexType> mixedVector(dist,0);
 	{
 		scai::hmemo::WriteOnlyAccess<IndexType> wMixed(mixedVector.getLocalValues(), localN);
 		for (IndexType i = 0; i < localN; i++) {
@@ -215,32 +215,12 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( N ));
     const IndexType k = comm->getSize();
     
-    scai::lama::CSRSparseMatrix<ValueType> graph;
-    
-    // create random graph
-    scai::common::scoped_array<ValueType> adjArray( new ValueType[ N*N ] );
-    
-    //initialize matrix with zeros
-    for(int i=0; i<N; i++)
-        for(int j=0; j<N; j++)
-            adjArray[i*N+j]= 0.0;
-        
-	//broadcast seed value from root to ensure equal pseudorandom numbers.
-	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
-	comm->bcast( seed, 1, 0 );
-	srand(seed[0]);
+    auto graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(N,N);
+    scai::lama::MatrixCreator::fillRandom(graph, 0.001);
+    CSRSparseMatrix<ValueType> transposed = scai::lama::eval<scai::lama::CSRSparseMatrix<ValueType>>(transpose(graph));
 
-    IndexType numEdges = IndexType (3*N);
-    for(IndexType i=0; i<numEdges; i++){
-        // a random position in the matrix
-        IndexType x = rand()%N;
-        IndexType y = rand()%N;
-        ASSERT_LT(x+y*N, N*N);
-        ASSERT_LT(x*N+y, N*N);
-        adjArray[ x+y*N ]= 1;
-        adjArray[ x*N+y ]= 1;
-    }
-    graph.setRawDenseData( N, N, adjArray.get() );
+    graph = scai::lama::eval<scai::lama::CSRSparseMatrix<ValueType>>(graph + transposed);
+    
     EXPECT_TRUE( graph.isConsistent() );
     EXPECT_TRUE( graph.checkSymmetry() );
     ValueType beforel1Norm = graph.l1Norm();
