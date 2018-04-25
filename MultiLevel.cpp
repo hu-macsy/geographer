@@ -455,11 +455,6 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     const scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(newGlobalN, myGlobalIndices, comm));
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(newGlobalN));
 
-    // CSRStorage<ValueType> storage;
-    // storage.setCSRDataSwap(newLocalN, newGlobalN, localEdgeCount, newIA, csrJA, csrValues, scai::hmemo::ContextPtr());
-    // coarseGraph = CSRSparseMatrix<ValueType>(newDist, noDist);
-    // coarseGraph.swapLocalStorage(storage);
-
     CSRStorage<ValueType> storage( newLocalN, newGlobalN, std::move(newIA), std::move(csrJA), std::move(csrValues) );
     coarseGraph = CSRSparseMatrix<ValueType>( newDist, std::move( storage ) );
 
@@ -510,9 +505,11 @@ DenseVector<T> MultiLevel<IndexType, ValueType>::computeGlobalPrefixSum(const De
 
     //get results by adding local sums and offsets
     HArray<T> localResult;
-    scai::hmemo::WriteOnlyAccess<T> wResult(localResult, localN);
-    for (IndexType i = 0; i < localN; i++) {
-    	wResult[i] = localPrefixSum[i] + myOffset[0] + globalOffset;
+    {
+        scai::hmemo::WriteOnlyAccess<T> wResult(localResult, localN);
+        for (IndexType i = 0; i < localN; i++) {
+            wResult[i] = localPrefixSum[i] + myOffset[0] + globalOffset;
+        }
     }
     DenseVector<T> result(input.getDistributionPtr(), std::move(localResult));
 
