@@ -210,7 +210,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
   scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
   
-  scai::lama::CSRSparseMatrix<ValueType>a = scai::lama::zero<CSRSparseMatrix<ValueType>>(dist, noDistPointer);
+  scai::lama::CSRSparseMatrix<ValueType> a = scai::lama::zero<CSRSparseMatrix<ValueType>>(dist, noDistPointer);
   std::vector<ValueType> maxCoord(dimensions, nroot);
   std::vector<IndexType> numPoints(dimensions, nroot);
 
