@@ -69,7 +69,7 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
     //
     //create weights locally
     //
-    scai::lama::DenseVector<ValueType> nodeWeights( dist );
+    scai::lama::DenseVector<ValueType> nodeWeights( dist, 0.0);
     IndexType actualTotalWeight = 0;
     {
         scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
@@ -136,7 +136,7 @@ TEST_F(MultiSectionTest, testGetRectangles){
     IndexType dim = 3;
     IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-    scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
+    scai::lama::DenseVector<ValueType> nodeWeights( blockDist, 0.0 );
     IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();  
     
     //create weights locally
@@ -241,7 +241,7 @@ TEST_F(MultiSectionTest, test1DPartitionGreedy){
     IndexType dim = 2;
     IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-    scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
+    scai::lama::DenseVector<ValueType> nodeWeights( blockDist, 0.0);
     IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
     
     ValueType origTotalWeight = 0;
@@ -672,7 +672,7 @@ TEST_F(MultiSectionTest, testGetRectangleWeightNonUniform){
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N+1) );
     
-    scai::lama::DenseVector<ValueType> nodeWeights(N+1);
+    scai::lama::DenseVector<ValueType> nodeWeights(N+1, 0.0);
     std::vector<scai::lama::DenseVector<ValueType>> coordinates(dimensions);
     
     // put weights only in the line x=y
@@ -778,7 +778,7 @@ TEST_F(MultiSectionTest, test1DProjection){
     IndexType dim = 3;
     IndexType N= std::pow( sideLen+1, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-    scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
+    scai::lama::DenseVector<ValueType> nodeWeights( blockDist, 0.0 );
     IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
     
     //create local weights
