@@ -649,8 +649,10 @@ int main(int argc, char** argv) {
         
         std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
 		
-		//WARNING: with the noRefinement flag the partition is not destributed
-		partition.redistribute( rowDistPtr);
+		//WARNING: with the noRefinement flag the partition is not distributed
+        if (!comm->all(partition.getDistribution().isEqual(graph.getRowDistribution()))) {
+            partition.redistribute( graph.getRowDistributionPtr());
+        }
 		
         metricsVec[r].finalCut = ITI::GraphUtils::computeCut(graph, partition, true);
         metricsVec[r].finalImbalance = ITI::GraphUtils::computeImbalance<IndexType,ValueType>(partition, settings.numBlocks ,nodeWeights);
