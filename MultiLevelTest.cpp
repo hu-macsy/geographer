@@ -133,10 +133,10 @@ TEST_F (MultiLevelTest, testGetMatchingGrid_2D) {
     // for an matching as std::vector<std::vector<IndexType>> (2)
     for(int i=0; i<matching.size(); i++){
         IndexType thisNodeGlob = matching[0].first;
-        assert( thisNodeGlob!= matching[0].second );
+        EXPECT_NE( thisNodeGlob, matching[0].second );
             for(int j=i+1; j<matching.size(); j++){
-                assert( thisNodeGlob != matching[j].first);
-                assert( thisNodeGlob != matching[j].second);
+                EXPECT_NE( thisNodeGlob, matching[j].first);
+                EXPECT_NE( thisNodeGlob, matching[j].second);
             }
     }
     
@@ -226,6 +226,11 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     ValueType beforel1Norm = graph.l1Norm();
     IndexType beforeNumValues = graph.getNumValues();
     
+    //broadcast seed value from root to ensure equal pseudorandom numbers.
+    ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+    comm->bcast( seed, 1, 0 );
+    srand(seed[0]);
+
     //random partition
 	DenseVector<IndexType> partition( N , 0);
 	for(IndexType i=0; i<N; i++){

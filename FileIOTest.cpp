@@ -129,10 +129,10 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
         const CSRStorage<ValueType>& localStorage2 = Graph2.getLocalStorage();
         scai::hmemo::ReadAccess<ValueType> values2(localStorage2.getValues());
 
-        assert( values.size() == values2.size() );
+        EXPECT_EQ( values.size(), values2.size() );
 
         for(IndexType i=0; i< values.size(); i++){
-            assert( values[i] == values2[i] );
+            EXPECT_EQ( values[i] , values2[i] );
         }
     }
 }
