@@ -148,16 +148,14 @@ TEST_P(HilbertCurveTest, testInverseHilbertIndex_Local) {
 TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
   const IndexType dimensions = 2;
   const IndexType recursionDepth = 7;
-
-  IndexType N, edges;
   
   std::string fileName = graphPath + "trace-00008.graph";
-  std::ifstream f(fileName);
-  if(f.fail()) 
-    throw std::runtime_error("File "+ fileName+ " failed.");
   
-  f >> N>> edges;
-  PRINT("file "<< fileName<< ", nodes= "<< N << ", edges= " << edges);  
+  // get graph
+  scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( fileName );
+
+  const IndexType N = graph.getNumRows();
+  const IndexType M = graph.getNumValues();
 
   std::vector<ValueType> maxCoords({0,0});
 
@@ -199,21 +197,20 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
   DenseVector<IndexType> permutation;
   indices.sort(permutation, true);
   
-  // get graph
-  scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( fileName );
+  permutation.redistribute(noDist);
 
   //get partition by-hand
   IndexType part =0;
   {
     scai::hmemo::WriteAccess<IndexType> wPart(partition.getLocalValues());
+    scai::hmemo::ReadAccess<IndexType> rPermutation(permutation.getLocalValues());
 
     for(IndexType i=0; i<N; i++){
       part = (int) i*k/N ;
+      EXPECT_GE(part, 0);
+      EXPECT_LT(part, k);
+
       wPart[permutation[i]] = part;
-      partition.setValue( permutation.getValue(i), part );
-      assert( part >= 0);
-      assert( part <= k);
-      
     }
   }
 }

@@ -298,7 +298,7 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 
 			bool inFirstRound = true;
 			for (IndexType i = 0; i < interfaceNodes.size(); i++) {
-				assert(newDist->isLocal(interfaceNodes[i]));
+				ASSERT_TRUE(newDist->isLocal(interfaceNodes[i]));
 				IndexType localID = newDist->global2local(interfaceNodes[i]);
 				bool directNeighbor = false;
 				for (IndexType j = ia[localID]; j < ia[localID+1]; j++) {

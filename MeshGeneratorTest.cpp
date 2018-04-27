@@ -292,6 +292,8 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
     // create the adjacency matrix and the coordinates
     MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
     
+    PRINT0("Constructed Mesh." );
+
     EXPECT_EQ( adjM.getLocalNumColumns() , N);
     EXPECT_EQ( adjM.getLocalNumRows() , coords[0].getLocalValues().size() );
     EXPECT_EQ( true , adjM.getRowDistribution().isEqual(coords[0].getDistribution()) );
@@ -301,8 +303,8 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
     if (!adjM.isConsistent()) {
 	throw std::runtime_error("Input matrix inconsistent");
     }
-    //PRINT(*comm<< ": "<< adjM.getLocalNumValues() );
-    //PRINT(*comm<< ": "<< comm->sum(adjM.getLocalNumValues()) );
+    PRINT(*comm<< ": "<< adjM.getLocalNumValues() );
+    PRINT(*comm<< ": "<< comm->sum(adjM.getLocalNumValues()) );
     
     {
         SCAI_REGION("testCreateRandomStructuredMesh_Distributed_3D.noDist")
@@ -310,7 +312,7 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
         adjM.redistribute(noDistPointer, noDistPointer);
         
         ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
-        //PRINT(*comm<<": "<< adjM.getNumValues() );
+        PRINT(*comm<<": "<< adjM.getNumValues() );
         if (!adjM.isConsistent()) {
             throw std::runtime_error("Input matrix inconsistent");
         }
