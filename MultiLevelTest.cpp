@@ -208,21 +208,24 @@ TEST_F (MultiLevelTest, testComputeGlobalPrefixSum) {
 
 TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 
-    const IndexType N = 300;
     
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-    scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( N ));
-    const IndexType k = comm->getSize();
-    
-    auto graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(N,N);
-    scai::lama::MatrixCreator::fillRandom(graph, 0.001);
-    CSRSparseMatrix<ValueType> transposed = scai::lama::eval<scai::lama::CSRSparseMatrix<ValueType>>(transpose(graph));
 
-    graph = scai::lama::eval<scai::lama::CSRSparseMatrix<ValueType>>(graph + transposed);
+    std::string file = graphPath+ "rotation-00000.graph";
+    std::string coordFile = graphPath+ "rotation-00000.graph.xyz";
+
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    const IndexType N = graph.getNumRows();
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr distPtr ( graph.getRowDistributionPtr() );
+    scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( N ));
     
+    struct Settings settings;
+    settings.numBlocks= comm->getSize();
+    settings.dimensions = 2;
+
     EXPECT_TRUE( graph.isConsistent() );
-    EXPECT_TRUE( graph.checkSymmetry() );
+    //EXPECT_TRUE( graph.checkSymmetry() );
     ValueType beforel1Norm = graph.l1Norm();
     IndexType beforeNumValues = graph.getNumValues();
     
@@ -233,13 +236,23 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 
     //random partition
 	DenseVector<IndexType> partition( N , 0);
-	for(IndexType i=0; i<N; i++){
-		partition.setValue(i, rand()%k );
+	{
+	    scai::hmemo::WriteAccess<IndexType> wPart(partition.getLocalValues());
+	    for(IndexType i=0; i<N; i++){
+	        wPart[i] = rand()%settings.numBlocks;
+        }
+	    const IndexType localSum = std::accumulate(wPart.get(), wPart.get() + N, 0);
+	    const IndexType globalSum = comm->sum(localSum);
+	    ASSERT_EQ(globalSum, settings.numBlocks*localSum);
 	}
+
 	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(partition.getLocalValues(), comm));
 	partition.redistribute( newDist );
 
     graph.redistribute( newDist , noDistPtr);
+
+    EXPECT_EQ( graph.l1Norm() , beforel1Norm);
+    EXPECT_EQ( graph.getNumValues() , beforeNumValues);
 
     // node weights = 1
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1.0);
@@ -247,28 +260,20 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     IndexType beforeSumWeights = N;
     
     //coordinates at random and redistribute
-    std::vector<DenseVector<ValueType>> coords(2);
-    for(IndexType i=0; i<2; i++){ 
-        coords[i].allocate(N);
-        coords[i] = static_cast<ValueType>( 0 );
-        // set random coordinates
-        for(IndexType j=0; j<N; j++){
-            coords[i].setValue(j, rand()%10);
-        }
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType,ValueType>::readCoords(coordFile, N, settings.dimensions);
+    for(IndexType i=0; i<settings.dimensions; i++){
         coords[i].redistribute( newDist );
     }
 
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
-    Settings.multiLevelRounds= 6;
-    Settings.coarseningStepsBetweenRefinement = 3;
-    Settings.useGeometricTieBreaking = true;
-    Settings.dimensions= 2;
-    Settings.minGainForNextRound = 10;
+    settings.epsilon = 0.2;
+    settings.multiLevelRounds= 6;
+    settings.coarseningStepsBetweenRefinement = 3;
+    settings.useGeometricTieBreaking = true;
+    settings.dimensions= 2;
+    settings.minGainForNextRound = 10;
     
     scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, halo, Settings);
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, halo, settings);
     
     EXPECT_EQ( graph.l1Norm() , beforel1Norm);
     EXPECT_EQ( graph.getNumValues() , beforeNumValues);

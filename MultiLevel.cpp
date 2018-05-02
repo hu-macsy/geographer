@@ -94,7 +94,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 			scai::dmemo::DistributionPtr projectedFineDist = redistributor.getTargetDistributionPtr();
 
 			assert(projectedFineDist->getGlobalSize() == globalN);
-			// part = fill<DenseVector<IndexType>>(projectedFineDist, comm->getRank());
+
 			part.setSameValue(projectedFineDist, comm->getRank());
 
 			if (settings.useGeometricTieBreaking) {

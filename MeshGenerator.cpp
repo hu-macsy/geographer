@@ -647,8 +647,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
             
             IndexType relativeIndex=0;
             std::tuple<IndexType, IndexType, IndexType>  ngbPoint;
-            std::pair<std::set<long int>::iterator,bool> setInsertion;
-            setInsertion.second= false;
+            bool setInsertion = false;
             
             do{
                 //int randInd = (int) (rand()%(neighbourGlobalIndices.size()-1) +1 ) ;
@@ -695,9 +694,9 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
                 // but we may have already inserted
                 
                 // insert the index to the set. if it already exists then setInsertion.second = false
-                // setInsertion = ngbGloblaIndSet.insert(ngbGlobalInd);
+                setInsertion = ngbGloblaIndSet.insert(ngbGlobalInd).second;
           
-            }while(setInsertion.second==false);
+            }while(setInsertion==false);
             //finally, we inserted a valid (>0 && <N && close enough) neighbour
 
         } // for(IndexType j=0; j<numOfNeighbours; j++)

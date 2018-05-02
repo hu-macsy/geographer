@@ -1049,7 +1049,7 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 		// matrix.getLocalStorage().setCSRDataSwap(targetNumRows, globalN, numValues, targetIA, targetJA, targetValues, scai::hmemo::ContextPtr());
                 // ThomasBrandes: optimize by std::move(targetIA), std::move(targetJA), std::move(targetValues) ??
                 // ThomasBrandes: col distribution is replicated !!!
-                matrix = CSRSparseMatrix<ValueType>( newDist, CSRStorage<ValueType>( targetNumRows, globalN, targetIA, targetJA, targetValues ) );
+                matrix = CSRSparseMatrix<ValueType>( newDist, CSRStorage<ValueType>( targetNumRows, globalN, std::move(targetIA), std::move(targetJA), std::move(targetValues) ) );
 	}
 }
 //---------------------------------------------------------------------------------------
