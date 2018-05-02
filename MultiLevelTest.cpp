@@ -225,7 +225,6 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     settings.dimensions = 2;
 
     EXPECT_TRUE( graph.isConsistent() );
-    //EXPECT_TRUE( graph.checkSymmetry() );
     ValueType beforel1Norm = graph.l1Norm();
     IndexType beforeNumValues = graph.getNumValues();
     
