@@ -41,31 +41,27 @@ TEST_F(SpectralPartitionTest, testFiedlerVector) {
     // for now local refinement requires k = P
     //
     IndexType N = 40;
-    //CSRSparseMatrix<ValueType> graph(N, N);
-    scai::lama::CSRStorage<ValueType> graphSt(N, N);
-    
+    scai::lama::CSRSparseMatrix<ValueType> graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(N, N);
+
     srand(time(NULL));
     
-    //TODO: this (rarely) can give disconnected graph
     // random graph with weighted edges
     for(IndexType row=0; row<N; row++){    
         for( IndexType j=0; j<rand()%5+6; j++){
             IndexType col= rand()%N;
-            if( col==row ) continue;
-            IndexType w = rand()%10+1;
-            //PRINT0(row << ", "<< col << ": "<< w);
-            graphSt.setValue(row, col, w);
-            graphSt.setValue(col, row, w);
+            if( col!=row ){
+                IndexType w = rand()%10+1;
+                //PRINT(row << ", "<< col << ": "<< w);
+                graph.setValue(row, col, w);
+                graph.setValue(col, row, w);
+            }
         }
         
         // connect this row with the next one so graph is connected
-        graphSt.setValue(row, (row+1)%N, rand()%10 +1);
-        graphSt.setValue((row+1)%N, row, rand()%10 +1 );
+        graph.setValue(row, (row+1)%N, rand()%10 +1);
+        graph.setValue((row+1)%N, row, rand()%10 +1 );
     }
     
-    scai::lama::CSRSparseMatrix<ValueType> graph( graphSt);
-
-
     ValueType fiedlerEigenvalue = -8;
     scai::lama::DenseVector<ValueType> fiedler;
     

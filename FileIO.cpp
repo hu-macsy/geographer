@@ -1431,7 +1431,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
     IndexType maxDimension = 3;
     
     const UINT beginLocalCoords = beginLocalRange*maxDimension;
-    const UINT endLocalCoords = endLocalRange*maxDimension;
+    //const UINT endLocalCoords = endLocalRange*maxDimension;
     const UINT localTotalNumOfCoords = localN*maxDimension;
     
     SCAI_ASSERT_EQ_ERROR( globalN, comm->sum(localN), "Mismatch in total number of coordinates" );
@@ -1440,7 +1440,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
     // set like in KaHiP/parallel/prallel_src/app/configuration.h in configuration::standard
     //const IndexType binary_io_window_size = 64;   
     
-    const IndexType window_size = numPEs;// std::min( binary_io_window_size, numPEs );
+    const IndexType window_size = numPEs;
     IndexType lowPE =0;
     IndexType highPE = window_size;
 

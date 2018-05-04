@@ -207,7 +207,7 @@ ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<
 
 	const IndexType n = inputDist->getGlobalSize();
 	const IndexType localN = inputDist->getLocalSize();
-	const IndexType maxBlockID = part.max();
+	//const IndexType maxBlockID = part.max();
 
 	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
     
@@ -539,7 +539,7 @@ DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, c
     DenseVector<IndexType> border(dist,0);
     scai::hmemo::HArray<IndexType>& localBorder= border.getLocalValues();
 
-    IndexType globalN = dist->getGlobalSize();
+    //const IndexType globalN = dist->getGlobalSize();
     IndexType max = part.max();
 
     if( !dist->isEqual( part.getDistribution() ) ){
@@ -593,7 +593,7 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes	
     const IndexType localN = dist->getLocalSize();
     const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
 
-    IndexType globalN = dist->getGlobalSize();
+    //const IndexType globalN = dist->getGlobalSize();
     IndexType max = part.max();
 	
 	if(max!=settings.numBlocks-1){
@@ -903,7 +903,7 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
     const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
-    IndexType N = adjM.getNumColumns();
+    //const IndexType N = adjM.getNumColumns();
     IndexType max = part.max();
    
     if( !dist->isEqual( part.getDistribution() ) ){

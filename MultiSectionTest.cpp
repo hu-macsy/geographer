@@ -71,7 +71,7 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
     //
     scai::lama::DenseVector<ValueType> nodeWeights( dist, ValueType(1) );
 
-    ValueType actualTotalWeight = nodeWeights.sum();
+    //ValueType actualTotalWeight = nodeWeights.sum();
     
     Settings settings;
     settings.dimensions = dimensions;
@@ -127,7 +127,7 @@ TEST_F(MultiSectionTest, testGetRectangles){
     IndexType dim = 3;
     IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-    IndexType localN = blockDist->getLocalSize();
+    //IndexType localN = blockDist->getLocalSize();
     
     scai::lama::DenseVector<ValueType> nodeWeights( blockDist, ValueType(1) );
 
@@ -762,7 +762,7 @@ TEST_F(MultiSectionTest, test1DProjection){
     IndexType N= std::pow( sideLen+1, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::lama::DenseVector<ValueType> nodeWeights( blockDist, ValueType(1) );
-    IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
+    //IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
     
     // test projection in all dimensions
     
