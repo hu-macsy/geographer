@@ -1119,10 +1119,14 @@ std::vector<T> MultiSection<IndexType, ValueType>::indexTo3D(IndexType ind, Inde
 
 template class MultiSection<IndexType, ValueType>;
 
-template double MultiSection<long int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<long int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
+template ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vector<scai::lama::DenseVector<IndexType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
 
-template double MultiSection<long int, double>::getRectangleWeight( const std::vector<std::vector<long int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
+template ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vector<std::vector<IndexType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
 
-template double MultiSection<long int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<double>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
+template ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
+
+template std::vector<IndexType> MultiSection<IndexType, ValueType>::indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dim);
+
+template std::vector<ValueType> MultiSection<IndexType, ValueType>::indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dim);
 
 };

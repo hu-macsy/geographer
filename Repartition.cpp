@@ -24,9 +24,6 @@
 #include "HilbertCurve.h"
 #include "KMeans.h"
 
-//TODO: get rid of dependacy with wrappers
-//#include "Wrappers.h"
-
 //#include "RBC/Sort/SQuick.hpp"
 
 using scai::lama::Scalar;
@@ -54,7 +51,7 @@ scai::lama::DenseVector<ValueType> Repartition<IndexType,ValueType>::setNodeWeig
 	for( IndexType d=0; d<dimensions; d++){
 		maxCoords[d] = coordinates[d].max();
 		minCoords[d] = coordinates[d].min();
-		std::uniform_real_distribution<ValueType> dist(minCoord[d], maxCoord[d]);
+		std::uniform_real_distribution<ValueType> dist(minCoords[d], maxCoords[d]);
 		center[d] = dist( generator );
 		//center[d] = maxCoords[d]/2.0;
 		//PRINT(*comm << ": cent["<< d <<"]= " << center[d]);
@@ -136,7 +133,7 @@ void Repartition<IndexType,ValueType>::getImbalancedDistribution(
 		}
 		
 		// set node weights to create artificial imbalance
-		imbaNodeWeights = ITI::Repartition<IndexType,ValueType>::sNW( coords, seed, diverg, dimensions);
+		imbaNodeWeights = ITI::Repartition<IndexType,ValueType>::setNodeWeights( coords, seed, diverg, dimensions);
 		ValueType maxWeight = imbaNodeWeights.max();
 		ValueType minWeight = imbaNodeWeights.min();
 		PRINT0("maxWeight= "<< maxWeight << " , minWeight= "<< minWeight);
@@ -154,7 +151,7 @@ void Repartition<IndexType,ValueType>::getImbalancedDistribution(
 			//TODO: assuming uniform block sizes
 			const IndexType globalN = graph.getNumRows();
 			const std::vector<IndexType> blockSizes(settings.numBlocks, globalN/settings.numBlocks);
-			firstPartition = ITI::KMeans::computePartition ( coords, settings.numBlocks, imbaNodeWeights, blockSizes, imbaSettings);
+			firstPartition = ITI::KMeans::computePartition ( coords, imbaNodeWeights, blockSizes, imbaSettings);
 		}
 		else{
 			bool nodeWeightsFlag = true;

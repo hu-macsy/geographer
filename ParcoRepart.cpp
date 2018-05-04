@@ -98,7 +98,7 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     /**
      * fill sort pair
      */
-    scai::hmemo::HArray<IndexType> myGlobalIndices(localN, 0.0);
+    scai::hmemo::HArray<IndexType> myGlobalIndices(localN, IndexType(0));
     inputDist->getOwnedIndexes(myGlobalIndices);
     std::vector<sort_pair> localPairs(localN);
     {
