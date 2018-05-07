@@ -1488,7 +1488,7 @@ CSRSparseMatrix<ValueType> constructLaplacian(CSRSparseMatrix<ValueType> graph) 
         const IndexType globalI = dist->local2global(i);
         for (IndexType j = ia[i]; j < ia[i+1]; j++) {
             if (ja[j] == globalI) {
-                throw std::runtime_error("No self loops allowed.");
+                throw std::runtime_error("Forbidden self loop at " + std::to_string(globalI) + " with weight " + std::to_string(values[j]));
             }
             targetDegree[i] += values[j];
         }
