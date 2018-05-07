@@ -37,31 +37,73 @@ protected:
 };
 
 TEST_F(SpectralPartitionTest, testFiedlerVector) {
+    using scai::hmemo::HArray;
+
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     // for now local refinement requires k = P
     //
     IndexType N = 40;
-    scai::lama::CSRSparseMatrix<ValueType> graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(N, N);
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
 
-    srand(time(NULL));
-    
-    // random graph with weighted edges
-    for(IndexType row=0; row<N; row++){    
-        for( IndexType j=0; j<rand()%5+6; j++){
-            IndexType col= rand()%N;
-            if( col!=row ){
-                IndexType w = rand()%10+1;
-                //PRINT(row << ", "<< col << ": "<< w);
-                graph.setValue(row, col, w);
-                graph.setValue(col, row, w);
+    //broadcast seed value from root to ensure equal pseudorandom numbers.
+    ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+    comm->bcast( seed, 1, 0 );
+    srand(seed[0]);
+
+    scai::lama::CSRSparseMatrix<ValueType> graph;// = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDist);
+
+    /**
+     * create random graph with weighted edges. We first store the edges in a dense adjacency matrix, then manually convert to CSR.
+     * This is necessary since the Lama-supplied conversion to CSR adds zero-valued entries on the diagonal, which confuses constructLaplacian
+     */
+    {
+        std::vector<ValueType> denseAdjacencyMatrix(N*N, 0);
+
+        for (IndexType i = 0; i < N; i++) {
+            const IndexType degreeBound = rand()%5+6;
+            bool connectedToNextRow = false;
+
+            for( IndexType j=0; j<degreeBound; j++){
+                const IndexType col= rand()%N;
+                if( col!=i ){
+                    const ValueType w = rand()%10+1;
+                    denseAdjacencyMatrix[i*N+col] = w;
+                    denseAdjacencyMatrix[col*N+i] = w;
+                }
             }
+
+            // connect this row with the next one so graph is connected
+            const IndexType col = (i+1)%N;
+            if (col != i) {
+                const ValueType w = rand()%10 +1;
+                denseAdjacencyMatrix[i*N+col] = w;
+                denseAdjacencyMatrix[col*N+i] = w;
+            }
+
         }
-        
-        // connect this row with the next one so graph is connected
-        graph.setValue(row, (row+1)%N, rand()%10 +1);
-        graph.setValue((row+1)%N, row, rand()%10 +1 );
+
+        //convert to CSR
+        std::vector<IndexType> newIA(N+1);
+        std::vector<IndexType> newJA;
+        std::vector<ValueType> newValues;
+
+        for(IndexType i=0; i<N; i++){
+            for( IndexType j=0; j<N; j++){
+                if( denseAdjacencyMatrix[i*N+j] != 0 ){
+                    newJA.push_back(j);
+                    newValues.push_back(denseAdjacencyMatrix[i*N+j]);
+                }
+            }
+            newIA[i+1] = newJA.size();
+        }
+
+        const IndexType M = newJA.size();
+        ASSERT_EQ(M, newValues.size());
+
+        scai::lama::CSRStorage<ValueType> storage(N,N, HArray<IndexType>(N+1,newIA.data()), HArray<IndexType>(M, newJA.data()), HArray<ValueType>(M, newValues.data()));
+        graph = scai::lama::CSRSparseMatrix<ValueType>(std::move(storage));
     }
-    
     ValueType fiedlerEigenvalue = -8;
     scai::lama::DenseVector<ValueType> fiedler;
     
@@ -72,7 +114,7 @@ TEST_F(SpectralPartitionTest, testFiedlerVector) {
         SCAI_ASSERT( fiedlerEigenvalue >0, "fiedler eigenvalue negative: "<< fiedlerEigenvalue);
     }
     
-    //TODO: done in a hurry, add prorper tests, assertions
+    //TODO: done in a hurry, add proper tests, assertions
     //prints - assertion
     
     ValueType fiedlerMax = fiedler.max();
