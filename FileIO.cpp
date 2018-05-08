@@ -10,7 +10,6 @@
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>
 #include <scai/lama/Vector.hpp>
-#include <scai/lama/Scalar.hpp>
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/common/Math.hpp>
 #include <scai/common/Settings.hpp>
@@ -34,7 +33,7 @@
 
 
 using scai::lama::CSRStorage;
-using scai::lama::Scalar;
+using scai::hmemo::HArray;
 
 const IndexType fileTypeVersionNumber= 3;
 
@@ -65,10 +64,10 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
     // in order to keep input array unchanged, create new tmp array by coping
     // adjM.redistribute( noDist , noDist);
     
-    scai::lama::CSRSparseMatrix<ValueType> tmpAdjM ( adjM.getLocalStorage(),
-                                                     adjM.getRowDistributionPtr(),
-                                                     adjM.getColDistributionPtr()
-                                           );
+    auto tmpAdjM = scai::lama::distribute<scai::lama::CSRSparseMatrix<ValueType>>( adjM.getLocalStorage(),
+                                                                                   adjM.getRowDistributionPtr(),
+                                                                                   adjM.getColDistributionPtr()
+                                                                                );
     tmpAdjM.redistribute( noDist , noDist);
 
     if(comm->getRank()==root){
@@ -171,7 +170,7 @@ void FileIO<IndexType, ValueType>::writeVTKCentral (const CSRSparseMatrix<ValueT
     // for(inv v=0; v<number_of_variables; v++){}
     
     f << "LOOKUP_TABLE default" << std::endl;
-    int k = part.max().Scalar::getValue<IndexType>();
+    int k = part.max();
     for( int i=0; i<N; i++){
         f << (double) part.getLocalValues()[i]/(double)k << std::endl;
     }
@@ -204,7 +203,7 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
 	if (!dist->isReplicated()) {
 		maybeCopy.resize(dimension);
 		for (IndexType d = 0; d < dimension; d++) {
-			maybeCopy[d] = DenseVector<ValueType>(coords[d], noDist);
+			maybeCopy[d] = scai::lama::distribute<DenseVector<ValueType>>(coords[d], noDist);
 		}
 
 	}
@@ -732,7 +731,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 	nodeWeights.resize(numberNodeWeights);
     //std::cout << "Process " << comm->getRank() << " allocated memory for " << numberNodeWeights << " node weights. " << std::endl;
 	for (IndexType i = 0; i < numberNodeWeights; i++) {
-		nodeWeights[i] = DenseVector<ValueType>(dist, scai::utilskernel::LArray<ValueType>(localN, nodeWeightStorage[i].data()));
+		nodeWeights[i] = DenseVector<ValueType>(dist, HArray<ValueType>(localN, nodeWeightStorage[i].data()));
 	}
 
     //std::cout << "Process " << comm->getRank() << " converted node weights. " << std::endl;
@@ -762,14 +761,15 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     }
 
     //assign matrix
-    scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, ja.size(), 
-                scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
-    		scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
-    		scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
+    scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, 
+                HArray<IndexType>(ia.size(), ia.data()),
+    		HArray<IndexType>(ja.size(), ja.data()),
+    		HArray<ValueType>(values.size(), values.data()));
 
     //std::cout << "Process " << comm->getRank() << " created local storage " << std::endl;
 
-    return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
+    return scai::lama::distribute<scai::lama::CSRSparseMatrix<ValueType>>(myStorage, dist, noDist);
+    //ThomasBranses ? return scai::lama::CSRSparseMatrix<ValueType>( dist, std::move(myStorage) ); // if no comm
 }
 //-------------------------------------------------------------------------------------------------
 
@@ -926,16 +926,17 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     //assign matrix
     //
     
-    scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, ja.size(),   
-    scai::utilskernel::LArray<IndexType>(ia.size(), ia.data()),
-    scai::utilskernel::LArray<IndexType>(ja.size(), ja.data()),
-    scai::utilskernel::LArray<ValueType>(values.size(), values.data()));
+    scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, 
+        HArray<IndexType>(ia.size(), ia.data()),
+        HArray<IndexType>(ja.size(), ja.data()),
+        HArray<ValueType>(values.size(), values.data()));
     
     // block distribution for rows and no distribution for columns
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
-    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 
-    return scai::lama::CSRSparseMatrix<ValueType>(myStorage, dist, noDist);
+    // myStorage is exactly my local part corresponding to the block distribution
+    // ThomasBrandes: is localN realy dist->getLocalSize()
+    return scai::lama::CSRSparseMatrix<ValueType>( dist, std::move( myStorage ) );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1217,9 +1218,9 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
 	}
 
 	//create result vector
-	std::vector<scai::utilskernel::LArray<ValueType> > coords(dimension);
+	std::vector<HArray<ValueType> > coords(dimension);
 	for (IndexType dim = 0; dim < dimension; dim++) {
-		coords[dim] = scai::utilskernel::LArray<ValueType>(localN, 0);
+		coords[dim] = HArray<ValueType>(localN, ValueType(0));
 	}
 
 	//read local range
@@ -1292,7 +1293,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsTEEC
 /*File "filename" contains the coordinates of a graph. The function reads these coordinates and returns a vector of DenseVectors, one for each dimension
  */
 template<typename IndexType, typename ValueType>
-std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( std::string filename, IndexType numberOfPoints, IndexType dimension, Format format){
+std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( std::string filename, IndexType numberOfPoints, const IndexType dimension, Format format){
     SCAI_REGION( "FileIO.readCoords" );
 
     IndexType globalN= numberOfPoints;
@@ -1341,9 +1342,10 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
     }
 
     //create result vector
-    std::vector<scai::utilskernel::LArray<ValueType> > coords(dimension);
+    std::vector<std::vector<ValueType> > coords(dimension);
     for (IndexType dim = 0; dim < dimension; dim++) {
-    	coords[dim] = scai::utilskernel::LArray<ValueType>(localN, 0);
+    	coords[dim].resize(localN);
+    	SCAI_ASSERT_EQUAL_ERROR(coords[dim].size(), localN);
     }
 
     //read local range
@@ -1386,8 +1388,8 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 
     std::vector<DenseVector<ValueType> > result(dimension);
 
-    for (IndexType i = 0; i < dimension; i++) {
-        result[i] = DenseVector<ValueType>(dist, coords[i] );
+    for (IndexType dim = 0; dim < dimension; dim++) {
+        result[dim] = DenseVector<ValueType>(dist, HArray<ValueType>(localN, coords[dim].data()) );
     }
 
     return result;
@@ -1429,7 +1431,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
     IndexType maxDimension = 3;
     
     const UINT beginLocalCoords = beginLocalRange*maxDimension;
-    const UINT endLocalCoords = endLocalRange*maxDimension;
+    //const UINT endLocalCoords = endLocalRange*maxDimension;
     const UINT localTotalNumOfCoords = localN*maxDimension;
     
     SCAI_ASSERT_EQ_ERROR( globalN, comm->sum(localN), "Mismatch in total number of coordinates" );
@@ -1438,14 +1440,14 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
     // set like in KaHiP/parallel/prallel_src/app/configuration.h in configuration::standard
     //const IndexType binary_io_window_size = 64;   
     
-    const IndexType window_size = numPEs;// std::min( binary_io_window_size, numPEs );
+    const IndexType window_size = numPEs;
     IndexType lowPE =0;
     IndexType highPE = window_size;
 
     //create local part result vector
-    std::vector<scai::utilskernel::LArray<ValueType> > coords(dimension);
+    std::vector<HArray<ValueType> > coords(dimension);
     for (IndexType dim = 0; dim < dimension; dim++) {
-    	coords[dim] = scai::utilskernel::LArray<ValueType>(localN, 0);
+        coords[dim] = HArray<ValueType>(localN, ValueType(0));
     }
 
     while( lowPE<numPEs ){
@@ -1544,9 +1546,9 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsMatr
     }
     
     //create result vector
-    std::vector<scai::utilskernel::LArray<ValueType> > coords(dimensions);
+    std::vector<HArray<ValueType> > coords(dimensions);
     for (IndexType dim = 0; dim < dimensions; dim++) {
-    	coords[dim] = scai::utilskernel::LArray<ValueType>(localN, 0);
+        coords[dim] = HArray<ValueType>(localN, ValueType(0));
     }
     
     //read local range
@@ -1615,9 +1617,9 @@ void  FileIO<IndexType, ValueType>::readOFFTriangularCentral( scai::lama::CSRSpa
 
     IndexType dimension = 3;
     
-    std::vector<scai::utilskernel::LArray<ValueType> > coordsLA(dimension);
+    std::vector<HArray<ValueType> > coordsLA(dimension);
 	for (IndexType dim = 0; dim < dimension; dim++) {
-		coordsLA[dim] = scai::utilskernel::LArray<ValueType>(N, 0);
+        coordsLA[dim] = HArray<ValueType>(N, ValueType(0));
 	}
 	
 	for(IndexType i=0; i<N; i++){
@@ -1805,9 +1807,9 @@ void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix
 		}
 	}
 	
-	std::vector<scai::utilskernel::LArray<ValueType> > coordsLA(dimensions);
+	std::vector<scai::hmemo::HArray<ValueType> > coordsLA(dimensions);
 	for (IndexType dim = 0; dim < dimensions; dim++) {
-		coordsLA[dim] = scai::utilskernel::LArray<ValueType>(N, 0);
+		coordsLA[dim] = scai::hmemo::HArray<ValueType>(N, 0.0);
 	}
 	
 	for(IndexType i=0; i<N; i++){
@@ -2156,8 +2158,8 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
 
 	for (IndexType d = 0; d < dimension; d++) {
 		assert(vCoords[d].size() == numLeaves);
-		scai::utilskernel::LArray<ValueType> localValues(vCoords[d].size(), vCoords[d].data());
-		coords[d] = DenseVector<ValueType>(localValues);
+		HArray<ValueType> localValues(vCoords[d].size(), vCoords[d].data());
+		coords[d] = DenseVector<ValueType>(std::move(localValues));
 	}
     return matrix;
 }

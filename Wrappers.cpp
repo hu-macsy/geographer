@@ -262,7 +262,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
 		if( parMetisGeom==1 or parMetisGeom==2 or settings.writeDebugCoordinates ){
 			xyzLocal = new real_t[ ndims*localN ];
 			
-			std::vector<scai::utilskernel::LArray<ValueType>> localPartOfCoords( ndims );
+			std::vector<scai::hmemo::HArray<ValueType>> localPartOfCoords( ndims );
 			for(int d=0; d<ndims; d++){
 				localPartOfCoords[d] = coords[d].getLocalValues();
 			}
@@ -553,7 +553,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 	// the local part of coordinates for zoltan
 	ValueType *zoltanCoords = new ValueType [dimensions * localN];
 
-	std::vector<scai::utilskernel::LArray<ValueType>> localPartOfCoords( dimensions );
+	std::vector<scai::hmemo::HArray<ValueType>> localPartOfCoords( dimensions );
 	for(unsigned int d=0; d<dimensions; d++){
 		localPartOfCoords[d] = coords[d].getLocalValues();
 	}

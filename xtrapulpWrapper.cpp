@@ -540,7 +540,7 @@ PRINT(*comm << ": " << beginLocalRange << " - " << endLocalRange );
 	
 	
 	g.ghost_tasks = new uint64_t[g.n_ghost];			// WARNING: owning PE of each ghost node?
-	scai::utilskernel::LArray<IndexType> indexTransport(nonLocalNgbrs.size(), nonLocalNgbrs.data());
+	scai::hmemo::HArray<IndexType> indexTransport(nonLocalNgbrs.size(), nonLocalNgbrs.data());
     // find the PEs that own every non-local index
     scai::hmemo::HArray<IndexType> owners(nonLocalNgbrs.size() , -1);
     dist->computeOwners( owners, indexTransport);

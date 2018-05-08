@@ -82,20 +82,20 @@ TEST_F(GraphUtilsTest, testConstructLaplacian) {
 
     //test that L*1 = 0
     DenseVector<ValueType> x( n, 1 );
-    DenseVector<ValueType> y( L * x );
+    DenseVector<ValueType> y = scai::lama::eval<DenseVector<ValueType>>( L * x );
 
-    ValueType norm = y.maxNorm().Scalar::getValue<ValueType>();
+    ValueType norm = y.maxNorm();
     EXPECT_EQ(norm,0);
 
     //test consistency under distributions
-    const CSRSparseMatrix<ValueType> replicatedGraph(graph, noDist, noDist);
+    const CSRSparseMatrix<ValueType> replicatedGraph = scai::lama::distribute<CSRSparseMatrix<ValueType>>(graph, noDist, noDist);
     CSRSparseMatrix<ValueType> LFromReplicated = GraphUtils::constructLaplacian<IndexType, ValueType>(replicatedGraph);
     LFromReplicated.redistribute(L.getRowDistributionPtr(), L.getColDistributionPtr());
-    CSRSparseMatrix<ValueType> diff (LFromReplicated - L);
-    EXPECT_EQ(0, diff.l2Norm().Scalar::getValue<ValueType>());
+    CSRSparseMatrix<ValueType> diff = scai::lama::eval<CSRSparseMatrix<ValueType>> (LFromReplicated - L);
+    EXPECT_EQ(0, diff.l2Norm());
 
     //sum is zero
-    EXPECT_EQ(0, comm->sum(L.getLocalStorage().getValues().sum()) );
+    EXPECT_EQ(0, comm->sum(scai::utilskernel::HArrayUtils::sum(L.getLocalStorage().getValues())) );
 }
 
 TEST_F(GraphUtilsTest, benchConstructLaplacian) {
@@ -179,7 +179,7 @@ TEST_F (GraphUtilsTest, testGraphMaxDegree){
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
 
     //generate random complete matrix
-    scai::lama::CSRSparseMatrix<ValueType> graph(dist, noDistPointer);
+    auto graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDistPointer);
     
     for( int i=0; i<10; i++){
         scai::lama::MatrixCreator::fillRandom(graph, i/9.0);

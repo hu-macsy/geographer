@@ -9,7 +9,6 @@
 #include <scai/hmemo/Context.hpp>
 #include <scai/hmemo/HArray.hpp>
 
-#include <scai/utilskernel/LArray.hpp>
 #include <scai/lama/Vector.hpp>
 
 #include <boost/algorithm/string.hpp>
@@ -336,7 +335,7 @@ int main(int argc, char** argv) {
     if( vm.count("blockSizesFile") ){
         settings.blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
         IndexType blockSizesSum  = std::accumulate( settings.blockSizes.begin(), settings.blockSizes.end(), 0);
-        IndexType nodeWeightsSum = nodeWeights.sum().Scalar::getValue<IndexType>();
+        IndexType nodeWeightsSum = nodeWeights.sum();
         SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
     }
     
@@ -459,7 +458,7 @@ int main(int argc, char** argv) {
 				nodeWeightsInt.swap( localWeightsInt, rowDistPtr );
 				nodeWeightsInt.redistribute(tempResult.getDistributionPtr());
 					
-				weightSum = nodeWeightsInt.sum().Scalar::getValue<IndexType>();
+				weightSum = nodeWeightsInt.sum();
 			}else{
 				// if all nodes have weight 1 then weightSum = globalN
 				weightSum = N;

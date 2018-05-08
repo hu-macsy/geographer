@@ -9,7 +9,6 @@
 #include <scai/hmemo/Context.hpp>
 #include <scai/hmemo/HArray.hpp>
 
-#include <scai/utilskernel/LArray.hpp>
 #include <scai/lama/Vector.hpp>
 
 #include <algorithm>
@@ -70,18 +69,9 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
     //
     //create weights locally
     //
-    scai::lama::DenseVector<ValueType> nodeWeights( dist );
-    IndexType actualTotalWeight = 0;
-    {
-        scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
-        srand(time(NULL));
-        for(int i=0; i<localN; i++){
-            localPart[i] = 1;
-            //localPart[i] = rand()%9+rand()%7;
-            actualTotalWeight += localPart[i];         
-        }
-    }
-    actualTotalWeight =  comm->sum(actualTotalWeight);
+    scai::lama::DenseVector<ValueType> nodeWeights( dist, ValueType(1) );
+
+    //ValueType actualTotalWeight = nodeWeights.sum();
     
     Settings settings;
     settings.dimensions = dimensions;
@@ -137,18 +127,9 @@ TEST_F(MultiSectionTest, testGetRectangles){
     IndexType dim = 3;
     IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-    scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
-    IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();  
+    //IndexType localN = blockDist->getLocalSize();
     
-    //create weights locally
-    {
-        scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
-        srand(time(NULL));
-        for(int i=0; i<localN; i++){
-            localPart[i] = 1;
-            //localPart[i] = rand()%7*comm->getRank()+2;
-        }
-    }
+    scai::lama::DenseVector<ValueType> nodeWeights( blockDist, ValueType(1) );
 
     Settings settings;
     settings.dimensions = dim;
@@ -227,7 +208,7 @@ TEST_F(MultiSectionTest, testGetRectangles){
     PRINT0( "minWeight= "<< minWeight << " , maxWeight= "<< maxWeight );
     
     //all points are covered by a rectangle
-    ValueType sumWeight = nodeWeights.sum().Scalar::getValue<ValueType>();
+    ValueType sumWeight = nodeWeights.sum();
     SCAI_ASSERT( totalWeight==sumWeight , "sum of all rectangles weight= "<< totalWeight << " and should be equal the sum of weights= "<< sumWeight);
     // this works even when weights are not 1
     SCAI_ASSERT( totalVolume==N , "total volume= "<< totalVolume << " and should be equal the number of points= "<< N);
@@ -242,7 +223,7 @@ TEST_F(MultiSectionTest, test1DPartitionGreedy){
     IndexType dim = 2;
     IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-    scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
+    scai::lama::DenseVector<ValueType> nodeWeights( blockDist, ValueType(0) );
     IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
     
     ValueType origTotalWeight = 0;
@@ -673,15 +654,15 @@ TEST_F(MultiSectionTest, testGetRectangleWeightNonUniform){
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N+1) );
     
-    scai::lama::DenseVector<ValueType> nodeWeights(N+1);
+    const int w=4;
+    scai::lama::DenseVector<ValueType> nodeWeights(N+1, ValueType(w));
     std::vector<scai::lama::DenseVector<ValueType>> coordinates(dimensions);
     
     // put weights only in the line x=y
-    int w=4;
+
     for(int d=0; d<dimensions; d++){
         coordinates[d].allocate( N+1 );
         for(int i=0; i<=N; i++){
-            nodeWeights[i] = w;
             coordinates[d].setValue(i,i);   
         }
         coordinates[d].redistribute( blockDist );
@@ -738,7 +719,8 @@ TEST_F(MultiSectionTest, testGetRectangleWeight){
                             9, 0, 1, 5,
                             3, 4, 5, 6
     };
-    scai::lama::DenseVector<ValueType> nodeWeights(N, nodeW);
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    scai::lama::DenseVector<ValueType> nodeWeights(noDistPointer, scai::hmemo::HArray<ValueType>(N, nodeW));
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
@@ -779,17 +761,8 @@ TEST_F(MultiSectionTest, test1DProjection){
     IndexType dim = 3;
     IndexType N= std::pow( sideLen+1, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-    scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
-    IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
-    
-    //create local weights
-    {
-        scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
-        srand(time(NULL));
-        for(int i=0; i<localN; i++){
-            localPart[i] = 1;
-        }
-    }
+    scai::lama::DenseVector<ValueType> nodeWeights( blockDist, ValueType(1) );
+    //IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
     
     // test projection in all dimensions
     
@@ -845,20 +818,12 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
     const IndexType localN = dist->getLocalSize();
     
     // in this version the adjacency matrix is not used in the getRectanglesNonUniform
-    scai::lama::CSRSparseMatrix<ValueType> adjM(dist, noDistPointer);
+    scai::lama::CSRSparseMatrix<ValueType> adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDistPointer);
     
     //
-    //create weights locally
+    //create weights
     //
-    scai::lama::DenseVector<ValueType> nodeWeights( dist );
-    {
-        scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
-        srand(time(NULL));
-        for(int i=0; i<localN; i++){
-            localPart[i] = 1;
-            //localPart[i] = rand()%7*comm->getRank()+2;
-        }
-    }
+    scai::lama::DenseVector<ValueType> nodeWeights( dist, ValueType(1) );
     
     //
     // create integer coordinates in the grid every two points (not all)
@@ -891,7 +856,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
     std::vector<std::vector<IndexType>> coords( localN, std::vector<IndexType>( dimensions, 0) );
     {
         for (IndexType d = 0; d < dimensions; d++) {
-            const scai::utilskernel::LArray<IndexType>& localPartOfCoords = coordinates[d].getLocalValues();
+            const scai::hmemo::HArray<IndexType>& localPartOfCoords = coordinates[d].getLocalValues();
             for (IndexType i = 0; i < localN; i++) {
                 coords[i][d] = IndexType (localPartOfCoords[i]);
             }
@@ -977,7 +942,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
     PRINT0( "minWeight= "<< minWeight << " , maxWeight= "<< maxWeight );
     
     //all points are covered by a rectangle
-    ValueType sumWeight = nodeWeights.sum().Scalar::getValue<ValueType>();
+    ValueType sumWeight = nodeWeights.sum();
     SCAI_ASSERT( totalWeight==sumWeight , "sum of all rectangles weight= "<< totalWeight << " and should be equal the sum of weights= "<< sumWeight);
     // this works even when weights are not 1
     SCAI_ASSERT( totalVolume==N , "total volume= "<< totalVolume << " and should be equal the number of points= "<< N);    
@@ -1017,7 +982,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
     //
     //create weights locally
     //
-    scai::lama::DenseVector<ValueType> nodeWeights( dist );
+    scai::lama::DenseVector<ValueType> nodeWeights( dist, ValueType(0) );
     IndexType actualTotalWeight = 0;
     {
         scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
@@ -1047,7 +1012,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
         for (IndexType d = 0; d < dimensions; d++) {
             //scaledCoords[d].allocate( dist );
             //scaledCoords[d] = static_cast<ValueType>( 0 );
-            const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
+            const scai::hmemo::HArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
             
             for (IndexType i = 0; i < localN; i++) {
                 ValueType coord = localPartOfCoords[i];
@@ -1066,7 +1031,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
         
         for (IndexType d = 0; d < dimensions; d++) {
             //get local parts of coordinates
-            const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
+            const scai::hmemo::HArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
             
             for (IndexType i = 0; i < localN; i++) {
                 ValueType normalizedCoord = (localPartOfCoords[i] - minCoords[d])/(maxCoords[d]-minCoords[d]);
@@ -1195,8 +1160,6 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
     const scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr("BLOCK", comm, N) );
     const scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
     const IndexType localN = dist->getLocalSize();
-    
-    scai::lama::CSRSparseMatrix<ValueType> adjM(dist, noDistPointer);
   
     std::vector<DenseVector<IndexType>> coordinates(dimensions);
     
@@ -1219,15 +1182,9 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
     coordinates[1].redistribute( dist );
     
     //set local weights + convert local part of coordinates to a vector<vector<IndexType>>
-    scai::lama::DenseVector<ValueType> nodeWeights( dist );
+    scai::lama::DenseVector<ValueType> nodeWeights( dist, ValueType(1) );
     std::vector<std::vector<IndexType>> localPoints( localN, std::vector<IndexType>( dimensions, 0) );
     {
-        scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
-        srand(time(NULL));
-        for(int i=0; i<localN; i++){
-            localPart[i] = 1; //rand()%10;
-        }
-        
         for(int d=0; d<dimensions; d++){
             scai::hmemo::ReadAccess<IndexType> localCoordR( coordinates[d].getLocalValues() );
             for(int i=0; i<localN; i++){
@@ -1342,7 +1299,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
     if( comm->getRank()==0 ){
         for(int i=0; i<numRows; i++){
             for(int j=0; j<numCols; j++){
-                std::cout<< blockGraph.getValue(i,j).Scalar::getValue<IndexType>() << " ";
+                std::cout<< blockGraph.getValue(i,j) << " ";
             }
             std::cout << std::endl;
         }
@@ -1362,7 +1319,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
     const scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
     const IndexType localN = dist->getLocalSize();
     
-    scai::lama::CSRSparseMatrix<ValueType> adjM(dist, noDistPointer);
+    scai::lama::CSRSparseMatrix<ValueType> adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDistPointer);
   
     std::vector<DenseVector<ValueType>> coordinates(dimensions);
     
@@ -1392,7 +1349,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
     std::vector<std::vector<IndexType>> coordsIndex( localN, std::vector<IndexType>(dimensions,0) );
     {
         for (IndexType d = 0; d < dimensions; d++) {
-            const scai::utilskernel::LArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
+            const scai::hmemo::HArray<ValueType>& localPartOfCoords = coordinates[d].getLocalValues();
             
             for (IndexType i = 0; i < localN; i++) {
                 coordsIndex[i][d] = localPartOfCoords[i];
@@ -1401,14 +1358,8 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
     }
 
     //set local weights
-    scai::lama::DenseVector<ValueType> nodeWeights( dist );
-    {
-        scai::hmemo::WriteAccess<ValueType> localPart(nodeWeights.getLocalValues());
-        srand(time(NULL));
-        for(int i=0; i<localN; i++){
-            localPart[i] = 1; //rand()%10;
-        }
-    }
+    scai::lama::DenseVector<ValueType> nodeWeights( dist , ValueType(1));
+
     SCAI_ASSERT( coordinates[0].getLocalValues().size()==nodeWeights.getLocalValues().size(), "Wrong local sizes for coordinates and weights vectors");
     
     struct Settings settings;
@@ -1455,7 +1406,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
     // bBox0 not leaf, bBox1=projections[2], bBox2=projections[0] , bBox3=projections[1]
 
     ValueType totalGridWeight = N;
-    SCAI_ASSERT( totalGridWeight==nodeWeights.sum() , "Wrong sum of node weights: "<< nodeWeights.sum().Scalar::getValue<IndexType>() );
+    SCAI_ASSERT( totalGridWeight==nodeWeights.sum() , "Wrong sum of node weights: "<< nodeWeights.sum() );
     
     for(int d=0; d<dimensions; d++){
         //dim2proj.size() = number of leaves/rectangles
@@ -1489,8 +1440,6 @@ TEST_F(MultiSectionTest, testInbBox){
     IndexType dim = 3;
     IndexType N= std::pow( sideLen, dim );   // for a N^dim grid
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-    scai::lama::DenseVector<ValueType> nodeWeights( blockDist );
-    //IndexType localN = nodeWeights.getDistributionPtr()->getLocalSize();
     
     // for all dimensions i: first[i]<second[i] 
     rectangle bBox;

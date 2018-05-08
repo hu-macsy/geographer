@@ -76,7 +76,7 @@ ValueType computeCut(const scai::lama::CSRSparseMatrix<ValueType> &input, const 
  * @param[in] k number of blocks in partition.
  */
 template<typename IndexType, typename ValueType>
-ValueType computeImbalance(const scai::lama::DenseVector<IndexType> &part, IndexType k, const scai::lama::DenseVector<ValueType> &nodeWeights = {});
+ValueType computeImbalance(const scai::lama::DenseVector<IndexType> &part, IndexType k, const scai::lama::DenseVector<ValueType> &nodeWeights = scai::lama::DenseVector<ValueType>(0,0));
 
 /**
  * @brief Builds a halo containing all non-local neighbors.

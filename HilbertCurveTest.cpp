@@ -8,7 +8,6 @@
 #include <scai/hmemo/Context.hpp>
 #include <scai/hmemo/HArray.hpp>
 
-#include <scai/utilskernel/LArray.hpp>
 #include <scai/lama/Vector.hpp>
 
 #include <memory>
@@ -149,16 +148,14 @@ TEST_P(HilbertCurveTest, testInverseHilbertIndex_Local) {
 TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
   const IndexType dimensions = 2;
   const IndexType recursionDepth = 7;
-
-  IndexType N, edges;
   
   std::string fileName = graphPath + "trace-00008.graph";
-  std::ifstream f(fileName);
-  if(f.fail()) 
-    throw std::runtime_error("File "+ fileName+ " failed.");
   
-  f >> N>> edges;
-  PRINT("file "<< fileName<< ", nodes= "<< N << ", edges= " << edges);  
+  // get graph
+  scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( fileName );
+
+  const IndexType N = graph.getNumRows();
+  const IndexType M = graph.getNumValues();
 
   std::vector<ValueType> maxCoords({0,0});
 
@@ -169,7 +166,7 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
 
   for(IndexType j=0; j<dimensions; j++){
 	  coords[j].redistribute(noDist);
-      maxCoords[j]= coords[j].max().Scalar::getValue<ValueType>();
+      maxCoords[j]= coords[j].max();
   }
   EXPECT_EQ(coords[0].size(), N);
   EXPECT_EQ(coords.size(), dimensions);
@@ -177,16 +174,21 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
   const std::vector<ValueType> minCoords({0,0});
   
   DenseVector<ValueType> indices(N, 0);
-  for (IndexType i = 0; i < N; i++){
-    ValueType point[2];
-    point[0]=coords[0].getValue(i).Scalar::getValue<ValueType>();
-    point[1]=coords[1].getValue(i).Scalar::getValue<ValueType>();
-    
-    ValueType hilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex(point, dimensions, recursionDepth, minCoords, maxCoords) ;
-    indices.setValue(i, hilbertIndex);
-    
-    EXPECT_LE(indices.getValue(i).getValue<ValueType>(), 1);
-    EXPECT_GE(indices.getValue(i).getValue<ValueType>(), 0);
+  {
+    scai::hmemo::WriteAccess<ValueType> wIndices(indices.getLocalValues());
+    scai::hmemo::ReadAccess<ValueType> rCoord0(coords[0].getLocalValues());
+    scai::hmemo::ReadAccess<ValueType> rCoord1(coords[1].getLocalValues());
+    for (IndexType i = 0; i < N; i++){
+      ValueType point[2];
+      point[0] = rCoord0[i];
+      point[1] = rCoord1[i];
+      
+      ValueType hilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex(point, dimensions, recursionDepth, minCoords, maxCoords) ;
+      wIndices[i] = hilbertIndex;
+      
+      EXPECT_LE(wIndices[i], 1);
+      EXPECT_GE(wIndices[i], 0);
+    }
   }
 
   IndexType k=60;
@@ -195,17 +197,21 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
   DenseVector<IndexType> permutation;
   indices.sort(permutation, true);
   
-  // get graph
-  scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( fileName );
+  permutation.redistribute(noDist);
 
   //get partition by-hand
   IndexType part =0;
-  for(IndexType i=0; i<N; i++){
-    part = (int) i*k/N ;
-    partition.setValue( permutation(i).Scalar::getValue<IndexType>() , part );
-    assert( part >= 0);
-    assert( part <= k);
-    
+  {
+    scai::hmemo::WriteAccess<IndexType> wPart(partition.getLocalValues());
+    scai::hmemo::ReadAccess<IndexType> rPermutation(permutation.getLocalValues());
+
+    for(IndexType i=0; i<N; i++){
+      part = (int) i*k/N ;
+      EXPECT_GE(part, 0);
+      EXPECT_LT(part, k);
+
+      wPart[permutation[i]] = part;
+    }
   }
 }
 
@@ -246,7 +252,7 @@ TEST_P(HilbertCurveTest, testHilbertIndexRandom_Distributed) {
 
   for (IndexType dim = 0; dim < dimensions; dim++) {
     for (IndexType i = 0; i < N; i++) {
-      ValueType coord = coordinates[dim].getValue(i).Scalar::getValue<ValueType>();
+      ValueType coord = coordinates[dim].getValue(i);
       if (coord < minCoords[dim]) minCoords[dim] = coord;
       if (coord > maxCoords[dim]) maxCoords[dim] = coord;
     }
@@ -335,7 +341,7 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
 
  //the hilbert indices initiated with the dummy value 19
  DenseVector<ValueType> hilbertIndex(dist, 19);
- DenseVector<IndexType> perm(dist);
+ DenseVector<IndexType> perm(dist, 0);
 
  std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
  std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
@@ -343,7 +349,7 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
  
  for (IndexType dim = 0; dim < dimensions; dim++) {
     for (IndexType i = 0; i < N; i++) {
-      ValueType coord = coordinates[dim].getValue(i).Scalar::getValue<ValueType>();
+      ValueType coord = coordinates[dim].getValue(i);
       if (coord < minCoords[dim]) minCoords[dim] = coord;
       if (coord > maxCoords[dim]) maxCoords[dim] = coord;
     }

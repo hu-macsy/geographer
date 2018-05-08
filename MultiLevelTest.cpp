@@ -9,7 +9,6 @@
 #include <scai/hmemo/Context.hpp>
 #include <scai/hmemo/HArray.hpp>
 
-#include <scai/utilskernel/LArray.hpp>
 #include <scai/lama/Vector.hpp>
 
 #include <algorithm>
@@ -134,10 +133,10 @@ TEST_F (MultiLevelTest, testGetMatchingGrid_2D) {
     // for an matching as std::vector<std::vector<IndexType>> (2)
     for(int i=0; i<matching.size(); i++){
         IndexType thisNodeGlob = matching[0].first;
-        assert( thisNodeGlob!= matching[0].second );
+        EXPECT_NE( thisNodeGlob, matching[0].second );
             for(int j=i+1; j<matching.size(); j++){
-                assert( thisNodeGlob != matching[j].first);
-                assert( thisNodeGlob != matching[j].second);
+                EXPECT_NE( thisNodeGlob, matching[j].first);
+                EXPECT_NE( thisNodeGlob, matching[j].second);
             }
     }
     
@@ -177,7 +176,7 @@ TEST_F (MultiLevelTest, testComputeGlobalPrefixSum) {
 	}
 
 	//test for a DenseVector consisting of zeros and ones
-	DenseVector<IndexType> mixedVector(dist);
+	DenseVector<IndexType> mixedVector(dist,0);
 	{
 		scai::hmemo::WriteOnlyAccess<IndexType> wMixed(mixedVector.getLocalValues(), localN);
 		for (IndexType i = 0; i < localN; i++) {
@@ -209,82 +208,71 @@ TEST_F (MultiLevelTest, testComputeGlobalPrefixSum) {
 
 TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 
-    const IndexType N = 300;
     
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-    scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( N ));
-    const IndexType k = comm->getSize();
-    
-    scai::lama::CSRSparseMatrix<ValueType> graph;
-    
-    // create random graph
-    scai::common::scoped_array<ValueType> adjArray( new ValueType[ N*N ] );
-    
-    //initialize matrix with zeros
-    for(int i=0; i<N; i++)
-        for(int j=0; j<N; j++)
-            adjArray[i*N+j]= 0.0;
-        
-	//broadcast seed value from root to ensure equal pseudorandom numbers.
-	ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
-	comm->bcast( seed, 1, 0 );
-	srand(seed[0]);
 
-    IndexType numEdges = IndexType (3*N);
-    for(IndexType i=0; i<numEdges; i++){
-        // a random position in the matrix
-        IndexType x = rand()%N;
-        IndexType y = rand()%N;
-        ASSERT_LT(x+y*N, N*N);
-        ASSERT_LT(x*N+y, N*N);
-        adjArray[ x+y*N ]= 1;
-        adjArray[ x*N+y ]= 1;
-    }
-    graph.setRawDenseData( N, N, adjArray.get() );
+    std::string file = graphPath+ "rotation-00000.graph";
+    std::string coordFile = graphPath+ "rotation-00000.graph.xyz";
+
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    const IndexType N = graph.getNumRows();
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr distPtr ( graph.getRowDistributionPtr() );
+    scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( N ));
+    
+    struct Settings settings;
+    settings.numBlocks= comm->getSize();
+    settings.dimensions = 2;
+
     EXPECT_TRUE( graph.isConsistent() );
-    EXPECT_TRUE( graph.checkSymmetry() );
-    ValueType beforel1Norm = graph.l1Norm().Scalar::getValue<ValueType>();
+    ValueType beforel1Norm = graph.l1Norm();
     IndexType beforeNumValues = graph.getNumValues();
     
+    //broadcast seed value from root to ensure equal pseudorandom numbers.
+    ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+    comm->bcast( seed, 1, 0 );
+    srand(seed[0]);
+
     //random partition
 	DenseVector<IndexType> partition( N , 0);
-	for(IndexType i=0; i<N; i++){
-		partition.setValue(i, rand()%k );
+	{
+	    scai::hmemo::WriteAccess<IndexType> wPart(partition.getLocalValues());
+	    for(IndexType i=0; i<N; i++){
+	        wPart[i] = rand()%settings.numBlocks;
+        }
+	    const IndexType localSum = std::accumulate(wPart.get(), wPart.get() + N, 0);
+	    const IndexType globalSum = comm->sum(localSum);
+	    ASSERT_EQ(globalSum, settings.numBlocks*localSum);
 	}
+
 	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(partition.getLocalValues(), comm));
 	partition.redistribute( newDist );
 
     graph.redistribute( newDist , noDistPtr);
 
+    EXPECT_EQ( graph.l1Norm() , beforel1Norm);
+    EXPECT_EQ( graph.getNumValues() , beforeNumValues);
+
     // node weights = 1
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1.0);
-    //ValueType beforeSumWeigths = uniformWeights.l1Norm().Scalar::getValue<ValueType>();
+    //ValueType beforeSumWeigths = uniformWeights.l1Norm();
     IndexType beforeSumWeights = N;
     
     //coordinates at random and redistribute
-    std::vector<DenseVector<ValueType>> coords(2);
-    for(IndexType i=0; i<2; i++){ 
-        coords[i].allocate(N);
-        coords[i] = static_cast<ValueType>( 0 );
-        // set random coordinates
-        for(IndexType j=0; j<N; j++){
-            coords[i].setValue(j, rand()%10);
-        }
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType,ValueType>::readCoords(coordFile, N, settings.dimensions);
+    for(IndexType i=0; i<settings.dimensions; i++){
         coords[i].redistribute( newDist );
     }
 
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
-    Settings.multiLevelRounds= 6;
-    Settings.coarseningStepsBetweenRefinement = 3;
-    Settings.useGeometricTieBreaking = true;
-    Settings.dimensions= 2;
-    Settings.minGainForNextRound = 10;
+    settings.epsilon = 0.2;
+    settings.multiLevelRounds= 6;
+    settings.coarseningStepsBetweenRefinement = 3;
+    settings.useGeometricTieBreaking = true;
+    settings.dimensions= 2;
+    settings.minGainForNextRound = 10;
     
     scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, halo, Settings);
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, halo, settings);
     
     EXPECT_EQ( graph.l1Norm() , beforel1Norm);
     EXPECT_EQ( graph.getNumValues() , beforeNumValues);
@@ -364,13 +352,13 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
         if(pixeledGraphSize < 4000){
             EXPECT_TRUE(pixelGraph.checkSymmetry());
         }
-        SCAI_ASSERT_EQ_ERROR( pixelWeights.sum().Scalar::getValue<ValueType>() , N , "should ne equal");
-        EXPECT_LE( pixelGraph.l1Norm().Scalar::getValue<ValueType>()  , edges);
+        SCAI_ASSERT_EQ_ERROR( pixelWeights.sum(), N , "should ne equal");
+        EXPECT_LE( pixelGraph.l1Norm(), edges);
         
         IndexType nnzValues= 2*dimensions*(std::pow(sideLen, dimensions) - std::pow(sideLen, dimensions-1) );
         
         EXPECT_EQ( nnzValues , pixelGraph.getNumValues() );
-        EXPECT_GE( pixelGraph.l1Norm().Scalar::getValue<ValueType>(), 1 );
+        EXPECT_GE( pixelGraph.l1Norm(), 1 );
     }
 }
 

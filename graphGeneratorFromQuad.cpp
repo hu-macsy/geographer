@@ -12,8 +12,6 @@
 #include <scai/hmemo/WriteAccess.hpp>
 #include <scai/hmemo/ReadAccess.hpp>
 
-#include <scai/utilskernel/LArray.hpp>
-
 #include <memory>
 #include <cstdlib>
 #include <fstream>

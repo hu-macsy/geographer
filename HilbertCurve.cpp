@@ -209,8 +209,6 @@ template<typename IndexType, typename ValueType>
 std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth) {
     SCAI_REGION("HilbertCurve.getHilbertIndex2DVector")
 	
-	using scai::lama::Scalar;
-	
 	const IndexType dimensions = coordinates.size();
 	
     size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
@@ -232,8 +230,8 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
 	{
 		SCAI_REGION( "HilbertCurve.getHilbertIndex2DVector.minMax" )
 		for (IndexType dim = 0; dim < 2; dim++) {
-			minCoords[dim] = coordinates[dim].min().Scalar::getValue<ValueType>();
-			maxCoords[dim] = coordinates[dim].max().Scalar::getValue<ValueType>();
+			minCoords[dim] = coordinates[dim].min();
+			maxCoords[dim] = coordinates[dim].max();
 			assert(std::isfinite(minCoords[dim]));
 			assert(std::isfinite(maxCoords[dim]));
 			SCAI_ASSERT_GT_ERROR(maxCoords[dim], minCoords[dim], "Wrong coordinates.");
@@ -308,8 +306,6 @@ template<typename IndexType, typename ValueType>
 std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth) {
     SCAI_REGION("HilbertCurve.getHilbertIndex2DVector")
 	
-	using scai::lama::Scalar;
-	
 	const IndexType dimensions = coordinates.size();
 	
     size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
@@ -331,8 +327,8 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
 	{
 		SCAI_REGION( "HilbertCurve.getHilbertIndex3DVector.minMax" )
 		for (IndexType dim = 0; dim < 3; dim++) {
-			minCoords[dim] = coordinates[dim].min().Scalar::getValue<ValueType>();
-			maxCoords[dim] = coordinates[dim].max().Scalar::getValue<ValueType>();
+			minCoords[dim] = coordinates[dim].min();
+			maxCoords[dim] = coordinates[dim].max();
 			assert(std::isfinite(minCoords[dim]));
 			assert(std::isfinite(maxCoords[dim]));
 			SCAI_ASSERT(maxCoords[dim] > minCoords[dim], "Wrong coordinates.");
@@ -558,8 +554,6 @@ std::vector<std::vector<ValueType>> HilbertCurve<IndexType, ValueType>::Hilbert3
 template<typename IndexType, typename ValueType>
 std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates){
 	
-	using scai::lama::Scalar;
-	
 	const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
 	
@@ -575,8 +569,8 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
     {
 		SCAI_REGION( "ParcoRepart.getSortedHilbertIndices.minMax" )
 		for (IndexType dim = 0; dim < dimensions; dim++) {
-			minCoords[dim] = coordinates[dim].min().Scalar::getValue<ValueType>();
-			maxCoords[dim] = coordinates[dim].max().Scalar::getValue<ValueType>();
+			minCoords[dim] = coordinates[dim].min();
+			maxCoords[dim] = coordinates[dim].max();
 			assert(std::isfinite(minCoords[dim]));
 			assert(std::isfinite(maxCoords[dim]));
 			SCAI_ASSERT(maxCoords[dim] > minCoords[dim], "Wrong coordinates.");

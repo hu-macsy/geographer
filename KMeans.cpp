@@ -19,8 +19,6 @@
 namespace ITI {
 namespace KMeans {
 
-using scai::lama::Scalar;
-
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCentersSFC(
 		const std::vector<DenseVector<ValueType> >& coordinates, const std::vector<ValueType> &minCoords,
@@ -78,7 +76,7 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 
 	for (IndexType j = 0; j < k; j++) {
 		IndexType localIndex = blockDist->global2local(wantedIndices[j]);
-		if (localIndex != nIndex) {
+		if (localIndex != scai::invalidIndex) {
 			assert(localIndex < localN);
 			IndexType permutedIndex = localIndices[localIndex];
 			assert(permutedIndex < localN);

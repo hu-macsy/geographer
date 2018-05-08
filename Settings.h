@@ -8,7 +8,10 @@
 
 const std::string version = BUILD_COMMIT_STRING;
 
-typedef long int IndexType;
+// typedef long int IndexType;
+
+using scai::IndexType;
+
 typedef double ValueType;
 
 namespace ITI{

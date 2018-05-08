@@ -9,11 +9,9 @@
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>
 #include <scai/lama/Vector.hpp>
-#include <scai/lama/Scalar.hpp>
 #include <scai/dmemo/Distribution.hpp>
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/common/Math.hpp>
-#include <scai/common/unique_ptr.hpp>
 #include <scai/lama/storage/MatrixStorage.hpp>
 #include <scai/tracing.hpp>
 
@@ -41,7 +39,6 @@
 
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
-using scai::lama::Scalar;
 
 
 namespace ITI {
@@ -85,7 +82,7 @@ namespace ITI {
                 
                 /* Calculates the 3D distance between two points.
                  */
-                static Scalar dist3D(DenseVector<ValueType> p1, DenseVector<ValueType> p2);
+                static ValueType dist3D(DenseVector<ValueType> p1, DenseVector<ValueType> p2);
                                 
                 static ValueType dist3DSquared(std::tuple<IndexType, IndexType, IndexType> p1, std::tuple<IndexType, IndexType, IndexType> p2);
                 

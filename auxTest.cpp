@@ -9,7 +9,6 @@
 #include <scai/hmemo/Context.hpp>
 #include <scai/hmemo/HArray.hpp>
 
-#include <scai/utilskernel/LArray.hpp>
 #include <scai/lama/Vector.hpp>
 
 #include <algorithm>
@@ -278,7 +277,8 @@ TEST_F(auxTest, testIndex2_2DPoint){
 
 TEST_F(auxTest, testBenchIndexReordering){
 
-	IndexType M = 51009;
+	//const IndexType M = 51009; << overflow
+    const IndexType M = 41009;
 	
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();	
 	std::chrono::time_point<std::chrono::high_resolution_clock> FYstart = std::chrono::high_resolution_clock::now();

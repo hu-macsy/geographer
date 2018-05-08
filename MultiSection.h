@@ -2,7 +2,6 @@
 
 #include <scai/lama.hpp>
 #include <scai/lama/Vector.hpp>
-//#include <scai/lama/Scalar.hpp>
 
 #include <climits>
 #include <chrono>

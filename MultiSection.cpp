@@ -139,9 +139,9 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::setPartit
     const IndexType localN = distPtr->getLocalSize();
     const scai::dmemo::CommunicatorPtr comm = distPtr->getCommunicatorPtr();
     
-    scai::lama::DenseVector<IndexType> partition( distPtr );
+    scai::hmemo::HArray<IndexType> localPartition;
         
-    scai::hmemo::WriteOnlyAccess<IndexType> wLocalPart( partition.getLocalValues() );
+    scai::hmemo::WriteOnlyAccess<IndexType> wLocalPart(localPartition, localN);
     
     for(IndexType i=0; i<localN; i++){
         try{
@@ -153,6 +153,8 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::setPartit
     }
     wLocalPart.release();
     
+    scai::lama::DenseVector<IndexType> partition(distPtr, std::move(localPartition));
+
     return partition;
 }
 //--------------------------------------------------------------------------------------- 
@@ -176,9 +178,9 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         bBox.top.push_back(sideLen -1); //WARNING: changes rectangle to be [bot, top], not [bot, top)
     }
 
-    // TODO: try to avoid that, perhaps not needed
-    ValueType totalWeight = nodeWeights.sum().scai::lama::Scalar::getValue<ValueType>();
-    //ValueType averageWeight = totalWeight/k;
+    // TODO: try to avoid that, probably not needed
+    ValueType totalWeight = nodeWeights.sum();
+    ValueType averageWeight = totalWeight/k;
 
     bBox.weight = totalWeight;
 
@@ -493,7 +495,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     }
 
     // TODO: try to avoid that
-    ValueType totalWeight = nodeWeights.sum().scai::lama::Scalar::getValue<ValueType>();
+    ValueType totalWeight = nodeWeights.sum();
     //ValueType averageWeight = totalWeight/k;
 
     bBox.weight = totalWeight;
@@ -1038,10 +1040,9 @@ scai::lama::CSRSparseMatrix<ValueType> MultiSection<IndexType, ValueType>::getBl
     const IndexType numLeaves = allLeaves.size();
     SCAI_ASSERT_EQ_ERROR( numLeaves, treeRoot->getNumLeaves() , "Number of leaves is wrong");
 
-    scai::lama::CSRSparseMatrix<ValueType> ret( numLeaves, numLeaves );
     
     //TODO: has size k^2, change that to save memory and time
-    scai::common::scoped_array<ValueType> rawArray( new ValueType[ numLeaves*numLeaves ] );
+    std::unique_ptr<ValueType[]> rawArray( new ValueType[ numLeaves*numLeaves ] );
     
     for(IndexType l=0; l<numLeaves; l++){
         for(IndexType l2=0; l2<numLeaves; l2++){
@@ -1056,6 +1057,8 @@ scai::lama::CSRSparseMatrix<ValueType> MultiSection<IndexType, ValueType>::getBl
             }
         }
     }
+
+    scai::lama::CSRSparseMatrix<ValueType> ret;
     ret.setRawDenseData( numLeaves, numLeaves, rawArray.get() );
     return ret;
 }
@@ -1116,10 +1119,14 @@ std::vector<T> MultiSection<IndexType, ValueType>::indexTo3D(IndexType ind, Inde
 
 template class MultiSection<IndexType, ValueType>;
 
-template double MultiSection<long int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<long int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
+template ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vector<scai::lama::DenseVector<IndexType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
 
-template double MultiSection<long int, double>::getRectangleWeight( const std::vector<std::vector<long int>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
+template ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vector<std::vector<IndexType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
 
-template double MultiSection<long int, double>::getRectangleWeight( const std::vector<scai::lama::DenseVector<double>> &coordinates, const scai::lama::DenseVector<double>& nodeWeights, const struct rectangle& bBox, const std::vector<double> maxCoords, Settings settings);
+template ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
+
+template std::vector<IndexType> MultiSection<IndexType, ValueType>::indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dim);
+
+template std::vector<ValueType> MultiSection<IndexType, ValueType>::indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dim);
 
 };

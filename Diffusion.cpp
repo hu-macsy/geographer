@@ -10,7 +10,6 @@
 
 #include <scai/hmemo/ReadAccess.hpp>
 #include <scai/hmemo/WriteAccess.hpp>
-#include <scai/lama/Scalar.hpp>
 #include <scai/solver.hpp>
 
 #include "Diffusion.h"
@@ -23,7 +22,6 @@ using scai::lama::DIASparseMatrix;
 using scai::lama::DIAStorage;
 using scai::lama::DenseMatrix;
 using scai::lama::DenseStorage;
-using scai::lama::Scalar;
 using scai::hmemo::ReadAccess;
 using scai::hmemo::WriteAccess;
 
@@ -31,6 +29,8 @@ template<typename IndexType, typename ValueType>
 DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource( CSRSparseMatrix<ValueType> laplacian, DenseVector<ValueType> nodeWeights, IndexType source, ValueType eps) {
 	using scai::lama::NormPtr;
 	using scai::lama::L2Norm;
+	using scai::lama::fill;
+	using scai::lama::eval;
 	using namespace scai::solver;
 
 	const IndexType n = laplacian.getNumRows();
@@ -46,33 +46,33 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource( CS
 	IndexType sourceSum = comm->sum(source);
 	assert(sourceSum == source*comm->getSize());
 
-	ValueType weightSum = nodeWeights.sum().Scalar::getValue<IndexType>();
+	ValueType weightSum = nodeWeights.sum();
 
 	IndexType sourceIndex = dist->global2local(source);
 
-	DenseVector<ValueType> nullVector(dist,0);
-	DenseVector<ValueType> d(nullVector - nodeWeights);
+	auto nullVector = fill<DenseVector<ValueType>>(dist,0);
+	auto d = eval<DenseVector<ValueType>>(nullVector - nodeWeights);
 
-	if (sourceIndex != nIndex) {
+	if (sourceIndex != scai::invalidIndex) {
 		d.getLocalValues()[sourceIndex] = weightSum - nodeWeights.getLocalValues()[sourceIndex];
 	}
 
-	ValueType newWeightSum = d.sum().Scalar::getValue<IndexType>();
+	ValueType newWeightSum = d.sum();
 	if (std::abs(newWeightSum) >= eps) {
 		throw std::logic_error("Residual weight sum " + std::to_string(newWeightSum) + " too large!");
 	}
 
-	DenseVector<ValueType> solution( dist, 0.0 );
+	auto solution = fill<DenseVector<ValueType>>( dist, 0.0 );
 
-	NormPtr norm( new L2Norm() );
+        auto norm = std::make_shared<L2Norm<ValueType>>();
 
-	CriterionPtr rt( new ResidualThreshold( norm, eps, ResidualThreshold::Relative ) );
+        auto rt = std::make_shared<ResidualThreshold<ValueType>>( norm, eps, ResidualCheck::Relative );
 
-	LoggerPtr logger( new CommonLogger ( "myLogger: ",
-	                                        LogLevel::convergenceHistory,
-	                                        LoggerWriteBehaviour::toConsoleOnly ) );
+        auto logger = std::make_shared<CommonLogger>( "myLogger: ",
+                                                      LogLevel::convergenceHistory,
+ 	                                              LoggerWriteBehaviour::toConsoleOnly );
 
-	CG solver( "simpleCG" );
+	CG<ValueType> solver( "simpleCG" );
 
 	//solver.setLogger( logger );
 
@@ -116,7 +116,7 @@ DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(scai:
 	assert(offset == localN*l);
 
 	//the matrix is transposed, not sure if this is a problem.
-	return DenseMatrix<ValueType>(DenseStorage<ValueType>(resultContainer, l, localN), lDist, dist);
+	return scai::lama::distribute<DenseMatrix<ValueType>>(DenseStorage<ValueType>(l, localN, resultContainer), lDist, dist);
 }
 
 template class Diffusion<IndexType, ValueType>;

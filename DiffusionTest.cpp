@@ -40,7 +40,7 @@ TEST_F(DiffusionTest, testPotentials) {
 	DenseVector<ValueType> nodeWeights(L.getRowDistributionPtr(),1);
 	DenseVector<ValueType> potentials = Diffusion<IndexType, ValueType>::potentialsFromSource(L, nodeWeights, 0);
 	ASSERT_EQ(n, potentials.size());
-	ASSERT_LT(potentials.sum().Scalar::getValue<ValueType>(), 0.000001);
+	ASSERT_LT(potentials.sum(), 0.000001);
 }
 
 TEST_F(DiffusionTest, testMultiplePotentials) {

@@ -9,7 +9,6 @@
 #include <scai/hmemo/Context.hpp>
 #include <scai/hmemo/HArray.hpp>
 
-#include <scai/utilskernel/LArray.hpp>
 #include <scai/lama/Vector.hpp>
 
 #include <algorithm>
@@ -60,7 +59,7 @@ TEST_F(RepartitionTest, testNodeWeights){
 	settings.dimensions = dimensions;
 	IndexType seed =0;
 	IndexType divergence = 1;
-	scai::lama::DenseVector<ValueType> nodeWeights = Repartition<IndexType,ValueType>::sNW( coords, seed, divergence, dimensions);
+	scai::lama::DenseVector<ValueType> nodeWeights = Repartition<IndexType,ValueType>::setNodeWeights( coords, seed, divergence, dimensions);
 }
 //-----------------------------------------------------------------------------------------------------
 

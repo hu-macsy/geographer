@@ -40,8 +40,8 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
     for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-        minCoords[dim] = coords[dim].min().scai::lama::Scalar::getValue<ValueType>();
-        maxCoords[dim] = coords[dim].max().scai::lama::Scalar::getValue<ValueType>();
+        minCoords[dim] = coords[dim].min();
+        maxCoords[dim] = coords[dim].max();
         SCAI_ASSERT_NE_ERROR( minCoords[dim], maxCoords[dim], "min=max for dimension "<< dim << ", this will cause problems to the hilbert index. local= " << coords[0].getLocalValues().size() );
     }
 
@@ -224,8 +224,8 @@ TEST_F(KMeansTest, testPartitionWithNodeWeights) {
 		
 	scai::lama::DenseVector<ValueType> imbaNodeWeights = ITI::Repartition<IndexType,ValueType>::sNW( coords, seed, diverg, dimensions);
 	
-	ValueType maxWeight = imbaNodeWeights.max().Scalar::getValue<ValueType>();
-	ValueType minWeight = imbaNodeWeights.min().Scalar::getValue<ValueType>();
+	ValueType maxWeight = imbaNodeWeights.max();
+	ValueType minWeight = imbaNodeWeights.min();
 	PRINT0("maxWeight= "<< maxWeight << " , minWeight= "<< minWeight);
 
 	const IndexType localN = graph.getLocalNumRows();

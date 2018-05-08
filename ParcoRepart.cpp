@@ -32,15 +32,13 @@
 #include "MultiSection.h"
 #include "GraphUtils.h"
 
-#include "RBC/Sort/SQuick.hpp"
-
-using scai::lama::Scalar;
+//  #include "RBC/Sort/SQuick.hpp"
 
 namespace ITI {
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings, struct Metrics& metrics)
 {
-	DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(input.getRowDistributionPtr(), 1);
+	auto uniformWeights = fill<DenseVector<ValueType>>(input.getRowDistributionPtr(), 1);
 	return partitionGraph(input, coordinates, uniformWeights, settings, metrics);
 }
 
@@ -63,7 +61,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
     struct Metrics metrics(settings.numBlocks);
     assert(settings.storeInfo == false); // Cannot return timing information. Better throw an error than silently drop it.
     
-    DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(input.getRowDistributionPtr(), 1);
+    auto uniformWeights = fill<DenseVector<ValueType>>(input.getRowDistributionPtr(), 1);
     return partitionGraph(input, coordinates, uniformWeights, settings, metrics);
 }
 
@@ -100,7 +98,7 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     /**
      * fill sort pair
      */
-    scai::utilskernel::LArray<IndexType> myGlobalIndices(localN, 0);
+    scai::hmemo::HArray<IndexType> myGlobalIndices(localN, IndexType(0));
     inputDist->getOwnedIndexes(myGlobalIndices);
     std::vector<sort_pair> localPairs(localN);
     {
@@ -183,7 +181,7 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     comm->exchangeByPlan(recvIndices.data(), recvPlan, sendIndices.data(),
             sendPlan);
     //get new distribution
-    scai::utilskernel::LArray<IndexType> indexTransport(newLocalN,
+    scai::hmemo::HArray<IndexType> indexTransport(newLocalN,
             recvIndices.data());
     scai::dmemo::DistributionPtr newDist(
             new scai::dmemo::GeneralDistribution(globalN, indexTransport,
@@ -427,7 +425,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			
 		}
 		
-		const ValueType weightSum = nodeWeights.sum().Scalar::getValue<ValueType>();
+		const ValueType weightSum = nodeWeights.sum();
 		
 		// vector of size k, each element represents the size of one block
 		std::vector<IndexType> blockSizes;
@@ -448,8 +446,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
 		metrics.timeKmeans[rank] = kMeansTime.count();
 		//timeForKmeans = ValueType ( comm->max(kMeansTime.count() ));
-		assert(result.getLocalValues().min() >= 0);
-		assert(result.getLocalValues().max() < k);
+            assert(scai::utilskernel::HArrayUtils::min(result.getLocalValues()) >= 0);
+            assert(scai::utilskernel::HArrayUtils::max(result.getLocalValues()) < k);
 		
 		if (settings.verbose) {
 			ValueType totKMeansTime = ValueType( comm->max(kMeansTime.count()) );
@@ -457,8 +455,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				std::cout << "K-Means, Time:" << totKMeansTime << std::endl;
 		}
 		
-		assert(result.max().Scalar::getValue<IndexType>() == settings.numBlocks -1);
-		assert(result.min().Scalar::getValue<IndexType>() == 0);
+            assert(result.max() == settings.numBlocks -1);
+            assert(result.min() == 0);
 		
 	} else if (settings.initialPartition == InitialPartitioningMethods::Multisection) {// multisection
 		PRINT0("Initial partition with multisection");
@@ -572,7 +570,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings){
 
-    DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(coordinates[0].getDistributionPtr(), 1);
+    auto uniformWeights = fill<DenseVector<ValueType>>(coordinates[0].getDistributionPtr(), 1);
     return hilbertPartition( coordinates, settings);
 }
 //--------------------------------------------------------------------------------------- 
@@ -603,7 +601,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     //
     std::vector<IndexType> blockSizes;
 	//TODO: for nowm assume uniform nodeweights
-    IndexType weightSum = globalN;// = nodeWeights.sum().Scalar::getValue<IndexType>();
+    IndexType weightSum = globalN;// = nodeWeights.sum();
     if( settings.blockSizes.empty() ){
         blockSizes.assign( settings.numBlocks, weightSum/settings.numBlocks );
     }else{
@@ -621,7 +619,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
      *	create space filling curve indices.
      */
     
-    scai::lama::DenseVector<ValueType> hilbertIndices(coordDist);
+    scai::lama::DenseVector<ValueType> hilbertIndices(coordDist, 0);
 	std::vector<ValueType> localHilberIndices = HilbertCurve<IndexType,ValueType>::getHilbertIndexVector(coordinates, recursionDepth, dimensions);
 	hilbertIndices.assign( scai::hmemo::HArray<ValueType>( localHilberIndices.size(), localHilberIndices.data()) , coordDist);
 
@@ -631,7 +629,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     /**
      * now sort the global indices by where they are on the space-filling curve.
      */
+
     std::vector<IndexType> newLocalIndices;
+
     {
         SCAI_REGION( "ParcoRepart.hilbertPartition.sorting" );
         //TODO: maybe call getSortedHilbertIndices here?
@@ -693,12 +693,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     	assert(!coordDist->isReplicated() && comm->getSize() == k);
         SCAI_REGION( "ParcoRepart.hilbertPartition.createDistribution" );
 
-        scai::utilskernel::LArray<IndexType> indexTransport(newLocalIndices.size(), newLocalIndices.data());
+        scai::hmemo::HArray<IndexType> indexTransport(newLocalIndices.size(), newLocalIndices.data());
         assert(comm->sum(indexTransport.size()) == globalN);
         scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
         
         if (comm->getRank() == 0) std::cout << "Created distribution." << std::endl;
-        result = DenseVector<IndexType>(newDistribution, comm->getRank());
+        result = fill<DenseVector<IndexType>>(newDistribution, comm->getRank());
         if (comm->getRank() == 0) std::cout << "Created initial partition." << std::endl;
     }
 

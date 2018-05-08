@@ -12,8 +12,6 @@
 #include <scai/hmemo/WriteAccess.hpp>
 #include <scai/hmemo/ReadAccess.hpp>
 
-#include <scai/utilskernel/LArray.hpp>
-
 #include <memory>
 #include <cstdlib>
 #include <fstream>
@@ -54,7 +52,7 @@ TEST_F(MeshGeneratorTest, testCreateStructured3DMeshLocalDegreeSymmetry) {
 		scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
 		scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
 
-		scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
+		auto a = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
 		std::vector<ValueType> maxCoord(dimensions, nroot);
 		std::vector<IndexType> numPoints(dimensions, nroot);
 
@@ -91,7 +89,7 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_3D) {
 	  coords[i] = static_cast<ValueType>( 0 );
     }
     
-    scai::lama::CSRSparseMatrix<ValueType> adjM( dist, noDistPointer);
+    auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
     
     // create the adjacency matrix and the coordinates
     MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
@@ -155,7 +153,7 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_3D) {
     
     {
     SCAI_REGION("testCreateStructuredMesh_Distributed_3D.check_coords_2")
-    std::vector<scai::utilskernel::LArray<ValueType>> localCoords(3);
+    std::vector<scai::hmemo::HArray<ValueType>> localCoords(3);
     for(IndexType i=0; i<3; i++){
         localCoords[i] = coords[i].getLocalValues();
     }
@@ -191,7 +189,7 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_2D) {
 	  coords[i] = static_cast<ValueType>( 0 );
     }
     
-    scai::lama::CSRSparseMatrix<ValueType> adjM( dist, noDistPointer);
+    auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
     
     // create the adjacency matrix and the coordinates
     MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(adjM, coords, maxCoord, numPoints);
@@ -253,7 +251,7 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_2D) {
     
     {
         SCAI_REGION("testCreateStructuredMesh_Distributed_3D.check_coords_2")
-        std::vector<scai::utilskernel::LArray<ValueType>> localCoords(2);
+        std::vector<scai::hmemo::HArray<ValueType>> localCoords(2);
         for(IndexType i=0; i<2; i++){
             localCoords[i] = coords[i].getLocalValues();
         }
@@ -283,7 +281,7 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
     PRINT0("Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N );
             
     scai::lama::CSRSparseMatrix<ValueType> adjM;
-    adjM =  scai::lama::CSRSparseMatrix<ValueType>( dist, noDistPointer);
+    adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
         
     std::vector<DenseVector<ValueType>> coords(3);
     for(IndexType i=0; i<3; i++){ 
@@ -294,6 +292,8 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
     // create the adjacency matrix and the coordinates
     MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
     
+    PRINT0("Constructed Mesh." );
+
     EXPECT_EQ( adjM.getLocalNumColumns() , N);
     EXPECT_EQ( adjM.getLocalNumRows() , coords[0].getLocalValues().size() );
     EXPECT_EQ( true , adjM.getRowDistribution().isEqual(coords[0].getDistribution()) );
@@ -303,8 +303,8 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
     if (!adjM.isConsistent()) {
 	throw std::runtime_error("Input matrix inconsistent");
     }
-    //PRINT(*comm<< ": "<< adjM.getLocalNumValues() );
-    //PRINT(*comm<< ": "<< comm->sum(adjM.getLocalNumValues()) );
+    PRINT(*comm<< ": "<< adjM.getLocalNumValues() );
+    PRINT(*comm<< ": "<< comm->sum(adjM.getLocalNumValues()) );
     
     {
         SCAI_REGION("testCreateRandomStructuredMesh_Distributed_3D.noDist")
@@ -312,7 +312,7 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
         adjM.redistribute(noDistPointer, noDistPointer);
         
         ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
-        //PRINT(*comm<<": "<< adjM.getNumValues() );
+        PRINT(*comm<<": "<< adjM.getNumValues() );
         if (!adjM.isConsistent()) {
             throw std::runtime_error("Input matrix inconsistent");
         }
@@ -351,7 +351,7 @@ TEST_F(MeshGeneratorTest, testWriteMetis_Dist_3D){
 	  coords[i] = static_cast<ValueType>( 0 );
     }
     
-    scai::lama::CSRSparseMatrix<ValueType> adjM( dist, noDistPointer);
+    auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
     
     // create the adjacency matrix and the coordinates
     MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);

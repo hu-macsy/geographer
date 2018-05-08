@@ -280,7 +280,8 @@ struct Metrics{
 		
 		//TODO: change NoDist with graph.getColumnDistribution() ?
 		scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( graph.getNumRows() ));
-		scai::lama::CSRSparseMatrix<ValueType> copyGraph( graph, distFromPartition, noDistPtr);
+		scai::lama::CSRSparseMatrix<ValueType> copyGraph( graph );
+		copyGraph.redistribute(distFromPartition, noDistPtr);
 			
 		std::chrono::duration<ValueType> redistributionTime =  std::chrono::system_clock::now() - beforeRedistribution;
 		
@@ -300,7 +301,8 @@ struct Metrics{
 						
 		// diameter
 		if( maxBlockDiameter==0 or harmMeanDiam==0){
-			scai::lama::DenseVector<IndexType> copyPartition( partition, distFromPartition );	
+			scai::lama::DenseVector<IndexType> copyPartition( partition );
+			copyPartition.redistribute( distFromPartition );
 			std::tie( maxBlockDiameter, harmMeanDiam, numDisconBlocks ) = getDiameter(copyGraph, copyPartition, settings);
 		}
 		
@@ -313,7 +315,7 @@ struct Metrics{
 			// vector for multiplication
 			scai::lama::DenseVector<ValueType> x ( copyGraph.getColDistributionPtr(), 1.0 );
 			scai::lama::DenseVector<ValueType> y ( copyGraph.getRowDistributionPtr(), 0.0 );
-			copyGraph.setCommunicationKind( scai::lama::Matrix::SyncKind::ASYNCHRONOUS );
+			copyGraph.setCommunicationKind( scai::lama::SyncKind::ASYNC_COMM );
 			comm->synchronize();
 			
 			// perfom the actual multiplication
@@ -335,7 +337,7 @@ struct Metrics{
 		//TODO: maybe extract this time from the actual SpMV above
 		// comm time in SpMV
 		{
-			PRINT0("starting comm shcedule...");
+			PRINT0("starting comm schedule...");
 			const scai::dmemo::Halo& matrixHalo = copyGraph.getHalo();
 			const scai::dmemo::CommunicationPlan& sendPlan  = matrixHalo.getProvidesPlan();
 			const scai::dmemo::CommunicationPlan& recvPlan  = matrixHalo.getRequiredPlan();
@@ -375,14 +377,14 @@ struct Metrics{
 		scai::dmemo::Redistributor prepareRedist( newDist, oldDist );	
 				
 		// redistribution load
-		scai::hmemo::HArray<IndexType> sourceIndices = prepareRedist.getHaloSourceIndexes();
-		scai::hmemo::HArray<IndexType> targetIndices = prepareRedist.getHaloTargetIndexes();
-		IndexType thisSourceSize = prepareRedist.getHaloSourceSize();
-		IndexType thisTargetSize = prepareRedist.getHaloTargetSize();
+		scai::hmemo::HArray<IndexType> sourceIndices = prepareRedist.getExchangeSourceIndexes();
+		scai::hmemo::HArray<IndexType> targetIndices = prepareRedist.getExchangeTargetIndexes();
+		IndexType thisSourceSize = prepareRedist.getExchangeSourceSize();
+		IndexType thisTargetSize = prepareRedist.getExchangeTargetSize();
 
 		IndexType globTargetSize = comm->sum( thisTargetSize);
 		IndexType globSourceSize = comm->sum( thisSourceSize);
-		SCAI_ASSERT_EQ_ERROR( globSourceSize, globTargetSize, "Mismatch in total migartion volume.");
+		SCAI_ASSERT_EQ_ERROR( globSourceSize, globTargetSize, "Mismatch in total migration volume.");
 		//PRINT0("total migration volume= " << globSourceSize);
 		
 		IndexType maxTargetSize = comm->max( thisTargetSize);

@@ -130,16 +130,16 @@ int main(int argc, char** argv) {
     if( vm.count("blockSizesFile") ){
         settings.blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
         IndexType blockSizesSum  = std::accumulate( settings.blockSizes.begin(), settings.blockSizes.end(), 0);
-        IndexType nodeWeightsSum = nodeWeights.sum().Scalar::getValue<IndexType>();
+        IndexType nodeWeightsSum = nodeWeights.sum();
         SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
     }
 
     std::string partname = vm["partition"].as<std::string>();
     DenseVector<IndexType> part = ITI::FileIO<IndexType, ValueType>::readPartition(partname, N);
-    settings.numBlocks = part.max().Scalar::getValue<IndexType>() +1;
+    settings.numBlocks = part.max() +1;
 
-    if (part.min().Scalar::getValue<IndexType>() != 0) {
-    	throw std::runtime_error("Illegal minimum block ID in partition:" + std::to_string(part.min().Scalar::getValue<IndexType>()));
+    if (part.min() != 0) {
+    	throw std::runtime_error("Illegal minimum block ID in partition:" + std::to_string(part.min()));
     }
 
     scai::dmemo::CommunicatorPtr comm = rowDistPtr->getCommunicatorPtr();

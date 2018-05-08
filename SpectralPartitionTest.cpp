@@ -9,8 +9,6 @@
 #include <scai/hmemo/Context.hpp>
 #include <scai/hmemo/HArray.hpp>
 
-#include <scai/utilskernel/LArray.hpp>
-
 #include <scai/solver/GMRES.hpp>
 #include <scai/solver/SimpleAMG.hpp>
 #include <scai/solver/CG.hpp>
@@ -39,35 +37,73 @@ protected:
 };
 
 TEST_F(SpectralPartitionTest, testFiedlerVector) {
+    using scai::hmemo::HArray;
+
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     // for now local refinement requires k = P
     //
     IndexType N = 40;
-    //CSRSparseMatrix<ValueType> graph(N, N);
-    scai::lama::SparseAssemblyStorage<ValueType> graphSt(N, N);
-    
-    srand(time(NULL));
-    
-    //TODO: this (rarely) can give disconnected graph
-    // random graph with weighted edges
-    for(IndexType row=0; row<N; row++){    
-        for( IndexType j=0; j<rand()%5+6; j++){
-            IndexType col= rand()%N;
-            if( col==row ) continue;
-            IndexType w = rand()%10+1;
-            //PRINT0(row << ", "<< col << ": "<< w);
-            graphSt.setValue(row, col, w);
-            graphSt.setValue(col, row, w);
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
+
+    //broadcast seed value from root to ensure equal pseudorandom numbers.
+    ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
+    comm->bcast( seed, 1, 0 );
+    srand(seed[0]);
+
+    scai::lama::CSRSparseMatrix<ValueType> graph;// = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDist);
+
+    /**
+     * create random graph with weighted edges. We first store the edges in a dense adjacency matrix, then manually convert to CSR.
+     * This is necessary since the Lama-supplied conversion to CSR adds zero-valued entries on the diagonal, which confuses constructLaplacian
+     */
+    {
+        std::vector<ValueType> denseAdjacencyMatrix(N*N, 0);
+
+        for (IndexType i = 0; i < N; i++) {
+            const IndexType degreeBound = rand()%5+6;
+            bool connectedToNextRow = false;
+
+            for( IndexType j=0; j<degreeBound; j++){
+                const IndexType col= rand()%N;
+                if( col!=i ){
+                    const ValueType w = rand()%10+1;
+                    denseAdjacencyMatrix[i*N+col] = w;
+                    denseAdjacencyMatrix[col*N+i] = w;
+                }
+            }
+
+            // connect this row with the next one so graph is connected
+            const IndexType col = (i+1)%N;
+            if (col != i) {
+                const ValueType w = rand()%10 +1;
+                denseAdjacencyMatrix[i*N+col] = w;
+                denseAdjacencyMatrix[col*N+i] = w;
+            }
+
         }
-        
-        // connect this row with the next one so graph is connected
-        graphSt.setValue(row, (row+1)%N, rand()%10 +1);
-        graphSt.setValue((row+1)%N, row, rand()%10 +1 );
+
+        //convert to CSR
+        std::vector<IndexType> newIA(N+1);
+        std::vector<IndexType> newJA;
+        std::vector<ValueType> newValues;
+
+        for(IndexType i=0; i<N; i++){
+            for( IndexType j=0; j<N; j++){
+                if( denseAdjacencyMatrix[i*N+j] != 0 ){
+                    newJA.push_back(j);
+                    newValues.push_back(denseAdjacencyMatrix[i*N+j]);
+                }
+            }
+            newIA[i+1] = newJA.size();
+        }
+
+        const IndexType M = newJA.size();
+        ASSERT_EQ(M, newValues.size());
+
+        scai::lama::CSRStorage<ValueType> storage(N,N, HArray<IndexType>(N+1,newIA.data()), HArray<IndexType>(M, newJA.data()), HArray<ValueType>(M, newValues.data()));
+        graph = scai::lama::CSRSparseMatrix<ValueType>(std::move(storage));
     }
-    
-    scai::lama::CSRSparseMatrix<ValueType> graph( graphSt);
-
-
     ValueType fiedlerEigenvalue = -8;
     scai::lama::DenseVector<ValueType> fiedler;
     
@@ -78,13 +114,13 @@ TEST_F(SpectralPartitionTest, testFiedlerVector) {
         SCAI_ASSERT( fiedlerEigenvalue >0, "fiedler eigenvalue negative: "<< fiedlerEigenvalue);
     }
     
-    //TODO: done in a hurry, add prorper tests, assertions
+    //TODO: done in a hurry, add proper tests, assertions
     //prints - assertion
     
-    ValueType fiedlerMax = fiedler.max().Scalar::getValue<ValueType>();
-    ValueType fiedlerl1Norm = fiedler.l1Norm().Scalar::getValue<ValueType>();
-    ValueType fiedlerl2Norm = fiedler.l2Norm().Scalar::getValue<ValueType>();
-    ValueType fiedlerMin = fiedler.min().Scalar::getValue<ValueType>();
+    ValueType fiedlerMax = fiedler.max();
+    ValueType fiedlerl1Norm = fiedler.l1Norm();
+    ValueType fiedlerl2Norm = fiedler.l2Norm();
+    ValueType fiedlerMin = fiedler.min();
     
     PRINT0(fiedler.size() << " , max= " << fiedlerMax << " , min= " << fiedlerMin << " , l1Norm= " << fiedlerl1Norm << " , l2Norm= " << fiedlerl2Norm << " , fiedlerEigenvalue= " << fiedlerEigenvalue);
     
@@ -133,10 +169,10 @@ TEST_F(SpectralPartitionTest, testGetPartition){
     //}
     //aux::print2DGrid( graph, spectralPartition );
     
-    EXPECT_GE(k-1, spectralPartition.getLocalValues().max() );
+    EXPECT_GE(k-1, scai::utilskernel::HArrayUtils::max(spectralPartition.getLocalValues()) );
     EXPECT_EQ(N, spectralPartition.size());
-    EXPECT_EQ(0, spectralPartition.min().getValue<ValueType>());
-    EXPECT_EQ(k-1, spectralPartition.max().getValue<ValueType>());
+    EXPECT_EQ(0, spectralPartition.min());
+    EXPECT_EQ(k-1, spectralPartition.max());
     EXPECT_EQ(graph.getRowDistribution(), spectralPartition.getDistribution());
 }
 //------------------------------------------------------------------------------
@@ -209,7 +245,7 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     // the Eigen approach for the pixeled graph
        
     
-    DenseVector<ValueType> prod ( pixelGraph*eigenVec);
+    DenseVector<ValueType> prod = scai::lama::eval<DenseVector<ValueType>>( pixelGraph*eigenVec);
     
     // get the fiedler vector for the pixeled graph using LAMA
     ValueType eigenvalue;
@@ -220,20 +256,20 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     SCAI_ASSERT_EQ_ERROR( eigenVec.size() , fiedler.size(), "Wrong vector sizes");
     PRINT0("eigenvalue should be similar: Eigen= "<< eigenEigenValue << " , fiedler= "<< eigenvalue);
     
-    ValueType eigenl1Norm = eigenVec.l1Norm().Scalar::getValue<ValueType>();
-    ValueType fiedlerl1Norm = fiedler.l1Norm().Scalar::getValue<ValueType>();
+    ValueType eigenl1Norm = eigenVec.l1Norm();
+    ValueType fiedlerl1Norm = fiedler.l1Norm();
     PRINT0("l1 norm should be similar: Eigen= "<< eigenl1Norm << " , fiedler= "<< fiedlerl1Norm );
     
-    ValueType eigenl2Norm = eigenVec.l2Norm().Scalar::getValue<ValueType>();
-    ValueType fiedlerl2Norm = fiedler.l2Norm().Scalar::getValue<ValueType>();
+    ValueType eigenl2Norm = eigenVec.l2Norm();
+    ValueType fiedlerl2Norm = fiedler.l2Norm();
     PRINT0("l2 norm should be similar: Eigen= "<< eigenl2Norm << " , fiedler= "<< fiedlerl2Norm );
     
-    ValueType eigenMax = eigenVec.max().Scalar::getValue<ValueType>();
-    ValueType fiedlerMax = fiedler.max().Scalar::getValue<ValueType>();
+    ValueType eigenMax = eigenVec.max();
+    ValueType fiedlerMax = fiedler.max();
     PRINT0("max should be similar: Eigen= "<< eigenMax  << " , fiedler= "<< fiedlerMax );
     
-    ValueType eigenMin = eigenVec.min().Scalar::getValue<ValueType>();
-    ValueType fiedlerMin = fiedler.min().Scalar::getValue<ValueType>();
+    ValueType eigenMin = eigenVec.min();
+    ValueType fiedlerMin = fiedler.min();
     PRINT0("min should be similar: Eigen= "<< eigenMin << " , fiedler= "<< fiedlerMin );
 
     EXPECT_TRUE( eigenVec.getDistributionPtr()->isEqual( fiedler.getDistribution() ) );
@@ -241,8 +277,8 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     
     
     // check 
-    DenseVector<ValueType> prodF (pixelGraph*fiedler);
-    DenseVector<ValueType> prodF2 ( eigenvalue*fiedler);   
+    DenseVector<ValueType> prodF = scai::lama::eval<DenseVector<ValueType>>(pixelGraph*fiedler);
+    DenseVector<ValueType> prodF2 = scai::lama::eval<DenseVector<ValueType>>( eigenvalue*fiedler);
     
     // sort
     scai::lama::DenseVector<IndexType> permutation, permutationF;
@@ -252,7 +288,7 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     PRINT0("The permutation should be almost the same or the inverse: ");
     for(int i=0; i<fiedler.size(); i++){
         if( i<10 or i>fiedler.size()-10){
-            PRINT0(i<<": "<< permutation.getValue(i).Scalar::getValue<ValueType>() << " + " << permutationF.getValue(i).Scalar::getValue<ValueType>() );
+            PRINT0(i<<": "<< permutation.getValue(i) << " + " << permutationF.getValue(i) );
         }
     }
     

@@ -181,8 +181,8 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 	std::vector<ValueType> minCoords(dim);
 	std::vector<ValueType> maxCoords(dim);
 	for (int d = 0; d < dim; d++) {
-		minCoords[d] = coordinates[d].getLocalValues().min();//.Scalar::getValue<ValueType>();
-		maxCoords[d] = coordinates[d].getLocalValues().max();//.Scalar::getValue<ValueType>();
+		minCoords[d] = scai::utilskernel::HArrayUtils::min(coordinates[d].getLocalValues());
+		maxCoords[d] = scai::utilskernel::HArrayUtils::max(coordinates[d].getLocalValues());
 	}
 	return {minCoords, maxCoords};
 }
@@ -194,8 +194,8 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
     for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-        minCoords[dim] = coordinates[dim].min().scai::lama::Scalar::getValue<ValueType>();
-        maxCoords[dim] = coordinates[dim].max().scai::lama::Scalar::getValue<ValueType>();
+        minCoords[dim] = coordinates[dim].min();
+        maxCoords[dim] = coordinates[dim].max();
 		SCAI_ASSERT_NE_ERROR( minCoords[dim], maxCoords[dim], "min=max for dimension "<< dim << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
     }
 
@@ -211,8 +211,8 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 	std::vector<std::vector<ValueType> > initialCenters;
 
 	if (settings.numBlocks == comm->getSize()
-	        && comm->all(previous.getLocalValues().max() == comm->getRank())
-	        && comm->all(previous.getLocalValues().min() == comm->getRank())) {
+	        && comm->all(scai::utilskernel::HArrayUtils::max(previous.getLocalValues()) == comm->getRank())
+	        && comm->all(scai::utilskernel::HArrayUtils::min(previous.getLocalValues()) == comm->getRank())) {
 	    //partition is equal to distribution
 	    initialCenters = findLocalCenters<IndexType,ValueType>(coordinates, nodeWeights);
 	} else {
@@ -275,7 +275,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
         std::cout << ") , ( ";
         for (auto coord : maxCoords) std::cout << coord << " ";
         std::cout << ")";
-        std::cout << ", " << localN << " nodes, " << nodeWeights.getLocalValues().sum() << " total weight";
+        std::cout << ", " << localN << " nodes, " << scai::utilskernel::HArrayUtils::sum(nodeWeights.getLocalValues()) << " total weight";
         std::cout << ", volume ratio " << localVolume / (volume / p);
         std::cout << std::endl;
     }

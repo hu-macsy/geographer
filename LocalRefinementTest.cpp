@@ -9,7 +9,6 @@
 #include <scai/hmemo/Context.hpp>
 #include <scai/hmemo/HArray.hpp>
 
-#include <scai/utilskernel/LArray.hpp>
 #include <scai/lama/Vector.hpp>
 
 #include <algorithm>
@@ -53,7 +52,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	scai::dmemo::DistributionPtr inputDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
 	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
 
-	scai::lama::CSRSparseMatrix<ValueType>graph(inputDist, noDistPointer);
+	auto graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(inputDist, noDistPointer);
 	std::vector<ValueType> maxCoord(dimensions, nroot);
 	std::vector<IndexType> numPoints(dimensions, nroot);
 
@@ -70,7 +69,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	const IndexType localN = inputDist->getLocalSize();
 
 	//generate random partition
-	scai::lama::DenseVector<IndexType> part(inputDist);
+	scai::lama::DenseVector<IndexType> part(inputDist, 0);
 	for (IndexType i = 0; i < localN; i++) {
 		IndexType blockId = rand() % k;
 		IndexType globalID = inputDist->local2global(i);
@@ -89,12 +88,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	}
         
 	//redistribute according to partition
-	scai::utilskernel::LArray<IndexType> owners(n);
-	for (IndexType i = 0; i < n; i++) {
-		Scalar blockID = part.getValue(i);
-		owners[i] = blockID.getValue<IndexType>();
-	}
-	scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(owners, comm));
+	scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(part.getDistribution(), part.getLocalValues()));
 
 	graph.redistribute(newDistribution, graph.getColDistributionPtr());
 	part.redistribute(newDistribution);
@@ -122,10 +116,10 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	//weights.setRandom(graph.getRowDistributionPtr(), 1);
 	//ValueType totalWeight = n*(n+1)/2;
 	ValueType totalWeight = n;	//TODO: assuming unit weights
-	ValueType minNodeWeight = weights.min().Scalar::getValue<IndexType>();
-	ValueType maxNodeWeight = weights.max().Scalar::getValue<IndexType>();
+	ValueType minNodeWeight = weights.min();
+	ValueType maxNodeWeight = weights.max();
 
-	EXPECT_EQ(weights.sum().getValue<ValueType>(), totalWeight );
+	EXPECT_EQ(weights.sum(), totalWeight );
 	if (comm->getRank() == 0) {
 		std::cout << "Max node weight: " << maxNodeWeight << std::endl;
 		std::cout << "Min node weight: " << minNodeWeight << std::endl;
@@ -217,7 +211,7 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 
 	const IndexType k = comm->getSize();
 
-	scai::lama::CSRSparseMatrix<ValueType>a(n,n);
+	auto a = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(n,n);
         // WARNING: an error in the next line when run with p=7
 	scai::lama::MatrixCreator::buildPoisson(a, 3, 19, dimX,dimY,dimZ);
 
@@ -228,19 +222,14 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 	a.redistribute(dist, noDistPointer);
 
 	//generate balanced distributed partition
-	scai::lama::DenseVector<IndexType> part(dist);
+	scai::lama::DenseVector<IndexType> part(dist, 0);
 	for (IndexType i = 0; i < n; i++) {
 		IndexType blockId = i % k;
 		part.setValue(i, blockId);
 	}
 
 	//redistribute according to partition
-	scai::utilskernel::LArray<IndexType> owners(n);
-	for (IndexType i = 0; i < n; i++) {
-		Scalar blockID = part.getValue(i);
-		owners[i] = blockID.getValue<IndexType>();
-	}
-	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(owners, comm));
+	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(*dist, part.getLocalValues()));
 
 	a.redistribute(newDist, a.getColDistributionPtr());
 	part.redistribute(newDist);
@@ -264,7 +253,7 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 
 		if (partner == thisBlock) {
 			scai::dmemo::Halo partHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(a);
-			scai::utilskernel::LArray<IndexType> haloData;
+			scai::hmemo::HArray<IndexType> haloData;
 			comm->updateHalo( haloData, part.getLocalValues(), partHalo );
 
 		} else {
@@ -304,12 +293,12 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 			const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
 			scai::dmemo::Halo partHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(a);
-			scai::utilskernel::LArray<IndexType> haloData;
+			scai::hmemo::HArray<IndexType> haloData;
 			comm->updateHalo( haloData, localData, partHalo );
 
 			bool inFirstRound = true;
 			for (IndexType i = 0; i < interfaceNodes.size(); i++) {
-				assert(newDist->isLocal(interfaceNodes[i]));
+				ASSERT_TRUE(newDist->isLocal(interfaceNodes[i]));
 				IndexType localID = newDist->global2local(interfaceNodes[i]);
 				bool directNeighbor = false;
 				for (IndexType j = ia[localID]; j < ia[localID+1]; j++) {
@@ -322,7 +311,7 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 						}
 					} else {
 						IndexType haloIndex = partHalo.global2halo(neighbor);
-						if (haloIndex != nIndex && haloData[haloIndex] == otherBlock) {
+						if (haloIndex != scai::invalidIndex && haloData[haloIndex] == otherBlock) {
 							directNeighbor = true;
 						}
 					}
@@ -354,7 +343,7 @@ TEST_F(LocalRefinementTest, testDistancesFromBlockCenter) {
 	scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
 	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
 
-	scai::lama::CSRSparseMatrix<ValueType>a(dist, noDistPointer);
+	auto a = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDistPointer);
 	std::vector<ValueType> maxCoord(dimensions, nroot);
 	std::vector<IndexType> numPoints(dimensions, nroot);
 

@@ -286,7 +286,7 @@ int main(int argc, char *argv[])
 	// the local part of coordinates for zoltan
 	ValueType *zoltanCoords = new ValueType [dimensions * localN];
 
-	std::vector<scai::utilskernel::LArray<ValueType>> localPartOfCoords( dimensions );
+	std::vector<scai::hmemo::HArray<ValueType>> localPartOfCoords( dimensions );
 	for(unsigned int d=0; d<dimensions; d++){
 		localPartOfCoords[d] = coords[d].getLocalValues();
 	}
