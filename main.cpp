@@ -714,7 +714,6 @@ int main(int argc, char** argv) {
     
     if (repeatTimes > 1) {
         if (comm->getRank() == 0) {
-        std::cout << "Running " << __FILE__ << std::endl;
             std::cout<<  "\033[1;36m";
         }
         printVectorMetrics( metricsVec, std::cout );
@@ -728,6 +727,7 @@ int main(int argc, char** argv) {
             std::ofstream outF( settings.outFile, std::ios::out);
             if(outF.is_open()){
 				outF << "Running " << __FILE__ << std::endl;
+				settings.print( outF, comm);
 				
 				if( settings.noRefinement)
 					printVectorMetricsShort( metricsVec, outF ); 
