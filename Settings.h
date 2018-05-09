@@ -145,8 +145,8 @@ struct Settings{
     IndexType numZ = 32;
     
     //general tuning parameters
-    InitialPartitioningMethods initialPartition = InitialPartitioningMethods::SFC;
-    InitialPartitioningMethods initialMigration = InitialPartitioningMethods::SFC;
+    InitialPartitioningMethods initialPartition = InitialPartitioningMethods::KMeans;
+    InitialPartitioningMethods initialMigration = InitialPartitioningMethods::SFC;//TODO: rename
     
     //tuning parameters for local refinement
     IndexType minBorderNodes = 1;
