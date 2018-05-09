@@ -35,7 +35,7 @@ RBC_DIR=./RBC
 
 LFLAGS= -Wl,-rpath=$(SCAI_LIB) -L$(SCAI_LIB) -L$(GTEST_LIB) -L$(RBC_DIR)/build/lib -L$(MPI_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lscai_sparsekernel -lscai_solver -lscai_logging -lboost_program_options -lboost_filesystem -lboost_system -l_rbc -lparmetis -lmetis $(MPI_LINK_FLAGS) 
 
-CCFLAGS= --openmp --std=c++11 -g -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -I$(RCB_DIR)/Sort -I$(MPI_INCLUDE) -DSCAI_TRACE_OFF  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR -DBUILD_COMMIT=$(GIT_COMMIT)
+CCFLAGS= --openmp --std=c++11 -g -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -I$(RBC_DIR)/Sort -I$(MPI_INCLUDE) -DSCAI_TRACE_OFF  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR -DBUILD_COMMIT=$(GIT_COMMIT)
 
 all: main tests metisWrapper lib converter diffusionCoords graphGen testInitial weakScaling
 .PHONY: all
