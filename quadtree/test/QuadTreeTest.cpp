@@ -796,7 +796,7 @@ TEST_F(QuadTreeTest, testPolarEuclidQuery) {
 		auto edgeProb = [acc](double distance) -> double {return acc;};
 		std::vector<index> near;
 		tree.getElementsProbabilistically({angles[query], radii[query]}, edgeProb, near);
-		EXPECT_NEAR(near.size(), acc*n, std::max(acc*n*0.25, 10.0));
+		EXPECT_NEAR(near.size(), acc*n, std::max(acc*n*0.5, 10.0));
 	}
 
 	//TODO: some test about appropriate subtrees and leaves

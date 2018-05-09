@@ -492,7 +492,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(CSRSparseM
 // coords.size()= 3 , coords[i].size()= N
 // here, N= numPoints[0]*numPoints[1]*numPoints[2]
 
-//TODO: not used, deprate?
+//TODO: not used, deprecate?
 //TODO: similarities with an rgg generator?
 
 template<typename IndexType, typename ValueType>
