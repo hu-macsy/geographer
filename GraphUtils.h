@@ -139,13 +139,13 @@ scai::lama::DenseVector<IndexType> getBorderNodes( const scai::lama::CSRSparseMa
  *
  */
 template<typename IndexType, typename ValueType>
-std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const struct Settings settings);
+std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, Settings settings);
 
 /* Computes the communication volume for every block. 
  * TODO: Should the result is gathered in the root PE and not be replicated?
  * */
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> computeCommVolume( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part , const IndexType numBlocks );
+std::vector<IndexType> computeCommVolume( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, Settings settings );
 
 /**Computes the communication volume, boundary and inner nodes in one pass to save time.
  * 
@@ -153,7 +153,7 @@ std::vector<IndexType> computeCommVolume( const scai::lama::CSRSparseMatrix<Valu
  * the number of inner nodes pre block.
  */
 template<typename IndexType, typename ValueType>
-std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType>> computeCommBndInner( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType numBlocks);
+std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType>> computeCommBndInner( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, Settings settings );
 
 /** Returns the edges of the block graph only for the local part. Eg. if blocks 1 and 2 are local
  * in this processor it finds the edge (1,2) ( and the edge (2,1)).

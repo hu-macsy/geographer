@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
                 ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
                 ("noComputeDiameter", "Compute Diameter of resulting block files.")
                 ("maxDiameterRounds", value<IndexType>(&settings.maxDiameterRounds)->default_value(settings.maxDiameterRounds), "abort diameter algorithm after that many BFS rounds")
-				("metricsDetail", value<std::string>(&metricsDetail), "no: no metrics, easy:cut, imbalance, communication volume and diamter if possible, all: easy + SpMV time and communication time in SpMV")
+				("metricsDetail", value<std::string>(&metricsDetail)->default_value("easy"), "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV")
 				;
 
         //------------------------------------------------
@@ -588,10 +588,6 @@ int main(int argc, char** argv) {
     	previous = fill<DenseVector<IndexType>>(previousRedist.getTargetDistributionPtr(), comm->getRank());
 
     }
-
-    if( comm->getRank() ==0){
-          settings.print(std::cout, comm);
-    }
     
     std::vector<struct Metrics> metricsVec;
     
@@ -625,8 +621,10 @@ int main(int argc, char** argv) {
                 
         // for the next runs the input is redistributed, so we must redistribute to the original distributions
         
-        if(comm->getRank()==0) std::cout<< std::endl<< std::endl;
-        PRINT0("\t\t ----------- Starting run number " << r +1 << " -----------");
+        if (repeatTimes > 0) {
+            if(comm->getRank()==0) std::cout<< std::endl<< std::endl;
+            PRINT0("\t\t ----------- Starting run number " << r +1 << " -----------");
+        }
         
         if(r>0){
             PRINT0("Input redistribution: block distribution for graph rows, coordinates and nodeWeigts, no distribution for graph columns");
@@ -717,7 +715,6 @@ int main(int argc, char** argv) {
     // writing results in a file and std::cout
     //
     
-    settings.print( std::cout, comm );
     if (comm->getRank() == 0) {
 	std::cout << "Running " << __FILE__ << std::endl;
         std::cout<<  "\033[1;36m";
@@ -732,7 +729,6 @@ int main(int argc, char** argv) {
             std::ofstream outF( settings.outFile, std::ios::out);
             if(outF.is_open()){
 				outF << "Running " << __FILE__ << std::endl;
-                settings.print( outF, comm);
 				
 				if( settings.noRefinement)
 					printVectorMetricsShort( metricsVec, outF ); 

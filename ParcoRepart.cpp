@@ -123,12 +123,10 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     std::vector<ValueType> recvThresholds(comm->getSize());
 
     MPI_Datatype MPI_ValueType = MPI_DOUBLE; //TODO: properly template this
-    PRINT0("Setting local threshold to " + std::to_string(minLocalIndex.value));
     MPI_Alltoall(sendThresholds.data(), 1, MPI_ValueType, recvThresholds.data(),
             1, MPI_ValueType, mpi_comm); //TODO: replace this monstrosity with a proper call to LAMA
     //comm->all2all(recvThresholds.data(), sendTresholds.data());//TODO: maybe speed up with hypercube
-    PRINT0(std::to_string(recvThresholds[0]) + " < hilbert indices < " + std::to_string(recvThresholds[comm->getSize() - 1])
-                    + ".");
+    SCAI_ASSERT_LT_ERROR(recvThresholds[comm->getSize() - 1], 1, "invalid hilbert index");
     // merge to get quantities //Problem: nodes are not sorted according to their hilbert indices, so accesses are not aligned.
     // Need to sort before and after communication
     assert(std::is_sorted(recvThresholds.begin(), recvThresholds.end()));
@@ -164,8 +162,10 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     IndexType newLocalN = recvPlan.totalQuantity();
     SCAI_REGION_END("ParcoRepart.hilbertRedistribution.communicationPlan")
 
-    PRINT0(std::to_string(localN) + " old local values "
-                    + std::to_string(newLocalN) + " new ones.");
+    if (settings.verbose) {
+        PRINT0(std::to_string(localN) + " old local values "
+                        + std::to_string(newLocalN) + " new ones.");
+    }
     //transmit indices, allowing for resorting of the received values
     std::vector<IndexType> sendIndices(localN);
     {
@@ -346,7 +346,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		PRINT0("Initial partition with spectral");
 		result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
 	} else if (settings.initialPartition == InitialPartitioningMethods::KMeans) {
-		PRINT0("Initial partition with K-Means");
+	    if (comm->getRank() == 0) {
+	        std::cout << "Initial partition with K-Means" << std::endl;
+	    }
+
 		//prepare coordinates for k-means
 		std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
 		DenseVector<ValueType> nodeWeightCopy = nodeWeights;
@@ -377,11 +380,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 						std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );
 						tempResult = ITI::KMeans::computePartition(coordinates, convertedWeights, migrationBlockSizes, migrationSettings);
 					}
-					//TODO: initial migration with external tools, how to do it to avoid dependence
-					//of the whole class to Wrappers.?
-					//else if (settings.initialMigration == InitialPartitioningMethods::MJ){
-					//	tempResult = ITI::Wrappers<IndexType,ValueType>::partition (input, coordinates, convertedWeights, ITI::Tool::zoltanMJ, migrationSettings, metrics);
-					//}
 					
 					initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
 					

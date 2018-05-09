@@ -170,7 +170,7 @@ struct Metrics{
 		// TODO: can re returned in an auto, check if it is faster
 		// it is a bit uglier but saves time
 		std::tie( commVolume, numBorderNodesPerBlock, numInnerNodesPerBlock ) = \
-				ITI::GraphUtils::computeCommBndInner( graph, partition, settings.numBlocks );
+				ITI::GraphUtils::computeCommBndInner( graph, partition, settings );
 		
 		maxCommVolume = *std::max_element( commVolume.begin(), commVolume.end() );
 		totalCommVolume = std::accumulate( commVolume.begin(), commVolume.end(), 0 );
@@ -238,7 +238,9 @@ struct Metrics{
 				}
 				
 				numDisconBlocks = comm->sum(isDisconnected);
-				PRINT0("number of disconnected blocks: " << numDisconBlocks);
+				if (settings.verbose) {
+				    PRINT0("number of disconnected blocks: " << numDisconBlocks);
+				}
 				
 				//PRINT(*comm << ": "<< localDiameter);
 				maxBlockDiameter = comm->max(localDiameter);
@@ -258,7 +260,9 @@ struct Metrics{
 		}
 		std::chrono::duration<ValueType,std::ratio<1>> diameterTime = std::chrono::high_resolution_clock::now() - diameterStart; 
 		ValueType time = comm->max( diameterTime.count() );
-		PRINT0("time to get the diameter: " <<  time );
+		if (settings.verbose) {
+		    PRINT0("time to get the diameter: " <<  time );
+		}
 	
 		return std::make_tuple( maxBlockDiameter, harmMeanDiam, numDisconBlocks);
 	}

@@ -203,6 +203,7 @@ ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<
 	scai::dmemo::CommunicatorPtr comm = partDist->getCommunicatorPtr();
 	if( comm->getRank()==0 ){
         std::cout<<"Computing the cut...";
+        std::cout.flush();
 	}
 
 	const IndexType n = inputDist->getGlobalSize();
@@ -288,9 +289,12 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 	const bool weighted = (weightsSize != 0);
     scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
     
+    /*
     if( comm->getRank()==0 ){
-        std::cout<<"Computing the imbalance..." << std::endl;
+        std::cout<<"Computing the imbalance...";
+        std::cout.flush();
     }
+    */
     
     SCAI_ASSERT_EQ_ERROR(weighted, comm->any(weighted), "inconsistent input!");
 
@@ -370,9 +374,11 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 		assert(maxBlockSize >= optSize);
 	}
 
+	/**
     if( comm->getRank()==0 ){
         std::cout<<" done" << std::endl;
     }
+    */
 
 	return (ValueType(maxBlockSize - optSize)/ optSize);
 }
@@ -662,11 +668,13 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes	
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const IndexType numBlocks) {
+std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, Settings settings) {
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const IndexType numBlocks = settings.numBlocks;
     
-    if( comm->getRank()==0 ){
-        std::cout<<"Computing the communication volume ..." << std::endl;
+    if( comm->getRank()==0 && settings.verbose){
+        std::cout<<"Computing the communication volume ...";
+        std::cout.flush();
     }
     std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
 	
@@ -728,8 +736,8 @@ std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM
 	
 	std::chrono::duration<double> endTime = std::chrono::system_clock::now() - startTime;
 	double totalTime= comm->max(endTime.count() );
-	if( comm->getRank()==0 ){
-        std::cout<<"\t\t\t time to get volume: " << totalTime <<  std::endl;
+	if( comm->getRank()==0 && settings.verbose){
+        std::cout<<" done in " << totalTime <<  std::endl;
     }
     return commVolumePerBlock;
 }
@@ -740,12 +748,15 @@ template<typename IndexType, typename ValueType>
 std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType>> computeCommBndInner( 
 	const CSRSparseMatrix<ValueType> &adjM, 
 	const DenseVector<IndexType> &part, 
-	const IndexType numBlocks) {
+	Settings settings) {
+
+    const IndexType numBlocks = settings.numBlocks;
 	
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
-    if( comm->getRank()==0 ){
-        std::cout<<"Computing the communication volume, number of border and inner nodes ..." << std::endl;
+    if( comm->getRank()==0 && settings.verbose){
+        std::cout<<"Computing the communication volume, number of border and inner nodes ...";
+        std::cout.flush();
     }
     std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
 	
@@ -824,8 +835,8 @@ std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType
 	
 	std::chrono::duration<double> endTime = std::chrono::system_clock::now() - startTime;
 	double totalTime= comm->max(endTime.count() );
-	if( comm->getRank()==0 ){
-        std::cout<<"\t\t\t\t time to get volume, number of border and inner nodes: " << totalTime <<  std::endl;
+	if( comm->getRank()==0 && settings.verbose){
+        std::cout<<" done in " << totalTime <<  std::endl;
     }
     return std::make_tuple( std::move(commVolumePerBlock), std::move(borderNodesPerBlock), std::move(innerNodesPerBlock) );
 }
@@ -1605,9 +1616,9 @@ template std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMat
 template std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input, const std::set<IndexType>& candidates);
 template std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
 template DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
-template std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const struct Settings settings);
-template std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType>> computeCommBndInner( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType numBlocks);
-template std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const IndexType k);
+template std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, Settings settings);
+template std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType>> computeCommBndInner( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, Settings settings);
+template std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, Settings settings);
 template std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part);
 template scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 template IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
