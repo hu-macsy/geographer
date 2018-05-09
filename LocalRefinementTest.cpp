@@ -184,7 +184,7 @@ TEST_F(LocalRefinementTest, testOriginArray) {
 		gain = std::accumulate(gainPerRound.begin(), gainPerRound.end(), 0);
 		if (comm->getRank() == 0) std::cout << "Found gain " << gain << " with " << gainPerRound.size() << " colors." << std::endl;
 		iter++;
-	} while(gain > 0);
+	} while(gain > 100);
 
 	//check for equality of redistributed values and origin
 	scai::dmemo::DistributionPtr newDist = graph.getRowDistributionPtr();

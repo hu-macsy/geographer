@@ -208,8 +208,6 @@ TEST_F (MultiLevelTest, testComputeGlobalPrefixSum) {
 
 TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 
-    
-
     std::string file = graphPath+ "rotation-00000.graph";
     std::string coordFile = graphPath+ "rotation-00000.graph.xyz";
 
@@ -269,7 +267,7 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     settings.coarseningStepsBetweenRefinement = 3;
     settings.useGeometricTieBreaking = true;
     settings.dimensions= 2;
-    settings.minGainForNextRound = 10;
+    settings.minGainForNextRound = 100;
     
     scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, halo, settings);
