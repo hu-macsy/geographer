@@ -95,7 +95,6 @@ struct Metrics{
 		}else if (maxBlockGraphDegree==0 ){
 			out << " ### WARNING: possibly not all metrics calculated ###" << std::endl;
 		}
-		out << "gather" << std::endl;
 				
 		out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxCommVol totCommVol maxDiameter harmMeanDiam numDisBlocks timeSpMV timeComm" << std::endl;
 

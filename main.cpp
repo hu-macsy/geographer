@@ -269,11 +269,9 @@ int main(int argc, char** argv) {
     //
     
     if( comm->getRank() ==0 ){
-		std::cout <<"Starting file " << __FILE__ << std::endl;
-		
 		std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
 		std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
-		std::cout << "date and time: " << std::ctime(&timeNow) << std::endl;
+		std::cout << "date and time: " << std::ctime(&timeNow);
 	}
 	
     IndexType N = -1; 		// total number of points
@@ -327,7 +325,18 @@ int main(int argc, char** argv) {
     		inputstring = "generate";
     	}
 
-        std::cout<< "commit:"<< version<< " input:"<< inputstring << std::endl;
+        std::cout<< "commit:"<< version<< " main file: "<< __FILE__ << " machine:" << machine << " p:"<< comm->getSize();
+
+        auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
+        std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
+        std::cout.precision(oldprecision);
+
+        std::cout << "Calling command:" << std::endl;
+        for (IndexType i = 0; i < argc; i++) {
+            std::cout << std::string(argv[i]) << " ";
+        }
+        std::cout << std::endl << std::endl;
+
     }
 
     //---------------------------------------------------------
@@ -590,14 +599,6 @@ int main(int argc, char** argv) {
     }
     
     std::vector<struct Metrics> metricsVec;
-    
-	/*
-	//TODO: used ifort -nofor-main ... to compile but does not link properly
-	size_t total=-1,used=-1,free=-1,buffers=-1, cached=-1;
-	memusage(&total, &used, &free, &buffers, &cached);
-	printf("%ld %ld %ld %ld %ld \n", total,used,free,buffers, cached);
-	*/
-	
 	
     //------------------------------------------------------------
     //
@@ -621,7 +622,7 @@ int main(int argc, char** argv) {
                 
         // for the next runs the input is redistributed, so we must redistribute to the original distributions
         
-        if (repeatTimes > 0) {
+        if (repeatTimes > 1) {
             if(comm->getRank()==0) std::cout<< std::endl<< std::endl;
             PRINT0("\t\t ----------- Starting run number " << r +1 << " -----------");
         }
@@ -661,10 +662,6 @@ int main(int argc, char** argv) {
         // Print some output
         //
         if (comm->getRank() == 0 ) {
-            for (IndexType i = 0; i < argc; i++) {
-                std::cout << std::string(argv[i]) << " ";
-            }
-            std::cout << std::endl;
             std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
             std::cout << " p:"<< comm->getSize() << " k:"<< settings.numBlocks;
             auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
@@ -715,13 +712,15 @@ int main(int argc, char** argv) {
     // writing results in a file and std::cout
     //
     
-    if (comm->getRank() == 0) {
-	std::cout << "Running " << __FILE__ << std::endl;
-        std::cout<<  "\033[1;36m";
-    }
-    printVectorMetrics( metricsVec, std::cout );
-    if (comm->getRank() == 0) {
-        std::cout << " \033[0m";
+    if (repeatTimes > 1) {
+        if (comm->getRank() == 0) {
+        std::cout << "Running " << __FILE__ << std::endl;
+            std::cout<<  "\033[1;36m";
+        }
+        printVectorMetrics( metricsVec, std::cout );
+        if (comm->getRank() == 0) {
+            std::cout << " \033[0m";
+        }
     }
     
     if( settings.storeInfo && settings.outFile!="-" ) {
@@ -748,8 +747,7 @@ int main(int argc, char** argv) {
         std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
         std::string partOutFile = settings.outFile + ".partition";
 		ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
-        //ITI::FileIO<IndexType, ValueType>::writeDenseVectorParallel<IndexType>( partition, partOutFile );
-        //ITI::FileIO<IndexType, ValueType>::writePartitionCentral( partition, partOutFile );
+
         std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
         if( comm->getRank()==0 ){
             std::cout << " and last partition of the series in file." << partOutFile << std::endl;
