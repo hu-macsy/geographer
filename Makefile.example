@@ -2,20 +2,22 @@ CC=mpicxx
 
 SRCS=$(wildcard *.cpp)
 OBJ_COMMON= ParcoRepart.o MultiLevel.o LocalRefinement.o HilbertCurve.o MeshGenerator.o FileIO.o PrioQueueForInts.o SpectralPartition.o Diffusion.o GraphUtils.o MultiSection.o KMeans.o
-OBJ_GOOGLETEST= $(OBJ_COMMON) test_main.o ParcoRepartTest.o MultiLevelTest.o LocalRefinementTest.o HilbertCurveTest.o FileIOTest.o MeshGeneratorTest.o quadtree/test/QuadTreeTest.o auxTest.o SpectralPartitionTest.o DiffusionTest.o KMeansTest.o
+OBJ_GOOGLETEST= $(OBJ_COMMON) test_main.o auxTest.o DiffusionTest.o FileIOTest.o GraphUtilsTest.o HilbertCurveTest.o KMeansTest.o LocalRefinementTest.o MeshGeneratorTest.o MultiLevelTest.o MultiSectionTest.o ParcoRepartTest.o quadtree/test/QuadTreeTest.o SpectralPartitionTest.o
 OBJ_TEST_MAIN= $(OBJ_COMMON) main.o
+OBJ_PARTITION_ANALYSIS = $(OBJ_COMMON) analyzePartition.o
 OBJ_GRAPH_GEN=  $(OBJ_COMMON) graphGeneratorFromQuad.o
-OBJ_CONVERTER = quadTreeConverter.o FileIO.o
+OBJ_CONVERTER = quadTreeConverter.o FileIO.o GraphUtils.o
 OBJ_DIFFUSIONCOORDS = FileIO.o Diffusion.o diffusionCoords.o
 OBJ_TEST_INITIAL= $(OBJ_COMMON) testInitial.o 
 OBJ_WEAKSCALING= $(OBJ_COMMON) testWeakScaling.o 
 OBJ_XTRAPULP = FileIO.o GraphUtils.o xtrapulpWrapper.cpp MeshGenerator.o
 
-EXECUTABLE_GOOGLETEST=KatanomiTest
-EXECUTABLE_MAIN=Katanomi
+EXECUTABLE_GOOGLETEST=GeographerTest
+EXECUTABLE_MAIN=Geographer
 EXECUTABLE_GRAPH_GEN= graphGen
 EXECUTABLE_CONVERTER= converter
 EXECUTABLE_DIFFUSIONCOORDS=diffCoords
+EXECUTABLE_ANALYZE= analyze
 EXECUTABLE_INITIAL= initTest
 EXECUTABLE_WEAKSCALING= weakScaling
 
@@ -25,18 +27,15 @@ SCAI_LIB=
 GTEST_INCLUDE=
 GTEST_LIB=
 BOOST_LIB=
-QUICKSORT_INCLUDE=schizoQuicksort/src
-QUICKSORT_LIB=schizoQuicksort/build
+QUICKSORT_INCLUDE=RBC/Sort
+QUICKSORT_LIB=RBC/build/lib
 MPI_INCLUDE=/usr/lib/openmpi/include/
 MPI_LIB=/usr/lib/openmpi/lib/
 RBC_DIR=./RBC
 
+LFLAGS= -Wl,-rpath=$(SCAI_LIB) -L$(SCAI_LIB) -L$(GTEST_LIB) -L$(RBC_DIR)/build/lib -L$(MPI_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lscai_sparsekernel -lscai_solver -lscai_logging -lboost_program_options -lboost_filesystem -lboost_system -l_rbc -lparmetis -lmetis $(MPI_LINK_FLAGS) 
 
-
-
-LFLAGS= -Wl,-rpath=$(SCAI_LIB) -L$(SCAI_LIB) -L$(GTEST_LIB) -L$(RBC_DIR)/build/lib -L$(MPI_LIB) -lscai_lama -lscai_dmemo -lscai_common -lscai_hmemo -lscai_utilskernel -lscai_tracing -lscai_sparsekernel -lscai_solver -lboost_program_options -lboost_filesystem -lboost_system -lquicksort -lparmetis -lmetis
-
-CCFLAGS= --openmp --std=c++11 -g -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -I$(RCB_DIR)/Sort -I$(QUICKSORT_INCLUDE) -I$(MPI_INCLUDE) -DSCAI_TRACE_ON  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR -DBUILD_COMMIT=$(GIT_COMMIT)
+CCFLAGS= --openmp --std=c++11 -g -I$(SCAI_INCLUDE) -I$(GTEST_INCLUDE) -I$(RCB_DIR)/Sort -I$(MPI_INCLUDE) -DSCAI_TRACE_OFF  -DSCAI_ASSERT_LEVEL_ERROR -DSCAI_LOG_LEVEL_ERROR -DBUILD_COMMIT=$(GIT_COMMIT)
 
 all: main tests metisWrapper lib converter diffusionCoords graphGen testInitial weakScaling
 .PHONY: all
@@ -46,6 +45,9 @@ tests: $(OBJ_GOOGLETEST)
 
 main: $(OBJ_TEST_MAIN)
 	$(CC) $(CCFLAGS) $(OBJ_TEST_MAIN) -o $(EXECUTABLE_MAIN) $(LFLAGS)
+
+analyzePartition: $(OBJ_PARTITION_ANALYSIS)
+	$(CC) $(CCFLAGS) $(OBJ_PARTITION_ANALYSIS) -o $(EXECUTABLE_ANALYZE) $(LFLAGS)
 
 testInitial: $(OBJ_TEST_INITIAL)
 	$(CC) $(CCFLAGS) $(OBJ_TEST_INITIAL) -o $(EXECUTABLE_INITIAL) $(LFLAGS)
@@ -143,7 +145,7 @@ lib: $(OBJ_COMMON)
 		
 .PHONY: clean
 clean:
-	rm -f $(EXECUTABLE_MAIN) $(EXECUTABLE_GOOGLETEST) $(EXECUTABLE_GRAPH_GEN) $(OBJ_GOOGLETEST) $(OBJ_TEST_MAIN) $(OBJ_GRAPH_GEN)
+	rm -f $(EXECUTABLE_MAIN) $(EXECUTABLE_GOOGLETEST) $(EXECUTABLE_GRAPH_GEN) $(OBJ_PARTITION_ANALYSIS) $(EXECUTABLE_ANALYZE) $(OBJ_GOOGLETEST) $(OBJ_TEST_MAIN) $(OBJ_GRAPH_GEN) .depend
 
 %.o: %.cpp
 	$(CC) $(CCFLAGS) -c -o $@ $<
