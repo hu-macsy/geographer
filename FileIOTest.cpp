@@ -535,50 +535,24 @@ TEST_F(FileIOTest, testReadGraphAndCoordsBinary){
 //-------------------------------------------------------------------------------------------------
 
 TEST_F (FileIOTest, testWriteDenseVectorCentral){
-    std::string file= "trace-00008.graph";
-    std::string grFile= graphPath +file , coordFile= graphPath +file +".xyz";  //graph file and coordinates file
-    IndexType dimensions = 2;
-    std::fstream f(grFile);
-    IndexType N;
-    f>> N;
-    f.close();
     
+    const IndexType N = 9001;
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    const IndexType k = comm->getSize();
+    const IndexType localN = dist->getLocalSize();
+    
+    scai::lama::DenseVector<IndexType> partition(dist, 0);
+    {
+        scai::hmemo::WriteAccess<IndexType> wPart(partition.getLocalValues());
+        for (IndexType i = 0; i < localN; i++) {
+            IndexType blockId = rand() % k;
+            wPart[i] = blockId;
+        }
+    }
 
-    IndexType k = comm->getSize();
-       
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( grFile );
-
-    
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions);
-    
-    struct Settings settings;
-    settings.numBlocks= k;
-    settings.epsilon = 0.5;
-    settings.dimensions = dimensions;
-    settings.initialPartition = InitialPartitioningMethods::KMeans;
-    settings.multiLevelRounds = 12;
-    settings.minGainForNextRound= 1;
-    // 5% of (approximetely, if at every round you get a 60% reduction in nodes) the nodes of the coarsest graph
-    //settings.minBorderNodes = N*std::pow(0.6, settings.multiLevelRounds)/k * 0.05;
-    settings.minBorderNodes = std::sqrt((ValueType(N))/k);
-    settings.coarseningStepsBetweenRefinement = 3;
-    settings.stopAfterNoGainRounds = 200;
-
-    struct Metrics metrics(settings.numBlocks);
-    
-    settings.print(std::cout, comm);
-  
-    DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(coords[0].getDistributionPtr(), 1);
-    
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, uniformWeights, settings, metrics);
-    
-
-    metrics.getAllMetrics( graph, partition, uniformWeights, settings);
-    metrics.print( std::cout );
-    
-    FileIO<IndexType, ValueType>::writeDenseVectorCentral( partition, file+"_k_"+std::to_string(k)+".part");
-    
+    FileIO<IndexType, ValueType>::writeDenseVectorCentral( partition, "testWriteDenseVectorCentral.part");
+    //TODO: maybe clean up?
 }
 
 //-------------------------------------------------------------------------------------------------
