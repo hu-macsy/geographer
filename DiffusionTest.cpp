@@ -29,7 +29,7 @@ class DiffusionTest : public ::testing::Test {
 };
 
 TEST_F(DiffusionTest, testPotentials) {
-    std::string fileName = "bubbles-00010.graph";
+    std::string fileName = "trace-00008.graph";
     std::string file = graphPath + fileName;
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     const IndexType n = graph.getNumRows();
@@ -38,14 +38,16 @@ TEST_F(DiffusionTest, testPotentials) {
 	CSRSparseMatrix<ValueType> L = GraphUtils::constructLaplacian<IndexType, ValueType>(graph);
 
 	DenseVector<ValueType> nodeWeights(L.getRowDistributionPtr(),1);
-	DenseVector<ValueType> potentials = Diffusion<IndexType, ValueType>::potentialsFromSource(L, nodeWeights, 0);
+	IndexType source = 0;
+	ValueType epsilon = 1e-4;
+	DenseVector<ValueType> potentials = Diffusion<IndexType, ValueType>::potentialsFromSource(L, nodeWeights, source, epsilon);
 	ASSERT_EQ(n, potentials.size());
 	ASSERT_LT(potentials.sum(), 0.000001);
 }
 
 TEST_F(DiffusionTest, testMultiplePotentials) {
 	const IndexType numLandmarks = 2;
-	std::string fileName = "bubbles-00010.graph";
+	std::string fileName = "trace-00008.graph";
 	std::string file = graphPath + fileName;
 	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 	scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
@@ -75,7 +77,8 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 	L.redistribute(noDist, noDist);
 	nodeWeights.redistribute(noDist);
 
-	DenseMatrix<ValueType> potentials = Diffusion<IndexType, ValueType>::multiplePotentials(L, nodeWeights, landmarks, 1e-5);
+	const ValueType epsilon = 1e-4;
+	DenseMatrix<ValueType> potentials = Diffusion<IndexType, ValueType>::multiplePotentials(L, nodeWeights, landmarks, epsilon);
 
 	ASSERT_EQ(numLandmarks, potentials.getNumRows());
 	ASSERT_EQ(globalN, potentials.getNumColumns());
