@@ -133,7 +133,7 @@ struct Settings{
     IndexType dimensions= 2;
     std::string fileName = "-";
     std::string outFile = "-";
-    ITI::Format fileFormat = ITI::Format::METIS;   // 0 for METIS, 4 for MatrixMarket
+    ITI::Format fileFormat = ITI::Format::AUTO;   // 0 for METIS, 4 for MatrixMarket
     bool useDiffusionCoordinates = false;
     IndexType diffusionRounds = 20;
     std::vector<IndexType> blockSizes;
