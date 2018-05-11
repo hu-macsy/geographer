@@ -208,9 +208,10 @@ TEST_F (MultiLevelTest, testComputeGlobalPrefixSum) {
 
 TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 
-    std::string file = graphPath+ "rotation-00000.graph";
-    std::string coordFile = graphPath+ "rotation-00000.graph.xyz";
-
+    //std::string file = graphPath+ "rotation-00000.graph";
+    //std::string coordFile = graphPath+ "rotation-00000.graph.xyz";
+    std::string file = graphPath+ "trace-00008.graph";
+    std::string coordFile = graphPath+ "trace-00008.graph.xyz";
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     const IndexType N = graph.getNumRows();
 
@@ -263,11 +264,12 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     }
 
     settings.epsilon = 0.2;
-    settings.multiLevelRounds= 6;
-    settings.coarseningStepsBetweenRefinement = 3;
+    settings.multiLevelRounds= 2;
+    settings.coarseningStepsBetweenRefinement = 1;
     settings.useGeometricTieBreaking = true;
     settings.dimensions= 2;
     settings.minGainForNextRound = 100;
+    settings.minBorderNodes=100;
     
     scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, halo, settings);

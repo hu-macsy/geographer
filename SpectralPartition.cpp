@@ -206,7 +206,7 @@ scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getF
     t[0] = 0.0;
     scai::lama::DenseVector<ValueType> z(t);
     
-    IndexType kmax = 220;        // maximal number of iterations
+    IndexType kmax = 200;        // maximal number of iterations
     ValueType eps  = 1e-7;       // accuracy for maxNorm
     ValueType lambda = 0.0;   // the eigenvalue (?) TODO: make sure
 
@@ -275,6 +275,38 @@ scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getF
     return t;
 }
 
+/*
+template<typename IndexType, typename ValueType>
+scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getFiedlerVector2(const scai::lama::CSRSparseMatrix<ValueType>& adjM, ValueType& eigenvalue ){
+    SCAI_REGION("SpectralPartition.getFiedlerVector2");
+
+    IndexType globalN= adjM.getNumRows();
+    SCAI_ASSERT_EQ_ERROR( globalN, adjM.getNumColumns(), "Matrix not square, numRows != numColumns");
+    
+    scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils::constructLaplacian<IndexType, ValueType>( adjM );
+    
+    // set u=[ 1+sqrt(n), 1, 1, 1, ... ]
+    ValueType n12 = scai::common::Math::sqrt( ValueType( globalN ));
+    
+    auto u = scai::lama::fill<scai::lama::DenseVector<ValueType>>( laplacian.getRowDistributionPtr(), 1);
+    u[0] = n12 + 1;
+    
+    ValueType alpha= globalN + n12;
+
+    scai::HouseholderTransformedMatrix<ValueType> HLH( L, u, alpha );
+
+    auto t = fill<DenseVector<ValueType>>( L.getRowDistributionPtr(), 1.0 );
+
+    DenseVector<ValueType> y;
+    DenseVector<ValueType> diff;
+
+    t[0] = 0.0;
+
+    DenseVector<ValueType> z( t );
+
+
+}
+*/
 //---------------------------------------------------------------------------------------
 
 template class SpectralPartition<IndexType, ValueType>;

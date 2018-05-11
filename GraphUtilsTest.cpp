@@ -154,7 +154,7 @@ TEST_F (GraphUtilsTest, testComputeCommVolumeAndBoundaryNodes){
     */
 	
 	std::tie( commVolume, numBorderNodes, numInnerNodes) = \
-		ITI::GraphUtils::computeCommBndInner( graph, partition, k );
+		ITI::GraphUtils::computeCommBndInner( graph, partition, settings );
     
     SCAI_ASSERT_EQ_ERROR( commVolume.size(), numBorderNodes.size(), "size mismatch");
     

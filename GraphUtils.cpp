@@ -1604,6 +1604,18 @@ scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d) {
 }
 
 //-----------------------------------------------------------------------------------
+template<typename IndexType, typename ValueType>
+CSRSparseMatrix<ValueType> mecGraphColoring( const CSRSparseMatrix<ValueType> &graph ) {
+
+// 1 - convert CSR to adjacency list
+
+// 2 - sort adjacency list based on edge weights
+
+// 3 - apply greedy (quadratic) algorithm for mec
+
+
+}
+//-----------------------------------------------------------------------------------
 
 template scai::lama::DenseVector<IndexType> reindex(CSRSparseMatrix<ValueType> &graph);
 template std::vector<IndexType> localBFS(const CSRSparseMatrix<ValueType> &graph, IndexType u);
