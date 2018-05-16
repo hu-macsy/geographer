@@ -2,7 +2,6 @@ cmake_minimum_required (VERSION 2.6)
 project (Geographer)
 
 set(SCAI_INCLUDE "/home/moritz/lama3/lama/install/include/") 
-set(GTEST_INCLUDE "home/moritz/Includes/gtest-1.7.0/include")
 set(SCAI_LIB "/home/moritz/lama3/lama/install/lib/")
 
 set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp PrioQueueForInts.cpp SpectralPartition.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp KMeans.cpp)
@@ -13,16 +12,15 @@ set(RBC_DIR "${PROJECT_SOURCE_DIR}/RBC")
 set(SCAI_LIBLIST scai_lama scai_dmemo scai_common scai_hmemo scai_utilskernel scai_tracing scai_sparsekernel scai_solver scai_logging)
 
 find_package(MPI REQUIRED)
-
 include_directories(${MPI_CXX_INCLUDE_PATH})
 
+find_package(GTest)#TODO: make build of unit tests conditional on whether GTest was found
+include_directories(${GTEST_INCLUDE_DIRS})
+
 include_directories(${SCAI_INCLUDE})
-include_directories(${GTEST_INCLUDE})
 include_directories(${RBC_DIR})
 
-
 link_directories(${SCAI_LIB})
-
 link_directories(${RBC_DIR}/build/lib)
 
 set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11" )
@@ -33,4 +31,4 @@ target_link_libraries(Geographer ${SCAI_LIBLIST} boost_program_options boost_fil
 
 add_executable(GeographerTest ${FILES_COMMON} ${FILES_TEST})
 
-target_link_libraries(GeographerTest ${SCAI_LIBLIST} boost_program_options boost_filesystem boost_system _rbc ${MPI_CXX_LIBRARIES} gtest)
+target_link_libraries(GeographerTest ${SCAI_LIBLIST} boost_program_options boost_filesystem boost_system _rbc ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
