@@ -1,7 +1,10 @@
 cmake_minimum_required (VERSION 2.6)
 project (Geographer)
 
-set(SCAI_DIR "/home/moritz/lama3/lama/install")
+if (NOT DEFINED SCAI_DIR)
+	message( FATAL_ERROR "Install Directory of LAMA not known, specify with -DSCAI_DIR" )
+endif (NOT DEFINED SCAI_DIR)
+
 set(SCAI_INCLUDE "${SCAI_DIR}/include/") 
 set(SCAI_LIB "${SCAI_DIR}/lib/")
 
