@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 2.6)
 project (Geographer)
 
 if (NOT DEFINED SCAI_DIR)
-	message( FATAL_ERROR "Install Directory of LAMA not known, specify with -DSCAI_DIR" )
+	message( FATAL_ERROR "Install Directory of LAMA not defined, specify with -DSCAI_DIR" )
 endif (NOT DEFINED SCAI_DIR)
 
 set(SCAI_INCLUDE "${SCAI_DIR}/include/") 
@@ -25,8 +25,8 @@ find_package(GTest)
 include_directories(${GTEST_INCLUDE_DIRS})
 
 ### find Boost ###
-find_package(Boost REQUIRED)
-include_directories(${BOOST_INCLUDE_DIRS})
+find_package(Boost REQUIRED COMPONENTS program_options filesystem system)
+include_directories(${Boost_INCLUDE_DIRS})
 
 ### include and link Lama and RBC ###
 include_directories(${SCAI_INCLUDE})
@@ -42,9 +42,9 @@ set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11 -DBUILD_COMMIT=${
 
 ### define targets ###
 add_executable(Geographer ${FILES_COMMON} main.cpp)
-target_link_libraries(Geographer ${SCAI_LIBLIST} boost_program_options boost_filesystem boost_system _rbc ${MPI_CXX_LIBRARIES})
+target_link_libraries(Geographer ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
 
 if (GTEST_FOUND)
 	add_executable(GeographerTest ${FILES_COMMON} ${FILES_TEST})
-	target_link_libraries(GeographerTest ${SCAI_LIBLIST} boost_program_options boost_filesystem boost_system _rbc ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
+	target_link_libraries(GeographerTest ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
 endif (GTEST_FOUND)
