@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
                 ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
                 ("noComputeDiameter", "Compute Diameter of resulting block files.")
                 ("maxDiameterRounds", value<IndexType>(&settings.maxDiameterRounds)->default_value(settings.maxDiameterRounds), "abort diameter algorithm after that many BFS rounds")
-				("metricsDetail", value<std::string>(&metricsDetail)->default_value("easy"), "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV")
+				("metricsDetail", value<std::string>(&metricsDetail)->default_value("no"), "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV")
 				;
 
         //------------------------------------------------
@@ -669,8 +669,6 @@ int main(int argc, char** argv) {
             std::cout.precision(oldprecision);
             std::cout<< std::endl<< "\033[1;36mcut:"<< metricsVec[r].finalCut<< "   imbalance:"<< metricsVec[r].finalImbalance << std::endl;
             std::cout<<"inputTime:" << metricsVec[r].inputTime << "   partitionTime:" << metricsVec[r].timeFinalPartition << " \033[0m" << std::endl;
-
-            metricsVec[r].print( std::cout );
         }
                 
         //---------------------------------------------
@@ -698,7 +696,7 @@ int main(int argc, char** argv) {
         metricsVec[r].reportTime = ValueType (comm->max(reportTime.count()));
         
         
-        if (comm->getRank() == 0 ) {
+        if (comm->getRank() == 0 && metricsDetail != "no") {
             metricsVec[r].print( std::cout );            
         }
         
