@@ -3,8 +3,10 @@
 Makefile
 .project
 .cproject
-Katanomi
-KatanomiTest
+CMakeCache.txt
+CMakeFiles/
+Geographer
+GeographerTest
 *.time.?
 *.time.??
 *.time.???
@@ -12,6 +14,7 @@ KatanomiTest
 .depend
 meshes/
 local/
+partResults/
 .settings/
 .depend
 *.graph
@@ -34,3 +37,4 @@ scorep-2017*
 *.gcno
 *.gcda
 *~
+.ipynb_checkpoints/
