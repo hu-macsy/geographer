@@ -1,40 +1,55 @@
+# object files
 *.gch
 *.o
+Geographer
+GeographerTest
+
+# build system
 Makefile
 .project
 .cproject
 CMakeCache.txt
 CMakeFiles/
-Geographer
-GeographerTest
+cmake_install.cmake
+.depend
+
+# unit test output
+partResults/
+SpectralPartition_Grid32x32_*.xyz
+writeCoordsDist_*.xyz
+testWriteDenseVectorCentral.part
+diffusion-coords.xyz
+hilbertPartition_*.xyz
+SpectralPartition_+trace01_*.xyz
+
+# tracing output
 *.time.?
 *.time.??
 *.time.???
 *.time.????
-.depend
-meshes/
-local/
-partResults/
-.settings/
-.depend
-*.graph
-*.graph.xyz
-*.csv
-*.cmd
 *.output
-*.map
-SpectralPartition_Grid32x32_*.xyz
-writeCoordsDist_*.xyz
-hilbertPartition_*.xyz
-SpectralPartition_+trace01_*.xyz
-octree_timestep_*.dat
-LLRUN.out.*
-LLRUN.err.*
 scorep-failed*
 scorep-2017*
-*.cmd
 *.gcov
 *.gcno
 *.gcda
+
+# job scheduling files
+LLRUN.out.*
+LLRUN.err.*
+*.cmd
+
+# backups
 *~
 .ipynb_checkpoints/
+
+# other
+meshes/
+local/
+.settings/
+*.graph
+*.graph.xyz
+*.csv
+*.map
+octree_timestep_*.dat
+
