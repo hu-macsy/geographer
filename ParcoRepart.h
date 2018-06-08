@@ -77,6 +77,26 @@ namespace ITI {
 			 */
 			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, struct Settings settings);
 
+			/**
+			* Wrapper for metis-like input.
+			
+			* vtxDist, size=numPEs,  is a replicated array, it is the prefix sum of the number of nodes per PE
+        			eg: [0, 15, 25, 50], PE0 has 15 vertices, PE1 10 and PE2 25
+			* xadj, size=localN+1, (= IA array of the CSR sparse matrix format), is the prefix sum of the degrees
+        			of the local nodes, ie, how many non-zero values the row has.
+			* adjncy, size=localM (number of local edges = the JA array), contains numbers >0 and <N, each
+        			number is the global id of the neighboring vertex
+        	* localM, the number of local edges
+        	* vwgt, size=localN, array for the node weights
+        	* ndims, the dimensions of the coordinates
+        	* xyz, size=ndims*locaN, the coordinates for every vertex. For vertex/point i, its coordinates are
+        			in xyz[ndims*i], xyz[ndims*i+1], ... , xyz[ndims*i+ndims]
+			*/
+			static DenseVector<IndexType> partitionGraph(
+				IndexType *vtxDist, IndexType *xadj, IndexType *adjncy, IndexType localM,
+    			IndexType *vwgt, IndexType ndims, ValueType *xyz,
+    			Settings  settings, Metrics metrics);
+
             /*
              * Get an initial partition using the Hilbert curve.
              * TODO: This currently does nothing and isn't used. Remove?

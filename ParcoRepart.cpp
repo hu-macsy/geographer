@@ -75,6 +75,91 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
     return partitionGraph(input, coordinates, nodeWeights, previous, settings, metrics);
 
 }
+
+/* wrapper for input in metis-like format
+
+*   vtxDist, size=numPEs,  is a replicated array, it is the prefix sum of the number of nodes per PE
+        eg: [0, 15, 25, 50], PE0 has 15 vertices, PE1 10 and PE2 25
+*   xadj, size=localN+1, (= IA array of the CSR sparse matrix format), is the prefix sum of the degrees
+        of the local nodes, ie, how many non-zero values the row has.
+*   adjncy, size=localM (number of local edges = the JA array), contains numbers >0 and <N, each
+        number is the global id of the neighboring vertex
+*/
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
+    IndexType *vtxDist, IndexType *xadj, IndexType *adjncy, IndexType localM,
+    IndexType *vwgt, IndexType dimensions, ValueType *xyz,
+    Settings  settings, Metrics metrics ){
+
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const IndexType numPEs = comm->getSize();
+    const IndexType thisPE = comm->getRank();
+
+   //SCAI_ASSERT_EQ_ERROR(numPEs+1, sizeof(vtxDist)/sizeof(IndexType), "wrong size for array vtxDist" );
+    // ^^ this is wrong,  sizeof(vtxDist)=size of a pointer. How to check if size is correct?
+    const IndexType N = vtxDist[numPEs];
+
+    // how to check if array has the correct size?
+    const IndexType localN = vtxDist[thisPE+1]-vtxDist[thisPE];
+    SCAI_ASSERT_GT_ERROR( localN, 0, "Wrong value for localN for PE " << thisPE << ". Probably wrong vtxDist array");
+    SCAI_ASSERT_EQ_ERROR( N, comm->sum(localN), "Global number of vertices mismatch");
+
+    PRINT0("N= " << N);
+
+    // contains the size of each part
+    std::vector<IndexType> partSize( numPEs );
+    for( int i=0; i<numPEs; i++){
+        partSize[i] = vtxDist[i+1]-vtxDist[i];
+    }
+
+    // pointer to the general block distribution created using the vtxDist array
+    const scai::dmemo::DistributionPtr genBlockDistPtr = scai::dmemo::DistributionPtr ( new scai::dmemo::GenBlockDistribution(N, partSize, comm ) );
+
+    //-----------------------------------------------------
+    //
+    // convert to scai data types
+    //
+
+    //
+    // graph
+    //
+
+    scai::hmemo::HArray<IndexType> localIA(localN+1, xadj);
+    scai::hmemo::HArray<IndexType> localJA(localM, adjncy);
+    scai::hmemo::HArray<ValueType> localValues(localM, 1.0);      //TODO: weight 1.0=> no edge weights, change/generalize
+
+    scai::lama::CSRStorage<ValueType> graphLocalStorage( localN, N, localIA, localJA, localValues);
+    scai::lama::CSRSparseMatrix<ValueType> graph (genBlockDistPtr, graphLocalStorage);
+
+    SCAI_ASSERT_EQ_ERROR( graph.getLocalNumRows(), localN, "Local size mismatch");
+    SCAI_ASSERT_EQ_ERROR( genBlockDistPtr->getLocalSize(), localN, "Local size mismatch");
+    
+    //
+    // coordinates
+    //
+
+    std::vector<std::vector<ValueType>> localCoords(dimensions);
+
+    for (IndexType dim = 0; dim < dimensions; dim++) {
+        localCoords[dim].resize(localN);
+        for( int i=0; i<localN; i++){
+            localCoords[dim][i] = xyz[dimensions*i+dim];
+        }
+    }
+
+    std::vector<scai::lama::DenseVector<ValueType>> coordinates(dimensions);
+    for (IndexType dim = 0; dim < dimensions; dim++) {
+        coordinates[dim] = scai::lama::DenseVector<ValueType>(genBlockDistPtr, scai::hmemo::HArray<ValueType>(localN, localCoords[dim].data()) );
+    }
+
+    //
+    // node weights
+    //
+    scai::lama::DenseVector<ValueType> nodeWeights(genBlockDistPtr, scai::hmemo::HArray<ValueType>(localN, *vwgt));
+
+    return partitionGraph( graph, coordinates, nodeWeights, settings, metrics);
+}
+
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
@@ -252,7 +337,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 {
 	IndexType k = settings.numBlocks;
 	ValueType epsilon = settings.epsilon;
-    
+    const IndexType dimensions = coordinates.size();
+
 	SCAI_REGION( "ParcoRepart.partitionGraph" )
 
 	std::chrono::time_point<std::chrono::steady_clock> start, afterSFC, round;
@@ -263,10 +349,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	* check input arguments for sanity
 	*/
 	IndexType n = input.getNumRows();
-	if (n != coordinates[0].size()) {
-		throw std::runtime_error("Matrix has " + std::to_string(n) + " rows, but " + std::to_string(coordinates[0].size())
-		 + " coordinates are given.");
-	}
+    for( int d=0; d<dimensions; d++){
+    	if (n != coordinates[d].size()) {
+    		throw std::runtime_error("Matrix has " + std::to_string(n) + " rows, but " + std::to_string(coordinates[0].size())
+    		 + " coordinates are given.");
+    	}
+    }
 
 	if (n != input.getNumColumns()) {
 		throw std::runtime_error("Matrix must be quadratic.");
@@ -283,9 +371,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	if (epsilon < 0) {
 		throw std::runtime_error("Epsilon " + std::to_string(epsilon) + " is invalid.");
 	}
-
-	const IndexType dimensions = coordinates.size();
-        
+	        
 	const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));

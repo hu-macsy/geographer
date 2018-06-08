@@ -214,7 +214,7 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_2D) {
     {
         SCAI_REGION("testCreateStructuredMesh_Distributed_2D.check_adjM_2")
         const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+        const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
         
         for(IndexType i=0; i<ia.size()-1; i++){
             // this checks that the number of non-zero elements in each row is less than 4 
