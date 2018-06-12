@@ -118,8 +118,10 @@ int main(int argc, char** argv) {
     }
 
     if( (!vm.count("outPath")) and storeInfo ){
-		std::cout<< "Must give parameter outPath to store metrics.\nAborting..." << std::endl;
-		return -1;
+    	if( comm->getRank() ==0 ){
+			std::cout<< "Must give parameter outPath to store metrics.\nAborting..." << std::endl;
+			return -1;
+		}
 	}
 	
 	if( vm.count("metricsDetail") ){
@@ -226,7 +228,7 @@ int main(int argc, char** argv) {
 
         scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
         scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
-        graph = scai::lama::CSRSparseMatrix<ValueType>( rowDistPtr , noDistPtr );
+        graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( rowDistPtr , noDistPtr );
                 
         scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
         for(IndexType i=0; i<settings.dimensions; i++){
@@ -268,15 +270,33 @@ int main(int argc, char** argv) {
 	
 	std::vector<ITI::Tool> wantedTools;
 
-	if( tool == "all"){
+	if( tools[0] == "all"){
 		wantedTools = allTools;
 	}else{
-
+		for( std::vector<std::string>::iterator tool=tools.begin(); tool!=tools.end(); tool++){
+			ITI::Tool thisTool;
+			if( (*tool).substr(0,8)=="parMetis"){
+				if 		( *tool=="parMetisGraph"){	thisTool = ITI::Tool::parMetisGraph; }
+				else if ( *tool=="parMetisGeom"){	thisTool = ITI::Tool::parMetisGeom;	}
+				else if	( *tool=="parMetisSfc"){		thisTool = ITI::Tool::parMetisSFC;	}
+			}else if ( (*tool).substr(0,6)=="zoltan"){
+				std::string algo;
+				if		( *tool=="zoltanRcb"){	thisTool = ITI::Tool::zoltanRCB;	}
+				else if ( *tool=="zoltanRib"){	thisTool = ITI::Tool::zoltanRIB;	}
+				else if ( *tool=="zoltanMJ"){	thisTool = ITI::Tool::zoltanMJ;		}
+				else if ( *tool=="zoltanHsfc"){	thisTool = ITI::Tool::zoltanSFC;	}
+			}else{
+				std::cout<< "Tool "<< *tool <<" not supported.\nAborting..."<<std::endl;
+				return -1;
+			}
+			wantedTools.push_back( thisTool );
+		}
 	}
 
-	for( int t=0; t<allTools.size(); t++){
+
+	for( int t=0; t<wantedTools.size(); t++){
 		
-		ITI::Tool thisTool = allTools[t];
+		ITI::Tool thisTool = wantedTools[t];
 	
 		// get the partition and metrics
 		//
@@ -392,7 +412,7 @@ int main(int argc, char** argv) {
         
         std::string destPath = "partResults/" +  ITI::tool2string(thisTool) +"/blocks_" + std::to_string(settings.numBlocks) ;
         boost::filesystem::create_directories( destPath );   
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, N, settings.dimensions, destPath + "/debugResult");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, settings.dimensions, destPath + "/debugResult");
         comm->synchronize();
         
         //TODO: use something like the code below instead of a NoDistribution
@@ -411,7 +431,7 @@ int main(int argc, char** argv) {
 	memusage(&total, &used, &free, &buffers, &cached);	
 	printf("\nMEM: avail: %ld , used: %ld , free: %ld , buffers: %ld , file cache: %ld \n\n",total,used,free,buffers, cached);
 	*/		
-	} // for allTools.size()
+	} // for wantedTools.size()
      
 	std::chrono::duration<ValueType> totalTimeLocal = std::chrono::system_clock::now() - startTime;
 	ValueType totalTime = comm->max( totalTimeLocal.count() );
