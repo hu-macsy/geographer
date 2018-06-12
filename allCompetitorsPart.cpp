@@ -22,31 +22,10 @@
 #include <scai/dmemo/BlockDistribution.hpp>
 
 #include "FileIO.h"
-//#include "GraphUtils.h"
 #include "Settings.h"
 #include "Metrics.h"
 #include "MeshGenerator.h"
 #include "Wrappers.h"
-
-//#include <parmetis.h>
-
-/*
-void printCompetitorMetrics(struct Metrics metrics, std::ostream& out){
-	out << "gather" << std::endl;
-	out << "timeTotal finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxBndPercnt avgBndPercnt" << std::endl;
-    out << metrics.timeFinalPartition<< " " \
-		<< metrics.finalCut << " "\
-		<< metrics.finalImbalance << " "\
-		<< metrics.maxBoundaryNodes << " "\
-		<< metrics.totalBoundaryNodes << " "\
-		<< metrics.maxCommVolume << " "\
-		<< metrics.totalCommVolume << " ";
-	out << std::setprecision(6) << std::fixed;
-	out <<  metrics.maxBorderNodesPercent << " " \
-		<<  metrics.avgBorderNodesPercent \
-		<< std::endl; 
-}
-*/
 
 
 
@@ -69,6 +48,7 @@ int main(int argc, char** argv) {
 	ITI::Format coordFormat;
 	std::string outPath;
 	std::string graphName;
+	std::vector<std::string> tools;
     std::string metricsDetail = "all";
 	
 	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
@@ -95,6 +75,10 @@ int main(int argc, char** argv) {
 		("outPath", value<std::string>(&outPath), "write result partition into file")
 		("graphName", value<std::string>(&graphName), "this is needed to create the correct outFile for every tool. Must be the graphFile with the path and the ending")
 		
+		//("tool", value<std::string>(&tool), "The tool to partition with.")
+		("tools", value<std::vector<std::string>>(&tools)->multitoken(), "The tool to partition with.")
+
+
 		("computeDiameter", value<bool>(&settings.computeDiameter)->default_value(true), "Compute Diameter of resulting block files.")
 		("storeInfo", value<bool>(&storeInfo), "is this is false then no outFile is produced")
 		("metricsDetail", value<std::string>(&metricsDetail), "no: no metrics, easy:cut, imbalance, communication volume and diamter if possible, all: easy + SpMV time and communication time in SpMV")
@@ -280,10 +264,16 @@ int main(int argc, char** argv) {
 	
 	//WARNING: 1) removed parmetis sfc
 	//WARNING: 2) parMetisGraph should be last because it often crashes
-	std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRCB, ITI::Tool::zoltanRIB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisSFC};
-	//std::vector<ITI::Tool> allTools = { ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph };
-	//std::vector<ITI::Tool> allTools = { ITI::Tool::parMetisSFC};
+	std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRCB, ITI::Tool::zoltanRIB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph };
 	
+	std::vector<ITI::Tool> wantedTools;
+
+	if( tool == "all"){
+		wantedTools = allTools;
+	}else{
+
+	}
+
 	for( int t=0; t<allTools.size(); t++){
 		
 		ITI::Tool thisTool = allTools[t];
@@ -386,18 +376,18 @@ int main(int argc, char** argv) {
 			}
 		}
 		
-		// the code below writes the output coordinates in one file per processor for visualization purposes.
+	// the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================
     
     if (settings.writeDebugCoordinates) {
 		
 		std::vector<DenseVector<ValueType> > coordinateCopy = coords;
 		
-scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );		
+		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );		
         for (IndexType dim = 0; dim < settings.dimensions; dim++) {
             assert( coordinateCopy[dim].size() == N);
             //coordinates[dim].redistribute(partition.getDistributionPtr());
-coordinateCopy[dim].redistribute( distFromPartition );			
+			coordinateCopy[dim].redistribute( distFromPartition );			
         }
         
         std::string destPath = "partResults/" +  ITI::tool2string(thisTool) +"/blocks_" + std::to_string(settings.numBlocks) ;
@@ -417,10 +407,10 @@ coordinateCopy[dim].redistribute( distFromPartition );
         }
         */
     }
-/*		
-memusage(&total, &used, &free, &buffers, &cached);	
-printf("\nMEM: avail: %ld , used: %ld , free: %ld , buffers: %ld , file cache: %ld \n\n",total,used,free,buffers, cached);
-*/		
+	/*		
+	memusage(&total, &used, &free, &buffers, &cached);	
+	printf("\nMEM: avail: %ld , used: %ld , free: %ld , buffers: %ld , file cache: %ld \n\n",total,used,free,buffers, cached);
+	*/		
 	} // for allTools.size()
      
 	std::chrono::duration<ValueType> totalTimeLocal = std::chrono::system_clock::now() - startTime;
@@ -428,6 +418,7 @@ printf("\nMEM: avail: %ld , used: %ld , free: %ld , buffers: %ld , file cache: %
 	if( thisPE==0 ){
 		std::cout<<"Exiting file " << __FILE__ << " , total time= " << totalTime <<  std::endl;
 	}
+
     //this is needed for supermuc
     std::exit(0);   
 	
