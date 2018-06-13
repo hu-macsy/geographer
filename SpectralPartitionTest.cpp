@@ -25,8 +25,6 @@
 #include "FileIO.h"
 #include "gtest/gtest.h"
 #include "SpectralPartition.h"
-#include "AuxiliaryFunctions.h"
-
 
 namespace ITI {
 
@@ -162,13 +160,7 @@ TEST_F(SpectralPartitionTest, testGetPartition){
     // get spectral partition
     settings.pixeledSideLen = 16;    // for a 16x16 coarsen graph
     scai::lama::DenseVector<IndexType> spectralPartition = SpectralPartition<IndexType, ValueType>::getPartition( graph, coordinates, settings);
-    
-	//TODO: remove code if not needed
-    //if(dimensions==2){
-    //    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, "SpectralPartition_trace01");
-    //}
-    //aux::print2DGrid( graph, spectralPartition );
-    
+        
     EXPECT_GE(k-1, scai::utilskernel::HArrayUtils::max(spectralPartition.getLocalValues()) );
     EXPECT_EQ(N, spectralPartition.size());
     EXPECT_EQ(0, spectralPartition.min());

@@ -1,9 +1,5 @@
 #include "FileIO.h"
-
 #include "KMeans.h"
-#include "AuxiliaryFunctions.h"
-
-//#include "Repartition.h"
 
 #include "gtest/gtest.h"
 

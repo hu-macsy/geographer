@@ -409,7 +409,6 @@ TEST_F(FileIOTest, testReadBlockSizes){
 
     std::vector<IndexType> blockSizes = FileIO<IndexType,ValueType>::readBlockSizes(blocksFile, 16);
     
-    //aux::printVector( blockSizes );
     SCAI_ASSERT( blockSizes.size()==16 , "Wrong number of blocks, should be 16 but is " << blockSizes.size() );
 
 }

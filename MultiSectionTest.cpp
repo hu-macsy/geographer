@@ -20,7 +20,6 @@
 
 #include "MeshGenerator.h"
 #include "FileIO.h"
-#include "AuxiliaryFunctions.h"
 #include "MultiSection.h"
 
 
@@ -502,12 +501,9 @@ TEST_F(MultiSectionTest, testProbeFunction ){
     std::vector<IndexType> splitters;
     while( !existsPart ){
         std::tie(existsPart,splitters) = MultiSection<IndexType, ValueType>::probeAndGetSplitters( prefixSum2, 6, target2);
-        //PRINT(" -- " << target2);
         target2 += 1.0;
     }
-    //PRINT(" ++ " << target2-1);
-    //aux::printVector(splitters);
-    
+        
 }
 //---------------------------------------------------------------------------------------
 
