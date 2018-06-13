@@ -551,7 +551,7 @@ TEST_F (FileIOTest, testWriteDenseVectorCentral){
         }
     }
 
-    FileIO<IndexType, ValueType>::writeDenseVectorCentral( partition, "testWriteDenseVectorCentral.part");
+    FileIO<IndexType, ValueType>::writeDenseVectorCentral( partition, "partResults/testWriteDenseVectorCentral.part");
     //TODO: maybe clean up?
 }
 
