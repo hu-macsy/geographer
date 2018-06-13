@@ -86,7 +86,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         number is the global id of the neighboring vertex
 */
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
+std::vector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     IndexType *vtxDist, IndexType *xadj, IndexType *adjncy, IndexType localM,
     IndexType *vwgt, IndexType dimensions, ValueType *xyz,
     Settings  settings, Metrics metrics ){
@@ -157,7 +157,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     //
     scai::lama::DenseVector<ValueType> nodeWeights(genBlockDistPtr, scai::hmemo::HArray<ValueType>(localN, *vwgt));
 
-    return partitionGraph( graph, coordinates, nodeWeights, settings, metrics);
+    scai::lama::DenseVector<IndexType> localPartitionDV = partitionGraph( graph, coordinates, nodeWeights, settings, metrics);
+	
+	//WARNING: must check that is correct
+	localPartitionDV.redistribute( graph.getRowDistributionPtr() );
+	
+    //copy the local values to a std::vector and return
+	scai::hmemo::ReadAccess<IndexType> localPartRead ( localPartitionDV.getLocalValues() );
+	std::vector<IndexType> localPartition( localPartRead.get(), localPartRead.get()+ localN );
+	return localPartition;
 }
 
 //-------------------------------------------------------------------------------------------------

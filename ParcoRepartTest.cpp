@@ -300,15 +300,18 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
 
     Settings settings;
     settings.numBlocks = k;
-    settings.noRefinement=  true;
+    settings.noRefinement=  true;  //does not work when we do local refinement
     settings.minSamplingNodes = -1; // used as flag in order to use all local nodes to minimize random behavior
 
     struct Metrics metrics1(settings.numBlocks);
     struct Metrics metrics2(settings.numBlocks);
 
-    scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );
-    partition.redistribute( graph.getRowDistributionPtr() );
+    //scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );
+    std::vector<IndexType> localPartition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );
+    //partition.redistribute( graph.getRowDistributionPtr() );
 
+    scai::lama::DenseVector<IndexType> partition( graph.getRowDistributionPtr(), scai::hmemo::HArray<IndexType>(  localPartition.size(), localPartition.data()) );
+	
     metrics1.getAllMetrics(graph, partition, nodeWeights, settings);
     
     scai::lama::DenseVector<IndexType> partition2 = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( graph, coords, nodeWeights, settings, metrics2);
