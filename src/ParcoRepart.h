@@ -91,10 +91,12 @@ namespace ITI {
         	* ndims, the dimensions of the coordinates
         	* xyz, size=ndims*locaN, the coordinates for every vertex. For vertex/point i, its coordinates are
         			in xyz[ndims*i], xyz[ndims*i+1], ... , xyz[ndims*i+ndims]
+
+        	* @param[out] partition, the returned partition
 			*/
-			static DenseVector<IndexType> partitionGraph(
+			static std::vector<IndexType> partitionGraph(
 				IndexType *vtxDist, IndexType *xadj, IndexType *adjncy, IndexType localM,
-    			IndexType *vwgt, IndexType ndims, ValueType *xyz,
+    			IndexType *vwgt, IndexType ndims, ValueType *xyz, 
     			Settings  settings, Metrics metrics);
 
             /*

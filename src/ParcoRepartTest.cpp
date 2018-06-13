@@ -306,8 +306,10 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
     struct Metrics metrics1(settings.numBlocks);
     struct Metrics metrics2(settings.numBlocks);
 
-    scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );
-    partition.redistribute( graph.getRowDistributionPtr() );
+    std::vector<IndexType> localPartition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );
+    //partition.redistribute( graph.getRowDistributionPtr() );
+
+    scai::lama::DenseVector<IndexType> partition( graph.getRowDistributionPtr(), scai::hmemo::HArray<IndexType>(  localPartition.size(), localPartition.data()) );
 
     metrics1.getAllMetrics(graph, partition, nodeWeights, settings);
     
