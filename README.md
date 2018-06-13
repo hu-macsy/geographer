@@ -14,8 +14,8 @@ The following software is needed to install and use Geographer:
 
 The following libraries are necessary to build the unit tests:
 
-- Boost (&gt;= 1.61.0)
-- Google Test
+- [Boost] (https://www.boost.org/) (&gt;= 1.61.0)
+- [Google Test] (https://github.com/google/googletest)
 
 ## Installation
 
