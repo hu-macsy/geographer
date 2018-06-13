@@ -404,7 +404,7 @@ TEST_F(FileIOTest, testReadMatrixMarketFormat){
 
 TEST_F(FileIOTest, testReadBlockSizes){
     
-    std::string path = "./";
+    std::string path = "testing/";
     std::string blocksFile = path + "blockSizes.txt";
 
     std::vector<IndexType> blockSizes = FileIO<IndexType,ValueType>::readBlockSizes(blocksFile, 16);
