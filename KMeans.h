@@ -294,6 +294,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::iota(localIndices.begin(), localIndices.end(), 0);
 
 	IndexType minNodes = settings.minSamplingNodes*blocksPerProcess;
+	if( settings.minSamplingNodes==-1 ){
+		minNodes = localN;
+	}
 
 	assert(minNodes > 0);
 	IndexType samplingRounds = 0;

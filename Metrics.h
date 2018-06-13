@@ -20,12 +20,12 @@ struct Metrics{
     std::vector<ValueType>  timeSecondDistribution;
     std::vector<ValueType>  timePreliminary;
     
-   	ValueType inputTime = -1;
-	ValueType timeFinalPartition = -1;
-	ValueType reportTime = -1 ;
-	ValueType timeTotal = -1;
-	ValueType timeSpMV = -1;
-	ValueType timeComm = -1;
+   	ValueType inputTime = 0;
+	ValueType timeFinalPartition = 0;
+	ValueType reportTime = 0 ;
+	ValueType timeTotal = 0;
+	ValueType timeSpMV = 0;
+	ValueType timeComm = 0;
     
     //metrics, each for every time we repeat the algo
     //

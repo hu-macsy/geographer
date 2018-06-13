@@ -198,6 +198,139 @@ TEST_F(ParcoRepartTest, testInitialPartition){
 }
 //--------------------------------------------------------------------------------------- 
 
+TEST_F(ParcoRepartTest, testMetisWrapper){
+    std::string fileName = "bigtrace-00000.graph";
+    //std::string fileName = "Grid16x16";
+    std::string file = graphPath + fileName;
+    std::ifstream f(file);
+    IndexType dimensions= 2;
+    IndexType N, edges;
+    f >> N >> edges; 
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+
+    // for now local refinement requires k = P
+    const IndexType k = comm->getSize();
+    const IndexType numPEs = comm->getSize();
+    const IndexType thisPE = comm->getRank();
+    const IndexType localN = blockDist->getLocalSize();
+
+    //
+    PRINT0("nodes= "<< N << " and k= "<< k );
+
+    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    scai::lama::DenseVector<ValueType> nodeWeights( blockDist, 1);
+
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*blockDist));
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*graph.getRowDistributionPtr() ));
+    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
+    EXPECT_EQ(edges, (graph.getNumValues())/2 );  
+
+
+    IndexType vtxDist[numPEs+1];
+    for(int i=0; i<numPEs+1; i++){
+      vtxDist[i] = 0;
+    }
+    vtxDist[thisPE+1] = localN;
+    
+//PRINT( *comm << ": " << vtxDist[thisPE+1] << " === " << blockDist->getLocalSize());
+
+    comm->sumImpl( vtxDist, vtxDist, numPEs+1, scai::common::TypeTraits<IndexType>::stype);
+
+    // get the prefix sum
+    for(int i=1; i<numPEs+1; i++){
+      vtxDist[i] = vtxDist[i-1]+vtxDist[i];
+    }
+
+    //
+    // setting xadj=ia and adjncy=ja values, these are the local values of every processor
+    //
+    
+    const scai::lama::CSRStorage<ValueType>& localMatrix= graph.getLocalStorage();
+    
+    scai::hmemo::ReadAccess<IndexType> ia( localMatrix.getIA() );
+    scai::hmemo::ReadAccess<IndexType> ja( localMatrix.getJA() );
+    IndexType iaSize= ia.size();
+    
+    IndexType xadj[ iaSize ];
+    IndexType adjncy[ja.size()];
+
+    for(int i=0; i<iaSize ; i++){
+      xadj[i]= ia[i];
+      SCAI_ASSERT( xadj[i] >=0, "negative value for i= "<< i << " , val= "<< xadj[i]);
+    }
+
+    for(int i=0; i<ja.size(); i++){
+      adjncy[i]= ja[i];
+      SCAI_ASSERT( adjncy[i] >=0, "negative value for i= "<< i << " , val= "<< adjncy[i]);
+      SCAI_ASSERT( adjncy[i] <N , "too large value for i= "<< i << " , val= "<< adjncy[i]);
+    }
+    ia.release();
+    ja.release();
+
+    //
+    // convert the coordinates
+    //
+
+    ValueType xyzLocal[localN*dimensions];
+
+    for(int d=0; d<dimensions; d++){
+        scai::hmemo::ReadAccess<ValueType> localCoords( coords[d].getLocalValues() );
+        for( int i=0; i<localN; i++){
+          xyzLocal[dimensions*i+d] = ValueType( localCoords[i] );
+        }
+    }
+
+    //
+    // convert the node weights
+    //
+
+    // this required from parmetis but why int node weights and not double?
+    IndexType vwgt[localN];
+    {
+        scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights.getLocalValues() );
+        SCAI_ASSERT_EQ_ERROR( localN, localWeights.size(), "Local weights size mismatch. Are node weights distributed correctly?");
+        for(unsigned int i=0; i<localN; i++){
+            vwgt[i] = IndexType (localWeights[i]);
+        }
+    }
+
+
+    Settings settings;
+    settings.numBlocks = k;
+    settings.noRefinement=  true;
+    settings.minSamplingNodes = -1; // used as flag in order to use all local nodes to minimize random behavior
+
+    struct Metrics metrics1(settings.numBlocks);
+    struct Metrics metrics2(settings.numBlocks);
+
+    scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );
+    partition.redistribute( graph.getRowDistributionPtr() );
+
+    metrics1.getAllMetrics(graph, partition, nodeWeights, settings);
+    
+    scai::lama::DenseVector<IndexType> partition2 = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( graph, coords, nodeWeights, settings, metrics2);
+    partition2.redistribute( graph.getRowDistributionPtr() );
+
+    metrics2.getAllMetrics(graph, partition2, nodeWeights, settings);
+
+    if( comm->getRank()==0){
+      std::cout<< "Metrics for first partition:"<< std::endl;
+      metrics1.print( std::cout );
+      std::cout<< std::endl <<"Metrics for second partition:"<< std::endl;
+      metrics2.print( std::cout );
+    }
+
+    EXPECT_LE( std::abs(metrics1.finalCut-metrics2.finalCut)/std::max(metrics1.finalCut, metrics2.finalCut), 0.02) ;
+    EXPECT_LE( std::abs(metrics1.finalImbalance-metrics2.finalImbalance)/std::max(metrics1.finalImbalance, metrics2.finalImbalance), 0.02) ;
+    EXPECT_LE( std::abs(metrics1.maxCommVolume-metrics2.maxCommVolume)/std::max(metrics1.maxCommVolume, metrics2.maxCommVolume), 0.02) ;
+    EXPECT_LE( std::abs(metrics1.totalCommVolume-metrics2.totalCommVolume)/std::max(metrics1.totalCommVolume, metrics2.totalCommVolume), 0.02) ;
+  }
+
+//--------------------------------------------------------------------------------------- 
+
 TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   IndexType nroot = 11;
   IndexType n = nroot * nroot * nroot;

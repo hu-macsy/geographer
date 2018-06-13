@@ -395,7 +395,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
     //
     // convert partition to a DenseVector
     //
-    scai::lama::DenseVector<IndexType> partitionKway(dist);
+    scai::lama::DenseVector<IndexType> partitionKway(dist, IndexType(0));
     for(unsigned int i=0; i<localN; i++){
         partitionKway.getLocalValues()[i] = partKway[i];
     }
@@ -459,7 +459,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisRepartit
 	
 	//trying Moritz version that also redistributes coordinates
 	const scai::dmemo::DistributionPtr dist( copyGraph.getRowDistributionPtr() );
-	SCAI_ASSERT_NE_ERROR(dist->getBlockDistributionSize(), nIndex, "Reindexed distribution should be a block distribution.");
+	//SCAI_ASSERT_NE_ERROR(dist->getBlockDistributionSize(), nIndex, "Reindexed distribution should be a block distribution.");
 	SCAI_ASSERT_EQ_ERROR(graph.getNumRows(), copyGraph.getNumRows(), "Graph sizes must be equal.");
 	
 	std::vector<scai::lama::DenseVector<ValueType>> copyCoords = coords;
@@ -675,7 +675,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 	//
 	// convert partition to a DenseVector
     //
-	scai::lama::DenseVector<IndexType> partitionZoltan(dist);
+	scai::lama::DenseVector<IndexType> partitionZoltan(dist, IndexType(0));
 
 	//std::vector<IndexType> localBlockSize( numBlocks, 0 );
 	
