@@ -15,13 +15,20 @@ The following software is needed to install and use Geographer:
 The following libraries are necessary to build the unit tests:
 
 - Boost (&gt;= 1.61.0)
+- Google Test
 
 ## Installation
 
+### Libraries
 Geographer requires some custom additions to Lama for faster redistributions in distributed memory.
 Please clone [our fork](https://github.com/kit-parco/lama), then compile and install the branch `looz-dmemo`.
 
-After installing Lama and cloning this repository, enter the directory of this repository and call `cmake src -DSCAI_DIR=<path/to/lama>`, where `<path/to/lama>` is your Lama installation directory.
+The *RBC* library for splitting MPI communicators is included as a submodule.
+After installing Lama and cloning this repository, enter the directory of this repository and call `git submodule init && git submodule update`.
+Afterwards, enter `src/RBC` and call `make`.
+
+### Compilation
+From the root directory of this repository, call `cmake src -DSCAI_DIR=<path/to/lama>`, where `<path/to/lama>` is your Lama installation directory.
 
 ## Usage
 
