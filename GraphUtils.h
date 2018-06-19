@@ -214,7 +214,9 @@ template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM);
 
 /**Returns the process graph, as calculated from the local halos.
- *
+ * The edges of the process graph has weights that indicate the number of vertices (not edges) that
+ * are not local. eg: w(0,1)=10 means than PE 0 has 10 neighboring vertices in PE 1
+ * and if w(1,0)=12, then PE 1 has 12 neighboring vertices in PE 0. The graph is not symmetric.
  *
  * @param halo Halo objects in which all non-local neighbors are present
  * @return A [#PE x #PE] adjacency matrix of the process graph, distributed with a Block distribution

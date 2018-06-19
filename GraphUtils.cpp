@@ -414,7 +414,8 @@ std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input
 	scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
-	std::set<IndexType> neighborSet;
+	//std::set<IndexType> neighborSet;	//does not allows duplicates, we count vertices
+	std::multiset<IndexType> neighborSet; //since this allows duplicates,  we count edges
 
 	for (IndexType i = 0; i < localN; i++) {
 		const IndexType beginCols = ia[i];
@@ -905,6 +906,7 @@ std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama::CSRSpars
  *
  * @return A 2 dimensional vector with the edges of the local parts of the block graph:
  * edge (u,v) is (ret[0][i], ret[1][i]) if block u and block v are connected.
+ * edges[0]: first vetrex id, edges[1]: second vetrex id. edges[2]: the weight of the edge
  */
 //return: there is an edge in the block graph between blocks ret[0][i]-ret[1][i]
 template<typename IndexType, typename ValueType>
@@ -937,7 +939,10 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
     // we do not know the size of the non-local indices that is why we use an std::vector
     // with push_back, then convert that to a DenseVector in order to call DenseVector::gather
     // TODO: skip the std::vector to DenseVector conversion. maybe use HArray
-    std::vector< std::vector<IndexType> > edges(2);
+    
+    //std::vector< std::vector<IndexType> > edges(2);
+    //edges[0]: first vetrex id, edges[1]: second vetrex id. edges[2]: the weight of the edge
+    std::vector< std::vector<IndexType> > edges(3);	
     std::vector<IndexType> localInd, nonLocalInd;
 
     for(IndexType i=0; i<dist->getLocalSize(); i++){ 
@@ -951,13 +956,16 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
                         bool add_edge = true;
                         for(IndexType k=0; k<edges[0].size(); k++){ //check that this edge is not already in
                             if( edges[0][k]==u && edges[1][k]==v ){
+                            	// the edge (u,v) already exists, increase weight
+                            	edges[2][k]++;
                                 add_edge= false;
-                                break;      // the edge (u,v) already exists
+                                break;      
                             }
                         }
                         if( add_edge== true){       //if this edge does not exist, add it
                             edges[0].push_back(u);
                             edges[1].push_back(v);
+                            edges[2].push_back(1);
                         }
                 }
             } else{  // if(dist->isLocal(j)) 
@@ -998,13 +1006,16 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
             bool add_edge = true;
             for(IndexType k=0; k<edges[0].size(); k++){ //check that this edge is not already in
                 if( edges[0][k]==u && edges[1][k]==v ){
+                	// the edge (u,v) already exists, increase weight
                     add_edge= false;
-                    break;      // the edge (u,v) already exists
+                    edges[2][k]++;
+                    break;      
                 }
             }
             if( add_edge== true){       //if this edge does not exist, add it
                 edges[0].push_back(u);
                 edges[1].push_back(v);
+                edges[2].push_back(1);
             }
         }
     }
@@ -1030,7 +1041,6 @@ scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSpars
     SCAI_REGION("ParcoRepart.getBlockGraph");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-    //const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
     
     // there are k blocks in the partition so the adjacency matrix for the block graph has dimensions [k x k]
     scai::dmemo::DistributionPtr distRowBlock ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, k) );  
@@ -1052,7 +1062,8 @@ scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSpars
             for(IndexType i=0; i<blockEdges[0].size(); i++){
                 IndexType u = blockEdges[0][i];
                 IndexType v = blockEdges[1][i];
-                sendPartWrite[ u*k + v ] = 1;
+                //sendPartWrite[ u*k + v ] = 1;
+                sendPartWrite[ u*k + v ] = blockEdges[2][i];
             }
         }
         comm->shiftArray(recvPart , sendPart, 1);
@@ -1074,12 +1085,12 @@ scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSpars
     
     scai::hmemo::HArray<IndexType> csrIA;
     scai::hmemo::HArray<IndexType> csrJA;
-    scai::hmemo::HArray<ValueType> csrValues; 
+    scai::hmemo::HArray<ValueType> csrValues( numEdges, 0.0 ); 
     {
         IndexType numNZ = numEdges;     // this equals the number of edges of the graph
         scai::hmemo::WriteOnlyAccess<IndexType> ia( csrIA, k +1 );
         scai::hmemo::WriteOnlyAccess<IndexType> ja( csrJA, numNZ );
-        scai::hmemo::WriteOnlyAccess<ValueType> values( csrValues, numNZ );   
+        scai::hmemo::WriteOnlyAccess<ValueType> values( csrValues );   
         scai::hmemo::ReadAccess<IndexType> recvPartRead( recvPart );
         ia[0]= 0;
         
@@ -1099,7 +1110,8 @@ scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSpars
             for(IndexType j=0; j<k; j++){
                 if( recvPartRead[i*k +j] >0){   // there exist edge (i,j)
                     ja[nnzCounter] = j;
-                    values[nnzCounter] = 1;
+                    //values[nnzCounter] = 1;
+                    values[nnzCounter] = recvPartRead[i*k +j];
                     ++nnzCounter;
                 }
             }
@@ -1166,10 +1178,27 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueTy
     scai::hmemo::ReadAccess<IndexType> rOwners(owners);
     std::vector<IndexType> neighborPEs(rOwners.get(), rOwners.get()+rOwners.size());
     rOwners.release();
+    
+    std::map<IndexType, unsigned int> edgeWeights;
+    for( int i=0; i<neighborPEs.size(); i++){
+    	edgeWeights[ neighborPEs[i] ]++;
+    }
+
+    //for(int i=0; i<edgeWeights.size(); i++){
+    int c=0;
+    for( auto edge = edgeWeights.begin(); edge!=edgeWeights.end(); edge++ ){
+    	PRINT(comm->getRank() << "-" << edge->first << " , weight= " << edge->second);
+    	PRINT( *comm << ": " << edgeWeights[edge->first] );
+    }
+
+    //TODO: maybe no need to sort and remove duplicates...
+    
     std::sort(neighborPEs.begin(), neighborPEs.end());
+
     //remove duplicates
     neighborPEs.erase(std::unique(neighborPEs.begin(), neighborPEs.end()), neighborPEs.end());
     const IndexType numNeighbors = neighborPEs.size();
+    SCAI_ASSERT_EQ_ERROR(edgeWeights.size(), numNeighbors, "Num neighbors mismatch");
 
     // create the PE adjacency matrix to be returned
     scai::dmemo::DistributionPtr distPEs ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, numPEs) );
@@ -1180,6 +1209,12 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueTy
     scai::hmemo::HArray<IndexType> ia( { 0, numNeighbors } );
     scai::hmemo::HArray<IndexType> ja(numNeighbors, neighborPEs.data());
     scai::hmemo::HArray<ValueType> values(numNeighbors, 1);
+    int ii=0;
+    for( auto edge = edgeWeights.begin(); edge!=edgeWeights.end(); edge++ ){
+    	values[ii] = edge->second;
+    	ii++;
+    }
+
     scai::lama::CSRStorage<ValueType> myStorage(1, numPEs, std::move(ia), std::move(ja), std::move(values));
     SCAI_REGION_END("ParcoRepart.getPEGraph.buildMatrix");
     

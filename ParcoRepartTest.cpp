@@ -775,7 +775,8 @@ TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
 //------------------------------------------------------------------------------
 
 TEST_F (ParcoRepartTest, testPEGraphBlockGraph_k_equal_p_Distributed) {
-    std::string file = graphPath + "Grid16x16";
+    //std::string file = graphPath + "Grid16x16";
+    std::string file = graphPath + "trace-00008.graph";
     std::ifstream f(file);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;
@@ -801,8 +802,9 @@ TEST_F (ParcoRepartTest, testPEGraphBlockGraph_k_equal_p_Distributed) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
+    settings.minGainForNextRound = 100;
     //settings.noRefinement = true;
-    settings.initialPartition = InitialPartitioningMethods::None;
+    settings.initialPartition = InitialPartitioningMethods::SFC;
     struct Metrics metrics(settings.numBlocks);
     
     scai::lama::DenseVector<IndexType> partition(dist, -1);
@@ -812,6 +814,7 @@ TEST_F (ParcoRepartTest, testPEGraphBlockGraph_k_equal_p_Distributed) {
     scai::lama::CSRSparseMatrix<ValueType> PEgraph =  GraphUtils::getPEGraph<IndexType, ValueType>( graph); 
     EXPECT_EQ( PEgraph.getNumColumns(), comm->getSize() );
     EXPECT_EQ( PEgraph.getNumRows(), comm->getSize() );
+    EXPECT_TRUE( PEgraph.checkSymmetry() );
     
     scai::dmemo::DistributionPtr noPEDistPtr(new scai::dmemo::NoDistribution( comm->getSize() ));
     PEgraph.redistribute(noPEDistPtr , noPEDistPtr);
@@ -828,11 +831,13 @@ TEST_F (ParcoRepartTest, testPEGraphBlockGraph_k_equal_p_Distributed) {
     EXPECT_EQ( PEgraph.getNumColumns(), blockGraph.getNumColumns() );
     EXPECT_EQ( PEgraph.getNumRows(), blockGraph.getNumRows() );
     EXPECT_EQ( PEgraph.getNumRows(), k);
+    EXPECT_TRUE( blockGraph.checkSymmetry() );
     
     // !! this check is extremly costly !!
     for(IndexType i=0; i<PEgraph.getNumRows() ; i++){
         for(IndexType j=0; j<PEgraph.getNumColumns(); j++){
             EXPECT_EQ( PEgraph(i,j), blockGraph(i,j) );
+//PRINT0( "("<<i <<", "<< j <<") = "<< PEgraph(i,j) << " __ " << blockGraph(i,j) );
         }
     }
 
