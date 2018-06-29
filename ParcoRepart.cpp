@@ -32,6 +32,12 @@
 #include "MultiSection.h"
 #include "GraphUtils.h"
 
+
+//just for the MEC coloring algo
+#include "/home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring/ColoringAlgorithms.h"
+#include "/home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring/HelpFunctions.h"
+#include "/home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring/Graph.h"
+
 //  #include "RBC/Sort/SQuick.hpp"
 
 namespace ITI {
@@ -1244,8 +1250,10 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     IndexType N= adjM.getNumRows();
     assert( N== adjM.getNumColumns() ); // numRows = numColumns
     
-    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
     if (!adjM.getRowDistributionPtr()->isReplicated()) {
+        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        PRINT0("***WARNING: In getGraphEdgeColoring_local: given graph is not replicated; will replicate now");
+        const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
     	adjM.redistribute(noDist, noDist);
     	//throw std::runtime_error("Input matrix must be replicated.");
     }
@@ -1283,7 +1291,52 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     
     return retG;
 }
-//---------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraphMEC_local(CSRSparseMatrix<ValueType> &adjM, IndexType &colors) {
+    SCAI_REGION("ParcoRepart.coloring");
+    using namespace boost;
+    IndexType N= adjM.getNumRows();
+    assert( N== adjM.getNumColumns() ); // numRows = numColumns
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    
+    if (!adjM.getRowDistributionPtr()->isReplicated()) {
+        PRINT0("***WARNING: In getGraphMEC_local: given graph is not replicated; will replicate now");
+        const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
+        adjM.redistribute(noDist, noDist);
+        //throw std::runtime_error("Input matrix must be replicated.");
+    }
+
+    std::vector<std::tuple<IndexType,IndexType,IndexType>> edgeList = GraphUtils::CSR2EdgeList_local<IndexType,ValueType>( adjM );
+
+    //the constructor adds the edges with the same order as they are in edgeList.
+    //so, edge with edgeID=i is the edge edgeList[i]
+    mec::graph G( edgeList );
+
+PRINT0(G.vertices_map.size() << " + + " << G.edge_map.size() );
+PRINT0(G.adjacency_List[0]->edge_ID);
+
+    std::unordered_map<int, int> mecColoring = greedyColoring(G);
+
+    //convert tp vector<vector<>>. TODO: return a vector<vector<>> directly to avoid conversion
+
+    // retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge
+    std::vector< std::vector<IndexType>> retG(3);
+    for( std::unordered_map<int,int>::iterator mecIt= mecColoring.begin(); mecIt!=mecColoring.end(); mecIt++){
+        IndexType edgeID = mecIt->first;
+        IndexType edgeColor = mecIt->second;
+        retG[0].push_back( std::get<0>(edgeList[edgeID]) );
+        retG[1].push_back( std::get<1>(edgeList[edgeID]) );
+        retG[2].push_back( edgeColor );
+PRINT("edge ("<< retG[0].back() << ", "<< retG[1].back() << "): " << retG[2].back() );
+    }
+    
+    
+    return retG;
+}
+
+//-----------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM) {
@@ -1296,6 +1349,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 
     IndexType colors;
     std::vector<std::vector<IndexType>> coloring = getGraphEdgeColoring_local( adjM, colors );
+    //std::vector<std::vector<IndexType>> coloring = getGraphMEC_local( adjM, colors );
     std::vector<DenseVector<IndexType>> retG(colors);
     
     if (adjM.getNumRows()==2) {

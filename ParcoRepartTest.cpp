@@ -1083,7 +1083,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
    */
 }
 //------------------------------------------------------------------------------
-/* with the 8x8 grid and k=16 the block graph is a 4x4 grid. With the hilbert curve it looks like this:
+/* with the 8x8  grid and k=16 the block graph is a 4x4 grid. With the hilbert curve it looks like this:
  * 
  *  5 - 6 - 9 - 10
  *  |   |   |   |
@@ -1094,7 +1094,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
  *  0 - 1 - 14- 15
 */
 TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
-     std::string file = graphPath+ "Grid8x8";
+    std::string file = graphPath+ "Grid8x8";
     std::ifstream f(file);
     IndexType dimensions= 2, k=16;
     IndexType N, edges;
@@ -1289,6 +1289,7 @@ TEST_F(ParcoRepartTest, testPixelNeighbours){
     }
 }       
 //------------------------------------------------------------------------------
+
 
 /**
 * TODO: test for correct error handling in case of inconsistent distributions

@@ -332,6 +332,90 @@ TEST_F(auxTest, testBenchIndexReordering){
 
 //-----------------------------------------------------------------
 
+//testing csr2edgelist converter and mec edge coloring
+TEST_F(auxTest, testMEColoring_local){
+
+    std::string file = graphPath+ "Grid8x8";
+    std::ifstream f(file);
+    IndexType dimensions= 2, k=16;
+    IndexType N, edges;
+    f >> N >> edges; 
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    // for now local refinement requires k = P
+    k = comm->getSize();
+    //
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    
+    //read the array locally and messed the distribution. Left as a remainder.
+    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
+    EXPECT_EQ( edges, (graph.getNumValues())/2 );
+    
+    //reading coordinates
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
+    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
+    
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+    settings.dimensions = dimensions;
+    settings.initialPartition = InitialPartitioningMethods::SFC;
+    struct Metrics metrics(settings.numBlocks);
+    
+    //get the partition
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
+    
+    aux<IndexType,ValueType>::print2DGrid( graph, partition );
+
+    //check distributions
+    assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
+
+    scai::lama::CSRSparseMatrix<ValueType> processGraph = GraphUtils::getPEGraph<IndexType, ValueType>(graph);
+
+    {
+
+        const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(k) );
+        if (!processGraph.getRowDistributionPtr()->isReplicated()) {
+            PRINT0("Replicating process graph");
+            processGraph.redistribute(noDist, noDist);
+            //throw std::runtime_error("Input matrix must be replicated.");
+        }
+
+        if(comm->getRank()==0){
+            for( int i=0; i<k; i++){
+                for( int j=0; j<k; j++){
+                    std::cout << processGraph.getLocalStorage().getValue(i,j) << ", ";
+                }
+                std::cout << std::endl;
+            }
+        }
+    }
+
+    EXPECT_EQ( processGraph.getNumRows(), k);//, "Wrong process graph num rows");
+
+    IndexType colorsBoost, colorsMEC;
+    
+    std::vector<std::vector<IndexType>> coloringBoost = ParcoRepart<IndexType,ValueType>::getGraphEdgeColoring_local( processGraph, colorsBoost );
+
+    std::vector<std::tuple<IndexType,IndexType,IndexType>> edgeList = GraphUtils::CSR2EdgeList_local<IndexType,ValueType>( processGraph );
+
+    // undirected graph so every edge appears once in the edge list
+    EXPECT_EQ( edgeList.size()*2, processGraph.getNumValues() ); 
+    for( int i=0; i<edgeList.size(); i++){
+        //if( std::get<0>(edgeList[i]) == std::get<1>(edgeList[i]) ){
+        //    PRINT0("Edge " << i << " is a self-loop for vertex "<< std::get<0>(edgeList[i]) );
+        //}
+        PRINT0("edge " << i << ": (" << std::get<0>(edgeList[i]) << ", " << std::get<1>(edgeList[i]) << "), weight= " << std::get<2>(edgeList[i]));
+    }
+
+    std::vector< std::vector<IndexType>>  coloringMEC = ParcoRepart<IndexType,ValueType>::getGraphMEC_local( processGraph, colorsMEC );
+
+}
+
+
 //TODO: 11.04.18, Moritz has started a new branch for that. Remove tests and functions if not needed here
 /*
 TEST_F(auxTest, testBenchKMeansSFCCoords){

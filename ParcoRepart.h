@@ -22,6 +22,10 @@
 #include "Metrics.h"
 #include "FileIO.h"
 
+
+
+
+
 using namespace scai::lama;
 using scai::dmemo::Halo;
 using scai::dmemo::Halo;
@@ -151,6 +155,8 @@ namespace ITI {
 			 * @return A 3xN vector with the edges and the color of each edge: retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge.
 			 */
 			static std::vector< std::vector<IndexType>>  getGraphEdgeColoring_local( CSRSparseMatrix<ValueType> &adjM, IndexType& colors);
+
+			static std::vector< std::vector<IndexType>> getGraphMEC_local(CSRSparseMatrix<ValueType> &adjM, IndexType &colors);
 
 			/** Given the block graph, creates an edge coloring of the graph and returns a communication
 			 *  scheme based on the coloring

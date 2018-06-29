@@ -241,6 +241,16 @@ scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( co
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>>& edgeList );
 
+
+/*	@brief Given a csr sparse matrix, it calulates its edge list representations.
+		For every tuple, the first two numbers are the vertex IDs for this edge and the
+		third is the edge weight.
+	@param[in] graph The input graph
+	@return The edge list representation
+*/
+template<typename IndexType, typename ValueType>
+std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const scai::lama::CSRSparseMatrix<ValueType> graph);
+
 /**
  * @brief Construct the Laplacian of the input matrix. May contain parallel communication.
  *

@@ -1181,15 +1181,21 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueTy
     
     std::map<IndexType, unsigned int> edgeWeights;
     for( int i=0; i<neighborPEs.size(); i++){
-    	edgeWeights[ neighborPEs[i] ]++;
-    }
+	   	edgeWeights[ neighborPEs[i] ]++;
+  	}
+    
+    /*
+    {	
+    	for(int i=0; i< neighborPEs.size(); i++)
+    		PRINT(*comm << ": " << neighborPEs[i] );
 
-    //for(int i=0; i<edgeWeights.size(); i++){
-    int c=0;
-    for( auto edge = edgeWeights.begin(); edge!=edgeWeights.end(); edge++ ){
-    	PRINT(comm->getRank() << "-" << edge->first << " , weight= " << edge->second);
-    	PRINT( *comm << ": " << edgeWeights[edge->first] );
+	    int c=0;
+    	for( auto edge = edgeWeights.begin(); edge!=edgeWeights.end(); edge++ ){
+    		PRINT(comm->getRank() << "-" << edge->first << " , weight= " << edge->second);
+    		//PRINT( *comm << ": " << edgeWeights[edge->first] );
+    	}
     }
+    */
 
     //TODO: maybe no need to sort and remove duplicates...
     
@@ -1212,6 +1218,7 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueTy
     int ii=0;
     for( auto edge = edgeWeights.begin(); edge!=edgeWeights.end(); edge++ ){
     	values[ii] = edge->second;
+    	//PRINT(*comm << ": values[" << ii << "]= " << values[ii] );
     	ii++;
     }
 
@@ -1506,6 +1513,58 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 }
 
 //--------------------------------------------------------------------------------------- 
+// given a non-distributed csr matrix converts it to an edge list
+// two first numbers are the vertex ID and the third one is the edge weight
+template<typename IndexType, typename ValueType>
+std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const CSRSparseMatrix<ValueType> graph) {
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    CSRSparseMatrix<ValueType> tmpGraph(graph);
+	const IndexType N= graph.getNumRows();
+
+	// TODO: maybe handle differently? with an error message?
+	if (!tmpGraph.getRowDistributionPtr()->isReplicated()) {
+		PRINT0("***WARNING: In CSR2EdgeList_local: given graph is not replicated; will replicate now");
+		const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N) );
+		tmpGraph.redistribute(noDist, noDist);
+		PRINT0("Graph replicated");
+	}	
+
+	const CSRStorage<ValueType>& localStorage = tmpGraph.getLocalStorage();
+	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+	const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+
+	//not needed assertion
+	SCAI_ASSERT_EQ_ERROR( ja.size(), values.size(), "Size mismatch for csr sparse matrix" );
+	SCAI_ASSERT_EQ_ERROR( ia.size(), N+1, "Wrong ia size?" );	
+
+	const IndexType numEdges = values.size();
+	std::vector<std::tuple<IndexType,IndexType,IndexType>> edgeList;//( numEdges/2 );
+	IndexType edgeIndex = 0;
+
+	//WARNING: we only need the upper, left part of the matrix values since
+	//		matrix is symmetric
+	for(IndexType i=0; i<N; i++){
+		const IndexType v1 = i;	//first vertex
+		SCAI_ASSERT_LE_ERROR( i+1, ia.size(), "Wrong index for ia[i+1]" );
+    	for (IndexType j = ia[i]; j < ia[i+1]; j++) {
+    		const IndexType v2 = ja[j]; //second vertex
+    		// so we do not enter every edge twice, assuming graph is undirected
+    		if ( v2<v1 ){
+    			edgeIndex++;
+    			continue;
+    		}
+    		SCAI_ASSERT_LE_ERROR( edgeIndex, numEdges, "Wrong edge index");
+    		edgeList.push_back( std::make_tuple( v1, v2, values[edgeIndex]) );
+    		edgeIndex++;
+    	}
+    }
+    SCAI_ASSERT_EQ_ERROR( edgeList.size()*2, numEdges, "Wrong number of edges");
+    return edgeList;
+}
+
+//--------------------------------------------------------------------------------------- 
 
 template<typename IndexType, typename ValueType>
 CSRSparseMatrix<ValueType> constructLaplacian(CSRSparseMatrix<ValueType> graph) {
@@ -1652,6 +1711,8 @@ CSRSparseMatrix<ValueType> mecGraphColoring( const CSRSparseMatrix<ValueType> &g
 }
 //-----------------------------------------------------------------------------------
 
+
+
 template scai::lama::DenseVector<IndexType> reindex(CSRSparseMatrix<ValueType> &graph);
 template std::vector<IndexType> localBFS(const CSRSparseMatrix<ValueType> &graph, IndexType u);
 template IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const IndexType u, IndexType lowerBound, const IndexType k, IndexType maxRounds);
@@ -1673,12 +1734,15 @@ template  std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama
 template scai::lama::CSRSparseMatrix<ValueType> getPEGraph<IndexType,ValueType>( const scai::lama::CSRSparseMatrix<ValueType> &adjM);
 template scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>> &adjList);
 template scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList );
+template std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const CSRSparseMatrix<ValueType> graph);
 template scai::lama::CSRSparseMatrix<ValueType> constructLaplacian<IndexType, ValueType>(scai::lama::CSRSparseMatrix<ValueType> graph);
 template scai::lama::CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension);
 template scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d);
 
 
-
 } /*namespace GraphUtils*/
+
+
+
 
 } /* namespace ITI */
