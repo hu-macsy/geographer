@@ -34,9 +34,9 @@
 
 
 //just for the MEC coloring algo
-#include "/home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring/ColoringAlgorithms.h"
-#include "/home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring/HelpFunctions.h"
-#include "/home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring/Graph.h"
+#include "ColoringAlgorithms.h"
+#include "HelpFunctions.h"
+#include "Graph.h"
 
 //  #include "RBC/Sort/SQuick.hpp"
 
@@ -1314,12 +1314,14 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     //so, edge with edgeID=i is the edge edgeList[i]
     mec::graph G( edgeList );
 
-PRINT0(G.vertices_map.size() << " + + " << G.edge_map.size() );
-PRINT0(G.adjacency_List[0]->edge_ID);
+//PRINT0(G.vertices_map.size() << " + + " << G.edge_map.size() );
+//PRINT0(G.adjacency_List[0]->edge_ID);
 
     std::unordered_map<int, int> mecColoring = greedyColoring(G);
 
     //convert tp vector<vector<>>. TODO: return a vector<vector<>> directly to avoid conversion
+
+    colors = 0;
 
     // retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge
     std::vector< std::vector<IndexType>> retG(3);
@@ -1330,6 +1332,9 @@ PRINT0(G.adjacency_List[0]->edge_ID);
         retG[1].push_back( std::get<1>(edgeList[edgeID]) );
         retG[2].push_back( edgeColor );
 PRINT("edge ("<< retG[0].back() << ", "<< retG[1].back() << "): " << retG[2].back() );
+        if(edgeColor>colors){
+            colors = edgeColor;
+        }
     }
     
     
@@ -1339,7 +1344,7 @@ PRINT("edge ("<< retG[0].back() << ", "<< retG[1].back() << "): " << retG[2].bac
 //-----------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM) {
+std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM, Settings settings) {
     IndexType N= adjM.getNumRows();
     SCAI_REGION("ParcoRepart.getCommunicationPairs_local");
     // coloring.size()=3: coloring(i,j,c) means that edge with endpoints i and j is colored with color c.
@@ -1348,8 +1353,13 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
     assert(adjM.getNumColumns() == adjM.getNumRows() );
 
     IndexType colors;
-    std::vector<std::vector<IndexType>> coloring = getGraphEdgeColoring_local( adjM, colors );
-    //std::vector<std::vector<IndexType>> coloring = getGraphMEC_local( adjM, colors );
+    std::vector<std::vector<IndexType>> coloring;
+    if(settings.mec){
+        coloring = getGraphMEC_local( adjM, colors );
+    }else{
+        coloring = getGraphEdgeColoring_local( adjM, colors );
+    }
+
     std::vector<DenseVector<IndexType>> retG(colors);
     
     if (adjM.getNumRows()==2) {
@@ -1371,7 +1381,8 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
     // coloring[2][i]= the color/round in which the two blocks shall communicate
     for(IndexType i=0; i<coloring[0].size(); i++){
         IndexType color = coloring[2][i]; // the color/round of this edge
-        assert(color<colors);
+        //assert(color<colors);
+        SCAI_ASSERT_LT_ERROR( color, colors, "Wrong number of colors?");
         IndexType firstBlock = coloring[0][i];
         IndexType secondBlock = coloring[1][i];
         retG[color].setValue( firstBlock, secondBlock);

@@ -1,15 +1,26 @@
 cmake_minimum_required (VERSION 2.6)
 project (Geographer)
 
+set(SCAI_DIR "~/Lama")
+
 if (NOT DEFINED SCAI_DIR)
 	message( FATAL_ERROR "Install Directory of LAMA not defined, specify with -DSCAI_DIR" )
 endif (NOT DEFINED SCAI_DIR)
 
+set(GTEST_INCLUDE_DIR "~/Code/googletest/googletest/include")
+set(GTEST_LIBRARY "~/Code/googletest/googletest/lib")
+set(GTEST_MAIN_LIBRARY "~/Code/googletest/googletest/lib/libgtest.a")
+#set(BOOST_INCLUDEDIR "/lrz/sys/libraries/boost/1.61_gcc/include")
+set(BOOST_INCLUDEDIR "/home/hpc/pr87si/di36qin/Code/boost_1_63_0")
 set(SCAI_INCLUDE "${SCAI_DIR}/include/") 
 set(SCAI_LIB "${SCAI_DIR}/lib/")
+set(MEC_DIR "~/Code/Thesis_GraphColoring")
+
+### set compiler manualy ###
+set(CMAKE_CXX_COMPILER /lrz/sys/compilers/gcc/5.4.0/bin/c++)
 
 ### set files ###
-set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp SpectralPartition.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp KMeans.cpp /home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring/ColoringAlgorithms.cpp /home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring/HelpFunctions.cpp  /home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring/Graph.cpp)
+set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp SpectralPartition.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp KMeans.cpp ${MEC_DIR}/ColoringAlgorithms.cpp ${MEC_DIR}/HelpFunctions.cpp ${MEC_DIR}/Graph.cpp)
 
 # for mec
 #set(FILES_COMMON "${FILES_COMMON} /home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring/ColoringAlgorithms.cpp /home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring/HelpFunctions.cpp  /home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring/Graph.cpp")
@@ -26,7 +37,7 @@ include_directories(${MPI_CXX_INCLUDE_PATH})
 
 ### find GTest ###
 find_package(GTest)
-include_directories(${GTEST_INCLUDE_DIRS})
+include_directories(${GTEST_INCLUDE_DIR})
 
 ### find Boost ###
 find_package(Boost REQUIRED COMPONENTS program_options filesystem system)
@@ -35,12 +46,13 @@ include_directories(${Boost_INCLUDE_DIRS})
 ### include and link Lama and RBC ###
 include_directories(${SCAI_INCLUDE})
 include_directories(${RBC_DIR})
-
-link_directories(${SCAI_LIB})
-link_directories(${RBC_DIR}/build/lib)
+include_directories(${MEC_DIR})
 
 ### link the mec code
-link_directories(/home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring)
+link_directories(${MEC_DIR})
+link_directories(${SCAI_LIB})
+link_directories(${RBC_DIR}/build/lib)
+#link_directories(/lrz/sys/libraries/boost/1.61_gcc/lib)
 
 ### get git commit ###
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)

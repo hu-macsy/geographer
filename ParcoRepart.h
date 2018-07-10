@@ -169,7 +169,7 @@ namespace ITI {
 			 *  return[i][j] = k : in round i, node j talks with node k. Must also be that return[i][k] = j.
 			 *  Inactive nodes have their own rank: rank[i][j] = j.
 			 */
-			static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM);
+			static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM, Settings settings);
 
 		//private:
 			
