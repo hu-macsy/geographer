@@ -106,7 +106,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils::getBlockGraph<IndexType, ValueType>( graph, part, settings.numBlocks);
 
 	//color block graph and get a communication schedule
-	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
+	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph, settings);
 
 	//get random node weights
 	DenseVector<ValueType> weights(graph.getRowDistributionPtr(), 1);
@@ -175,7 +175,7 @@ TEST_F(LocalRefinementTest, testOriginArray) {
 	Settings settings;
 	settings.numBlocks= comm->getSize();
 	scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils::getBlockGraph<IndexType, ValueType>( graph, part, settings.numBlocks);
-	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
+	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph, settings);
 
 	ValueType gain = 0;
 	IndexType iter = 0;
@@ -242,7 +242,7 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 
 	//std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::computeCommunicationPairings(a, part, mapping);
         scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils::getBlockGraph<IndexType, ValueType>( a, part, k);
-	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
+	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph, settings );
 	std::vector<IndexType> localBorder = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(a);
 
 	IndexType thisBlock = comm->getRank();

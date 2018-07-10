@@ -413,6 +413,7 @@ TEST_F(auxTest, testMEColoring_local){
 
     std::vector< std::vector<IndexType>>  coloringMEC = ParcoRepart<IndexType,ValueType>::getGraphMEC_local( processGraph, colorsMEC );
 
+    
 }
 
 

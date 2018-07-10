@@ -32,14 +32,8 @@ import argparse
 	
 def submitExp( exp, tool, outDir ):
 
-	if tool=="Geographer":
-		submitGeographer(exp, "Geographer", outDir)
-	elif tool=="geoKmeans":
-		submitGeographer(exp, "geoKmeans", outDir)
-	elif tool=="geoSfc":
-		submitGeographer(exp, "geoSfc", outDir)
-	elif tool=="repartKmeans":
-		submitGeographer(exp, "repartKmeans", outDir)
+	if ( (tool=="Geographer") or (tool=="geoKmeans") or (tool=="geoSfc") or (tool=="repartKmeans") ):
+		submitGeographer(exp, tool, outDir)
 	else:
 		submitCompetitor( exp, tool, outDir)
 
@@ -50,17 +44,16 @@ def submitGeographer(exp, version, outDir):
 		
 	for path in exp.paths:
 		if not os.path.exists( path ) :
-			print("WARNING: " + path + " does not exist.")
-			
+			print("WARNING: " + path + " does not exist.")			
 	
 	tool = version
 	
 	for i in range(0,exp.size):
 		
+		# set parameters for every experiment
 		params = ""
 		
 		if version=="Geographer":
-			# set parameters for every experiment
 			params = defaultSettings()
 			params += " --repeatTimes=5"
 			executable = geoExe
