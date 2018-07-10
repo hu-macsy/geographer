@@ -1280,7 +1280,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	//TODO: not filling with dummy values, each localPairs can have different sizes
 	std::vector<int_pair> localPairs(localM*2);
 	
-	// duplicate and reverse all edges before SortingDatatype to ensure matrix will be symmetric
+	// duplicate and reverse all edges before sorting to ensure matrix will be symmetric
 	// TODO: any better way to avoid edge duplication?
 	
 	IndexType maxLocalVertex=0;
@@ -1516,7 +1516,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 // given a non-distributed csr matrix converts it to an edge list
 // two first numbers are the vertex ID and the third one is the edge weight
 template<typename IndexType, typename ValueType>
-std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const CSRSparseMatrix<ValueType> graph) {
+std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const CSRSparseMatrix<ValueType> &graph, IndexType &maxDegree) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     CSRSparseMatrix<ValueType> tmpGraph(graph);
@@ -1542,12 +1542,17 @@ std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const 
 	const IndexType numEdges = values.size();
 	std::vector<std::tuple<IndexType,IndexType,IndexType>> edgeList;//( numEdges/2 );
 	IndexType edgeIndex = 0;
+	//IndexType maxDegree = 0;
 
 	//WARNING: we only need the upper, left part of the matrix values since
 	//		matrix is symmetric
 	for(IndexType i=0; i<N; i++){
 		const IndexType v1 = i;	//first vertex
 		SCAI_ASSERT_LE_ERROR( i+1, ia.size(), "Wrong index for ia[i+1]" );
+		IndexType thisDegree = ia[i+1]-ia[i];
+		if(thisDegree>maxDegree){
+			maxDegree = thisDegree;
+		}
     	for (IndexType j = ia[i]; j < ia[i+1]; j++) {
     		const IndexType v2 = ja[j]; //second vertex
     		// so we do not enter every edge twice, assuming graph is undirected
@@ -1734,7 +1739,7 @@ template  std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama
 template scai::lama::CSRSparseMatrix<ValueType> getPEGraph<IndexType,ValueType>( const scai::lama::CSRSparseMatrix<ValueType> &adjM);
 template scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>> &adjList);
 template scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList );
-template std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const CSRSparseMatrix<ValueType> graph);
+template std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const CSRSparseMatrix<ValueType>& graph, IndexType& maxDegree);
 template scai::lama::CSRSparseMatrix<ValueType> constructLaplacian<IndexType, ValueType>(scai::lama::CSRSparseMatrix<ValueType> graph);
 template scai::lama::CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension);
 template scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d);

@@ -246,10 +246,11 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 		For every tuple, the first two numbers are the vertex IDs for this edge and the
 		third is the edge weight.
 	@param[in] graph The input graph
+	@param[out] maxDegree The maximum degree of the graph
 	@return The edge list representation
 */
 template<typename IndexType, typename ValueType>
-std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const scai::lama::CSRSparseMatrix<ValueType> graph);
+std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const scai::lama::CSRSparseMatrix<ValueType>& graph, IndexType& maxDegree);
 
 /**
  * @brief Construct the Laplacian of the input matrix. May contain parallel communication.

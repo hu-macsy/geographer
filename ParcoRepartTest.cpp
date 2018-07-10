@@ -496,11 +496,14 @@ TEST_F(ParcoRepartTest, testTwoWayCut) {
 		mapping.setValue(i, i);
 	}
 
+  struct Settings settings;
+  settings.numBlocks= k;
+
 	//std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::computeCommunicationPairings(graph, part, mapping);
-        scai::lama::CSRSparseMatrix<ValueType> blockGraph =  GraphUtils::getBlockGraph<IndexType, ValueType>( graph, part, k);
-        EXPECT_TRUE( blockGraph.isConsistent() );
-        EXPECT_TRUE( blockGraph.checkSymmetry() );
-	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local(blockGraph);
+  scai::lama::CSRSparseMatrix<ValueType> blockGraph =  GraphUtils::getBlockGraph<IndexType, ValueType>( graph, part, k);
+  EXPECT_TRUE( blockGraph.isConsistent() );
+  EXPECT_TRUE( blockGraph.checkSymmetry() );
+	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local(blockGraph, settings);
 
 	const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
 	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
@@ -565,11 +568,14 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
 		IndexType blockId = rand() % k;
 		part.setValue(i, blockId);
 	}
+  
+  struct Settings settings;
+  settings.numBlocks= k;
 
 	scai::lama::CSRSparseMatrix<ValueType> blockGraph =  GraphUtils::getBlockGraph<IndexType, ValueType>( a, part, k);
 	EXPECT_TRUE( blockGraph.isConsistent() );
 	EXPECT_TRUE( blockGraph.checkSymmetry() );
-	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local(blockGraph);
+	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local(blockGraph, settings);
 
 	IndexType rounds = scheme.size();
 	//PRINT("num edges of the blockGraph= "<< blockGraph.getNumValues()/2 );
@@ -1141,7 +1147,7 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     IndexType colors;
     std::vector< std::vector<IndexType>>  coloring = ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local(blockGraph, colors);
     
-    std::vector<DenseVector<IndexType>> communication = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph);
+    std::vector<DenseVector<IndexType>> communication = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph, settings);
     
     // as many rounds as colors
     EXPECT_EQ(colors, communication.size());
@@ -1185,6 +1191,8 @@ std::string file = graphPath + "Grid16x16";
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
     
+    struct Settings settings;  
+
     //scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, k, 0.2);
     
     //check distributions
@@ -1212,7 +1220,7 @@ std::string file = graphPath + "Grid16x16";
         scai::lama::CSRSparseMatrix<ValueType> blockGraph;
         blockGraph.setRawDenseData( 6, 6, adjArray);
         // get the communication pairs
-        std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
+        std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph,settings );
         
         // print the pairs
         /*
@@ -1235,7 +1243,7 @@ std::string file = graphPath + "Grid16x16";
         scai::lama::CSRSparseMatrix<ValueType> blockGraph;
         blockGraph.setRawDenseData( 4, 4, adjArray4);
         // get the communication pairs
-        std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );
+        std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph, settings);
         
         // print the pairs
         /*
@@ -1257,7 +1265,7 @@ std::string file = graphPath + "Grid16x16";
         blockGraph.setRawDenseData( 2, 2, adjArray2);
 
         // get the communication pairs
-        std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph );        
+        std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph , settings);        
     }
 }
 //------------------------------------------------------------------------------

@@ -1307,13 +1307,15 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
         adjM.redistribute(noDist, noDist);
         //throw std::runtime_error("Input matrix must be replicated.");
     }
+    IndexType maxDegree = -1;
 
-    std::vector<std::tuple<IndexType,IndexType,IndexType>> edgeList = GraphUtils::CSR2EdgeList_local<IndexType,ValueType>( adjM );
+    std::vector<std::tuple<IndexType,IndexType,IndexType>> edgeList = GraphUtils::CSR2EdgeList_local<IndexType,ValueType>( adjM, maxDegree );
 
     //the constructor adds the edges with the same order as they are in edgeList.
     //so, edge with edgeID=i is the edge edgeList[i]
     mec::graph G( edgeList );
-
+    G.maxDegree = maxDegree;
+    
 //PRINT0(G.vertices_map.size() << " + + " << G.edge_map.size() );
 //PRINT0(G.adjacency_List[0]->edge_ID);
 

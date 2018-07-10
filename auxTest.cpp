@@ -396,11 +396,11 @@ TEST_F(auxTest, testMEColoring_local){
 
     EXPECT_EQ( processGraph.getNumRows(), k);//, "Wrong process graph num rows");
 
-    IndexType colorsBoost, colorsMEC;
+    IndexType colorsBoost, colorsMEC, maxDegree;
     
     std::vector<std::vector<IndexType>> coloringBoost = ParcoRepart<IndexType,ValueType>::getGraphEdgeColoring_local( processGraph, colorsBoost );
 
-    std::vector<std::tuple<IndexType,IndexType,IndexType>> edgeList = GraphUtils::CSR2EdgeList_local<IndexType,ValueType>( processGraph );
+    std::vector<std::tuple<IndexType,IndexType,IndexType>> edgeList = GraphUtils::CSR2EdgeList_local<IndexType,ValueType>( processGraph, maxDegree );
 
     // undirected graph so every edge appears once in the edge list
     EXPECT_EQ( edgeList.size()*2, processGraph.getNumValues() ); 
@@ -413,7 +413,6 @@ TEST_F(auxTest, testMEColoring_local){
 
     std::vector< std::vector<IndexType>>  coloringMEC = ParcoRepart<IndexType,ValueType>::getGraphMEC_local( processGraph, colorsMEC );
 
-    
 }
 
 

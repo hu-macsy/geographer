@@ -240,8 +240,10 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 		mapping.setValue(i, i);
 	}
 
+	Settings settings;
+	settings.numBlocks= comm->getSize();
 	//std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::computeCommunicationPairings(a, part, mapping);
-        scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils::getBlockGraph<IndexType, ValueType>( a, part, k);
+    scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils::getBlockGraph<IndexType, ValueType>( a, part, k);
 	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph, settings );
 	std::vector<IndexType> localBorder = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(a);
 
