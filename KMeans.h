@@ -17,6 +17,7 @@
 #include "Settings.h"
 #include "GraphUtils.h"
 #include "HilbertCurve.h"
+#include "AuxiliaryFunctions.h"
 
 using scai::lama::DenseVector;
 
@@ -53,6 +54,10 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights,
 		const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings);
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings);
+
 
 /**
  * @brief Partition a point set using balanced k-means.

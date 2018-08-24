@@ -492,6 +492,57 @@ DenseVector<IndexType> assignBlocks(
 	return assignment;
 }
 
+/**
+ */
+//WARNING: we do not use k as repartition assumes k=comm->getSize() and neither blockSizes and we assume
+// 			that every block has the same size
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings) {
+	
+	const IndexType localN = nodeWeights.getLocalValues().size();
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	const IndexType k = comm->getSize();
+	SCAI_ASSERT_EQ_ERROR(k, settings.numBlocks, "Deriving the previous partition from the distribution cannot work for p == k");
+	
+	// calculate the global weight sum to set the block sizes
+	//TODO: the local weight sums are already calculated in findLocalCenters, maybe extract info from there
+	ValueType globalWeightSum;
+	
+	{
+		ValueType localWeightSum = 0;
+		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
+		SCAI_ASSERT_EQ_ERROR( rWeights.size(), localN, "Mismatch of nodeWeights and coordinates size. Chech distributions.");
+		
+		for (IndexType i=0; i<localN; i++) {
+			localWeightSum += rWeights[i];
+		}
+	
+		globalWeightSum = comm->sum(localWeightSum);
+	}
+	
+	const std::vector<IndexType> blockSizes(settings.numBlocks, globalWeightSum/settings.numBlocks);
+
+	std::chrono::time_point<std::chrono::high_resolution_clock> startCents = std::chrono::high_resolution_clock::now();
+	//
+	//TODO: change to findCenters
+	//
+	std::vector<std::vector<ValueType> > initialCenters = findLocalCenters<IndexType,ValueType>(coordinates, nodeWeights);
+	std::chrono::duration<ValueType,std::ratio<1>> centTime = std::chrono::high_resolution_clock::now() - startCents;	
+	ValueType time = centTime.count();
+	std::cout<< comm->getRank()<< ": time " << time << std::endl;
+
+	aux<IndexType,ValueType>::timeMeasurement( startCents );
+	//aux::printTimeMeasurements( centTIme );
+
+	//WARNING: this was in the initial version. The problem is that each PE find one center. T
+	// This can lead to bad solutions since dense areas may require more centers
+	//std::vector<std::vector<ValueType> > initialCenters = findLocalCenters<IndexType,ValueType>(coordinates, nodeWeights);
+	//std::vector<std::vector<ValueType> > initialCenters = findLocalCenters(coordinates, nodeWeights);
+	
+	return computePartition(coordinates, nodeWeights, blockSizes, initialCenters, settings);
+}
+
 
 
 template std::vector<std::vector<ValueType> > findInitialCentersSFC<IndexType, ValueType>( const std::vector<DenseVector<ValueType> >& coordinates, const std::vector<ValueType> &minCoords,    const std::vector<ValueType> &maxCoords, Settings settings);
@@ -508,6 +559,8 @@ template DenseVector<IndexType> assignBlocks(
         std::vector<IndexType>::iterator firstIndex, std::vector<IndexType>::iterator lastIndex,
         const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment, const std::vector<IndexType> &blockSizes, const SpatialCell &boundingBox,
         std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter, std::vector<ValueType> &influence, Settings settings);
+
+template DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings);
 
 }
 

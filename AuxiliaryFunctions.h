@@ -7,6 +7,7 @@
 
 #include <chrono>
 #include <fstream>
+#include <chrono>
 
 #include <scai/lama.hpp>
 #include <scai/lama/DenseVector.hpp>
@@ -25,6 +26,50 @@ public:
 
 //------------------------------------------------------------------------------   
 
+static void timeMeasurement(std::chrono::time_point<std::chrono::high_resolution_clock> timeStart){
+
+    std::chrono::duration<ValueType,std::ratio<1>> time = std::chrono::high_resolution_clock::now() - timeStart;
+    ValueType elapTime = time.count() ;
+
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const IndexType thisPE = comm->getRank();
+    const IndexType numPEs = comm->getSize();
+
+    std::vector<ValueType> allTimes(numPEs,0);
+
+    //set local time in your position
+    allTimes[thisPE] = elapTime;
+
+    //gather all times in root (=0) PE
+    //std::vector<ValueType> allTimesLocal(numPEs);
+    //comm->gatherImpl(allTimesLocal.data(), numPEs, 0 , allTimes.data(), scai::common::TypeTraits<ValueType>::stype);
+    comm->sumImpl(allTimes.data(), allTimes.data(), numPEs, scai::common::TypeTraits<ValueType>::stype);
+
+    //PRINT0(allTimes.size() << " : " << allTimesLocal.size() );
+
+    if( thisPE==0 ){
+        typename std::vector<ValueType>::iterator maxTimeIt = std::max_element( allTimes.begin(), allTimes.end() );
+        IndexType maxTimePE = std::distance( allTimes.begin(), maxTimeIt );
+        typename std::vector<ValueType>::iterator minTimeIt = std::min_element( allTimes.begin(), allTimes.end() );
+        IndexType minTimePE = std::distance( allTimes.begin(), minTimeIt );
+
+        IndexType slowPEs5=0, slowPEs8=0;
+        for(int i=0; i<numPEs; i++ ){
+            if(allTimes[i]>0.5*(*maxTimeIt) + *minTimeIt*(0.5))
+                ++slowPEs5;
+            if(allTimes[i]>0.8*(*maxTimeIt) + *minTimeIt*(0.2))
+                ++slowPEs8;
+        }
+
+        std::cout<< "max time: " << *maxTimeIt << " from PE " << maxTimePE << std::endl;
+        std::cout<< "min time: " << *minTimeIt << " from PE " << minTimePE << std::endl;
+        std::cout<< "there are " << slowPEs5 << " that did more than 50% of max time and "<< slowPEs8 << " with more than 80%" << std::endl;
+    }
+
+}
+
+
+//------------------------------------------------------------------------------   
 
 static void writeHeatLike_local_2D(std::vector<IndexType> input,IndexType sideLen, IndexType dim, const std::string filename){
     std::ofstream f(filename);
