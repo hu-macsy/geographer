@@ -119,8 +119,6 @@ int main(int argc, char** argv) {
 				("useDiffusionCoordinates", value<bool>(&settings.useDiffusionCoordinates)->default_value(settings.useDiffusionCoordinates), "Use coordinates based from diffusive systems instead of loading from file")
 				("dimensions", value<IndexType>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 				("previousPartition", value<std::string>(), "file of previous partition, used for repartitioning")
-				//output
-				("outFile", value<std::string>(&settings.outFile), "write result partition into file")
 				//mesh generation
 				("generate", "generate random graph. Currently, only uniform meshes are supported.")
 				("numX", value<IndexType>(&settings.numX), "Number of points in x dimension of generated graph")
@@ -157,6 +155,8 @@ int main(int argc, char** argv) {
 				("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
 				("initialMigration", value<InitialPartitioningMethods>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration, 0: SFCs, 3:k-means, 4:Multisection")
 				("manhattanDistance", "Tuning parameter for K-Means")
+				//output
+				("outFile", value<std::string>(&settings.outFile), "write result partition into file")
 				//debug
 				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 				("verbose", "Increase output.")
@@ -641,7 +641,8 @@ int main(int argc, char** argv) {
             nodeWeights.redistribute( rowDistPtr );
         }
           
-        metricsVec.push_back( Metrics( comm->getSize()) );
+        //metricsVec.push_back( Metrics( comm->getSize()) );
+        metricsVec.push_back( Metrics( settings ) );
             
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
         
@@ -714,6 +715,7 @@ int main(int argc, char** argv) {
     // writing results in a file and std::cout
     //
     
+    
     if (repeatTimes > 1) {
         if (comm->getRank() == 0) {
             std::cout<<  "\033[1;36m";
@@ -724,6 +726,8 @@ int main(int argc, char** argv) {
         }
     }
     
+ 	//printVectorMetrics( metricsVec, std::cout );
+
     if( settings.storeInfo && settings.outFile!="-" ) {
         if( comm->getRank()==0){
             std::ofstream outF( settings.outFile, std::ios::out);

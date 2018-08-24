@@ -1542,7 +1542,8 @@ std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const 
 	const IndexType numEdges = values.size();
 	std::vector<std::tuple<IndexType,IndexType,IndexType>> edgeList;//( numEdges/2 );
 	IndexType edgeIndex = 0;
-	//IndexType maxDegree = 0;
+	IndexType maxEdgeWeight = 0;
+	IndexType minEdgeWeight = std::numeric_limits<int>::max();
 
 	//WARNING: we only need the upper, left part of the matrix values since
 	//		matrix is symmetric
@@ -1562,9 +1563,12 @@ std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const 
     		}
     		SCAI_ASSERT_LE_ERROR( edgeIndex, numEdges, "Wrong edge index");
     		edgeList.push_back( std::make_tuple( v1, v2, values[edgeIndex]) );
+			if( values[edgeIndex] > maxEdgeWeight ) maxEdgeWeight = values[edgeIndex];
+			if( values[edgeIndex] < minEdgeWeight ) minEdgeWeight = values[edgeIndex];
     		edgeIndex++;
     	}
     }
+    PRINT0("min edge weight: " <<minEdgeWeight << ", max edge weight: " << maxEdgeWeight);
     SCAI_ASSERT_EQ_ERROR( edgeList.size()*2, numEdges, "Wrong number of edges");
     return edgeList;
 }

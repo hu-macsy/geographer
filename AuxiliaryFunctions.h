@@ -211,7 +211,9 @@ static std::tuple<IndexType, IndexType> index2_2DPoint(IndexType index,  std::ve
 
     return std::make_tuple(xIndex, yIndex);
 } 
- 
+//------------------------------------------------------------------------------
+
+
 }; //class aux
 
 template class aux<IndexType, ValueType>;

@@ -13,13 +13,18 @@ struct Metrics{
     
     // timing results
     //
-    std::vector<ValueType>  timeMigrationAlgo;
-	std::vector<ValueType>  timeConstructRedistributor;
-    std::vector<ValueType>  timeFirstDistribution;
-    std::vector<ValueType>  timeKmeans;
-    std::vector<ValueType>  timeSecondDistribution;
-    std::vector<ValueType>  timePreliminary;
+    std::vector<ValueType> timeMigrationAlgo;
+	std::vector<ValueType> timeConstructRedistributor;
+    std::vector<ValueType> timeFirstDistribution;
+    std::vector<ValueType> timeKmeans;
+    std::vector<ValueType> timeSecondDistribution;
+    std::vector<ValueType> timePreliminary;
     
+    //std::map< std::pair<int,int>, int, ValueType > localRefDetails;
+
+    //std::pair<int,ValueType> ;
+    std::vector< std::vector<std::pair<int,ValueType>> > localRefDetails;
+
    	ValueType inputTime = 0;
 	ValueType timeFinalPartition = 0;
 	ValueType reportTime = 0 ;
@@ -61,6 +66,15 @@ struct Metrics{
 		initialize(k);
 	}
 	
+	Metrics( Settings settings) {
+		initialize( settings.numBlocks );
+		localRefDetails.resize( settings.multiLevelRounds+1 );
+		for( int i=0; i<settings.multiLevelRounds+1; i++){
+			//WARNING: problem if refinement rounds are more than 50. Very, very difficult to happen
+			localRefDetails[i].resize( 50, std::make_pair(-1,-1) );	
+		}
+	}
+
 	void initialize(IndexType k ){
 		timeMigrationAlgo.resize(k);
 		timeConstructRedistributor.resize(k);
@@ -94,6 +108,20 @@ struct Metrics{
 			out << " ### WARNING: setting dummy value -1 for expensive (and not used) metrics max and total blockGraphDegree ###" << std::endl;
 		}else if (maxBlockGraphDegree==0 ){
 			out << " ### WARNING: possibly not all metrics calculated ###" << std::endl;
+		}
+
+		out<< "localRefinement details" << std::endl;
+		for( int i=0; i<this->localRefDetails.size(); i++){
+			if( this->localRefDetails[i][0].first != -1){
+				out << "MLRound " << i << std::endl;
+			}
+			for( int j=0; j<this->localRefDetails[i].size(); j++){
+				if( this->localRefDetails[i][j].first != -1){
+					out << "\t refine round " << j <<", gain: " << \
+						this->localRefDetails[i][j].first << ", time: "<< \
+						this->localRefDetails[i][j].second << std::endl;
+				}
+			}
 		}
 				
 		out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxCommVol totCommVol maxDiameter harmMeanDiam numDisBlocks timeSpMV timeComm" << std::endl;
@@ -259,9 +287,9 @@ struct Metrics{
 		}
 		std::chrono::duration<ValueType,std::ratio<1>> diameterTime = std::chrono::high_resolution_clock::now() - diameterStart; 
 		ValueType time = comm->max( diameterTime.count() );
-		if (settings.verbose) {
+		//if (settings.verbose) {
 		    PRINT0("time to get the diameter: " <<  time );
-		}
+		//}
 	
 		return std::make_tuple( maxBlockDiameter, harmMeanDiam, numDisconBlocks);
 	}
@@ -540,6 +568,14 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
 	ValueType sumPrelimanry = 0; 
 	ValueType sumLocalRef = 0; 
 	ValueType sumFinalTime = 0;
+	//umLocalRefDetails[i][j].first is the time, for local refinement round i,j
+	//umLocalRefDetails[i][j].second is the gain (edges) in cut, for local refinement round i,j
+	std::vector< std::vector<std::pair<ValueType,ValueType>> > sumLocalRefDetails(50);
+	int counter[50][50] = {0};
+	for(int i=0; i<50; i++){
+		sumLocalRefDetails[i].resize(50, std::make_pair(0.0,0.0) );
+		std::fill( counter[i], counter[i]+50, 0);
+	}
 	
 	IndexType sumPreliminaryCut = 0;
 	IndexType sumFinalCut = 0;
@@ -607,12 +643,31 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
 		
 		sumTimeSpMV += thisMetric.timeSpMV;
 		sumTimeComm += thisMetric.timeComm;
+
+
+		
+		//std::vector< std::tuple<int, int, int, double>> lala;
+
+		//sumLocalRefDetails.resize(50);
+		//out<< "localRefinement details for run " << run << std::endl;
+		for( int i=0; i<thisMetric.localRefDetails.size(); i++){
+			for( int j=0; j<thisMetric.localRefDetails[i].size(); j++){
+				if( thisMetric.localRefDetails[i][j].first != -1){
+					sumLocalRefDetails[i][j].first += thisMetric.localRefDetails[i][j].first;
+					sumLocalRefDetails[i][j].second += thisMetric.localRefDetails[i][j].second;
+					counter[i][j]++;
+					//PRINT0( i << " _ " << j << " = " << counter[i][j]);
+				}
+			}
+		}
+
 	}
 	
 	if( comm->getRank()==0 ){
+				
 		out << std::setprecision(4) << std::fixed;
 		out << "average,  "\
-			<< ValueType (metricsVec[0].inputTime)<< ",  "\
+			<< ValueType(metricsVec[0].inputTime)<< ",  "\
 			<< ValueType(sumMigrAlgo)/numRuns<< ",  " \
 			<< ValueType(sumFirstDistr)/numRuns<< ",  " \
 			<< ValueType(sumKmeans)/numRuns<< ",  " \
@@ -634,7 +689,23 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
 			out << ValueType(sumTimeSpMV)/numRuns << ", " \
 			<< ValueType(sumTimeComm)/numRuns \
 			<< std::endl;
-			
+		
+		out<< "localRefinement detail" << std::endl;
+		for( int i=0; i<sumLocalRefDetails.size(); i++){
+			if( sumLocalRefDetails[i][0].first != 0){
+				out << "MLRound " << i << std::endl;
+			}
+			for( int j=0; j<sumLocalRefDetails[i].size(); j++){
+				if( sumLocalRefDetails[i][j].first != 0 or sumLocalRefDetails[i][j].first != 0){
+//PRINT0( sumLocalRefDetails[i][j].first << "  + + + " << sumLocalRefDetails[i][j].second  );
+					SCAI_ASSERT_NE_ERROR(counter[i][j], 0 , "wrong counter value for i,j= " << i << ", "<< j);
+					out << "\t refine round " << j <<", gain: " << \
+						sumLocalRefDetails[i][j].first/counter[i][j] << ", time: "<< \
+						sumLocalRefDetails[i][j].second/counter[i][j] << std::endl;
+				}
+			}
+		}
+
 		out << std::setprecision(4) << std::fixed;
 		out << "gather" << std::endl;
 		out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxBnd totBnd maxCommVol totCommVol maxDiameter harmMeanDiam numDisBlocks timeSpMV timeComm" << std::endl;
@@ -691,6 +762,7 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
 	ValueType sumDisconBlocks = 0;
 	ValueType sumTimeSpMV = 0;
 	ValueType sumTimeComm = 0;
+	ValueType sumFMStep = 0;
 	
 	for(IndexType run=0; run<numRuns; run++){
 		Metrics thisMetric = metricsVec[ run ];
@@ -729,6 +801,7 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
 		sumDisconBlocks += thisMetric.numDisconBlocks;
 		sumTimeSpMV += thisMetric.timeSpMV;
 		sumTimeComm += thisMetric.timeComm;
+		//sumFMStep += thisMetric.timeDistFMStep;
 	}
 	
 	if( comm->getRank()==0 ){

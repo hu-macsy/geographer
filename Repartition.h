@@ -19,7 +19,7 @@
 #include "Metrics.h"
 
 //WARNING and TODO: error if Wrappers.h is the last include !!
-//#include "Wrappers.h"
+#include "Wrappers.h"
 
 
 //using namespace scai::lama;

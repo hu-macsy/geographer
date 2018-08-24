@@ -20,6 +20,8 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     const std::vector<DenseVector<IndexType>>& communicationScheme,
     Settings settings) {
     
+	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+	
     SCAI_REGION( "LocalRefinement.distributedFMStep" )
     const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
     scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
@@ -78,9 +80,15 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 		}
 	}
 
+	std::chrono::duration<double> beforeLoop = std::chrono::system_clock::now() - startTime;
+	ValueType t1 = comm->max(beforeLoop.count());
+	PRINT0("time elapsed before main loop: " << t1 );
+	PRINT0("number of rounds/loops: " << communicationScheme.size() );
+	
 	//main loop, one iteration for each color of the graph coloring
 	for (IndexType color = 0; color < communicationScheme.size(); color++) {
 		SCAI_REGION( "LocalRefinement.distributedFMStep.loop" )
+		std::chrono::time_point<std::chrono::system_clock> loopStart =  std::chrono::system_clock::now();
 
 		const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 		const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
@@ -436,12 +444,21 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				}
 			}
 		}
+		std::chrono::duration<double> oneLoop = std::chrono::system_clock::now() - loopStart;
+		ValueType t2 = comm->max(oneLoop.count());
+		PRINT0("time elapsed for loop " << color <<": " << t2 );
 	}
 
 	comm->synchronize();
 	for (IndexType color = 0; color < gainPerRound.size(); color++) {
 		gainPerRound[color] = comm->sum(gainPerRound[color]) / 2;
 	}
+	
+	std::chrono::duration<double> finalTime = std::chrono::system_clock::now() - startTime;
+	ValueType tf = comm->max(finalTime.count());
+	PRINT0("time elapsed for one distFM step: " << tf );
+	//metrics.timeDistFMStep.push_back( tf );
+	
 	return gainPerRound;
 }
 //---------------------------------------------------------------------------------------

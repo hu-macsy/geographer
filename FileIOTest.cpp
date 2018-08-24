@@ -136,6 +136,29 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
         }
     }
 }
+//-----------------------------------------------------------------
+
+TEST_F(FileIOTest, testWriteGraphWithEdgeWeights){
+    const IndexType N = 10;
+    
+    //define distributions
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+
+    //generate random complete matrix
+    auto graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDistPointer);
+    
+	scai::lama::MatrixCreator::fillRandom(graph, i/9.0);
+	
+	std::string filename = "./meshes/noEdgeWeights.graph";	
+	FileIO<IndexType, ValueType>::writeGraph( graph, filename );
+	
+	filename = "./meshes/dgeWeights.graph"
+	FileIO<IndexType, ValueType>::writeGraph( graph, filename, 1 );
+	
+}
+
 
 //-----------------------------------------------------------------
 // read a graph from a file in METIS format and its coordinates in 2D and partition that graph

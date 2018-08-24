@@ -45,7 +45,7 @@ namespace ITI{
          *
          * @return origin DenseVector that specifies for each element the original process before the multiLevelStep. Only needed when used to speed up redistribution.
          */
-        static DenseVector<IndexType> multiLevelStep(scai::lama::CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const Halo& halo, Settings settings);
+        static DenseVector<IndexType> multiLevelStep(scai::lama::CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const Halo& halo, Settings settings, Metrics& metrics);
 
         /**
          * Given the origin array resulting from a multi-level step on a coarsened graph, compute where local elements on the current level have to be sent to recreate the coarse distribution on the current level.

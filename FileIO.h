@@ -21,7 +21,7 @@
 #include <vector>
 #include <set>
 #include <memory>
-
+#include <sys/stat.h>
 
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
@@ -52,7 +52,7 @@ public:
 	 * @param[in] adjM The graph's adjacency matrix.
 	 * @param[in] filename The file's name to write to
 	 */
-	static void writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
+	static void writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename, const IndexType options=0);
 
 	/** Given an adjacency matrix and a filename writes the local part of matrix in the file using the METIS format.
 	 *  Every proccesor adds his rank in the end of the file name.
@@ -242,7 +242,14 @@ public:
     /** Read graph and coordinates from a dom.geo file of the ALYA tool. Coordinates are (usually) in 3D.
 	*/
     static void readAlyaCentral( scai::lama::CSRSparseMatrix<ValueType>& graph, std::vector<DenseVector<ValueType>>& coords, const IndexType N, const IndexType dimensions, const std::string filename);
-
+	
+	// taken from https://stackoverflow.com/questions/4316442/stdofstream-check-if-file-exists-before-writing
+	/** Check if a file exists
+	 @ *param[in] filename - the name of the file to check
+	 @return    true if the file exists, else false
+	 */
+	static bool fileExists(const std::string& filename);
+	
 private:
 	/**
 	 * given the central coordinates of a cell and its level, compute the bounding corners
@@ -250,13 +257,14 @@ private:
 	static std::pair<std::vector<ValueType>, std::vector<ValueType>> getBoundingCoords(std::vector<ValueType> centralCoords, 
         IndexType level);
         
-        /*Reads a graph in Matrix Market format
-        */
-        static scai::lama::CSRSparseMatrix<ValueType> readGraphMatrixMarket(const std::string filename);
-        
-        /** Reads the coordinates for the MatrixMarket file format.
-         */
-        static std::vector<DenseVector<ValueType>> readCoordsMatrixMarket ( const std::string filename);
+	/*Reads a graph in Matrix Market format
+	 */
+	static scai::lama::CSRSparseMatrix<ValueType> readGraphMatrixMarket(const std::string filename);
+	
+	/** Reads the coordinates for the MatrixMarket file format.
+	 */
+	static std::vector<DenseVector<ValueType>> readCoordsMatrixMarket ( const std::string filename);
+	
 };
 
 } /* namespace ITI */

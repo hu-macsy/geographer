@@ -182,6 +182,7 @@ struct Settings{
     bool noRefinement = false;
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
+    IndexType thisRound=-1;
     bool mec = false;
 
     //debug and profiling parameters

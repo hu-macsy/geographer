@@ -650,7 +650,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			
 			SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
 			scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(input);
-			ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, halo, settings);
+			ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, halo, settings, metrics );
 			SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
 		}
 	} else {
@@ -1301,6 +1301,8 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     assert( N== adjM.getNumColumns() ); // numRows = numColumns
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
+	std::chrono::time_point<std::chrono::system_clock> before =  std::chrono::system_clock::now();
+	
     if (!adjM.getRowDistributionPtr()->isReplicated()) {
         PRINT0("***WARNING: In getGraphMEC_local: given graph is not replicated; will replicate now");
         const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
@@ -1310,14 +1312,19 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     IndexType maxDegree = -1;
 
     std::vector<std::tuple<IndexType,IndexType,IndexType>> edgeList = GraphUtils::CSR2EdgeList_local<IndexType,ValueType>( adjM, maxDegree );
-
+	/*
+	std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - before;
+	ValueType maxTime = comm->max( elapTime.count() );
+	ValueType minTime = comm->min( elapTime.count() );
+	PRINT0("replication and conversion to edge list: time " << minTime << " -- " << maxTime);
+	*/
     //the constructor adds the edges with the same order as they are in edgeList.
     //so, edge with edgeID=i is the edge edgeList[i]
     mec::graph G( edgeList );
     G.maxDegree = maxDegree;
     
 //PRINT0(G.vertices_map.size() << " + + " << G.edge_map.size() );
-//PRINT0(G.adjacency_List[0]->edge_ID);
+//PRINT0("max degree = " << maxDegree );
 
     std::unordered_map<int, int> mecColoring = greedyColoring(G);
 
@@ -1333,12 +1340,13 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
         retG[0].push_back( std::get<0>(edgeList[edgeID]) );
         retG[1].push_back( std::get<1>(edgeList[edgeID]) );
         retG[2].push_back( edgeColor );
-PRINT("edge ("<< retG[0].back() << ", "<< retG[1].back() << "): " << retG[2].back() );
+//PRINT("edge ("<< retG[0].back() << ", "<< retG[1].back() << "): " << retG[2].back() );
         if(edgeColor>colors){
             colors = edgeColor;
         }
     }
-    
+
+    colors++; //number of colors is the max color used +1
     
     return retG;
 }
@@ -1352,16 +1360,31 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
     // coloring.size()=3: coloring(i,j,c) means that edge with endpoints i and j is colored with color c.
     // and coloring[i].size()= number of edges in input graph
 
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	
     assert(adjM.getNumColumns() == adjM.getNumRows() );
-
     IndexType colors;
     std::vector<std::vector<IndexType>> coloring;
-    if(settings.mec){
-        coloring = getGraphMEC_local( adjM, colors );
-    }else{
-        coloring = getGraphEdgeColoring_local( adjM, colors );
-    }
-
+	{
+		std::chrono::time_point<std::chrono::system_clock> beforeColoring =  std::chrono::system_clock::now();
+		if (!adjM.getRowDistributionPtr()->isReplicated()) {
+			PRINT0("***WARNING: In getCommunicationPairs_local: given graph is not replicated; will replicate now");
+			const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
+			adjM.redistribute(noDist, noDist);
+			//throw std::runtime_error("Input matrix must be replicated.");
+		}
+		//here graph is replicated. PE0 will write it in a file
+		
+		if(settings.mec){
+			coloring = getGraphMEC_local( adjM, colors );
+		}else{
+			coloring = getGraphEdgeColoring_local( adjM, colors );
+		}
+		std::chrono::duration<double> coloringTime = std::chrono::system_clock::now() - beforeColoring;
+		ValueType maxTime = comm->max( coloringTime.count() );
+		ValueType minTime = comm->min( coloringTime.count() );
+		PRINT0("coloring done in time " << minTime << " -- " << maxTime << ", using " << colors << " colors" );
+	}	
     std::vector<DenseVector<IndexType>> retG(colors);
     
     if (adjM.getNumRows()==2) {

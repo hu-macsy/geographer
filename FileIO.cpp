@@ -47,9 +47,15 @@ namespace ITI {
  *
  */
 template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename){
+void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename, const IndexType option){
     SCAI_REGION( "FileIO.writeGraph" )
-    
+	
+	SCAI_ASSERT_GE_ERROR(option, 0, "Wrong -options- parameter for writeGraph function");
+	SCAI_ASSERT_LE_ERROR(option, 1, "Wrong -options- parameter for writeGraph function");
+	//so, option is either 0 or 1
+	//0: no weights
+	//1: edge weights
+	
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
     IndexType root =0;
@@ -79,17 +85,26 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
         const scai::lama::CSRStorage<ValueType>& localAdjM = tmpAdjM.getLocalStorage();
         const scai::hmemo::ReadAccess<IndexType> rGlobalIA( localAdjM.getIA() );
         const scai::hmemo::ReadAccess<IndexType> rGlobalJA( localAdjM.getJA() );
+		const scai::hmemo::ReadAccess<ValueType> rGlobalVal( localAdjM.getValues() );
         
         // first line is number of nodes and edges
         IndexType cols= tmpAdjM.getNumColumns();
-        fNew << cols <<" "<< tmpAdjM.getNumValues()/2 << std::endl;
+        fNew << cols <<" "<< tmpAdjM.getNumValues()/2; 
+        if(option==1){
+            fNew << " 001";
+        }
+        fNew<< std::endl;
 
         // globlaIA.size() = globalN+1
         SCAI_ASSERT_EQ_ERROR( rGlobalIA.size() , globalN+1, "Wrong globalIA size.");
         for(IndexType i=0; i< globalN; i++){        // for all local nodes
             for(IndexType j= rGlobalIA[i]; j<rGlobalIA[i+1]; j++){             // for all the edges of a node
-                SCAI_ASSERT( rGlobalJA[j]<= globalN , rGlobalJA[j] << " must be < "<< globalN );
-                fNew << rGlobalJA[j]+1 << " ";
+                SCAI_ASSERT_LE_ERROR( rGlobalJA[j], globalN , rGlobalJA[j] << " must be < "<< globalN );
+				if( option==0){
+					fNew << rGlobalJA[j]+1 << " ";
+				}else if(option==1){
+					fNew << rGlobalJA[j]+1 << " "<< rGlobalVal[j]<< " ";
+				}
             }
             fNew << std::endl;
         }
@@ -2240,7 +2255,23 @@ std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::s
     return blockSizes;
 }
 //-------------------------------------------------------------------------------------------------
- 
+
+// taken from https://stackoverflow.com/questions/4316442/stdofstream-check-if-file-exists-before-writing
+/** Check if a file exists
+@param[in] filename - the name of the file to check
+@return    true if the file exists, else false
+*/
+template<typename IndexType, typename ValueType>
+bool FileIO<IndexType, ValueType>::fileExists(const std::string& filename){
+    struct stat buf;
+    if (stat(filename.c_str(), &buf) != -1)
+    {
+        return true;
+    }
+    return false;
+}
+//------------------------------------------------------------------------------
+
  template class FileIO<IndexType, ValueType>;
 
 } /* namespace ITI */
