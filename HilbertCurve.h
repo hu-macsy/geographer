@@ -50,7 +50,7 @@ namespace ITI {
 			 * @param[in] recursionDepth The number of refinement levels the hilbert curve should have
 			 * @param[in] dimensions Number of dimensions of coordinates.
 			 * 
-			 * @return A vector with the hilbert indices for every point. return.size()=coordinates[0].size()
+			 * @return A vector with the hilbert indices for every local point. return.size()=coordinates[0].size()
 			 */
 			static std::vector<ValueType> getHilbertIndexVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth, const IndexType dimensions);
 			

@@ -250,8 +250,13 @@ DenseVector<IndexType> assignBlocks(
 		std::vector<ValueType> &upperBoundOwnCenter,
 		std::vector<ValueType> &lowerBoundNextCenter,
 		std::vector<ValueType> &influence,
+		std::vector<ValueType> &timePerPE,
 		Settings settings) {
 	SCAI_REGION( "KMeans.assignBlocks" );
+
+//
+std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::chrono::high_resolution_clock::now();
+//
 
 	const IndexType dim = coordinates.size();
 	const scai::dmemo::DistributionPtr dist = nodeWeights.getDistributionPtr();
@@ -308,6 +313,8 @@ DenseVector<IndexType> assignBlocks(
 
 	ValueType imbalance;
 	IndexType iter = 0;
+	IndexType skippedLoops = 0;
+	ValueType time = 0;	// for timing/profiling
 	std::vector<bool> influenceGrew(k);
 	std::vector<ValueType> influenceChangeUpperBound(k,1+settings.influenceChangeCap);
 	std::vector<ValueType> influenceChangeLowerBound(k,1-settings.influenceChangeCap);
@@ -315,17 +322,19 @@ DenseVector<IndexType> assignBlocks(
 	//iterate if necessary to achieve balance
 	do
 	{
-		//std::chrono::time_point<std::chrono::high_resolution_clock> balanceStart = std::chrono::high_resolution_clock::now();
+		std::chrono::time_point<std::chrono::high_resolution_clock> balanceStart = std::chrono::high_resolution_clock::now();
 		SCAI_REGION( "KMeans.assignBlocks.balanceLoop" );
 		std::vector<ValueType> blockWeights(k,0.0);
 		IndexType totalComps = 0;
-		IndexType skippedLoops = 0;
+		skippedLoops = 0;
 		IndexType balancedBlocks = 0;
 		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
 		scai::hmemo::WriteAccess<IndexType> wAssignment(assignment.getLocalValues());
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.assign" );
+			IndexType forLoopCnt = 0;
 			for (Iterator it = firstIndex; it != lastIndex; it++) {
+				++forLoopCnt;
 				const IndexType i = *it;
 				const IndexType oldCluster = wAssignment[i];
 				if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i]) {
@@ -390,14 +399,22 @@ DenseVector<IndexType> assignBlocks(
 					}
 				}
 				blockWeights[wAssignment[i]] += rWeights[i];
-			}
-/*			
+			}//for
+			
 			if (settings.verbose) {
 				std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
 				ValueType time = balanceTime.count() ;
-				std::cout<< comm->getRank()<< ": time " << time << std::endl;
+				//std::cout<< comm->getRank()<< ": time " << time << std::endl;
+				PRINT(comm->getRank() << ": in assignBlocks, balanceIter time: " << time << ", for loops: " << forLoopCnt );
+				ValueType maxTime = comm->max( time );
+				//PRINT0( "max time: " << maxTime << ", for loops: " << forLoopCnt );
+
+				SCAI_ASSERT_LT_ERROR( comm->getRank(), timePerPE.size(), "vector size mismatch" );
+				timePerPE[comm->getRank()] += time;
 			}
-*/			
+
+			//aux<IndexType,ValueType>::timeMeasurement(balanceStart);
+
 			comm->synchronize();
 		}
 
@@ -480,15 +497,18 @@ DenseVector<IndexType> assignBlocks(
 			//double minInfluence, maxInfluence;
 			auto pair = std::minmax_element(influence.begin(), influence.end());
 			const ValueType influenceSpread = *pair.second / *pair.first;
+			std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
+			time += balanceTime.count() ;
+
 			auto oldprecision = std::cout.precision(3);
 			if (comm->getRank() == 0) std::cout << "Iter " << iter << ", loop: " << 100*ValueType(takenLoops) / currentLocalN << "%, average comparisons: "
 					<< averageComps << ", balanced blocks: " << 100*ValueType(balancedBlocks) / k << "%, influence spread: " << influenceSpread
-					<< ", imbalance : " << imbalance << std::endl;
+					<< ", imbalance : " << imbalance << ", time elapsed: " << time << std::endl;
 			std::cout.precision(oldprecision);
 		}
 	} while (imbalance > settings.epsilon - 1e-12 && iter < settings.balanceIterations);
 	//std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
-
+	//aux<IndexType,ValueType>::timeMeasurement(assignStart);
 	return assignment;
 }
 
@@ -498,7 +518,7 @@ DenseVector<IndexType> assignBlocks(
 // 			that every block has the same size
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings) {
+DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings, struct Metrics& metrics) {
 	
 	const IndexType localN = nodeWeights.getLocalValues().size();
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -540,7 +560,7 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 	//std::vector<std::vector<ValueType> > initialCenters = findLocalCenters<IndexType,ValueType>(coordinates, nodeWeights);
 	//std::vector<std::vector<ValueType> > initialCenters = findLocalCenters(coordinates, nodeWeights);
 	
-	return computePartition(coordinates, nodeWeights, blockSizes, initialCenters, settings);
+	return computePartition(coordinates, nodeWeights, blockSizes, initialCenters, settings, metrics);
 }
 
 
@@ -558,9 +578,9 @@ template DenseVector<IndexType> assignBlocks(
 		const std::vector<std::vector<ValueType> > &centers,
         std::vector<IndexType>::iterator firstIndex, std::vector<IndexType>::iterator lastIndex,
         const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment, const std::vector<IndexType> &blockSizes, const SpatialCell &boundingBox,
-        std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter, std::vector<ValueType> &influence, Settings settings);
+        std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter, std::vector<ValueType> &influence, std::vector<ValueType> &timePerPE, Settings settings);
 
-template DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings);
+template DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings, struct Metrics& metrics);
 
 }
 

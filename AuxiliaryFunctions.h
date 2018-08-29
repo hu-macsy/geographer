@@ -48,6 +48,12 @@ static void timeMeasurement(std::chrono::time_point<std::chrono::high_resolution
     //PRINT0(allTimes.size() << " : " << allTimesLocal.size() );
 
     if( thisPE==0 ){
+        if( numPEs <33 ){
+            for(int i=0; i<numPEs; i++){
+                std::cout << i << ": " << allTimes[i] << " _ ";
+            }
+            std::cout << std::endl;
+        }
         typename std::vector<ValueType>::iterator maxTimeIt = std::max_element( allTimes.begin(), allTimes.end() );
         IndexType maxTimePE = std::distance( allTimes.begin(), maxTimeIt );
         typename std::vector<ValueType>::iterator minTimeIt = std::min_element( allTimes.begin(), allTimes.end() );

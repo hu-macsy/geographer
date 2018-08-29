@@ -323,7 +323,7 @@ static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
 	IndexType denom;
     for( denom=1; denom<maxIndex; denom*=2){
 		for( IndexType numer=1; numer<denom; numer+=2){
-			IndexType val = (maxIndex*numer)/denom; 
+			IndexType val = maxIndex*((ValueType)numer/denom); 
 			//std::cout << numer <<"/" << denom << " = "<< val <<" <> ";
 			ret[index++] = val;
 			chosen[val]=true;

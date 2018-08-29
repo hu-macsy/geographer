@@ -15,6 +15,7 @@
 
 #include "quadtree/QuadNodeCartesianEuclid.h"
 #include "Settings.h"
+#include "Metrics.h"
 #include "GraphUtils.h"
 #include "HilbertCurve.h"
 #include "AuxiliaryFunctions.h"
@@ -37,8 +38,11 @@ namespace KMeans {
  * @return partition
  */
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights,
-		const std::vector<IndexType> &blockSizes, const Settings settings);
+DenseVector<IndexType> computePartition(
+	const std::vector<DenseVector<ValueType>> &coordinates, \
+	const DenseVector<ValueType> &nodeWeights, \
+	const std::vector<IndexType> &blockSizes, \
+	const Settings settings);
 
 /**
  * @brief Repartition a point set using balanced k-means.
@@ -56,7 +60,7 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 		const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings);
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings);
+DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings, struct Metrics& metrics);
 
 
 /**
@@ -72,9 +76,16 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
  *
  * @return partition
  */
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights,
-		const std::vector<IndexType> &blockSizes, std::vector<std::vector<ValueType> > centers, const Settings settings);
+
+ // template<typename IndexType, typename ValueType>
+ // DenseVector<IndexType> computePartition(
+ // 	const std::vector<DenseVector<ValueType>> &coordinates, \
+ // 	const DenseVector<ValueType> &nodeWeights, \
+ // 	const std::vector<IndexType> &blockSizes, \
+ // 	std::vector<std::vector<ValueType> > centers, \
+ // 	const Settings settings, \
+ // 	struct Metrics& metrics=Metrics() );
+
 
 /**
  * Find initial centers for k-means by sorting the local points along a space-filling curve.
@@ -169,7 +180,7 @@ DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &c
 		const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment,
 		const std::vector<IndexType> &blockSizes,  const SpatialCell &boundingBox,
 		std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter,
-		std::vector<ValueType> &influence,
+		std::vector<ValueType> &influence, std::vector<ValueType> &timePerPE,
 		Settings settings);
 
 /**
@@ -192,22 +203,7 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 	return {minCoords, maxCoords};
 }
 
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights,
-		const std::vector<IndexType> &blockSizes, const Settings settings) {
 
-    std::vector<ValueType> minCoords(settings.dimensions);
-    std::vector<ValueType> maxCoords(settings.dimensions);
-    for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-        minCoords[dim] = coordinates[dim].min();
-        maxCoords[dim] = coordinates[dim].max();
-		SCAI_ASSERT_NE_ERROR( minCoords[dim], maxCoords[dim], "min=max for dimension "<< dim << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
-    }
-
-	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC<IndexType,ValueType>(coordinates, minCoords, maxCoords, settings);
-
-	return computePartition(coordinates, nodeWeights, blockSizes, centers, settings);
-}
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights, const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings) {
@@ -219,19 +215,28 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 	        && comm->all(scai::utilskernel::HArrayUtils::max(previous.getLocalValues()) == comm->getRank())
 	        && comm->all(scai::utilskernel::HArrayUtils::min(previous.getLocalValues()) == comm->getRank())) {
 	    //partition is equal to distribution
+	    //TODO:: change with findCenters
 	    initialCenters = findLocalCenters<IndexType,ValueType>(coordinates, nodeWeights);
 	} else {
 	    std::vector<IndexType> indices(localN);
 	    std::iota(indices.begin(), indices.end(), 0);
 	    initialCenters = findCenters(coordinates, previous, settings.numBlocks, indices.begin(), indices.end(), nodeWeights);
 	}
+
 	return computePartition(coordinates, nodeWeights, blockSizes, initialCenters, settings);
 }
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights,
-		const std::vector<IndexType> &blockSizes, std::vector<std::vector<ValueType> > centers, const Settings settings) {
+DenseVector<IndexType> computePartition( \
+	const std::vector<DenseVector<ValueType>> &coordinates, \
+	const DenseVector<ValueType> &  nodeWeights, \
+	const std::vector<IndexType> &blockSizes, \
+	std::vector<std::vector<ValueType> > centers, \
+	const Settings settings, \
+	struct Metrics metrics=Metrics() ) {
+
 	SCAI_REGION( "KMeans.computePartition" );
+	std::chrono::time_point<std::chrono::high_resolution_clock> KMeansStart = std::chrono::high_resolution_clock::now();
 
 	const IndexType k = settings.numBlocks;
 	std::vector<ValueType> influence(k,1);
@@ -248,13 +253,30 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<ValueType> minCoords(dim);
 	std::vector<ValueType> maxCoords(dim);
 	std::vector<std::vector<ValueType> > convertedCoords(dim);
+
 	for (IndexType d = 0; d < dim; d++) {
 		scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
 		assert(rAccess.size() == localN);
 		convertedCoords[d] = std::vector<ValueType>(rAccess.get(), rAccess.get()+localN);
-		assert(convertedCoords[d].size() == localN);
+		
 		minCoords[d] = *std::min_element(convertedCoords[d].begin(), convertedCoords[d].end());
 		maxCoords[d] = *std::max_element(convertedCoords[d].begin(), convertedCoords[d].end());
+
+		// sort local coordinates based on their HilbertCurve index
+		const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(globalN), double(21));
+		std::vector<ValueType> localHilbertInd = HilbertCurve<IndexType,ValueType>::getHilbertIndexVector(coordinates, recursionDepth, settings.dimensions);
+
+		SCAI_ASSERT_EQ_ERROR( convertedCoords[0].size(), localHilbertInd.size() , "vector mismatch");
+
+		ValueType sumCoord = std::accumulate( convertedCoords[d].begin(), convertedCoords[d].end(), 0.0);
+		
+		std::sort(convertedCoords[d].begin(), convertedCoords[d].end(), \
+				[&localHilbertInd](ValueType i, ValueType j){ return localHilbertInd[i]<localHilbertInd[j]; });
+
+		ValueType sumCoord2 = std::accumulate( convertedCoords[d].begin(), convertedCoords[d].end(), 0.0);
+
+		SCAI_ASSERT_GE_ERROR( sumCoord, 0.999*sumCoord2, "Error in sorting local coordinates");
+		assert(convertedCoords[d].size() == localN);
 	}
 
 	std::vector<ValueType> globalMinCoords(dim);
@@ -273,6 +295,12 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		localVolume *= localDiff;
 	}
 
+	//
+
+//
+//PRINT(*comm << ": localN= "<< localN << ", " << ((ValueType)localN)/globalN *100 <<"% ,   localVol= " << localVolume );
+//
+
 	QuadNodeCartesianEuclid boundingBox(minCoords, maxCoords);
     if (settings.verbose) {
         std::cout << "Process " << comm->getRank() << ": ( ";
@@ -280,7 +308,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
         std::cout << ") , ( ";
         for (auto coord : maxCoords) std::cout << coord << " ";
         std::cout << ")";
-        std::cout << ", " << localN << " nodes, " << scai::utilskernel::HArrayUtils::sum(nodeWeights.getLocalValues()) << " total weight";
+        std::cout << ", " << localN << " nodes, " << scai::utilskernel::HArrayUtils::sum(nodeWeights.getLocalValues()) << ", " << ((ValueType)localN)/globalN *100<< "%, total weight";
         std::cout << ", volume ratio " << localVolume / (volume / p);
         std::cout << std::endl;
     }
@@ -294,8 +322,6 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 
 	//prepare sampling
 	std::vector<IndexType> localIndices(localN);
-	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
-	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
 	std::iota(localIndices.begin(), localIndices.end(), 0);
 
 	IndexType minNodes = settings.minSamplingNodes*blocksPerProcess;
@@ -309,13 +335,29 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
 	const bool randomInitialization = comm->all(localN > minNodes);
 
+//
+PRINT(*comm <<": localN= " << localN << ", minNodes= "<< minNodes );
+//
+
 	if (randomInitialization) {
-		ITI::GraphUtils::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
+		//ITI::GraphUtils::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
+		std::vector<IndexType> localIndices = GraphUtils::indexReorderCantor( localN );
+/*
+IndexType indexSumFY = std::accumulate( localIndices.begin(), localIndices.end(), 0);
+IndexType indexSumC = std::accumulate( localIndices2.begin(), localIndices2.end(), 0);
+SCAI_ASSERT_EQ_ERROR( indexSumFY, indexSumC, "Erros in index reordering");
+*/
+		SCAI_ASSERT_EQ_ERROR(*std::max_element(localIndices.begin(), localIndices.end()), localN -1, "Error in index reordering");
+		SCAI_ASSERT_EQ_ERROR(*std::min_element(localIndices.begin(), localIndices.end()), 0, "Error in index reordering");
 
 		samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNodes*k)))+1;
 		samples.resize(samplingRounds);
 		samples[0] = std::min(minNodes, localN);
 	}
+
+//
+PRINT(*comm << ": "<< randomInitialization << ", samplingRounds= " << samplingRounds << ", lastIndex: " << *localIndices.end() );
+//
 
 	if (samplingRounds > 0 && settings.verbose) {
 		if (comm->getRank() == 0) std::cout << "Starting with " << samplingRounds << " sampling rounds." << std::endl;
@@ -329,6 +371,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	    samples[samplingRounds-1] = localN;
 	}
 
+	//
+	aux<IndexType,ValueType>::timeMeasurement(KMeansStart);
+	//
 
 	scai::hmemo::ReadAccess<ValueType> rWeight(nodeWeights.getLocalValues());
 
@@ -337,8 +382,11 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	bool balanced = false;
 	const ValueType threshold = 0.002*diagonalLength;//TODO: take global point density into account
 	const IndexType maxIterations = settings.maxKMeansIterations;
+	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
+	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
+
 	do {
-		//std::chrono::time_point<std::chrono::high_resolution_clock> iterStart = std::chrono::high_resolution_clock::now();
+		std::chrono::time_point<std::chrono::high_resolution_clock> iterStart = std::chrono::high_resolution_clock::now();
 		if (iter < samplingRounds) {
 		    SCAI_ASSERT_LE_ERROR(samples[iter], localN, "invalid number of samples");
 			lastIndex = localIndices.begin() + samples[iter];
@@ -353,8 +401,24 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 			assert(lastIndex == localIndices.end());
 		}
 
-		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, settings);
+		std::vector<ValueType> timePerPE( comm->getSize(), 0.0);
+
+		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, timePerPE, settings);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
+
+		if(settings.verbose){
+			comm->sumImpl( timePerPE.data(), timePerPE.data(), comm->getSize(), scai::common::TypeTraits<ValueType>::stype);
+			if(comm->getRank()==0 ){
+				vector<IndexType> indices( timePerPE.size() );
+				std::iota(indices.begin(), indices.end(), 0);
+				std::sort( indices.begin(), indices.end(), 
+					[&timePerPE](int i, int j){ return timePerPE[i]<timePerPE[j]; } );
+
+				for(int i=0; i<comm->getSize(); i++){
+					std::cout << indices[i]<< ": time for PE: " << timePerPE[indices[i]] << std::endl;
+				}
+			}
+		}
 
 		std::vector<std::vector<ValueType> > newCenters = findCenters(coordinates, result, k, firstIndex, lastIndex, nodeWeights);
 
@@ -423,6 +487,14 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 			IndexType cluster = rResult[i];
 			blockWeights[cluster] += rWeight[i];
 		}
+
+		// print times before global reduce step
+		//aux<IndexType,ValueType>::timeMeasurement(iterStart);
+		std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - iterStart;			
+		ValueType time = balanceTime.count() ;
+		PRINT(*comm <<": in computePartition, iteration time: " << time );
+		//
+
 		{
 			SCAI_REGION( "KMeans.computePartition.blockWeightSum" );
 			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<IndexType>::stype);
@@ -435,13 +507,48 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 			}
 		}
 
-		if (comm->getRank() == 0) {
-			std::cout << "i: " << iter << ", delta: " << delta << std::endl;
+		ValueType maxTime=0;
+		if(settings.verbose){
+			balanceTime = std::chrono::high_resolution_clock::now() - iterStart;
+			maxTime = comm->max( balanceTime.count() );
 		}
+
+		ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( result, settings.numBlocks, nodeWeights );
+
+		if (comm->getRank() == 0) {
+			std::cout << "i: " << iter<< ", delta: " << delta << ", time : "<< maxTime << ", imbalance= " << imbalance<< std::endl;
+		}
+
+		metrics.kmeansProfiling.push_back( std::make_tuple(maxTime, imbalance) );
+
 		iter++;
-	} while (iter < samplingRounds or (iter < maxIterations && (delta > threshold || !balanced)) );
+
+	} while (iter < samplingRounds or (iter < maxIterations && (delta > threshold || !balanced)) );// or (imbalance<settings.epsilon) );
+
+
+	std::chrono::duration<ValueType,std::ratio<1>> KMeansTime = std::chrono::high_resolution_clock::now() - KMeansStart;
+	ValueType time = comm->max( KMeansTime.count() );
+	
+	PRINT0("total KMeans time: " << time << " , number of iterations: " << iter );
 
 	return result;
+}
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights,
+		const std::vector<IndexType> &blockSizes, const Settings settings) {
+
+    std::vector<ValueType> minCoords(settings.dimensions);
+    std::vector<ValueType> maxCoords(settings.dimensions);
+    for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+        minCoords[dim] = coordinates[dim].min();
+        maxCoords[dim] = coordinates[dim].max();
+		SCAI_ASSERT_NE_ERROR( minCoords[dim], maxCoords[dim], "min=max for dimension "<< dim << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
+    }
+
+	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC<IndexType,ValueType>(coordinates, minCoords, maxCoords, settings);
+
+	return computePartition(coordinates, nodeWeights, blockSizes, centers, settings);
 }
 
 }

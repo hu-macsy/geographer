@@ -145,7 +145,7 @@ void Repartition<IndexType,ValueType>::getImbalancedDistribution(
 			KmeansIter = (KmeansIterTop+KmeansIterBot)/2;
 			imbaSettings.maxKMeansIterations = 30;
 			imbaSettings.balanceIterations = KmeansIter;
-			imbaSettings.minSamplingNodes = graph.getLocalNumRows();;
+			imbaSettings.minSamplingNodes = graph.getLocalNumRows();
 			imbaSettings.freezeBalancedInfluence = true;
 			imbaSettings.repartition = true;
 			//TODO: assuming uniform block sizes

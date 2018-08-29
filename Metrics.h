@@ -19,6 +19,9 @@ struct Metrics{
     std::vector<ValueType> timeKmeans;
     std::vector<ValueType> timeSecondDistribution;
     std::vector<ValueType> timePreliminary;
+
+    //vector specific for kmeans
+    std::vector<std::tuple<ValueType,ValueType>> kmeansProfiling;
     
     //std::map< std::pair<int,int>, int, ValueType > localRefDetails;
 
@@ -59,8 +62,12 @@ struct Metrics{
 	// various other needed info
 	IndexType numBlocks = -1;
 	
-	//constructor
+	//constructors
 	//
+
+//	Metrics(){
+//		initialize(1);
+//	}
 	
 	Metrics( IndexType k = 1) {
 		initialize(k);
