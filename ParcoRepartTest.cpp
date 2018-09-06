@@ -1299,7 +1299,9 @@ TEST_F(ParcoRepartTest, testPixelNeighbours){
 //------------------------------------------------------------------------------
 
 TEST_F(ParcoRepartTest, testRedistributeFromPartition){
-    std::string file = graphPath + "Grid32x32";
+//    std::string file = graphPath + "Grid32x32";
+    std::string fileName = "bigtrace-00000.graph";
+    std::string file = graphPath + fileName;
     IndexType dimensions= 2;
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -1328,7 +1330,8 @@ TEST_F(ParcoRepartTest, testRedistributeFromPartition){
     settings.multiLevelRounds = 3;
     //settings.initialPartition = InitialPartitioningMethods::Multisection;
     settings.initialPartition = InitialPartitioningMethods::KMeans;
-    struct Metrics metrics(settings.numBlocks);
+	settings.noRefinement = true;
+    struct Metrics metrics(settings);
 
     // set uniform weights
     scai::lama::DenseVector<ValueType> nodeWeights(graph.getRowDistributionPtr(), 1);
@@ -1337,7 +1340,29 @@ TEST_F(ParcoRepartTest, testRedistributeFromPartition){
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, nodeWeights, settings, metrics);
     ASSERT_EQ(globalN, partition.size());
 
-    scai::dmemo::DistributionPtr retDist = ParcoRepart<IndexType, ValueType>::redistributeFromPartittion( partition, graph, coords, nodeWeights, settings, metrics);
+	bool useRedistributor = false;
+
+	std::chrono::time_point<std::chrono::system_clock> beforeRedistribution =  std::chrono::system_clock::now();
+    scai::dmemo::DistributionPtr retDist = ParcoRepart<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings, metrics, useRedistributor);
+	std::chrono::duration<double> redistTime = std::chrono::system_clock::now() - beforeRedistribution;
+	ValueType maxTime = comm->max( redistTime.count() );
+	if( comm->getRank()==0)
+		std::cout << "Time to redistribute (useRedistributor= " << useRedistributor <<"): " << maxTime << std::endl;
+
+    EXPECT_TRUE( coords[0].getDistribution().isEqual(nodeWeights.getDistribution()) );
+    EXPECT_TRUE( coords[0].getDistribution().isEqual(graph.getRowDistribution()) );
+    EXPECT_TRUE( coords[0].getDistribution().isEqual(partition.getDistribution()) );
+
+
+	useRedistributor = !useRedistributor;
+	beforeRedistribution =  std::chrono::system_clock::now();
+	scai::dmemo::DistributionPtr retDist2 = ParcoRepart<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings, metrics, useRedistributor);
+	redistTime = std::chrono::system_clock::now() - beforeRedistribution;
+	maxTime = comm->max( redistTime.count() );
+	if( comm->getRank()==0)
+		std::cout << "Time to redistribute (useRedistributor= " << useRedistributor <<"): " << maxTime << std::endl;
+
+	EXPECT_TRUE( retDist->isEqual(*retDist2) );
 
 }
 //------------------------------------------------------------------------------

@@ -1472,14 +1472,15 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const 
 }
 //---------------------------------------------------------------------------------------
 
-static scai::dmemo::DistributionPtr redistributeFromPartition( 
-                DenseVector<IndexType> partition,
-                CSRSparseMatrix<ValueType> graph,
+template<typename IndexType, typename ValueType>
+scai::dmemo::DistributionPtr ParcoRepart<IndexType, ValueType>::redistributeFromPartition( 
+                DenseVector<IndexType>& partition,
+                CSRSparseMatrix<ValueType>& graph,
                 std::vector<DenseVector<ValueType>>& coordinates,
                 DenseVector<ValueType>& nodeWeights,
                 Settings settings, 
                 struct Metrics& metrics,
-                bool useRedistributor = false ){
+                bool useRedistributor/* = false*/ ){
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const IndexType numPEs = comm->getSize();
@@ -1489,9 +1490,9 @@ static scai::dmemo::DistributionPtr redistributeFromPartition(
 
     SCAI_ASSERT_EQ_ERROR( graph.getNumRows(), globalN, "Mismatch in graph and     coordinates size" );
     SCAI_ASSERT_EQ_ERROR( nodeWeights.getDistributionPtr()->getGlobalSize(), globalN , "Mismatch in nodeWeights vector" );
+	SCAI_ASSERT_EQ_ERROR( partition.size(), globalN, "Mismatch in partition size");
     SCAI_ASSERT_EQ_ERROR( partition.min(), 0, "Minimum entry in partition should be 0" );
-    SCAI_ASSERT_EQ_ERROR( partition.max(), numPEs, "Maximum entry in partition must be equal the number of processors.")
-    SCAI_ASSERT_EQ_ERROR( partition.sum(), numPEs*((numPEs-1)/2), "partition must be a permutation of the indeices from 0 to comm->getSize()-1." );
+    SCAI_ASSERT_EQ_ERROR( partition.max(), numPEs-1, "Maximum entry in partition must be equal the number of processors.")
 
     scai::dmemo::DistributionPtr distFromPartition;
 

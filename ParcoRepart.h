@@ -206,8 +206,8 @@ namespace ITI {
 			*/
 
 			static scai::dmemo::DistributionPtr redistributeFromPartition( 
-				DenseVector<IndexType> partition,
-				CSRSparseMatrix<ValueType> graph,
+				DenseVector<IndexType>& partition,
+				CSRSparseMatrix<ValueType>& graph,
 				std::vector<DenseVector<ValueType>>& coordinates,
 				DenseVector<ValueType>& nodeWeights,
 				Settings settings, 

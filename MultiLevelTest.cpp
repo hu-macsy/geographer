@@ -270,9 +270,10 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     settings.dimensions= 2;
     settings.minGainForNextRound = 100;
     settings.minBorderNodes=100;
+	Metrics metrics;
     
     scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, halo, settings);
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, halo, settings, metrics);
     
     EXPECT_EQ( graph.l1Norm() , beforel1Norm);
     EXPECT_EQ( graph.getNumValues() , beforeNumValues);

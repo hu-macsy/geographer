@@ -149,12 +149,12 @@ TEST_F(FileIOTest, testWriteGraphWithEdgeWeights){
     //generate random complete matrix
     auto graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDistPointer);
     
-	scai::lama::MatrixCreator::fillRandom(graph, i/9.0);
+	scai::lama::MatrixCreator::fillRandom(graph, 1/9.0);
 	
 	std::string filename = "./meshes/noEdgeWeights.graph";	
 	FileIO<IndexType, ValueType>::writeGraph( graph, filename );
 	
-	filename = "./meshes/dgeWeights.graph"
+	filename = "./meshes/dgeWeights.graph";
 	FileIO<IndexType, ValueType>::writeGraph( graph, filename, 1 );
 	
 }
