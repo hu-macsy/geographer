@@ -251,7 +251,8 @@ DenseVector<IndexType> assignBlocks(
 		std::vector<ValueType> &lowerBoundNextCenter,
 		std::vector<ValueType> &influence,
 		std::vector<ValueType> &timePerPE,
-		Settings settings) {
+		Settings settings,
+		Metrics &metrics) {
 	SCAI_REGION( "KMeans.assignBlocks" );
 
 //
@@ -506,9 +507,14 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 					<< ", imbalance : " << imbalance << ", time elapsed: " << time << std::endl;
 			std::cout.precision(oldprecision);
 		}
+
 	} while (imbalance > settings.epsilon - 1e-12 && iter < settings.balanceIterations);
 	//std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
 	//aux<IndexType,ValueType>::timeMeasurement(assignStart);
+	
+	//for kmeans profiling
+	metrics.numBalanceIter.push_back(iter);
+
 	return assignment;
 }
 
@@ -555,7 +561,7 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 	aux<IndexType,ValueType>::timeMeasurement( startCents );
 	//aux::printTimeMeasurements( centTIme );
 
-	//WARNING: this was in the initial version. The problem is that each PE find one center. T
+	//WARNING: this was in the initial version. The problem is that each PE find one center.
 	// This can lead to bad solutions since dense areas may require more centers
 	//std::vector<std::vector<ValueType> > initialCenters = findLocalCenters<IndexType,ValueType>(coordinates, nodeWeights);
 	//std::vector<std::vector<ValueType> > initialCenters = findLocalCenters(coordinates, nodeWeights);
@@ -578,7 +584,7 @@ template DenseVector<IndexType> assignBlocks(
 		const std::vector<std::vector<ValueType> > &centers,
         std::vector<IndexType>::iterator firstIndex, std::vector<IndexType>::iterator lastIndex,
         const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment, const std::vector<IndexType> &blockSizes, const SpatialCell &boundingBox,
-        std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter, std::vector<ValueType> &influence, std::vector<ValueType> &timePerPE, Settings settings);
+        std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter, std::vector<ValueType> &influence, std::vector<ValueType> &timePerPE, Settings settings, Metrics &metrics);
 
 template DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings, struct Metrics& metrics);
 

@@ -77,14 +77,14 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
  * @return partition
  */
 
- // template<typename IndexType, typename ValueType>
- // DenseVector<IndexType> computePartition(
- // 	const std::vector<DenseVector<ValueType>> &coordinates, \
- // 	const DenseVector<ValueType> &nodeWeights, \
- // 	const std::vector<IndexType> &blockSizes, \
- // 	std::vector<std::vector<ValueType> > centers, \
- // 	const Settings settings, \
- // 	struct Metrics& metrics=Metrics() );
+ template<typename IndexType, typename ValueType>
+ DenseVector<IndexType> computePartition(
+ 	const std::vector<DenseVector<ValueType>> &coordinates, \
+ 	const DenseVector<ValueType> &nodeWeights, \
+ 	const std::vector<IndexType> &blockSizes, \
+ 	std::vector<std::vector<ValueType> > centers, \
+ 	const Settings settings, \
+ 	struct Metrics& metrics);
 
 
 /**
@@ -181,7 +181,7 @@ DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &c
 		const std::vector<IndexType> &blockSizes,  const SpatialCell &boundingBox,
 		std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter,
 		std::vector<ValueType> &influence, std::vector<ValueType> &timePerPE,
-		Settings settings);
+		Settings settings, Metrics &metrics);
 
 /**
  * Implementations
@@ -223,7 +223,8 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 	    initialCenters = findCenters(coordinates, previous, settings.numBlocks, indices.begin(), indices.end(), nodeWeights);
 	}
 
-	return computePartition(coordinates, nodeWeights, blockSizes, initialCenters, settings);
+	Metrics metrics;
+	return computePartition(coordinates, nodeWeights, blockSizes, initialCenters, settings, metrics);
 }
 
 template<typename IndexType, typename ValueType>
@@ -233,7 +234,7 @@ DenseVector<IndexType> computePartition( \
 	const std::vector<IndexType> &blockSizes, \
 	std::vector<std::vector<ValueType> > centers, \
 	const Settings settings, \
-	struct Metrics metrics=Metrics() ) {
+	struct Metrics &metrics ) {
 
 	SCAI_REGION( "KMeans.computePartition" );
 	std::chrono::time_point<std::chrono::high_resolution_clock> KMeansStart = std::chrono::high_resolution_clock::now();
@@ -340,8 +341,8 @@ PRINT(*comm <<": localN= " << localN << ", minNodes= "<< minNodes );
 //
 
 	if (randomInitialization) {
-		//ITI::GraphUtils::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
-		std::vector<IndexType> localIndices = GraphUtils::indexReorderCantor( localN );
+		ITI::GraphUtils::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
+		//std::vector<IndexType> localIndices = GraphUtils::indexReorderCantor( localN );
 /*
 IndexType indexSumFY = std::accumulate( localIndices.begin(), localIndices.end(), 0);
 IndexType indexSumC = std::accumulate( localIndices2.begin(), localIndices2.end(), 0);
@@ -403,7 +404,7 @@ PRINT(*comm << ": "<< randomInitialization << ", samplingRounds= " << samplingRo
 
 		std::vector<ValueType> timePerPE( comm->getSize(), 0.0);
 
-		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, timePerPE, settings);
+		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, timePerPE, settings, metrics);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
 		if(settings.verbose){
@@ -519,7 +520,7 @@ PRINT(*comm << ": "<< randomInitialization << ", samplingRounds= " << samplingRo
 			std::cout << "i: " << iter<< ", delta: " << delta << ", time : "<< maxTime << ", imbalance= " << imbalance<< std::endl;
 		}
 
-		metrics.kmeansProfiling.push_back( std::make_tuple(maxTime, imbalance) );
+		metrics.kmeansProfiling.push_back( std::make_tuple(delta, maxTime, imbalance) );
 
 		iter++;
 
@@ -547,8 +548,9 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
     }
 
 	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC<IndexType,ValueType>(coordinates, minCoords, maxCoords, settings);
+	Metrics metrics;
 
-	return computePartition(coordinates, nodeWeights, blockSizes, centers, settings);
+	return computePartition(coordinates, nodeWeights, blockSizes, centers, settings, metrics);
 }
 
 }

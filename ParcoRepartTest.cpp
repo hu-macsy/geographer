@@ -643,8 +643,8 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     graph.redistribute(dist, noDistPointer);
     
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), globalN, dimensions);
+
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
-    
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
     
     struct Settings settings;
@@ -1296,6 +1296,50 @@ TEST_F(ParcoRepartTest, testPixelNeighbours){
         SCAI_ASSERT_EQUAL_ERROR(numEdges/2,  dimension*( std::pow(sideLen,dimension)- std::pow(sideLen, dimension-1)) );
     }
 }       
+//------------------------------------------------------------------------------
+
+TEST_F(ParcoRepartTest, testRedistributeFromPartition){
+    std::string file = graphPath + "Grid32x32";
+    IndexType dimensions= 2;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    // for now local refinement requires k = P
+    IndexType k = comm->getSize();
+    //  
+
+    //read graph and coordinates
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+    IndexType globalN = graph.getNumRows();
+
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, globalN) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(globalN));
+
+    graph.redistribute(dist, noDistPointer);
+    
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), globalN, dimensions);
+
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
+    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
+
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+    settings.dimensions = dimensions;
+    settings.multiLevelRounds = 3;
+    //settings.initialPartition = InitialPartitioningMethods::Multisection;
+    settings.initialPartition = InitialPartitioningMethods::KMeans;
+    struct Metrics metrics(settings.numBlocks);
+
+    // set uniform weights
+    scai::lama::DenseVector<ValueType> nodeWeights(graph.getRowDistributionPtr(), 1);
+    
+    // get partition
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, nodeWeights, settings, metrics);
+    ASSERT_EQ(globalN, partition.size());
+
+    scai::dmemo::DistributionPtr retDist = ParcoRepart<IndexType, ValueType>::redistributeFromPartittion( partition, graph, coords, nodeWeights, settings, metrics);
+
+}
 //------------------------------------------------------------------------------
 
 

@@ -21,7 +21,9 @@ struct Metrics{
     std::vector<ValueType> timePreliminary;
 
     //vector specific for kmeans
-    std::vector<std::tuple<ValueType,ValueType>> kmeansProfiling;
+    // tuple has 3 values: (delta, maxTime, imbalance)
+    std::vector<std::tuple<ValueType, ValueType, ValueType>> kmeansProfiling;
+    std::vector<IndexType> numBalanceIter;
     
     //std::map< std::pair<int,int>, int, ValueType > localRefDetails;
 
