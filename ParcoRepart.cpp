@@ -599,6 +599,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			/**
 			 * redistribute to prepare for local refinement
 			 */
+            bool useRedistributor = true;
+            scai::dmemo::DistributionPtr distFromPartition = redistributeFromPartition( result, input, coordinates, nodeWeights, settings, metrics, useRedistributor);
+
+            /*
 			std::chrono::time_point<std::chrono::system_clock> beforeSecondRedistributiom =  std::chrono::system_clock::now();
 			
 			scai::dmemo::Redistributor resultRedist(result.getLocalValues(), result.getDistributionPtr());//TODO: Wouldn't it be faster to use a GeneralDistribution here?
@@ -614,6 +618,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			nodeWeights.redistribute(redistributor);
 			
 			secondRedistributionTime =  std::chrono::system_clock::now() - beforeSecondRedistributiom;
+            */
+            
 			//ValueType timeForSecondRedistr = ValueType ( comm->max(secondRedistributionTime.count() ));
 			
 			partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
@@ -1472,6 +1478,8 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const 
 }
 //---------------------------------------------------------------------------------------
 
+// moved it to AuxiliaryFunctions
+/*
 template<typename IndexType, typename ValueType>
 scai::dmemo::DistributionPtr ParcoRepart<IndexType, ValueType>::redistributeFromPartition( 
                 DenseVector<IndexType>& partition,
@@ -1480,7 +1488,7 @@ scai::dmemo::DistributionPtr ParcoRepart<IndexType, ValueType>::redistributeFrom
                 DenseVector<ValueType>& nodeWeights,
                 Settings settings, 
                 struct Metrics& metrics,
-                bool useRedistributor/* = false*/ ){
+                bool useRedistributor ){
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const IndexType numPEs = comm->getSize();
@@ -1531,7 +1539,7 @@ scai::dmemo::DistributionPtr ParcoRepart<IndexType, ValueType>::redistributeFrom
 
     return distFromPartition;
 }
-
+*/
 
 
 //-------------------------------------------------------------------------------------

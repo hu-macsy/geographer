@@ -23,11 +23,7 @@
 #include "FileIO.h"
 
 
-
-
-
 using namespace scai::lama;
-using scai::dmemo::Halo;
 using scai::dmemo::Halo;
 
 namespace ITI {
@@ -189,6 +185,7 @@ namespace ITI {
 
 			static std::vector<IndexType> neighbourPixels(const IndexType thisPixel,const IndexType sideLen, const IndexType dimensions);
 
+			//WARNING: moved function to AuxiliaryFuncions.h
 			/**
 			Given a partition as input, redistribute the graph, coordinates and node weights. 
 			The partition vector must be a permutation of the indices from 0 to comm->getSize()-1.
@@ -204,7 +201,7 @@ namespace ITI {
 			@param[out} nodeWeights The coordinates of the points/vertices.
 			@param[out] The weights for every vertex.
 			*/
-
+			/*
 			static scai::dmemo::DistributionPtr redistributeFromPartition( 
 				DenseVector<IndexType>& partition,
 				CSRSparseMatrix<ValueType>& graph,
@@ -213,6 +210,6 @@ namespace ITI {
 				Settings settings, 
 				struct Metrics& metrics,
 				bool useRedistributor = false );
-
+			*/
 	};
 }

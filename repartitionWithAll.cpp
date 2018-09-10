@@ -280,7 +280,7 @@ int main(int argc, char** argv) {
 	//		general distribution. Must reindex vertices for parMetis
 	//
 	
-	std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRIB, ITI::Tool::zoltanRCB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC};//, ITI::Tool::parMetisGeom };
+	std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRIB, ITI::Tool::zoltanRCB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool:geoKmeans};//, ITI::Tool::parMetisGeom };
 	//std::vector<ITI::Tool> allTools = { ITI::Tool::parMetisGeom };
 	
 	for( int t=0; t<allTools.size(); t++){
@@ -331,8 +331,13 @@ int main(int argc, char** argv) {
 		// the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
 		struct Metrics metrics(1);
 		metrics.numBlocks = settings.numBlocks;
-
-		scai::lama::DenseVector<IndexType> partition = ITI::Wrappers<IndexType,ValueType>::repartition ( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
+		scai::lama::DenseVector<IndexType> partition;
+		
+		if( thisTool==ITI::Tool:geoKmeans){
+			partition = ITI::KMeans::computeRepartition<IndexType,ValueType>( coords, nodeWeights, settings, metrics);
+		}else{
+			partition = ITI::Wrappers<IndexType,ValueType>::repartition ( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
+		}
 		
 		PRINT0("time to get the partition: " <<  metrics.timeFinalPartition );
 		

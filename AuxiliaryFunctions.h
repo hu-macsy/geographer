@@ -16,7 +16,9 @@
 
 #include "GraphUtils.h"
 #include "Settings.h"
+#include "Metrics.h"
 
+using namespace scai::lama;
 
 namespace ITI{
 
@@ -264,6 +266,65 @@ static std::tuple<IndexType, IndexType> index2_2DPoint(IndexType index,  std::ve
 } 
 //------------------------------------------------------------------------------
 
+
+static scai::dmemo::DistributionPtr redistributeFromPartition( 
+                DenseVector<IndexType>& partition,
+                CSRSparseMatrix<ValueType>& graph,
+                std::vector<DenseVector<ValueType>>& coordinates,
+                DenseVector<ValueType>& nodeWeights,
+                Settings settings, 
+                struct Metrics& metrics,
+                bool useRedistributor = true ){
+
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const IndexType numPEs = comm->getSize();
+    const IndexType thisPE = comm->getRank();
+    const IndexType globalN = coordinates[0].getDistributionPtr()->getGlobalSize();
+    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
+
+    SCAI_ASSERT_EQ_ERROR( graph.getNumRows(), globalN, "Mismatch in graph and     coordinates size" );
+    SCAI_ASSERT_EQ_ERROR( nodeWeights.getDistributionPtr()->getGlobalSize(), globalN , "Mismatch in nodeWeights vector" );
+    SCAI_ASSERT_EQ_ERROR( partition.size(), globalN, "Mismatch in partition size");
+    SCAI_ASSERT_EQ_ERROR( partition.min(), 0, "Minimum entry in partition should be 0" );
+    SCAI_ASSERT_EQ_ERROR( partition.max(), numPEs-1, "Maximum entry in partition must be equal the number of processors.")
+
+    scai::dmemo::DistributionPtr distFromPartition;
+
+    if( useRedistributor ){
+        scai::dmemo::Redistributor resultRedist(partition.getLocalValues(), partition.getDistributionPtr());//TODO: Wouldn't it be faster to use a GeneralDistribution here?
+        
+        partition = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
+        scai::dmemo::Redistributor redistributor(resultRedist.getTargetDistributionPtr(), graph.getRowDistributionPtr());
+
+        for (IndexType d=0; d<settings.dimensions; d++) {
+            coordinates[d].redistribute(redistributor);
+        }
+        nodeWeights.redistribute(redistributor);    
+        graph.redistribute( redistributor, noDist );
+
+        distFromPartition = resultRedist.getTargetDistributionPtr();
+    }else{
+        // create new distribution from partition
+        distFromPartition = scai::dmemo::DistributionPtr( new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
+
+        partition.redistribute( distFromPartition );
+        graph.redistribute( distFromPartition, noDist );
+        nodeWeights.redistribute( distFromPartition );
+
+        // redistribute coordinates
+        for (IndexType d = 0; d < settings.dimensions; d++) {
+            //assert( coordinates[dim].size() == globalN);
+            coordinates[d].redistribute( distFromPartition );
+        }
+    }
+
+    const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
+    SCAI_ASSERT_ERROR( nodeWeights.getDistribution().isEqual(*inputDist), "Distribution mismatch" );
+    SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*inputDist), "Distribution mismatch" );
+    SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*inputDist), "Distribution mismatch" );
+
+    return distFromPartition;
+}
 
 }; //class aux
 

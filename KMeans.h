@@ -385,6 +385,7 @@ PRINT(*comm << ": "<< randomInitialization << ", samplingRounds= " << samplingRo
 	const IndexType maxIterations = settings.maxKMeansIterations;
 	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
 	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
+	ValueType imbalance = 1;
 
 	do {
 		std::chrono::time_point<std::chrono::high_resolution_clock> iterStart = std::chrono::high_resolution_clock::now();
@@ -514,7 +515,7 @@ PRINT(*comm << ": "<< randomInitialization << ", samplingRounds= " << samplingRo
 			maxTime = comm->max( balanceTime.count() );
 		}
 
-		ValueType imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( result, settings.numBlocks, nodeWeights );
+		imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( result, settings.numBlocks, nodeWeights );
 
 		if (comm->getRank() == 0) {
 			std::cout << "i: " << iter<< ", delta: " << delta << ", time : "<< maxTime << ", imbalance= " << imbalance<< std::endl;
@@ -524,7 +525,10 @@ PRINT(*comm << ": "<< randomInitialization << ", samplingRounds= " << samplingRo
 
 		iter++;
 
-	} while (iter < samplingRounds or (iter < maxIterations && (delta > threshold || !balanced)) );// or (imbalance<settings.epsilon) );
+		if(imbalance<settings.epsilon)
+			break;
+
+	} while (iter < samplingRounds or (iter < maxIterations && (delta > threshold || !balanced)) ); // or (imbalance>settings.epsilon) );
 
 
 	std::chrono::duration<ValueType,std::ratio<1>> KMeansTime = std::chrono::high_resolution_clock::now() - KMeansStart;

@@ -406,7 +406,7 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 				std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
 				ValueType time = balanceTime.count() ;
 				//std::cout<< comm->getRank()<< ": time " << time << std::endl;
-				PRINT(comm->getRank() << ": in assignBlocks, balanceIter time: " << time << ", for loops: " << forLoopCnt );
+				//PRINT(comm->getRank() << ": in assignBlocks, balanceIter time: " << time << ", for loops: " << forLoopCnt );
 				ValueType maxTime = comm->max( time );
 				//PRINT0( "max time: " << maxTime << ", for loops: " << forLoopCnt );
 

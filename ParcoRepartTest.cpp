@@ -1330,7 +1330,7 @@ TEST_F(ParcoRepartTest, testRedistributeFromPartition){
     settings.multiLevelRounds = 3;
     //settings.initialPartition = InitialPartitioningMethods::Multisection;
     settings.initialPartition = InitialPartitioningMethods::KMeans;
-	settings.noRefinement = true;
+    settings.noRefinement = true;
     struct Metrics metrics(settings);
 
     // set uniform weights
