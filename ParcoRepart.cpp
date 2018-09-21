@@ -600,7 +600,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			 * redistribute to prepare for local refinement
 			 */
             bool useRedistributor = true;
-            scai::dmemo::DistributionPtr distFromPartition = redistributeFromPartition( result, input, coordinates, nodeWeights, settings, metrics, useRedistributor);
+            scai::dmemo::DistributionPtr distFromPartition = aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights, settings, metrics, useRedistributor);
 
             /*
 			std::chrono::time_point<std::chrono::system_clock> beforeSecondRedistributiom =  std::chrono::system_clock::now();

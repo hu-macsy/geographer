@@ -304,6 +304,7 @@ DenseVector<IndexType> computePartition( \
 
 	QuadNodeCartesianEuclid boundingBox(minCoords, maxCoords);
     if (settings.verbose) {
+    	/*
         std::cout << "Process " << comm->getRank() << ": ( ";
         for (auto coord : minCoords) std::cout << coord << " ";
         std::cout << ") , ( ";
@@ -312,6 +313,10 @@ DenseVector<IndexType> computePartition( \
         std::cout << ", " << localN << " nodes, " << scai::utilskernel::HArrayUtils::sum(nodeWeights.getLocalValues()) << ", " << ((ValueType)localN)/globalN *100<< "%, total weight";
         std::cout << ", volume ratio " << localVolume / (volume / p);
         std::cout << std::endl;
+		*/
+		std::cout << "(" << comm->getRank() << ", "<< localN << ")" << std::endl;
+		comm->synchronize();
+		std::cout << "(" << comm->getRank() << ", "<< localVolume / (volume / p) << ")" << std::endl;
     }
 
 	diagonalLength = std::sqrt(diagonalLength);
@@ -417,7 +422,8 @@ PRINT(*comm << ": "<< randomInitialization << ", samplingRounds= " << samplingRo
 					[&timePerPE](int i, int j){ return timePerPE[i]<timePerPE[j]; } );
 
 				for(int i=0; i<comm->getSize(); i++){
-					std::cout << indices[i]<< ": time for PE: " << timePerPE[indices[i]] << std::endl;
+					//std::cout << indices[i]<< ": time for PE: " << timePerPE[indices[i]] << std::endl;
+					std::cout << "(" << indices[i] << "," << timePerPE[indices[i]] << ")" << std::endl;
 				}
 			}
 		}
@@ -525,6 +531,9 @@ PRINT(*comm << ": "<< randomInitialization << ", samplingRounds= " << samplingRo
 
 		iter++;
 
+		// WARNING-TODO: this stops the iterations prematurely, when the wanted balance
+		// is reached. It is possible that if we allow more iterations, the solution
+		// will converge to some optima reagaridng the cut/shape. Investigate that
 		if(imbalance<settings.epsilon)
 			break;
 

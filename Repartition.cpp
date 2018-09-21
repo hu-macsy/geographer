@@ -177,13 +177,16 @@ void Repartition<IndexType,ValueType>::getImbalancedDistribution(
 	}while( (imbalance<imbaLowBound or imbalance>imbaUpBound) and (std::abs(KmeansIterTop-KmeansIterBot)>2  or std::abs(divergTop-divergBot)>0.05) );
 	//TODO: check that these are OK
 	
-	{
-		//get the distribution from the partition
-		scai::dmemo::DistributionPtr firstDist = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( firstPartition.getDistribution(), firstPartition.getLocalValues() ) );
-		
+	{				
 		SCAI_ASSERT_ERROR( imbaNodeWeights.getDistributionPtr()->isEqual( graph.getRowDistribution() ), "nodeWeights->distribution and graph.getRowDistribution do not agree.");
 		SCAI_ASSERT_ERROR( imbaNodeWeights.getDistributionPtr()->isEqual( coords[0].getDistribution() ), "nodeWeights->distribution and coords[0].getDistribution do not agree.");
 		
+
+		scai::dmemo::DistributionPtr firstDist = ITI::aux<IndexType,ValueType>::redistributeFromPartition( firstPartition, graph, coords, nodeWeights, settings, metrics );
+		/*
+		//get the distribution from the partition
+		scai::dmemo::DistributionPtr firstDist = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( firstPartition.getDistribution(), firstPartition.getLocalValues() ) );
+
 		scai::dmemo::DistributionPtr defaultDist = imbaNodeWeights.getDistributionPtr();
 		scai::dmemo::Redistributor prepareRedist( firstDist, defaultDist );
 		
@@ -197,8 +200,9 @@ void Repartition<IndexType,ValueType>::getImbalancedDistribution(
 		
 		nodeWeights.redistribute( prepareRedist );
 		firstPartition.redistribute( prepareRedist);	//needed to get metrics
+		*/
 	}
-	metrics.getEasyMetrics( graph, firstPartition, nodeWeights, settings );	
+	metrics.getAllMetrics( graph, firstPartition, nodeWeights, settings );	
 	
 }
 

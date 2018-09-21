@@ -163,7 +163,7 @@ struct Metrics{
 	}
 //---------------------------------------------------------------------------
 	
-	void getAllMetrics(scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
+	void getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
 		
 		getEasyMetrics( graph, partition, nodeWeights, settings );
 		
@@ -173,7 +173,7 @@ struct Metrics{
 	}
 //---------------------------------------------------------------------------
 
-	void getRedistMetrics( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
+	void getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
 		
 		getAllMetrics( graph, partition, nodeWeights, settings);
 		
@@ -184,7 +184,7 @@ struct Metrics{
 		
 	}
 //---------------------------------------------------------------------------
-	void getEasyMetrics( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
+	void getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
 		
 		finalCut = ITI::GraphUtils::computeCut(graph, partition, true);
 		finalImbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
@@ -233,7 +233,7 @@ struct Metrics{
 //---------------------------------------------------------------------------
 
 
-	std::tuple<IndexType,IndexType,IndexType> getDiameter( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, struct Settings settings ){
+	std::tuple<IndexType,IndexType,IndexType> getDiameter( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, struct Settings settings ){
 		
 		std::chrono::time_point<std::chrono::high_resolution_clock> diameterStart = std::chrono::high_resolution_clock::now();
 		IndexType maxBlockDiameter = 0;
