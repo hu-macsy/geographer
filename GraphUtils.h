@@ -308,10 +308,15 @@ static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_rand
     return begin;
 }
 
+
 /**	Reordering a sequence of numbers from 0 to maxIndex.
  * The order is: maxIndex/2, maxIdnex/4, maxIndex*3/4, maxIndex/8, maxIndex*3/8, maxIndex*5/8, ...
  * @return The premutated numbers. return.size()=maxIdnex and 0< return[i]< maxIndex.
  */
+
+//currently unused
+/*
+
 //TODO: verify that it works properly
 static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
 	IndexType index = 0;
@@ -342,7 +347,7 @@ static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
 	
 	return ret;
 }
-
+*/
 
 
 

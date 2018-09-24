@@ -278,7 +278,7 @@ static scai::dmemo::DistributionPtr redistributeFromPartition(
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const IndexType numPEs = comm->getSize();
-    const IndexType thisPE = comm->getRank();
+    //const IndexType thisPE = comm->getRank();
     const IndexType globalN = coordinates[0].getDistributionPtr()->getGlobalSize();
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
 

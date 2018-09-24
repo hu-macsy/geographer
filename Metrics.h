@@ -120,11 +120,11 @@ struct Metrics{
 		}
 
 		out<< "localRefinement details" << std::endl;
-		for( int i=0; i<this->localRefDetails.size(); i++){
+		for( unsigned int i=0; i<this->localRefDetails.size(); i++){
 			if( this->localRefDetails[i][0].first != -1){
 				out << "MLRound " << i << std::endl;
 			}
-			for( int j=0; j<this->localRefDetails[i].size(); j++){
+			for( unsigned int j=0; j<this->localRefDetails[i].size(); j++){
 				if( this->localRefDetails[i][j].first != -1){
 					out << "\t refine round " << j <<", gain: " << \
 						this->localRefDetails[i][j].first << ", time: "<< \
@@ -659,8 +659,8 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
 
 		//sumLocalRefDetails.resize(50);
 		//out<< "localRefinement details for run " << run << std::endl;
-		for( int i=0; i<thisMetric.localRefDetails.size(); i++){
-			for( int j=0; j<thisMetric.localRefDetails[i].size(); j++){
+		for( unsigned int i=0; i<thisMetric.localRefDetails.size(); i++){
+			for( unsigned int j=0; j<thisMetric.localRefDetails[i].size(); j++){
 				if( thisMetric.localRefDetails[i][j].first != -1){
 					sumLocalRefDetails[i][j].first += thisMetric.localRefDetails[i][j].first;
 					sumLocalRefDetails[i][j].second += thisMetric.localRefDetails[i][j].second;
@@ -771,7 +771,7 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
 	ValueType sumDisconBlocks = 0;
 	ValueType sumTimeSpMV = 0;
 	ValueType sumTimeComm = 0;
-	ValueType sumFMStep = 0;
+	//ValueType sumFMStep = 0;
 	
 	for(IndexType run=0; run<numRuns; run++){
 		Metrics thisMetric = metricsVec[ run ];

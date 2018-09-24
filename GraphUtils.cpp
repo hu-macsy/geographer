@@ -317,7 +317,7 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 		throw std::runtime_error("Negative node weights not supported.");
 	}
 
-	std::vector<ValueType> subsetSizes(k, 0);
+	std::vector<ValueType> subsetSizes(k, 0.0);
 	const IndexType minK = part.min();
 	const IndexType maxK = part.max();
 
@@ -340,7 +340,16 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 		subsetSizes[partID] += weight;
 		weightSum += weight;
 	}
-	//PRINT(*comm << ": " << ", local node weightSum= " << weightSum);
+PRINT(*comm << ": " << ", local node weightSum= " << weightSum);
+
+for(int p=0; p<comm->getSize(); p++ ){
+	if(comm->getRank()==p){
+		for(int i=0; i<subsetSizes.size(); i++ ){
+			PRINT(*comm << ": " << i << " -- " << subsetSizes[i]);
+		}
+	}
+	comm->synchronize();
+}
 	
 	ValueType optSize;
 	
@@ -367,7 +376,12 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 	}else{
             globalSubsetSizes = subsetSizes;
 	}
+for(int i=0; i<globalSubsetSizes.size(); i++ ){
+	PRINT0(i<< ": " << " -- " << globalSubsetSizes[i]);
+}
+	
 
+	
 	ValueType maxBlockSize = *std::max_element(globalSubsetSizes.begin(), globalSubsetSizes.end());
 
 	if (!weighted) {

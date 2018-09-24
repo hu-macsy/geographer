@@ -180,7 +180,7 @@ DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &c
 		const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment,
 		const std::vector<IndexType> &blockSizes,  const SpatialCell &boundingBox,
 		std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter,
-		std::vector<ValueType> &influence, std::vector<ValueType> &timePerPE,
+		std::vector<ValueType> &influence, ValueType &imbalance, std::vector<ValueType> &timePerPE,
 		Settings settings, Metrics &metrics);
 
 /**
@@ -320,6 +320,7 @@ DenseVector<IndexType> computePartition( \
 	const ValueType expectedBlockDiameter = pow(volume / k, 1.0/dim);
 
 	DenseVector<IndexType> result(coordinates[0].getDistributionPtr(), 0);
+
 	std::vector<ValueType> upperBoundOwnCenter(localN, std::numeric_limits<ValueType>::max());
 	std::vector<ValueType> lowerBoundNextCenter(localN, 0);
 
@@ -404,7 +405,7 @@ SCAI_ASSERT_EQ_ERROR( indexSumFY, indexSumC, "Erros in index reordering");
 
 		std::vector<ValueType> timePerPE( comm->getSize(), 0.0);
 
-		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, timePerPE, settings, metrics);
+		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, imbalance, timePerPE, settings, metrics);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
 		if(settings.verbose){
@@ -483,7 +484,7 @@ SCAI_ASSERT_EQ_ERROR( indexSumFY, indexSumC, "Erros in index reordering");
 		}
 		centers = newCenters;
 
-		std::vector<IndexType> blockWeights(k,0);
+		std::vector<ValueType> blockWeights(k,0.0);
 		for (auto it = firstIndex; it != lastIndex; it++) {
 			const IndexType i = *it;
 			IndexType cluster = rResult[i];
@@ -499,8 +500,12 @@ SCAI_ASSERT_EQ_ERROR( indexSumFY, indexSumC, "Erros in index reordering");
 
 		{
 			SCAI_REGION( "KMeans.computePartition.blockWeightSum" );
-			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<IndexType>::stype);
+			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<ValueType>::stype);
 		}
+
+for(int i=0; i<blockWeights.size(); i++ ){
+	PRINT0(i << ": " << blockWeights[i]);
+}
 
 		balanced = true;
 		for (IndexType j = 0; j < k; j++) {
@@ -515,7 +520,26 @@ SCAI_ASSERT_EQ_ERROR( indexSumFY, indexSumC, "Erros in index reordering");
 			maxTime = comm->max( balanceTime.count() );
 		}
 
-		imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( result, settings.numBlocks, nodeWeights );
+{
+scai::hmemo::ReadAccess<ValueType> localWeight(nodeWeights.getLocalValues());
+ValueType weightSum = 0.0;
+ValueType maxWeight = 0.0;
+for (IndexType i = 0; i < localN; i++) {
+	weightSum += localWeight[i];
+	if( localWeight[i]>maxWeight)
+		maxWeight = localWeight[i];
+}
+PRINT(*comm << ": " << ", local node weightSum= " << weightSum << " , max = " << maxWeight );
+}
+		
+		//WARNING: when sampling, a (big!) part of the result vector is not changed
+		//	and keeps its initial value which is 0. So, the computeImbalance finds,
+		//	falsely, block 0 to be over weighted. We use the returned imabalance
+		//	from assign centers when sampling is used and we compute a new imbalance
+		// only when thene is no sampling
+		if( !randomInitialization ){
+			imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( result, settings.numBlocks, nodeWeights );
+		}
 
 		if (comm->getRank() == 0) {
 			std::cout << "i: " << iter<< ", delta: " << delta << ", time : "<< maxTime << ", imbalance= " << imbalance<< std::endl;
@@ -528,8 +552,12 @@ SCAI_ASSERT_EQ_ERROR( indexSumFY, indexSumC, "Erros in index reordering");
 		// WARNING-TODO: this stops the iterations prematurely, when the wanted balance
 		// is reached. It is possible that if we allow more iterations, the solution
 		// will converge to some optima reagaridng the cut/shape. Investigate that
-		if(imbalance<settings.epsilon)
-			break;
+
+		//WARNING2: this is also needed to ensure that the required number of sampling
+		//	rounds will be performed so at the end, all nodes are accounted for
+
+		//if(imbalance<settings.epsilon)
+		//	break;
 
 	} while (iter < samplingRounds or (iter < maxIterations && (delta > threshold || !balanced)) ); // or (imbalance>settings.epsilon) );
 

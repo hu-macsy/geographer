@@ -1308,7 +1308,7 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     assert( N== adjM.getNumColumns() ); // numRows = numColumns
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
-	std::chrono::time_point<std::chrono::system_clock> before =  std::chrono::system_clock::now();
+	//std::chrono::time_point<std::chrono::system_clock> before =  std::chrono::system_clock::now();
 	
     if (!adjM.getRowDistributionPtr()->isReplicated()) {
         PRINT0("***WARNING: In getGraphMEC_local: given graph is not replicated; will replicate now");
