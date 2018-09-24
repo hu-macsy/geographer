@@ -230,7 +230,7 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition( \
 	const std::vector<DenseVector<ValueType>> &coordinates, \
-	const DenseVector<ValueType> &  nodeWeights, \
+	const DenseVector<ValueType> &nodeWeights, \
 	const std::vector<IndexType> &blockSizes, \
 	std::vector<std::vector<ValueType> > centers, \
 	const Settings settings, \
@@ -298,9 +298,6 @@ DenseVector<IndexType> computePartition( \
 
 	//
 
-//
-//PRINT(*comm << ": localN= "<< localN << ", " << ((ValueType)localN)/globalN *100 <<"% ,   localVol= " << localVolume );
-//
 
 	QuadNodeCartesianEuclid boundingBox(minCoords, maxCoords);
     if (settings.verbose) {
@@ -341,9 +338,6 @@ DenseVector<IndexType> computePartition( \
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
 	const bool randomInitialization = comm->all(localN > minNodes);
 
-//
-PRINT(*comm <<": localN= " << localN << ", minNodes= "<< minNodes );
-//
 
 	if (randomInitialization) {
 		ITI::GraphUtils::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
@@ -361,9 +355,9 @@ SCAI_ASSERT_EQ_ERROR( indexSumFY, indexSumC, "Erros in index reordering");
 		samples[0] = std::min(minNodes, localN);
 	}
 
-//
-PRINT(*comm << ": "<< randomInitialization << ", samplingRounds= " << samplingRounds << ", lastIndex: " << *localIndices.end() );
-//
+	if(settings.verbose){
+		PRINT(*comm << ": localN= "<< localN << ", samplingRounds= " << samplingRounds << ", lastIndex: " << *localIndices.end() );
+	}
 
 	if (samplingRounds > 0 && settings.verbose) {
 		if (comm->getRank() == 0) std::cout << "Starting with " << samplingRounds << " sampling rounds." << std::endl;
@@ -549,8 +543,12 @@ PRINT(*comm << ": "<< randomInitialization << ", samplingRounds= " << samplingRo
 }
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights,
-		const std::vector<IndexType> &blockSizes, const Settings settings) {
+DenseVector<IndexType> computePartition(
+	const std::vector<DenseVector<ValueType>> &coordinates,
+	const DenseVector<ValueType> &nodeWeights,
+	const std::vector<IndexType> &blockSizes,
+	const Settings settings,
+	struct Metrics& metrics) {
 
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
@@ -561,7 +559,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
     }
 
 	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC<IndexType,ValueType>(coordinates, minCoords, maxCoords, settings);
-	Metrics metrics;
+	//Metrics metrics;
 
 	return computePartition(coordinates, nodeWeights, blockSizes, centers, settings, metrics);
 }

@@ -741,29 +741,23 @@ int main(int argc, char** argv) {
 					printVectorMetricsShort( metricsVec, outF ); 
 				else
 					printVectorMetrics( metricsVec, outF ); 
-				
-//
-outF << " iteration | delta | time | imbalance | balanceIter" << std::endl;
-ValueType totTime = 0.0;
-SCAI_ASSERT_EQ_ERROR( metricsVec[0].kmeansProfiling.size(), metricsVec[0].numBalanceIter.size() , "mismatch in kmeans profiling metrics vectors");
+			
+				//	profiling info for k-means
+				if(settings.verbose){
+					outF << "iter | delta | time | imbalance | balanceIter" << std::endl;
+					ValueType totTime = 0.0;
+					SCAI_ASSERT_EQ_ERROR( metricsVec[0].kmeansProfiling.size(), metricsVec[0].numBalanceIter.size() , "mismatch in kmeans profiling metrics vectors");
 
 
-for( int i=0; i<metricsVec[0].kmeansProfiling.size(); i++){
-	std::tuple<ValueType, ValueType, ValueType> tuple = metricsVec[0].kmeansProfiling[i];
-	/*
-	ValueType sumNumBalanceIter = 0.0;
-	for(IndexType r=0; r<repeatTimes; r++){
-		std::get<0>(tuple) = std::get<0>(tuple) + metricsVec[r].kmeansProfiling[i];
-		std::get<1>(tuple) = std::get<1>(tuple) + metricsVec[r].kmeansProfiling[i];
-		std::get<2>(tuple) = std::get<2>(tuple) + metricsVec[r].kmeansProfiling[i];
-		sumNumBalanceIter += metricsVec[r].numBalanceIter[i];
-	}
-	*/
-	outF << i << " " << std::get<0>(tuple) << " " << std::get<1>(tuple) << " " << std::get<2>(tuple) << " " <<  metricsVec[0].numBalanceIter[i] << std::endl;
-	totTime += std::get<1>(tuple);
-}
-outF << "totTime: " << totTime << std::endl;
-//
+					for( int i=0; i<metricsVec[0].kmeansProfiling.size(); i++){
+						std::tuple<ValueType, ValueType, ValueType> tuple = metricsVec[0].kmeansProfiling[i];
+
+						outF << i << " " << std::get<0>(tuple) << " " << std::get<1>(tuple) << " " << std::get<2>(tuple) << " " <<  metricsVec[0].numBalanceIter[i] << std::endl;
+						totTime += std::get<1>(tuple);
+					}
+					outF << "totTime: " << totTime << std::endl;
+				}	
+				//
 
 				//printVectorMetrics( metricsVec, outF ); 
                 std::cout<< "Output information written to file " << settings.outFile << " in total time " << totalT << std::endl;

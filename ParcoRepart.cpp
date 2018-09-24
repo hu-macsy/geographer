@@ -95,7 +95,7 @@ template<typename IndexType, typename ValueType>
 std::vector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     IndexType *vtxDist, IndexType *xadj, IndexType *adjncy, IndexType localM,
     IndexType *vwgt, IndexType dimensions, ValueType *xyz,
-    Settings  settings, Metrics metrics ){
+    Settings  settings, Metrics &metrics ){
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const IndexType numPEs = comm->getSize();
@@ -478,7 +478,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 						tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, migrationSettings);
 					} else if (settings.initialMigration == InitialPartitioningMethods::KMeans) {
 						std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );
-						tempResult = ITI::KMeans::computePartition(coordinates, convertedWeights, migrationBlockSizes, migrationSettings);
+                        struct Metrics tmpMetrics;
+						tempResult = ITI::KMeans::computePartition(coordinates, convertedWeights, migrationBlockSizes, migrationSettings, tmpMetrics);
 					}
 					
 					initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
@@ -538,7 +539,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		if (settings.repartition) {
 			result = ITI::KMeans::computeRepartition(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
 		} else {
-			result = ITI::KMeans::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings);
+			result = ITI::KMeans::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
 		}
 		
 		kMeansTime = std::chrono::system_clock::now() - beforeKMeans;

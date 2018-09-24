@@ -95,7 +95,7 @@ namespace ITI {
 			static std::vector<IndexType> partitionGraph(
 				IndexType *vtxDist, IndexType *xadj, IndexType *adjncy, IndexType localM,
     			IndexType *vwgt, IndexType ndims, ValueType *xyz,
-    			Settings  settings, Metrics metrics);
+    			Settings  settings, Metrics& metrics);
 
             /*
              * Get an initial partition using the Hilbert curve.
