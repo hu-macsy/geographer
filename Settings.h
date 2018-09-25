@@ -191,6 +191,7 @@ struct Settings{
     //debug and profiling parameters
     bool verbose = false;
     bool writeDebugCoordinates = false;
+    bool writePEgraph = false;
     bool writeInFile = false;
     bool storeInfo = false;
 	int repeatTimes = 1;

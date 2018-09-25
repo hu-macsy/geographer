@@ -495,17 +495,15 @@ SCAI_ASSERT_EQ_ERROR( indexSumFY, indexSumC, "Erros in index reordering");
 		//aux<IndexType,ValueType>::timeMeasurement(iterStart);
 		std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - iterStart;			
 		ValueType time = balanceTime.count() ;
-		PRINT(*comm <<": in computePartition, iteration time: " << time );
-		//
+
+		if(settings.verbose){
+			PRINT(*comm <<": in computePartition, iteration time: " << time );
+		}
 
 		{
 			SCAI_REGION( "KMeans.computePartition.blockWeightSum" );
 			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<ValueType>::stype);
 		}
-
-for(int i=0; i<blockWeights.size(); i++ ){
-	PRINT0(i << ": " << blockWeights[i]);
-}
 
 		balanced = true;
 		for (IndexType j = 0; j < k; j++) {
@@ -520,17 +518,6 @@ for(int i=0; i<blockWeights.size(); i++ ){
 			maxTime = comm->max( balanceTime.count() );
 		}
 
-{
-scai::hmemo::ReadAccess<ValueType> localWeight(nodeWeights.getLocalValues());
-ValueType weightSum = 0.0;
-ValueType maxWeight = 0.0;
-for (IndexType i = 0; i < localN; i++) {
-	weightSum += localWeight[i];
-	if( localWeight[i]>maxWeight)
-		maxWeight = localWeight[i];
-}
-PRINT(*comm << ": " << ", local node weightSum= " << weightSum << " , max = " << maxWeight );
-}
 		
 		//WARNING: when sampling, a (big!) part of the result vector is not changed
 		//	and keeps its initial value which is 0. So, the computeImbalance finds,

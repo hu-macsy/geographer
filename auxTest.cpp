@@ -364,7 +364,7 @@ TEST_F(auxTest, testMEColoring_local){
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
     settings.initialPartition = InitialPartitioningMethods::SFC;
-    struct Metrics metrics(settings.numBlocks);
+    struct Metrics metrics(settings);
     
     //get the partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
@@ -401,7 +401,7 @@ TEST_F(auxTest, testMEColoring_local){
     
     std::vector<std::vector<IndexType>> coloringBoost = ParcoRepart<IndexType,ValueType>::getGraphEdgeColoring_local( processGraph, colorsBoost );
 
-    std::vector<std::tuple<IndexType,IndexType,IndexType>> edgeList = GraphUtils::CSR2EdgeList_local<IndexType,ValueType>( processGraph, maxDegree );
+    std::vector<std::tuple<IndexType,IndexType,ValueType>> edgeList = GraphUtils::CSR2EdgeList_local<IndexType,ValueType>( processGraph, maxDegree );
 
     // undirected graph so every edge appears once in the edge list
     EXPECT_EQ( edgeList.size()*2, processGraph.getNumValues() ); 

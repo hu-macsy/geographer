@@ -82,8 +82,10 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
 	std::chrono::duration<double> beforeLoop = std::chrono::system_clock::now() - startTime;
 	ValueType t1 = comm->max(beforeLoop.count());
-	PRINT0("time elapsed before main loop: " << t1 );
-	PRINT0("number of rounds/loops: " << communicationScheme.size() );
+	if(settings.verbose){
+		PRINT0("time elapsed before main loop: " << t1 );
+		PRINT0("number of rounds/loops: " << communicationScheme.size() );
+	}
 	
 	//main loop, one iteration for each color of the graph coloring
 	for (IndexType color = 0; color < communicationScheme.size(); color++) {
@@ -446,7 +448,9 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 		}
 		std::chrono::duration<double> oneLoop = std::chrono::system_clock::now() - loopStart;
 		ValueType t2 = comm->max(oneLoop.count());
-		PRINT0("time elapsed for loop " << color <<": " << t2 );
+		if(settings.verbose){
+			PRINT0("time elapsed for loop " << color <<": " << t2 );
+		}
 	}
 
 	comm->synchronize();

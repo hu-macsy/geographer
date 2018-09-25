@@ -124,20 +124,22 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 		SCAI_REGION( "MultiLevel.multiLevelStep.localRefinement" )
 		scai::lama::CSRSparseMatrix<ValueType> processGraph = GraphUtils::getPEGraph<IndexType, ValueType>(input);
 		
-		
-{//write PE graph for further experiments
-	//TODO: this workds only for 12 rounds
-	PRINT0( "thisRound= " << settings.thisRound << " , multiLevelRounds= " << settings.multiLevelRounds);
-	if( settings.thisRound==0){
-		std::chrono::time_point<std::chrono::system_clock> before =  std::chrono::system_clock::now();
-		std::string filename = settings.fileName+ "_k"+ std::to_string(settings.numBlocks)+ ".PEgraph";
-		if( not FileIO<IndexType,ValueType>::fileExists(filename) ){
-			FileIO<IndexType,ValueType>::writeGraph(processGraph, filename, 1);
+		//TODO: remove from final version?
+		// write the PE graph for further experiments
+		if(settings.writePEgraph){//write PE graph for further experiments
+			//TODO: this workos only for 12 rounds
+			PRINT0( "thisRound= " << settings.thisRound << " , multiLevelRounds= " << settings.multiLevelRounds);
+			if( settings.thisRound==0){
+				std::chrono::time_point<std::chrono::system_clock> before =  std::chrono::system_clock::now();
+				std::string filename = settings.fileName+ "_k"+ std::to_string(settings.numBlocks)+ ".PEgraph";
+				if( not FileIO<IndexType,ValueType>::fileExists(filename) ){
+					FileIO<IndexType,ValueType>::writeGraph(processGraph, filename, 1);
+				}
+				std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - before;
+				PRINT0("time to write PE graph: :" << elapTime.count() );
+			}
 		}
-		std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - before;
-		PRINT0("time to write PE graph: :" << elapTime.count() );
-	}
-}
+
 		std::chrono::time_point<std::chrono::system_clock> before =  std::chrono::system_clock::now();
 		
 		std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(processGraph, settings);
@@ -161,15 +163,19 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 		while (numRefinementRounds == 0 || gain >= settings.minGainForNextRound) {
 
 			std::chrono::time_point<std::chrono::system_clock> beforeFMStep =  std::chrono::system_clock::now();
-// get garph before every step			
+/*			
+// get graph before every step			
 processGraph = GraphUtils::getPEGraph<IndexType, ValueType>(input);			
 communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(processGraph, settings);
 nodesWithNonLocalNeighbors = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(input);
 elapTime = std::chrono::system_clock::now() - beforeFMStep;
 maxTime = comm->max( elapTime.count() );
 minTime = comm->min( elapTime.count() );
-PRINT0("getCommPairs and border nodes: time " << minTime << " -- " << maxTime );
 
+if(settings.verbose){
+	PRINT0("getCommPairs and border nodes: time " << minTime << " -- " << maxTime );
+}
+*/
 			std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(input, part, nodesWithNonLocalNeighbors, nodeWeights, coordinates, distances, origin, communicationScheme, settings);
 			gain = 0;
 			for (IndexType roundGain : gainPerRound) gain += roundGain;
@@ -208,7 +214,7 @@ PRINT0("getCommPairs and border nodes: time " << minTime << " -- " << maxTime );
 				assert(gain >= 0);
 			}
 			if (comm->getRank() == 0) {
-				std::cout << "Multilevel round "<< settings.multiLevelRounds <<": In refinement round " << numRefinementRounds << ", gain was " << gain << " in time " << FMStepTime << std::endl;
+				std::cout << "\nMultilevel round "<< settings.multiLevelRounds <<": In refinement round " << numRefinementRounds << ", gain was " << gain << " in time " << FMStepTime << std::endl;
 			}
 			numRefinementRounds++;
 

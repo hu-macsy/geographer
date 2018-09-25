@@ -1318,20 +1318,12 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     }
     IndexType maxDegree = -1;
 
-    std::vector<std::tuple<IndexType,IndexType,IndexType>> edgeList = GraphUtils::CSR2EdgeList_local<IndexType,ValueType>( adjM, maxDegree );
-	/*
-	std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - before;
-	ValueType maxTime = comm->max( elapTime.count() );
-	ValueType minTime = comm->min( elapTime.count() );
-	PRINT0("replication and conversion to edge list: time " << minTime << " -- " << maxTime);
-	*/
+    std::vector<std::tuple<IndexType,IndexType,ValueType>> edgeList = GraphUtils::CSR2EdgeList_local<IndexType,ValueType>( adjM, maxDegree );
+
     //the constructor adds the edges with the same order as they are in edgeList.
     //so, edge with edgeID=i is the edge edgeList[i]
     mec::graph G( edgeList );
     G.maxDegree = maxDegree;
-    
-//PRINT0(G.vertices_map.size() << " + + " << G.edge_map.size() );
-//PRINT0("max degree = " << maxDegree );
 
     std::unordered_map<int, int> mecColoring = greedyColoring(G);
 
@@ -1347,7 +1339,7 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
         retG[0].push_back( std::get<0>(edgeList[edgeID]) );
         retG[1].push_back( std::get<1>(edgeList[edgeID]) );
         retG[2].push_back( edgeColor );
-//PRINT("edge ("<< retG[0].back() << ", "<< retG[1].back() << "): " << retG[2].back() );
+        //PRINT("edge ("<< retG[0].back() << ", "<< retG[1].back() << "): " << retG[2].back() );
         if(edgeColor>colors){
             colors = edgeColor;
         }
@@ -1383,7 +1375,8 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 		//here graph is replicated. PE0 will write it in a file
 		
 		if(settings.mec){
-			coloring = getGraphMEC_local( adjM, colors );
+			//coloring = getGraphMEC_local( adjM, colors );  // using hasan's code
+            coloring = GraphUtils::mecGraphColoring<IndexType, ValueType>( adjM, colors); // our implementation
 		}else{
 			coloring = getGraphEdgeColoring_local( adjM, colors );
 		}

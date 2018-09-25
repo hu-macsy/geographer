@@ -213,7 +213,7 @@ ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<
 	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
     
 	if (partDist->getLocalSize() != localN) {
-		PRINT0("Local values mismatch for matrix and partition");
+		PRINT0("Local g mismatch for matrix and partition");
 		throw std::runtime_error("partition has " + std::to_string(partDist->getLocalSize()) + " local values, but matrix has " + std::to_string(localN));
 	}
 	
@@ -340,16 +340,6 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 		subsetSizes[partID] += weight;
 		weightSum += weight;
 	}
-PRINT(*comm << ": " << ", local node weightSum= " << weightSum);
-
-for(int p=0; p<comm->getSize(); p++ ){
-	if(comm->getRank()==p){
-		for(int i=0; i<subsetSizes.size(); i++ ){
-			PRINT(*comm << ": " << i << " -- " << subsetSizes[i]);
-		}
-	}
-	comm->synchronize();
-}
 	
 	ValueType optSize;
 	
@@ -376,12 +366,7 @@ for(int p=0; p<comm->getSize(); p++ ){
 	}else{
             globalSubsetSizes = subsetSizes;
 	}
-for(int i=0; i<globalSubsetSizes.size(); i++ ){
-	PRINT0(i<< ": " << " -- " << globalSubsetSizes[i]);
-}
-	
 
-	
 	ValueType maxBlockSize = *std::max_element(globalSubsetSizes.begin(), globalSubsetSizes.end());
 
 	if (!weighted) {
@@ -1528,9 +1513,9 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 
 //--------------------------------------------------------------------------------------- 
 // given a non-distributed csr matrix converts it to an edge list
-// two first numbers are the vertex ID and the third one is the edge weight
+// two first numbers are the vertex IDs and the third one is the edge weight
 template<typename IndexType, typename ValueType>
-std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const CSRSparseMatrix<ValueType> &graph, IndexType &maxDegree) {
+std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local(const CSRSparseMatrix<ValueType> &graph, IndexType &maxDegree) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     CSRSparseMatrix<ValueType> tmpGraph(graph);
@@ -1554,7 +1539,7 @@ std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const 
 	SCAI_ASSERT_EQ_ERROR( ia.size(), N+1, "Wrong ia size?" );	
 
 	const IndexType numEdges = values.size();
-	std::vector<std::tuple<IndexType,IndexType,IndexType>> edgeList;//( numEdges/2 );
+	std::vector<std::tuple<IndexType,IndexType,ValueType>> edgeList;//( numEdges/2 );
 	IndexType edgeIndex = 0;
 	IndexType maxEdgeWeight = 0;
 	IndexType minEdgeWeight = std::numeric_limits<int>::max();
@@ -1582,7 +1567,10 @@ std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const 
     		edgeIndex++;
     	}
     }
-    PRINT0("min edge weight: " <<minEdgeWeight << ", max edge weight: " << maxEdgeWeight);
+    if(settings.verbose){
+    	PRINT0("min edge weight: " <<minEdgeWeight << ", max edge weight: " << maxEdgeWeight);
+    }
+    
     SCAI_ASSERT_EQ_ERROR( edgeList.size()*2, numEdges, "Wrong number of edges");
     return edgeList;
 }
@@ -1721,16 +1709,149 @@ scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d) {
 }
 
 //-----------------------------------------------------------------------------------
+// return[0][i] the first node, return[1][i] the second node, return[2][i] the color of the edge
+// WARNING: the code from hasan thesis is faster, almost half the time.
+//		For small graphs (~ <32K  edges) that is OK. 
+//TODO: invest possible optimizations
+
 template<typename IndexType, typename ValueType>
-CSRSparseMatrix<ValueType> mecGraphColoring( const CSRSparseMatrix<ValueType> &graph ) {
+std::vector< std::vector<IndexType>> mecGraphColoring( const CSRSparseMatrix<ValueType> &graph, IndexType &colors) {
 
-// 1 - convert CSR to adjacency list
+	typedef std::tuple<IndexType,IndexType,ValueType> edge;
+	typedef std::tuple<IndexType,IndexType> edgeNoWeight;
+	const IndexType N = graph.getNumRows();
+	colors = -1;
 
-// 2 - sort adjacency list based on edge weights
+	std::chrono::time_point<std::chrono::steady_clock> start= std::chrono::steady_clock::now();
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-// 3 - apply greedy (quadratic) algorithm for mec
+	if (!graph.getRowDistributionPtr()->isReplicated()) {
+		PRINT0("***WARNING: In getCommunicationPairs_local: given graph is not replicated;\nAborting...");		
+		throw std::runtime_error("In mecGraphColoring, graph is not replicated");
+	}
+
+	// 1 - convert CSR to adjacency list
+
+	IndexType maxDegree = 0;
+
+	//edgeList[i] = a tuple (v1,v2,w) describing an edges. v1 and v2 are the two
+	// edge IDs and w is the edge weight
+	std::vector<edge> edgeList = CSR2EdgeList_local(graph, maxDegree);
+
+	//
+	// 2 - sort adjacency list based on edge weights
+	//
+	std::sort( edgeList.begin(), edgeList.end(),
+	 [](edge v1, edge v2){
+	 	return std::get<2>(v1) > std::get<2>(v2);
+	 }
+	);
+	//std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - start;
+	//PRINT("Edges sorted succesfully, time to convert and sort: " << elapTime.count() );
+
+	//
+	// 3 - apply greedy algorithm for mec
+	//
+
+	// a map storing the color for each edge. Initialize coloring to 2*maxDegree
+	std::map<edgeNoWeight, int> edgesColor;
+	for(typename std::vector<edge>::iterator it=edgeList.begin(); it!=edgeList.end(); it++){
+		//edge thisEdge = *it;
+		edgeNoWeight thisEdge = std::make_tuple( std::get<0>(*it), std::get<1>(*it) );
+		edgesColor.insert( std::pair<edgeNoWeight,int>( thisEdge, 2*maxDegree));
+	}
+	//elapTime = std::chrono::steady_clock::now() - start - elapTime;
+	//PRINT0("map created succesfully, time to initialize map: " << elapTime.count() );
+
+	// to be returned
+	//retCol[0][i] the first node, retCol[1][i] the second node, retCol[2][i] the color of the edge
+	std::vector< std::vector<IndexType>> retCol(3);
+	start= std::chrono::steady_clock::now();
+	// for all the edges
+	for(typename std::vector<edge>::iterator edgeIt=edgeList.begin(); edgeIt!=edgeList.end(); edgeIt++){
+		//edge thisEdge = *edgeIt;
+		IndexType v0 = std::get<0>(*edgeIt);
+		IndexType v1 = std::get<1>(*edgeIt);
+		
+		// since the matrix is symmetric, we need only to check to top right half
+		if( v0>v1 ){
+			continue;
+		}
+
+		//TODO: maybe too many assertion , consider removing them
+		SCAI_ASSERT_LT_ERROR( v0, N, "Too large vertex ID");
+		SCAI_ASSERT_LT_ERROR( v1, N, "Too large vertex ID");
+		SCAI_ASSERT_GE_ERROR( v0, 0, "Negative vertex ID");
+		SCAI_ASSERT_GE_ERROR( v1, 0, "Negative vertex ID");
+		
+		const CSRStorage<ValueType>& storage = graph.getLocalStorage();
+		const scai::hmemo::ReadAccess<IndexType> ia(storage.getIA());
+		const scai::hmemo::ReadAccess<IndexType> ja(storage.getJA());
+		
+		//TODO? maybe use a set for colors to automatically remove duplicates?
+		std::vector<int> usedColors = {2*(int)maxDegree};
+		//std::set<int> foundColors;
+
+    	// check the color of the rest of the edges for the two nodes of this edge,
+		std::vector<IndexType> tmpEdge = {v0, v1};
+		for(typename vector<IndexType>::iterator nodeIt=tmpEdge.begin(); nodeIt!=tmpEdge.end(); nodeIt++){
+			SCAI_ASSERT_LT_ERROR(*nodeIt, ia.size(), "Wrong node index");
+	    	for(IndexType j=ia[*nodeIt]; j<ia[*nodeIt+1]; j++){ // for all the edges of a node
+	    		IndexType neighbor = ja[j];
+	    		// not check this edge, edgeIt=(v0, v1, ...)
+				if(neighbor==v0 or neighbor==v1 ){
+					continue;
+				}
+	    		// to find the edge (v0,v1), the smallest id must be first
+	    		edgeNoWeight neighborEdge;
+	    		if( neighbor<*nodeIt){
+	    			neighborEdge = std::make_tuple( neighbor, *nodeIt );
+	    		}else{
+	    			neighborEdge = std::make_tuple( *nodeIt, neighbor );
+	    		}
+
+	    		int color = edgesColor.find( neighborEdge )->second;
+	    		usedColors.push_back( color );
+	    		//foundColors.insert( color );
+	    	}
+    	}
 
 
+    	//find the minimum free color
+    	std::sort(usedColors.begin(), usedColors.end() );
+    	//remove duplicates
+    	usedColors.erase( std::unique(usedColors.begin(), usedColors.end()), usedColors.end() );
+
+		int freeColor = -1;
+
+    	//TODO: worth to replace linear scan with an (adapted) binary search
+    	for(unsigned int i=0; i<usedColors.size(); i++){
+    		if(usedColors[i]!=i){
+    			freeColor = i;
+    			break;
+    		}
+    	}
+		
+
+    	//update the colors variable
+    	if(freeColor>colors){
+    		colors = freeColor;
+    	}
+    	SCAI_ASSERT_LT_ERROR( freeColor, 2*maxDegree, "Color too large" );
+
+		edgesColor.find( std::make_tuple(v0, v1) )->second = freeColor;
+
+    	retCol[0].push_back( v0 );
+    	retCol[1].push_back( v1 );
+    	retCol[2].push_back( freeColor );
+    }//for all edges in list
+    //elapTime = std::chrono::steady_clock::now() - start;
+    //PRINT0("time for all edges: " << elapTime.count() );
+
+   	//number of colors is the max color used +1
+    colors++;
+
+    return retCol;
 }
 //-----------------------------------------------------------------------------------
 
@@ -1757,11 +1878,11 @@ template  std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama
 template scai::lama::CSRSparseMatrix<ValueType> getPEGraph<IndexType,ValueType>( const scai::lama::CSRSparseMatrix<ValueType> &adjM);
 template scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>> &adjList);
 template scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList );
-template std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const CSRSparseMatrix<ValueType>& graph, IndexType& maxDegree);
+template std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local(const CSRSparseMatrix<ValueType>& graph, IndexType& maxDegree);
 template scai::lama::CSRSparseMatrix<ValueType> constructLaplacian<IndexType, ValueType>(scai::lama::CSRSparseMatrix<ValueType> graph);
 template scai::lama::CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension);
 template scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d);
-
+template std::vector< std::vector<IndexType>> mecGraphColoring( const CSRSparseMatrix<ValueType> &graph, IndexType &colors);
 
 } /*namespace GraphUtils*/
 

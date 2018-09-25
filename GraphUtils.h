@@ -250,7 +250,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	@return The edge list representation
 */
 template<typename IndexType, typename ValueType>
-std::vector<std::tuple<IndexType,IndexType,IndexType>> CSR2EdgeList_local(const scai::lama::CSRSparseMatrix<ValueType>& graph, IndexType& maxDegree);
+std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local(const scai::lama::CSRSparseMatrix<ValueType>& graph, IndexType& maxDegree);
 
 /**
  * @brief Construct the Laplacian of the input matrix. May contain parallel communication.
@@ -286,6 +286,8 @@ scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d);
 
 //taken from https://stackoverflow.com/a/9345144/494085
 
+template<typename IndexType, typename ValueType>
+std::vector< std::vector<IndexType>> mecGraphColoring( const scai::lama::CSRSparseMatrix<ValueType> &graph, IndexType &colors);
 
 /**
  * @brief Randomly select elements and move them to the front.
@@ -314,8 +316,6 @@ static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_rand
  * @return The premutated numbers. return.size()=maxIdnex and 0< return[i]< maxIndex.
  */
 
-//currently unused
-/*
 
 //TODO: verify that it works properly
 static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
@@ -347,7 +347,7 @@ static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
 	
 	return ret;
 }
-*/
+
 
 
 

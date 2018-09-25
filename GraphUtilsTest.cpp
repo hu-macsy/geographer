@@ -7,6 +7,8 @@
 #include "GraphUtils.h"
 
 #include <scai/dmemo/CyclicDistribution.hpp>
+#include <scai/hmemo/ReadAccess.hpp>
+#include <scai/hmemo/WriteAccess.hpp>
 
 namespace ITI {
 
@@ -249,6 +251,126 @@ TEST_F(GraphUtilsTest, testIndexReordering){
 	}
 	
 }
+//------------------------------------------------------------------------------------ 
 
+TEST_F(GraphUtilsTest, testMEColoring_local){
+    
+    std::string file = graphPath + "delaunayTest.graph";
+    //std::string file = graphPath + "bigtrace-00000.graph";
+    IndexType dimensions = 2;
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+    // read graph and coords
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    IndexType N = graph.getNumRows();
+    IndexType M = graph.getNumValues()/2;
+    IndexType colors;
+
+    //add random weights to edges, too slow for bif graphs
+    if(N<2000){
+        CSRStorage<ValueType>& storage = graph.getLocalStorage();
+        IndexType localNumRows = graph.getLocalNumRows();
+        IndexType localNumCols = graph.getLocalNumColumns();
+        for(int i=0; i<localNumRows; i++){
+            for(int j=0; j<localNumCols; j++){
+                ValueType val = storage.getValue(i,j);
+                if( val != 0){
+                    storage.setValue(i, j, rand()%N) ;
+                }
+                //PRINT( *comm << ": "<< i <<", " <<j << " = "<< val);
+            }
+        }
+    }
+
+    if (!graph.getRowDistributionPtr()->isReplicated()) {
+        const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
+        graph.redistribute(noDist, noDist);
+    }
+
+    std::chrono::time_point<std::chrono::steady_clock> start= std::chrono::steady_clock::now();
+    //
+    std::vector<std::vector<IndexType>> coloring = GraphUtils::mecGraphColoring<IndexType, ValueType>( graph, colors);
+    //
+    std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - start;
+    ValueType ourTime = elapTime.count();
+
+    EXPECT_EQ( coloring[0].size(), M);
+
+    IndexType maxDegree =  GraphUtils::getGraphMaxDegree<IndexType, ValueType>( graph );
+    EXPECT_LE(colors, 2*maxDegree);
+    PRINT0("num colors: " << colors << " , max degree: " << maxDegree);
+
+    IndexType maxNode0 = *std::max_element( coloring[0].begin(), coloring[0].end() );
+    IndexType maxNode1 = *std::max_element( coloring[1].begin(), coloring[1].end() );
+    IndexType minNode0 = *std::min_element( coloring[0].begin(), coloring[0].end() );
+    IndexType minNode1 = *std::min_element( coloring[1].begin(), coloring[1].end() );
+    EXPECT_LE(maxNode0,N-1);
+    EXPECT_LE(maxNode1,N-1);
+    EXPECT_GE(maxNode0,0);
+    EXPECT_GE(maxNode1,0);
+
+    IndexType minColors = *std::min_element( coloring[2].begin(), coloring[2].end() );
+    IndexType maxColors = *std::max_element( coloring[2].begin(), coloring[2].end() );
+    PRINT(*comm << ": "<< minColors << " -- " << maxColors);
+
+    std::vector<ValueType> maxEdge( colors, 0);
+
+    //Check that it is a valid coloring
+    for(int col=0; col<colors; col++){
+        vector<int> alreadyColored(N, 0);
+        for(int i=0; i<coloring[2].size(); i++){
+            if( coloring[2][i]== col ){
+                IndexType v0 = coloring[0][i];
+                IndexType v1 = coloring[1][i];
+                EXPECT_LE( v0, N-1);
+                EXPECT_LE( v1, N-1);
+//                EXPECT_TRUE( alreadyColored[v0]==0 );
+//                EXPECT_TRUE( alreadyColored[v1]==0 );
+                alreadyColored[v0] = 1;
+                alreadyColored[v1] = 1;
+
+                if( maxEdge[col] < graph.getValue(v0,v1)){
+                    maxEdge[col] = graph.getValue(v0,v1);
+                }
+            }
+        //PRINT0(i << ": "<< coloring[2][i]);
+        }
+    }
+
+    ValueType sumEdgeWeight = std::accumulate(maxEdge.begin(), maxEdge.end() , 0.0);
+
+    // benchmarking
+    //
+    //take a coloring using Hasan code and compare the results
+    //
+
+    start= std::chrono::steady_clock::now();
+    //
+    IndexType colors2 = -1;
+    std::vector<std::vector<IndexType>> coloring2 = ParcoRepart<IndexType, ValueType>::getGraphMEC_local( graph, colors2);
+    //
+    elapTime = std::chrono::steady_clock::now() - start;
+    ValueType hasanTime = elapTime.count();
+
+    std::vector<ValueType> maxEdge2( colors2, 0);
+    //for( int i=0; i<3; i++ ){
+        for( int j=0; j<coloring2[0].size(); j++ ){
+          //  EXPECT_EQ( coloring[i][j], coloring2[i][j]);
+//            PRINT0(coloring[0][j] << ", " << coloring[1][j] << ") -- " << coloring[2][j] <<  "  +=+=+=+  " << coloring2[0][j] << ", " << coloring2[1][j] << ") -- " << coloring2[2][j]);
+            IndexType v0 = coloring2[0][j];
+            IndexType v1 = coloring2[1][j];
+            IndexType color = coloring2[2][j];
+
+            if( maxEdge2[color] < graph.getValue(v0,v1)){
+                maxEdge2[color] = graph.getValue(v0,v1);
+            }
+        }
+        ValueType sumEdgeWeight2 = std::accumulate(maxEdge2.begin(), maxEdge2.end() , 0.0);
+    //}
+
+    PRINT0("colors, sumEdges: " << colors << ", " << sumEdgeWeight << " , in time " << ourTime);
+    PRINT0("colors2, sumEdges2: " << colors2 << ", " << sumEdgeWeight2 << " , in time " << hasanTime);
+}
 
 } //namespace
