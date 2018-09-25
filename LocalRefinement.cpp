@@ -460,7 +460,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 	
 	std::chrono::duration<double> finalTime = std::chrono::system_clock::now() - startTime;
 	ValueType tf = comm->max(finalTime.count());
-	PRINT0("time elapsed for one distFM step: " << tf );
+	//PRINT0("time elapsed for one distFM step: " << tf );
 	//metrics.timeDistFMStep.push_back( tf );
 	
 	return gainPerRound;

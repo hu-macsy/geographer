@@ -34,9 +34,9 @@
 
 
 //just for the MEC coloring algo
-#include "ColoringAlgorithms.h"
-#include "HelpFunctions.h"
-#include "Graph.h"
+//#include "ColoringAlgorithms.h"
+//#include "HelpFunctions.h"
+//#include "Graph.h"
 
 //  #include "RBC/Sort/SQuick.hpp"
 
@@ -1295,57 +1295,6 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     for (size_t i = 0; i <retG[0].size(); i++) {
         retG[2].push_back( G[ boost::edge( retG[0][i],  retG[1][i], G).first] );
     }
-    
-    return retG;
-}
-//-----------------------------------------------------------------------------------------
-
-template<typename IndexType, typename ValueType>
-std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraphMEC_local(CSRSparseMatrix<ValueType> &adjM, IndexType &colors) {
-    SCAI_REGION("ParcoRepart.coloring");
-    using namespace boost;
-    IndexType N= adjM.getNumRows();
-    assert( N== adjM.getNumColumns() ); // numRows = numColumns
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    
-	//std::chrono::time_point<std::chrono::system_clock> before =  std::chrono::system_clock::now();
-	
-    if (!adjM.getRowDistributionPtr()->isReplicated()) {
-        PRINT0("***WARNING: In getGraphMEC_local: given graph is not replicated; will replicate now");
-        const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
-        adjM.redistribute(noDist, noDist);
-        //throw std::runtime_error("Input matrix must be replicated.");
-    }
-    IndexType maxDegree = -1;
-
-    std::vector<std::tuple<IndexType,IndexType,ValueType>> edgeList = GraphUtils::CSR2EdgeList_local<IndexType,ValueType>( adjM, maxDegree );
-
-    //the constructor adds the edges with the same order as they are in edgeList.
-    //so, edge with edgeID=i is the edge edgeList[i]
-    mec::graph G( edgeList );
-    G.maxDegree = maxDegree;
-
-    std::unordered_map<int, int> mecColoring = greedyColoring(G);
-
-    //convert tp vector<vector<>>. TODO: return a vector<vector<>> directly to avoid conversion
-
-    colors = 0;
-
-    // retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge
-    std::vector< std::vector<IndexType>> retG(3);
-    for( std::unordered_map<int,int>::iterator mecIt= mecColoring.begin(); mecIt!=mecColoring.end(); mecIt++){
-        IndexType edgeID = mecIt->first;
-        IndexType edgeColor = mecIt->second;
-        retG[0].push_back( std::get<0>(edgeList[edgeID]) );
-        retG[1].push_back( std::get<1>(edgeList[edgeID]) );
-        retG[2].push_back( edgeColor );
-        //PRINT("edge ("<< retG[0].back() << ", "<< retG[1].back() << "): " << retG[2].back() );
-        if(edgeColor>colors){
-            colors = edgeColor;
-        }
-    }
-
-    colors++; //number of colors is the max color used +1
     
     return retG;
 }

@@ -1567,9 +1567,8 @@ std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local(const 
     		edgeIndex++;
     	}
     }
-    if(settings.verbose){
-    	PRINT0("min edge weight: " <<minEdgeWeight << ", max edge weight: " << maxEdgeWeight);
-    }
+
+	//PRINT0("min edge weight: " <<minEdgeWeight << ", max edge weight: " << maxEdgeWeight);
     
     SCAI_ASSERT_EQ_ERROR( edgeList.size()*2, numEdges, "Wrong number of edges");
     return edgeList;
@@ -1746,8 +1745,6 @@ std::vector< std::vector<IndexType>> mecGraphColoring( const CSRSparseMatrix<Val
 	 	return std::get<2>(v1) > std::get<2>(v2);
 	 }
 	);
-	//std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - start;
-	//PRINT("Edges sorted succesfully, time to convert and sort: " << elapTime.count() );
 
 	//
 	// 3 - apply greedy algorithm for mec
@@ -1760,8 +1757,6 @@ std::vector< std::vector<IndexType>> mecGraphColoring( const CSRSparseMatrix<Val
 		edgeNoWeight thisEdge = std::make_tuple( std::get<0>(*it), std::get<1>(*it) );
 		edgesColor.insert( std::pair<edgeNoWeight,int>( thisEdge, 2*maxDegree));
 	}
-	//elapTime = std::chrono::steady_clock::now() - start - elapTime;
-	//PRINT0("map created succesfully, time to initialize map: " << elapTime.count() );
 
 	// to be returned
 	//retCol[0][i] the first node, retCol[1][i] the second node, retCol[2][i] the color of the edge
@@ -1790,7 +1785,6 @@ std::vector< std::vector<IndexType>> mecGraphColoring( const CSRSparseMatrix<Val
 		
 		//TODO? maybe use a set for colors to automatically remove duplicates?
 		std::vector<int> usedColors = {2*(int)maxDegree};
-		//std::set<int> foundColors;
 
     	// check the color of the rest of the edges for the two nodes of this edge,
 		std::vector<IndexType> tmpEdge = {v0, v1};
@@ -1812,10 +1806,8 @@ std::vector< std::vector<IndexType>> mecGraphColoring( const CSRSparseMatrix<Val
 
 	    		int color = edgesColor.find( neighborEdge )->second;
 	    		usedColors.push_back( color );
-	    		//foundColors.insert( color );
 	    	}
     	}
-
 
     	//find the minimum free color
     	std::sort(usedColors.begin(), usedColors.end() );
@@ -1831,7 +1823,6 @@ std::vector< std::vector<IndexType>> mecGraphColoring( const CSRSparseMatrix<Val
     			break;
     		}
     	}
-		
 
     	//update the colors variable
     	if(freeColor>colors){
@@ -1845,9 +1836,7 @@ std::vector< std::vector<IndexType>> mecGraphColoring( const CSRSparseMatrix<Val
     	retCol[1].push_back( v1 );
     	retCol[2].push_back( freeColor );
     }//for all edges in list
-    //elapTime = std::chrono::steady_clock::now() - start;
-    //PRINT0("time for all edges: " << elapTime.count() );
-
+    
    	//number of colors is the max color used +1
     colors++;
 

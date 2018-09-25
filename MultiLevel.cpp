@@ -209,7 +209,6 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 			}else{
 				SCAI_ASSERT_LT_ERROR( numRefinementRounds, metrics.localRefDetails[settings.thisRound].size(), "Metrics structure not allocated?" );
 				metrics.localRefDetails[settings.thisRound][numRefinementRounds] = std::make_pair(gain, FMStepTime) ;
-//PRINT0(metrics.localRefDetails[settings.multiLevelRounds][numRefinementRounds].first << " ___ " << metrics.localRefDetails[settings.multiLevelRounds][numRefinementRounds].second );
 			}
 
 			if (numRefinementRounds > 0) {

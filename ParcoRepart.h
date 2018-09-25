@@ -152,8 +152,6 @@ namespace ITI {
 			 */
 			static std::vector< std::vector<IndexType>>  getGraphEdgeColoring_local( CSRSparseMatrix<ValueType> &adjM, IndexType& colors);
 
-			static std::vector< std::vector<IndexType>> getGraphMEC_local(CSRSparseMatrix<ValueType> &adjM, IndexType &colors);
-
 			/** Given the block graph, creates an edge coloring of the graph and returns a communication
 			 *  scheme based on the coloring
 			 *  TODO: This method redistributes the graph. Maybe it should not.

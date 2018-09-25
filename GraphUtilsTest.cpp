@@ -148,13 +148,7 @@ TEST_F (GraphUtilsTest, testComputeCommVolumeAndBoundaryNodes){
     std::vector<IndexType> commVolume;
     std::vector<IndexType> numBorderNodes;
     std::vector<IndexType> numInnerNodes;
-    
-	/*
-	//older version, TODO:remove if these functions are no longer used	
-	commVolume = ITI::GraphUtils::computeCommVolume( graph, partition, k );	
-    std::tie( numBorderNodes, numInnerNodes) = ITI::GraphUtils::getNumBorderInnerNodes( graph, partition, settings);
-    */
-	
+
 	std::tie( commVolume, numBorderNodes, numInnerNodes) = \
 		ITI::GraphUtils::computeCommBndInner( graph, partition, settings );
     
@@ -241,13 +235,6 @@ TEST_F(GraphUtilsTest, testIndexReordering){
 		
 		IndexType indexSum = std::accumulate( indices.begin(), indices.end(), 0);
 		EXPECT_EQ( indexSum, maxIndex*(maxIndex-1)/2);
-		/*
-		if(maxIndex==15){
-			for(int i=0; i<indices.size(); i++){
-				std::cout<< i <<": " << indices[i]<<std::endl;
-			}
-		}
-		*/
 	}
 	
 }
@@ -278,7 +265,6 @@ TEST_F(GraphUtilsTest, testMEColoring_local){
                 if( val != 0){
                     storage.setValue(i, j, rand()%N) ;
                 }
-                //PRINT( *comm << ": "<< i <<", " <<j << " = "<< val);
             }
         }
     }
@@ -325,8 +311,8 @@ TEST_F(GraphUtilsTest, testMEColoring_local){
                 IndexType v1 = coloring[1][i];
                 EXPECT_LE( v0, N-1);
                 EXPECT_LE( v1, N-1);
-//                EXPECT_TRUE( alreadyColored[v0]==0 );
-//                EXPECT_TRUE( alreadyColored[v1]==0 );
+                EXPECT_TRUE( alreadyColored[v0]==0 );
+                EXPECT_TRUE( alreadyColored[v1]==0 );
                 alreadyColored[v0] = 1;
                 alreadyColored[v1] = 1;
 
@@ -340,38 +326,6 @@ TEST_F(GraphUtilsTest, testMEColoring_local){
 
     ValueType sumEdgeWeight = std::accumulate(maxEdge.begin(), maxEdge.end() , 0.0);
 
-    // benchmarking - needs code from Hasan's Ocur master thesis
-    /*
-    //
-    //take a coloring using Hasan code and compare the results
-    //
-
-    start= std::chrono::steady_clock::now();
-    //
-    IndexType colors2 = -1;
-    std::vector<std::vector<IndexType>> coloring2 = ParcoRepart<IndexType, ValueType>::getGraphMEC_local( graph, colors2);
-    //
-    elapTime = std::chrono::steady_clock::now() - start;
-    ValueType hasanTime = elapTime.count();
-
-    std::vector<ValueType> maxEdge2( colors2, 0);
-    
-    for( int j=0; j<coloring2[0].size(); j++ ){
-      //  EXPECT_EQ( coloring[i][j], coloring2[i][j]);
-        IndexType v0 = coloring2[0][j];
-        IndexType v1 = coloring2[1][j];
-        IndexType color = coloring2[2][j];
-
-        if( maxEdge2[color] < graph.getValue(v0,v1)){
-            maxEdge2[color] = graph.getValue(v0,v1);
-        }
-    }
-    ValueType sumEdgeWeight2 = std::accumulate(maxEdge2.begin(), maxEdge2.end() , 0.0);
-    
-
-    PRINT0("colors, sumEdges: " << colors << ", " << sumEdgeWeight << " , in time " << ourTime);
-    PRINT0("colors2, sumEdges2: " << colors2 << ", " << sumEdgeWeight2 << " , in time " << hasanTime);
-    */
 }
 
 } //namespace
