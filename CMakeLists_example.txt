@@ -1,0 +1,63 @@
+cmake_minimum_required (VERSION 2.6)
+project (Geographer)
+
+set(SCAI_DIR "~/ParcoRepart/lama/LamaInstall")
+
+if (NOT DEFINED SCAI_DIR)
+	message( FATAL_ERROR "Install Directory of LAMA not defined, specify with -DSCAI_DIR" )
+endif (NOT DEFINED SCAI_DIR)
+
+#set(GTEST_INCLUDE_DIR "~/Code/googletest/googletest/include")
+#set(GTEST_LIBRARY "~/Code/googletest/googletest/lib")
+#set(GTEST_MAIN_LIBRARY "~/Code/googletest/googletest/lib/libgtest.a")
+#set(BOOST_INCLUDEDIR "/lrz/sys/libraries/boost/1.61_gcc/include")
+set(BOOST_INCLUDEDIR "/home/hpc/pr87si/di36qin/Code/boost_1_63_0")
+set(SCAI_INCLUDE "${SCAI_DIR}/include/") 
+set(SCAI_LIB "${SCAI_DIR}/lib/")
+set(MEC_DIR "/home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring")
+
+### set compiler manualy ###
+#set(CMAKE_CXX_COMPILER /lrz/sys/compilers/gcc/5.4.0/bin/c++)
+
+### set files ###
+set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp SpectralPartition.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp KMeans.cpp ${MEC_DIR}/ColoringAlgorithms.cpp ${MEC_DIR}/HelpFunctions.cpp ${MEC_DIR}/Graph.cpp)
+
+# for mec
+#set(FILES_COMMON "${FILES_COMMON} /home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring/ColoringAlgorithms.cpp /home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring/HelpFunctions.cpp  /home/harry/courses/thesis/edge_coloring/Thesis_GraphColoring/Thesis_GraphColoring/Graph.cpp")
+
+set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp quadtree/test/QuadTreeTest.cpp SpectralPartitionTest.cpp)
+
+set(RBC_DIR "${PROJECT_SOURCE_DIR}/RBC")
+
+set(SCAI_LIBLIST scai_lama scai_dmemo scai_common scai_hmemo scai_utilskernel scai_tracing scai_sparsekernel scai_solver scai_logging)
+
+### find MPI ###
+find_package(MPI REQUIRED)
+include_directories(${MPI_CXX_INCLUDE_PATH})
+
+### find GTest ###
+find_package(GTest)
+include_directories(${GTEST_INCLUDE_DIR})
+
+### find Boost ###
+find_package(Boost REQUIRED COMPONENTS program_options filesystem system)
+include_directories(${Boost_INCLUDE_DIRS})
+
+### include and link Lama and RBC ###
+include_directories(${SCAI_INCLUDE})
+include_directories(${RBC_DIR})
+include_directories(${MEC_DIR})
+
+### get git commit ###
+execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11 -Wall -Wno-sign-compare -Wno-unused-variable -DBUILD_COMMIT=${GIT_COMMIT}" )
+
+### define targets ###
+add_executable(Geographer ${FILES_COMMON} main.cpp)
+target_link_libraries(Geographer ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
+
+if (GTEST_FOUND)
+	add_executable(GeographerTest ${FILES_COMMON} ${FILES_TEST})
+	target_link_libraries(GeographerTest ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
+endif (GTEST_FOUND)
