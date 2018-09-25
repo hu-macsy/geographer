@@ -340,7 +340,8 @@ TEST_F(GraphUtilsTest, testMEColoring_local){
 
     ValueType sumEdgeWeight = std::accumulate(maxEdge.begin(), maxEdge.end() , 0.0);
 
-    // benchmarking
+    // benchmarking - needs code from Hasan's Ocur master thesis
+    /*
     //
     //take a coloring using Hasan code and compare the results
     //
@@ -354,23 +355,23 @@ TEST_F(GraphUtilsTest, testMEColoring_local){
     ValueType hasanTime = elapTime.count();
 
     std::vector<ValueType> maxEdge2( colors2, 0);
-    //for( int i=0; i<3; i++ ){
-        for( int j=0; j<coloring2[0].size(); j++ ){
-          //  EXPECT_EQ( coloring[i][j], coloring2[i][j]);
-//            PRINT0(coloring[0][j] << ", " << coloring[1][j] << ") -- " << coloring[2][j] <<  "  +=+=+=+  " << coloring2[0][j] << ", " << coloring2[1][j] << ") -- " << coloring2[2][j]);
-            IndexType v0 = coloring2[0][j];
-            IndexType v1 = coloring2[1][j];
-            IndexType color = coloring2[2][j];
+    
+    for( int j=0; j<coloring2[0].size(); j++ ){
+      //  EXPECT_EQ( coloring[i][j], coloring2[i][j]);
+        IndexType v0 = coloring2[0][j];
+        IndexType v1 = coloring2[1][j];
+        IndexType color = coloring2[2][j];
 
-            if( maxEdge2[color] < graph.getValue(v0,v1)){
-                maxEdge2[color] = graph.getValue(v0,v1);
-            }
+        if( maxEdge2[color] < graph.getValue(v0,v1)){
+            maxEdge2[color] = graph.getValue(v0,v1);
         }
-        ValueType sumEdgeWeight2 = std::accumulate(maxEdge2.begin(), maxEdge2.end() , 0.0);
-    //}
+    }
+    ValueType sumEdgeWeight2 = std::accumulate(maxEdge2.begin(), maxEdge2.end() , 0.0);
+    
 
     PRINT0("colors, sumEdges: " << colors << ", " << sumEdgeWeight << " , in time " << ourTime);
     PRINT0("colors2, sumEdges2: " << colors2 << ", " << sumEdgeWeight2 << " , in time " << hasanTime);
+    */
 }
 
 } //namespace

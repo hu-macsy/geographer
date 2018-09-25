@@ -163,19 +163,21 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 		while (numRefinementRounds == 0 || gain >= settings.minGainForNextRound) {
 
 			std::chrono::time_point<std::chrono::system_clock> beforeFMStep =  std::chrono::system_clock::now();
-/*			
-// get graph before every step			
-processGraph = GraphUtils::getPEGraph<IndexType, ValueType>(input);			
-communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(processGraph, settings);
-nodesWithNonLocalNeighbors = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(input);
-elapTime = std::chrono::system_clock::now() - beforeFMStep;
-maxTime = comm->max( elapTime.count() );
-minTime = comm->min( elapTime.count() );
 
-if(settings.verbose){
-	PRINT0("getCommPairs and border nodes: time " << minTime << " -- " << maxTime );
-}
-*/
+			/* TODO: if getting the graph is fast, maybe doing it in every steo might help
+			// get graph before every step			
+			processGraph = GraphUtils::getPEGraph<IndexType, ValueType>(input);			
+			communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(processGraph, settings);
+			nodesWithNonLocalNeighbors = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(input);
+			elapTime = std::chrono::system_clock::now() - beforeFMStep;
+			maxTime = comm->max( elapTime.count() );
+			minTime = comm->min( elapTime.count() );
+
+			if(settings.verbose){
+				PRINT0("getCommPairs and border nodes: time " << minTime << " -- " << maxTime );
+			}
+			*/
+
 			std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(input, part, nodesWithNonLocalNeighbors, nodeWeights, coordinates, distances, origin, communicationScheme, settings);
 			gain = 0;
 			for (IndexType roundGain : gainPerRound) gain += roundGain;
