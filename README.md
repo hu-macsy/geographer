@@ -29,6 +29,7 @@ Afterwards, enter `src/RBC` and call `make`.
 
 ### Compilation
 From the root directory of this repository, call `cmake src -DSCAI_DIR=<path/to/lama>`, where `<path/to/lama>` is your Lama installation directory.
+Afterwards, call `make` or `make Geographer` to create the executable.
 
 ## Usage
 
