@@ -10,6 +10,7 @@ Makefile
 .cproject
 CMakeCache.txt
 CMakeFiles/
+CMakeLists.txt
 cmake_install.cmake
 .depend
 

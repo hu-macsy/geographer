@@ -554,7 +554,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				std::cout << "K-Means, Time:" << totKMeansTime << std::endl;
 		}
 		
-        assert(result.max() == settings.numBlocks -1);
+        SCAI_ASSERT_EQ_ERROR( result.max(), settings.numBlocks -1, "Wrong index in partition" );
+        //assert(result.max() == settings.numBlocks -1);
         assert(result.min() == 0);
 		
 	} else if (settings.initialPartition == InitialPartitioningMethods::Multisection) {// multisection
