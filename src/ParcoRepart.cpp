@@ -577,10 +577,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	
 	SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
 	
-	
-	if( settings.outFile!="-" and settings.writeInFile ){
-		FileIO<IndexType, ValueType>::writePartitionParallel( result, settings.outFile+"_initPart.partition" );
-	}
+	// TODO: add another 'debug' parameter to control that?
+	//if( settings.outFile!="-" and settings.writeInFile ){
+	//	FileIO<IndexType, ValueType>::writePartitionParallel( result, settings.outFile+"_initPart.partition" );
+	//}
 	
 	//-----------------------------------------------------------
 	//
