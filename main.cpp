@@ -775,7 +775,7 @@ int main(int argc, char** argv) {
 
         std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
         if( comm->getRank()==0 ){
-            std::cout << " and last partition of the series in file." << partOutFile << std::endl;
+            std::cout << " and last partition of the series in file " << partOutFile << std::endl;
             std::cout<< " Time needed to write .partition file: " << writePartTime.count() <<  std::endl;
         }
     }    

@@ -275,7 +275,8 @@ TEST_F(auxTest, testIndex2_2DPoint){
 }
 //-----------------------------------------------------------------
 
-
+// trancated function
+/*
 TEST_F(auxTest, testBenchIndexReordering){
 
 	//const IndexType M = 51009; << overflow
@@ -330,6 +331,7 @@ TEST_F(auxTest, testBenchIndexReordering){
 	}
 		
 }
+*/
 
 //-----------------------------------------------------------------
 

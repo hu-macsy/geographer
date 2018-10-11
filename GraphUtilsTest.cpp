@@ -223,7 +223,8 @@ TEST_F (GraphUtilsTest,testEdgeList2CSR){
 }
 
 //--------------------------------------------------------------------------------------- 
-
+// trancated function
+/*
 TEST_F(GraphUtilsTest, testIndexReordering){
 	
 	IndexType M = 1000;
@@ -238,11 +239,13 @@ TEST_F(GraphUtilsTest, testIndexReordering){
 	}
 	
 }
+*/
 //------------------------------------------------------------------------------------ 
 
 TEST_F(GraphUtilsTest, testMEColoring_local){
     
-    std::string file = graphPath + "delaunayTest.graph";
+    std::string file = graphPath + "Grid8x8";
+    //std::string file = graphPath + "delaunayTest.graph";
     //std::string file = graphPath + "bigtrace-00000.graph";
     IndexType dimensions = 2;
 

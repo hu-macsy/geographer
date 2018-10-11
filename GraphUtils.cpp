@@ -1512,7 +1512,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 }
 
 //--------------------------------------------------------------------------------------- 
-// given a non-distributed csr matrix converts it to an edge list
+// given a non-distributed csr undirected matrix converts it to an edge list
 // two first numbers are the vertex IDs and the third one is the edge weight
 template<typename IndexType, typename ValueType>
 std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local(const CSRSparseMatrix<ValueType> &graph, IndexType &maxDegree) {
@@ -1555,13 +1555,15 @@ std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local(const 
 		}
     	for (IndexType j = ia[i]; j < ia[i+1]; j++) {
     		const IndexType v2 = ja[j]; //second vertex
-    		// so we do not enter every edge twice, assuming graph is undirected
+    		// so we do not enter every edge twice
+    		//WARNING: here, we assume graph is undirected
     		if ( v2<v1 ){
     			edgeIndex++;
     			continue;
     		}
     		SCAI_ASSERT_LE_ERROR( edgeIndex, numEdges, "Wrong edge index");
     		edgeList.push_back( std::make_tuple( v1, v2, values[edgeIndex]) );
+PRINT0( v1 << " _ " << v2);
 			if( values[edgeIndex] > maxEdgeWeight ) maxEdgeWeight = values[edgeIndex];
 			if( values[edgeIndex] < minEdgeWeight ) minEdgeWeight = values[edgeIndex];
     		edgeIndex++;

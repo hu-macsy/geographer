@@ -364,7 +364,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
   settings.epsilon = epsilon;
   settings.dimensions = dimensions;
   settings.minGainForNextRound = 10;
-  struct Metrics metrics(settings.numBlocks);
+  struct Metrics metrics(settings);
 
   scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, settings, metrics);
 
@@ -654,7 +654,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     settings.multiLevelRounds = 3;
     //settings.initialPartition = InitialPartitioningMethods::Multisection;
     settings.initialPartition = InitialPartitioningMethods::KMeans;
-    struct Metrics metrics(settings.numBlocks);
+    struct Metrics metrics(settings);
     
     // get partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
@@ -750,7 +750,7 @@ TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    struct Metrics metrics(settings.numBlocks);
+    struct Metrics metrics(settings);
      
     scai::lama::DenseVector<IndexType> partition(dist, -1);
     partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
@@ -811,7 +811,7 @@ TEST_F (ParcoRepartTest, testPEGraphBlockGraph_k_equal_p_Distributed) {
     settings.minGainForNextRound = 100;
     //settings.noRefinement = true;
     settings.initialPartition = InitialPartitioningMethods::SFC;
-    struct Metrics metrics(settings.numBlocks);
+    struct Metrics metrics(settings);
     
     scai::lama::DenseVector<IndexType> partition(dist, -1);
     partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
@@ -892,7 +892,7 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_2D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    struct Metrics metrics(settings.numBlocks);
+    struct Metrics metrics(settings);
     
     // get partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics );
@@ -945,7 +945,7 @@ TEST_F (ParcoRepartTest, testGetLocalBlockGraphEdges_3D) {
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
     settings.minBorderNodes =1;
-    struct Metrics metrics(settings.numBlocks);
+    struct Metrics metrics(settings);
     
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
 
@@ -1000,7 +1000,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    struct Metrics metrics(settings.numBlocks);
+    struct Metrics metrics(settings);
     
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
     
@@ -1057,7 +1057,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = 3;
-    struct Metrics metrics(settings.numBlocks);
+    struct Metrics metrics(settings);
     
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(adjM, coords, settings, metrics);
     
@@ -1130,7 +1130,8 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    struct Metrics metrics(settings.numBlocks);
+    settings.mec = false; //use the boost coloring algo
+    struct Metrics metrics(settings);
     
     //get the partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
@@ -1165,7 +1166,7 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
 
 TEST_F (ParcoRepartTest, testGetLocalCommunicationWithColoring_2D) {
 
-std::string file = graphPath + "Grid16x16";
+    std::string file = graphPath + "Grid16x16";
     std::ifstream f(file);
     IndexType dimensions= 2;
     IndexType N, edges;
@@ -1208,33 +1209,40 @@ std::string file = graphPath + "Grid16x16";
     
     // two cases
     
-    { // case 1
-        ValueType adjArray[36] = {  0, 1, 0, 1, 0, 1,
-                                    1, 0, 1, 0, 1, 0,
-                                    0, 1, 0, 1, 1, 0,
-                                    1, 0, 1, 0, 0, 1,
-                                    0, 1, 1, 0, 0, 1,
-                                    1, 0, 0, 1, 1, 0
+    { // case 1                     0  1  2  3  4  5
+        ValueType adjArray[36] = {  0, 1, 0, 1, 0, 1, //0
+                                    1, 0, 1, 0, 1, 0, //1
+                                    0, 1, 0, 1, 1, 0, //2
+                                    1, 0, 1, 0, 0, 1, //3
+                                    0, 1, 1, 0, 0, 1, //4
+                                    1, 0, 0, 1, 1, 0  //5
         };
                 
         scai::lama::CSRSparseMatrix<ValueType> blockGraph;
         blockGraph.setRawDenseData( 6, 6, adjArray);
+PRINT0(">> "<< blockGraph.getLocalStorage().getValues().size());
+PRINT0(">> "<< blockGraph.getLocalStorage().getIA().size());
+PRINT0(">> "<< blockGraph.getLocalStorage().getJA().size());
+for(int i=0; i<6; i++){
+  for(int j=0; j<6; j++)
+    PRINT0(i<<", " << j << " = " << blockGraph.getValue(i,j));
+}        
         // get the communication pairs
         std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph,settings );
         
         // print the pairs
-        /*
+        
         for(IndexType i=0; i<commScheme.size(); i++){
             for(IndexType j=0; j<commScheme[i].size(); j++){
                 PRINT( "round :"<< i<< " , PEs talking: "<< j << " with "<< commScheme[i].getValue(j));
             }
             std::cout << std::endl;
         }
-        */
+        
     }
     
     
-    { // case 1
+    { // case 2
         ValueType adjArray4[16] = { 0, 1, 0, 1,
                                     1, 0, 1, 0,
                                     0, 1, 0, 1,
@@ -1256,7 +1264,7 @@ std::string file = graphPath + "Grid16x16";
         */
     }
     
-    {// case 2
+    {// case 3
         ValueType adjArray2[4] = {  0, 1, 
                                     1, 0 };
         scai::lama::CSRSparseMatrix<ValueType> blockGraph;

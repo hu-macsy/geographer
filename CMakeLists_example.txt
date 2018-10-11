@@ -47,6 +47,8 @@ include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${SCAI_INCLUDE})
 include_directories(${RBC_DIR})
 include_directories(${MEC_DIR})
+link_directories(${SCAI_LIB})
+link_directories(${RBC_DIR}/build/lib)
 
 ### get git commit ###
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)

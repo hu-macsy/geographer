@@ -318,6 +318,7 @@ static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_rand
 
 
 //TODO: verify that it works properly
+/*
 static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
 	IndexType index = 0;
 	std::vector<IndexType> ret(maxIndex, -1);
@@ -347,7 +348,7 @@ static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
 	
 	return ret;
 }
-
+*/
 
 
 
