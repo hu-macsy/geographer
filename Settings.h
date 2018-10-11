@@ -1,5 +1,8 @@
 #pragma once
 
+#include <iostream>
+#include <scai/lama.hpp>
+
 #define STRINGIZER(arg)     #arg
 #define STR_VALUE(arg)      STRINGIZER(arg)
 #define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
