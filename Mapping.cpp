@@ -200,7 +200,7 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::torstenMapping_local(
 		}
 
 		// map blockNode to peNode
-		mapping[blockNode] = peNode;
+		mapping[blockNode] = peNode;	//peNode is "current" in libtopomap.cpp
 		mapped[blockNode] = true;
 		discovered[blockNode] = true;
 		usedPEs[peNode] = true;
@@ -235,7 +235,41 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::torstenMapping_local(
        		* current but still has available slots (vertex weight is not 0)
        		* map the target of the edge from previous step to it */
 
-     		std::vector<ValueType> distances = GraphUtils::localDijkstra( blockGraph, blockNode);
+     		//TODO: possible opt, not need a full Dijkstra, when the first not
+     		// used node is found stop
+//WARNING: need shortest paths of longest? we need to map "heavy" nodes of the 
+// blockGraph with "heavy" nodes in the PEGraph (heavy cacording to their weighted
+// degree).
+// Update: the aboce is true but irrelevant here: we should find a "heavy" node
+// but also one that is close/near to peNode.
+     		std::vector<IndexType> predecessor;
+     		std::vector<ValueType> distances = GraphUtils::localDijkstra( PEGraph, peNode, predecessor);
+     		SCAI_ASSERT_EQ_ERROR( distances.size(), N, "Wrong distances size");
+
+     		IndexType closestNode = -1;
+     		ValueType nodeDist = std::numeric_limits<double>::max();
+     		for( unsigned int i=0; i<N; i++){
+     			/*in the original code is "and has free processors"*/
+     			if( distances[i]<nodeDist and !usedPEs[i] ){ 
+     				closestNode = i;
+     				nodeDist = distances[i];
+     			}
+     		}
+
+     		// map the neighbor to the closest node in the PEGraph
+     		mapping[neighbor] = closestNode;
+     		mapped[neighbor] = true;
+     		discovered[neighbor] = true;
+     		usedPEs[closestNode] = true;
+     		numMappedNodes++;
+
+     		// update occupied edges in processor graph
+// "occupied edges" are all the edges in the shortest path from peNode to closestNode
+// for these edges, we should update (reduce) their capacity.
+     		IndexType v = closestNode;
+     		while( v!= peNode ){
+
+     		}
 
      	}//while(!Q.empty()) 
 

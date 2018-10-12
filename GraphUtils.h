@@ -35,8 +35,8 @@ scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType
 /**
  * @brief Perform a BFS on the local subgraph.
  *
- * @param graph (may be distributed)
- * @param u local index of starting node
+ * @param[in] graph (may be distributed)
+ * @param[in] u local index of starting node
  *
  * @return vector with (local) distance to u for each local node
  */
@@ -46,10 +46,19 @@ std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &gr
 /**
 	@brief Single source shortest path, a Dijkstra implementation
 
+	* @param[in] graph (may be distributed)
+	* @param[in] u local index of starting node
+	* @param[out] predecessor A vector with the predecessor of a node in 
+	the shortest path. 
+	Example, predecessor[4] = 5 means that in the shortes path from u to 4,
+	the previous vertex is 5. If also, predeccor[5] = 10 and predecessor[10] = u
+	then the shortes path to 4 is: u--10--5--4
+
+	* @return vector with (local) distance to u for each local node
 */
 
 template<typename IndexType, typename ValueType>
-std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u);
+std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u, std::vector<IndexType>& predecessor);
 /**
  * @brief Computes the diameter of the local subgraph using the iFUB algorithm.
  *

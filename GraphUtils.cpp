@@ -141,7 +141,7 @@ std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &gr
 //very similar to localBFS
 
 template<typename IndexType, typename ValueType>
-std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u)
+std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u, std::vector<IndexType>& predecessor )
 {
     const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
     const IndexType localN = inputDist->getLocalSize();
@@ -155,11 +155,13 @@ std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<ValueType
     std::priority_queue<iPair, std::vector<iPair>, std::greater<iPair> > queue;
     std::priority_queue<iPair, std::vector<iPair>, std::greater<iPair> > alternateQueue;
 
+    // fill predessor vector with wrong value
+    predecessor.resize( localN, -1);
+
     std::vector<bool> visited(localN, false);
     std::vector<ValueType> dist(localN, std::numeric_limits<ValueType>::max() );
 
     queue.push( std::make_pair( 0, u ) );
-    //result[u] = 0;
     visited[u] = true;
     dist[u] = 0;
 
@@ -196,7 +198,7 @@ std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<ValueType
                 		dist[localNeighbor] = dist[v] + edgeWeight;
                 		alternateQueue.push( std::make_pair( dist[localNeighbor],localNeighbor) );
                 		//queue.push( std::make_pair( dist[localNeighbor],localNeighbor) );
-                    	//result[localNeighbor] = round+1;
+                    	predecessor[localNeighbor] = v;
                     	visited[v] = true;
                     }
                 }
@@ -1924,7 +1926,7 @@ std::vector< std::vector<IndexType>> mecGraphColoring( const CSRSparseMatrix<Val
 
 template scai::lama::DenseVector<IndexType> reindex(CSRSparseMatrix<ValueType> &graph);
 template std::vector<IndexType> localBFS(const CSRSparseMatrix<ValueType> &graph, IndexType u);
-template std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u);
+template std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u, std::vector<IndexType>& predecessor);
 template IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const IndexType u, IndexType lowerBound, const IndexType k, IndexType maxRounds);
 template ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool weighted);
 template ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<ValueType> &nodeWeights);

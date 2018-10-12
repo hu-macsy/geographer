@@ -133,7 +133,8 @@ TEST_F (GraphUtilsTest, testLocalDijkstra){
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     N= graph.getNumRows();
 
-    std::vector<ValueType> shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0);
+    std::vector<IndexType> predecessor;
+    std::vector<ValueType> shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0, predecessor);
 
     EXPECT_EQ( shortDist.size(), N );
 
@@ -144,27 +145,32 @@ TEST_F (GraphUtilsTest, testLocalDijkstra){
     //PRINT0("set edge (14, 15) to 1.5");
     graph.setValue(5, 6, 1.5);
     graph.setValue(8, 12, 1.1);
-    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0);
+    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0, predecessor);
     EXPECT_EQ( shortDist[15], 6);
 
     //PRINT0("set edge (11, 15) to 0.5");
     graph.setValue(11, 15, 0.5);
-    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0);
+    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0, predecessor);
     EXPECT_EQ( shortDist[15], 5.5);
+    EXPECT_EQ( predecessor[15], 11);
 
     //PRINT0("set edge (9, 10) to 0.3");
     graph.setValue(9, 10, 0.3);
-    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0);    
+    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0, predecessor);
     EXPECT_EQ( shortDist[15], 4.8);
     EXPECT_EQ( shortDist[11], 4.3);
+    EXPECT_EQ( predecessor[10], 9);
+    EXPECT_EQ( predecessor[11], 10);
+    EXPECT_EQ( predecessor[14], 10);
 
     graph.setValue(5, 9, 1.3);
     graph.setValue(7, 11, 1.3);
-    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0);    
+    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0, predecessor);
     EXPECT_EQ( shortDist[15], 4.8);
     EXPECT_EQ( shortDist[11], 4.3);
+    EXPECT_EQ( predecessor[9], 8);
 
-    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 13);
+    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 13, predecessor);
     EXPECT_EQ( shortDist[0], 4);
     EXPECT_EQ( shortDist[15], 2);
     EXPECT_EQ( shortDist[7], 3.3);
