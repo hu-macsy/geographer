@@ -136,6 +136,80 @@ std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &gr
 
     return result;
 }
+//------------------------------------------------------------------------------------
+
+//very similar to localBFS
+
+template<typename IndexType, typename ValueType>
+std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u)
+{
+    const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
+    const IndexType localN = inputDist->getLocalSize();
+    assert(u < localN);
+    assert(u >= 0);
+
+    //std::vector<IndexType> result(localN, std::numeric_limits<IndexType>::max());
+    //std::queue<IndexType> queue;
+    // first is the distance to the node, second is the node ID
+    typedef std::pair<ValueType, IndexType> iPair; 
+    std::priority_queue<iPair, std::vector<iPair>, std::greater<iPair> > queue;
+    std::priority_queue<iPair, std::vector<iPair>, std::greater<iPair> > alternateQueue;
+
+    std::vector<bool> visited(localN, false);
+    std::vector<ValueType> dist(localN, std::numeric_limits<ValueType>::max() );
+
+    queue.push( std::make_pair( 0, u ) );
+    //result[u] = 0;
+    visited[u] = true;
+    dist[u] = 0;
+
+    const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
+    const scai::hmemo::ReadAccess<IndexType> localIa(localStorage.getIA());
+    const scai::hmemo::ReadAccess<IndexType> localJa(localStorage.getJA());
+    const scai::hmemo::ReadAccess<ValueType> localValues(localStorage.getValues());
+
+    IndexType round = 0;
+    while (!queue.empty()) {
+        while (!queue.empty()) {
+            const IndexType v = queue.top().second; // node ID of the nearest node
+            queue.pop();
+            assert(v < localN);
+            assert(v >= 0);
+
+            // check all neighbors of node v
+            const IndexType beginCols = localIa[v];
+            const IndexType endCols = localIa[v+1];
+            for (IndexType j = beginCols; j < endCols; j++) {
+                IndexType globalNeighbor = localJa[j];
+                IndexType localNeighbor = inputDist->global2local(globalNeighbor);
+
+                //neighbor is local and not visited
+                if (localNeighbor != scai::invalidIndex	and !visited[localNeighbor] ){
+					assert(localNeighbor < localN);
+                    assert(localNeighbor >= 0);
+                    assert(localNeighbor != u);
+
+                    //weight of edge (v, localNeighbor)
+                	ValueType edgeWeight = localValues[j]; 
+
+                	if( dist[localNeighbor] > dist[v] + edgeWeight ){
+                		dist[localNeighbor] = dist[v] + edgeWeight;
+                		alternateQueue.push( std::make_pair( dist[localNeighbor],localNeighbor) );
+                		//queue.push( std::make_pair( dist[localNeighbor],localNeighbor) );
+                    	//result[localNeighbor] = round+1;
+                    	visited[v] = true;
+                    }
+                }
+            }
+        }
+        round++;
+        std::swap(queue, alternateQueue);
+        //if alternateQueue was empty, queue is now empty and outer loop will abort
+    }
+    assert(dist[u] == 0);
+
+    return dist;
+}
 
 template<typename IndexType, typename ValueType>
 IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const IndexType u, IndexType lowerBound, const IndexType k, IndexType maxRounds)
@@ -1850,6 +1924,7 @@ std::vector< std::vector<IndexType>> mecGraphColoring( const CSRSparseMatrix<Val
 
 template scai::lama::DenseVector<IndexType> reindex(CSRSparseMatrix<ValueType> &graph);
 template std::vector<IndexType> localBFS(const CSRSparseMatrix<ValueType> &graph, IndexType u);
+template std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u);
 template IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const IndexType u, IndexType lowerBound, const IndexType k, IndexType maxRounds);
 template ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool weighted);
 template ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<ValueType> &nodeWeights);

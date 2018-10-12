@@ -44,6 +44,13 @@ template<typename IndexType, typename ValueType>
 std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &graph, IndexType u);
 
 /**
+	@brief Single source shortest path, a Dijkstra implementation
+
+*/
+
+template<typename IndexType, typename ValueType>
+std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u);
+/**
  * @brief Computes the diameter of the local subgraph using the iFUB algorithm.
  *
  * @param graph

@@ -118,6 +118,62 @@ TEST_F(GraphUtilsTest, DISABLED_benchConstructLaplacianBig) {
 
 //TODO: test also with edge weights
 
+//-----------------------------------------------------------------
+
+TEST_F (GraphUtilsTest, testLocalDijkstra){
+
+    std::string file = graphPath + "Grid4x4";
+    IndexType dimensions = 2;
+    IndexType N;
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    IndexType k =comm->getSize();
+
+    // read graph
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    N= graph.getNumRows();
+
+    std::vector<ValueType> shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0);
+
+    EXPECT_EQ( shortDist.size(), N );
+
+    //check specific distances for Grid4x4
+    EXPECT_EQ( shortDist[15], 6);
+    EXPECT_EQ( shortDist[7], 4);
+
+    //PRINT0("set edge (14, 15) to 1.5");
+    graph.setValue(5, 6, 1.5);
+    graph.setValue(8, 12, 1.1);
+    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0);
+    EXPECT_EQ( shortDist[15], 6);
+
+    //PRINT0("set edge (11, 15) to 0.5");
+    graph.setValue(11, 15, 0.5);
+    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0);
+    EXPECT_EQ( shortDist[15], 5.5);
+
+    //PRINT0("set edge (9, 10) to 0.3");
+    graph.setValue(9, 10, 0.3);
+    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0);    
+    EXPECT_EQ( shortDist[15], 4.8);
+    EXPECT_EQ( shortDist[11], 4.3);
+
+    graph.setValue(5, 9, 1.3);
+    graph.setValue(7, 11, 1.3);
+    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0);    
+    EXPECT_EQ( shortDist[15], 4.8);
+    EXPECT_EQ( shortDist[11], 4.3);
+
+    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 13);
+    EXPECT_EQ( shortDist[0], 4);
+    EXPECT_EQ( shortDist[15], 2);
+    EXPECT_EQ( shortDist[7], 3.3);
+
+    //for( int i=0; i<N; i++){
+    //    PRINT0("dist to vertex " << i << "= " << shortDist[i]);
+    //}
+}
+
 //--------------------------------------------------------------------------------------- 
 
 TEST_F (GraphUtilsTest, testComputeCommVolumeAndBoundaryNodes){
