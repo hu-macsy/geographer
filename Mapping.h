@@ -36,9 +36,16 @@ public:
 	// http://htor.inf.ethz.ch/research/mpitopo/libtopomap/,
 	// function TPM_Map_greedy found in file libtopomap.cpp around line 580
 
-	std::vector<IndexType> torstenMapping_local( 
-		scai::lama::CSRSparseMatrix<ValueType>& blockGraph,
-		scai::lama::CSRSparseMatrix<ValueType>& PEGraph);
+	static std::vector<IndexType> torstenMapping_local( 
+		const scai::lama::CSRSparseMatrix<ValueType>& blockGraph,
+		const scai::lama::CSRSparseMatrix<ValueType>& PEGraph);
+
+	/**Check if a given mappinf is valid
+	*/
+	static bool isValid( 
+		const scai::lama::CSRSparseMatrix<ValueType>& blockGraph,
+		const scai::lama::CSRSparseMatrix<ValueType>& PEGraph,
+		std::vector<IndexType> mapping);
 
 private:
 	class max_compare_func {

@@ -144,8 +144,9 @@ template<typename IndexType, typename ValueType>
 std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u, std::vector<IndexType>& predecessor )
 {
     const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
-    const IndexType localN = inputDist->getLocalSize();
-    assert(u < localN);
+    const IndexType localN = graph.getNumRows();
+    SCAI_ASSERT_LT_ERROR(u, localN, "Index too large");
+    SCAI_ASSERT_EQ_ERROR( localN, graph.getNumColumns() , "Matrix not square");
     assert(u >= 0);
 
     //std::vector<IndexType> result(localN, std::numeric_limits<IndexType>::max());

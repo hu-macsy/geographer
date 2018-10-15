@@ -129,8 +129,8 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::rolandMapping_local(
 
 template <typename IndexType, typename ValueType>
 std::vector<IndexType> Mapping<IndexType, ValueType>::torstenMapping_local( 
-	scai::lama::CSRSparseMatrix<ValueType>& blockGraph,
-	scai::lama::CSRSparseMatrix<ValueType>& PEGraph){
+	const scai::lama::CSRSparseMatrix<ValueType>& blockGraph,
+	const scai::lama::CSRSparseMatrix<ValueType>& PEGraph){
 
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType N = blockGraph.getNumRows(); //number of nodes in bot graphs
@@ -139,9 +139,62 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::torstenMapping_local(
 	SCAI_ASSERT_EQ_ERROR( N, blockGraph.getNumColumns(), "Block graph matrix must be square" );
 	SCAI_ASSERT_EQ_ERROR( PEGraph.getNumRows(), PEGraph.getNumColumns(), "Processor graph matrix must be square" );
 
+	// PEGraph is const so make local copy
+	scai::lama::CSRSparseMatrix<ValueType> copyPEGraph = PEGraph;
+
 	/*TODO: add the part where we initialize the edges of the PEGraph
 	to force shortest paths
 	*/
+	//TODO: why is the thing below needed? we ignore the edges of the original
+	// PEGraph?
+	//change the edge weights in the copyPEGraph
+	{
+		const scai::lama::CSRStorage<ValueType> localStorage = blockGraph.getLocalStorage();
+		const scai::hmemo::ReadAccess<ValueType> blockValues(localStorage.getValues());
+		ValueType maxW = 0;
+		for( unsigned int i=0; i<blockValues.size(); i++ ){
+			if( blockValues[i]>maxW ){
+				maxW = blockValues[i];
+			}
+		}
+		// initValue = max edge in blockGraph * (num nodes in PEGraph)^2
+		//WARNING: in original function, is initValue = maxW * PEGraph.size()^2 
+		//but here we assume that the two  graph have same number of nodes
+		ValueType initValue = maxW * N * N;
+		SCAI_ASSERT_GT(initValue, 0, "Int overflow"); // check for overflow
+
+//set initValue to copyPEgrah
+
+		scai::lama::CSRStorage<ValueType> blockStorage;
+		//PEGraph.getLocalStorage().copyTo(copyPEGraph.getLocalStorage() /* blockStorage*/);
+		 //= copyPEGraph.getLocalStorage();
+/*		scai::hmemo::WriteAccess<ValueType> PEValues( localStorage2.getValues() );
+		
+		for( unsigned int i=0; i<PEValues.size(); i++ ){
+			PEValues[i] = initValue;
+		}
+*/
+//std::vector<ValueType> val2(N, initValue);
+
+//localStorage2.getValues().swap( scai::hmemo::HArray<ValueType>( N, val2.data()) );
+
+/*
+how to update the values HArrayin the copyPEGraph???
+copy ia
+copy ja
+and us swap (ia, ja, newValues)	?????
+*/
+
+
+SCAI_ASSERT_EQ_ERROR( PEGraph.getNumValues(), copyPEGraph.getNumValues(), "Error in coping matrix");
+for( int i=0; i<N; i++){
+	for(int j=0; j<N; j++ ){
+		SCAI_ASSERT_EQ_ERROR( PEGraph.getValue(i,j), copyPEGraph.getValue(i,j), "value is not same for edge (" << i << ", " << j << ")");
+		//std::cout<< i << " - " << j << " ==> " << copyPEGraph.getValue(i,j) << std::endl;
+	}
+}
+	}
+
 
   	std::vector<bool> mapped( N, false);
   	std::vector<bool> discovered( N, false);
@@ -157,50 +210,68 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::torstenMapping_local(
   	srand(time(NULL));
    	IndexType peNode = rand()%N; // the current vertex in PEGraph to be mapped to
   	SCAI_ASSERT_GE_ERROR(peNode, 0, "Wrong node ID");
-  	usedPEs[peNode] = true;
+  	
   	IndexType numMappedNodes = 0; // number of already mapped nodes in blockGraph
 
-	std::vector<ValueType> comFrom(N, 0);
+	//std::vector<ValueType> comFrom(N, 0);
 
 	// access the data of the block graph
-	const scai::lama::CSRStorage<ValueType> localStorage = blockGraph.getLocalStorage();
-	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-	const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
-
+	const scai::lama::CSRStorage<ValueType> blockStorage = blockGraph.getLocalStorage();
+	const scai::hmemo::ReadAccess<IndexType> ia(blockStorage.getIA());
+	const scai::hmemo::ReadAccess<IndexType> ja(blockStorage.getJA());
+	const scai::hmemo::ReadAccess<ValueType> blockValues(blockStorage.getValues());
+	//actually, the weights of the edges of the PE graph. We will update them
+	//after wvery time we map a vertex
+	scai::lama::CSRStorage<ValueType> PEStorage = copyPEGraph.getLocalStorage();
+	scai::hmemo::ReadAccess<ValueType> PEValues( PEStorage.getValues() );
+	const scai::hmemo::ReadAccess<IndexType> PEia( PEStorage.getIA() );
 	// the mapping to be returned
 	std::vector<IndexType> mapping(N,0);
 
   	//while there are unmapped nodes
   	while(numMappedNodes < N) {
-
   		//TODO: instead of storing all weights and ten call max_element,
   		// just find the max directly
   		//compute weighted node degrees in block graph and store them in comFrom
+		//std::fill( comFrom.begin(), comFrom.end(), 0);
+		
+		ValueType blockNodeWeight = -1;
+		IndexType blockNode = -1;
+
 	    for(IndexType i=0; i<N; i++){
 	    	if(mapped[i])	// if this is already mapped 
 	    		continue;
+	    	ValueType weightedDegree = 0;
 	    	for(IndexType valuesInd=ia[i]; valuesInd<ia[i+1]; valuesInd++){
-	    	//for(IndexType j=ia[i]; j<ia[i+1]; j++){ 
-	    		comFrom[i] += values[valuesInd];
+	    		//comFrom[i] += blockValues[valuesInd];
+	    		weightedDegree += blockValues[valuesInd];
+	    	}
+	    	if( weightedDegree>blockNodeWeight ){
+				blockNodeWeight = weightedDegree;
+				blockNode = i;
 	    	}
 	    }
 
-		typename std::vector<ValueType>::iterator blockNodeWeight = std::max_element(comFrom.begin(), comFrom.end() );
-		IndexType blockNode = std::distance(comFrom.begin(), blockNodeWeight);
+		//typename std::vector<ValueType>::iterator blockNodeWeight = std::max_element(comFrom.begin(), comFrom.end() );
+		//IndexType blockNode = std::distance(comFrom.begin(), blockNodeWeight);
 
 		SCAI_ASSERT_GE_ERROR( blockNode, 0, "Wrong node ID");
 		SCAI_ASSERT_LT_ERROR( blockNode, N, "Wrong node ID");
-		PRINT0("heaviest vertex in block graph is " << blockNode << " with weight " << *blockNodeWeight);
+		SCAI_ASSERT_GE_ERROR( blockNodeWeight, 0, "Wrong node weight");
+		PRINT0("heaviest vertex in block graph is " << blockNode << " with weight " << blockNodeWeight);
 
 		//TODO: check, possible opt: when/where is peNode changing?? is it always picked
 		// at random
-		while( !usedPEs[peNode] ){ 
+		while( usedPEs[peNode] ){ 
 			peNode = rand()%N;
 		}
+//for(int i =0; i<N; i++) //PRINT0(i << " : " << usedPEs[i] << " +++ " <<mapped[i] );
+//	PRINT0( i << " --> " << mapping[i]);
+
 
 		// map blockNode to peNode
 		mapping[blockNode] = peNode;	//peNode is "current" in libtopomap.cpp
+PRINT0( "mapped vertex " << blockNode << " to " << peNode);
 		mapped[blockNode] = true;
 		discovered[blockNode] = true;
 		usedPEs[peNode] = true;
@@ -215,7 +286,7 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::torstenMapping_local(
      	// check all edges of blockNode
      	for(IndexType iaInd=ia[blockNode]; iaInd<ia[blockNode+1]; iaInd++){
      		IndexType neighbor = ja[iaInd];	// edge (blockNode, neighbor)
-     		ValueType edgeWeight = values[iaInd];
+     		ValueType edgeWeight = blockValues[iaInd];
      		if( !discovered[neighbor] ){
      			Q.push( std::make_pair(edgeWeight, neighbor) );
      			discovered[neighbor] = true;
@@ -240,10 +311,10 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::torstenMapping_local(
 //WARNING: need shortest paths of longest? we need to map "heavy" nodes of the 
 // blockGraph with "heavy" nodes in the PEGraph (heavy cacording to their weighted
 // degree).
-// Update: the aboce is true but irrelevant here: we should find a "heavy" node
+// Update: the above is true but irrelevant here: we should find a "heavy" node
 // but also one that is close/near to peNode.
      		std::vector<IndexType> predecessor;
-     		std::vector<ValueType> distances = GraphUtils::localDijkstra( PEGraph, peNode, predecessor);
+     		std::vector<ValueType> distances = GraphUtils::localDijkstra( copyPEGraph, peNode, predecessor);
      		SCAI_ASSERT_EQ_ERROR( distances.size(), N, "Wrong distances size");
 
      		IndexType closestNode = -1;
@@ -258,6 +329,7 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::torstenMapping_local(
 
      		// map the neighbor to the closest node in the PEGraph
      		mapping[neighbor] = closestNode;
+PRINT0( "mapped vertex " << neighbor << " to " << closestNode);     		
      		mapped[neighbor] = true;
      		discovered[neighbor] = true;
      		usedPEs[closestNode] = true;
@@ -265,10 +337,17 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::torstenMapping_local(
 
      		// update occupied edges in processor graph
 // "occupied edges" are all the edges in the shortest path from peNode to closestNode
-// for these edges, we should update (reduce) their capacity.
+// for these edges, we should update (reduce?) their capacity.
+     		//IndexType v = predecessor[closestNode];
      		IndexType v = closestNode;
      		while( v!= peNode ){
-
+     			IndexType predV = predecessor[v];
+     			IndexType valuesInd = PEia[v];
+     			SCAI_ASSERT_LT_ERROR(valuesInd, PEValues.size(), "Wrong values index" );
+//WARNING: not sure at all that this is correct     			
+//PEValues[valuesInd] += Qel.first/PEValues[valuesInd];
+PEStorage.setValue( v, predV, Qel.first/PEStorage.getValue(v, predV) );
+     			v = predecessor[v];
      		}
 
      	}//while(!Q.empty()) 
@@ -278,6 +357,23 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::torstenMapping_local(
   	return mapping;
 }
 
+//------------------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
+bool Mapping<IndexType, ValueType>::isValid(
+	const scai::lama::CSRSparseMatrix<ValueType>& blockGraph,
+	const scai::lama::CSRSparseMatrix<ValueType>& PEGraph,
+	std::vector<IndexType> mapping){
+
+	const IndexType n = blockGraph.getNumRows();
+	SCAI_ASSERT_EQ_ERROR( mapping.size(), n,"Wrong mapping size");
+	SCAI_ASSERT_EQ_ERROR( mapping.size(), PEGraph.getNumRows(),"Wrong mapping size");
+
+	IndexType mapSum = std::accumulate( mapping.begin(), mapping.end(), 0);
+	SCAI_ASSERT_EQ_ERROR( mapSum, n*(n-1)/2, "Wrong mapping checksum");
+
+	return true;
+}
 
 //to force instantiation
 template class Mapping<IndexType, ValueType>;

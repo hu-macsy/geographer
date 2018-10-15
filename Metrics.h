@@ -163,14 +163,15 @@ struct Metrics{
 	}
 //---------------------------------------------------------------------------
 	
-	void getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
+	void getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings );
+	/*{
 		
 		getEasyMetrics( graph, partition, nodeWeights, settings );
 		
 		int numIter = 100;
 		getRedistRequiredMetrics( graph, partition, settings, numIter );
 		
-	}
+	}*/
 //---------------------------------------------------------------------------
 
 	void getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
@@ -497,6 +498,13 @@ struct Metrics{
 		
 		return time;
 	}
+
+	//inplementation in Metrics.cpp
+	void getMappingMetrics(
+		const scai::lama::CSRSparseMatrix<ValueType> blockGraph, 
+		const scai::lama::CSRSparseMatrix<ValueType> PEGraph, 
+		const std::vector<IndexType> mapping);
+
 
 }; //struct Metrics
 
