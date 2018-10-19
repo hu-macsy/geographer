@@ -340,7 +340,7 @@ static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_rand
 
 */
 //template<typename IndexType, typename ValueType>
-static std::vector<ValueType> getBetweennessCentrality(const scai::lama::CSRSparseMatrix<ValueType>& graph);
+static std::vector<ValueType> getBetweennessCentrality(const scai::lama::CSRSparseMatrix<ValueType>& graph, bool normalize= false);
 
 
 /**	Reordering a sequence of numbers from 0 to maxIndex.

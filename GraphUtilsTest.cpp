@@ -394,9 +394,12 @@ TEST_F(GraphUtilsTest, testMEColoring_local){
 //------------------------------------------------------------------------------------ 
 
 TEST_F(GraphUtilsTest, testBetweennessCentrality){
-    std::string file = graphPath + "Grid8x8";
+    //std::string file = graphPath + "trace-00008.graph";
     //std::string file = graphPath + "delaunayTest.graph";
     //std::string file = graphPath + "bigtrace-00000.graph";
+    //std::string file = "/home/harry/ParcoRepart/localMeshes/airfoil1.graph";
+    std::string file = "/home/harry/ParcoRepart/meshes/PEgraphs/333SP.graph_k64.PEgraph";
+
     IndexType dimensions = 2;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -406,12 +409,22 @@ TEST_F(GraphUtilsTest, testBetweennessCentrality){
     IndexType N = graph.getNumRows();
     IndexType M = graph.getNumValues()/2;
 
-    std::vector<ValueType> betwCentr = GraphUtils<IndexType,ValueType>::getBetweennessCentrality( graph );
+    std::chrono::time_point<std::chrono::steady_clock> start= std::chrono::steady_clock::now();
+    //
+    std::vector<ValueType> betwCentr = GraphUtils<IndexType,ValueType>::getBetweennessCentrality( graph, false);
+    //
+    std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - start;
+    ValueType ourTime = elapTime.count();
+    std::cout << "time for getting betweenness " << ourTime << std::endl;
 
     EXPECT_EQ( betwCentr.size() , N);
 
+    std::vector<IndexType> IDs(N,0);
+    std::iota( IDs.begin(), IDs.end(), 0);
+    std::sort(IDs.begin(), IDs.end(), [&](IndexType i, IndexType j){return betwCentr[i] > betwCentr[j];});
+
     for(int i=0; i<N; i++)
-        std::cout<< i << ": " << betwCentr[i] << std::endl;
+        std::cout<<IDs[i] << ": " << betwCentr[IDs[i]] << std::endl;
 
 }
 

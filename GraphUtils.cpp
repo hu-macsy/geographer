@@ -1927,7 +1927,7 @@ std::vector< std::vector<IndexType>> GraphUtils<IndexType, ValueType>::mecGraphC
 //------------------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-std::vector<ValueType> GraphUtils<IndexType, ValueType>::getBetweennessCentrality(const scai::lama::CSRSparseMatrix<ValueType>& graph){
+std::vector<ValueType> GraphUtils<IndexType, ValueType>::getBetweennessCentrality(const scai::lama::CSRSparseMatrix<ValueType>& graph, bool normalize){
 
 	const IndexType N = graph.getNumRows();
 	const IndexType M = graph.getNumValues()/2;	//WARNING: assumes graph is undirected
@@ -1943,7 +1943,7 @@ std::vector<ValueType> GraphUtils<IndexType, ValueType>::getBetweennessCentralit
 		edgeList[i] = std::make_pair( std::get<0>(edgeListTmp[i]), std::get<1>(edgeListTmp[i]) );
 		edgeWeights[i] = std::get<2>(edgeListTmp[i]);
 	}
-PRINT(M);
+
 	using namespace boost;
 	// undirected graph with edge weights
 	typedef property<edge_weight_t, double> EdgeProperty;
@@ -1952,48 +1952,35 @@ PRINT(M);
 							undirectedS,	// TODO: option to change to directed
 							no_property,
 							EdgeProperty> Graph;							
-/*
-boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost::no_property, boost::property<boost::edge_weight_t, double> > g;
-auto weight_map = get(boost::edge_weight, g);
-for (auto ed : boost::make_iterator_range(edges(g)))
-        weight_map[ed] = 1.0;
-*/
+
 	Graph G(N);
-	//Graph G(edgeList.data(), edgeList.data()+M);
-	//property_map<Graph, edge_weight_t>::type weightmap = get(edge_weight, G);
 	//add edges manually... TODO: use a constructor
 	for( int e=0; e<M; e++){
-		/*boost::add_edge( 	std::get<0>(edgeListTmp[i]), 	// u
-							std::get<1>(edgeListTmp[i]),	// v
-							std::get<2>(edgeListTmp[i]), // weight
-							G );	*/
 		boost::add_edge( 	edgeList[e].first,
 							edgeList[e].second,
 							EdgeProperty(edgeWeights[e]),
 							//edgeWeights[e],
 							G);
-PRINT(e << ": (" << edgeList[e].first << ", " << edgeList[e].second <<") -- "<< edgeWeights[e]);							
-		//weightmap[e] = edgeWeights[e];
+		//PRINT(e << ": (" << edgeList[e].first << ", " << edgeList[e].second <<") -- "<< edgeWeights[e]);							
 	}
 
 
 
 	boost::shared_array_property_map<double, boost::property_map<Graph, vertex_index_t>::const_type> centrality_map(num_vertices(G), get(boost::vertex_index, G));
+	//WARNING, TODO: relative betweenness returns just 0, do it manually
 	//boost::relative_betweenness_centrality(G, centrality_map);
 	boost::brandes_betweenness_centrality(G, centrality_map);
-//	SCAI_ASSERT_EQ_ERROR( centrality_map.size(), N, "Wrong size");
+
+	// in boost page is 2/(...). I used 4 instead so it gives same results
+	// with the betweenness scores when using Networkit
+	ValueType scaleF = normalize ? 2.0/(N-2)*(N-3) : 1;
+	SCAI_ASSERT_GT_ERROR( scaleF, 0 , "Possible int overflow");
 
 	std::vector<double> centrality(N);
 	for( int i=0; i<N; i++ ){
-		centrality[i] = centrality_map[i];
+		centrality[i] = centrality_map[i]*scaleF;
 	}
-/*	
-	boost::relative_betweenness_centrality(G,
-	    centrality_map(
-      make_iterator_property_map(centrality.begin(), get(vertex_index, G), double())
-      ).vertex_index_map(get(vertex_index, G)).weight_map(get(edge_weight, G)));
-PRINT("LALALA");
-*/
+
 	return centrality;
 }
 

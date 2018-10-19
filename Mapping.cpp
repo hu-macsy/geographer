@@ -140,15 +140,13 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::torstenMapping_local(
 	SCAI_ASSERT_EQ_ERROR( PEGraph.getNumRows(), PEGraph.getNumColumns(), "Processor graph matrix must be square" );
 
 	// PEGraph is const so make local copy
-	scai::lama::CSRSparseMatrix<ValueType> copyPEGraph = PEGraph;
+	scai::lama::CSRSparseMatrix<ValueType> copyPEGraph;// = PEGraph;
 
-	/*TODO: add the part where we initialize the edges of the PEGraph
-	to force shortest paths
-	*/
 	//TODO: why is the thing below needed? we ignore the edges of the original
 	// PEGraph?
 	//change the edge weights in the copyPEGraph
 	{
+		//find max weight in block graph
 		const scai::lama::CSRStorage<ValueType> localStorage = blockGraph.getLocalStorage();
 		const scai::hmemo::ReadAccess<ValueType> blockValues(localStorage.getValues());
 		ValueType maxW = 0;
@@ -157,42 +155,37 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::torstenMapping_local(
 				maxW = blockValues[i];
 			}
 		}
+
 		// initValue = max edge in blockGraph * (num nodes in PEGraph)^2
 		//WARNING: in original function, is initValue = maxW * PEGraph.size()^2 
-		//but here we assume that the two  graph have same number of nodes
+		//but here we assume that the two graph have same number of nodes
 		ValueType initValue = maxW * N * N;
 		SCAI_ASSERT_GT(initValue, 0, "Int overflow"); // check for overflow
 
-//set initValue to copyPEgrah
-
-		scai::lama::CSRStorage<ValueType> blockStorage;
-		//PEGraph.getLocalStorage().copyTo(copyPEGraph.getLocalStorage() /* blockStorage*/);
-		 //= copyPEGraph.getLocalStorage();
-/*		scai::hmemo::WriteAccess<ValueType> PEValues( localStorage2.getValues() );
+		//set initValue to copyPEgrah
+		//TODO: find faster, shorter way to do the copy
+		// with copyGraph(PEGraph) throws a "binding const reference" error
+		scai::lama::CSRStorage<ValueType> tmpStorage ( PEGraph.getLocalStorage() );
+		scai::hmemo::HArray< IndexType > tmpIA( tmpStorage.getIA() );
+		scai::hmemo::HArray< IndexType > tmpJA( tmpStorage.getJA() );
+		scai::hmemo::HArray< ValueType > tmpValues( tmpStorage.getValues().size() );
+		SCAI_ASSERT_EQ_ERROR( tmpIA.size(), N+1, "Wrong ia size");
 		
-		for( unsigned int i=0; i<PEValues.size(); i++ ){
-			PEValues[i] = initValue;
+		for( unsigned int i=0; i<tmpValues.size(); i++ ){
+			tmpValues[i] = initValue;
 		}
-*/
-//std::vector<ValueType> val2(N, initValue);
+		scai::lama::CSRStorage<ValueType> copyStorage( N, N, tmpIA, tmpJA, tmpValues);
+		copyPEGraph.assign( copyStorage );
 
-//localStorage2.getValues().swap( scai::hmemo::HArray<ValueType>( N, val2.data()) );
-
-/*
-how to update the values HArrayin the copyPEGraph???
-copy ia
-copy ja
-and us swap (ia, ja, newValues)	?????
-*/
-
-
-SCAI_ASSERT_EQ_ERROR( PEGraph.getNumValues(), copyPEGraph.getNumValues(), "Error in coping matrix");
+		SCAI_ASSERT_EQ_ERROR( PEGraph.getNumValues(), copyPEGraph.getNumValues(), "Error in coping matrix");
+/*		
 for( int i=0; i<N; i++){
 	for(int j=0; j<N; j++ ){
 		SCAI_ASSERT_EQ_ERROR( PEGraph.getValue(i,j), copyPEGraph.getValue(i,j), "value is not same for edge (" << i << ", " << j << ")");
-		//std::cout<< i << " - " << j << " ==> " << copyPEGraph.getValue(i,j) << std::endl;
+		std::cout<< i << " - " << j << " ==> " << copyPEGraph.getValue(i,j) << std::endl;
 	}
 }
+*/
 	}
 
 
