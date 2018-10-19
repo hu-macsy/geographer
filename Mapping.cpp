@@ -314,7 +314,7 @@ PRINT0( "mapped vertex " << blockNode << " to " << peNode);
 // Update: the above is true but irrelevant here: we should find a "heavy" node
 // but also one that is close/near to peNode.
      		std::vector<IndexType> predecessor;
-     		std::vector<ValueType> distances = GraphUtils::localDijkstra( copyPEGraph, peNode, predecessor);
+     		std::vector<ValueType> distances = GraphUtils<IndexType, ValueType>::localDijkstra( copyPEGraph, peNode, predecessor);
      		SCAI_ASSERT_EQ_ERROR( distances.size(), N, "Wrong distances size");
 
      		IndexType closestNode = -1;

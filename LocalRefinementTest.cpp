@@ -77,7 +77,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	}
 	//test initial partion for imbalance
 	DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1.0);
-	ValueType initialImbalance = GraphUtils::computeImbalance<IndexType, ValueType>(part, k, uniformWeights);
+	ValueType initialImbalance = GraphUtils<IndexType,ValueType>::computeImbalance(part, k, uniformWeights);
         
 	// If initial partition is highly imbalanced local refinement cannot fix it.
 	// TODO: should the final partion be balanced no matter how imbalanced is the initial one???
@@ -103,7 +103,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	settings.epsilon = epsilon;
         
 	//get block graph
-	scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils::getBlockGraph<IndexType, ValueType>( graph, part, settings.numBlocks);
+	scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils<IndexType,ValueType>::getBlockGraph( graph, part, settings.numBlocks);
 
 	//color block graph and get a communication schedule
 	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph, settings);
@@ -126,12 +126,12 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	}
 	//DenseVector<IndexType> nonWeights = DenseVector<IndexType>(0, 1);
 	
-	std::vector<IndexType> localBorder = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(graph);
+	std::vector<IndexType> localBorder = GraphUtils<IndexType,ValueType>::getNodesWithNonLocalNeighbors(graph);
 
 	//get distances
 	std::vector<double> distances = LocalRefinement<IndexType,ValueType>::distancesFromBlockCenter(coordinates);
 
-	ValueType cut = GraphUtils::computeCut(graph, part, true);
+	ValueType cut = GraphUtils<IndexType,ValueType>::computeCut(graph, part, true);
 	DenseVector<IndexType> origin(graph.getRowDistributionPtr(), comm->getRank());
 	ASSERT_GE(cut, 0);
 	for (IndexType i = 0; i < iterations; i++) {
@@ -140,7 +140,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 		for (IndexType roundGain : gainPerRound) gain += roundGain;
 
 		//check correct gain calculation
-		const ValueType newCut = GraphUtils::computeCut(graph, part, true);
+		const ValueType newCut = GraphUtils<IndexType,ValueType>::computeCut(graph, part, true);
 		EXPECT_EQ(cut - gain, newCut) << "Old cut " << cut << ", gain " << gain << " newCut " << newCut;
 
 		EXPECT_LE(newCut, cut);
@@ -148,7 +148,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	}
 
 	//check for balance
-	ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(part, k, weights);
+	ValueType imbalance = GraphUtils<IndexType,ValueType>::computeImbalance(part, k, weights);
 	PRINT0("final imbalance: " << imbalance);
 	// TODO: I do not know, both assertion fail from time to time...
 	// at least return a solution less imbalanced than the initial one
@@ -168,13 +168,13 @@ TEST_F(LocalRefinementTest, testOriginArray) {
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
 	DenseVector<IndexType> part(dist, comm->getRank());
-	std::vector<IndexType> localBorder = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(graph);
+	std::vector<IndexType> localBorder = GraphUtils<IndexType,ValueType>::getNodesWithNonLocalNeighbors(graph);
 	DenseVector<ValueType> weights(dist, 1);
 	std::vector<double> distances = LocalRefinement<IndexType,ValueType>::distancesFromBlockCenter(coordinates);
 	DenseVector<IndexType> origin(dist, comm->getRank());
 	Settings settings;
 	settings.numBlocks= comm->getSize();
-	scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils::getBlockGraph<IndexType, ValueType>( graph, part, settings.numBlocks);
+	scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils<IndexType,ValueType>::getBlockGraph( graph, part, settings.numBlocks);
 	std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph, settings);
 
 	ValueType gain = 0;
@@ -243,9 +243,9 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 	Settings settings;
 	settings.numBlocks= comm->getSize();
 	//std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::computeCommunicationPairings(a, part, mapping);
-    scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils::getBlockGraph<IndexType, ValueType>( a, part, k);
+    scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils<IndexType,ValueType>::getBlockGraph( a, part, k);
 	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph, settings );
-	std::vector<IndexType> localBorder = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(a);
+	std::vector<IndexType> localBorder = GraphUtils<IndexType,ValueType>::getNodesWithNonLocalNeighbors(a);
 
 	IndexType thisBlock = comm->getRank();
 
@@ -254,7 +254,7 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 		IndexType partner = commAccess[scheme[round].getDistributionPtr()->global2local(comm->getRank())];
 
 		if (partner == thisBlock) {
-			scai::dmemo::Halo partHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(a);
+			scai::dmemo::Halo partHalo = GraphUtils<IndexType,ValueType>::buildNeighborHalo(a);
 			scai::hmemo::HArray<IndexType> haloData;
 			comm->updateHalo( haloData, part.getLocalValues(), partHalo );
 
@@ -294,7 +294,7 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 			const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 			const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
-			scai::dmemo::Halo partHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(a);
+			scai::dmemo::Halo partHalo = GraphUtils<IndexType,ValueType>::buildNeighborHalo(a);
 			scai::hmemo::HArray<IndexType> haloData;
 			comm->updateHalo( haloData, localData, partHalo );
 

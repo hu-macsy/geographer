@@ -125,21 +125,21 @@ TEST_F (auxTest, testInitialPartitions){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"pixelPart");
     }
     //cut = comm->getSize() == 1 ? computeCut(input, result) : comm->sum(localSumOutgoingEdges(input, false)) / 2;
-    cut = GraphUtils::computeCut( graph, pixeledPartition);
-    imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( pixeledPartition, k);
+    cut = GraphUtils<IndexType, ValueType>::computeCut( graph, pixeledPartition);
+    imbalance = GraphUtils<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
     if(comm->getRank()==0){
         logF<< "-- Initial Pixeled partition " << std::endl;
         logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
     }
     uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
-	scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
+	scai::dmemo::Halo halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
 	Metrics metrics;
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, halo, settings, metrics);
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"finalWithPixel");
     }
-    cut = GraphUtils::computeCut( graph, pixeledPartition);
-    imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( pixeledPartition, k);
+    cut = GraphUtils<IndexType, ValueType>::computeCut( graph, pixeledPartition);
+    imbalance = GraphUtils<IndexType, ValueType>::computeImbalance( pixeledPartition, k);
     if(comm->getRank()==0){
         logF<< "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
         logF  << std::endl  << std::endl; 
@@ -170,21 +170,21 @@ TEST_F (auxTest, testInitialPartitions){
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"hilbertPart");
     }
-    cut = GraphUtils::computeCut( graph, hilbertPartition);
-    imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( hilbertPartition, k);
+    cut = GraphUtils<IndexType, ValueType>::computeCut( graph, hilbertPartition);
+    imbalance = GraphUtils<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
     if(comm->getRank()==0){
         logF<< "-- Initial Hilbert/sfc partition " << std::endl;
         logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
     }
     uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
-	halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
+	halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
 
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, halo, settings, metrics);
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"finalWithHilbert");
     }
-    cut = GraphUtils::computeCut( graph, hilbertPartition);
-    imbalance = GraphUtils::computeImbalance<IndexType, ValueType>( hilbertPartition, k);
+    cut = GraphUtils<IndexType, ValueType>::computeCut( graph, hilbertPartition);
+    imbalance = GraphUtils<IndexType, ValueType>::computeImbalance( hilbertPartition, k);
     if(comm->getRank()==0){
         logF<< "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
         logF  << std::endl  << std::endl; 

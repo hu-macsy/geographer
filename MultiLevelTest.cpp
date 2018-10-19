@@ -73,7 +73,7 @@ TEST_F (MultiLevelTest, testCoarseningGrid_2D) {
     CSRSparseMatrix<ValueType> coarseGraph;
     DenseVector<IndexType> fineToCoarseMap;
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1.0);
-    scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
+    scai::dmemo::Halo halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
 
     MultiLevel<IndexType, ValueType>::coarsen(graph, uniformWeights, halo, coarseGraph, fineToCoarseMap);
     
@@ -272,7 +272,7 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     settings.minBorderNodes=100;
 	Metrics metrics;
     
-    scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
+    scai::dmemo::Halo halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, halo, settings, metrics);
     
     EXPECT_EQ( graph.l1Norm() , beforel1Norm);

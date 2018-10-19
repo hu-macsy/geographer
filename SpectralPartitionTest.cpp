@@ -222,7 +222,7 @@ TEST_F(DISABLED_SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     ValueType eigenEigenValue =0;
     
     // get the laplacian of the pixeled graph , since the pixeled graph is replicated so should be the laplacian
-    scai::lama::CSRSparseMatrix<ValueType> pixelLaplacian = GraphUtils::constructLaplacian<IndexType, ValueType>( pixelGraph );
+    scai::lama::CSRSparseMatrix<ValueType> pixelLaplacian = GraphUtils<IndexType, ValueType>::constructLaplacian( pixelGraph );
     SCAI_ASSERT( pixelLaplacian.isConsistent() == 1 , "Laplacian graph not consistent.");
     SCAI_ASSERT( pixelLaplacian.getNumRows() == numPixels , "Wrong size of the laplacian.");
     ValueType sum=0;

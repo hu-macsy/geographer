@@ -393,10 +393,10 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
         
         scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordsDV, settings, metrics);
 
-        const ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(partition, k);
+        const ValueType imbalance = GraphUtils<IndexType, ValueType>::computeImbalance(partition, k);
         EXPECT_LE(imbalance, epsilon);
 
-        const ValueType cut = GraphUtils::computeCut<IndexType, ValueType>(graph, partition, true);
+        const ValueType cut = GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
 
         if (comm->getRank() == 0) {
             std::cout << "Commit " << version << ": Partitioned graph with " << N << " nodes into " << k << " blocks with a total cut of " << cut << std::endl;
@@ -649,7 +649,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
             scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( sfcPartition.getDistribution(), sfcPartition.getLocalValues() ) );
             sfcPartition.redistribute(newDist);
             graph.redistribute(newDist, noDist);
-            cut = GraphUtils::computeCut<IndexType, ValueType>(graph, sfcPartition, true);
+            cut = GraphUtils<IndexType, ValueType>::computeCut(graph, sfcPartition, true);
             if (cut<maxCut){
                 maxCut = cut;
                 bestDist = sfcPartition.getDistributionPtr();
@@ -679,8 +679,8 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
 
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordsDV, dimension, destPath+"hilbert");
                 
-        cut = ITI::GraphUtils::computeCut(graph, hilbertPartition, true);
-        imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>(hilbertPartition, k);
+        cut = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, hilbertPartition, true);
+        imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(hilbertPartition, k);
         
         if( imbalance>epsilon ){
             PRINT0("WARNING, imbalance: "<< imbalance <<" more than epislon: "<< epsilon);

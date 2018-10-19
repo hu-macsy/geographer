@@ -28,7 +28,7 @@ using std::queue;
 
 namespace ITI {
 
-namespace GraphUtils {
+//namespace GraphUtils {
 
 using scai::hmemo::ReadAccess;
 using scai::dmemo::Distribution;
@@ -37,7 +37,7 @@ using scai::lama::DenseVector;
 using scai::lama::CSRStorage;
 
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType> &graph) {
+scai::lama::DenseVector<IndexType> GraphUtils<IndexType,ValueType>::reindex(scai::lama::CSRSparseMatrix<ValueType> &graph) {
     const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
 
@@ -51,7 +51,7 @@ scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType
 
     SCAI_ASSERT_EQUAL_ERROR(result.sum(), globalN*(globalN-1)/2);
 
-    scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(graph);
+    scai::dmemo::Halo partHalo = buildNeighborHalo(graph);
     scai::hmemo::HArray<IndexType> haloData;
     comm->updateHalo( haloData, result.getLocalValues(), partHalo );
 
@@ -84,7 +84,7 @@ scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType
 }
 
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u)
+std::vector<IndexType> GraphUtils<IndexType,ValueType>::localBFS(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u)
 {
     const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
     const IndexType localN = inputDist->getLocalSize();
@@ -141,7 +141,7 @@ std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &gr
 //very similar to localBFS
 
 template<typename IndexType, typename ValueType>
-std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u, std::vector<IndexType>& predecessor )
+std::vector<ValueType> GraphUtils<IndexType,ValueType>::localDijkstra(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u, std::vector<IndexType>& predecessor )
 {
     const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
     const IndexType localN = graph.getNumRows();
@@ -215,7 +215,7 @@ std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<ValueType
 }
 
 template<typename IndexType, typename ValueType>
-IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const IndexType u, IndexType lowerBound, const IndexType k, IndexType maxRounds)
+IndexType GraphUtils<IndexType,ValueType>::getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const IndexType u, IndexType lowerBound, const IndexType k, IndexType maxRounds)
 {
     const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
@@ -272,7 +272,7 @@ IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const I
 }
 
 template<typename IndexType, typename ValueType>
-ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const bool weighted) {
+ValueType GraphUtils<IndexType,ValueType>::computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, const bool weighted) {
 	SCAI_REGION( "ParcoRepart.computeCut" )
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
@@ -302,7 +302,7 @@ ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<
 
 	scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
-	scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(input);
+	scai::dmemo::Halo partHalo = buildNeighborHalo(input);
 	scai::hmemo::HArray<IndexType> haloData;
 	partDist->getCommunicatorPtr()->updateHalo( haloData, localData, partHalo );
 
@@ -358,7 +358,7 @@ ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<ValueType> &nodeWeights) {
+ValueType GraphUtils<IndexType,ValueType>::computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<ValueType> &nodeWeights) {
 	SCAI_REGION( "ParcoRepart.computeImbalance" )
 	const IndexType globalN = part.getDistributionPtr()->getGlobalSize();
 	const IndexType localN = part.getDistributionPtr()->getLocalSize();
@@ -461,13 +461,13 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::dmemo::Halo buildNeighborHalo(const CSRSparseMatrix<ValueType>& input) {
+scai::dmemo::Halo GraphUtils<IndexType,ValueType>::buildNeighborHalo(const CSRSparseMatrix<ValueType>& input) {
 
 	SCAI_REGION( "ParcoRepart.buildPartHalo" )
 
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 
-	std::vector<IndexType> requiredHaloIndices = nonLocalNeighbors<IndexType, ValueType>(input);
+	std::vector<IndexType> requiredHaloIndices = nonLocalNeighbors(input);
 
 	scai::dmemo::Halo halo;
 	{
@@ -480,7 +480,7 @@ scai::dmemo::Halo buildNeighborHalo(const CSRSparseMatrix<ValueType>& input) {
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input) {
+std::vector<IndexType> GraphUtils<IndexType, ValueType>::nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input) {
 	SCAI_REGION( "ParcoRepart.nonLocalNeighbors" )
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 	const IndexType n = inputDist->getGlobalSize();
@@ -512,7 +512,7 @@ std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-inline bool hasNonLocalNeighbors(const CSRSparseMatrix<ValueType> &input, IndexType globalID) {
+inline bool GraphUtils<IndexType, ValueType>::hasNonLocalNeighbors(const CSRSparseMatrix<ValueType> &input, IndexType globalID) {
 	SCAI_REGION( "ParcoRepart.hasNonLocalNeighbors" )
 
 	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
@@ -537,7 +537,7 @@ inline bool hasNonLocalNeighbors(const CSRSparseMatrix<ValueType> &input, IndexT
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input, const std::set<IndexType>& candidates) {
+std::vector<IndexType> GraphUtils<IndexType, ValueType>::getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input, const std::set<IndexType>& candidates) {
     SCAI_REGION( "ParcoRepart.getNodesWithNonLocalNeighbors_cache" );
     std::vector<IndexType> result;
     const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
@@ -570,7 +570,7 @@ std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<Value
 
 
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input) {
+std::vector<IndexType> GraphUtils<IndexType, ValueType>::getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input) {
 	SCAI_REGION( "ParcoRepart.getNodesWithNonLocalNeighbors" )
 	std::vector<IndexType> result;
 
@@ -613,7 +613,7 @@ std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<Value
 /* The results returned is already distributed
  */
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part) {
+DenseVector<IndexType> GraphUtils<IndexType, ValueType>::getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
@@ -635,7 +635,7 @@ DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, c
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-	scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
+	scai::dmemo::Halo partHalo = buildNeighborHalo(adjM);
 	scai::hmemo::HArray<IndexType> haloData;
 	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
 
@@ -663,7 +663,7 @@ DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, c
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes	( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const struct Settings settings) {
+std::pair<std::vector<IndexType>,std::vector<IndexType>> GraphUtils<IndexType, ValueType>::getNumBorderInnerNodes	( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const struct Settings settings) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
@@ -700,7 +700,7 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes	
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-	scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
+	scai::dmemo::Halo partHalo = buildNeighborHalo(adjM);
 	scai::hmemo::HArray<IndexType> haloData;
 	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
 
@@ -745,7 +745,7 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes	
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, Settings settings) {
+std::vector<IndexType> GraphUtils<IndexType, ValueType>::computeCommVolume( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, Settings settings) {
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const IndexType numBlocks = settings.numBlocks;
     
@@ -773,7 +773,7 @@ std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-	scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
+	scai::dmemo::Halo partHalo = buildNeighborHalo(adjM);
 	scai::hmemo::HArray<IndexType> haloData;
 	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
 
@@ -822,7 +822,7 @@ std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType>> computeCommBndInner( 
+std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType>> GraphUtils<IndexType, ValueType>::computeCommBndInner( 
 	const CSRSparseMatrix<ValueType> &adjM, 
 	const DenseVector<IndexType> &part, 
 	Settings settings) {
@@ -859,7 +859,7 @@ std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-	scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
+	scai::dmemo::Halo partHalo = buildNeighborHalo(adjM);
 	scai::hmemo::HArray<IndexType> haloData;
 	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
 
@@ -923,7 +923,7 @@ std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType
 /** Get the maximum degree of a graph.
  * */
 template<typename IndexType, typename ValueType>
-IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM){
+IndexType GraphUtils<IndexType, ValueType>::getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM){
 
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = distPtr->getCommunicatorPtr();
@@ -954,7 +954,7 @@ IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM)
 /** Compute maximum communication= max degree of the block graph, and total communication= sum of all edges
  */
 template<typename IndexType, typename ValueType>
-std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k){
+std::pair<IndexType,IndexType> GraphUtils<IndexType, ValueType>::computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k){
 
     scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
     
@@ -964,7 +964,7 @@ std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama::CSRSpars
     //TODO: getting the block graph probably fails for p>5000, 
     scai::lama::CSRSparseMatrix<ValueType> blockGraph = getBlockGraph( adjM, part, k);
     
-    IndexType maxComm = getGraphMaxDegree<IndexType,ValueType>( blockGraph );
+    IndexType maxComm = getGraphMaxDegree( blockGraph );
     IndexType totalComm = blockGraph.getNumValues()/2;
     
     return std::make_pair(maxComm, totalComm);
@@ -986,7 +986,7 @@ std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama::CSRSpars
  */
 //return: there is an edge in the block graph between blocks ret[0][i]-ret[1][i]
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part) {
+std::vector<std::vector<IndexType>> GraphUtils<IndexType, ValueType>::getLocalBlockGraphEdges( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part) {
     SCAI_REGION("ParcoRepart.getLocalBlockGraphEdges");
     SCAI_REGION_START("ParcoRepart.getLocalBlockGraphEdges.initialise");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -1113,7 +1113,7 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
  * with size k*k and [i,j]= i*k+j.
  */
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k) {
+scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k) {
     SCAI_REGION("ParcoRepart.getBlockGraph");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -1202,9 +1202,10 @@ scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSpars
     return matrix;
 }
 //----------------------------------------------------------------------------------------
-
+//WARNING: 17.10.18, commented it out, probably outdated lama version
+/* 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::Halo& halo) {
+scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getPEGraph( const scai::dmemo::Halo& halo) {
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	scai::dmemo::DistributionPtr distPEs ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, comm->getSize()) );
 	assert(distPEs->getLocalSize() == 1);
@@ -1233,16 +1234,17 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::Halo& halo
 
     return PEgraph;
 }
+*/
 //-----------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueType> &adjM) {
+scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getPEGraph( const CSRSparseMatrix<ValueType> &adjM) {
     SCAI_REGION("ParcoRepart.getPEGraph");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr(); 
     const IndexType numPEs = comm->getSize();
     
-    const std::vector<IndexType> nonLocalIndices = GraphUtils::nonLocalNeighbors<IndexType, ValueType>(adjM);
+    const std::vector<IndexType> nonLocalIndices = GraphUtils<IndexType, ValueType>::nonLocalNeighbors(adjM);
     
     SCAI_REGION_START("ParcoRepart.getPEGraph.getOwners");
     scai::hmemo::HArray<IndexType> indexTransport(nonLocalIndices.size(), nonLocalIndices.data());
@@ -1308,7 +1310,7 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const CSRSparseMatrix<ValueTy
 //-----------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>>& adjList) {
+scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>>& adjList) {
     
     IndexType N = adjList.size();
 
@@ -1338,7 +1340,7 @@ scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( co
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList ){
+scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList ){
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType thisPE = comm->getRank();
@@ -1589,10 +1591,11 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 }
 
 //--------------------------------------------------------------------------------------- 
+//WARNING,TODO: Assumes the graph is undirected
 // given a non-distributed csr undirected matrix converts it to an edge list
 // two first numbers are the vertex IDs and the third one is the edge weight
 template<typename IndexType, typename ValueType>
-std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local(const CSRSparseMatrix<ValueType> &graph, IndexType &maxDegree) {
+std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, ValueType>::CSR2EdgeList_local(const CSRSparseMatrix<ValueType> &graph, IndexType &maxDegree) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     CSRSparseMatrix<ValueType> tmpGraph(graph);
@@ -1640,7 +1643,7 @@ std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local(const 
     		}
     		SCAI_ASSERT_LE_ERROR( edgeIndex, numEdges, "Wrong edge index");
     		edgeList.push_back( std::make_tuple( v1, v2, values[edgeIndex]) );
-PRINT0( v1 << " _ " << v2);
+//PRINT0( v1 << " _ " << v2);
 			if( values[edgeIndex] > maxEdgeWeight ) maxEdgeWeight = values[edgeIndex];
 			if( values[edgeIndex] < minEdgeWeight ) minEdgeWeight = values[edgeIndex];
     		edgeIndex++;
@@ -1656,7 +1659,7 @@ PRINT0( v1 << " _ " << v2);
 //--------------------------------------------------------------------------------------- 
 
 template<typename IndexType, typename ValueType>
-CSRSparseMatrix<ValueType> constructLaplacian(CSRSparseMatrix<ValueType> graph) {
+CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(CSRSparseMatrix<ValueType> graph) {
     using scai::lama::CSRStorage;
     using scai::hmemo::HArray;
     using std::vector;
@@ -1710,7 +1713,7 @@ CSRSparseMatrix<ValueType> constructLaplacian(CSRSparseMatrix<ValueType> graph) 
 //--------------------------------------------------------------------------------------- 
 
 template<typename IndexType, typename ValueType>
-CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension) {
+CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension) {
     using scai::hmemo::HArray;
     using scai::lama::DenseMatrix;
     using scai::lama::DIASparseMatrix;
@@ -1749,7 +1752,7 @@ CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, I
         }
     }
 
-    DenseMatrix<ValueType> H = constructHadamardMatrix<IndexType,ValueType>(origDimension);
+    DenseMatrix<ValueType> H = constructHadamardMatrix(origDimension);
 
     HArray<ValueType> randomDiagonal(origDimension);
     {
@@ -1770,7 +1773,7 @@ CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, I
 }
 
 template<typename IndexType, typename ValueType>
-scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d) {
+scai::lama::DenseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructHadamardMatrix(IndexType d) {
     using scai::lama::DenseMatrix;
     using scai::hmemo::WriteAccess;
     const ValueType scalingFactor = 1/sqrt(d);
@@ -1793,7 +1796,7 @@ scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d) {
 //TODO: invest possible optimizations
 
 template<typename IndexType, typename ValueType>
-std::vector< std::vector<IndexType>> mecGraphColoring( const CSRSparseMatrix<ValueType> &graph, IndexType &colors) {
+std::vector< std::vector<IndexType>> GraphUtils<IndexType, ValueType>::mecGraphColoring( const CSRSparseMatrix<ValueType> &graph, IndexType &colors) {
 
 	typedef std::tuple<IndexType,IndexType,ValueType> edge;
 	typedef std::tuple<IndexType,IndexType> edgeNoWeight;
@@ -1921,9 +1924,82 @@ std::vector< std::vector<IndexType>> mecGraphColoring( const CSRSparseMatrix<Val
 
     return retCol;
 }
+//------------------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
+std::vector<ValueType> GraphUtils<IndexType, ValueType>::getBetweennessCentrality(const scai::lama::CSRSparseMatrix<ValueType>& graph){
+
+	const IndexType N = graph.getNumRows();
+	const IndexType M = graph.getNumValues()/2;	//WARNING: assumes graph is undirected
+
+	IndexType maxDegree;
+	std::vector<std::tuple<IndexType,IndexType,ValueType>> edgeListTmp = CSR2EdgeList_local( graph, maxDegree );
+	SCAI_ASSERT_EQ_ERROR( edgeListTmp.size(), M, "Wrong edge list size");
+
+	std::vector<std::pair<IndexType,ValueType>> edgeList(M);
+	std::vector<ValueType> edgeWeights(M);
+
+	for(IndexType i=0; i<M; i++){
+		edgeList[i] = std::make_pair( std::get<0>(edgeListTmp[i]), std::get<1>(edgeListTmp[i]) );
+		edgeWeights[i] = std::get<2>(edgeListTmp[i]);
+	}
+PRINT(M);
+	using namespace boost;
+	// undirected graph with edge weights
+	typedef property<edge_weight_t, double> EdgeProperty;
+	typedef adjacency_list<	vecS,
+							vecS,
+							undirectedS,	// TODO: option to change to directed
+							no_property,
+							EdgeProperty> Graph;							
+/*
+boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost::no_property, boost::property<boost::edge_weight_t, double> > g;
+auto weight_map = get(boost::edge_weight, g);
+for (auto ed : boost::make_iterator_range(edges(g)))
+        weight_map[ed] = 1.0;
+*/
+	Graph G(N);
+	//Graph G(edgeList.data(), edgeList.data()+M);
+	//property_map<Graph, edge_weight_t>::type weightmap = get(edge_weight, G);
+	//add edges manually... TODO: use a constructor
+	for( int e=0; e<M; e++){
+		/*boost::add_edge( 	std::get<0>(edgeListTmp[i]), 	// u
+							std::get<1>(edgeListTmp[i]),	// v
+							std::get<2>(edgeListTmp[i]), // weight
+							G );	*/
+		boost::add_edge( 	edgeList[e].first,
+							edgeList[e].second,
+							EdgeProperty(edgeWeights[e]),
+							//edgeWeights[e],
+							G);
+PRINT(e << ": (" << edgeList[e].first << ", " << edgeList[e].second <<") -- "<< edgeWeights[e]);							
+		//weightmap[e] = edgeWeights[e];
+	}
+
+
+
+	boost::shared_array_property_map<double, boost::property_map<Graph, vertex_index_t>::const_type> centrality_map(num_vertices(G), get(boost::vertex_index, G));
+	//boost::relative_betweenness_centrality(G, centrality_map);
+	boost::brandes_betweenness_centrality(G, centrality_map);
+//	SCAI_ASSERT_EQ_ERROR( centrality_map.size(), N, "Wrong size");
+
+	std::vector<double> centrality(N);
+	for( int i=0; i<N; i++ ){
+		centrality[i] = centrality_map[i];
+	}
+/*	
+	boost::relative_betweenness_centrality(G,
+	    centrality_map(
+      make_iterator_property_map(centrality.begin(), get(vertex_index, G), double())
+      ).vertex_index_map(get(vertex_index, G)).weight_map(get(edge_weight, G)));
+PRINT("LALALA");
+*/
+	return centrality;
+}
+
 //-----------------------------------------------------------------------------------
 
-
+/*
 
 template scai::lama::DenseVector<IndexType> reindex(CSRSparseMatrix<ValueType> &graph);
 template std::vector<IndexType> localBFS(const CSRSparseMatrix<ValueType> &graph, IndexType u);
@@ -1952,10 +2028,13 @@ template scai::lama::CSRSparseMatrix<ValueType> constructLaplacian<IndexType, Va
 template scai::lama::CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension);
 template scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d);
 template std::vector< std::vector<IndexType>> mecGraphColoring( const CSRSparseMatrix<ValueType> &graph, IndexType &colors);
+template std::vector<ValueType> getBetweennessCentrality(const scai::lama::CSRSparseMatrix<ValueType>& graph);
+*/
 
-} /*namespace GraphUtils*/
+//} /*namespace GraphUtils*/
 
 
-
+//template class GraphUtils<int, double>;
+template class GraphUtils<long int, double>;
 
 } /* namespace ITI */

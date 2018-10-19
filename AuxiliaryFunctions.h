@@ -138,7 +138,7 @@ static void print2DGrid(const scai::lama::CSRSparseMatrix<ValueType>& adjM, scai
         
     //get the border nodes
     scai::lama::DenseVector<IndexType> border(adjM.getColDistributionPtr(), 0);
-    border = ITI::GraphUtils::getBorderNodes( adjM , partition);
+    border = ITI::GraphUtils<IndexType, ValueType>::getBorderNodes( adjM , partition);
     
     IndexType partViz[numX][numY];   
     IndexType bordViz[numX][numY]; 

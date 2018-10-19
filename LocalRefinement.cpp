@@ -425,7 +425,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				 */
 				{
 					SCAI_REGION( "LocalRefinement.distributedFMStep.loop.updateLocalBorder" )
-					nodesWithNonLocalNeighbors = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(input, borderCandidates);
+					nodesWithNonLocalNeighbors = GraphUtils<IndexType, ValueType>::getNodesWithNonLocalNeighbors(input, borderCandidates);
 				}
 
 				/**

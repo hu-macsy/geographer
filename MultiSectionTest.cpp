@@ -106,11 +106,11 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
         SCAI_ASSERT( partitionBS.getLocalValues()[i]!=-1 , "In PE " << *comm << " local point " << i << " has no partition." );
     }
     
-    const ValueType cutMS = GraphUtils::computeCut(adjM, partitionMS, true);
-    const ValueType cutBS = GraphUtils::computeCut(adjM, partitionBS, true);
+    const ValueType cutMS = GraphUtils<IndexType, ValueType>::computeCut(adjM, partitionMS, true);
+    const ValueType cutBS = GraphUtils<IndexType, ValueType>::computeCut(adjM, partitionBS, true);
     
-    const ValueType imbalanceMS = GraphUtils::computeImbalance<IndexType, ValueType>(partitionMS, k);
-    const ValueType imbalanceBS = GraphUtils::computeImbalance<IndexType, ValueType>(partitionBS, k);
+    const ValueType imbalanceMS = GraphUtils<IndexType, ValueType>::computeImbalance(partitionMS, k);
+    const ValueType imbalanceBS = GraphUtils<IndexType, ValueType>::computeImbalance(partitionBS, k);
     
     PRINT0( "Multisection:  cut= " << cutMS << " , imbalance= "<< imbalanceMS);
     PRINT0( "Bisection: cut= " << cutBS << " , imbalance= " << imbalanceBS );

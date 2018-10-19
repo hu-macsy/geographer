@@ -627,7 +627,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
 			//ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
 			ValueType cut = comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;//TODO: this assumes that the graph is unweighted
-			ValueType imbalance = GraphUtils::computeImbalance<IndexType, ValueType>(result, k, nodeWeights);
+			ValueType imbalance = GraphUtils<IndexType, ValueType>::computeImbalance(result, k, nodeWeights);
 			
 			
 			//-----------------------------------------------------------
@@ -657,7 +657,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			//IndexType numRefinementRounds = 0;
 			
 			SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
-			scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(input);
+			scai::dmemo::Halo halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(input);
 			ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, halo, settings, metrics );
 			SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
 		}
@@ -1267,7 +1267,12 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     }
 
     // use boost::Graph and boost::edge_coloring()
-    typedef adjacency_list<vecS, vecS, undirectedS, no_property, size_t, no_property> Graph;
+    typedef adjacency_list< vecS,
+                            vecS,
+                            undirectedS,
+                            no_property,
+                            size_t,
+                            no_property> Graph;
     //typedef std::pair<std::size_t, std::size_t> Pair;
     Graph G(N);
     
@@ -1326,7 +1331,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 		
 		if(settings.mec){
 			//coloring = getGraphMEC_local( adjM, colors );  // using hasan's code
-            coloring = GraphUtils::mecGraphColoring<IndexType, ValueType>( adjM, colors); // our implementation
+            coloring = GraphUtils<IndexType, ValueType>::mecGraphColoring( adjM, colors); // our implementation
 		}else{
 			coloring = getGraphEdgeColoring_local( adjM, colors );
 		}

@@ -341,7 +341,7 @@ DenseVector<IndexType> computePartition( \
 
 
 	if (randomInitialization) {
-		ITI::GraphUtils::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
+		ITI::GraphUtils<IndexType, ValueType>::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
 		//std::vector<IndexType> localIndices = GraphUtils::indexReorderCantor( localN );
 /*
 IndexType indexSumFY = std::accumulate( localIndices.begin(), localIndices.end(), 0);
@@ -525,7 +525,7 @@ SCAI_ASSERT_EQ_ERROR( indexSumFY, indexSumC, "Erros in index reordering");
 		//	from assign centers when sampling is used and we compute a new imbalance
 		// only when thene is no sampling
 		if( !randomInitialization ){
-			imbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( result, settings.numBlocks, nodeWeights );
+			imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( result, settings.numBlocks, nodeWeights );
 		}
 
 		if (comm->getRank() == 0) {

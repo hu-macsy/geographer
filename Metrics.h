@@ -187,8 +187,8 @@ struct Metrics{
 //---------------------------------------------------------------------------
 	void getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
 		
-		finalCut = ITI::GraphUtils::computeCut(graph, partition, true);
-		finalImbalance = ITI::GraphUtils::computeImbalance<IndexType, ValueType>( partition, settings.numBlocks, nodeWeights );
+		finalCut = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
+		finalImbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights );
 		
 		//TODO: getting the block graph probably fails for p>5000, removed this metric since we do not use it so much
 		//std::tie(maxBlockGraphDegree, totalBlockGraphEdges) = ITI::GraphUtils::computeBlockGraphComm<IndexType, ValueType>( graph, partition, settings.numBlocks );
@@ -207,7 +207,7 @@ struct Metrics{
 		// TODO: can re returned in an auto, check if it is faster
 		// it is a bit uglier but saves time
 		std::tie( commVolume, numBorderNodesPerBlock, numInnerNodesPerBlock ) = \
-				ITI::GraphUtils::computeCommBndInner( graph, partition, settings );
+				ITI::GraphUtils<IndexType, ValueType>::computeCommBndInner( graph, partition, settings );
 		
 		maxCommVolume = *std::max_element( commVolume.begin(), commVolume.end() );
 		totalCommVolume = std::accumulate( commVolume.begin(), commVolume.end(), 0 );
@@ -260,7 +260,7 @@ struct Metrics{
 				if (maxRounds < 0) {
 					maxRounds = localN;
 				}
-				IndexType localDiameter = ITI::GraphUtils::getLocalBlockDiameter<IndexType, ValueType>(graph, localN/2, 0, 0, maxRounds);
+				IndexType localDiameter = ITI::GraphUtils<IndexType, ValueType>::getLocalBlockDiameter(graph, localN/2, 0, 0, maxRounds);
 				
 				ValueType sumInverseDiam = comm->sum( 1.0/localDiameter );
 				harmMeanDiam = comm->getSize()/sumInverseDiam;

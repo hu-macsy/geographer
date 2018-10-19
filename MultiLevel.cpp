@@ -122,7 +122,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 	// do local refinement
 	{
 		SCAI_REGION( "MultiLevel.multiLevelStep.localRefinement" )
-		scai::lama::CSRSparseMatrix<ValueType> processGraph = GraphUtils::getPEGraph<IndexType, ValueType>(input);
+		scai::lama::CSRSparseMatrix<ValueType> processGraph = GraphUtils<IndexType, ValueType>::getPEGraph(input);
 		
 		//TODO: remove from final version?
 		// write the PE graph for further experiments
@@ -144,7 +144,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 		
 		std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(processGraph, settings);
 
-		std::vector<IndexType> nodesWithNonLocalNeighbors = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(input);
+		std::vector<IndexType> nodesWithNonLocalNeighbors = GraphUtils<IndexType, ValueType>::getNodesWithNonLocalNeighbors(input);
 
 		std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - before;
 		ValueType maxTime = comm->max( elapTime.count() );
@@ -835,7 +835,7 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
     }
     
     // get halo for the non-local coordinates
-    scai::dmemo::Halo coordHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(adjM);
+    scai::dmemo::Halo coordHalo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(adjM);
     std::vector<HArray<ValueType>> coordHaloData(dimensions);
     for(int d=0; d<dimensions; d++){        
         comm->updateHalo( coordHaloData[d], coordinates[d].getLocalValues(), coordHalo );

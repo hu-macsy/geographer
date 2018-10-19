@@ -1135,7 +1135,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 	    std::cout << "Max encountered node: " << maxEncounteredNode << std::endl;
 	}
     
-    scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils::edgeList2CSR<IndexType, ValueType>( edgeList );
+    scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils<IndexType, ValueType>::edgeList2CSR( edgeList );
     scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, globalN) );
     scai::dmemo::DistributionPtr noDist( new scai::dmemo::NoDistribution(globalN));
     graph.redistribute(rowDistPtr, noDist);
@@ -1185,7 +1185,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 		
 	}
 	
-	scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils::edgeList2CSR<IndexType, ValueType>( edgeList );
+	scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils<IndexType, ValueType>::edgeList2CSR( edgeList );
     
     return graph;
 	
@@ -1718,7 +1718,7 @@ void  FileIO<IndexType, ValueType>::readOFFTriangularCentral( scai::lama::CSRSpa
     // convert adjacency list to CSR matrix
     //
     
-    graph = GraphUtils::getCSRmatrixFromAdjList_NoEgdeWeights<IndexType, ValueType>( adjList );
+    graph = GraphUtils<IndexType, ValueType>::getCSRmatrixFromAdjList_NoEgdeWeights( adjList );
     SCAI_ASSERT_EQ_ERROR( graph.getNumColumns(), N, "Wrong number of columns");
     SCAI_ASSERT_EQ_ERROR( graph.getNumRows(), N, "Wrong number of rows");
     if( numEdges!=0 ){
@@ -1806,7 +1806,7 @@ void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix
 		// convert adjacency list to CSR matrix
 		//
 		
-		graph = GraphUtils::getCSRmatrixFromAdjList_NoEgdeWeights<IndexType, ValueType>( adjList );
+		graph = GraphUtils<IndexType, ValueType>::getCSRmatrixFromAdjList_NoEgdeWeights( adjList );
 	}
 	
     

@@ -28,7 +28,7 @@
 		std::vector<std::vector<IndexType>> predecessor(N, std::vector<IndexType> (N, 0)); 
     
 		for(IndexType i=0; i<N; i++){
-			APSP[i] = ITI::GraphUtils::localDijkstra( PEGraph, i, predecessor[i]);
+			APSP[i] = ITI::GraphUtils<IndexType, ValueType>::localDijkstra( PEGraph, i, predecessor[i]);
 		}
 
 		//access to the graphs

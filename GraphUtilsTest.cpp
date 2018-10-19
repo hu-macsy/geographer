@@ -48,20 +48,20 @@ TEST_F(GraphUtilsTest, testReindexCut){
     //scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));    
 
     //get first cut
-    ValueType initialCut = GraphUtils::computeCut<IndexType, ValueType>(graph, partition, true);
+    ValueType initialCut = GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
     ASSERT_GE(initialCut, 0);
     ValueType sumNonLocalInitial = ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(graph, true);
 
 	PRINT("about to reindex the graph");
     //now reindex and get second cut
-    GraphUtils::reindex<IndexType, ValueType>(graph);
+    GraphUtils<IndexType, ValueType>::reindex(graph);
     ValueType sumNonLocalAfterReindexing = ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(graph, true);
     EXPECT_EQ(sumNonLocalInitial, sumNonLocalAfterReindexing);
 
     DenseVector<IndexType> reIndexedPartition = DenseVector<IndexType>(graph.getRowDistributionPtr(), partition.getLocalValues());
     ASSERT_TRUE(reIndexedPartition.getDistributionPtr()->isEqual(*graph.getRowDistributionPtr()));
 
-    ValueType secondCut = GraphUtils::computeCut<IndexType, ValueType>(graph, reIndexedPartition, true);
+    ValueType secondCut = GraphUtils<IndexType, ValueType>::computeCut(graph, reIndexedPartition, true);
 
     EXPECT_EQ(initialCut, secondCut);
 }
@@ -77,7 +77,7 @@ TEST_F(GraphUtilsTest, testConstructLaplacian) {
     scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
     scai::dmemo::DistributionPtr cyclidCist(new scai::dmemo::CyclicDistribution(n, 10, comm));
 
-    CSRSparseMatrix<ValueType> L = GraphUtils::constructLaplacian<IndexType, ValueType>(graph);
+    CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
 
     ASSERT_EQ(L.getRowDistribution(), graph.getRowDistribution());
     ASSERT_TRUE(L.isConsistent());
@@ -91,7 +91,7 @@ TEST_F(GraphUtilsTest, testConstructLaplacian) {
 
     //test consistency under distributions
     const CSRSparseMatrix<ValueType> replicatedGraph = scai::lama::distribute<CSRSparseMatrix<ValueType>>(graph, noDist, noDist);
-    CSRSparseMatrix<ValueType> LFromReplicated = GraphUtils::constructLaplacian<IndexType, ValueType>(replicatedGraph);
+    CSRSparseMatrix<ValueType> LFromReplicated = GraphUtils<IndexType, ValueType>::constructLaplacian(replicatedGraph);
     LFromReplicated.redistribute(L.getRowDistributionPtr(), L.getColDistributionPtr());
     CSRSparseMatrix<ValueType> diff = scai::lama::eval<CSRSparseMatrix<ValueType>> (LFromReplicated - L);
     EXPECT_EQ(0, diff.l2Norm());
@@ -105,7 +105,7 @@ TEST_F(GraphUtilsTest, benchConstructLaplacian) {
     std::string file = graphPath + fileName;
     const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 
-    CSRSparseMatrix<ValueType> L = GraphUtils::constructLaplacian<IndexType, ValueType>(graph);
+    CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
 }
 
 TEST_F(GraphUtilsTest, DISABLED_benchConstructLaplacianBig) {
@@ -113,7 +113,7 @@ TEST_F(GraphUtilsTest, DISABLED_benchConstructLaplacianBig) {
     std::string file = graphPath + fileName;
     const scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 
-    CSRSparseMatrix<ValueType> L = GraphUtils::constructLaplacian<IndexType, ValueType>(graph);
+    CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
 }
 
 //TODO: test also with edge weights
@@ -134,7 +134,7 @@ TEST_F (GraphUtilsTest, testLocalDijkstra){
     N= graph.getNumRows();
 
     std::vector<IndexType> predecessor;
-    std::vector<ValueType> shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0, predecessor);
+    std::vector<ValueType> shortDist = GraphUtils<IndexType, ValueType>::localDijkstra( graph, 0, predecessor);
 
     EXPECT_EQ( shortDist.size(), N );
 
@@ -145,18 +145,18 @@ TEST_F (GraphUtilsTest, testLocalDijkstra){
     //PRINT0("set edge (14, 15) to 1.5");
     graph.setValue(5, 6, 1.5);
     graph.setValue(8, 12, 1.1);
-    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0, predecessor);
+    shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 0, predecessor);
     EXPECT_EQ( shortDist[15], 6);
 
     //PRINT0("set edge (11, 15) to 0.5");
     graph.setValue(11, 15, 0.5);
-    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0, predecessor);
+    shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 0, predecessor);
     EXPECT_EQ( shortDist[15], 5.5);
     EXPECT_EQ( predecessor[15], 11);
 
     //PRINT0("set edge (9, 10) to 0.3");
     graph.setValue(9, 10, 0.3);
-    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0, predecessor);
+    shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 0, predecessor);
     EXPECT_EQ( shortDist[15], 4.8);
     EXPECT_EQ( shortDist[11], 4.3);
     EXPECT_EQ( predecessor[10], 9);
@@ -165,12 +165,12 @@ TEST_F (GraphUtilsTest, testLocalDijkstra){
 
     graph.setValue(5, 9, 1.3);
     graph.setValue(7, 11, 1.3);
-    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 0, predecessor);
+    shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 0, predecessor);
     EXPECT_EQ( shortDist[15], 4.8);
     EXPECT_EQ( shortDist[11], 4.3);
     EXPECT_EQ( predecessor[9], 8);
 
-    shortDist = GraphUtils::localDijkstra<IndexType,ValueType>( graph, 13, predecessor);
+    shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 13, predecessor);
     EXPECT_EQ( shortDist[0], 4);
     EXPECT_EQ( shortDist[15], 2);
     EXPECT_EQ( shortDist[7], 3.3);
@@ -212,7 +212,7 @@ TEST_F (GraphUtilsTest, testComputeCommVolumeAndBoundaryNodes){
     std::vector<IndexType> numInnerNodes;
 
 	std::tie( commVolume, numBorderNodes, numInnerNodes) = \
-		ITI::GraphUtils::computeCommBndInner( graph, partition, settings );
+		ITI::GraphUtils<IndexType,ValueType>::computeCommBndInner( graph, partition, settings );
     
     SCAI_ASSERT_EQ_ERROR( commVolume.size(), numBorderNodes.size(), "size mismatch");
     
@@ -243,7 +243,7 @@ TEST_F (GraphUtilsTest, testGraphMaxDegree){
         scai::lama::MatrixCreator::fillRandom(graph, i/9.0);
     
         IndexType maxDegree;
-        maxDegree = GraphUtils::getGraphMaxDegree<IndexType, ValueType>(graph);
+        maxDegree = GraphUtils<IndexType,ValueType>::getGraphMaxDegree(graph);
         //PRINT0("maxDegree= " << maxDegree);
         
         EXPECT_LE( maxDegree, N);
@@ -278,7 +278,7 @@ TEST_F (GraphUtilsTest,testEdgeList2CSR){
 		//PRINT(thisPE << ": inserting edge " << v1 << " - " << v2 );
 	}
 	
-	scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils::edgeList2CSR<IndexType, ValueType>( localEdgeList );
+	scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils<IndexType,ValueType>::edgeList2CSR( localEdgeList );
 	
 	SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
 	EXPECT_TRUE( graph.checkSymmetry() );
@@ -341,14 +341,14 @@ TEST_F(GraphUtilsTest, testMEColoring_local){
 
     std::chrono::time_point<std::chrono::steady_clock> start= std::chrono::steady_clock::now();
     //
-    std::vector<std::vector<IndexType>> coloring = GraphUtils::mecGraphColoring<IndexType, ValueType>( graph, colors);
+    std::vector<std::vector<IndexType>> coloring = GraphUtils<IndexType,ValueType>::mecGraphColoring( graph, colors);
     //
     std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - start;
     ValueType ourTime = elapTime.count();
 
     EXPECT_EQ( coloring[0].size(), M);
 
-    IndexType maxDegree =  GraphUtils::getGraphMaxDegree<IndexType, ValueType>( graph );
+    IndexType maxDegree =  GraphUtils<IndexType,ValueType>::getGraphMaxDegree( graph );
     EXPECT_LE(colors, 2*maxDegree);
     PRINT0("num colors: " << colors << " , max degree: " << maxDegree);
 
@@ -390,7 +390,30 @@ TEST_F(GraphUtilsTest, testMEColoring_local){
     }
 
     ValueType sumEdgeWeight = std::accumulate(maxEdge.begin(), maxEdge.end() , 0.0);
+}
+//------------------------------------------------------------------------------------ 
+
+TEST_F(GraphUtilsTest, testBetweennessCentrality){
+    std::string file = graphPath + "Grid8x8";
+    //std::string file = graphPath + "delaunayTest.graph";
+    //std::string file = graphPath + "bigtrace-00000.graph";
+    IndexType dimensions = 2;
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+    // read graph and coords
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    IndexType N = graph.getNumRows();
+    IndexType M = graph.getNumValues()/2;
+
+    std::vector<ValueType> betwCentr = GraphUtils<IndexType,ValueType>::getBetweennessCentrality( graph );
+
+    EXPECT_EQ( betwCentr.size() , N);
+
+    for(int i=0; i<N; i++)
+        std::cout<< i << ": " << betwCentr[i] << std::endl;
 
 }
+
 
 } //namespace
