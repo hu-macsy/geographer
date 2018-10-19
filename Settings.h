@@ -2,6 +2,8 @@
 
 #include <iostream>
 #include <scai/lama.hpp>
+#include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
 
 #define STRINGIZER(arg)     #arg
 #define STR_VALUE(arg)      STRINGIZER(arg)
@@ -125,7 +127,9 @@ static std::string tool2string( Tool t){
 enum class InitialPartitioningMethods {SFC = 0, Pixel = 1, Spectral = 2, KMeans = 3, Multisection = 4, MJ = 5, None = 6};
 
 //-----------------------------------------------------------------------------------
+std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method);
 
+std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method);
 
 
 struct Settings{
@@ -138,7 +142,9 @@ struct Settings{
     IndexType dimensions= 2;
     std::string fileName = "-";
     std::string outFile = "-";
+    std::string blockSizesFile = "-";
     ITI::Format fileFormat = ITI::Format::AUTO;   // 0 for METIS, 4 for MatrixMarket
+    ITI::Format coordFormat = ITI::Format::AUTO; 
     bool useDiffusionCoordinates = false;
     IndexType diffusionRounds = 20;
     std::vector<IndexType> blockSizes;
@@ -196,12 +202,15 @@ struct Settings{
     bool writePEgraph = false;
     bool writeInFile = false;
     bool storeInfo = false;
-	int repeatTimes = 1;
+	IndexType repeatTimes = 1;
     
     //calculate expensive performance metrics?
     bool computeDiameter = false;
     IndexType maxDiameterRounds = 2;
+    std::string metricsDetail;
 
+    // variable to check if the settings given are valid or not
+    bool isValid = true;
     //
     // print settings
     //
@@ -268,7 +277,7 @@ struct Settings{
 		}
 	}
 
-
+	boost::program_options::variables_map parseInput(int argc, char** argv);
     
-};
+}; //struct Settings
 

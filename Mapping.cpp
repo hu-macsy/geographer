@@ -258,9 +258,6 @@ for( int i=0; i<N; i++){
 		while( usedPEs[peNode] ){ 
 			peNode = rand()%N;
 		}
-//for(int i =0; i<N; i++) //PRINT0(i << " : " << usedPEs[i] << " +++ " <<mapped[i] );
-//	PRINT0( i << " --> " << mapping[i]);
-
 
 		// map blockNode to peNode
 		mapping[blockNode] = peNode;	//peNode is "current" in libtopomap.cpp
@@ -367,6 +364,8 @@ bool Mapping<IndexType, ValueType>::isValid(
 
 	return true;
 }
+
+
 
 //to force instantiation
 template class Mapping<IndexType, ValueType>;
