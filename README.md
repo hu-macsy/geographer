@@ -21,7 +21,11 @@ The following libraries are necessary to build the unit tests:
 
 ### Libraries
 Geographer requires some custom additions to Lama for faster redistributions in distributed memory.
-Please clone [our fork](https://github.com/kit-parco/lama), then compile and install the branch `looz-dmemo`.
+Please clone [our fork](https://github.com/kit-parco/lama), then compile and install the branch `looz-dmemo` with IndexType sent to long
+(this is done by -DSCAI_INDEX_TYPE="long" in the cmake command; you may also
+need to set -DSCAI_BLAS_LIBRARY=INTERNALBLAS). 
+**You *DO* need to do a `make install`
+after cmake although the Lama website may state otherwise.**
 
 The *RBC* library for splitting MPI communicators is included as a submodule.
 After installing Lama and cloning this repository, enter the directory of this repository and call `git submodule init && git submodule update`.
