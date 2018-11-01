@@ -186,6 +186,12 @@ variables_map Settings::parseInput(int argc, char** argv){
 		}
 	}
 
+	// check if corrdFormat is provided
+	// if no coordFormat was given but was given a fileFormat assume they are the same
+	if( !vm.count("coordFormat") and vm.count("fileFormat") ){
+		coordFormat = fileFormat;
+	}
+
 	if (vm.count("previousPartition")) {
 		repartition = true;
 		if (vm.count("initialPartition")) {

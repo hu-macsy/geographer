@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
     
 	std::string metricsDetail = "all";
 	std::string blockSizesFile;
-	ITI::Format coordFormat;
+	//ITI::Format coordFormat;
     IndexType repeatTimes = 1;
         
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -219,15 +219,7 @@ int main(int argc, char** argv) {
 			}
 
         } else {
-            if( vm.count("coordFormat") ) { // coordFormat given
-                coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
-            }else if ( !vm.count("coordFormat") and vm.count("fileFormat") ) { 
-                // if no coordFormat was given but was given a fileFormat assume they are the same
-                coordFormat = settings.fileFormat;
-                coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
-            }else {
-                coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
-            }
+            coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.coordFormat);
         }
         
         std::chrono::duration<double> readCoordsTime = std::chrono::system_clock::now() - startTime;
