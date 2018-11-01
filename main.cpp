@@ -51,9 +51,8 @@
 
 int main(int argc, char** argv) {
 	using namespace boost::program_options;
-	options_description desc("Supported options");
-       
-    bool writePartition = false;
+	
+	bool writePartition = false;
     
 	std::string metricsDetail = "all";
 	std::string blockSizesFile;
@@ -82,35 +81,10 @@ int main(int argc, char** argv) {
 	
     IndexType N = -1; 		// total number of points
 
-    char machineChar[255];
-    std::string machine;
-    gethostname(machineChar, 255);
-    
-    machine = std::string(machineChar);
-    settings.machine = machine;
-    
-    settings.verbose = vm.count("verbose");
-    settings.storeInfo = vm.count("storeInfo");
-    settings.erodeInfluence = vm.count("erodeInfluence");
-    settings.tightenBounds = vm.count("tightenBounds");
-    settings.manhattanDistance = vm.count("manhattanDistance");
-	settings.noRefinement = vm.count("noRefinement");
-	
-	if( vm.count("noComputeDiameter") ){
-		settings.computeDiameter = false;
-	}else{
-		settings.computeDiameter = true;
-	}
-	
-    writePartition = vm.count("writePartition");
-    if( writePartition ){
-        settings.writeInFile = true;
-    }
-   
-    srand(vm["seed"].as<double>());
-
+	std::string machine = settings.machine;
     /* timing information
      */
+
     std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
     if (comm->getRank() == 0){

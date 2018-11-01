@@ -233,5 +233,31 @@ variables_map Settings::parseInput(int argc, char** argv){
 		metricsDetail = "easy";
 	}	
 
+	if( vm.count("noComputeDiameter") ){
+		computeDiameter = false;
+	}else{
+		computeDiameter = true;
+	}
+	
+    if( vm.count("writePartition") ){
+    	//writePartition = true;
+        writeInFile = true;
+    }
+   
+    char machineChar[255];
+    std::string machine;
+    gethostname(machineChar, 255);
+    
+    machine = std::string(machineChar);
+        
+    verbose = vm.count("verbose");
+    storeInfo = vm.count("storeInfo");
+    erodeInfluence = vm.count("erodeInfluence");
+    tightenBounds = vm.count("tightenBounds");
+    manhattanDistance = vm.count("manhattanDistance");
+	noRefinement = vm.count("noRefinement");
+
+    srand(vm["seed"].as<double>());
+
 	return vm;
 }
