@@ -272,19 +272,25 @@ DenseVector<IndexType> computePartition( \
 		ValueType sumCoord = std::accumulate( convertedCoords[d].begin(), convertedCoords[d].end(), 0.0);
 		
 		/*//WARNING, TODO: remove or fix
-		//not sure if this is needed but i is wrong
+		//not sure if this is needed but it is wrong
 		// i=convertedCoord[d][x] for some 0<x<size() and not x as I though
 		// so, localHilbertInd[i] is wrong and meaningless. I guess the intention
 		// was localHilbertInd[x] but is not clear how to do that or why (to align
 		// access to the coordinates?).
+		// A way around is to combine them in a pair or get the permutation vector
+		// of the sorted indices and reorder/copy convertedCoords based on that
+		// e.g. if the sorted indices of localHilbertInd are [ 10, 4, 3, 8, ...]
+		// then make newCoords= [ coords[10], coords[4], coords[3] , coords[8] ... ]
 		std::sort(convertedCoords[d].begin(), convertedCoords[d].end(), \
 			[&localHilbertInd](ValueType i, ValueType j){ 
 				return localHilbertInd[i]<localHilbertInd[j]; 
 			});
-		*/
+		
 		ValueType sumCoord2 = std::accumulate( convertedCoords[d].begin(), convertedCoords[d].end(), 0.0);
 
 		SCAI_ASSERT_GE_ERROR( sumCoord, 0.999*sumCoord2, "Error in sorting local coordinates");
+		*/
+		
 		assert(convertedCoords[d].size() == localN);
 	}
 

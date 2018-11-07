@@ -66,7 +66,6 @@ int main(int argc, char** argv) {
 	if( !settings.isValid )
 		return -1;
 
-
     //--------------------------------------------------------
     //
     // initialize
