@@ -387,7 +387,7 @@ SCAI_ASSERT_EQ_ERROR( indexSumFY, indexSumC, "Erros in index reordering");
 	}
 
 	//
-	aux<IndexType,ValueType>::timeMeasurement(KMeansStart);
+	//aux<IndexType,ValueType>::timeMeasurement(KMeansStart);
 	//
 
 	scai::hmemo::ReadAccess<ValueType> rWeight(nodeWeights.getLocalValues());

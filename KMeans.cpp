@@ -559,8 +559,7 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 	ValueType time = centTime.count();
 	std::cout<< comm->getRank()<< ": time " << time << std::endl;
 
-	aux<IndexType,ValueType>::timeMeasurement( startCents );
-	//aux::printTimeMeasurements( centTIme );
+	//aux<IndexType,ValueType>::timeMeasurement( startCents );
 
 	//WARNING: this was in the initial version. The problem is that each PE find one center.
 	// This can lead to bad solutions since dense areas may require more centers
