@@ -743,7 +743,7 @@ int main(int argc, char** argv) {
     
     if( settings.outFile!="-" and writePartition ){
         std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
-        std::string partOutFile = settings.outFile + ".partition";
+        std::string partOutFile = settings.outFile;
 		ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
 
         std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
