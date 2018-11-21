@@ -33,6 +33,7 @@ TEST_F(CommTreeTest, testTreeFromLeaves){
 	};
 
 	ITI::CommTree<IndexType,ValueType> cTree( leaves );
+	cTree.print();
 
 }
 

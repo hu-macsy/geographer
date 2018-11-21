@@ -102,6 +102,7 @@ std::vector<std::vector<commNode>> tree;
 //(well, it can infered but it is just easier)
 IndexType hierarchyLevels;
 IndexType numNodes;
+IndexType numLeaves;
 
 
 /*@brief constructor to create tree from a vector of leaves
@@ -116,6 +117,12 @@ IndexType createTreeFromLeaves( const std::vector<commNode> leaves);
 grouping together nodes that have the same last hierarchy index
 */
 std::vector<commNode> createLevelAbove( const std::vector<commNode> levelBelow, IndexType hierLevel);
+
+/*@brief Print information for the tree
+*/
+
+void print();
+
 
 
 
