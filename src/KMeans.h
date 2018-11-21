@@ -22,8 +22,13 @@
 
 using scai::lama::DenseVector;
 
+
+
 namespace ITI {
 namespace KMeans {
+
+//typedef to make it more readable
+using point = std::vector<ValueType>;
 
 /**
  * @brief Partition a point set using balanced k-means
@@ -88,6 +93,25 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 
 
 /**
+	@brief Version for hierarchical version. The centers now are a vector of vectors,
+	a set o centers for every block/center in the previous hierarchy level.
+	
+	@param[in] centers Centers from previous partition: centers[i] are the centers 
+	for block i in the previous hierarchy level.
+	@param[in] partition The block id of every point in the previous hierarchy.
+	partition[i]=b means that point i was in block b in the previous hierarchy
+	level. 
+*/
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<point>> findInitialCentersSFC(
+		const std::vector<DenseVector<ValueType> >& coordinates, 
+		const std::vector<ValueType> &minCoords,
+		const std::vector<ValueType> &maxCoords,
+		const scai::lama::DenseVector<IndexType> &partition,
+		Settings settings);
+
+
+/**
  * Find initial centers for k-means by sorting the local points along a space-filling curve.
  * Assumes that points are already divided globally according to their SFC indices, but the local order was changed to have increasing global node IDs,
  * as required by the GeneralDistribution constructor.
@@ -100,9 +124,11 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
  * @return coordinates of centers
  */
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType> >  findInitialCentersSFC(
-		const std::vector<DenseVector<ValueType> >& coordinates, const std::vector<ValueType> &minCoords,
-		const std::vector<ValueType> &maxCoords, Settings settings);
+std::vector<std::vector<ValueType>>  findInitialCentersSFC(
+		const std::vector<DenseVector<ValueType> >& coordinates,
+		const std::vector<ValueType> &minCoords,
+		const std::vector<ValueType> &maxCoords,
+		Settings settings);
 
 /**
  * @brief Compute initial centers from space-filling curve without considering point positions

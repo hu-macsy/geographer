@@ -19,11 +19,13 @@
 namespace ITI {
 namespace KMeans {
 
+
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType> > findInitialCentersSFC(
+std::vector<std::vector<point>> findInitialCentersSFC(
 		const std::vector<DenseVector<ValueType> >& coordinates, 
 		const std::vector<ValueType> &minCoords,
 		const std::vector<ValueType> &maxCoords,
+		const scai::lama::DenseVector<IndexType> &partition,
 		Settings settings) {
 
 	SCAI_REGION( "KMeans.findInitialCentersSFC" );
@@ -32,6 +34,32 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 	const IndexType dimensions = settings.dimensions;
 	const IndexType k = settings.numBlocks;
 	
+	//hrr: maybe not needed
+	const IndexType maxPart = partition.max();
+
+	//hrr: convention: graph is already partitioned. We call the already 
+	// known blocks as "parts". 
+	// So, numXperPart means how many Xs the already knows blocks have.
+	// numXperBlocks means how many Xs the new, to-be-found blocks must have
+/*
+	//hrr
+	//in how many blocks each known block (part) will be partitioned
+	//numBlocksPerPart[i]=k means than current partition i should be partitioned
+	//into k blocks
+	std:vector<unsigned int> numBlocksPerPart = settings.XXX;
+	SCAI_ASSERT_EQ_ERROR( numBlocksPerPart.size(), maxPart, "The partition given must have equal number of blocks with the vector of block per part");
+	
+	std::vector<unsigned int> coresPerBlock = CCC;
+	std::vector<unsigned int> memPerBlock = MMM;
+	std::vector<ValueType> speedPerBlock = SSS;
+
+	const IndexType totalNumOfBlocks = std::accumulate(numBlocksPerPart.begin(), numBlocksPerPart.end(), 0);
+
+	//hrr: a property per new block; sizes must match
+	SCAI_ASSERT_EQ_ERROR( coresPerBlock.size(), totalNumOfBlocks, "Must be provided a number of cores per new block. The size of the vector mustbe equal the total number on new blocks");
+	SCAI_ASSERT_EQ_ERROR( memPerBlock.size(), totalNumOfBlocks, "Must be provided a memory capacity per new block. The size of the vector mustbe equal the total number on new blocks");
+	SCAI_ASSERT_EQ_ERROR( speedPerBlock.size(), totalNumOfBlocks, "Must be provided a cpu speed per new block. The size of the vector mustbe equal the total number on new blocks");
+*/
 	//convert coordinates, switch inner and outer order
 	std::vector<std::vector<ValueType> > convertedCoords(localN);
 	for (IndexType i = 0; i < localN; i++) {
@@ -71,11 +99,13 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 	scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
 
 	//set local values in vector, leave non-local values with zero
-	std::vector<std::vector<ValueType> > result(dimensions);
+	std::vector<std::vector<point>> result(dimensions);
 	for (IndexType d = 0; d < dimensions; d++) {
 		result[d].resize(k);
 	}
 
+	//check for all centers: if the index of a center is in this PE,
+	//add it to the results vector.
 	for (IndexType j = 0; j < k; j++) {
 		IndexType localIndex = blockDist->global2local(wantedIndices[j]);
 		if (localIndex != scai::invalidIndex) {
@@ -84,7 +114,11 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 			assert(permutedIndex < localN);
 			assert(permutedIndex >= 0);
 			for (IndexType d = 0; d < dimensions; d++) {
-				result[d][j] = convertedCoords[permutedIndex][d];
+//TODO: this is wrong, added [0] just to compile
+// fix it appropiatelly				
+				result[0][d][j] = convertedCoords[permutedIndex][d];
+//
+//
 			}
 		}
 	}
@@ -96,6 +130,24 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 
 	return result;
 }
+
+
+//overloaded function for non-hierarchical version. Set partition to 0 for all points
+//and return only the first (there is only one) group of centers
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<ValueType>>  findInitialCentersSFC(
+		const std::vector<DenseVector<ValueType>>& coordinates,
+		const std::vector<ValueType> &minCoords,
+		const std::vector<ValueType> &maxCoords,
+		Settings settings){
+
+		//TODO: probably must also change the seetings.numBlocks
+	
+		scai::lama::DenseVector<IndexType> partition( coordinates[0].getDistributionPtr(), 0);
+
+		return findInitialCentersSFC( coordinates, minCoords, maxCoords, partition, settings)[0];
+}
+
 
 
 template<typename IndexType, typename ValueType>
@@ -637,67 +689,53 @@ DenseVector<IndexType> computePartition( \
 	std::vector<ValueType> maxCoords(dim);
 	std::vector<std::vector<ValueType> > convertedCoords(dim);
 
-	// a vector of the indices
-	std::vector<IndexType> permIndices(localN);
-	std::iota(permIndices.begin(), permIndices.end(), 0);
+	// copy and sort coordinates according to their hilbert index
+	{
+		// a vector of the indices
+		std::vector<IndexType> permIndices(localN);
+		std::iota(permIndices.begin(), permIndices.end(), 0);
 
-	// hilbert curve indices of all local points
-	const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(globalN), double(21));
-	std::vector<ValueType> localHilbertInd = HilbertCurve<IndexType,ValueType>::getHilbertIndexVector(coordinates, recursionDepth, settings.dimensions);
+		// hilbert curve indices of all local points
+		const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(globalN), double(21));
+		std::vector<ValueType> localHilbertInd = HilbertCurve<IndexType,ValueType>::getHilbertIndexVector(coordinates, recursionDepth, settings.dimensions);
 
-	//SCAI_ASSERT_EQ_ERROR( convertedCoords[0].size(), localHilbertInd.size() , "vector size mismatch");
-	SCAI_ASSERT_EQ_ERROR(localN, localHilbertInd.size() , "vector size mismatch");
+		SCAI_ASSERT_EQ_ERROR(localN, localHilbertInd.size() , "vector size mismatch");
 
-	// sort the point/vertex indices based on their hilbert index
-	std::sort(permIndices.begin(), permIndices.end(), [&](IndexType i, IndexType j){return localHilbertInd[i] < localHilbertInd[j];});
+		// sort the point/vertex indices based on their hilbert index
+		std::sort(permIndices.begin(), permIndices.end(), [&](IndexType i, IndexType j){return localHilbertInd[i] < localHilbertInd[j];});
 
-	for (IndexType d = 0; d < dim; d++) {
-		scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
-		assert(rAccess.size() == localN);				
-		
-		// copy coordinates sorted by their hilbert index
-		IndexType checkSum = 0;
-		ValueType sumCoord = 0.0;
-		convertedCoords[d].resize(localN);
-		for(IndexType i=0; i<localN; i++){
-			IndexType ind = permIndices[i];
-			ValueType coord = rAccess[ ind ];
-			convertedCoords[d][i] = coord;
+		for (IndexType d = 0; d < dim; d++) {
+			scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
+			assert(rAccess.size() == localN);				
+			
+			// copy coordinates sorted by their hilbert index
+			IndexType checkSum = 0;
+			ValueType sumCoord = 0.0;
+			convertedCoords[d].resize(localN);
+			for(IndexType i=0; i<localN; i++){
+				IndexType ind = permIndices[i];
+				ValueType coord = rAccess[ ind ];
+				convertedCoords[d][i] = coord;
 
-			checkSum += ind;
-			sumCoord += coord;
+				//meant for debugging reasons, remove or add debug macros
+				checkSum += ind;
+				sumCoord += coord;
+			}
+
+			SCAI_ASSERT_EQ_ERROR(checkSum, (localN*(localN-1)/2), "Checksum error");
+			ValueType sumCoord2 = std::accumulate( convertedCoords[d].begin(), convertedCoords[d].end(), 0.0);
+			SCAI_ASSERT_GE_ERROR( sumCoord, 0.999*sumCoord2, "Error in sorting local coordinates");
+
+			minCoords[d] = *std::min_element(convertedCoords[d].begin(), convertedCoords[d].end());
+			maxCoords[d] = *std::max_element(convertedCoords[d].begin(), convertedCoords[d].end());
+
+			//or, do not take the hilbert index, do not sort and just copy coordinates
+			//TODO: test improvement, in some small inputs, the sorted version did less 
+			// iterations
+			//convertedCoords[d] = std::vector<ValueType>(rAccess.get(), rAccess.get()+localN);
+
+			assert(convertedCoords[d].size() == localN);
 		}
-
-		SCAI_ASSERT_EQ_ERROR(checkSum, (localN*(localN-1)/2), "Checksum error");
-		ValueType sumCoord2 = std::accumulate( convertedCoords[d].begin(), convertedCoords[d].end(), 0.0);
-		SCAI_ASSERT_GE_ERROR( sumCoord, 0.999*sumCoord2, "Error in sorting local coordinates");
-
-		//ignore sorting
-		//convertedCoords[d] = std::vector<ValueType>(rAccess.get(), rAccess.get()+localN);
-
-		minCoords[d] = *std::min_element(convertedCoords[d].begin(), convertedCoords[d].end());
-		maxCoords[d] = *std::max_element(convertedCoords[d].begin(), convertedCoords[d].end());
-
-		/*//WARNING, TODO: remove or fix
-		//not sure if this is needed but it is wrong
-		// i=convertedCoord[d][x] for some 0<x<size() and not x as I though
-		// so, localHilbertInd[i] is wrong and meaningless. I guess the intention
-		// was localHilbertInd[x] but is not clear how to do that or why (to align
-		// access to the coordinates?).
-		// A way around is to combine them in a pair or get the permutation vector
-		// of the sorted indices and reorder/copy convertedCoords based on that
-		// e.g. if the sorted indices of localHilbertInd are [ 10, 4, 3, 8, ...]
-		// then make newCoords= [ coords[10], coords[4], coords[3] , coords[8] ... ]
-		std::sort(convertedCoords[d].begin(), convertedCoords[d].end(), \
-			[&localHilbertInd](ValueType i, ValueType j){ 
-				return localHilbertInd[i]<localHilbertInd[j]; 
-			});
-		*/
-
-		
-		
-
-		assert(convertedCoords[d].size() == localN);
 	}
 
 	std::vector<ValueType> globalMinCoords(dim);
@@ -716,21 +754,8 @@ DenseVector<IndexType> computePartition( \
 		localVolume *= localDiff;
 	}
 
-	//
-
-
 	QuadNodeCartesianEuclid boundingBox(minCoords, maxCoords);
     if (settings.verbose) {
-    	/*
-        std::cout << "Process " << comm->getRank() << ": ( ";
-        for (auto coord : minCoords) std::cout << coord << " ";
-        std::cout << ") , ( ";
-        for (auto coord : maxCoords) std::cout << coord << " ";
-        std::cout << ")";
-        std::cout << ", " << localN << " nodes, " << scai::utilskernel::HArrayUtils::sum(nodeWeights.getLocalValues()) << ", " << ((ValueType)localN)/globalN *100<< "%, total weight";
-        std::cout << ", volume ratio " << localVolume / (volume / p);
-        std::cout << std::endl;
-		*/
 		std::cout << "(" << comm->getRank() << ", "<< localN << ")" << std::endl;
 		comm->synchronize();
 		std::cout << "(" << comm->getRank() << ", "<< localVolume / (volume / p) << ")" << std::endl;
@@ -738,8 +763,6 @@ DenseVector<IndexType> computePartition( \
 
 	diagonalLength = std::sqrt(diagonalLength);
 	const ValueType expectedBlockDiameter = pow(volume / k, 1.0/dim);
-
-	DenseVector<IndexType> result(coordinates[0].getDistributionPtr(), 0);
 
 	std::vector<ValueType> upperBoundOwnCenter(localN, std::numeric_limits<ValueType>::max());
 	std::vector<ValueType> lowerBoundNextCenter(localN, 0);
@@ -761,41 +784,40 @@ DenseVector<IndexType> computePartition( \
 	std::vector<IndexType> adjustedBlockSizes(blockSizes);
 	const bool randomInitialization = comm->all(localN > minNodes);
 
+	//perform sampling
+	{
+		if (randomInitialization) {
+			ITI::GraphUtils<IndexType, ValueType>::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
+			//TODO: the cantor shuffle is more stable, random suffling can yield better
+			// results occasionally but has higher fluxations/variance
+			//localIndices = GraphUtils<IndexType,ValueType>::indexReorderCantor( localN );
 
-	if (randomInitialization) {
-		ITI::GraphUtils<IndexType, ValueType>::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
-		//std::vector<IndexType> localIndices = GraphUtils::indexReorderCantor( localN );
+			SCAI_ASSERT_EQ_ERROR(*std::max_element(localIndices.begin(), localIndices.end()), localN -1, "Error in index reordering");
+			SCAI_ASSERT_EQ_ERROR(*std::min_element(localIndices.begin(), localIndices.end()), 0, "Error in index reordering");
 
-		SCAI_ASSERT_EQ_ERROR(*std::max_element(localIndices.begin(), localIndices.end()), localN -1, "Error in index reordering");
-		SCAI_ASSERT_EQ_ERROR(*std::min_element(localIndices.begin(), localIndices.end()), 0, "Error in index reordering");
+			samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNodes*k)))+1;
+			samples.resize(samplingRounds);
+			samples[0] = std::min(minNodes, localN);
+		}
 
-		samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNodes*k)))+1;
-		samples.resize(samplingRounds);
-		samples[0] = std::min(minNodes, localN);
+		if(settings.verbose){
+			PRINT(*comm << ": localN= "<< localN << ", samplingRounds= " << samplingRounds << ", lastIndex: " << *localIndices.end() );
+		}
+		if (samplingRounds > 0 && settings.verbose) {
+			if (comm->getRank() == 0) std::cout << "Starting with " << samplingRounds << " sampling rounds." << std::endl;
+		}
+		for (IndexType i = 1; i < samplingRounds; i++) {
+			samples[i] = std::min(IndexType(samples[i-1]*2), localN);
+		}
+		if (samplingRounds > 0) {
+		    samples[samplingRounds-1] = localN;
+		}
 	}
-
-	if(settings.verbose){
-		PRINT(*comm << ": localN= "<< localN << ", samplingRounds= " << samplingRounds << ", lastIndex: " << *localIndices.end() );
-	}
-
-	if (samplingRounds > 0 && settings.verbose) {
-		if (comm->getRank() == 0) std::cout << "Starting with " << samplingRounds << " sampling rounds." << std::endl;
-	}
-
-	for (IndexType i = 1; i < samplingRounds; i++) {
-		samples[i] = std::min(IndexType(samples[i-1]*2), localN);
-	}
-
-	if (samplingRounds > 0) {
-	    samples[samplingRounds-1] = localN;
-	}
-
 	//
 	//aux<IndexType,ValueType>::timeMeasurement(KMeansStart);
 	//
 
 	scai::hmemo::ReadAccess<ValueType> rWeight(nodeWeights.getLocalValues());
-
 	IndexType iter = 0;
 	ValueType delta = 0;
 	bool balanced = false;
@@ -804,6 +826,9 @@ DenseVector<IndexType> computePartition( \
 	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
 	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
 	ValueType imbalance = 1;
+
+	// result[i]=b, means that point i belongs to cluster/block b
+	DenseVector<IndexType> result(coordinates[0].getDistributionPtr(), 0);
 
 	do {
 		std::chrono::time_point<std::chrono::high_resolution_clock> iterStart = std::chrono::high_resolution_clock::now();
@@ -997,7 +1022,7 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 	return {minCoords, maxCoords};
 }
 
-
+//called initially with no centers parameter
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,

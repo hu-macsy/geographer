@@ -19,6 +19,7 @@ using scai::IndexType;
 typedef double ValueType;
 
 namespace ITI{
+
 enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5, BINARY = 6, EDGELIST = 7, BINARYEDGELIST = 8, EDGELISTDIST = 9};
 
 inline std::istream& operator>>(std::istream& in, Format& format){
@@ -131,7 +132,6 @@ std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method);
 
 std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method);
 
-
 struct Settings{
     //partition settings
     IndexType numBlocks = 2;
@@ -211,6 +211,8 @@ struct Settings{
 
     // variable to check if the settings given are valid or not
     bool isValid = true;
+
+    //struct communicationTree commTree;
     //
     // print settings
     //

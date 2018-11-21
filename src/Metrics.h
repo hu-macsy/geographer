@@ -6,7 +6,6 @@
 #include <chrono>
 #include <algorithm>
 
-//#include <scai/lama.hpp>
 #include "GraphUtils.h"
 
 struct Metrics{
