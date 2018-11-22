@@ -133,7 +133,7 @@ template <typename IndexType, typename ValueType>
 void CommTree<IndexType, ValueType>::print(){
 
 	if( checkTree() ){
-		std::cout << "tree has " << hierarchyLevels << " hierarchy levels with total " << numNodes << " and " << numLeaves << " number of leaves" <<std::endl;
+		std::cout << "tree has " << hierarchyLevels << " hierarchy levels with total " << numNodes << " nodes and " << numLeaves << " number of leaves" <<std::endl;
 		for(int i=0; i<tree.size(); i++){
 			PRINT("hierarchy "<< i << " with size " << tree[i].size() );
 			for(int j=0; j<tree[i].size(); j++){

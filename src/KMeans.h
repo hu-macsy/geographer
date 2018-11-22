@@ -19,6 +19,7 @@
 #include "GraphUtils.h"
 #include "HilbertCurve.h"
 #include "AuxiliaryFunctions.h"
+#include "CommTree.h"
 
 using scai::lama::DenseVector;
 
@@ -26,6 +27,9 @@ using scai::lama::DenseVector;
 
 namespace ITI {
 namespace KMeans {
+
+//TODO: any other more proper way to do this?
+typedef typename CommTree<IndexType,ValueType>::commNode cNode;
 
 //typedef to make it more readable
 using point = std::vector<ValueType>;
@@ -48,25 +52,6 @@ DenseVector<IndexType> computePartition(
 	const DenseVector<ValueType> &nodeWeights, \
 	const std::vector<IndexType> &blockSizes, \
 	const Settings settings);
-
-/**
- * @brief Repartition a point set using balanced k-means.
- *
- * @param[in] coordinates first level index specifies dimension, second level index the point id
- * @param[in] nodeWeights
- * @param[in] blockSizes target block sizes, not maximum sizes
- * @param[in] previous Previous partition
- * @param[in] settings Settings struct
- *
- * @return partition
- */
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights,
-		const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings);
-
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings, struct Metrics& metrics);
-
 
 /**
  * @brief Partition a point set using balanced k-means.
@@ -92,6 +77,43 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
  	struct Metrics& metrics);
 
 
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computePartition(
+	const std::vector<DenseVector<ValueType>> &coordinates,
+	const DenseVector<ValueType> &nodeWeights,
+	const std::vector<IndexType> &blockSizes,
+	const Settings settings,
+	struct Metrics& metrics);
+
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computePartition(
+	const std::vector<DenseVector<ValueType>> &coordinates,
+	const DenseVector<ValueType> &nodeWeights,
+	const CommTree<IndexType,ValueType> &commTree,
+	const Settings settings,
+	struct Metrics& metrics);
+
+/**
+ * @brief Repartition a point set using balanced k-means.
+ *
+ * @param[in] coordinates first level index specifies dimension, second level index the point id
+ * @param[in] nodeWeights
+ * @param[in] blockSizes target block sizes, not maximum sizes
+ * @param[in] previous Previous partition
+ * @param[in] settings Settings struct
+ *
+ * @return partition
+ */
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights,
+		const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings);
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings, struct Metrics& metrics);
+
+
+
 /**
 	@brief Version for hierarchical version. The centers now are a vector of vectors,
 	a set o centers for every block/center in the previous hierarchy level.
@@ -108,6 +130,8 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		const std::vector<ValueType> &minCoords,
 		const std::vector<ValueType> &maxCoords,
 		const scai::lama::DenseVector<IndexType> &partition,
+		//const CommTree<IndexType,ValueType> &commTree,
+		const std::vector<cNode> hierarchyLevel,
 		Settings settings);
 
 
@@ -222,14 +246,6 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 
 
 
-
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(
-	const std::vector<DenseVector<ValueType>> &coordinates,
-	const DenseVector<ValueType> &nodeWeights,
-	const std::vector<IndexType> &blockSizes,
-	const Settings settings,
-	struct Metrics& metrics);
 
 }
 } /* namespace ITI */

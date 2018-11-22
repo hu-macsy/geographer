@@ -1,8 +1,7 @@
 #pragma once
 
 #include "Settings.h"
-#include "Metrics.h"
-
+//#include <iostream>
 
 namespace ITI {
 
@@ -19,7 +18,6 @@ struct commNode{
 	ValueType relatSpeed;
 	bool isLeaf;
 	static unsigned int leafCount;
-	//unsigned int leafCount =0 ;
 	unsigned int leafID = std::numeric_limits<unsigned int>::max();
 
 	commNode( std::vector<unsigned int> hier,
@@ -34,7 +32,7 @@ struct commNode{
 	{
 		leafID = leafCount;
 		leafCount++;
-		//convention: leaf node have their ID as theri only child
+		//convention: leaf node have their ID as their only child
 		// this will speed up the += operator
 		children.resize(1,leafID);
 	}
@@ -55,15 +53,7 @@ struct commNode{
 		this->numCores += c.numCores;
 		this->memMB += c.memMB;
 		this->relatSpeed += c.relatSpeed;
-		/*//TODO: if leaf count and leafID workds properly then this 
-		//check is not needed
-		//if it a leaf then it has no children
-		if(c.isLeaf){
-			this->children.push_back(c.leafID);
-		}else{
-			this->children.insert( this->children.begin(), c.children.begin(), c.children.end() );
-		}
-		*/
+		// by concention, leaf nodes have their id as their only child
 		this->children.insert( this->children.begin(), c.children.begin(), c.children.end() );
 		//nodes are added to form the upper level, so the result of
 		//the addition is not a leaf node
@@ -94,7 +84,6 @@ struct commNode{
 	}
 
 }; //struct commNode{
-
 
 
 //structure used to store the communication tree. used for hierarchical

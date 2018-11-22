@@ -68,7 +68,7 @@ TEST_F(CommTreeTest, testTreeFromLeaves){
 	for( std::vector<cNode> leaves: {leaves1, leaves2} ){
 
 		ITI::CommTree<IndexType,ValueType> cTree( leaves );
-		
+
 		//cTree.print();
 
 		EXPECT_TRUE( cTree.checkTree() );
@@ -94,9 +94,30 @@ TEST_F(CommTreeTest, testTreeFromLeaves){
 		//EXPECT_EQ( root.relatSpeed, totSpeed);
 		EXPECT_EQ( root.children.size(), cTree.numLeaves );
 	}
+}// TEST_F(CommTreeTest, testTreeFromLeaves)
 
 
+TEST_F(CommTreeTest, testTreeforHomogeneous){
 
-}
+	IndexType k= 12;
+	IndexType mem = 1;
+	IndexType speed = 1;
+	IndexType cores = 1;
+
+	//re-initialize leaf counter
+	ITI::CommTree<IndexType,ValueType>::commNode::leafCount = 0;
+
+	std::vector<cNode> leaves;
+	for(int i=0; i<k; i++){
+	 	leaves.push_back( cNode(std::vector<unsigned int>{0}, cores, mem, speed) );
+	}
+	
+	ITI::CommTree<IndexType,ValueType> cTree( leaves );
+
+	//cTree.print();
+	EXPECT_TRUE( cTree.checkTree() );
+	EXPECT_EQ( cTree.numLeaves, leaves.size() );
+	EXPECT_EQ( cTree.tree[0].size(), 1 ); 
+}//TEST_F(CommTreeTest, testTreeforHomogeneous)
 
 }//namespace ITI

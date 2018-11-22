@@ -16,16 +16,19 @@
 #include "KMeans.h"
 #include "HilbertCurve.h"
 
+
 namespace ITI {
 namespace KMeans {
 
-
+//base implementation
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<point>> findInitialCentersSFC(
 		const std::vector<DenseVector<ValueType> >& coordinates, 
 		const std::vector<ValueType> &minCoords,
 		const std::vector<ValueType> &maxCoords,
 		const scai::lama::DenseVector<IndexType> &partition,
+		//const CommTree<IndexType,ValueType> &commTree,
+		const std::vector<cNode> hierLevel,
 		Settings settings) {
 
 	SCAI_REGION( "KMeans.findInitialCentersSFC" );
@@ -34,6 +37,10 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	const IndexType dimensions = settings.dimensions;
 	const IndexType k = settings.numBlocks;
 	
+	//SCAI_ASSERT_GE_ERROR( commTree.hierarchyLevels, 1, "CommTree must have at least 1 level" );
+
+	//SCAI_ASSERT_EQ_ERROR( hierLevel.size(), maxPart, "The current hierarchy level size must match the");
+
 	//hrr: maybe not needed
 	const IndexType maxPart = partition.max();
 
@@ -41,6 +48,7 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	// known blocks as "parts". 
 	// So, numXperPart means how many Xs the already knows blocks have.
 	// numXperBlocks means how many Xs the new, to-be-found blocks must have
+
 /*
 	//hrr
 	//in how many blocks each known block (part) will be partitioned
@@ -132,7 +140,26 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 }
 
 
-//overloaded function for non-hierarchical version. Set partition to 0 for all points
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<point>> findInitialCentersSFC(
+		const std::vector<DenseVector<ValueType> >& coordinates, 
+		const std::vector<ValueType> &minCoords,
+		const std::vector<ValueType> &maxCoords,
+		//const scai::lama::DenseVector<IndexType> &partition,
+		const CommTree<IndexType,ValueType> &commTree,
+		Settings settings) {
+
+		//set partition to 0 for all points
+		scai::lama::DenseVector<IndexType> partition( coordinates[0].getDistributionPtr(), 0);
+
+		cNode root = commTree.getRoot();
+
+
+}
+
+//overloaded function for non-hierarchical version. 
+//Set partition to 0 for all points
+//A "flat" communication tree
 //and return only the first (there is only one) group of centers
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType>>  findInitialCentersSFC(
@@ -145,7 +172,21 @@ std::vector<std::vector<ValueType>>  findInitialCentersSFC(
 	
 		scai::lama::DenseVector<IndexType> partition( coordinates[0].getDistributionPtr(), 0);
 
-		return findInitialCentersSFC( coordinates, minCoords, maxCoords, partition, settings)[0];
+		//homogenous case, all PEs have the same memory and speed
+		//there is only hierarchy level
+		IndexType mem = 1;
+		IndexType speed = 1;
+		IndexType cores = 1;
+
+		std::vector<cNode> leaves( settings.numBlocks );
+		for(int i=0; i<settings.numBlocks; i++){ 
+			leaves.push_back( cNode(std::vector<unsigned int>{0}, cores, mem, speed) );
+		}
+
+		//create the tree from the leaves
+		//ITI::CommTree<IndexType,ValueType> cTree( leaves );
+
+		return findInitialCentersSFC( coordinates, minCoords, maxCoords, partition, leaves, settings)[0];
 }
 
 
@@ -660,13 +701,14 @@ DenseVector<IndexType> computeRepartition(
 }
 
 
+//base implementation 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition( \
 	const std::vector<DenseVector<ValueType>> &coordinates, \
 	const DenseVector<ValueType> &nodeWeights, \
 	const std::vector<IndexType> &blockSizes, \
 	std::vector<std::vector<ValueType> > centers, \
-	scai::dmemo::CommunicatorPtr comm,
+	//scai::dmemo::CommunicatorPtr comm,
 	const Settings settings, \
 	struct Metrics &metrics ) {
 
@@ -680,7 +722,7 @@ DenseVector<IndexType> computePartition( \
 	const IndexType localN = nodeWeights.getLocalValues().size();
 	const IndexType globalN = nodeWeights.size();
 	assert(nodeWeights.getLocalValues().size() == coordinates[0].getLocalValues().size());
-	//scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	const IndexType p = comm->getSize();
 	const ValueType blocksPerProcess = ValueType(k)/p;
@@ -1045,6 +1087,7 @@ DenseVector<IndexType> computePartition(
 	return computePartition(coordinates, nodeWeights, blockSizes, centers, settings, metrics);
 }
 
+/*
 // Wrapper function to keep compatibility for calls without a communicator
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition( \
@@ -1058,6 +1101,18 @@ DenseVector<IndexType> computePartition( \
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	return computePartition(coordinates, nodeWeights, blockSizes, centers, comm, settings, metrics) ;
+}
+*/
+
+//---------------------------------------
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computePartition(
+	const std::vector<DenseVector<ValueType>> &coordinates,
+	const DenseVector<ValueType> &nodeWeights,
+	const CommTree<IndexType,ValueType> &commTree,
+	const Settings settings,
+	struct Metrics& metrics){
+
 }
 
 //---------------------------------------
