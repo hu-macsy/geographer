@@ -19,6 +19,7 @@ struct commNode{
 	ValueType relatSpeed;
 	bool isLeaf;
 	static unsigned int leafCount;
+	//unsigned int leafCount =0 ;
 	unsigned int leafID = std::numeric_limits<unsigned int>::max();
 
 	commNode( std::vector<unsigned int> hier,
@@ -46,8 +47,8 @@ struct commNode{
 		relatSpeed(0.0),
 		isLeaf(false)
 	{
-		//leafID = leafCount;
-		//leafCount++;
+		leafID = leafCount;
+		leafCount++;
 	}
 
 	commNode& operator+=( const commNode& c){
@@ -64,6 +65,10 @@ struct commNode{
 		}
 		*/
 		this->children.insert( this->children.begin(), c.children.begin(), c.children.end() );
+		//nodes are added to form the upper level, so the result of
+		//the addition is not a leaf node
+		this->isLeaf = false;
+
 		return *this;
 	}
 
@@ -85,6 +90,7 @@ struct commNode{
 			}
 			std::cout<< std::endl;
 		}
+		std::cout<< "---" << std::endl;
 	}
 
 }; //struct commNode{
@@ -104,6 +110,10 @@ IndexType hierarchyLevels;
 IndexType numNodes;
 IndexType numLeaves;
 
+commNode getRoot(){ 
+	//TODO: check if tree is not initialized
+	return tree[0][0]; 
+}
 
 /*@brief constructor to create tree from a vector of leaves
 */
@@ -123,6 +133,9 @@ std::vector<commNode> createLevelAbove( const std::vector<commNode> levelBelow, 
 
 void print();
 
+/* @brief Basic sanity checks for the tree.
+*/
+bool checkTree();
 
 
 
