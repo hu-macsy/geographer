@@ -17,8 +17,8 @@
 #include "HilbertCurve.h"
 
 
-namespace ITI {
-namespace KMeans {
+namespace ITI{
+namespace KMeans{
 
 //base implementation
 template<typename IndexType, typename ValueType>
@@ -701,7 +701,7 @@ DenseVector<IndexType> computeRepartition(
 }
 
 
-//base implementation 
+//core implementation 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition( \
 	const std::vector<DenseVector<ValueType>> &coordinates, \
@@ -1064,14 +1064,15 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 	return {minCoords, maxCoords};
 }
 
-//called initially with no centers parameter
+
+//wrapper 1 - called initially with no centers parameter
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(
+DenseVector<IndexType> computePartition1(
 	const std::vector<DenseVector<ValueType>> &coordinates,
 	const DenseVector<ValueType> &nodeWeights,
 	const std::vector<IndexType> &blockSizes,
 	const Settings settings,
-	struct Metrics& metrics) {
+	struct Metrics &metrics) {
 
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
@@ -1082,10 +1083,10 @@ DenseVector<IndexType> computePartition(
     }
 
 	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC<IndexType,ValueType>(coordinates, minCoords, maxCoords, settings);
-	//Metrics metrics;
 
 	return computePartition(coordinates, nodeWeights, blockSizes, centers, settings, metrics);
 }
+
 
 /*
 // Wrapper function to keep compatibility for calls without a communicator
@@ -1105,6 +1106,7 @@ DenseVector<IndexType> computePartition( \
 */
 
 //---------------------------------------
+//wrapper 2 - with CommTree
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,
@@ -1118,14 +1120,14 @@ DenseVector<IndexType> computePartition(
 //---------------------------------------
 
 //TODO: why these two are needed since they are defined above?
-
+/*
 template DenseVector<IndexType> computePartition(
 	const std::vector<DenseVector<ValueType>>& coordinates,
 	const DenseVector<ValueType>& nodeWeights,
 	const std::vector<IndexType>& blockSizes,
 	const Settings settings,
 	struct Metrics& metrics);
-
+*/
 template DenseVector<IndexType> computeRepartition(
 	const std::vector<DenseVector<ValueType>>& coordinates,
 	const DenseVector<ValueType>& nodeWeights,
@@ -1154,6 +1156,16 @@ template DenseVector<IndexType> assignBlocks(
 
 template DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings, struct Metrics& metrics);
 
-}
+}; // namespace KMeans
+
+template DenseVector<IndexType> KMeans::computePartition1(
+	const std::vector<DenseVector<ValueType>> &coordinates,
+	const scai::lama::DenseVector<ValueType> &nodeWeights,
+	const std::vector<IndexType> &blockSizes,
+	const Settings settings,
+	struct Metrics& metrics);
+
 
 } /* namespace ITI */
+
+
