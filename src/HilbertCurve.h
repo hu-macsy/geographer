@@ -80,7 +80,7 @@ namespace ITI {
 			
 			
 			/** Get the hilbert indices sorted. Every PE will own its part of the hilbert indices.
-			 * Internaly, the sorting algorithm redistributes the returned vector so the local size of coordinates and the returned vector maybe do not agree.
+			 * Warning: Internaly, the sorting algorithm redistributes the returned vector so the local size of coordinates and the returned vector maybe do not agree.
 			 * return[i] is a sort_pair with:
 			 *	return[i].index = global id/index in the distribution of a point p
 			 * 	return[i].value = the hilbert index of point p 
@@ -93,7 +93,7 @@ namespace ITI {
 			 * @param[in] coordinates The coordinates of all the points
 			 * @return A sorted vector based on the hilbert index of each point.
 			 */			
-			static std::vector<sort_pair> getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates);			
+			static std::vector<sort_pair> getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);			
 			
 	//private:
 			/** @brief Accepts a 2D point and returns is hilbert index.

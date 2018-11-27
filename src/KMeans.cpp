@@ -27,7 +27,6 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		const std::vector<ValueType> &minCoords,
 		const std::vector<ValueType> &maxCoords,
 		const scai::lama::DenseVector<IndexType> &partition,
-		//const CommTree<IndexType,ValueType> &commTree,
 		const std::vector<cNode> hierLevel,
 		Settings settings) {
 
@@ -139,7 +138,7 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	return result;
 }
 
-
+/*
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<point>> findInitialCentersSFC(
 		const std::vector<DenseVector<ValueType> >& coordinates, 
@@ -153,9 +152,8 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		scai::lama::DenseVector<IndexType> partition( coordinates[0].getDistributionPtr(), 0);
 
 		cNode root = commTree.getRoot();
-
-
 }
+*/
 
 //overloaded function for non-hierarchical version. 
 //Set partition to 0 for all points
@@ -163,30 +161,28 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 //and return only the first (there is only one) group of centers
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType>>  findInitialCentersSFC(
-		const std::vector<DenseVector<ValueType>>& coordinates,
-		const std::vector<ValueType> &minCoords,
-		const std::vector<ValueType> &maxCoords,
-		Settings settings){
+	const std::vector<DenseVector<ValueType>>& coordinates,
+	const std::vector<ValueType> &minCoords,
+	const std::vector<ValueType> &maxCoords,
+	Settings settings){
 
-		//TODO: probably must also change the seetings.numBlocks
-	
-		scai::lama::DenseVector<IndexType> partition( coordinates[0].getDistributionPtr(), 0);
+	//TODO: probably must also change the seetings.numBlocks
 
-		//homogenous case, all PEs have the same memory and speed
-		//there is only hierarchy level
-		IndexType mem = 1;
-		IndexType speed = 1;
-		IndexType cores = 1;
+	//homogenous case, all PEs have the same memory and speed
+	//there is only hierarchy level
+	IndexType mem = 1;
+	IndexType speed = 1;
+	IndexType cores = 1;
 
-		std::vector<cNode> leaves( settings.numBlocks );
-		for(int i=0; i<settings.numBlocks; i++){ 
-			leaves.push_back( cNode(std::vector<unsigned int>{0}, cores, mem, speed) );
-		}
+	std::vector<cNode> leaves( settings.numBlocks );
+	for(int i=0; i<settings.numBlocks; i++){ 
+		leaves.push_back( cNode(std::vector<unsigned int>{0}, cores, mem, speed) );
+	}
 
-		//create the tree from the leaves
-		//ITI::CommTree<IndexType,ValueType> cTree( leaves );
+	//every point belongs to one block in the beginning
+	scai::lama::DenseVector<IndexType> partition( coordinates[0].getDistributionPtr(), 0);
 
-		return findInitialCentersSFC( coordinates, minCoords, maxCoords, partition, leaves, settings)[0];
+	return findInitialCentersSFC( coordinates, minCoords, maxCoords, partition, leaves, settings)[0];
 }
 
 
@@ -1045,10 +1041,6 @@ DenseVector<IndexType> computePartition( \
 //moved (7.11.18) from KMeans.h
 
 /**
- * Implementations
- */
-
-/**
  * @brief Get local minimum and maximum coordinates
  * TODO: This isn't used any more! Remove?
  */
@@ -1058,8 +1050,9 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 	std::vector<ValueType> minCoords(dim);
 	std::vector<ValueType> maxCoords(dim);
 	for (int d = 0; d < dim; d++) {
-		minCoords[d] = scai::utilskernel::HArrayUtils::min(coordinates[d].getLocalValues());
-		maxCoords[d] = scai::utilskernel::HArrayUtils::max(coordinates[d].getLocalValues());
+		minCoords[d] = coordinates[d].min();
+        maxCoords[d] = coordinates[d].max();
+		SCAI_ASSERT_NE_ERROR( minCoords[d], maxCoords[d], "min=max for dimension "<< d << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
 	}
 	return {minCoords, maxCoords};
 }
@@ -1067,7 +1060,7 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 
 //wrapper 1 - called initially with no centers parameter
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition1(
+DenseVector<IndexType> computePartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,
 	const DenseVector<ValueType> &nodeWeights,
 	const std::vector<IndexType> &blockSizes,
@@ -1076,34 +1069,13 @@ DenseVector<IndexType> computePartition1(
 
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
-    for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-        minCoords[dim] = coordinates[dim].min();
-        maxCoords[dim] = coordinates[dim].max();
-		SCAI_ASSERT_NE_ERROR( minCoords[dim], maxCoords[dim], "min=max for dimension "<< dim << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
-    }
+    std::tie(minCoords, maxCoords) = getLocalMinMaxCoords( coordinates );
 
 	std::vector<std::vector<ValueType> > centers = findInitialCentersSFC<IndexType,ValueType>(coordinates, minCoords, maxCoords, settings);
 
 	return computePartition(coordinates, nodeWeights, blockSizes, centers, settings, metrics);
 }
 
-
-/*
-// Wrapper function to keep compatibility for calls without a communicator
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition( \
-	const std::vector<DenseVector<ValueType>> &coordinates, \
-	const DenseVector<ValueType> &nodeWeights, \
-	const std::vector<IndexType> &blockSizes, \
-	std::vector<std::vector<ValueType> > centers, \
-	const Settings settings, \
-	struct Metrics &metrics ){
-
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-
-	return computePartition(coordinates, nodeWeights, blockSizes, centers, comm, settings, metrics) ;
-}
-*/
 
 //---------------------------------------
 //wrapper 2 - with CommTree
@@ -1115,25 +1087,44 @@ DenseVector<IndexType> computePartition(
 	const Settings settings,
 	struct Metrics& metrics){
 
+	//get global communicator
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+	std::vector<ValueType> minCoords(settings.dimensions);
+    std::vector<ValueType> maxCoords(settings.dimensions);
+    std::tie(minCoords, maxCoords) = getLocalMinMaxCoords( coordinates );
+
+    //typedef of commNode from CommTree.h, see also KMeans.h
+	cNode root = commTree.getRoot();
+	if( settings.debugMode ){
+		PRINT("Starting hierarchical KMeans.\nRoot node: ");
+		root.print();
+	}
+
+	//every point belongs to one block in the beginning
+	scai::lama::DenseVector<IndexType> partition( coordinates[0].getDistributionPtr(), 0);
+	//skip root
+	for(unsigned int h=1; h<commTree.hierarchyLevels; h++ ){
+
+		std::vector<cNode> thisLevel = commTree[h];
+		PRINT0("-- Hierarchy level " << h << " with " << thisLevel.size() << " number of nodes");
+		if( settings.debugMode ){
+			for( cNode c: thisLevel){ //print all nodes of this level
+				c.print();
+			}
+		}
+
+		//1- find initial centers for this hierarchy level
+		std::vector<std::vector<point>> groupOfCenters = findInitialCentersSFC(
+			coordinates, minCoords, maxCoords, partition, settings );
+
+		//2- main kmeans loop
+	}
+
 }
 
 //---------------------------------------
 
-//TODO: why these two are needed since they are defined above?
-/*
-template DenseVector<IndexType> computePartition(
-	const std::vector<DenseVector<ValueType>>& coordinates,
-	const DenseVector<ValueType>& nodeWeights,
-	const std::vector<IndexType>& blockSizes,
-	const Settings settings,
-	struct Metrics& metrics);
-*/
-template DenseVector<IndexType> computeRepartition(
-	const std::vector<DenseVector<ValueType>>& coordinates,
-	const DenseVector<ValueType>& nodeWeights,
-	const std::vector<IndexType>& blockSizes,
-	const DenseVector<IndexType>& previous,
-	const Settings settings);
 
 
 template std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
@@ -1158,13 +1149,21 @@ template DenseVector<IndexType> computeRepartition(const std::vector<DenseVector
 
 }; // namespace KMeans
 
-template DenseVector<IndexType> KMeans::computePartition1(
+
+//instantiations needed or there is a undefined reference otherwise
+template DenseVector<IndexType> KMeans::computePartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,
 	const scai::lama::DenseVector<ValueType> &nodeWeights,
 	const std::vector<IndexType> &blockSizes,
 	const Settings settings,
 	struct Metrics& metrics);
 
+template DenseVector<IndexType> KMeans::computeRepartition(
+	const std::vector<DenseVector<ValueType>>& coordinates,
+	const DenseVector<ValueType>& nodeWeights,
+	const std::vector<IndexType>& blockSizes,
+	const DenseVector<IndexType>& previous,
+	const Settings settings);
 
 } /* namespace ITI */
 

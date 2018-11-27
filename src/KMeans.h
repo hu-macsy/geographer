@@ -1,7 +1,7 @@
 /*
  * KMeans.h
  *
- *  Created on: 19.07.2017
+ *  Created on: 19.07.2017O
  *      Author: Moritz von Looz
  */
 
@@ -34,27 +34,6 @@ typedef typename CommTree<IndexType,ValueType>::commNode cNode;
 //typedef to make it more readable
 using point = std::vector<ValueType>;
 
-/**
- * @brief Partition a point set using balanced k-means
- *
- * Wrapper without initial centers. Calls computePartition with centers derived from a Hilbert Curve
- *
- * @param[in] coordinates first level index specifies dimension, second level index the point id
- * @param[in] nodeWeights
- * @param[in] blockSizes target block sizes, not maximum sizes
- * @param[in] settings Settings struct
- *
- * @return partition
- */
-
-/*
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(
-	const std::vector<DenseVector<ValueType>> &coordinates, \
-	const DenseVector<ValueType> &nodeWeights, \
-	const std::vector<IndexType> &blockSizes, \
-	const Settings settings);
-*/
 
 /**
  * @brief Partition a point set using balanced k-means.
@@ -80,6 +59,28 @@ DenseVector<IndexType> computePartition(
  	const Settings settings, \
  	struct Metrics& metrics);
 
+/**
+ * @brief Partition a point set using balanced k-means
+ *
+ * Wrapper without initial centers. Calls computePartition with centers derived from a Hilbert Curve
+ *
+ * @param[in] coordinates first level index specifies dimension, second level index the point id
+ * @param[in] nodeWeights
+ * @param[in] blockSizes target block sizes, not maximum sizes
+ * @param[in] settings Settings struct
+ * @param[in] metrics Metrics struct
+ *
+ * @return partition
+ */
+
+//wrapper 1- no centers
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computePartition(
+	const std::vector<DenseVector<ValueType>> &coordinates,
+	const DenseVector<ValueType> &nodeWeights,
+	const std::vector<IndexType> &blockSizes,
+	const Settings settings,
+	struct Metrics &metrics);
 
 //wrapper 2 - with CommTree
 template<typename IndexType, typename ValueType>
@@ -229,46 +230,14 @@ DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &c
 		std::vector<ValueType> &influence, ValueType &imbalance, std::vector<ValueType> &timePerPE,
 		Settings settings, Metrics &metrics);
 
-/**
- * Implementations
- */
-
-
-//wrapper 1- no centers
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition1(
-	const std::vector<DenseVector<ValueType>> &coordinates,
-	const DenseVector<ValueType> &nodeWeights,
-	const std::vector<IndexType> &blockSizes,
-	const Settings settings,
-	struct Metrics &metrics);
-
-/*{
-
-    std::vector<ValueType> minCoords(settings.dimensions);
-    std::vector<ValueType> maxCoords(settings.dimensions);
-    for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-        minCoords[dim] = coordinates[dim].min();
-        maxCoords[dim] = coordinates[dim].max();
-		SCAI_ASSERT_NE_ERROR( minCoords[dim], maxCoords[dim], "min=max for dimension "<< dim << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
-    }
-
-    //this is used when implementation is in .cpp
-	//std::vector<std::vector<ValueType> > centers = findInitialCentersSFC<IndexType,ValueType>(coordinates, minCoords, maxCoords, settings);
-    std::vector<std::vector<ValueType> > centers = findInitialCentersSFC<IndexType,ValueType>(coordinates, minCoords, maxCoords, settings);
-
-	return computePartition(coordinates, nodeWeights, blockSizes, centers, settings, metrics);
-}
-
-*/
 
 /**
  * @brief Get local minimum and maximum coordinates
  * TODO: This isn't used any more! Remove?
+ * Update, 27/11/8: started reusing 
  */
 template<typename ValueType>
 std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
-
 
 
 

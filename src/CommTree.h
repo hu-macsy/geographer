@@ -95,7 +95,7 @@ std::vector<std::vector<commNode>> tree;
 
 //must be known how many levels the tree has
 //(well, it can infered but it is just easier)
-IndexType hierarchyLevels;
+IndexType hierarchyLevels; //hierarchyLevels = tree,size()
 IndexType numNodes;
 IndexType numLeaves;
 

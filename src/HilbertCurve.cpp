@@ -245,7 +245,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
 	unsigned long integerIndex = 0;//TODO: also check whether this data type is long enough
 	const IndexType localN = coordinates[0].getLocalValues().size();
 	
-	// the DV to be returned
+	// the vector to be returned
 	std::vector<ValueType> hilbertIndices(localN,-1);
 	
 	{
@@ -304,7 +304,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
 
 template<typename IndexType, typename ValueType>
 std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth) {
-    SCAI_REGION("HilbertCurve.getHilbertIndex2DVector")
+    SCAI_REGION("HilbertCurve.getHilbertIndex3DVector")
 	
 	const IndexType dimensions = coordinates.size();
 	
@@ -552,7 +552,7 @@ std::vector<std::vector<ValueType>> HilbertCurve<IndexType, ValueType>::Hilbert3
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates){
+std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates, Settings settings){
 	
 	const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
@@ -560,25 +560,9 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
 	const IndexType dimensions = coordinates.size();
 	const IndexType localN = coordDist->getLocalSize();
     const IndexType globalN = coordDist->getGlobalSize();
-	
-	/**
-     * get minimum / maximum of coordinates
-     */
-	std::vector<ValueType> minCoords(dimensions);
-    std::vector<ValueType> maxCoords(dimensions);
-    {
-		SCAI_REGION( "ParcoRepart.getSortedHilbertIndices.minMax" )
-		for (IndexType dim = 0; dim < dimensions; dim++) {
-			minCoords[dim] = coordinates[dim].min();
-			maxCoords[dim] = coordinates[dim].max();
-			assert(std::isfinite(minCoords[dim]));
-			assert(std::isfinite(maxCoords[dim]));
-			SCAI_ASSERT(maxCoords[dim] > minCoords[dim], "Wrong coordinates.");
-		}
-    }
-    
-    //const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(globalN), double(21));
-    const IndexType recursionDepth = std::min(std::log2(globalN), double(21));
+
+    const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(globalN), double(21));
+    //const IndexType recursionDepth = std::min(std::log2(globalN), double(21));
 	
 	 /**
      *	create space filling curve indices.
@@ -588,25 +572,14 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
 	
     {
         SCAI_REGION("ParcoRepart.getSortedHilbertIndices.spaceFillingCurve");
-        // get local part of hilbert indices
-        // get read access to the local part of the coordinates
-        // TODO: should be coordAccess[dimension] but I don't know how ... maybe HArray::acquireReadAccess? (harry)
-        scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
-        scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
-        // this is faulty, if dimensions=2 coordAccess2 is equal to coordAccess1
-        scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[dimensions-1].getLocalValues() );
         
+        //get hilbert indices for all the points
+        std::vector<ValueType> localHilbertInd = HilbertCurve<IndexType,ValueType>::getHilbertIndexVector(coordinates, recursionDepth, dimensions);
+        SCAI_ASSERT_EQ_ERROR(localHilbertInd.size(), localN, "Size mismatch");
+
         ValueType point[dimensions];
         for (IndexType i = 0; i < localN; i++) {
-            coordAccess0.getValue(point[0], i);
-            coordAccess1.getValue(point[1], i);
-            // TODO change how I treat different dimensions
-            if(dimensions == 3){
-                coordAccess2.getValue(point[2], i);
-            }
-            
-            ValueType globalHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex( point, dimensions, recursionDepth, minCoords, maxCoords);
-			localPairs[i].value = globalHilbertIndex;
+			localPairs[i].value = localHilbertInd[i];
         	localPairs[i].index = coordDist->local2global(i);
         }
     }
@@ -621,31 +594,31 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
         int typesize;
         MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
         //assert(typesize == sizeof(sort_pair)); does not have to be true anymore due to padding
-        
-		
+        		
 		//call distributed sort
         //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
         MPI_Comm mpi_comm = MPI_COMM_WORLD;
         SQuick::sort<sort_pair>(mpi_comm, localPairs, -1);
 
-        //copy hilbert indices into array
-
-        //check size and sanity
+        //check size and sanity, TODO: move also to debugMode
         SCAI_ASSERT_EQ_ERROR( comm->sum(localPairs.size()), globalN, "Global index mismatch.");
 
-		/* TODO: expensive test, remove it and check in a unit test or use a settings.debug flag
         //check checksum
-        long indexSumAfter = 0;
-        for (IndexType i = 0; i < newLocalN; i++) {
-        	indexSumAfter += newLocalIndices[i];
-        }
-
-        const long newCheckSum = comm->sum(indexSumAfter);
-        SCAI_ASSERT( newCheckSum == checkSum, "Old checksum: " << checkSum << ", new checksum: " << newCheckSum );
-		*/
+        if( settings.debugMode){
+        	PRINT0("******** in debug mode");
+	        long indexSumAfter = 0;
+	        unsigned int newLocalN = localPairs.size();
+	        for (IndexType i=0; i<newLocalN; i++) {
+	        	indexSumAfter += localPairs[i].index;
+	        }
+	        unsigned long checkSum = globalN*(globalN-1)/2;
+	        const long newCheckSum = comm->sum(indexSumAfter);
+	        SCAI_ASSERT_EQ_ERROR( newCheckSum, checkSum, "Old checksum: " << checkSum << ", new checksum: " << newCheckSum );
+		}
+		
     }
 	 
-	 return localPairs;
+	return localPairs;
 }
 
 //-------------------------------------------------------------------------------------------------

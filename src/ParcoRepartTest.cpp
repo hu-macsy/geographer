@@ -1358,7 +1358,7 @@ TEST_F(ParcoRepartTest, testRedistributeFromPartition){
 	bool useRedistributor = false;
 
 	std::chrono::time_point<std::chrono::system_clock> beforeRedistribution =  std::chrono::system_clock::now();
-    scai::dmemo::DistributionPtr retDist = aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings, metrics, useRedistributor);
+    scai::dmemo::DistributionPtr retDist = aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings, useRedistributor);
 	std::chrono::duration<double> redistTime = std::chrono::system_clock::now() - beforeRedistribution;
 	ValueType maxTime = comm->max( redistTime.count() );
 	if( comm->getRank()==0)
@@ -1371,7 +1371,7 @@ TEST_F(ParcoRepartTest, testRedistributeFromPartition){
 
 	useRedistributor = !useRedistributor;
 	beforeRedistribution =  std::chrono::system_clock::now();
-	scai::dmemo::DistributionPtr retDist2 = aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings, metrics, useRedistributor);
+	scai::dmemo::DistributionPtr retDist2 = aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings, useRedistributor);
 	redistTime = std::chrono::system_clock::now() - beforeRedistribution;
 	maxTime = comm->max( redistTime.count() );
 	if( comm->getRank()==0)

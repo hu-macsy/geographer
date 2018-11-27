@@ -16,7 +16,7 @@
 
 #include "GraphUtils.h"
 #include "Settings.h"
-#include "Metrics.h"
+//#include "Metrics.h"
 
 using namespace scai::lama;
 
@@ -273,7 +273,6 @@ static scai::dmemo::DistributionPtr redistributeFromPartition(
                 std::vector<DenseVector<ValueType>>& coordinates,
                 DenseVector<ValueType>& nodeWeights,
                 Settings settings, 
-                struct Metrics& metrics,
                 bool useRedistributor = true ){
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();

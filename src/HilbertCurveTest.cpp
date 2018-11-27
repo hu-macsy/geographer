@@ -65,13 +65,14 @@ TEST_P(HilbertCurveTest, testHilbertIndexUnitSquare_Local) {
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( N ));
 
     for(IndexType j=0; j<dimensions; j++){
+      //replicate corrdinates
       coords[j].redistribute(noDist);
       scai::hmemo::ReadAccess<ValueType> coordAccess(coords[j].getLocalValues());
       ASSERT_EQ(coordAccess.size(), N);
-        for (IndexType i = 0; i < N; i++){
-          convertedCoords[i][j] = (coordAccess[i]+0.17)/8.2;
-          maxCoords[j] = std::max(maxCoords[j], convertedCoords[i][j]);
-        }
+      for (IndexType i = 0; i < N; i++){
+        convertedCoords[i][j] = (coordAccess[i]+0.17)/8.2;
+        maxCoords[j] = std::max(maxCoords[j], convertedCoords[i][j]);
+      }
     }
   } else {
         N = 7;
@@ -112,8 +113,7 @@ TEST_P(HilbertCurveTest, testHilbertIndexUnitSquare_Local) {
     for (IndexType d = 0; d < dimensions; d++) {
       EXPECT_NEAR(point[d]*(maxCoords[d] - minCoords[d])+minCoords[d], convertedCoords[i][d], 0.001);
     }
-  }
-  
+  } 
 
 }
 
@@ -382,7 +382,103 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
   }
 
 }
+//-------------------------------------------------------------------------------------------------
 
+TEST_F(HilbertCurveTest, testGetSortedHilbertIndices_Distributed){
+
+  std::vector<std::string> fileNames = { 
+    graphPath+"Grid8x8",
+    //graphPath+"bubbles-00010.graph",
+    graphPath+"3off.graph" 
+  };
+
+  std::vector<int> dims = { 2,
+   //2,
+    3
+  };
+
+  for(int i=0; i<fileNames.size(); i++){
+    std::string fileName = fileNames[i];
+    int dimensions = dims[i];
+
+    // get graph
+    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( fileName );
+
+    const IndexType globalN = graph.getNumRows();
+    
+    //get coords
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( fileName+".xyz", globalN, dimensions);
+
+    const unsigned int localN= coords[0].getLocalValues().size();
+
+    Settings settings;
+    settings.dimensions = dimensions;
+    settings.sfcResolution = 15;
+    settings.debugMode = true;
+
+    //get new sorted local indices
+    std::vector<sort_pair> localPairs = HilbertCurve<IndexType, ValueType>::getSortedHilbertIndices( coords, settings);
+    const scai::dmemo::CommunicatorPtr comm =  coords[0].getDistributionPtr()->getCommunicatorPtr();
+
+    const IndexType newLocalN = localPairs.size();
+
+    PRINT(*comm << ": prev localN= " <<localN << " , new= " << newLocalN );
+
+    SCAI_ASSERT_EQ_ERROR( comm->sum(newLocalN), globalN, "Global index mismatch.");
+
+    //redistribute coords based on the sfc indices
+    // *** taken from ParcoRepart::hilbertPartition
+    //copy indices into array    
+    std::vector<IndexType> newLocalIndices(newLocalN);
+    //and sfc indices
+    std::vector<ValueType> sfcIndices(newLocalN);
+
+    for (IndexType i = 0; i < newLocalN; i++) {
+      newLocalIndices[i] = localPairs[i].index;
+      sfcIndices[i] = localPairs[i].value;
+    }
+    //sort local indices for general distribution
+    std::sort(newLocalIndices.begin(), newLocalIndices.end());
+
+    scai::hmemo::HArray<IndexType> indexTransport(newLocalIndices.size(), newLocalIndices.data());
+    assert(comm->sum(indexTransport.size()) == globalN);
+    scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
+
+//TODO: convert those prints into a meaningfull check
+// if( comm->getRank()==1 ){
+//   for( int i=0; i<coords[0].getLocalValues().size(); i++){
+//     std::cout << coords[0].getLocalValues()[i] << ", " << coords[1].getLocalValues()[i] << std::endl;
+//   }
+// }
+    for(int d=0; d<dimensions; d++){
+      coords[d].redistribute(newDistribution);
+    }
+    // *** till here
+
+//TODO: and that one
+// std::cout<<"------ redistribute coords"<< std::endl;
+// if( comm->getRank()==1 ){
+//   for( int i=0; i<coords[0].getLocalValues().size(); i++){
+//     std::cout << coords[0].getLocalValues()[i] << ", " << coords[1].getLocalValues()[i] << std::endl;
+//   }
+// }
+
+    //take local hilbert indices and verify that they are sorted
+    std::vector<ValueType> localHilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coords, settings.sfcResolution+1, settings.dimensions);
+
+    EXPECT_EQ( newLocalN, localHilbertIndices.size() );
+
+    //indices from the sort_pair should be sorted
+    EXPECT_TRUE( std::is_sorted(sfcIndices.begin(), sfcIndices.end()) );
+  
+    //I though this is true but it is not. The local points seem
+    //correct but are sorted based on their vertex/rox id ,
+    //not their sfc index
+    //EXPECT_TRUE( std::is_sorted(localHilbertIndices.begin(), localHilbertIndices.end()) );
+
+}
+
+}
   
 INSTANTIATE_TEST_CASE_P(InstantiationName,
                         HilbertCurveTest,

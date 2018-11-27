@@ -479,7 +479,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 					} else if (settings.initialMigration == InitialPartitioningMethods::KMeans) {
 						std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );
                         struct Metrics tmpMetrics;
-						tempResult = ITI::KMeans::computePartition1(coordinates, convertedWeights, migrationBlockSizes, migrationSettings, tmpMetrics);
+						tempResult = ITI::KMeans::computePartition(coordinates, convertedWeights, migrationBlockSizes, migrationSettings, tmpMetrics);
 					}
 					
 					initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
@@ -539,7 +539,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		if (settings.repartition) {
 			result = ITI::KMeans::computeRepartition(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
 		} else {
-			result = ITI::KMeans::computePartition1(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
+			result = ITI::KMeans::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
 		}
 		
 		kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
@@ -602,7 +602,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			 * redistribute to prepare for local refinement
 			 */
             bool useRedistributor = true;
-            scai::dmemo::DistributionPtr distFromPartition = aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights, settings, metrics, useRedistributor);
+            scai::dmemo::DistributionPtr distFromPartition = aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights, settings, useRedistributor);
 
             /*
 			std::chrono::time_point<std::chrono::system_clock> beforeSecondRedistributiom =  std::chrono::system_clock::now();
@@ -705,6 +705,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     //
     // vector of size k, each element represents the size of each block
     //
+
     std::vector<IndexType> blockSizes;
 	//TODO: for nowm assume uniform nodeweights
     IndexType weightSum = globalN;// = nodeWeights.sum();
@@ -778,17 +779,21 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         std::sort(newLocalIndices.begin(), newLocalIndices.end());
 
         //check size and sanity
-        SCAI_ASSERT_LT_ERROR( *std::max_element(newLocalIndices.begin(), newLocalIndices.end()) , globalN, "Too large index (possible IndexType overflow?).");
         SCAI_ASSERT_EQ_ERROR( comm->sum(newLocalIndices.size()), globalN, "distribution mismatch");
 
-        //check checksum
-        long indexSumAfter = 0;
-        for (IndexType i = 0; i < newLocalN; i++) {
-        	indexSumAfter += newLocalIndices[i];
-        }
+        //more expensive checks
+        if( settings.debugMode ){
+            SCAI_ASSERT_EQ_ERROR( comm->sum(newLocalIndices.size()), globalN, "distribution mismatch");
 
-        const long newCheckSum = comm->sum(indexSumAfter);
-        SCAI_ASSERT( newCheckSum == checkSum, "Old checksum: " << checkSum << ", new checksum: " << newCheckSum );
+            //check checksum
+            long indexSumAfter = 0;
+            for (IndexType i = 0; i < newLocalN; i++) {
+            	indexSumAfter += newLocalIndices[i];
+            }
+
+            const long newCheckSum = comm->sum(indexSumAfter);
+            SCAI_ASSERT( newCheckSum == checkSum, "Old checksum: " << checkSum << ", new checksum: " << newCheckSum );
+        }
 
         //possible optimization: remove dummy values during first copy, then directly copy into HArray and sort with pointers. Would save one copy.
     }
@@ -1427,71 +1432,6 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const 
 }
 //---------------------------------------------------------------------------------------
 
-// moved it to AuxiliaryFunctions
-/*
-template<typename IndexType, typename ValueType>
-scai::dmemo::DistributionPtr ParcoRepart<IndexType, ValueType>::redistributeFromPartition( 
-                DenseVector<IndexType>& partition,
-                CSRSparseMatrix<ValueType>& graph,
-                std::vector<DenseVector<ValueType>>& coordinates,
-                DenseVector<ValueType>& nodeWeights,
-                Settings settings, 
-                struct Metrics& metrics,
-                bool useRedistributor ){
-
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    const IndexType numPEs = comm->getSize();
-    const IndexType thisPE = comm->getRank();
-    const IndexType globalN = coordinates[0].getDistributionPtr()->getGlobalSize();
-    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
-
-    SCAI_ASSERT_EQ_ERROR( graph.getNumRows(), globalN, "Mismatch in graph and     coordinates size" );
-    SCAI_ASSERT_EQ_ERROR( nodeWeights.getDistributionPtr()->getGlobalSize(), globalN , "Mismatch in nodeWeights vector" );
-	SCAI_ASSERT_EQ_ERROR( partition.size(), globalN, "Mismatch in partition size");
-    SCAI_ASSERT_EQ_ERROR( partition.min(), 0, "Minimum entry in partition should be 0" );
-    SCAI_ASSERT_EQ_ERROR( partition.max(), numPEs-1, "Maximum entry in partition must be equal the number of processors.")
-
-    scai::dmemo::DistributionPtr distFromPartition;
-
-    if( useRedistributor ){
-        scai::dmemo::Redistributor resultRedist(partition.getLocalValues(), partition.getDistributionPtr());//TODO: Wouldn't it be faster to use a GeneralDistribution here?
-        
-        partition = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
-        scai::dmemo::Redistributor redistributor(resultRedist.getTargetDistributionPtr(), graph.getRowDistributionPtr());
-
-        for (IndexType d=0; d<settings.dimensions; d++) {
-            coordinates[d].redistribute(redistributor);
-        }
-        nodeWeights.redistribute(redistributor);    
-        graph.redistribute( redistributor, noDist );
-
-        distFromPartition = resultRedist.getTargetDistributionPtr();
-    }else{
-        // create new distribution from partition
-        distFromPartition = scai::dmemo::DistributionPtr( new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
-
-        partition.redistribute( distFromPartition );
-        graph.redistribute( distFromPartition, noDist );
-        nodeWeights.redistribute( distFromPartition );
-
-        // redistribute coordinates
-        for (IndexType d = 0; d < settings.dimensions; d++) {
-            //assert( coordinates[dim].size() == globalN);
-            coordinates[d].redistribute( distFromPartition );
-        }
-    }
-
-    const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
-    SCAI_ASSERT_ERROR( nodeWeights.getDistribution().isEqual(*inputDist), "Distribution mismatch" );
-    SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*inputDist), "Distribution mismatch" );
-    SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*inputDist), "Distribution mismatch" );
-
-    return distFromPartition;
-}
-*/
-
-
-//-------------------------------------------------------------------------------------
 
 //to force instantiation
 template class ParcoRepart<IndexType, ValueType>;
