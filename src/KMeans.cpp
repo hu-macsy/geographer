@@ -40,39 +40,46 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 
 	//SCAI_ASSERT_EQ_ERROR( hierLevel.size(), maxPart, "The current hierarchy level size must match the");
 
-	//hrr: maybe not needed
-	const IndexType maxPart = partition.max();
 
 	//hrr: convention: graph is already partitioned. We call the already 
 	// known blocks as "parts". 
-	// So, numXperPart means how many Xs the already knows blocks have.
+	// So, numXperPart means how many Xs the already known blocks have.
 	// numXperBlocks means how many Xs the new, to-be-found blocks must have
 
-/*
 	//hrr
 	//in how many blocks each known block (part) will be partitioned
-	//numBlocksPerPart[i]=k means than current partition i should be partitioned
-	//into k blocks
-	std:vector<unsigned int> numBlocksPerPart = settings.XXX;
-	SCAI_ASSERT_EQ_ERROR( numBlocksPerPart.size(), maxPart, "The partition given must have equal number of blocks with the vector of block per part");
+	//numBlocksPerPart[i]=k means than current partition i should be 
+	//partitioned into k blocks
+	std::vector<unsigned int> numBlocksPerPart;
+	for( cNode c: hierLevel){
+		numBlocksPerPart.push_back( c.numChildren() );
+	}
+	//the number of old blocks from the previous, provided partition
+	const unsigned int numOldBlocks = numBlocksPerPart.size();
+
+	//const IndexType maxPart = partition.max();
+	//SCAI_ASSERT_EQ_ERROR( numOldBlocks, maxPart, "The provided partition must have equal number of blocks as the length of the vector with the new number of blocks per part");
 	
+	/*//Probably not needed here
+	const IndexType totalNumOfBlocks = std::accumulate(numBlocksPerPart.begin(), numBlocksPerPart.end(), 0);
 	std::vector<unsigned int> coresPerBlock = CCC;
 	std::vector<unsigned int> memPerBlock = MMM;
 	std::vector<ValueType> speedPerBlock = SSS;
-
-	const IndexType totalNumOfBlocks = std::accumulate(numBlocksPerPart.begin(), numBlocksPerPart.end(), 0);
-
 	//hrr: a property per new block; sizes must match
 	SCAI_ASSERT_EQ_ERROR( coresPerBlock.size(), totalNumOfBlocks, "Must be provided a number of cores per new block. The size of the vector mustbe equal the total number on new blocks");
 	SCAI_ASSERT_EQ_ERROR( memPerBlock.size(), totalNumOfBlocks, "Must be provided a memory capacity per new block. The size of the vector mustbe equal the total number on new blocks");
 	SCAI_ASSERT_EQ_ERROR( speedPerBlock.size(), totalNumOfBlocks, "Must be provided a cpu speed per new block. The size of the vector mustbe equal the total number on new blocks");
-*/
-	//convert coordinates, switch inner and outer order
-	std::vector<std::vector<ValueType> > convertedCoords(localN);
-	for (IndexType i = 0; i < localN; i++) {
-		convertedCoords[i].resize(dimensions);
-	}
+	*/
 
+
+	//convert coordinates, switch inner and outer order
+	std::vector<std::vector<ValueType> > convertedCoords( localN, std::vector<ValueType> (dimensions,0) );
+	//replaced next lines with the above constructor call
+	//for (IndexType i = 0; i < localN; i++) {
+	//	convertedCoords[i].resize(dimensions);
+	//}
+
+PRINT("");	
 	for (IndexType d = 0; d < dimensions; d++) {
 		scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
 		assert(rAccess.size() == localN);
@@ -80,6 +87,10 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 			convertedCoords[i][d] = rAccess[i];
 		}
 	}
+
+	//TODO: In the hierarchical case, we need to compute new centres
+	//many times, not just once. Take the hilbert indices once
+	//outside the function and not every time is called
 
 	//get local hilbert indices
 	std::vector<ValueType> sfcIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector( coordinates, settings.sfcResolution, settings.dimensions);
@@ -94,6 +105,63 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	//sort local indices according to SFC
 	std::sort(localIndices.begin(), localIndices.end(), [&sfcIndices](IndexType a, IndexType b){return sfcIndices[a] < sfcIndices[b];});
 
+	//global communicator
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+	//get prefix sum for every known block
+	//TODO: use a DenseVector in order to use the already implemented
+	//function MultiLevel::computeGlobalPrefixSum to get a global
+	//prefix sum.
+	
+	//sizesPrefixSum[i]: a vector of the prefix sum for the number of
+	//points that are local in every pe for block i
+	//sizesPrefixSum[i].size()=p+1
+	//sizesPrefixSum[i][j] = [ size of block i in PEs 0+1+...+j ]
+
+	const unsigned int p = comm->getSize();
+	std::vector<std::vector<IndexType>> sizesPrefixSum( numOldBlocks, std::vector<IndexType>(p+1,0));
+
+	{
+		std::vector<IndexType> oldBlockSizes( numOldBlocks, 0);
+		scai::hmemo::ReadAccess<IndexType> localPart = partition.getLocalValues();
+		//std::vector<IndexType> localPart( partition.getLocalValues().data() );
+		SCAI_ASSERT_EQ_ERROR( localPart.size(), localN, "Partition size mismatch");
+		//count the size of every block localy
+		for( unsigned int i=0; i<localN; i++){
+			IndexType thisPointPart = localPart[i];
+			oldBlockSizes[ thisPointPart ]++;
+		}
+
+		//gather all block sizes, a vector for every PE
+		IndexType allOldBlockSizes[p*numOldBlocks];
+		comm->gather( allOldBlockSizes, numOldBlocks, 0, oldBlockSizes.data() );
+
+		std::vector<IndexType> prefixSumArray( (p+1)*numOldBlocks,0 );
+
+		// only root PE calculates the prefixSum
+		if( comm->getRank()==0 ){
+			for(unsigned int i=0; i<p*numOldBlocks; i++){
+				IndexType pe = i/numOldBlocks;
+				IndexType blockInPe = i%numOldBlocks;
+				// i = pe*numOldBlocks + blockInPe
+				assert( pe+1<p+1 );
+				assert( blockInPe<numOldBlocks ); //trivially true
+				//sizesPrefixSum[blockInPe][pe+1] = sizesPrefixSum[blockInPe][pe] + allOldBlockSizes[i]; 
+				//prefixSumArray[i] = sizesPrefixSum[blockInPe][pe] + allOldBlockSizes[i]; 
+				prefixSumArray[numOldBlocks+i] = prefixSumArray[i] + allOldBlockSizes[i]; 
+			}
+		}
+
+		comm->scatter( prefixSumArray.data(), (p+1)*numOldBlocks, 0, prefixSumArray.data());
+	
+		IndexType prefixSumCheckSum = 0;
+		for( std::vector<IndexType> blockPrefix : sizesPrefixSum ){
+			IndexType sizeOfBlock = blockPrefix.back();
+			prefixSumCheckSum += sizeOfBlock;
+		}
+		SCAI_ASSERT_EQ_ERROR( prefixSumCheckSum, globalN, "Global sizes mismatch. Wrong calculation of prefix sum?");
+	}
+
 	//compute wanted indices for initial centers
 	std::vector<IndexType> wantedIndices(k);
 
@@ -102,9 +170,8 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	}
 
 	//setup general block distribution to model the space-filling curve
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
-
+PRINT(*comm);	
 	//set local values in vector, leave non-local values with zero
 	std::vector<std::vector<point>> result(dimensions);
 	for (IndexType d = 0; d < dimensions; d++) {
@@ -178,7 +245,7 @@ std::vector<std::vector<ValueType>>  findInitialCentersSFC(
 	for(int i=0; i<settings.numBlocks; i++){ 
 		leaves.push_back( cNode(std::vector<unsigned int>{0}, cores, mem, speed) );
 	}
-
+PRINT("");	
 	//every point belongs to one block in the beginning
 	scai::lama::DenseVector<IndexType> partition( coordinates[0].getDistributionPtr(), 0);
 
@@ -1080,15 +1147,29 @@ DenseVector<IndexType> computePartition(
 //---------------------------------------
 //wrapper 2 - with CommTree
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(
-	const std::vector<DenseVector<ValueType>> &coordinates,
-	const DenseVector<ValueType> &nodeWeights,
+DenseVector<IndexType> computeHierarchicalPartition(
+	std::vector<DenseVector<ValueType>> &coordinates,
+	DenseVector<ValueType> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,
 	const Settings settings,
 	struct Metrics& metrics){
 
 	//get global communicator
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+	//redistribute points based on their hilbert curve index
+	//warning: this functions redistributes the coordinates and
+	//the node weights. 
+	//TODO: is this supposed to be here? it is also in the
+	// ParcoRepart::partitionGraph
+	HilbertCurve<IndexType,ValueType>::hilbertRedistribution(
+		coordinates, nodeWeights, settings, metrics);
+
+	//added check to verify that the points are indeed distributed 
+	//based on the hilbert curve. Otherwise, the prefix sum needed to 
+	//calculate the centers, does not have the desired meaning.
+	bool hasHilbertDist = HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution( coordinates, nodeWeights, settings);
+	SCAI_ASSERT_EQ_ERROR( hasHilbertDist, true, "Input must be distributed according to a hilbert curve distribution");
 
 	std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
@@ -1106,17 +1187,17 @@ DenseVector<IndexType> computePartition(
 	//skip root
 	for(unsigned int h=1; h<commTree.hierarchyLevels; h++ ){
 
-		std::vector<cNode> thisLevel = commTree[h];
+		std::vector<cNode> thisLevel = commTree.getHierLevel(h);
 		PRINT0("-- Hierarchy level " << h << " with " << thisLevel.size() << " number of nodes");
 		if( settings.debugMode ){
+			PRINT0("******* in debug mode");
 			for( cNode c: thisLevel){ //print all nodes of this level
 				c.print();
 			}
 		}
 
 		//1- find initial centers for this hierarchy level
-		std::vector<std::vector<point>> groupOfCenters = findInitialCentersSFC(
-			coordinates, minCoords, maxCoords, partition, settings );
+		std::vector<std::vector<point>> groupOfCenters = findInitialCentersSFC( coordinates, minCoords, maxCoords, partition, thisLevel, settings );
 
 		//2- main kmeans loop
 	}
@@ -1133,7 +1214,6 @@ template std::vector<std::vector<ValueType> > findInitialCentersSFC<IndexType, V
 
 template std::vector<std::vector<ValueType> > findLocalCenters<IndexType,ValueType>(const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights);
 
-template std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly<IndexType,ValueType>(const std::vector<ValueType> &maxCoords, Settings settings);
 
 template std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<IndexType> &partition, const IndexType k, std::vector<IndexType>::iterator firstIndex, std::vector<IndexType>::iterator lastIndex, const DenseVector<ValueType> &nodeWeights);
 
@@ -1149,6 +1229,7 @@ template DenseVector<IndexType> computeRepartition(const std::vector<DenseVector
 
 }; // namespace KMeans
 
+template std::vector<std::vector<ValueType> > KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>(const std::vector<ValueType> &maxCoords, Settings settings);
 
 //instantiations needed or there is a undefined reference otherwise
 template DenseVector<IndexType> KMeans::computePartition(
@@ -1164,6 +1245,13 @@ template DenseVector<IndexType> KMeans::computeRepartition(
 	const std::vector<IndexType>& blockSizes,
 	const DenseVector<IndexType>& previous,
 	const Settings settings);
+
+template DenseVector<IndexType> KMeans::computeHierarchicalPartition(
+	std::vector<DenseVector<ValueType>> &coordinates,
+	DenseVector<ValueType> &nodeWeights,
+	const CommTree<IndexType,ValueType> &commTree,
+	const Settings settings,
+	struct Metrics& metrics);
 
 } /* namespace ITI */
 

@@ -32,6 +32,7 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
 	const IndexType p = comm->getSize();
 	Settings settings;
 	settings.numBlocks = k;
+	settings.dimensions = dimensions;
 
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
@@ -40,9 +41,9 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
         maxCoords[dim] = coords[dim].max();
         SCAI_ASSERT_NE_ERROR( minCoords[dim], maxCoords[dim], "min=max for dimension "<< dim << ", this will cause problems to the hilbert index. local= " << coords[0].getLocalValues().size() );
     }
-
+PRINT(*comm);	
 	std::vector<std::vector<ValueType> > centers = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords,  minCoords, maxCoords, settings);
-
+PRINT(*comm);	
 	//check for size
 	EXPECT_EQ(dimensions, centers.size());
 	EXPECT_EQ(k, centers[0].size());
@@ -68,7 +69,7 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
 		}
 	}
 	EXPECT_TRUE(allDistinct);
-
+PRINT(*comm);	
 	//check for equality across processors
 	for (IndexType d = 0; d < dimensions; d++) {
 		ValueType coordSum = std::accumulate(centers[d].begin(), centers[d].end(), 0.0);
@@ -118,8 +119,9 @@ TEST_F(KMeansTest, testFindCenters) {
 }
 
 //TODO: got undefined reference for getLocalMinMaxCoords and findInitialCentersFromSFCOnly
+//update: instantiation is needed
 
-/*
+
 TEST_F(KMeansTest, testCentersOnlySfc) {
 	std::string fileName = "bubbles-00010.graph";
 	std::string graphFile = graphPath + fileName;
@@ -181,7 +183,56 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 		}
 	}
 }
-*/
+
+
+TEST_F(KMeansTest, testHierarchicalPartition) {
+	std::string fileName = "bubbles-00010.graph";
+	std::string graphFile = graphPath + fileName;
+	std::string coordFile = graphFile + ".xyz";
+	const IndexType dimensions = 2;
+
+	//load graph and coords
+	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+	const IndexType n = graph.getNumRows();
+	std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
+
+	//set uniform node weights
+	scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+
+	//const IndexType k = comm->getSize();
+	//using KMeans::cNode;
+
+	//set CommTree
+	std::vector<cNode> leaves = {
+		// 				{hierachy ids}, numCores, mem, speed
+		cNode( std::vector<unsigned int>{0,0}, 4, 8, 50),
+		cNode( std::vector<unsigned int>{0,1}, 4, 8, 90),
+
+		cNode( std::vector<unsigned int>{1,0}, 6, 10, 80),
+		cNode( std::vector<unsigned int>{1,1}, 6, 10, 90),
+		cNode( std::vector<unsigned int>{1,2}, 6, 10, 70),
+
+		cNode( std::vector<unsigned int>{2,0}, 8, 12, 80),
+		cNode( std::vector<unsigned int>{2,1}, 8, 12, 90),
+		cNode( std::vector<unsigned int>{2,2}, 8, 12, 90),
+		cNode( std::vector<unsigned int>{2,3}, 8, 12, 100),
+		cNode( std::vector<unsigned int>{2,4}, 8, 12, 90)
+	};
+
+	ITI::CommTree<IndexType,ValueType> cTree( leaves );
+
+	struct Settings settings;
+	settings.dimensions = dimensions;
+	settings.numBlocks = comm->getSize();
+
+	Metrics metrics(settings);
+
+	scai::lama::DenseVector<IndexType> partition = KMeans::computeHierarchicalPartition( coords, unitNodeWeights, cTree, settings, metrics);
+
+	//checks
+}
 
 /*
 TEST_F(KMeansTest, testPartitionWithNodeWeights) {

@@ -793,6 +793,61 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
     metrics.timeFirstDistribution[rank] = migrationTime.count();
 }
 //-------------------------------------------------------------------------------------------------
+template<typename IndexType, typename ValueType>
+bool HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(
+	//const scai::lama::CSRSparseMatrix<ValueType> &graph,
+	const std::vector<DenseVector<ValueType>> &coordinates,
+	const DenseVector<ValueType> &nodeWeights,
+	Settings settings
+	){
+
+	//get distributions of the input
+	const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
+	//const scai::dmemo::DistributionPtr graphDist = graph.getRowDistributionPtr();
+	const scai::dmemo::DistributionPtr weightDist = nodeWeights.getDistributionPtr();
+
+	if( not coordDist->isEqual( *weightDist) ){
+		throw std::runtime_error( "Distributions should be equal.");
+	}
+
+	//get sfc indices in every PE
+	std::vector<ValueType> localSFCInd = getHilbertIndexVector ( coordinates,  settings.sfcResolution, settings.dimensions);
+
+	//sort local indices
+	std::sort( localSFCInd.begin(), localSFCInd.end() );
+
+	//the min and max local sfc value
+	ValueType sfcMinMax[2] = { localSFCInd.front(), localSFCInd.back() };
+
+const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();	
+PRINT(*comm <<": sending "<< sfcMinMax[0] << ", " << sfcMinMax[1] )	;
+
+	const IndexType p = comm->getSize();
+	const IndexType root = 0; //set PE 0 as root 
+	IndexType arraySize = 1;
+	if( comm->getRank()==root ){
+		arraySize = 2*p;
+	}
+	//so only the root PE allocates the array
+	ValueType allMinMax[arraySize];
+
+	comm->gather(allMinMax, 2, root, sfcMinMax );
+
+PRINT0("gathered: ");
+if( comm->getRank()==root )
+for(unsigned int i=0; i<arraySize; i++){
+	std::cout<< ", " << allMinMax[i];
+}
+std::cout<< std::endl;
+	
+	//check if array is sorted. For all PEs except the root, this is trivially
+	// true since their array has only one element
+	std::vector<ValueType> gatheredInd( allMinMax, allMinMax+arraySize  );
+	bool isSorted = std::is_sorted( gatheredInd.begin(), gatheredInd.end() );
+
+	return comm->all( isSorted );
+}
+
 
 template class HilbertCurve<long int, double>;
 //this instantiation does not work

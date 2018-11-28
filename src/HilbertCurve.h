@@ -119,6 +119,15 @@ namespace ITI {
 		 */
 		static void hilbertRedistribution(std::vector<DenseVector<ValueType> >& coordinates, DenseVector<ValueType>& nodeWeights, Settings settings, struct Metrics& metrics);
 
+		/** @brief Checks if all the input data are distributed to PEs 
+		according to the hilbert index curve of the coordinates
+		*/
+		static bool confirmHilbertDistribution(
+			//const scai::lama::CSRSparseMatrix<ValueType> &graph,
+			const std::vector<DenseVector<ValueType>> &coordinates,
+			const DenseVector<ValueType> &nodeWeights,
+			Settings settings);			
+			
 		
 //private:
 		/** @brief Accepts a 2D point and returns is hilbert index.
@@ -183,6 +192,6 @@ namespace ITI {
 		static std::vector<ValueType> Hilbert3DIndex2Point(const ValueType index, const IndexType recursionDepth);
 		
 		static std::vector<std::vector<ValueType>> Hilbert3DIndex2PointVec(const std::vector<ValueType> indices, IndexType recursionDepth);
-			
+
 	};
 }//namespace ITI

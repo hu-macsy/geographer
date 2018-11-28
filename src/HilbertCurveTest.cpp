@@ -411,6 +411,12 @@ TEST_F(HilbertCurveTest, testHilbertRedistribution) {
 
     HilbertCurve<IndexType, ValueType>::hilbertRedistribution(coords, nodeWeights, settings, metrics);
 
+    //redistribute also graph
+    //graph.redistribute( coords[0].getDistributionPtr(), scai::dmemo::DistributionPtr(new scai::dmemo::NoDistribution(N)) );
+
+    bool hasHilbertDist = HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution( coords, nodeWeights, settings);
+    EXPECT_TRUE( hasHilbertDist );
+
     //check checksum
     for (IndexType d = 0; d < settings.dimensions; d++) {
         EXPECT_NEAR(coordSum[d], coords[d].sum(), 0.001);

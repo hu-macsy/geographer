@@ -5,6 +5,7 @@
 
 namespace ITI {
 
+
 template <typename IndexType, typename ValueType>
 class CommTree{
 
@@ -12,6 +13,8 @@ public:
 
 struct commNode{
 	std::vector<unsigned int> hierarchy;
+	//TODO: probably, keeping all chidren is not necessary and uses a lot of space
+	// replace by keeping only the number of children
 	std::vector<unsigned int> children;
 	unsigned int numCores;
 	unsigned int memMB;
@@ -62,6 +65,14 @@ struct commNode{
 		return *this;
 	}
 
+	/* @brief Return the number of children this node has
+	*/
+	//TODO: probably children should be removed but this function is needed
+	//to know in how many new blocks each block will be partitioned.
+	IndexType numChildren() const{
+		return children.size();
+	}
+
 	void print(){
 		std::cout 	<< "numCores= " << numCores \
 					<< ", memory= " << memMB 	\
@@ -99,9 +110,18 @@ IndexType hierarchyLevels; //hierarchyLevels = tree,size()
 IndexType numNodes;
 IndexType numLeaves;
 
-commNode getRoot(){ 
+/* @brief Return the root, i.e., hierarchy level 0.
+*/
+commNode getRoot() const{ 
 	//TODO: check if tree is not initialized
 	return tree[0][0]; 
+}
+
+/* @brief Return the requested hierarchy level
+*/
+std::vector<commNode> getHierLevel( int level) const {
+	SCAI_ASSERT_LE_ERROR( level, hierarchyLevels, "Tree has less levels than requested" );
+	return tree[level];
 }
 
 /*@brief constructor to create tree from a vector of leaves
@@ -132,4 +152,7 @@ bool checkTree();
 
 
 };//class CommGraph
+
+typedef typename ITI::CommTree<IndexType,ValueType>::commNode cNode;
+
 }//namespace ITI

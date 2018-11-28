@@ -29,7 +29,7 @@ namespace ITI {
 namespace KMeans {
 
 //TODO: any other more proper way to do this?
-typedef typename CommTree<IndexType,ValueType>::commNode cNode;
+//typedef typename CommTree<IndexType,ValueType>::commNode cNode;
 
 //typedef to make it more readable
 using point = std::vector<ValueType>;
@@ -84,9 +84,9 @@ DenseVector<IndexType> computePartition(
 
 //wrapper 2 - with CommTree
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition(
-	const std::vector<DenseVector<ValueType>> &coordinates,
-	const DenseVector<ValueType> &nodeWeights,
+DenseVector<IndexType> computeHierarchicalPartition(
+	std::vector<DenseVector<ValueType>> &coordinates,
+	DenseVector<ValueType> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,
 	const Settings settings,
 	struct Metrics& metrics);
@@ -127,7 +127,6 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		const std::vector<ValueType> &minCoords,
 		const std::vector<ValueType> &maxCoords,
 		const scai::lama::DenseVector<IndexType> &partition,
-		//const CommTree<IndexType,ValueType> &commTree,
 		const std::vector<cNode> hierarchyLevel,
 		Settings settings);
 

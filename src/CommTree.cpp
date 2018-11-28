@@ -11,7 +11,7 @@
 namespace ITI {
 
 
-typedef typename CommTree<IndexType,ValueType>::commNode cNode;
+//typedef typename CommTree<IndexType,ValueType>::commNode cNode;
 
 
 //initialize static leaf counter
