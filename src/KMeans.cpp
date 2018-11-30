@@ -27,6 +27,7 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		const std::vector<ValueType> &minCoords,
 		const std::vector<ValueType> &maxCoords,
 		const scai::lama::DenseVector<IndexType> &partition,
+		//const std::vector<cNode> prevHierLevel,
 		const std::vector<cNode> hierLevel,
 		Settings settings) {
 
@@ -35,40 +36,39 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	const IndexType globalN = coordinates[0].size();
 	const IndexType dimensions = settings.dimensions;
 	const IndexType k = settings.numBlocks;
-	
-	//SCAI_ASSERT_GE_ERROR( commTree.hierarchyLevels, 1, "CommTree must have at least 1 level" );
-
-	//SCAI_ASSERT_EQ_ERROR( hierLevel.size(), maxPart, "The current hierarchy level size must match the");
-
+	//global communicator
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	//hrr: convention: graph is already partitioned. We call the already 
 	// known blocks as "parts". 
-	// So, numXperPart means how many Xs the already known blocks have.
-	// numXperBlocks means how many Xs the new, to-be-found blocks must have
+
 
 	//hrr
 	//in how many blocks each known block (part) will be partitioned
-	//numBlocksPerPart[i]=k means than current partition i should be 
+	//numBlocksPerPart[i]=k means that, current partition i should be 
 	//partitioned into k blocks
 	std::vector<unsigned int> numBlocksPerPart;
-	for( cNode c: hierLevel){
-		numBlocksPerPart.push_back( c.numChildren() );
-	}
-	//the number of old blocks from the previous, provided partition
-	const unsigned int numOldBlocks = numBlocksPerPart.size();
-
-	//const IndexType maxPart = partition.max();
-	//SCAI_ASSERT_EQ_ERROR( numOldBlocks, maxPart, "The provided partition must have equal number of blocks as the length of the vector with the new number of blocks per part");
+	unsigned int numOldBlocks;
+	unsigned int numNewTotalBlocks;//for debugging, printing
+	{
+		std::vector<cNode> prevLevel = CommTree<IndexType, ValueType>::createLevelAbove( hierLevel );
 	
-	/*//Probably not needed here
-	const IndexType totalNumOfBlocks = std::accumulate(numBlocksPerPart.begin(), numBlocksPerPart.end(), 0);
-	std::vector<unsigned int> coresPerBlock = CCC;
-	std::vector<unsigned int> memPerBlock = MMM;
-	std::vector<ValueType> speedPerBlock = SSS;
-	//hrr: a property per new block; sizes must match
-	SCAI_ASSERT_EQ_ERROR( coresPerBlock.size(), totalNumOfBlocks, "Must be provided a number of cores per new block. The size of the vector mustbe equal the total number on new blocks");
-	SCAI_ASSERT_EQ_ERROR( memPerBlock.size(), totalNumOfBlocks, "Must be provided a memory capacity per new block. The size of the vector mustbe equal the total number on new blocks");
-	SCAI_ASSERT_EQ_ERROR( speedPerBlock.size(), totalNumOfBlocks, "Must be provided a cpu speed per new block. The size of the vector mustbe equal the total number on new blocks");
+		for( cNode c: prevLevel){
+			numBlocksPerPart.push_back( c.getNumChildren() );
+		}
+		//the number of old blocks from the previous, provided partition
+		numOldBlocks = numBlocksPerPart.size();
+		numNewTotalBlocks = std::accumulate(numBlocksPerPart.begin(), numBlocksPerPart.end(), 0);
+		PRINT0("There are "  <<  numOldBlocks << " blocks from the previous partition and " << numNewTotalBlocks << " new blocks in total");
+
+		const IndexType maxPart = partition.max();
+		SCAI_ASSERT_EQ_ERROR( numOldBlocks-1, maxPart, "The provided partition must have equal number of blocks as the length of the vector with the new number of blocks per part");
+	}
+	//SCAI_ASSERT_EQ_ERROR( numBlocksPerPart.size(), numOldBlocks )
+	/*
+	SCAI_ASSERT_EQ_ERROR( coresPerBlock.size(), totalNumOfBlocks, "Must be provided a number of cores per new block. The size of the vector must be equal the total number on new blocks");
+	SCAI_ASSERT_EQ_ERROR( memPerBlock.size(), totalNumOfBlocks, "Must be provided a memory capacity per new block. The size of the vector must be equal the total number on new blocks");
+	SCAI_ASSERT_EQ_ERROR( speedPerBlock.size(), totalNumOfBlocks, "Must be provided a cpu speed per new block. The size of the vector must be equal the total number on new blocks");
 	*/
 
 
@@ -79,7 +79,6 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	//	convertedCoords[i].resize(dimensions);
 	//}
 
-PRINT("");	
 	for (IndexType d = 0; d < dimensions; d++) {
 		scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
 		assert(rAccess.size() == localN);
@@ -105,75 +104,264 @@ PRINT("");
 	//sort local indices according to SFC
 	std::sort(localIndices.begin(), localIndices.end(), [&sfcIndices](IndexType a, IndexType b){return sfcIndices[a] < sfcIndices[b];});
 
-	//global communicator
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	//get prefix sum for every known block
 	//TODO: use a DenseVector in order to use the already implemented
 	//function MultiLevel::computeGlobalPrefixSum to get a global
 	//prefix sum.
-	
-	//sizesPrefixSum[i]: a vector of the prefix sum for the number of
-	//points that are local in every pe for block i
-	//sizesPrefixSum[i].size()=p+1
-	//sizesPrefixSum[i][j] = [ size of block i in PEs 0+1+...+j ]
 
-	const unsigned int p = comm->getSize();
-	std::vector<std::vector<IndexType>> sizesPrefixSum( numOldBlocks, std::vector<IndexType>(p+1,0));
+	const unsigned int numPEs = comm->getSize();
+	const IndexType rootPE = 0; // set PE 0 as root
+
+	//the global sizes of each block
+	std::vector<IndexType> globalBlockSizes( numOldBlocks );
+	//global prefix sum veector of size (p+1)*numOldBlocks
+	//ATTENTION: this a a concatenation of prefix sum arrays
+	//the real prefix sums are [prefixSumArray[0]:prefixSumArray[numPEs]],
+	// prefixSumArray[numPEs+1]:prefixSumArray[2*numPEs]], ... ,
+	//example: [0,4,10,15, 0,7,15,22, 0,12,20,30, 0, ... ]
+	//           block 1    block 2     block 3 ... block numOldBlocks
+	//every "subarray" has size numPEs+1 (in this example numPEs=3)
+	std::vector<IndexType> concatPrefixSumArray;
 
 	{
 		std::vector<IndexType> oldBlockSizes( numOldBlocks, 0);
 		scai::hmemo::ReadAccess<IndexType> localPart = partition.getLocalValues();
-		//std::vector<IndexType> localPart( partition.getLocalValues().data() );
 		SCAI_ASSERT_EQ_ERROR( localPart.size(), localN, "Partition size mismatch");
+
 		//count the size of every block localy
 		for( unsigned int i=0; i<localN; i++){
-			IndexType thisPointPart = localPart[i];
-			oldBlockSizes[ thisPointPart ]++;
+			IndexType thisPointBlock = localPart[i];
+			oldBlockSizes[ thisPointBlock ]++;
 		}
 
-		//gather all block sizes, a vector for every PE
-		IndexType allOldBlockSizes[p*numOldBlocks];
-		comm->gather( allOldBlockSizes, numOldBlocks, 0, oldBlockSizes.data() );
-
-		std::vector<IndexType> prefixSumArray( (p+1)*numOldBlocks,0 );
+		//gather all block sizes to root
+		IndexType arraySize=1;
+		if( comm->getRank()==rootPE ){
+			arraySize = numPEs*numOldBlocks;
+		}
+		IndexType allOldBlockSizes[arraySize];
+		comm->gather( allOldBlockSizes, numOldBlocks, rootPE, oldBlockSizes.data() );
+PRINT0("allOldBlockSizes:");
+for( IndexType x: allOldBlockSizes)
+	PRINT0(x);
 
 		// only root PE calculates the prefixSum
-		if( comm->getRank()==0 ){
-			for(unsigned int i=0; i<p*numOldBlocks; i++){
-				IndexType pe = i/numOldBlocks;
-				IndexType blockInPe = i%numOldBlocks;
-				// i = pe*numOldBlocks + blockInPe
-				assert( pe+1<p+1 );
-				assert( blockInPe<numOldBlocks ); //trivially true
-				//sizesPrefixSum[blockInPe][pe+1] = sizesPrefixSum[blockInPe][pe] + allOldBlockSizes[i]; 
-				//prefixSumArray[i] = sizesPrefixSum[blockInPe][pe] + allOldBlockSizes[i]; 
-				prefixSumArray[numOldBlocks+i] = prefixSumArray[i] + allOldBlockSizes[i]; 
+		if( comm->getRank()==rootPE ){
+			for( unsigned int blockId=0; blockId<numOldBlocks; blockId++){
+				//prefix sum for every block starts with 0
+				concatPrefixSumArray.push_back(0);
+				for( unsigned int pe=0; pe<numPEs; pe++){
+					concatPrefixSumArray.push_back( concatPrefixSumArray.back() + allOldBlockSizes[pe*numOldBlocks+blockId] );
+				}
 			}
+			SCAI_ASSERT_EQ_ERROR( concatPrefixSumArray.size(), (numPEs+1)*numOldBlocks, "Prefix sum array has wrong size" );
+		}else{
+			concatPrefixSumArray.resize( (numPEs+1)*numOldBlocks, 0 );
 		}
 
-		comm->scatter( prefixSumArray.data(), (p+1)*numOldBlocks, 0, prefixSumArray.data());
-	
-		IndexType prefixSumCheckSum = 0;
-		for( std::vector<IndexType> blockPrefix : sizesPrefixSum ){
-			IndexType sizeOfBlock = blockPrefix.back();
-			prefixSumCheckSum += sizeOfBlock;
+		comm->bcast( concatPrefixSumArray.data() ,(numPEs+1)*numOldBlocks, rootPE);
+/*
+for( unsigned int i=0; i<(numPEs+1)*numOldBlocks; i++){
+	PRINT(*comm << ": " << i << ", "<< concatPrefixSumArray[i] );
+}
+*/
+
+		for( unsigned int b=0; b<numOldBlocks; b++){
+//TODO: check if correct, maybe it is (b+1)*(numPEs+1)
+//		or numPEs*(b+1)+b = b*(numPEs+1)+numPEs
+			//concatPrefixSumArray[ numPEs*(b+1) ]
+			globalBlockSizes[b] = concatPrefixSumArray[(b+1)*numPEs+b];
+PRINT(*comm <<": "<< b*numPEs+numPEs << " -- " << globalBlockSizes[b] );
+			SCAI_ASSERT_EQ_ERROR( concatPrefixSumArray[b*(numPEs+1)] , 0, "Wrong concat prefix sum array, values at indices b*(numPEs+1) must be zero, Failed for b=" << b);
 		}
+		IndexType prefixSumCheckSum = std::accumulate( globalBlockSizes.begin(), globalBlockSizes.end(), 0 );
 		SCAI_ASSERT_EQ_ERROR( prefixSumCheckSum, globalN, "Global sizes mismatch. Wrong calculation of prefix sum?");
 	}
 
 	//compute wanted indices for initial centers
-	std::vector<IndexType> wantedIndices(k);
+	//std::vector<IndexType> wantedIndices(k);
+	//newCenterIndWithinBLock[i] = a vector with the indices of the 
+	//centers for block i
+	//newCenterIndWithinBLock[i].size() = numBlocksPerPart[b], i.e., the 
+	// new number of blocks to partition previous block i
+	//ATTENTION: newCenterIndWithinBLock[i][j] = x: is the index of the 
+	//center within block i. If x is 30, then we want the 30-th point
+	//of block i.
 
-	for (IndexType i = 0; i < k; i++) {
-		wantedIndices[i] = i * (globalN / k) + (globalN / k)/2;
+	std::vector<std::vector<IndexType>> newCenterIndWithinBLock(numOldBlocks);
+
+	//for all old blocks
+	for( IndexType b=0; b<numOldBlocks; b++){
+		//the number of centers for block b
+		IndexType k_b = numBlocksPerPart[b]; 
+		newCenterIndWithinBLock[b].resize( k_b );
+		for( IndexType i = 0; i < k_b; i++) {
+			//wantedIndices[i] = i * (globalN / k) + (globalN / k)/2;
+			IndexType oldInd= i * (globalN / k) + (globalN / k)/2;
+			newCenterIndWithinBLock[b][i] = i*(globalBlockSizes[b]/k_b) + (globalBlockSizes[b]/k_b)/2;
+PRINT0(oldInd << " __ new " << newCenterIndWithinBLock[b][i]);
+		}
 	}
 
+	const IndexType thisPE = comm->getRank();
+	// localRange[b], the indices range for block b for this PE
+	//std::vector<std::pair<IndexType,IndexType> localRange( numOldBlocks );
+	//keep a counter for every block that indicates the starting index
+	//for a block in this PE. Different starting value for each PE
+	std::vector<IndexType> counter( numOldBlocks );
+
+	//the center for each block that are local in this PE
+	std::vector<std::vector<IndexType>> ownedCentersPerBlock( numOldBlocks);
+	//first is the center index within its block, second the block number
+	//and third the vector index of the center in the block
+	//e.g.: if newCenterIndWithinBLock[b][i] = cent
+	//then ownedCentersPerBlock2[x]= { cent, b, i}
+	std::vector<std::tuple<IndexType,IndexType,IndexType>> ownedCentersPerBlock2;
+	//store the block this center belogns and the index in the 
+	//newCenterIndWithinBLock vector
+	std::vector<std::pair<IndexType,IndexType>> centerInfo;
+
+	//the centers to be returned, fill only with owned centers
+	std::vector<std::vector<point>> centersPerNewBlock( numOldBlocks);
+	for( IndexType b=0; b<numOldBlocks; b++){
+		centersPerNewBlock[b].resize( numBlocksPerPart[b] , point(dimensions, 0.0) );
+	}
+
+	//for debugging
+	IndexType sumOfRanges = 0;
+	IndexType numOwnedCenters = 0;
+
+	for( IndexType b=0; b<numOldBlocks; b++){
+		IndexType fromInd = b*(numPEs+1)+thisPE;
+assert( fromInd+1<concatPrefixSumArray.size() );
+		//the range of the indices for block b for this PE
+		//localRange[b].first = concatPrefixSumArray[ fromInd ];
+		IndexType rangeStart = concatPrefixSumArray[ fromInd ];
+		counter[b] = rangeStart;
+		//localRange[b].second = concatPrefixSumArray[ fromInd+1];
+		IndexType rangeEnd = concatPrefixSumArray[ fromInd+1];
+		sumOfRanges += rangeEnd-rangeStart;
+
+PRINT(*comm <<": for block "<< b << " owns indices from " << rangeStart <<  " till " << rangeEnd);
+	
+		//center indices for block b
+		std::vector<IndexType> centersForThisBlock = newCenterIndWithinBLock[b];
+
+		//if some center indexes are local in this PE, store them.
+		//Later, we will scan the local points for their coordinates
+		for( unsigned int j=0; j<centersForThisBlock.size(); j++ ){
+			IndexType centerInd = centersForThisBlock[j];
+			//centerInd for block b is owned by thisPE
+			if( centerInd>=rangeStart and centerInd<=rangeEnd){
+PRINT(*comm << ": owns center with index " << centerInd << " for block " << b);				
+				//since we own a center, go over all local points
+				//and calculate their within-block index for the block 
+				//they belong to
+				scai::hmemo::ReadAccess<IndexType> localPart = partition.getLocalValues();
+				for(unsigned int i=0; i<localN; i++ ){
+					IndexType thisPointBlock = localPart[i];
+					//TODO: remove assertion?
+					assert( thisPointBlock<numOldBlocks );
+					if( thisPointBlock!=b ){
+						continue;//not in desired block
+					}
+					
+					counter[ thisPointBlock ]++;
+					IndexType withinBlockIndex = counter[thisPointBlock];
+					//desired center found
+					if( withinBlockIndex==centerInd ){
+						//store center coords
+PRINT(*comm <<": adding center "<< centerInd << " with coordinates " << convertedCoords[i][0] << ", " << convertedCoords[i][1] );			
+						centersPerNewBlock[b][j] = convertedCoords[i];
+						numOwnedCenters++;
+						break;
+					}
+				}
+				/*
+				ownedCentersPerBlock[b].push_back( centerInd );
+				//centerInd is in position newCenterIndWithinBLock[b][j]
+				centerInfo.push_back( std::make_pair(b,j));
+				ownedCentersPerBlock2.push_back( std::make_tuple( centerInd, b, j));
+				*/
+			}
+		}
+	}
+
+	SCAI_ASSERT_EQ_ERROR(sumOfRanges, localN, thisPE << ": Sum of owned number of points per block should be equal the total number of local points");
+PRINT( *comm << ": owns " << numOwnedCenters << " centers");
+	if( settings.debugMode ){
+		SCAI_ASSERT_EQ_ERROR( comm->sum(numOwnedCenters), numNewTotalBlocks , "Not all centers were found");
+	}
+
+	//global sum operation. Doing it in a separate loop on purpose
+	//since different PEs own centers from different block and for most
+	//block they own no centers at all
+	for( IndexType b=0; b<numOldBlocks; b++){
+		//copy constructor not needed
+		//std::vector<point> centersOfThisBlock = centersPerNewBlock[b];
+		//get iterator to the beginning
+		//std::vector<point>::iterator thisBlockCentersIt = centersPerNewBlock[b].begin();
+
+		SCAI_ASSERT_EQ_ERROR( centersPerNewBlock[b][0].size(), dimensions, "Dimension mismatch for center" );
+		IndexType numCenters = centersPerNewBlock[b].size();
+/*
+//TODO: this reverse is not needed here
+//reverse vector order here?
+
+std::vector<std::vector<ValueType>> reversedCenters( dimensions, std::vector<ValueType>(numCenters, 0.0) );
+for( unsigned int c=0; c<numCenters; c++){
+	for( unsigned int d=0; d<dimensions; d++){
+		reversedCenters[d][c] = centersOfThisBlock[c][d];
+	}
+}
+for (IndexType d=0; d<dimensions; d++) {
+PRINT( *comm << ": " << reversedCenters[d].data()[0] << " _ " << numCenters);
+	//SCAI_ASSERT_EQ_ERROR( reversedCenters[d].data(), reversedCenters[d].data(), "Do not know");
+	comm->sumImpl( reversedCenters[d].data(), reversedCenters[d].data(), numCenters, scai::common::TypeTraits<ValueType>::stype );
+PRINT(*comm << ": "<< reversedCenters[d][2] );
+}
+*/
+		//without reversing vector order
+		//pach in a raw array
+		std::vector<ValueType> allCenters( numCenters*dimensions );
+		//SCAI_ASSERT_EQ_ERROR( centersOfThisBlock.size(), dimensions, "Center dimensions mismatch" );
+		for( unsigned int c=0; c<numCenters; c++ ){
+			//this copies the point, this is unnecessary, TODO: fix
+			point thisCenter = centersPerNewBlock[b][c];
+			//copy this center
+			std::copy( thisCenter.begin(), thisCenter.end(), allCenters.begin() +c*dimensions );
+		}
+		//global sum
+		comm->sumImpl( allCenters.data(), allCenters.data(), numCenters*dimensions, scai::common::TypeTraits<ValueType>::stype  );
+
+		//unpack back to vector<point>
+		for( unsigned int c=0; c<numCenters; c++ ){
+			for (IndexType d=0; d<dimensions; d++) {
+				//center c, for block b
+				centersPerNewBlock[b][c][d] = allCenters[ c*dimensions+d ];
+			}
+		}
+		//comm->sumImpl( centersOfThisBlock.data(), centersOfThisBlock.data(), centersOfThisBlock.size()*dimensions, scai::common::TypeTraits<ValueType>::stype  );
+
+//make the thing above work!
+//must re-reverse order !!!!!
+
+		
+	}
+
+
+	/* for every local point: get its block, 
+			calculate its index	within the block
+			check if this index is the index of a center
+	*/
+
+/*initial, older code
 	//setup general block distribution to model the space-filling curve
 	scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
-PRINT(*comm);	
+
 	//set local values in vector, leave non-local values with zero
-	std::vector<std::vector<point>> result(dimensions);
+	std::vector<std::vector<ValueType>> result(dimensions);
 	for (IndexType d = 0; d < dimensions; d++) {
 		result[d].resize(k);
 	}
@@ -187,12 +375,8 @@ PRINT(*comm);
 			IndexType permutedIndex = localIndices[localIndex];
 			assert(permutedIndex < localN);
 			assert(permutedIndex >= 0);
-			for (IndexType d = 0; d < dimensions; d++) {
-//TODO: this is wrong, added [0] just to compile
-// fix it appropiatelly				
-				result[0][d][j] = convertedCoords[permutedIndex][d];
-//
-//
+			for (IndexType d = 0; d < dimensions; d++) {		
+				result[d][j] = convertedCoords[permutedIndex][d];
 			}
 		}
 	}
@@ -201,8 +385,8 @@ PRINT(*comm);
 	for (IndexType d = 0; d < dimensions; d++) {
 		comm->sumImpl(result[d].data(), result[d].data(), k, scai::common::TypeTraits<ValueType>::stype);
 	}
-
-	return result;
+*/
+	return centersPerNewBlock;
 }
 
 /*
@@ -243,13 +427,35 @@ std::vector<std::vector<ValueType>>  findInitialCentersSFC(
 
 	std::vector<cNode> leaves( settings.numBlocks );
 	for(int i=0; i<settings.numBlocks; i++){ 
-		leaves.push_back( cNode(std::vector<unsigned int>{0}, cores, mem, speed) );
+		leaves[i] = cNode(std::vector<unsigned int>{0}, cores, mem, speed);
 	}
-PRINT("");	
+PRINT(settings.numBlocks);	
+//PRINT( leaves.size() );
+	//std::vector<cNode> prevLevel = CommTree<IndexType, ValueType>::createLevelAbove(leaves);
+	//SCAI_ASSERT_EQ_ERROR( prevLevel.size(), 1 , "There should be only one hierarchy level");
+
 	//every point belongs to one block in the beginning
 	scai::lama::DenseVector<IndexType> partition( coordinates[0].getDistributionPtr(), 0);
 
-	return findInitialCentersSFC( coordinates, minCoords, maxCoords, partition, leaves, settings)[0];
+	//return a vector of size 1 with
+	std::vector<std::vector<point>> initialCenters = findInitialCentersSFC( coordinates, minCoords, maxCoords, partition, leaves, settings );
+
+	SCAI_ASSERT_EQ_ERROR( initialCenters.size(), 1, "Wrong vector size");
+	SCAI_ASSERT_EQ_ERROR( initialCenters[0].size(), settings.numBlocks, "Wrong vector size" );
+
+	//TODO: must change convert centers to a vector of size=dimensions
+	//where initialCenters[0][d][i] is the d-th coordinate of the i-th center
+	IndexType dimensions = settings.dimensions;
+
+	//reverse vector order here
+	std::vector<std::vector<ValueType>> reversedCenters( dimensions, std::vector<ValueType>(settings.numBlocks, 0.0) );
+	for( unsigned int c=0; c<settings.numBlocks; c++){
+		for( unsigned int d=0; d<dimensions; d++){
+			reversedCenters[d][c] = initialCenters[0][c][d];
+		}
+	}
+
+	return reversedCenters;
 }
 
 
@@ -1184,7 +1390,8 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 	//every point belongs to one block in the beginning
 	scai::lama::DenseVector<IndexType> partition( coordinates[0].getDistributionPtr(), 0);
-	//skip root
+	//skip root. If we start from the root, we will know the number
+	//of blocks but not the memory and speed per block
 	for(unsigned int h=1; h<commTree.hierarchyLevels; h++ ){
 
 		std::vector<cNode> thisLevel = commTree.getHierLevel(h);

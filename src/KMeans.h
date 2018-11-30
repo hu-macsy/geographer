@@ -114,8 +114,14 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 /**
 	@brief Version for hierarchical version. The centers now are a vector of vectors,
 	a set o centers for every block/center in the previous hierarchy level.
-	
-	@param[in] centers Centers from previous partition: centers[i] are the centers 
+	We need two hierarchy levels to partition. If we only use the top one,
+	e.g., start from the root, we know the number of children but we do not
+	know the memory ans speeds. If we use the one below, e.g., start from
+	level 1, we know the number of blocks and the properties for each block
+	but we do not know where block belong to.
+
+	@param [in] prevHierarLevel The previous hierarch level. 
+	//@param[in] centers Centers from previous partition: centers[i] are the centers 
 	for block i in the previous hierarchy level.
 	@param[in] partition The block id of every point in the previous hierarchy.
 	partition[i]=b means that point i was in block b in the previous hierarchy
@@ -127,7 +133,8 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		const std::vector<ValueType> &minCoords,
 		const std::vector<ValueType> &maxCoords,
 		const scai::lama::DenseVector<IndexType> &partition,
-		const std::vector<cNode> hierarchyLevel,
+		//const std::vector<cNode> prevHierarLevel,
+		const std::vector<cNode> hierLevel,
 		Settings settings);
 
 

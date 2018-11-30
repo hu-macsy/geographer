@@ -41,9 +41,9 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
         maxCoords[dim] = coords[dim].max();
         SCAI_ASSERT_NE_ERROR( minCoords[dim], maxCoords[dim], "min=max for dimension "<< dim << ", this will cause problems to the hilbert index. local= " << coords[0].getLocalValues().size() );
     }
-PRINT(*comm);	
-	std::vector<std::vector<ValueType> > centers = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords,  minCoords, maxCoords, settings);
-PRINT(*comm);	
+
+	std::vector<std::vector<ValueType>> centers = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords,  minCoords, maxCoords, settings);
+
 	//check for size
 	EXPECT_EQ(dimensions, centers.size());
 	EXPECT_EQ(k, centers[0].size());
@@ -69,7 +69,7 @@ PRINT(*comm);
 		}
 	}
 	EXPECT_TRUE(allDistinct);
-PRINT(*comm);	
+
 	//check for equality across processors
 	for (IndexType d = 0; d < dimensions; d++) {
 		ValueType coordSum = std::accumulate(centers[d].begin(), centers[d].end(), 0.0);
@@ -226,7 +226,8 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 	struct Settings settings;
 	settings.dimensions = dimensions;
 	settings.numBlocks = comm->getSize();
-
+	settings.debugMode = false;
+	
 	Metrics metrics(settings);
 
 	scai::lama::DenseVector<IndexType> partition = KMeans::computeHierarchicalPartition( coords, unitNodeWeights, cTree, settings, metrics);

@@ -52,11 +52,12 @@ IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vecto
 
 	for(int h = hierarchyLevels-1; h>=0; h--){
 		PRINT("starting level " << h);
-		std::vector<commNode> levelAbove = createLevelAbove(levelBelow, h);
+		std::vector<commNode> levelAbove = createLevelAbove(levelBelow);
 		//add the newly created level to the tree
 		tree.insert(tree.begin(), levelAbove );
 		size += levelAbove.size();
 		levelBelow = levelAbove;
+		PRINT("Size of level above (lvl " << h << ") is " << levelAbove.size() );
 	}
 	return size;
 }//createTreeFromLeaves
@@ -65,11 +66,11 @@ IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vecto
 
 //WARNING: Needed that 'typename' to compile...
 template <typename IndexType, typename ValueType>
-std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType, ValueType>::createLevelAbove( const std::vector<commNode> levelBelow, IndexType hierLevel){
+std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType, ValueType>::createLevelAbove( const std::vector<commNode> levelBelow ){
 
-	unsigned int h = hierLevel;
-	unsigned int lvlBelowHierSize = levelBelow.begin()->hierarchy.size();
-	SCAI_ASSERT_GT_ERROR(lvlBelowHierSize, h, "Hierarchy sizes mismatch for level "<< hierLevel);
+	//unsigned int h = hierLevel;
+	//unsigned int lvlBelowHierSize = levelBelow.begin()->hierarchy.size();
+	//SCAI_ASSERT_GT_ERROR(lvlBelowHierSize, h, "Hierarchy sizes mismatch for level "<< hierLevel);
 
 	//the level above has this many nodes
 	//unsigned int aboveLevelSize = 0;
@@ -91,6 +92,7 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 
 		commNode thisNode = levelBelow[i];
 		commNode fatherNode = thisNode;
+		fatherNode.numChildren = 1;		//direct children are 0
 
 		//get the prefix of this node and store it
 		hierPrefix thisPrefix(thisNode.hierarchy.size()-1);
@@ -113,7 +115,7 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 			std::copy(otherNode.hierarchy.begin(), otherNode.hierarchy.end()-1, otherPrefix.begin());
 			//same prefix means that have the same father
 			if( thisPrefix==otherPrefix ){
-				fatherNode += otherNode;
+				fatherNode += otherNode;		//operator += overloading
 				seen[j] = true;
 				numChildren++;
 			}
@@ -123,7 +125,6 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 
 		aboveLevel.push_back(fatherNode);
 	}
-	PRINT("Size of level above (lvl " << h << ") is " << aboveLevel.size() );
 
 	return aboveLevel;
 }//createLevelAbove

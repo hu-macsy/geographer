@@ -16,6 +16,8 @@ struct commNode{
 	//TODO: probably, keeping all chidren is not necessary and uses a lot of space
 	// replace by keeping only the number of children
 	std::vector<unsigned int> children;
+	//this the number of direct children this nodes has
+	unsigned int numChildren;
 	unsigned int numCores;
 	unsigned int memMB;
 	ValueType relatSpeed;
@@ -28,6 +30,7 @@ struct commNode{
 		 unsigned int c, unsigned int m, ValueType rSp, bool isLeaf=true)
 	:	hierarchy(hier),
 		//children(children),
+		numChildren(0),
 		numCores(c),
 		memMB(m),
 		relatSpeed(rSp),
@@ -43,6 +46,7 @@ struct commNode{
 	//this constructor is supposed to be used for non-leaf nodes
 	commNode()
 	:	hierarchy( std::vector<unsigned int>(1,1)), //TODO: is this right?
+		numChildren(0), //TODO: check
 		numCores(0),
 		memMB(0),
 		relatSpeed(0.0),
@@ -52,10 +56,12 @@ struct commNode{
 		leafCount++;
 	}
 
+	//used to construct the father node from the children
 	commNode& operator+=( const commNode& c){
 		this->numCores += c.numCores;
 		this->memMB += c.memMB;
 		this->relatSpeed += c.relatSpeed;
+		this->numChildren++;
 		// by concention, leaf nodes have their id as their only child
 		this->children.insert( this->children.begin(), c.children.begin(), c.children.end() );
 		//nodes are added to form the upper level, so the result of
@@ -69,8 +75,14 @@ struct commNode{
 	*/
 	//TODO: probably children should be removed but this function is needed
 	//to know in how many new blocks each block will be partitioned.
-	IndexType numChildren() const{
+	IndexType numAncestors() const{
 		return children.size();
+	}
+
+	/** @brief The number of direct children of this node
+	*/
+	IndexType getNumChildren() const{
+		return numChildren;
 	}
 
 	void print(){
@@ -132,10 +144,10 @@ CommTree(std::vector<commNode> leaves);
 */
 IndexType createTreeFromLeaves( const std::vector<commNode> leaves);
 
-/* @brief takes a level of the tree and creates the level above it by 
+/* @brief Takes a level of the tree and creates the level above it by 
 grouping together nodes that have the same last hierarchy index
 */
-std::vector<commNode> createLevelAbove( const std::vector<commNode> levelBelow, IndexType hierLevel);
+static std::vector<commNode> createLevelAbove( const std::vector<commNode> levelBelow);
 
 /*@brief Print information for the tree
 */
