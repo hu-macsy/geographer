@@ -45,7 +45,10 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	std::vector<unsigned int> numBlocksPerPart;
 	unsigned int numOldBlocks;
 	unsigned int numNewTotalBlocks;//for debugging, printing
-	{
+	//TODO: this block-of-code is to calculate the numBlocksPerPart
+	//outside of the function this is (probably) known. Pass this 
+	//information as an input parameter?
+	{ 
 		std::vector<cNode> prevLevel = CommTree<IndexType, ValueType>::createLevelAbove( hierLevel );
 	
 		for( cNode c: prevLevel){
@@ -59,7 +62,8 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		const IndexType maxPart = partition.max();
 		SCAI_ASSERT_EQ_ERROR( numOldBlocks-1, maxPart, "The provided partition must have equal number of blocks as the length of the vector with the new number of blocks per part");
 	}
-	//SCAI_ASSERT_EQ_ERROR( numBlocksPerPart.size(), numOldBlocks )
+	SCAI_ASSERT_EQ_ERROR( numBlocksPerPart.size(), numOldBlocks, "Vector size mismatch" );
+
 	/*
 	SCAI_ASSERT_EQ_ERROR( coresPerBlock.size(), totalNumOfBlocks, "Must be provided a number of cores per new block. The size of the vector must be equal the total number on new blocks");
 	SCAI_ASSERT_EQ_ERROR( memPerBlock.size(), totalNumOfBlocks, "Must be provided a memory capacity per new block. The size of the vector must be equal the total number on new blocks");
@@ -238,6 +242,7 @@ PRINT(*comm <<": for block "<< b << " owns indices from " << rangeStart <<  " ti
 		//Later, we will scan the local points for their coordinates
 		for( unsigned int j=0; j<centersForThisBlock.size(); j++ ){
 			IndexType centerInd = centersForThisBlock[j];
+			counter = rangeStart;//reset counter for next center
 			//if center index for block b is owned by thisPE
 			if( centerInd>=rangeStart and centerInd<=rangeEnd){
 //PRINT(*comm << ": owns center with index " << centerInd << " for block " << b);				
@@ -246,7 +251,7 @@ PRINT(*comm <<": for block "<< b << " owns indices from " << rangeStart <<  " ti
 				//they belong to
 				scai::hmemo::ReadAccess<IndexType> localPart = partition.getLocalValues();
 				for(unsigned int i=0; i<localN; i++ ){
-					//consider points based on hteir sorted sfc index
+					//consider points based on their sorted sfc index
 					IndexType sortedIndex = sortedLocalIndices[i];
 					IndexType thisPointBlock = localPart[ sortedIndex ];
 					//TODO: remove assertion?
@@ -266,6 +271,7 @@ PRINT(*comm <<": adding center "<< centerInd << " with coordinates " << converte
 					}
 					counter++;
 				}//for i<localN
+				SCAI_ASSERT_LE_ERROR( counter, rangeEnd, "Within-block index out of bounds");
 			}//if center is local
 		}//for j<centersForThisBlock.size()
 	}//for b<numOldBlocks
@@ -1312,6 +1318,15 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 		//1- find initial centers for this hierarchy level
 		std::vector<std::vector<point>> groupOfCenters = findInitialCentersSFC( coordinates, minCoords, maxCoords, partition, thisLevel, settings );
+
+		SCAI_ASSERT_EQ_ERROR( groupOfCenters.size(), commTree.getHierLevel(h).size(), "Wrong number of blocks calculated" );
+		if( settings.debugMode ){
+			PRINT0("******* in debug mode");
+			for( unsigned int b=0; b<thisLevel.size(); b++ ){
+				std::vector<point> centers = groupOfCenters[b];
+				SCAI_ASSERT_EQ_ERROR( centers.size(), thisLevel[b].getNumChildren(), "Wrong number of centers for block " << b);
+			}
+		}
 
 		//2- main kmeans loop
 	}
