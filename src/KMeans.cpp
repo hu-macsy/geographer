@@ -1319,11 +1319,11 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		//1- find initial centers for this hierarchy level
 		std::vector<std::vector<point>> groupOfCenters = findInitialCentersSFC( coordinates, minCoords, maxCoords, partition, thisLevel, settings );
 
-		SCAI_ASSERT_EQ_ERROR( groupOfCenters.size(), commTree.getHierLevel(h).size(), "Wrong number of blocks calculated" );
+		SCAI_ASSERT_EQ_ERROR( groupOfCenters.size(), commTree.getHierLevel(h-1).size(), "Wrong number of blocks calculated" );
 		if( settings.debugMode ){
 			PRINT0("******* in debug mode");
 			for( unsigned int b=0; b<thisLevel.size(); b++ ){
-				std::vector<point> centers = groupOfCenters[b];
+				std::vector<point>& centers = groupOfCenters[b];
 				SCAI_ASSERT_EQ_ERROR( centers.size(), thisLevel[b].getNumChildren(), "Wrong number of centers for block " << b);
 			}
 		}
