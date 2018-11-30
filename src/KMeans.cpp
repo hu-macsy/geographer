@@ -120,6 +120,9 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	//every "subarray" has size numPEs+1 (in this example numPEs=3)
 	std::vector<IndexType> concatPrefixSumArray;
 
+	//TODO: convert vector above to a vector<vector> of size numPEs and every
+	// inner vector of size numOldBlocks?
+
 	{
 		std::vector<IndexType> oldBlockSizes( numOldBlocks, 0);
 		scai::hmemo::ReadAccess<IndexType> localPart = partition.getLocalValues();
@@ -168,7 +171,7 @@ for( unsigned int i=0; i<(numPEs+1)*numOldBlocks; i++){
 //		or numPEs*(b+1)+b = b*(numPEs+1)+numPEs
 			//concatPrefixSumArray[ numPEs*(b+1) ]
 			globalBlockSizes[b] = concatPrefixSumArray[(b+1)*numPEs+b];
-PRINT(*comm <<": "<< b*numPEs+numPEs << " -- " << globalBlockSizes[b] );
+//PRINT(*comm <<": "<< b*numPEs+numPEs << " -- " << globalBlockSizes[b] );
 			SCAI_ASSERT_EQ_ERROR( concatPrefixSumArray[b*(numPEs+1)] , 0, "Wrong concat prefix sum array, values at indices b*(numPEs+1) must be zero, Failed for b=" << b);
 		}
 		IndexType prefixSumCheckSum = std::accumulate( globalBlockSizes.begin(), globalBlockSizes.end(), 0 );
@@ -237,7 +240,7 @@ PRINT(*comm <<": for block "<< b << " owns indices from " << rangeStart <<  " ti
 			IndexType centerInd = centersForThisBlock[j];
 			//if center index for block b is owned by thisPE
 			if( centerInd>=rangeStart and centerInd<=rangeEnd){
-PRINT(*comm << ": owns center with index " << centerInd << " for block " << b);				
+//PRINT(*comm << ": owns center with index " << centerInd << " for block " << b);				
 				//since we own a center, go over all local points
 				//and calculate their within-block index for the block 
 				//they belong to
@@ -252,7 +255,6 @@ PRINT(*comm << ": owns center with index " << centerInd << " for block " << b);
 						continue;//not in desired block
 					}
 					
-					counter++;
 					IndexType withinBlockIndex = counter;
 					//desired center found
 					if( withinBlockIndex==centerInd ){
@@ -262,8 +264,9 @@ PRINT(*comm <<": adding center "<< centerInd << " with coordinates " << converte
 						numOwnedCenters++;
 						break;
 					}
+					counter++;
 				}//for i<localN
-			}
+			}//if center is local
 		}//for j<centersForThisBlock.size()
 	}//for b<numOldBlocks
 
