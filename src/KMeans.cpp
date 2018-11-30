@@ -39,11 +39,6 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	//global communicator
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-	//hrr: convention: graph is already partitioned. We call the already 
-	// known blocks as "parts". 
-
-
-	//hrr
 	//in how many blocks each known block (part) will be partitioned
 	//numBlocksPerPart[i]=k means that, current partition i should be 
 	//partitioned into k blocks
@@ -73,7 +68,7 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 
 
 	//convert coordinates, switch inner and outer order
-	std::vector<std::vector<ValueType> > convertedCoords( localN, std::vector<ValueType> (dimensions,0) );
+	std::vector<std::vector<ValueType> > convertedCoords( localN, std::vector<ValueType> (dimensions,0.0) );
 	//replaced next lines with the above constructor call
 	//for (IndexType i = 0; i < localN; i++) {
 	//	convertedCoords[i].resize(dimensions);
@@ -91,19 +86,20 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	//many times, not just once. Take the hilbert indices once
 	//outside the function and not every time is called
 
-	//get local hilbert indices
-	std::vector<ValueType> sfcIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector( coordinates, settings.sfcResolution, settings.dimensions);
-	SCAI_ASSERT_EQ_ERROR( sfcIndices.size(), localN, "wrong local number of indices (?) ");
+	//the local points but sorted according to the SFC
+	//needed to find the correct(based on the sfc ordering) center index
+	std::vector<IndexType> sortedLocalIndices(localN);
+	{
+		//get local hilbert indices
+		std::vector<ValueType> sfcIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector( coordinates, settings.sfcResolution, settings.dimensions);
+		SCAI_ASSERT_EQ_ERROR( sfcIndices.size(), localN, "wrong local number of indices (?) ");
 
-	//prepare indices for sorting
-	std::vector<IndexType> localIndices(localN);
-	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
-	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();;
-	std::iota(firstIndex, lastIndex, 0);
+		//prepare indices for sorting
+		std::iota( sortedLocalIndices.begin(), sortedLocalIndices.end(), 0);
 
-	//sort local indices according to SFC
-	std::sort(localIndices.begin(), localIndices.end(), [&sfcIndices](IndexType a, IndexType b){return sfcIndices[a] < sfcIndices[b];});
-
+		//sort local indices according to SFC
+		std::sort( sortedLocalIndices.begin(), sortedLocalIndices.end(), [&sfcIndices](IndexType a, IndexType b){return sfcIndices[a] < sfcIndices[b];});
+	}
 
 	//get prefix sum for every known block
 	//TODO: use a DenseVector in order to use the already implemented
@@ -180,7 +176,6 @@ PRINT(*comm <<": "<< b*numPEs+numPEs << " -- " << globalBlockSizes[b] );
 	}
 
 	//compute wanted indices for initial centers
-	//std::vector<IndexType> wantedIndices(k);
 	//newCenterIndWithinBLock[i] = a vector with the indices of the 
 	//centers for block i
 	//newCenterIndWithinBLock[i].size() = numBlocksPerPart[b], i.e., the 
@@ -205,24 +200,8 @@ PRINT0(oldInd << " __ new " << newCenterIndWithinBLock[b][i]);
 	}
 
 	const IndexType thisPE = comm->getRank();
-	// localRange[b], the indices range for block b for this PE
-	//std::vector<std::pair<IndexType,IndexType> localRange( numOldBlocks );
-	//keep a counter for every block that indicates the starting index
-	//for a block in this PE. Different starting value for each PE
-	std::vector<IndexType> counter( numOldBlocks );
 
-	//the center for each block that are local in this PE
-	std::vector<std::vector<IndexType>> ownedCentersPerBlock( numOldBlocks);
-	//first is the center index within its block, second the block number
-	//and third the vector index of the center in the block
-	//e.g.: if newCenterIndWithinBLock[b][i] = cent
-	//then ownedCentersPerBlock2[x]= { cent, b, i}
-	std::vector<std::tuple<IndexType,IndexType,IndexType>> ownedCentersPerBlock2;
-	//store the block this center belogns and the index in the 
-	//newCenterIndWithinBLock vector
-	std::vector<std::pair<IndexType,IndexType>> centerInfo;
-
-	//the centers to be returned, fill only with owned centers
+	//the centers to be returned, each PE fills only with owned centers
 	std::vector<std::vector<point>> centersPerNewBlock( numOldBlocks);
 	for( IndexType b=0; b<numOldBlocks; b++){
 		centersPerNewBlock[b].resize( numBlocksPerPart[b] , point(dimensions, 0.0) );
@@ -234,25 +213,29 @@ PRINT0(oldInd << " __ new " << newCenterIndWithinBLock[b][i]);
 
 	for( IndexType b=0; b<numOldBlocks; b++){
 		IndexType fromInd = b*(numPEs+1)+thisPE;
-assert( fromInd+1<concatPrefixSumArray.size() );
-		//the range of the indices for block b for this PE
-		//localRange[b].first = concatPrefixSumArray[ fromInd ];
+		assert( fromInd+1<concatPrefixSumArray.size() );
+		
+		//the range of the indices for block b for this PE		
 		IndexType rangeStart = concatPrefixSumArray[ fromInd ];
-		counter[b] = rangeStart;
-		//localRange[b].second = concatPrefixSumArray[ fromInd+1];
 		IndexType rangeEnd = concatPrefixSumArray[ fromInd+1];
 		sumOfRanges += rangeEnd-rangeStart;
+		//keep a counter that indicates the index of a point within
+		//a block in this PE.
+		IndexType counter = rangeStart;
 
 PRINT(*comm <<": for block "<< b << " owns indices from " << rangeStart <<  " till " << rangeEnd);
 	
-		//center indices for block b
-		std::vector<IndexType> centersForThisBlock = newCenterIndWithinBLock[b];
+		//center indices for block b, pass by reference so not to copy
+		const std::vector<IndexType>& centersForThisBlock = newCenterIndWithinBLock[b];
+
+		//TODO: optimize? Now, complexity is localN*number of owned centers
+		//can we do it with one linear scan?
 
 		//if some center indexes are local in this PE, store them.
 		//Later, we will scan the local points for their coordinates
 		for( unsigned int j=0; j<centersForThisBlock.size(); j++ ){
 			IndexType centerInd = centersForThisBlock[j];
-			//centerInd for block b is owned by thisPE
+			//if center index for block b is owned by thisPE
 			if( centerInd>=rangeStart and centerInd<=rangeEnd){
 PRINT(*comm << ": owns center with index " << centerInd << " for block " << b);				
 				//since we own a center, go over all local points
@@ -260,33 +243,29 @@ PRINT(*comm << ": owns center with index " << centerInd << " for block " << b);
 				//they belong to
 				scai::hmemo::ReadAccess<IndexType> localPart = partition.getLocalValues();
 				for(unsigned int i=0; i<localN; i++ ){
-					IndexType thisPointBlock = localPart[i];
+					//consider points based on hteir sorted sfc index
+					IndexType sortedIndex = sortedLocalIndices[i];
+					IndexType thisPointBlock = localPart[ sortedIndex ];
 					//TODO: remove assertion?
 					assert( thisPointBlock<numOldBlocks );
 					if( thisPointBlock!=b ){
 						continue;//not in desired block
 					}
 					
-					counter[ thisPointBlock ]++;
-					IndexType withinBlockIndex = counter[thisPointBlock];
+					counter++;
+					IndexType withinBlockIndex = counter;
 					//desired center found
 					if( withinBlockIndex==centerInd ){
 						//store center coords
-PRINT(*comm <<": adding center "<< centerInd << " with coordinates " << convertedCoords[i][0] << ", " << convertedCoords[i][1] );			
-						centersPerNewBlock[b][j] = convertedCoords[i];
+PRINT(*comm <<": adding center "<< centerInd << " with coordinates " << convertedCoords[sortedIndex][0] << ", " << convertedCoords[sortedIndex][1] );			
+						centersPerNewBlock[b][j] = convertedCoords[ sortedIndex ];
 						numOwnedCenters++;
 						break;
 					}
-				}
-				/*
-				ownedCentersPerBlock[b].push_back( centerInd );
-				//centerInd is in position newCenterIndWithinBLock[b][j]
-				centerInfo.push_back( std::make_pair(b,j));
-				ownedCentersPerBlock2.push_back( std::make_tuple( centerInd, b, j));
-				*/
+				}//for i<localN
 			}
-		}
-	}
+		}//for j<centersForThisBlock.size()
+	}//for b<numOldBlocks
 
 	SCAI_ASSERT_EQ_ERROR(sumOfRanges, localN, thisPE << ": Sum of owned number of points per block should be equal the total number of local points");
 PRINT( *comm << ": owns " << numOwnedCenters << " centers");
@@ -294,44 +273,27 @@ PRINT( *comm << ": owns " << numOwnedCenters << " centers");
 		SCAI_ASSERT_EQ_ERROR( comm->sum(numOwnedCenters), numNewTotalBlocks , "Not all centers were found");
 	}
 
+	//
 	//global sum operation. Doing it in a separate loop on purpose
 	//since different PEs own centers from different block and for most
 	//block they own no centers at all
+	//
+
 	for( IndexType b=0; b<numOldBlocks; b++){
-		//copy constructor not needed
-		//std::vector<point> centersOfThisBlock = centersPerNewBlock[b];
-		//get iterator to the beginning
-		//std::vector<point>::iterator thisBlockCentersIt = centersPerNewBlock[b].begin();
 
 		SCAI_ASSERT_EQ_ERROR( centersPerNewBlock[b][0].size(), dimensions, "Dimension mismatch for center" );
 		IndexType numCenters = centersPerNewBlock[b].size();
-/*
-//TODO: this reverse is not needed here
-//reverse vector order here?
 
-std::vector<std::vector<ValueType>> reversedCenters( dimensions, std::vector<ValueType>(numCenters, 0.0) );
-for( unsigned int c=0; c<numCenters; c++){
-	for( unsigned int d=0; d<dimensions; d++){
-		reversedCenters[d][c] = centersOfThisBlock[c][d];
-	}
-}
-for (IndexType d=0; d<dimensions; d++) {
-PRINT( *comm << ": " << reversedCenters[d].data()[0] << " _ " << numCenters);
-	//SCAI_ASSERT_EQ_ERROR( reversedCenters[d].data(), reversedCenters[d].data(), "Do not know");
-	comm->sumImpl( reversedCenters[d].data(), reversedCenters[d].data(), numCenters, scai::common::TypeTraits<ValueType>::stype );
-PRINT(*comm << ": "<< reversedCenters[d][2] );
-}
-*/
-		//without reversing vector order
-		//pach in a raw array
+		//pack in a raw array
 		std::vector<ValueType> allCenters( numCenters*dimensions );
-		//SCAI_ASSERT_EQ_ERROR( centersOfThisBlock.size(), dimensions, "Center dimensions mismatch" );
+
 		for( unsigned int c=0; c<numCenters; c++ ){
 			//this copies the point, this is unnecessary, TODO: fix
 			point thisCenter = centersPerNewBlock[b][c];
 			//copy this center
 			std::copy( thisCenter.begin(), thisCenter.end(), allCenters.begin() +c*dimensions );
 		}
+
 		//global sum
 		comm->sumImpl( allCenters.data(), allCenters.data(), numCenters*dimensions, scai::common::TypeTraits<ValueType>::stype  );
 
@@ -342,69 +304,11 @@ PRINT(*comm << ": "<< reversedCenters[d][2] );
 				centersPerNewBlock[b][c][d] = allCenters[ c*dimensions+d ];
 			}
 		}
-		//comm->sumImpl( centersOfThisBlock.data(), centersOfThisBlock.data(), centersOfThisBlock.size()*dimensions, scai::common::TypeTraits<ValueType>::stype  );
-
-//make the thing above work!
-//must re-reverse order !!!!!
-
-		
 	}
 
-
-	/* for every local point: get its block, 
-			calculate its index	within the block
-			check if this index is the index of a center
-	*/
-
-/*initial, older code
-	//setup general block distribution to model the space-filling curve
-	scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
-
-	//set local values in vector, leave non-local values with zero
-	std::vector<std::vector<ValueType>> result(dimensions);
-	for (IndexType d = 0; d < dimensions; d++) {
-		result[d].resize(k);
-	}
-
-	//check for all centers: if the index of a center is in this PE,
-	//add it to the results vector.
-	for (IndexType j = 0; j < k; j++) {
-		IndexType localIndex = blockDist->global2local(wantedIndices[j]);
-		if (localIndex != scai::invalidIndex) {
-			assert(localIndex < localN);
-			IndexType permutedIndex = localIndices[localIndex];
-			assert(permutedIndex < localN);
-			assert(permutedIndex >= 0);
-			for (IndexType d = 0; d < dimensions; d++) {		
-				result[d][j] = convertedCoords[permutedIndex][d];
-			}
-		}
-	}
-
-	//global sum operation
-	for (IndexType d = 0; d < dimensions; d++) {
-		comm->sumImpl(result[d].data(), result[d].data(), k, scai::common::TypeTraits<ValueType>::stype);
-	}
-*/
 	return centersPerNewBlock;
 }
 
-/*
-template<typename IndexType, typename ValueType>
-std::vector<std::vector<point>> findInitialCentersSFC(
-		const std::vector<DenseVector<ValueType> >& coordinates, 
-		const std::vector<ValueType> &minCoords,
-		const std::vector<ValueType> &maxCoords,
-		//const scai::lama::DenseVector<IndexType> &partition,
-		const CommTree<IndexType,ValueType> &commTree,
-		Settings settings) {
-
-		//set partition to 0 for all points
-		scai::lama::DenseVector<IndexType> partition( coordinates[0].getDistributionPtr(), 0);
-
-		cNode root = commTree.getRoot();
-}
-*/
 
 //overloaded function for non-hierarchical version. 
 //Set partition to 0 for all points
@@ -774,7 +678,7 @@ DenseVector<IndexType> assignBlocks(
 				ValueType time = balanceTime.count() ;
 				//std::cout<< comm->getRank()<< ": time " << time << std::endl;
 				//PRINT(comm->getRank() << ": in assignBlocks, balanceIter time: " << time << ", for loops: " << forLoopCnt );
-				ValueType maxTime = comm->max( time );
+				//ValueType maxTime = comm->max( time );
 				//PRINT0( "max time: " << maxTime << ", for loops: " << forLoopCnt );
 
 				SCAI_ASSERT_LT_ERROR( comm->getRank(), timePerPE.size(), "vector size mismatch" );

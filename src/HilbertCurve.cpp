@@ -576,7 +576,6 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
         std::vector<ValueType> localHilbertInd = HilbertCurve<IndexType,ValueType>::getHilbertIndexVector(coordinates, recursionDepth, dimensions);
         SCAI_ASSERT_EQ_ERROR(localHilbertInd.size(), localN, "Size mismatch");
 
-        ValueType point[dimensions];
         for (IndexType i = 0; i < localN; i++) {
 			localPairs[i].value = localHilbertInd[i];
         	localPairs[i].index = coordDist->local2global(i);
