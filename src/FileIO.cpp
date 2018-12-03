@@ -608,7 +608,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 		std::getline(ss, item, ' ');
 		globalM = std::stoll(item);
 		
-		if( globalN<=0 or globalM<=0 ){
+		if( globalN<=0 or globalM<0 ){
 			throw std::runtime_error("Negative input, maybe int value is not big enough: globalN= "
 			+ std::to_string(globalN) + " , globalM= " + std::to_string(globalM));
 		}
@@ -1055,7 +1055,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
         globalM = std::stoll(item);
     }
 
-	if( globalN<=0 or globalM<=0 ){
+	if( globalN<=0 or globalM<0 ){
 		throw std::runtime_error("Negative input, maybe int value is not big enough: globalN= " + std::to_string(globalN) + " , globalM= " + std::to_string(globalM));
 	}
 	
