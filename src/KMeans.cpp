@@ -889,8 +889,8 @@ DenseVector<IndexType> computePartition( \
 	const std::vector<DenseVector<ValueType>> &coordinates, \
 	const DenseVector<ValueType> &nodeWeights, \
 	const std::vector<IndexType> &blockSizes, \
-	std::vector<std::vector<ValueType> > centers, \
-	//scai::dmemo::CommunicatorPtr comm,
+	//std::vector<std::vector<ValueType> > centers, 
+	std::vector<point> centers, \
 	const Settings settings, \
 	struct Metrics &metrics ) {
 
@@ -1328,7 +1328,13 @@ DenseVector<IndexType> computeHierarchicalPartition(
 			}
 		}
 
+		//number of old, known blocks
+		IndexType numOldBlocks = groupOfCenters.size();
+
 		//2- main kmeans loop
+
+
+
 	}
 
 }

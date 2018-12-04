@@ -31,7 +31,7 @@ namespace KMeans {
 //TODO: any other more proper way to do this?
 //typedef typename CommTree<IndexType,ValueType>::commNode cNode;
 
-//typedef to make it more readable
+//to make it more readable
 using point = std::vector<ValueType>;
 
 
@@ -55,7 +55,7 @@ using point = std::vector<ValueType>;
  	const std::vector<DenseVector<ValueType>> &coordinates, \
  	const DenseVector<ValueType> &nodeWeights, \
  	const std::vector<IndexType> &blockSizes, \
- 	std::vector<std::vector<ValueType> > centers, \
+ 	std::vector<point> centers, \
  	const Settings settings, \
  	struct Metrics& metrics);
 
