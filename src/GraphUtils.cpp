@@ -2022,6 +2022,6 @@ template std::vector<ValueType> getBetweennessCentrality(const scai::lama::CSRSp
 
 
 //template class GraphUtils<int, double>;
-template class GraphUtils<long int, double>;
+template class GraphUtils<IndexType, ValueType>;
 
 } /* namespace ITI */
