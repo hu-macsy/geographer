@@ -848,7 +848,7 @@ std::cout<< std::endl;
 }
 
 
-template class HilbertCurve<long int, double>;
+template class HilbertCurve<IndexType, ValueType>;
 //this instantiation does not work
 //template class HilbertCurve<int, double>;
 
