@@ -1,3 +1,3 @@
 [submodule "RBC"]
-	path = RBC
+	path = src/RBC
 	url = https://github.com/kit-parco/RBC.git/
