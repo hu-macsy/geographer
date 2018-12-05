@@ -88,7 +88,7 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 		convertedCoords[i] = DenseVector<ValueType>(globalN,0);
 		potentials.getLocalRow(convertedCoords[i].getLocalValues(), i);
 	}
-	FileIO<IndexType, ValueType>::writeCoords(convertedCoords, "diffusion-coords.xyz");
+	FileIO<IndexType, ValueType>::writeCoords(convertedCoords, "partResults/diffusion-coords.xyz");
 
 }
 

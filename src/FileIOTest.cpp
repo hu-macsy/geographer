@@ -250,7 +250,7 @@ TEST_F(FileIOTest, testWriteCoordsDistributed){
     std::vector<DenseVector<ValueType>> coords2D = FileIO<IndexType, ValueType>::readCoords( coordFile, nodes, dim);
     EXPECT_TRUE(coords2D[0].getDistributionPtr()->isEqual(*distPtr));
     
-    FileIO<IndexType, ValueType>::writeCoordsDistributed( coords2D, dim, "writeCoordsDist");
+    FileIO<IndexType, ValueType>::writeCoordsDistributed( coords2D, dim, "partResults/writeCoordsDist");
     //TODO: delete files after they have been written!
 }
 //-------------------------------------------------------------------------------------------------
@@ -427,7 +427,7 @@ TEST_F(FileIOTest, testReadMatrixMarketFormat){
 
 TEST_F(FileIOTest, testReadBlockSizes){
     
-    std::string path = "./";
+    std::string path = "testing/";
     std::string blocksFile = path + "blockSizes.txt";
 
     std::vector<IndexType> blockSizes = FileIO<IndexType,ValueType>::readBlockSizes(blocksFile, 16);
@@ -573,7 +573,7 @@ TEST_F (FileIOTest, testWriteDenseVectorCentral){
         }
     }
 
-    FileIO<IndexType, ValueType>::writeDenseVectorCentral( partition, "testWriteDenseVectorCentral.part");
+    FileIO<IndexType, ValueType>::writeDenseVectorCentral( partition, "partResults/testWriteDenseVectorCentral.part");
     //TODO: maybe clean up?
 }
 
