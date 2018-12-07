@@ -18,6 +18,16 @@ using scai::IndexType;
 //using scai::ValueType;
 typedef double ValueType;
 
+/*The size of a point/vertex in the application. This is mainly (only)
+used for the mapping using the CommTree. Every node in the tree has a 
+memory variable that indicated the maximum allowed size of this PE or
+group of PEs. Remember, in the CommTree the leaves are the actual PEs
+and the other nodes are groups consisting of a number of PEs. Then,
+every PEs p, can contain at most p.memory/bytesPerVertex vertices.
+TODO: investigate the best value to use
+*/
+const bytesPerVertex = 8;
+
 namespace ITI{
 
 enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5, BINARY = 6, EDGELIST = 7, BINARYEDGELIST = 8, EDGELISTDIST = 9};

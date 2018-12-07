@@ -2052,7 +2052,6 @@ template std::vector<ValueType> getBetweennessCentrality(const scai::lama::CSRSp
 //} /*namespace GraphUtils*/
 
 
-//template class GraphUtils<int, double>;
 template class GraphUtils<IndexType, ValueType>;
 
 } /* namespace ITI */

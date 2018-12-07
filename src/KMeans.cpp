@@ -487,7 +487,9 @@ std::vector<std::vector<ValueType> > findCenters(
 template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(
 		const std::vector<std::vector<ValueType>>& coordinates,
-		const std::vector<std::vector<point>>& centers,
+
+const std::vector<std::vector<point>>& centersPerBlock,
+//		const std::vector<std::vector<point>>& centers,
 
 //hierar: maybe this is not needed and we use previousAssignment
 		//const DenseVector<IndexType>& partition, 
@@ -498,7 +500,8 @@ DenseVector<IndexType> assignBlocks(
 		const DenseVector<IndexType> &previousAssignment,
 
 //hierar: this is also changed or should be changed!		
-		const std::vector<IndexType> &targetBlockSizes,
+		//const std::vector<IndexType> &targetBlockSizes,
+const 
 
 		const SpatialCell &boundingBox,
 		std::vector<ValueType> &upperBoundOwnCenter,
@@ -520,9 +523,17 @@ DenseVector<IndexType> assignBlocks(
 //	const IndexType localN = nodeWeights.getLocalValues().size();
 
 //hierar: also k should be adapted
-	const IndexType k = targetBlockSizes.size();
+	//const IndexType k = targetBlockSizes.size();
+	const IndexType numOldBlocks= targetBlockSizes.size();
 
-	assert(influence.size() == k);
+	assert( influence.size() == numOldBlocks );
+	assert( centersPerBlock.size() == numOldBlocks );
+
+	//this check is done before. TODO: remove?
+	if( settings.debugMode ){
+		const IndexType maxPart = previousAssignment.max(); //global operation
+		SCAI_ASSERT_EQ_ERROR( numOldBlocks-1, maxPart, "The provided previous assignment must have equal number of blocks as the length of the vector with the new number of blocks per part");
+	}
 
 	//compute assignment and balance
 	DenseVector<IndexType> assignment = previousAssignment;
@@ -531,39 +542,68 @@ DenseVector<IndexType> assignBlocks(
 //hierar: with effectiveMinDistance.size( numOldBlocks ) , effectiveMinDistance[i].size()=newNumBlocks[b]
 
 	//pre-filter possible closest blocks
-	std::vector<ValueType> effectiveMinDistance(k);
-	std::vector<ValueType> minDistance(k);
-	{
+	//std::vector<ValueType> effectiveMinDistance(k);
+	//std::vector<ValueType> minDistance(k);
+	//hierar: A[b][c] the value for previous block b for new center c
+std::vector<std::vector<ValueType>> effectiveMinDistancePerBlock( numOldBlocks );
+std::vector<std::vector<ValueType>> minDistancePerBlock( numOldBlocks );
+
+	//for all old, known blocks
+	for(IndexType b=0; b<numOldBlocks; b++){
 		SCAI_REGION( "KMeans.assignBlocks.filterCenters" );
-		for (IndexType j = 0; j < k; j++) {
+		const unsigned int k = centersPerBlock[b]; // k for this block
+		std::vector<ValueType>& minDistance = minDistancePerBlock[b];
+		std::vector<ValueType>& effectiveMinDistance = effectiveMinDistancePerBlock[b]
+		minDistance.resize( k );
+		effectiveMinDistance( k );
+
+		for( IndexType j=0; j<k; j++ ){
+			/*
 			std::vector<ValueType> center(dim);
 			//TODO: this conversion into points is annoying. Maybe change coordinate format and use n in the outer dimension and d in the inner?
 			//Can even use points as data structure. Update: Tried it, gave no performance benefit.
 			for (IndexType d = 0; d < dim; d++) {
-				center[d] = centers[d][j];
+				center[d] = centersPerBlock[b][j][d];
 			}
+			*/
+			point center = centersPerBlock[b][j];
+			//minDistance[j] = boundingBox.distances(center).first;
 			minDistance[j] = boundingBox.distances(center).first;
-			assert(std::isfinite(minDistance[j]));
-			effectiveMinDistance[j] = minDistance[j]*minDistance[j]*influence[j];
-			assert(std::isfinite(effectiveMinDistance[j]));
+			assert( std::isfinite(minDistance[j]) );
+			//effectiveMinDistance[j] = minDistance[j]*minDistance[j]*influence[j];
+			effectiveMinDistancePerBlock[b][j] = minDistance[j]*minDistance[j]*influence[j];
+			assert( std::isfinite(effectiveMinDistancePerBlock[b][j]) );
 		}
 	}
 
 //hierar: must sort centers per old block
 
 	//sort centers according to their distance from the bounding box of this PE
-	std::vector<IndexType> clusterIndices(k);
-	std::iota(clusterIndices.begin(), clusterIndices.end(), 0);
-	std::sort(clusterIndices.begin(), clusterIndices.end(),
-			[&effectiveMinDistance](IndexType a, IndexType b){return effectiveMinDistance[a] < effectiveMinDistance[b] || (effectiveMinDistance[a] == effectiveMinDistance[b] && a < b);});
-	std::sort(effectiveMinDistance.begin(), effectiveMinDistance.end());
+	std::vector<std::vector<IndexType>> clusterIndicesPerBlock( numOldBlocks );
+	
+	//for all old, known blocks
+	for(IndexType b=0; b<numOldBlocks; b++){
+//hierar: I hope is more readable like this	
+		std::vector<IndexType>& clusterIndices = clusterIndicesPerBlock[b];
+		std::vector<ValueType>& minDistance = minDistancePerBlock[b];
+		std::vector<ValueType>& effectiveMinDistance = effectiveMinDistancePerBlock[b];
+		const unsigned int k = centersPerBlock[b]; //k for this block
+		clusterIndices.resize( k );
 
-	for (IndexType i = 0; i < k; i++) {
-		IndexType c = clusterIndices[i];
-		ValueType effectiveDist = minDistance[c]*minDistance[c]*influence[c];
-		SCAI_ASSERT_LT_ERROR( std::abs(effectiveMinDistance[i] - effectiveDist), 1e-5, "effectiveMinDistance[" << i << "] = " << effectiveMinDistance[i] << " != " << effectiveDist << " = effectiveDist");
+		std::iota(clusterIndices.begin(), clusterIndices.end(), 0);
+		std::sort(clusterIndices.begin(), clusterIndices.end(),
+				[&effectiveMinDistance](IndexType a, IndexType b){return effectiveMinDistance[a] < effectiveMinDistance[b] || (effectiveMinDistance[a] == effectiveMinDistance[b] && a < b);});
+		std::sort(effectiveMinDistance.begin(), effectiveMinDistance.end());
+
+		
+		for (IndexType i = 0; i < k; i++) {
+			IndexType c = clusterIndices[i];
+			ValueType effectiveDist = minDistance[c]*minDistance[c]*influence[c];
+			SCAI_ASSERT_LT_ERROR( std::abs(effectiveMinDistance[i] - effectiveDist), 1e-5, "effectiveMinDistance[" << i << "] = " << effectiveMinDistance[i] << " != " << effectiveDist << " = effectiveDist");
+		}
 	}
 
+/*
 	ValueType localSampleWeightSum = 0;
 	{
 		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
@@ -572,9 +612,25 @@ DenseVector<IndexType> assignBlocks(
 			localSampleWeightSum += rWeights[*it];
 		}
 	}
+*/	
 //hierar: this is also must be done per old block	
-	const ValueType totalWeightSum = comm->sum(localSampleWeightSum);
-	ValueType optSize = std::ceil(totalWeightSum / k );
+	//const ValueType totalWeightSum = comm->sum(localSampleWeightSum);
+
+optSize:used to, later, calculate imbalance. But it does not consider block weights
+This whole thing should be redesigned to take into account different block 
+sizes and memory constraints.
+
+we need maxAllowedSize to model memory capacities
+and optCompWeight to model the computational speed of a block
+
+	std::vector<ValueType> totalWeightSumPerBlock( numOldBlocks );
+	//this is for the homogeneous case
+	//ValueType optSize = std::ceil(totalWeightSum / k );
+
+std::vector<ValueType> maxWeightPerNewBlock( numOldBlocks );
+for( unsigned int b=0; b<numOldBlocks; b++){
+	maxWeightPerNewBlock.resize();
+}
 
 	//ValueType imbalance;
 	IndexType iter = 0;
@@ -1440,7 +1496,7 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 }
 
 
-/*
+
 template std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
 
 template std::vector<std::vector<ValueType> > findInitialCentersSFC<IndexType, ValueType>( const std::vector<DenseVector<ValueType> >& coordinates, const std::vector<ValueType> &minCoords,    const std::vector<ValueType> &maxCoords, Settings settings);
