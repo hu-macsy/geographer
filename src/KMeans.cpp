@@ -605,6 +605,7 @@ std::vector<std::vector<ValueType>> minDistancePerBlock( numOldBlocks );
 
 /*
 	ValueType localSampleWeightSum = 0;
+	IndexType localSampleNumPoints = 0;
 	{
 		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
 
@@ -631,6 +632,9 @@ std::vector<ValueType> maxWeightPerNewBlock( numOldBlocks );
 for( unsigned int b=0; b<numOldBlocks; b++){
 	maxWeightPerNewBlock.resize();
 }
+
+
+//****
 
 	//ValueType imbalance;
 	IndexType iter = 0;
@@ -1496,7 +1500,7 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 }
 
 
-
+/*
 template std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
 
 template std::vector<std::vector<ValueType> > findInitialCentersSFC<IndexType, ValueType>( const std::vector<DenseVector<ValueType> >& coordinates, const std::vector<ValueType> &minCoords,    const std::vector<ValueType> &maxCoords, Settings settings);
@@ -1515,6 +1519,7 @@ template DenseVector<IndexType> assignBlocks(
 
 
 template DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings, struct Metrics& metrics);
+*/
 
 }; // namespace KMeans
 

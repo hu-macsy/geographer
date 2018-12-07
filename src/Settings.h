@@ -26,7 +26,7 @@ and the other nodes are groups consisting of a number of PEs. Then,
 every PEs p, can contain at most p.memory/bytesPerVertex vertices.
 TODO: investigate the best value to use
 */
-const bytesPerVertex = 8;
+const IndexType bytesPerVertex = 8;
 
 namespace ITI{
 
