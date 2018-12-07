@@ -149,6 +149,20 @@ grouping together nodes that have the same last hierarchy index
 */
 static std::vector<commNode> createLevelAbove( const std::vector<commNode> levelBelow);
 
+/** How nodes of a hierarchy level are grouped together. A hierarchy level
+ is just a vector of nodes. Using the hierarchy prefix of a node, this
+ function computes how nodes of this level are grouped together.
+ ret.size() = the size of the previous level
+ ret.accumulate() = the size of this level
+ Example, if ret[0]=3 and ret[1]=2 that means that thisLevel[0,1,2] belonged
+ to the same node in the previous level, i.e., have the same father,
+ thisLevel[3,4] belonged to the same node, etc.
+
+@param[in] thisLevel The input hierarchy level of the the tree.
+@return A vector with the number of nodes for each group.
+*/
+static std::vector<unsigned int> getGrouping(const std::vector<commNode> thisLevel);
+
 /*@brief Print information for the tree
 */
 

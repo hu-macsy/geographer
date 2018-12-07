@@ -27,8 +27,8 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		const std::vector<ValueType> &minCoords,
 		const std::vector<ValueType> &maxCoords,
 		const scai::lama::DenseVector<IndexType> &partition,
-		//const std::vector<cNode> prevHierLevel,
 		const std::vector<cNode> hierLevel,
+		//std::vector<IndexType> numNewBlocksPerOldBlock,
 		Settings settings) {
 
 	SCAI_REGION( "KMeans.findInitialCentersSFC" );
@@ -39,44 +39,11 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	//global communicator
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-	//in how many blocks each known block (part) will be partitioned
-	//numBlocksPerPart[i]=k means that, current partition i should be 
-	//partitioned into k blocks
-	std::vector<unsigned int> numBlocksPerPart;
-	unsigned int numOldBlocks;
-	unsigned int numNewTotalBlocks;//for debugging, printing
-	//TODO: this block-of-code is to calculate the numBlocksPerPart
-	//outside of the function this is (probably) known. Pass this 
-	//information as an input parameter?
-	{ 
-		std::vector<cNode> prevLevel = CommTree<IndexType, ValueType>::createLevelAbove( hierLevel );
-	
-		for( cNode c: prevLevel){
-			numBlocksPerPart.push_back( c.getNumChildren() );
-		}
-		//the number of old blocks from the previous, provided partition
-		numOldBlocks = numBlocksPerPart.size();
-		numNewTotalBlocks = std::accumulate(numBlocksPerPart.begin(), numBlocksPerPart.end(), 0);
-		PRINT0("There are "  <<  numOldBlocks << " blocks from the previous partition and " << numNewTotalBlocks << " new blocks in total");
-
-		const IndexType maxPart = partition.max();
-		SCAI_ASSERT_EQ_ERROR( numOldBlocks-1, maxPart, "The provided partition must have equal number of blocks as the length of the vector with the new number of blocks per part");
-	}
-	SCAI_ASSERT_EQ_ERROR( numBlocksPerPart.size(), numOldBlocks, "Vector size mismatch" );
-
-	/*
-	SCAI_ASSERT_EQ_ERROR( coresPerBlock.size(), totalNumOfBlocks, "Must be provided a number of cores per new block. The size of the vector must be equal the total number on new blocks");
-	SCAI_ASSERT_EQ_ERROR( memPerBlock.size(), totalNumOfBlocks, "Must be provided a memory capacity per new block. The size of the vector must be equal the total number on new blocks");
-	SCAI_ASSERT_EQ_ERROR( speedPerBlock.size(), totalNumOfBlocks, "Must be provided a cpu speed per new block. The size of the vector must be equal the total number on new blocks");
-	*/
-
+	const std::vector<unsigned int> numNewBlocksPerOldBlock = CommTree<IndexType,ValueType>::getGrouping( hierLevel );
+	const unsigned int numOldBlocks = numNewBlocksPerOldBlock.size();
 
 	//convert coordinates, switch inner and outer order
 	std::vector<std::vector<ValueType> > convertedCoords( localN, std::vector<ValueType> (dimensions,0.0) );
-	//replaced next lines with the above constructor call
-	//for (IndexType i = 0; i < localN; i++) {
-	//	convertedCoords[i].resize(dimensions);
-	//}
 
 	for (IndexType d = 0; d < dimensions; d++) {
 		scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
@@ -106,7 +73,7 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	}
 
 	//get prefix sum for every known block
-	//TODO: use a DenseVector in order to use the already implemented
+	//TODO?: use a DenseVector in order to use the already implemented
 	//function MultiLevel::computeGlobalPrefixSum to get a global
 	//prefix sum.
 
@@ -185,7 +152,7 @@ for( unsigned int i=0; i<(numPEs+1)*numOldBlocks; i++){
 	//compute wanted indices for initial centers
 	//newCenterIndWithinBLock[i] = a vector with the indices of the 
 	//centers for block i
-	//newCenterIndWithinBLock[i].size() = numBlocksPerPart[b], i.e., the 
+	//newCenterIndWithinBLock[i].size() = numNewBlocksPerOldBlock[b], i.e., the 
 	// new number of blocks to partition previous block i
 	//ATTENTION: newCenterIndWithinBLock[i][j] = x: is the index of the 
 	//center within block i. If x is 30, then we want the 30-th point
@@ -196,11 +163,11 @@ for( unsigned int i=0; i<(numPEs+1)*numOldBlocks; i++){
 	//for all old blocks
 	for( IndexType b=0; b<numOldBlocks; b++){
 		//the number of centers for block b
-		IndexType k_b = numBlocksPerPart[b]; 
+		IndexType k_b = numNewBlocksPerOldBlock[b]; 
 		newCenterIndWithinBLock[b].resize( k_b );
 		for( IndexType i = 0; i < k_b; i++) {
 			//wantedIndices[i] = i * (globalN / k) + (globalN / k)/2;
-			IndexType oldInd= i * (globalN / k) + (globalN / k)/2;
+IndexType oldInd= i * (globalN / k) + (globalN / k)/2;
 			newCenterIndWithinBLock[b][i] = i*(globalBlockSizes[b]/k_b) + (globalBlockSizes[b]/k_b)/2;
 PRINT0(oldInd << " __ new " << newCenterIndWithinBLock[b][i]);
 		}
@@ -211,7 +178,7 @@ PRINT0(oldInd << " __ new " << newCenterIndWithinBLock[b][i]);
 	//the centers to be returned, each PE fills only with owned centers
 	std::vector<std::vector<point>> centersPerNewBlock( numOldBlocks);
 	for( IndexType b=0; b<numOldBlocks; b++){
-		centersPerNewBlock[b].resize( numBlocksPerPart[b] , point(dimensions, 0.0) );
+		centersPerNewBlock[b].resize( numNewBlocksPerOldBlock[b] , point(dimensions, 0.0) );
 	}
 
 	//for debugging
@@ -279,6 +246,7 @@ PRINT(*comm <<": adding center "<< centerInd << " with coordinates " << converte
 	SCAI_ASSERT_EQ_ERROR(sumOfRanges, localN, thisPE << ": Sum of owned number of points per block should be equal the total number of local points");
 PRINT( *comm << ": owns " << numOwnedCenters << " centers");
 	if( settings.debugMode ){
+		unsigned int numNewTotalBlocks = std::accumulate(numNewBlocksPerOldBlock.begin(), numNewBlocksPerOldBlock.end(), 0);
 		SCAI_ASSERT_EQ_ERROR( comm->sum(numOwnedCenters), numNewTotalBlocks , "Not all centers were found");
 	}
 
@@ -1273,6 +1241,9 @@ DenseVector<IndexType> computeHierarchicalPartition(
 	const Settings settings,
 	struct Metrics& metrics){
 
+	//check although numBlocks is not needed or used
+	SCAI_ASSERT_EQ_ERROR(settings.numBlocks, commTree.numLeaves, "The number of leaves and number of blocks must agree");
+
 	//get global communicator
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -1303,11 +1274,28 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 	//every point belongs to one block in the beginning
 	scai::lama::DenseVector<IndexType> partition( coordinates[0].getDistributionPtr(), 0);
+
 	//skip root. If we start from the root, we will know the number
 	//of blocks but not the memory and speed per block
 	for(unsigned int h=1; h<commTree.hierarchyLevels; h++ ){
 
+		/*
+		There are already as many blocks as the number of leaves
+		of the previous hierarchy level. The new number of blocks per
+		old block is prevLeaf.numChildren. Example, if previous level
+		had 3 leaves with 4, 6 and 10 children respectivelly, then
+		the number of new blocks that we will partition in this step is 
+		4 for block 0, 6 for block 1 and 10 for block 2, in total 20.
+		*/
+	
+		//in how many blocks each known block (part) will be partitioned
+		//numNewBlocksPerOldBlock[i]=k means that, current partition i should be 
+		//partitioned into k new blocks
+
+
 		std::vector<cNode> thisLevel = commTree.getHierLevel(h);
+		//IndexType numNewBlocks = thisLevel.size();
+
 		PRINT0("-- Hierarchy level " << h << " with " << thisLevel.size() << " number of nodes");
 		if( settings.debugMode ){
 			PRINT0("******* in debug mode");
@@ -1315,9 +1303,15 @@ DenseVector<IndexType> computeHierarchicalPartition(
 				c.print();
 			}
 		}
-
+		
+		//
 		//1- find initial centers for this hierarchy level
-		std::vector<std::vector<point>> groupOfCenters = findInitialCentersSFC( coordinates, minCoords, maxCoords, partition, thisLevel, settings );
+		//
+		//Only the new level is passed and the previous level is 
+		//reconstructed internally
+		//TODO?: change prototype so to accept two hierarchy levels as input?
+
+		std::vector<std::vector<point>> groupOfCenters = findInitialCentersSFC( coordinates, minCoords, maxCoords, partition, thisLevel, /*numNewBlocksPerOldBlock,*/ settings );
 
 		SCAI_ASSERT_EQ_ERROR( groupOfCenters.size(), commTree.getHierLevel(h-1).size(), "Wrong number of blocks calculated" );
 		if( settings.debugMode ){
@@ -1331,9 +1325,28 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		//number of old, known blocks
 		IndexType numOldBlocks = groupOfCenters.size();
 
+		std::vector<unsigned int> numNewBlocks = CommTree<IndexType, ValueType>::getGrouping( thisLevel );
+		SCAI_ASSERT_EQ_ERROR( numOldBlocks, numNewBlocks.size(), "Hierarchy level size mismatch" );
+
+		if( settings.debugMode ){
+			const IndexType maxPart = partition.max();
+			SCAI_ASSERT_EQ_ERROR( numOldBlocks-1, maxPart, "The provided partition must have equal number of blocks as the length of the vector with the new number of blocks per part");
+		}
+
+		//
 		//2- main kmeans loop
+		//
 
+		//TODO: probably blockSizes is not needed
 
+		std::vector<std::vector<IndexType>> newBlockSizes( numOldBlocks );
+		for( unsigned int i=0; i<numOldBlocks; i++ ){
+//I do not know
+newBlockSizes[i].resize( numNewBlocks[i], 1000 );
+//just to compile for now
+		}
+
+		partition = computePartition( coordinates, nodeWeights, newBlockSizes[0], groupOfCenters[0], settings, metrics );
 
 	}
 

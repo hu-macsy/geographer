@@ -225,7 +225,7 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 
 	struct Settings settings;
 	settings.dimensions = dimensions;
-	settings.numBlocks = comm->getSize();
+	settings.numBlocks = leaves.size();
 	settings.debugMode = false;
 	
 	Metrics metrics(settings);

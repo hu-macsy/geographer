@@ -82,7 +82,7 @@ DenseVector<IndexType> computePartition(
 	const Settings settings,
 	struct Metrics &metrics);
 
-//wrapper 2 - with CommTree
+
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierarchicalPartition(
 	std::vector<DenseVector<ValueType>> &coordinates,
@@ -133,8 +133,8 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		const std::vector<ValueType> &minCoords,
 		const std::vector<ValueType> &maxCoords,
 		const scai::lama::DenseVector<IndexType> &partition,
-		//const std::vector<cNode> prevHierarLevel,
 		const std::vector<cNode> hierLevel,
+//		std::vector<IndexType> numNewBlocksPerOldBlock,		
 		Settings settings);
 
 

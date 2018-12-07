@@ -131,6 +131,31 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
+std::vector<unsigned int> CommTree<IndexType, ValueType>::getGrouping(const std::vector<commNode> thisLevel){
+
+	std::vector<unsigned int> groupSizes;
+	//unsigned int prevLvlSize;
+	unsigned int numNewTotalNodes;//for debugging, printing
+
+	std::vector<cNode> prevLevel = createLevelAbove(thisLevel);
+
+	for( cNode c: prevLevel){
+		groupSizes.push_back( c.getNumChildren() );
+	}
+	//the number of old blocks from the previous, provided partition
+	//prevLvlSize = groupSizes.size();
+	numNewTotalNodes = std::accumulate(groupSizes.begin(), groupSizes.end(), 0);
+	//PRINT0("There are "  <<  prevLvlSize << " blocks from the previous partition and " << numNewTotalBlocks << " new blocks in total");
+	SCAI_ASSERT_EQ_ERROR( numNewTotalNodes, thisLevel.size(), "Vector size mismatch" );
+	SCAI_ASSERT_EQ_ERROR( groupSizes.size(), prevLevel.size(), "Vector size mismatch" );
+	//const IndexType maxPart = partition.max();
+	//SCAI_ASSERT_EQ_ERROR( prevLvlSize-1, maxPart, "The provided partition must have equal number of blocks as the length of the vector with the new number of blocks per part");
+	
+	return groupSizes;
+}//getGrouping
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
 void CommTree<IndexType, ValueType>::print(){
 
 	if( checkTree() ){
