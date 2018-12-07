@@ -856,9 +856,9 @@ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition( \
 	const std::vector<DenseVector<ValueType>> &coordinates, \
 	const DenseVector<ValueType> &nodeWeights, \
-	const std::vector<IndexType> &blockSizes, \
-	//std::vector<std::vector<ValueType> > centers, 
-	std::vector<point> centers, \
+	const std::vector<std::vector<IndexType>> &blockSizes, \
+	const DenseVector<IndexType> partition, \
+	std::vector<std::vector<point>> centers, \
 	const Settings settings, \
 	struct Metrics &metrics ) {
 
@@ -1194,23 +1194,6 @@ DenseVector<IndexType> computePartition( \
 
 //moved (7.11.18) from KMeans.h
 
-/**
- * @brief Get local minimum and maximum coordinates
- * TODO: This isn't used any more! Remove?
- */
-template<typename ValueType>
-std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates) {
-	const int dim = coordinates.size();
-	std::vector<ValueType> minCoords(dim);
-	std::vector<ValueType> maxCoords(dim);
-	for (int d = 0; d < dim; d++) {
-		minCoords[d] = coordinates[d].min();
-        maxCoords[d] = coordinates[d].max();
-		SCAI_ASSERT_NE_ERROR( minCoords[d], maxCoords[d], "min=max for dimension "<< d << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
-	}
-	return {minCoords, maxCoords};
-}
-
 
 //wrapper 1 - called initially with no centers parameter
 template<typename IndexType, typename ValueType>
@@ -1311,7 +1294,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		//reconstructed internally
 		//TODO?: change prototype so to accept two hierarchy levels as input?
 
-		std::vector<std::vector<point>> groupOfCenters = findInitialCentersSFC( coordinates, minCoords, maxCoords, partition, thisLevel, /*numNewBlocksPerOldBlock,*/ settings );
+		std::vector<std::vector<point>> groupOfCenters = findInitialCentersSFC( coordinates, minCoords, maxCoords, partition, thisLevel, settings );
 
 		SCAI_ASSERT_EQ_ERROR( groupOfCenters.size(), commTree.getHierLevel(h-1).size(), "Wrong number of blocks calculated" );
 		if( settings.debugMode ){
@@ -1322,14 +1305,14 @@ DenseVector<IndexType> computeHierarchicalPartition(
 			}
 		}
 
-		//number of old, known blocks
+		//number of old, known blocks == previous level size
 		IndexType numOldBlocks = groupOfCenters.size();
 
 		std::vector<unsigned int> numNewBlocks = CommTree<IndexType, ValueType>::getGrouping( thisLevel );
 		SCAI_ASSERT_EQ_ERROR( numOldBlocks, numNewBlocks.size(), "Hierarchy level size mismatch" );
 
 		if( settings.debugMode ){
-			const IndexType maxPart = partition.max();
+			const IndexType maxPart = partition.max(); //global operation
 			SCAI_ASSERT_EQ_ERROR( numOldBlocks-1, maxPart, "The provided partition must have equal number of blocks as the length of the vector with the new number of blocks per part");
 		}
 
@@ -1340,13 +1323,17 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		//TODO: probably blockSizes is not needed
 
 		std::vector<std::vector<IndexType>> newBlockSizes( numOldBlocks );
+		unsigned int CNind = 0;
 		for( unsigned int i=0; i<numOldBlocks; i++ ){
-//I do not know
-newBlockSizes[i].resize( numNewBlocks[i], 1000 );
-//just to compile for now
+			newBlockSizes[i].resize( numNewBlocks[i] );
+			for( unsigned int j=0; j<numNewBlocks[i]; j++){
+				newBlockSizes[i][j] = thisLevel[CNind].memMB;	
+				CNind++;
+			}			
 		}
+		SCAI_ASSERT_EQ_ERROR( CNind, thisLevel.size(), "Not all comm nodes are accounted for");
 
-		partition = computePartition( coordinates, nodeWeights, newBlockSizes[0], groupOfCenters[0], settings, metrics );
+		partition = computePartition( coordinates, nodeWeights, newBlockSizes, partition, groupOfCenters, settings, metrics );
 
 	}
 
@@ -1355,7 +1342,25 @@ newBlockSizes[i].resize( numNewBlocks[i], 1000 );
 //---------------------------------------
 
 
+/**
+ * @brief Get local minimum and maximum coordinates
+ * TODO: This isn't used any more! Remove?
+ */
+template<typename ValueType>
+std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates) {
+	const int dim = coordinates.size();
+	std::vector<ValueType> minCoords(dim);
+	std::vector<ValueType> maxCoords(dim);
+	for (int d = 0; d < dim; d++) {
+		minCoords[d] = coordinates[d].min();
+        maxCoords[d] = coordinates[d].max();
+		SCAI_ASSERT_NE_ERROR( minCoords[d], maxCoords[d], "min=max for dimension "<< d << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
+	}
+	return {minCoords, maxCoords};
+}
 
+
+/*
 template std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
 
 template std::vector<std::vector<ValueType> > findInitialCentersSFC<IndexType, ValueType>( const std::vector<DenseVector<ValueType> >& coordinates, const std::vector<ValueType> &minCoords,    const std::vector<ValueType> &maxCoords, Settings settings);

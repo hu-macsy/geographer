@@ -154,9 +154,9 @@ static std::vector<commNode> createLevelAbove( const std::vector<commNode> level
  function computes how nodes of this level are grouped together.
  ret.size() = the size of the previous level
  ret.accumulate() = the size of this level
- Example, if ret[0]=3 and ret[1]=2 that means that thisLevel[0,1,2] belonged
- to the same node in the previous level, i.e., have the same father,
- thisLevel[3,4] belonged to the same node, etc.
+ Example, if ret[0]=3, ret[1]=2 and ret[2]=3 that means that thisLevel[0,1,2] 
+ belonged  to the same node in the previous level, i.e., have the same father,
+ thisLevel[3,4] belonged to the same node, the same for thisLevel[5,6,7]  etc.
 
 @param[in] thisLevel The input hierarchy level of the the tree.
 @return A vector with the number of nodes for each group.
