@@ -9,6 +9,7 @@
 \usepackage{cleveref}
 \usepackage{color}
 \usepackage{subcaption}
+%\usepackage[T1]{fontenc}
 
 \author{Harry Tzovas}
 
@@ -212,6 +213,42 @@ MPI\_sum(centersForBlock[b]);;
 \caption{sketch code for findInitialCenters in hierarchical $k$-means}
 \end{algorithm}
 
+\paragraph{Data types} There can be several way to store the new centers for each of the old
+blocks. Suppose we are at hierarchy level $h$. We have already a partition from the previous 
+level in $k_{h-1}$ parts and the new number of all the blocks are $k_h$. Moreover, we calculate
+the number of new blocks each old block has. This is stored in a vector $A$ and is calculated
+using the function $A=$CommTree::getGrouping($L_h$), where $L_h$ is the vector with all the nodes
+in this hierarchy. $A.size()=k_{h-1}$ and $\sum A= k_h$.
+
+\subparagraph*{1)} To store the centers (and possibly other information needed) we can create a 2D vector:
+vector$<$vector$<$point$>>$ centersPerOldBlock( $h_{k-1}$ ), each row has size as many and the 
+new number of blocks: centersPerOldBlock[$i$].size()=$A[i]$ and centersPerOldBlock[i][j] is the 
+j-th new center of the i-th old block. 
+
+\subparagraph*{2)} Another way is to store in a 1D vector. By doing so, it is not clear which new 
+centers belong to which old block. So we need an additional vector to store the number of new blocks
+each old block has. In this version, vector$<$point$>$ allNewCenters($h_k$) and we have a second
+vector$<$int$>$ numNewCentersPerOldBlock($h_{k-1}$) and the i-th entry is the number of new
+block that the old block i should be partitioned into. Equivalently, we can transform the second
+array to a prefix sum, similar to the ia array of a CSR sparse matrix. Now, we have a 
+vector$<$int$>$ blockSizePrefixSum( $h_{k-1}+1$) and the new number of block for old block i
+is blockSizePrefixSum[i+1]-blockSizePrefixSum[i].
+
+An advantage of the first option, is that we only need to pass one argument to all function calls.
+Also, it seems more intuitive and easier to understand. Some draw backs is that some time we 
+need to convert it to a 1D array. This is mainly for global reduce operations. For example,
+the comm-$>$sum() function needs a raw array which is easy to provide with the second option
+by doing comm-$>$sum(blockSizePrefixSum.data()). In the first case, we need to transform the
+2D vector into a 1D array, do the sum and convert the result back tot 2D.
+Another case is when we assign points to centers. The new partition we are calculating assigns
+a block id to every point. Block ids are positive numbers up to $h_k-1$. In the first option,
+we need to calculate a 2D index from this since the vector's outer dimension is $h_{k-1}$.
+This can cause minor delays. Mostly, it requires to write more code, making it less readable.
+
+For these reasons, the second options seems more appropriate.
+A hybrid solution is to use the first option in function prototypes and convert to a 1D inside
+every function. 
+
 
 
 \subsection*{Assigning a block to every point}
@@ -266,6 +303,20 @@ and did not considered block weights. This must be changes so to consider two im
 block weights and block number of points.
 \\\todo{? should we keep an imbalance per old block or just one (or two here) global imbalance?}
 
+For the speed-weight balance: every tree node (PE or PEs) has a $0\leq s_i \leq 1$  property that 
+indicates it relative computation speed compared to the fastest PE. Slower PEs should get blocks
+that require less computational effort. From $s_i$ we must calculate an optimum (or maximum)
+weight for every block. Let $w_i$ be the optimum block weight that PE $i$ should have:
+$$
+w_i = s_i \frac{totalWeightSum}{\sum_{i=0}^k s_i}
+$$
+where $k$ is the number of PE in the current hierarchy level.
+
+The total weight of the points is different in every iteration of \km because we use sampling.
+So, $totalWeightSum$ is the weight of the sampled points. Outside of the \km loop we compute the 
+value $s_i/\sum s_i$ and store this value into $blockSizes$ vector and pass it to \km. Then,
+inside the \km iteration, we calculate the total weight of the sampled points, and the optimum
+block weight for tree node $i$ will be $blockSizes[i]*sampledPointsWeight$
 
 \begin{figure}
 \includegraphics[scale=0.7]{heterog_tree_part_with_PEs}

@@ -227,7 +227,10 @@ std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<V
  * @param[in] lastIndex end local node indices
  * @param[in] nodeWeights node weights
  * @param[in] previousAssignment previous assignment of points
- * @param[in] blockSizes target block sizes
+ * @param[in] blockSizesPerCent A value indicating a percentage per block of
+ the points weight. If, W is the sum of weights of all the points, then
+ for block i, its weight (sum of the weight of points in the block) must
+ be at most (or near) blockSizesPerCent[i]*W.
  * @param[in] boundingBox min and max coordinates of local points, used to compute distance bounds
  * @param[in,out] upperBoundOwnCenter for each point, an upper bound of the effective distance to its own center
  * @param[in,out] lowerBoundNextCenter for each point, a lower bound of the effective distance to the next-closest center
@@ -247,7 +250,8 @@ DenseVector<IndexType> assignBlocks(
 	const Iterator lastIndex,
 	const DenseVector<ValueType> &nodeWeights, 
 	const DenseVector<IndexType> &previousAssignment,
-	const std::vector<IndexType> &blockSizes,
+	//const std::vector<IndexType> &blockSizes,
+	const std::vector<std::vector<IndexType>> &blockSizesPerCent,
 	const SpatialCell &boundingBox,
 	std::vector<ValueType> &upperBoundOwnCenter,
 	std::vector<ValueType> &lowerBoundNextCenter,
