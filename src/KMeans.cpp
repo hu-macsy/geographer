@@ -487,12 +487,19 @@ std::vector<std::vector<ValueType> > findCenters(
 template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(
 		const std::vector<std::vector<ValueType>>& coordinates,
-		const std::vector<std::vector<ValueType>>& centers,
+		const std::vector<std::vector<point>>& centers,
+
+//hierar: maybe this is not needed and we use previousAssignment
+		//const DenseVector<IndexType>& partition, 
+
 		const Iterator firstIndex,
 		const Iterator lastIndex,
 		const DenseVector<ValueType> &nodeWeights,
 		const DenseVector<IndexType> &previousAssignment,
+
+//hierar: this is also changed or should be changed!		
 		const std::vector<IndexType> &targetBlockSizes,
+
 		const SpatialCell &boundingBox,
 		std::vector<ValueType> &upperBoundOwnCenter,
 		std::vector<ValueType> &lowerBoundNextCenter,
@@ -511,12 +518,17 @@ DenseVector<IndexType> assignBlocks(
 	const scai::dmemo::DistributionPtr dist = nodeWeights.getDistributionPtr();
 	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 //	const IndexType localN = nodeWeights.getLocalValues().size();
+
+//hierar: also k should be adapted
 	const IndexType k = targetBlockSizes.size();
 
 	assert(influence.size() == k);
 
 	//compute assignment and balance
 	DenseVector<IndexType> assignment = previousAssignment;
+
+//hierar: turn these to vector<vector<ValueType>> ??
+//hierar: with effectiveMinDistance.size( numOldBlocks ) , effectiveMinDistance[i].size()=newNumBlocks[b]
 
 	//pre-filter possible closest blocks
 	std::vector<ValueType> effectiveMinDistance(k);
@@ -537,6 +549,9 @@ DenseVector<IndexType> assignBlocks(
 		}
 	}
 
+//hierar: must sort centers per old block
+
+	//sort centers according to their distance from the bounding box of this PE
 	std::vector<IndexType> clusterIndices(k);
 	std::iota(clusterIndices.begin(), clusterIndices.end(), 0);
 	std::sort(clusterIndices.begin(), clusterIndices.end(),
@@ -557,6 +572,7 @@ DenseVector<IndexType> assignBlocks(
 			localSampleWeightSum += rWeights[*it];
 		}
 	}
+//hierar: this is also must be done per old block	
 	const ValueType totalWeightSum = comm->sum(localSampleWeightSum);
 	ValueType optSize = std::ceil(totalWeightSum / k );
 
@@ -573,15 +589,20 @@ DenseVector<IndexType> assignBlocks(
 	{
 		std::chrono::time_point<std::chrono::high_resolution_clock> balanceStart = std::chrono::high_resolution_clock::now();
 		SCAI_REGION( "KMeans.assignBlocks.balanceLoop" );
+
+//hierar: k to ???	Again, turn that to vector<vector<ValueType>> ???
 		std::vector<ValueType> blockWeights(k,0.0);
+
 		IndexType totalComps = 0;		
 		skippedLoops = 0;
 		IndexType balancedBlocks = 0;
 		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
+//hierar: assignement = previousAssignement		
 		scai::hmemo::WriteAccess<IndexType> wAssignment(assignment.getLocalValues());
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.assign" );
 			IndexType forLoopCnt = 0;
+			//for the sampled range
 			for (Iterator it = firstIndex; it != lastIndex; it++) {
 				++forLoopCnt;
 				const IndexType i = *it;
@@ -594,6 +615,7 @@ DenseVector<IndexType> assignBlocks(
 				} else {
 					ValueType sqDistToOwn = 0;
 					for (IndexType d = 0; d < dim; d++) {
+//hierar: centers[d] should (probably) change						
 						sqDistToOwn += std::pow(centers[d][oldCluster] - coordinates[d][i], 2);
 					}
 					ValueType newEffectiveDistance = sqDistToOwn*influence[oldCluster];
@@ -609,6 +631,7 @@ DenseVector<IndexType> assignBlocks(
 						IndexType secondBest = 0;
 						ValueType secondBestValue = std::numeric_limits<ValueType>::max();
 
+//hierar: must check only centers of his father in the hierarchy, not centers but centers[b] oder so
 						IndexType c = 0;
 						while(c < k && secondBestValue > effectiveMinDistance[c]) {
 							totalComps++;
@@ -621,6 +644,7 @@ DenseVector<IndexType> assignBlocks(
 							}
 
 							const ValueType effectiveDistance = sqDist*influence[j];
+							//update best and second-best centers
 							if (effectiveDistance < bestValue) {
 								secondBest = bestBlock;
 								secondBestValue = bestValue;
@@ -634,6 +658,7 @@ DenseVector<IndexType> assignBlocks(
 						}
 						assert(bestBlock != secondBest);
 						assert(secondBestValue >= bestValue);
+						//this point has a new center
 						if (bestBlock != oldCluster) {
 							if (bestValue < lowerBoundNextCenter[i]) {
 								std::cout << "bestValue: " << bestValue << " lowerBoundNextCenter[" << i << "]: "<< lowerBoundNextCenter[i];
@@ -644,6 +669,9 @@ DenseVector<IndexType> assignBlocks(
 
 						upperBoundOwnCenter[i] = bestValue;
 						lowerBoundNextCenter[i] = secondBestValue;
+//hierar: adapt, if left like that there will be multiple blocks with same id,
+//although they belong to different father. Do something like bestBlock= centerGlobalInd
+//where centerGlobalInd = centers[:b].sizes() + j						
 						wAssignment[i] = bestBlock;					
 					}
 				}
@@ -681,6 +709,7 @@ DenseVector<IndexType> assignBlocks(
 		double minRatio = std::numeric_limits<double>::max();
 		double maxRatio = -std::numeric_limits<double>::min();
 
+//hierar: again indexing based on k
 		for (IndexType j = 0; j < k; j++) {
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.influence" );
 			double ratio = ValueType(blockWeights[j]) / targetBlockSizes[j];
@@ -727,6 +756,7 @@ DenseVector<IndexType> assignBlocks(
 
 		//update possible closest centers
 		{
+//hierar: again indexing based on k			
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.filterCenters" );
 			for (IndexType j = 0; j < k; j++) {
 				effectiveMinDistance[j] = minDistance[j]*minDistance[j]*influence[j];
@@ -764,7 +794,7 @@ DenseVector<IndexType> assignBlocks(
 	metrics.numBalanceIter.push_back(iter);
 
 	return assignment;
-}
+}//assignBlocks
 
 /**
  */
@@ -857,7 +887,7 @@ DenseVector<IndexType> computePartition( \
 	const std::vector<DenseVector<ValueType>> &coordinates, \
 	const DenseVector<ValueType> &nodeWeights, \
 	const std::vector<std::vector<IndexType>> &blockSizes, \
-	const DenseVector<IndexType> partition, \
+	const DenseVector<IndexType> &partition, \
 	std::vector<std::vector<point>> centers, \
 	const Settings settings, \
 	struct Metrics &metrics ) {
@@ -865,8 +895,30 @@ DenseVector<IndexType> computePartition( \
 	SCAI_REGION( "KMeans.computePartition" );
 	std::chrono::time_point<std::chrono::high_resolution_clock> KMeansStart = std::chrono::high_resolution_clock::now();
 
-	const IndexType k = settings.numBlocks;
-	std::vector<ValueType> influence(k,1);
+//hierar: now k in not a number but a vector: the number of new blocks per old block
+	const IndexType numOldBlocks = centers.size();
+	if( settings.debugMode ){
+		const IndexType maxPart = partition.max(); //global operation
+		SCAI_ASSERT_EQ_ERROR( numOldBlocks-1, maxPart, "The provided partition must have equal number of blocks as the length of the vector with the new number of blocks per part");
+	}
+	
+	//the number of new blocks per old block and the total number of new blocks
+	vector<IndexType> newNumBlocks( numOldBlocks );
+	//in a sense, this is the new k = settings.numBlocks
+	IndexType totalNumNewBlocks = 0;
+
+	for( int i=0; i<numOldBlocks; i++ ){
+		newNumBlocks[i] = centers[i].size();
+		totalNumNewBlocks += newNumBlocks[i];
+	}
+
+//hierar: new influence?? a vector<vector<ValueType>> of influences?
+//or a vector<ValueType> but of size totalNumNewBlocks?
+//std::vector<ValueType> influence(k,1);
+//TODO: temp solution to compile at least
+	//TODO: must be adjustedBlockSizes.size()=influence.size()
+std::vector<ValueType> influence(totalNumNewBlocks,1);
+
 	const IndexType dim = coordinates.size();
 	assert(dim > 0);
 	const IndexType localN = nodeWeights.getLocalValues().size();
@@ -875,11 +927,16 @@ DenseVector<IndexType> computePartition( \
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	const IndexType p = comm->getSize();
-	const ValueType blocksPerProcess = ValueType(k)/p;
+	
 
+	//min and max for local part of the coordinates
 	std::vector<ValueType> minCoords(dim);
 	std::vector<ValueType> maxCoords(dim);
 	std::vector<std::vector<ValueType> > convertedCoords(dim);
+
+	
+//TODO: in the hierarchical version this will be done at every step.
+//move it outside the function?	
 
 	// copy and sort coordinates according to their hilbert index
 	{
@@ -946,6 +1003,8 @@ DenseVector<IndexType> computePartition( \
 		localVolume *= localDiff;
 	}
 
+//the bounding box is per PE. no need to change for the hierarchical version
+
 	QuadNodeCartesianEuclid boundingBox(minCoords, maxCoords);
     if (settings.verbose) {
 		std::cout << "(" << comm->getRank() << ", "<< localN << ")" << std::endl;
@@ -959,21 +1018,35 @@ DenseVector<IndexType> computePartition( \
 	std::vector<ValueType> upperBoundOwnCenter(localN, std::numeric_limits<ValueType>::max());
 	std::vector<ValueType> lowerBoundNextCenter(localN, 0);
 
+//hierar: sampling is done per block, so this must be adapted
+//or is it done per PE?	
+
 	//
 	//prepare sampling
 	//
+
 	std::vector<IndexType> localIndices(localN);
 	std::iota(localIndices.begin(), localIndices.end(), 0);
 
-	IndexType minNodes = settings.minSamplingNodes*blocksPerProcess;
+//hierar: in the heterogenous and hierarchical case, minSamplingNodes
+//makes more sense to be a percentage of the nodes, not a number. Or not?
+//hierar: number of sampling nodes is calculated per PE, right? not per block.
+	//const ValueType avgBlocksPerPE = ValueType(k)/p;
+	const ValueType avgBlocksPerPE = ValueType(totalNumNewBlocks)/p;
+//We can calculate preciselly the number of local old blocks using "partition"
+//but we will have to go over all local points
+	IndexType minNodes = settings.minSamplingNodes*avgBlocksPerPE;
 	if( settings.minSamplingNodes==-1 ){
 		minNodes = localN;
 	}
 
 	assert(minNodes > 0);
-	IndexType samplingRounds = 0;
+	IndexType samplingRounds = 0;	//number of rounds needed to see all points
 	std::vector<IndexType> samples;
-	std::vector<IndexType> adjustedBlockSizes(blockSizes);
+//hierar: blockSizes are now a vector<vector<int>>
+	//std::vector<IndexType> adjustedBlockSizes(blockSizes);
+std::vector<std::vector<IndexType>> adjustedBlockSizes(blockSizes);	
+
 	const bool randomInitialization = comm->all(localN > minNodes);
 
 	//perform sampling
@@ -987,7 +1060,10 @@ DenseVector<IndexType> computePartition( \
 			SCAI_ASSERT_EQ_ERROR(*std::max_element(localIndices.begin(), localIndices.end()), localN -1, "Error in index reordering");
 			SCAI_ASSERT_EQ_ERROR(*std::min_element(localIndices.begin(), localIndices.end()), 0, "Error in index reordering");
 
-			samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNodes*k)))+1;
+//hierar:
+			//samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNodes*k)))+1;
+samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNodes*totalNumNewBlocks)))+1;
+//
 			samples.resize(samplingRounds);
 			samples[0] = std::min(minNodes, localN);
 		}
@@ -998,6 +1074,7 @@ DenseVector<IndexType> computePartition( \
 		if (samplingRounds > 0 && settings.verbose) {
 			if (comm->getRank() == 0) std::cout << "Starting with " << samplingRounds << " sampling rounds." << std::endl;
 		}
+		//double the number of samples per round
 		for (IndexType i = 1; i < samplingRounds; i++) {
 			samples[i] = std::min(IndexType(samples[i-1]*2), localN);
 		}
@@ -1018,6 +1095,8 @@ DenseVector<IndexType> computePartition( \
 	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
 	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
 	ValueType imbalance = 1;
+
+//hierar: must this be result = partition?
 
 	// result[i]=b, means that point i belongs to cluster/block b
 	DenseVector<IndexType> result(coordinates[0].getDistributionPtr(), 0);
@@ -1158,7 +1237,7 @@ DenseVector<IndexType> computePartition( \
 		//	and keeps its initial value which is 0. So, the computeImbalance finds,
 		//	falsely, block 0 to be over weighted. We use the returned imabalance
 		//	from assign centers when sampling is used and we compute a new imbalance
-		// only when thene is no sampling
+		// only when there is no sampling
 		if( !randomInitialization ){
 			imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( result, settings.numBlocks, nodeWeights );
 		}
@@ -1190,7 +1269,7 @@ DenseVector<IndexType> computePartition( \
 	PRINT0("total KMeans time: " << time << " , number of iterations: " << iter );
 
 	return result;
-}
+}//computePartition
 
 //moved (7.11.18) from KMeans.h
 
@@ -1332,7 +1411,8 @@ DenseVector<IndexType> computeHierarchicalPartition(
 			}			
 		}
 		SCAI_ASSERT_EQ_ERROR( CNind, thisLevel.size(), "Not all comm nodes are accounted for");
-
+//TODO: settings.numBlocks is needed, but now this is a vector
+// either set appropriately(?) or do not use it in computePartition
 		partition = computePartition( coordinates, nodeWeights, newBlockSizes, partition, groupOfCenters, settings, metrics );
 
 	}

@@ -173,7 +173,10 @@ struct Settings{
     IndexType sfcResolution = 17;
 
     //tuning parameters balanced K-Means
-    IndexType minSamplingNodes = 100;
+//TODO?: in the heterogenous and hierarchical case, minSamplingNodes
+//makes more sense to be a percentage of the nodes, not a number. Or not?
+    IndexType minSamplingNodes = 100;	
+
     double influenceExponent = 0.5;
     double influenceChangeCap = 0.1;
     IndexType balanceIterations = 20;

@@ -54,10 +54,11 @@ using point = std::vector<ValueType>;
  DenseVector<IndexType> computePartition(
  	const std::vector<DenseVector<ValueType>> &coordinates, \
  	const DenseVector<ValueType> &nodeWeights, \
- 	const std::vector<IndexType> &blockSizes, \
- 	std::vector<point> centers, \
+ 	const std::vector<std::vector<IndexType>> &blockSizes, \
+ 	const DenseVector<IndexType>& partition,\
+ 	std::vector<std::vector<point>> centers, \
  	const Settings settings, \
- 	struct Metrics& metrics);
+ 	struct Metrics &metrics);
 
 /**
  * @brief Partition a point set using balanced k-means
@@ -103,11 +104,19 @@ DenseVector<IndexType> computeHierarchicalPartition(
  * @return partition
  */
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights,
-		const std::vector<IndexType> &blockSizes, const DenseVector<IndexType>& previous, const Settings settings);
+DenseVector<IndexType> computeRepartition(
+	const std::vector<DenseVector<ValueType>> &coordinates,
+	const DenseVector<ValueType> &nodeWeights,
+	const std::vector<IndexType> &blockSizes,
+	const DenseVector<IndexType> &previous,
+	const Settings settings);
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings, struct Metrics& metrics);
+DenseVector<IndexType> computeRepartition(
+	const std::vector<DenseVector<ValueType>> &coordinates,
+	const DenseVector<ValueType> &nodeWeights,
+	const Settings settings,
+	struct Metrics& metrics);
 
 
 
@@ -228,13 +237,25 @@ std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<V
  * @return assignment of points to blocks
  */
 template<typename IndexType, typename ValueType, typename Iterator>
-DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &coordinates, const std::vector<std::vector<ValueType> > &centers,
-		const Iterator firstIndex, const Iterator lastIndex,
-		const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment,
-		const std::vector<IndexType> &blockSizes,  const SpatialCell &boundingBox,
-		std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter,
-		std::vector<ValueType> &influence, ValueType &imbalance, std::vector<ValueType> &timePerPE,
-		Settings settings, Metrics &metrics);
+DenseVector<IndexType> assignBlocks(
+	const std::vector<std::vector<ValueType>> &coordinates,
+	const std::vector<std::vector<point>> &centers,
+//hierar: maybe this is not needed and we use previousAssignment	
+	//const DenseVector<IndexType>& partition, 
+	
+	const Iterator firstIndex,
+	const Iterator lastIndex,
+	const DenseVector<ValueType> &nodeWeights, 
+	const DenseVector<IndexType> &previousAssignment,
+	const std::vector<IndexType> &blockSizes,
+	const SpatialCell &boundingBox,
+	std::vector<ValueType> &upperBoundOwnCenter,
+	std::vector<ValueType> &lowerBoundNextCenter,
+	std::vector<ValueType> &influence,
+	ValueType &imbalance,
+	std::vector<ValueType> &timePerPE,
+	Settings settings,
+	Metrics &metrics);
 
 
 /**
