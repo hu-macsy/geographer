@@ -484,6 +484,8 @@ std::vector<std::vector<ValueType> > findCenters(
 	return result;
 }
 
+
+
 template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(
 		const std::vector<std::vector<ValueType>>& coordinates,
@@ -527,19 +529,52 @@ const std::vector<std::vector<IndexType>> &blockSizesPerCent,
 	assert( influence.size() == numOldBlocks );
 	assert( centersPerBlock.size() == numOldBlocks );
 
+	
+//I think the prefix sum is better
+//use prefix sum
+
 	//the new number of block each old blocks contains
-	std::vector<IndexType> numNewBlocksPerOldBlock( numOldBlocks );
+	//std::vector<IndexType> numNewBlocksPerOldBlock( numOldBlocks );
 	//the prefix sum of the vector above
 	std::vector<IndexType> blockSizesPrefixSum( numOldBlocks+1, 0 );
 	// numNewBlocks is equivalent to 'k' in the classic version
 	IndexType numNewBlocks = 0; //probably not really needed
+
 	for(IndexType b=0; b<numOldBlocks; b++){
-		numNewBlocksPerOldBlock[b] = centersPerBlock[b].size();
-		blockSizesPrefixSum[b+1] += blockSizesPrefixSum[b]+numNewBlocksPerOldBlock[b];
-		numNewBlocks += numNewBlocksPerOldBlock[b];
+	//	numNewBlocksPerOldBlock[b] = centersPerBlock[b].size();
+		blockSizesPrefixSum[b+1] += blockSizesPrefixSum[b]+centersPerBlock[b].size();
+		numNewBlocks += centersPerBlock[b].size();
 	}
+	SCAI_ASSERT_EQ_ERROR( blockSizesPrefixSum.back(), numNewBlocks, "Total number of new blocks mismatch" );
 
 PRINT(*comm <<": num old blocks= "<< numOldBlocks << ", total number of new blocks " << numNewBlocks );
+
+	//convert 2D centersPerBlock to 1D vector (array).TODO: Use one of the two versions
+	std::vector<point> centers1DVector;
+	for(int b=0; b<numOldBlocks; b++){
+		//k for this (old) block
+		const unsigned int k = blockSizesPrefixSum[b+1]-blockSizesPrefixSum[b];
+		assert( k== centersPerBlock[b].size() ); //not really needed, TODO: remove?
+		for (IndexType i=0; i<k; i++) {
+			centers1DVector.push_back( centersPerBlock[b][i] );
+		}
+	}
+	SCAI_ASSERT_EQ_ERROR( centers1D.size(), numNewBlocks, "Vector size mismatch" );
+
+	//convert 2D influence to 1D vector (array).TODO: Use one of the two versions
+	std::vector<point> influence1DVector;
+	for(int b=0; b<numOldBlocks; b++){
+		//k for this (old) block
+		const unsigned int k = blockSizesPrefixSum[b+1]-blockSizesPrefixSum[b];
+		assert( k== influence[b].size() ); //not really needed, TODO: remove?
+		for (IndexType i=0; i<k; i++) {
+			influence1DVector.push_back( influence[b][i] );
+		}
+	}
+	SCAI_ASSERT_EQ_ERROR( influence1DVector.size(), numNewBlocks, "Vector size mismatch" );
+
+
+
 
 
 	//this check is done before. TODO: remove?
@@ -548,39 +583,51 @@ PRINT(*comm <<": num old blocks= "<< numOldBlocks << ", total number of new bloc
 		SCAI_ASSERT_EQ_ERROR( numOldBlocks-1, maxPart, "The provided previous assignment must have equal number of blocks as the length of the vector with the new number of blocks per part");
 	}
 
-//hierar: turn these to vector<vector<ValueType>> ??
-//hierar: with effectiveMinDistance.size( numOldBlocks ) , effectiveMinDistance[i].size()=newNumBlocks[b]
-
 	//pre-filter possible closest blocks
 	//std::vector<ValueType> effectiveMinDistance(k);
 	//std::vector<ValueType> minDistance(k);
 	//hierar: A[b][c] the value for previous block b for new center c
-std::vector<std::vector<ValueType>> effectiveMinDistancePerBlock( numOldBlocks );
-std::vector<std::vector<ValueType>> minDistancePerBlock( numOldBlocks );
 
-if we use 1D arrays and the prefix sum, these vectors mut be adapted too
-and clusterIndicesPerBlock below
+//std::vector<std::vector<ValueType>> effectiveMinDistancePerBlock( numOldBlocks );
+//std::vector<std::vector<ValueType>> minDistancePerBlock( numOldBlocks );
+
+//if we use 1D arrays and the prefix sum, vectors above mut be adapted too
+//and clusterIndicesPerBlock below
+
+std::vector<ValueType> minDistanceAllBlocks( numNewBlocks );
+std::vector<ValueType> effectiveMinDistanceAllBlocks( numNewBlocks );
 
 	//for all old, known blocks
-	for(IndexType b=0; b<numOldBlocks; b++){
+	//for(IndexType b=0; b<numOldBlocks; b++){
+	for( IndexType newB=0; newB<numNewBlocks; newB++ ){
 		SCAI_REGION( "KMeans.assignBlocks.filterCenters" );
-		const unsigned int k = numNewBlocksPerOldBlock[b]; // k for this block
-const unsigned int k1 = blockSizesPrefixSum[b+1]-blockSizesPrefixSum[b];
-assert( k==k1 );
-		std::vector<ValueType>& minDistance = minDistancePerBlock[b];
-		std::vector<ValueType>& effectiveMinDistance = effectiveMinDistancePerBlock[b];
-		minDistance.resize( k );
-		effectiveMinDistance( k );
+		//const unsigned int k = numNewBlocksPerOldBlock[b]; // k for this block
+		//k: the number of blocks that this (old) block should be partitioned to
+		//const unsigned int k = blockSizesPrefixSum[b+1]-blockSizesPrefixSum[b];
 
+		//std::vector<ValueType>& minDistance = minDistancePerBlock[b];
+		//std::vector<ValueType>& effectiveMinDistance = effectiveMinDistancePerBlock[b];
+		//minDistance.resize( k );
+		//effectiveMinDistance( k );
+
+		point center = centers1DVector[thisB];
+		minDistanceAllBlocks[newB] = boundingBox.distances(center).first;
+		assert( std::isfinite(minDistance[j]) );
+		effectiveMinDistancePerBlocks[newB] = minDistanceAllBlocks[j]\
+			*minDistanceAllBlocks[j]\
+			*influence1DVector[j];
+		assert( std::isfinite(effectiveMinDistancePerBlocks[b][j]) );
+
+/*
 		for( IndexType j=0; j<k; j++ ){
-			/*
-			std::vector<ValueType> center(dim);
+			// 
+			// std::vector<ValueType> center(dim);
 			//TODO: this conversion into points is annoying. Maybe change coordinate format and use n in the outer dimension and d in the inner?
 			//Can even use points as data structure. Update: Tried it, gave no performance benefit.
-			for (IndexType d = 0; d < dim; d++) {
-				center[d] = centersPerBlock[b][j][d];
-			}
-			*/
+			// for (IndexType d = 0; d < dim; d++) {
+				// center[d] = centersPerBlock[b][j][d];
+			// }
+			//
 			point center = centersPerBlock[b][j];
 			//minDistance[j] = boundingBox.distances(center).first;
 			minDistance[j] = boundingBox.distances(center).first;
@@ -589,22 +636,30 @@ assert( k==k1 );
 			effectiveMinDistancePerBlock[b][j] = minDistance[j]*minDistance[j]*influence[j];
 			assert( std::isfinite(effectiveMinDistancePerBlock[b][j]) );
 		}
+*/		
 	}
 
 //hierar: must sort centers per old block
 
 	//sort centers according to their distance from the bounding box of this PE
-	std::vector<std::vector<IndexType>> clusterIndicesPerBlock( numOldBlocks );
+	//std::vector<std::vector<IndexType>> clusterIndicesPerBlock( numOldBlocks );
+	std::vector<IndexType> clusterIndicesAllBlocks( numNewBlocks );
 	
+	for( IndexType newB=0; newB<numNewBlocks; newB++ ){
+
+	}
+
+maybe clusterIndices makes sense to stay as a vector<vector<>>
+
 	//for all old, known blocks
 	for(IndexType b=0; b<numOldBlocks; b++){
 //hierar: I hope is more readable like this	
 		std::vector<IndexType>& clusterIndices = clusterIndicesPerBlock[b];
-		std::vector<ValueType>& minDistance = minDistancePerBlock[b];
-		std::vector<ValueType>& effectiveMinDistance = effectiveMinDistancePerBlock[b];
-		const unsigned int k = numNewBlocksPerOldBlock[b]; //k for this (old) block
-const unsigned int k1 = blockSizesPrefixSum[b+1]-blockSizesPrefixSum[b];
-assert( k==k1 );
+		const std::vector<ValueType>& minDistance = minDistancePerBlock[b];
+		const std::vector<ValueType>& effectiveMinDistance = effectiveMinDistancePerBlock[b];
+		//const unsigned int k = numNewBlocksPerOldBlock[b]; //k for this (old) block
+const unsigned int k = blockSizesPrefixSum[b+1]-blockSizesPrefixSum[b];
+//assert( k==k1 );
 
 		clusterIndices.resize( k );
 
@@ -660,15 +715,6 @@ and optCompWeight to model the computational speed of a block
 
 //****
 
-//convert 2D centersPerBlock to 1D vector (array). Use one ofthe two versions
-std::vector<point> centersArray;
-for(int b=0; b<numOldBlocks; b++){
-	const unsigned int k = numNewBlocksPerOldBlock[b];  //k for this (old) block
-	for (IndexType i=0; i<k; i++) {
-		centersArray.push_back( centersPerBlock[b][i] );
-	}
-}
-SCAI_ASSERT_EQ_ERROR( centers1D.size(), numNewBlocks, "Vector size mismatch" );
 
 	//ValueType imbalance;
 	IndexType iter = 0;
@@ -714,7 +760,7 @@ blockSizesPrefixSum
 				} else {
 					ValueType sqDistToOwn = 0;
 //hierar: or use the 2D vector centersPerBlock					
-point myCenter = centersArray[oldCluster];
+point myCenter = centers1DVector[oldCluster];
 					for (IndexType d = 0; d < dim; d++) {		
 						sqDistToOwn += std::pow(myCenter[d]-coordinates[d][i], 2);
 					}
