@@ -574,9 +574,6 @@ PRINT(*comm <<": num old blocks= "<< numOldBlocks << ", total number of new bloc
 	SCAI_ASSERT_EQ_ERROR( influence1DVector.size(), numNewBlocks, "Vector size mismatch" );
 
 
-
-
-
 	//this check is done before. TODO: remove?
 	if( settings.debugMode ){
 		const IndexType maxPart = previousAssignment.max(); //global operation
@@ -595,7 +592,7 @@ PRINT(*comm <<": num old blocks= "<< numOldBlocks << ", total number of new bloc
 //and clusterIndicesPerBlock below
 
 std::vector<ValueType> minDistanceAllBlocks( numNewBlocks );
-std::vector<ValueType> effectiveMinDistanceAllBlocks( numNewBlocks );
+std::vector<ValueType> effectMinDistAllBlocks( numNewBlocks );
 
 	//for all old, known blocks
 	//for(IndexType b=0; b<numOldBlocks; b++){
@@ -613,10 +610,10 @@ std::vector<ValueType> effectiveMinDistanceAllBlocks( numNewBlocks );
 		point center = centers1DVector[thisB];
 		minDistanceAllBlocks[newB] = boundingBox.distances(center).first;
 		assert( std::isfinite(minDistance[j]) );
-		effectiveMinDistancePerBlocks[newB] = minDistanceAllBlocks[j]\
+		effectMinDistAllBlocks[newB] = minDistanceAllBlocks[j]\
 			*minDistanceAllBlocks[j]\
 			*influence1DVector[j];
-		assert( std::isfinite(effectiveMinDistancePerBlocks[b][j]) );
+		assert( std::isfinite(effectMinDistAllBlocks[b][j]) );
 
 /*
 		for( IndexType j=0; j<k; j++ ){
@@ -644,13 +641,44 @@ std::vector<ValueType> effectiveMinDistanceAllBlocks( numNewBlocks );
 	//sort centers according to their distance from the bounding box of this PE
 	//std::vector<std::vector<IndexType>> clusterIndicesPerBlock( numOldBlocks );
 	std::vector<IndexType> clusterIndicesAllBlocks( numNewBlocks );
-	
-	for( IndexType newB=0; newB<numNewBlocks; newB++ ){
+	//cluster indices are "global": from 0 to numNewBlocks
+	std::iota( clusterIndicesAllBlocks.begin(), clusterIndicesAllBlocks.end(), 0);
 
+	for( IndexType oldB=0; oldB<numOldBlocks; oldB++ ){
+		const unsigned int rangeStart = blockSizesPrefixSum[oldB];
+		const unsigned int rangeEnd = blockSizesPrefixSum[oldB+1];
+		std::vector<IndexType>::iterator startIt = clusterIndicesAllBlocks.begin()+rangeStart;
+		std::vector<IndexType>::iterator endIt = clusterIndicesAllBlocks.begin()+rangeEnd;
+		//TODO: remove not needed assertions
+		SCAI_ASSERT_LT_ERROR( rangeStart, rangeEnd, "Prefix sum vectos is wrong");
+		SCAI_ASSERT_LT_ERROR( rangeEnd, numNewBlocks, "Range out of bounds" );
+		SCAI_ASSERT_ERROR( endIt!=clusterIndicesAllBlocks.end(), "Iterator out of bounds");
+
+		//sort the part of the indices that belong to this old block
+		std::sort( startIt, endIt, 
+			[&](IndexType a, IndexType b){
+				return effectMinDistAllBlocks[a] < effectMinDistAllBlocks[b] \
+				|| (effectMinDistAllBlocks[a] == effectMinDistAllBlocks[b] && a < b);
+			}
+		);
+		//sort also this part of the distances
+		//TODO: is this sorting needed?
+		//TODO: is it correct to sort? if we sort, effectMinDistAllBlocks[clusterInd[i]] will be wrong, I think effectMinDistAllBlocks[i] will be correct
+		std::sort( effectMinDistAllBlocks.begin()+rangeStart, effectMinDistAllBlocks.begin()+rangeStart);
+
+		//just for checking
+		for (IndexType i=rangeStart; i<rangeEnd; i++) {
+			IndexType c=clusterIndicesAllBlocks[i];
+			ValueType effectiveDist = minDistanceAllBlocks[c]\
+				*minDistanceAllBlocks[c]*influence1DVector[c];
+			SCAI_ASSERT_LT_ERROR( std::abs(effectMinDistAllBlocks[i] - effectiveDist), 1e-5, "effectiveMinDistance[" << i << "] = " << effectMinDistAllBlocks[i] << " != " << effectiveDist << " = effectiveDist");
+		}
 	}
 
-maybe clusterIndices makes sense to stay as a vector<vector<>>
+//TODO?:maybe clusterIndices makes sense to stay as a vector<vector<>> ?
 
+/*
+//previous version with 2D vector
 	//for all old, known blocks
 	for(IndexType b=0; b<numOldBlocks; b++){
 //hierar: I hope is more readable like this	
@@ -674,10 +702,10 @@ const unsigned int k = blockSizesPrefixSum[b+1]-blockSizesPrefixSum[b];
 			SCAI_ASSERT_LT_ERROR( std::abs(effectiveMinDistance[i] - effectiveDist), 1e-5, "effectiveMinDistance[" << i << "] = " << effectiveMinDistance[i] << " != " << effectiveDist << " = effectiveDist");
 		}
 	}
-
+*/
 
 	ValueType localSampleWeightSum = 0;
-	IndexType localSampleNumPoints = lastIndex-firstIndex;
+	//IndexType localSampleNumPoints = lastIndex-firstIndex;
 	{
 		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
 
@@ -686,7 +714,7 @@ const unsigned int k = blockSizesPrefixSum[b+1]-blockSizesPrefixSum[b];
 		}
 	}
 	
-//hierar: this is also must be done per old block	
+//hierar: does this also must be done per old block?
 	const ValueType totalWeightSum = comm->sum(localSampleWeightSum);
 
 	//this is for the homogeneous case
@@ -734,7 +762,7 @@ and optCompWeight to model the computational speed of a block
 		SCAI_REGION( "KMeans.assignBlocks.balanceLoop" );
 
 //hierar: k to ???	Again, turn that to vector<vector<ValueType>> ???
-		std::vector<ValueType> blockWeights(k,0.0);
+		std::vector<ValueType> blockWeights( numNewBlocks, 0.0 );
 
 		IndexType totalComps = 0;		
 		skippedLoops = 0;
@@ -823,7 +851,7 @@ point myCenter = centers1DVector[oldCluster];
 					}
 				}
 				blockWeights[wAssignment[i]] += rWeights[i];
-			}//for
+			}//for sampled indices
 			
 			if (settings.verbose) {
 				std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
@@ -840,7 +868,7 @@ point myCenter = centers1DVector[oldCluster];
 			//aux<IndexType,ValueType>::timeMeasurement(balanceStart);
 
 			comm->synchronize();
-		}
+		}// assignnment block
 
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.blockWeightSum" );
