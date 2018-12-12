@@ -580,32 +580,20 @@ PRINT(*comm <<": num old blocks= "<< numOldBlocks << ", total number of new bloc
 		SCAI_ASSERT_EQ_ERROR( numOldBlocks-1, maxPart, "The provided previous assignment must have equal number of blocks as the length of the vector with the new number of blocks per part");
 	}
 
-	//pre-filter possible closest blocks
-	//std::vector<ValueType> effectiveMinDistance(k);
-	//std::vector<ValueType> minDistance(k);
-	//hierar: A[b][c] the value for previous block b for new center c
-
+//hierar: A[b][c] the value for previous block b for new center c
 //std::vector<std::vector<ValueType>> effectiveMinDistancePerBlock( numOldBlocks );
 //std::vector<std::vector<ValueType>> minDistancePerBlock( numOldBlocks );
 
-//if we use 1D arrays and the prefix sum, vectors above mut be adapted too
+//if we use 1D arrays and the prefix sum, vectors above must be adapted too
 //and clusterIndicesPerBlock below
 
+//pre-filter possible closest blocks
 std::vector<ValueType> minDistanceAllBlocks( numNewBlocks );
 std::vector<ValueType> effectMinDistAllBlocks( numNewBlocks );
 
 	//for all old, known blocks
-	//for(IndexType b=0; b<numOldBlocks; b++){
 	for( IndexType newB=0; newB<numNewBlocks; newB++ ){
 		SCAI_REGION( "KMeans.assignBlocks.filterCenters" );
-		//const unsigned int k = numNewBlocksPerOldBlock[b]; // k for this block
-		//k: the number of blocks that this (old) block should be partitioned to
-		//const unsigned int k = blockSizesPrefixSum[b+1]-blockSizesPrefixSum[b];
-
-		//std::vector<ValueType>& minDistance = minDistancePerBlock[b];
-		//std::vector<ValueType>& effectiveMinDistance = effectiveMinDistancePerBlock[b];
-		//minDistance.resize( k );
-		//effectiveMinDistance( k );
 
 		point center = centers1DVector[thisB];
 		minDistanceAllBlocks[newB] = boundingBox.distances(center).first;
@@ -613,30 +601,8 @@ std::vector<ValueType> effectMinDistAllBlocks( numNewBlocks );
 		effectMinDistAllBlocks[newB] = minDistanceAllBlocks[j]\
 			*minDistanceAllBlocks[j]\
 			*influence1DVector[j];
-		assert( std::isfinite(effectMinDistAllBlocks[b][j]) );
-
-/*
-		for( IndexType j=0; j<k; j++ ){
-			// 
-			// std::vector<ValueType> center(dim);
-			//TODO: this conversion into points is annoying. Maybe change coordinate format and use n in the outer dimension and d in the inner?
-			//Can even use points as data structure. Update: Tried it, gave no performance benefit.
-			// for (IndexType d = 0; d < dim; d++) {
-				// center[d] = centersPerBlock[b][j][d];
-			// }
-			//
-			point center = centersPerBlock[b][j];
-			//minDistance[j] = boundingBox.distances(center).first;
-			minDistance[j] = boundingBox.distances(center).first;
-			assert( std::isfinite(minDistance[j]) );
-			//effectiveMinDistance[j] = minDistance[j]*minDistance[j]*influence[j];
-			effectiveMinDistancePerBlock[b][j] = minDistance[j]*minDistance[j]*influence[j];
-			assert( std::isfinite(effectiveMinDistancePerBlock[b][j]) );
-		}
-*/		
+		assert( std::isfinite(effectMinDistAllBlocks[b][j]) );	
 	}
-
-//hierar: must sort centers per old block
 
 	//sort centers according to their distance from the bounding box of this PE
 	//std::vector<std::vector<IndexType>> clusterIndicesPerBlock( numOldBlocks );
@@ -676,33 +642,6 @@ std::vector<ValueType> effectMinDistAllBlocks( numNewBlocks );
 	}
 
 //TODO?:maybe clusterIndices makes sense to stay as a vector<vector<>> ?
-
-/*
-//previous version with 2D vector
-	//for all old, known blocks
-	for(IndexType b=0; b<numOldBlocks; b++){
-//hierar: I hope is more readable like this	
-		std::vector<IndexType>& clusterIndices = clusterIndicesPerBlock[b];
-		const std::vector<ValueType>& minDistance = minDistancePerBlock[b];
-		const std::vector<ValueType>& effectiveMinDistance = effectiveMinDistancePerBlock[b];
-		//const unsigned int k = numNewBlocksPerOldBlock[b]; //k for this (old) block
-const unsigned int k = blockSizesPrefixSum[b+1]-blockSizesPrefixSum[b];
-//assert( k==k1 );
-
-		clusterIndices.resize( k );
-
-		std::iota(clusterIndices.begin(), clusterIndices.end(), 0);
-		std::sort(clusterIndices.begin(), clusterIndices.end(),
-				[&effectiveMinDistance](IndexType a, IndexType b){return effectiveMinDistance[a] < effectiveMinDistance[b] || (effectiveMinDistance[a] == effectiveMinDistance[b] && a < b);});
-		std::sort(effectiveMinDistance.begin(), effectiveMinDistance.end());
-		
-		for (IndexType i = 0; i < k; i++) {
-			IndexType c = clusterIndices[i];
-			ValueType effectiveDist = minDistance[c]*minDistance[c]*influence[c];
-			SCAI_ASSERT_LT_ERROR( std::abs(effectiveMinDistance[i] - effectiveDist), 1e-5, "effectiveMinDistance[" << i << "] = " << effectiveMinDistance[i] << " != " << effectiveDist << " = effectiveDist");
-		}
-	}
-*/
 
 	ValueType localSampleWeightSum = 0;
 	//IndexType localSampleNumPoints = lastIndex-firstIndex;
