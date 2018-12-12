@@ -503,7 +503,7 @@ const std::vector<std::vector<point>>& centersPerBlock,
 
 //hierar: this is also changed or should be changed!		
 		//const std::vector<IndexType> &targetBlockSizes,
-const std::vector<std::vector<IndexType>> &blockSizesPerCent,
+const std::vector<ValueType> &blockSizesPerCent,
 		const SpatialCell &boundingBox,
 		std::vector<ValueType> &upperBoundOwnCenter,
 		std::vector<ValueType> &lowerBoundNextCenter,
@@ -525,7 +525,7 @@ const std::vector<std::vector<IndexType>> &blockSizesPerCent,
 
 //hierar: also k should be adapted
 	//const IndexType k = targetBlockSizes.size();
-	const IndexType numOldBlocks= blockSizesPerCent.size();
+	const IndexType numOldBlocks= centersPerBlock.size();
 	assert( influence.size() == numOldBlocks );
 	assert( centersPerBlock.size() == numOldBlocks );
 
@@ -546,6 +546,7 @@ const std::vector<std::vector<IndexType>> &blockSizesPerCent,
 		numNewBlocks += centersPerBlock[b].size();
 	}
 	SCAI_ASSERT_EQ_ERROR( blockSizesPrefixSum.back(), numNewBlocks, "Total number of new blocks mismatch" );
+	SCAI_ASSERT_EQ_ERROR( blockSizesPerCent.back(), numNewBlocks, "Total number of new blocks mismatch" );
 
 PRINT(*comm <<": num old blocks= "<< numOldBlocks << ", total number of new blocks " << numNewBlocks );
 
@@ -658,6 +659,8 @@ std::vector<ValueType> effectMinDistAllBlocks( numNewBlocks );
 
 	//this is for the homogeneous case
 	//ValueType optSize = std::ceil(totalWeightSum / k );
+
+/*	
 std::vector<ValueType> optSizePerBlock( numOldBlocks );
 for(int b=0; b<numOldBlocks; b++){
 	const unsigned int k = numNewBlocksPerOldBlock[b];  //k for this (old) block
@@ -668,6 +671,12 @@ assert( k==k1 );
 		optSizePerBlock[b][i] = blockSizesPerCent[b][i]*totalWeightSum;
 	}
 }
+*/
+
+	std::vector<ValueType> optSizeAllBlocks( numNewBlocks );
+	for( IndexType newB=0; newB<numNewBlocks; newB++ ){
+		optSizeAllBlocks = blockSizesPerCent[newB]*totalWeightSum;
+	}
 
 //TODO: must do something similar for the memory constraint
 
@@ -1000,7 +1009,7 @@ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition( \
 	const std::vector<DenseVector<ValueType>> &coordinates, \
 	const DenseVector<ValueType> &nodeWeights, \
-	const std::vector<std::vector<IndexType>> &blockSizesPerCent, \
+	const std::vector<IndexType> &blockSizesPerCent, \
 	const DenseVector<IndexType> &partition, \
 	std::vector<std::vector<point>> centers, \
 	const Settings settings, \
@@ -1532,6 +1541,8 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 		//TODO: do the equivalent for the memory constraint
 		//later, optBlockWeight[i] = blockSpeedPercent[i]*samplePointsWeight
+
+/*		
 		std::vector<std::vector<ValueType>> blockSpeedPercent( numOldBlocks );
 		unsigned int CNind = 0;
 		for( unsigned int i=0; i<numOldBlocks; i++ ){
@@ -1542,6 +1553,12 @@ DenseVector<IndexType> computeHierarchicalPartition(
 			}			
 		}
 		SCAI_ASSERT_EQ_ERROR( CNind, thisLevel.size(), "Not all comm nodes are accounted for");
+*/
+		std::vector<ValueType> blockSpeedPercent( numNewBlocks );
+		for( int i=0; i<numNewBlocks; i++){
+			blockSpeedPercent[i] = thisLevel[i].relatSpeed/speedSum;
+		}
+
 //TODO: settings.numBlocks is needed, but now this is a vector
 // either set appropriately(?) or do not use it in computePartition
 		partition = computePartition( coordinates, nodeWeights, blockSpeedPercent, partition, groupOfCenters, settings, metrics );
