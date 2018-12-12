@@ -227,6 +227,8 @@ std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<V
  * @param[in] lastIndex end local node indices
  * @param[in] nodeWeights node weights
  * @param[in] previousAssignment previous assignment of points
+ * @param[in] oldBlock The block from the previous hierarchy that every point
+ belongs to. In case of the non-hierarchical version, this is 0 for all points.
  * @param[in] blockSizesPerCent A value indicating a percentage per block of
  the points weight. If, W is the sum of weights of all the points, then
  for block i, its weight (sum of the weight of points in the block) must
@@ -250,6 +252,7 @@ DenseVector<IndexType> assignBlocks(
 	const Iterator lastIndex,
 	const DenseVector<ValueType> &nodeWeights, 
 	const DenseVector<IndexType> &previousAssignment,
+	const DenseVector<IndexType> &oldBlocks,
 	//const std::vector<IndexType> &blockSizes,
 	const std::vector<std::vector<IndexType>> &blockSizesPerCent,
 	const SpatialCell &boundingBox,
