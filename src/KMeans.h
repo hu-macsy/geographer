@@ -204,9 +204,13 @@ std::vector<std::vector<ValueType>> findLocalCenters(const std::vector<DenseVect
  * @return coordinates of centers
  */
 template<typename IndexType, typename ValueType, typename Iterator>
-std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<IndexType> &partition, const IndexType k,
-		const Iterator firstIndex, const Iterator lastIndex,
-		const DenseVector<ValueType> &nodeWeights);
+std::vector<point> findCenters(
+	const std::vector<DenseVector<ValueType>> &coordinates, 
+	const DenseVector<IndexType> &partition, 
+	const IndexType k,
+	const Iterator firstIndex,
+	const Iterator lastIndex,
+	const DenseVector<ValueType> &nodeWeights);
 
 /**
  * Assign points to block with smallest effective distance, adjusted for influence values.
@@ -268,12 +272,19 @@ DenseVector<IndexType> assignBlocks(
 /**
  * @brief Get local minimum and maximum coordinates
  * TODO: This isn't used any more! Remove?
- * Update, 27/11/8: started reusing 
+ * Update, 27/11/8: start reusing 
  */
 template<typename ValueType>
 std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
 
-
+/** Reverse the order of the vectors: given a 2D vector of size 
+dimension*numPoints, reverse it and retunr a vector of points
+of size numPoints; in other words, the returned vector has size
+numPoints*dimensions. In general, if the given 2D vector has size
+A*B, the returned vector has size B*A.
+*/
+template<typename IndexType, typename ValueType, typename Iterator>
+std::vector<point> vectorTranspose(std::vector<std::vector<ValueType>>& points);
 
 } /* namespace KMeans */
 } /* namespace ITI */

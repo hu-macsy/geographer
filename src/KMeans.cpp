@@ -302,6 +302,7 @@ std::vector<std::vector<ValueType>>  findInitialCentersSFC(
 
 	//homogenous case, all PEs have the same memory and speed
 	//there is only hierarchy level
+//TODO: probably this some further adaptation
 	IndexType mem = 1;
 	IndexType speed = 1;
 	IndexType cores = 1;
@@ -484,6 +485,25 @@ std::vector<std::vector<ValueType> > findCenters(
 	return result;
 }
 
+
+template<typename IndexType, typename ValueType, typename Iterator>
+std::vector<point> vectorTranspose(std::vector<std::vector<ValueType>>& points){
+	const IndexType dim = points.size();
+	SCAI_ASSERT_GT_ERROR( dim, 0, "Dimension of points cannot be 0" );
+PRINT0("points have dimension " << dim);	
+	const IndexType numPoints = points[0].size();
+	SCAI_ASSERT_GT_ERROR( numPoints, 0, "Empty vector of points" );
+
+	std::vector<point> retPoints( numPoints, point(dim) );
+	
+	for( unsigned int d=0; d<dim; d++ ){
+		for( unsigned int i=0; i<numPoints; i++ ){
+			retPoints[i][d] = points[d][i];
+		}
+	}
+
+	return retPoints;
+}
 
 
 template<typename IndexType, typename ValueType, typename Iterator>
@@ -1031,13 +1051,15 @@ DenseVector<IndexType> computePartition( \
 	}
 	
 	//the number of new blocks per old block and the total number of new blocks
-	vector<IndexType> newNumBlocks( numOldBlocks );
+	//std::vector<IndexType> newNumBlocks( numOldBlocks );
+	std::vector<IndexType> blockSizesPrefixSum( numOldBlocks+1, 0 );
 	//in a sense, this is the new k = settings.numBlocks
 	IndexType totalNumNewBlocks = 0;
 
 	for( int i=0; i<numOldBlocks; i++ ){
-		newNumBlocks[i] = centers[i].size();
-		totalNumNewBlocks += newNumBlocks[i];
+		//newNumBlocks[i] = centers[i].size();
+		blockSizesPrefixSum[b+1] += blockSizesPrefixSum[b]+centers[b].size();
+		totalNumNewBlocks += centers[b].size();
 	}
 
 //hierar: new influence?? a vector<vector<ValueType>> of influences?
@@ -1143,7 +1165,7 @@ std::vector<ValueType> influence(totalNumNewBlocks,1);
     }
 
 	diagonalLength = std::sqrt(diagonalLength);
-	const ValueType expectedBlockDiameter = pow(volume / k, 1.0/dim);
+	const ValueType expectedBlockDiameter = pow(volume /totalNumNewBlocks, 1.0/dim);
 
 	std::vector<ValueType> upperBoundOwnCenter(localN, std::numeric_limits<ValueType>::max());
 	std::vector<ValueType> lowerBoundNextCenter(localN, 0);
@@ -1271,34 +1293,68 @@ samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNo
 				}
 			}
 		}
+//does that need adaptattions for the hierarchical
+//reverse order of the vectors?
 
-		std::vector<std::vector<ValueType> > newCenters = findCenters(coordinates, result, k, firstIndex, lastIndex, nodeWeights);
+		std::vector<std::vector<ValueType>> newCenters = findCenters(coordinates, result, totalNumNewBlocks, firstIndex, lastIndex, nodeWeights);
+
+//newCenters have reversed order of the vectors
+//maybe turn centers to a 1D vector already in computePartition?
+
+		std::vector<point> transCenters = vectorTranspose( newCenters );
+		assert( transCenters.size()==totalNumNewBlocks );
+		assert( transCenters[0].size()==dimensions );
+
+//TODO: Use one of the two versions
+std::vector<point> centers1DVector;
+for(int b=0; b<numOldBlocks; b++){
+	const unsigned int k = blockSizesPrefixSum[b+1]-blockSizesPrefixSum[b];
+	assert( k==centersPerBlock[b].size() ); //not really needed, TODO: remove?
+	for (IndexType i=0; i<k; i++) {
+		centers1DVector.push_back( centersPerBlock[b][i] );
+	}
+}
+SCAI_ASSERT_EQ_ERROR( centers1D.size(), numNewBlocks, "Vector size mismatch" );
 
 		//keep centroids of empty blocks at their last known position
-		for (IndexType j = 0; j < k; j++) {
-		    for (int d = 0; d < dim; d++) {
-		        if (std::isnan(newCenters[d][j])) {
-		            newCenters[d][j] = centers[d][j];
-		        }
-		    }
+		for (IndexType j = 0; j <totalNumNewBlocks; j++) {
+			//center for block j is empty
+			if (std::isnan(transCenters[j][0])) {
+				//find the old block where this center belongs to
+				//TODO: or convert centers to a 1D vector
+/*				
+//TODO: hierar, verify that this is correct, especially when j == some entry in blockSizesPrefixSum vector
+std::vector<IndexType>::iterator blockIt = std::lower_bound( blockSizesPrefixSum.begin(), blockSizesPrefixSum.end(), j);
+IndexType oldBlockInd = (blockIt - blockSizesPrefixSum.begin()) -1;
+IndexType blockInBlock = j- oldBlockInd;
+//TODO: check, verify and remove some of the assertions
+SCAI_ASSERT_GE_ERROR( oldBlockInd, 0, "block id must be positive");
+SCAI_ASSERT_GE_ERROR( blockInBlockInd, 0, "block id must be positive");
+SCAI_ASSERT_LT_ERROR( blockInBlockInd, blockSizesPrefixSum[oldBlockInd]-blockSizesPrefixSum[oldBlockInd-1], "block index out of bounds");
+*/				
+				transCenters[j] = centers1D[j];
 		}
-		std::vector<ValueType> squaredDeltas(k,0);
-		std::vector<ValueType> deltas(k,0);
-		std::vector<ValueType> oldInfluence = influence;
+		std::vector<ValueType> squaredDeltas(totalNumNewBlocks,0);
+		std::vector<ValueType> deltas(totalNumNewBlocks,0);
+		std::vector<ValueType> oldInfluence = influence; //size= totalNumNewBlocks
 		ValueType minRatio = std::numeric_limits<double>::max();
 
-		for (IndexType j = 0; j < k; j++) {
+		for (IndexType j = 0; j < totalNumNewBlocks; j++) {
 			for (int d = 0; d < dim; d++) {
-				ValueType diff = (centers[d][j] - newCenters[d][j]);
+				ValueType diff = (centers1D[j][d] - transCenters[j][d]);
 				squaredDeltas[j] += diff*diff;
 			}
 			deltas[j] = std::sqrt(squaredDeltas[j]);
 			if (settings.erodeInfluence) {
-				const ValueType erosionFactor = 2/(1+exp(-std::max(deltas[j]/expectedBlockDiameter-0.1, 0.0))) - 1;
-				influence[j] = exp((1-erosionFactor)*log(influence[j]));//TODO: will only work for uniform target block sizes
-				if (oldInfluence[j] / influence[j] < minRatio) minRatio = oldInfluence[j] / influence[j];
+				std::cout<< "WARNING: erodeInfluence setting is not supported in the heterogeneous or hierarchical version" <<std::endl;
+				if( false ){}
+					const ValueType erosionFactor = 2/(1+exp(-std::max(deltas[j]/expectedBlockDiameter-0.1, 0.0))) - 1;
+					influence[j] = exp((1-erosionFactor)*log(influence[j]));//TODO: will only work for uniform target block sizes
+					if (oldInfluence[j] / influence[j] < minRatio) minRatio = oldInfluence[j] / influence[j];
+				}
 			}
 		}
+		centers = newCenters;
 
 		delta = *std::max_element(deltas.begin(), deltas.end());
 		assert(delta >= 0);
@@ -1310,8 +1366,10 @@ samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNo
 			for (auto it = firstIndex; it != lastIndex; it++) {
 				const IndexType i = *it;
 				IndexType cluster = rResult[i];
-
-				if (settings.erodeInfluence) {
+				assert( cluster<totalNumNewBlocks );
+//WARNING: erodeInfluence not supported for hierarchical version
+//TODO: or it is?? or it should be??
+				if (false and settings.erodeInfluence) {
 					//update due to erosion
 					upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]) + 1e-12;
 					lowerBoundNextCenter[i] *= minRatio - 1e-12;
@@ -1331,9 +1389,8 @@ samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNo
 				assert(std::isfinite(lowerBoundNextCenter[i]));
 			}
 		}
-		centers = newCenters;
-
-		std::vector<ValueType> blockWeights(k,0.0);
+		
+		std::vector<ValueType> blockWeights(totalNumNewBlocks,0.0);
 		for (auto it = firstIndex; it != lastIndex; it++) {
 			const IndexType i = *it;
 			IndexType cluster = rResult[i];
@@ -1351,9 +1408,18 @@ samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNo
 
 		{
 			SCAI_REGION( "KMeans.computePartition.blockWeightSum" );
-			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<ValueType>::stype);
+			comm->sumImpl(blockWeights.data(), blockWeights.data(), totalNumNewBlocks, scai::common::TypeTraits<ValueType>::stype);
 		}
 
+//TODO: adapt for heterogeneous weights
+//TODO: adapt for multiple node weights
+
+calculate the optimum weight per block
+maybe do it outside of the function? 
+what happens when we consider another level than the leafs? then max(relatSpeed)
+is not 1, maybe normalize?
+
+		//check if all blocks are balanced
 		balanced = true;
 		for (IndexType j = 0; j < k; j++) {
 			if (blockWeights[j] > blockSizes[j]*(1+settings.epsilon)) {
