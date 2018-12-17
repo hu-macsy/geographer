@@ -518,7 +518,7 @@ const std::vector<std::vector<point>>& centersPerBlock,
 const DenseVector<IndexType> &oldBlock,
 //hierar: this is also changed or should be changed!		
 		//const std::vector<IndexType> &targetBlockSizes,
-const std::vector<ValueType> &blockSizesPerCent,
+const std::vector<ValueType> &optWeightAllBlocks,
 		const SpatialCell &boundingBox,
 		std::vector<ValueType> &upperBoundOwnCenter,
 		std::vector<ValueType> &lowerBoundNextCenter,
@@ -646,6 +646,8 @@ std::vector<ValueType> effectMinDistAllBlocks( numNewBlocks );
 
 //TODO?:maybe clusterIndices makes sense to stay as a vector<vector<>> ?
 
+//moved next part of commented code outside assignBlocks in computePartition
+/*
 	ValueType localSampleWeightSum = 0;
 	//IndexType localSampleNumPoints = lastIndex-firstIndex;
 	{
@@ -660,13 +662,14 @@ std::vector<ValueType> effectMinDistAllBlocks( numNewBlocks );
 	//this is for the homogeneous case
 	//ValueType optSize = std::ceil(totalWeightSum / k );
 
-
 	//the "optimum" weight every new block should have
 	//TODO: adapt for multiple node weights
 	std::vector<ValueType> optWeightAllBlocks( numNewBlocks );
 	for( IndexType newB=0; newB<numNewBlocks; newB++ ){
 		optWeightAllBlocks = blockSizesPerCent[newB]*totalWeightSum;
 	}
+*/
+
 
 //TODO: must do something similar for the memory constraint
 
@@ -1274,9 +1277,26 @@ samplingRounds = std::ceil(std::log2( globalN / ValueType(settings.minSamplingNo
 			assert(lastIndex == localIndices.end());
 		}
 
+//moving here the sum of weights of the sampled point from assignBlock
+ValueType localSampleWeightSum = 0;
+{
+	scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
+	for (Iterator it = firstIndex; it != lastIndex; it++) {
+		localSampleWeightSum += rWeights[*it];
+	}
+}
+const ValueType totalWeightSum = comm->sum(localSampleWeightSum);
+//the "optimum" weight every new block should have
+//TODO: adapt for multiple node weights
+std::vector<ValueType> optWeightAllBlocks( numNewBlocks );
+for( IndexType newB=0; newB<numNewBlocks; newB++ ){
+	optWeightAllBlocks = blockSizesPerCent[newB]*totalWeightSum;
+}
+		
+
 		std::vector<ValueType> timePerPE( comm->getSize(), 0.0);
 //here, result.max()=numNewBlocks
-		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, partition, blockSizesPerCent, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, imbalance, timePerPE, settings, metrics);
+		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, partition, optWeightAllBlocks, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, imbalance, timePerPE, settings, metrics);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
 		if(settings.verbose){
@@ -1390,6 +1410,7 @@ SCAI_ASSERT_LT_ERROR( blockInBlockInd, blockSizesPrefixSum[oldBlockInd]-blockSiz
 			}
 		}
 		
+		//find local weight of each block
 		std::vector<ValueType> blockWeights(totalNumNewBlocks,0.0);
 		for (auto it = firstIndex; it != lastIndex; it++) {
 			const IndexType i = *it;
@@ -1418,6 +1439,10 @@ calculate the optimum weight per block
 maybe do it outside of the function? 
 what happens when we consider another level than the leafs? then max(relatSpeed)
 is not 1, maybe normalize?
+
+		//TODO: this is constant from the start, calculate it onece and
+		//	pass it as an argument?
+		const ValueType totalWeight = std::accumulate(blockWeights.begin(), blockWeights.end(), 0.0);
 
 		//check if all blocks are balanced
 		balanced = true;
