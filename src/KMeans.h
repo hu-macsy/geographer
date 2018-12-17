@@ -195,7 +195,7 @@ std::vector<std::vector<ValueType>> findLocalCenters(const std::vector<DenseVect
  * To enable random initialization of k-means with a subset of nodes, this function accepts iterators for the first and last local index that should be considered.
  *
  * @param[in] coordinates input points
- * @param[in] partition
+ * @param[in] partition an already know partition of the points
  * @param[in] k number of blocks
  * @param[in] firstIndex begin of local node indices
  * @param[in] lastIndex end of local node indices
