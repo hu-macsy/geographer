@@ -97,9 +97,19 @@ static ValueType computeCut(const scai::lama::CSRSparseMatrix<ValueType> &input,
  *
  * @param[in] part partition
  * @param[in] k number of blocks in partition.
+ * @param[in] nodeWeights The weight of every point/vertex if available
+ * @param[in] blockSizes The optimum size/weight for every block
  */
+
+//TODO: this does not include the case where we can have different
+//blocks sizes but no node weights; adapt
+
 //template<typename IndexType, typename ValueType>
-static ValueType computeImbalance(const scai::lama::DenseVector<IndexType> &part, IndexType k, const scai::lama::DenseVector<ValueType> &nodeWeights = scai::lama::DenseVector<ValueType>(0,0));
+static ValueType computeImbalance(
+	const scai::lama::DenseVector<IndexType> &part,
+	IndexType k,
+	const scai::lama::DenseVector<ValueType> &nodeWeights = scai::lama::DenseVector<ValueType>(0,0),
+	const std::vector<ValueType> &blockSizes = std::vector<ValueType>(0,0));
 
 /**
  * @brief Builds a halo containing all non-local neighbors.

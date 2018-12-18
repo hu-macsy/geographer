@@ -358,12 +358,21 @@ ValueType GraphUtils<IndexType,ValueType>::computeCut(const CSRSparseMatrix<Valu
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-ValueType GraphUtils<IndexType,ValueType>::computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<ValueType> &nodeWeights) {
+ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
+    const DenseVector<IndexType> &part,
+    IndexType k,
+    const DenseVector<ValueType> &nodeWeights,
+    const std::vector<ValueType> &blockSizes){
+
 	SCAI_REGION( "ParcoRepart.computeImbalance" )
 	const IndexType globalN = part.getDistributionPtr()->getGlobalSize();
 	const IndexType localN = part.getDistributionPtr()->getLocalSize();
 	const IndexType weightsSize = nodeWeights.getDistributionPtr()->getGlobalSize();
-	const bool weighted = (weightsSize != 0);
+	
+    const bool weighted = (weightsSize != 0);
+    //if a blockSizes vector is give, then we do not have homogeneous blocks weights
+    const bool homogeneous = (blockSizes.size()==0);
+
     scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
     
     /*
@@ -394,7 +403,7 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(const DenseVector<In
 		throw std::runtime_error("Negative node weights not supported.");
 	}
 
-	std::vector<ValueType> subsetSizes(k, 0.0);
+    //TODO: is this needed here? remove or wrap around settigns.debugMode?
 	const IndexType minK = part.min();
 	const IndexType maxK = part.max();
 
@@ -406,10 +415,12 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(const DenseVector<In
 		throw std::runtime_error("Block id " + std::to_string(maxK) + " found in partition with supposedly " + std::to_string(k) + " blocks.");
 	}
 
+    std::vector<ValueType> subsetSizes(k, 0.0);
 	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
 	scai::hmemo::ReadAccess<ValueType> localWeight(nodeWeights.getLocalValues());
 	assert(localPart.size() == localN);
 
+    //calculate weight of each block and global weight sum
 	ValueType weightSum = 0.0;
 	for (IndexType i = 0; i < localN; i++) {
 		IndexType partID = localPart[i];
@@ -418,17 +429,6 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(const DenseVector<In
 		weightSum += weight;
 	}
 	
-	ValueType optSize;
-	
-	if (weighted) {
-		//get global weight sum
-		weightSum = comm->sum(weightSum);
-		optSize = std::ceil(weightSum / k + (maxWeight - minWeight));
-        //optSize = std::ceil(ValueType(weightSum) / k );
-	} else {
-		optSize = std::ceil(ValueType(globalN) / k);
-	}
-
     std::vector<ValueType> globalSubsetSizes(k);
     const bool isReplicated = part.getDistribution().isReplicated();
     SCAI_ASSERT_EQ_ERROR(isReplicated, comm->any(isReplicated), "inconsistent distribution!");
@@ -446,17 +446,36 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(const DenseVector<In
 
 	ValueType maxBlockSize = *std::max_element(globalSubsetSizes.begin(), globalSubsetSizes.end());
 
-	if (!weighted) {
-		assert(maxBlockSize >= optSize);
-	}
+    //to be returned
+    ValueType imbalance;
+    
+    if (weighted) {
+        if( homogeneous){
+            //get global weight sum
+            weightSum = comm->sum(weightSum);
+            ValueType optSize = std::ceil(weightSum / k + (maxWeight - minWeight));
+            imbalance = (ValueType(maxBlockSize - optSize)/ optSize);
 
-	/**
-    if( comm->getRank()==0 ){
-        std::cout<<" done" << std::endl;
+            //optSize = std::ceil(ValueType(weightSum) / k );
+        }else{
+            //blockSizes is the optimum weight/size for every block
+            SCAI_ASSERT_EQ_ERROR( k, blockSizes.size(), "Number of blocks do not agree with the size of the vector of the block sizes");
+            //TODO: vector not really needed, only the max value
+//TODO: recheck how imbalance is calculated            
+            std::vector<ValueType> imbalances( k );
+            for( IndexType i=0; i<k; i++){
+                imbalances[i] = (ValueType( globalSubsetSizes[i]- blockSizes[i]))/blockSizes[i];
+            }
+            imbalance = *std::max_element(imbalances.begin(), imbalances.end() );
+        }
+    } else {
+        ValueType optSize = std::ceil(ValueType(globalN) / k);
+        assert(maxBlockSize >= optSize);
+
+        imbalance = (ValueType(maxBlockSize - optSize)/ optSize);
     }
-    */
 
-	return (ValueType(maxBlockSize - optSize)/ optSize);
+	return imbalance;
 }
 //---------------------------------------------------------------------------------------
 

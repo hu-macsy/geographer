@@ -112,11 +112,12 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		}
 		IndexType allOldBlockSizes[arraySize];
 		comm->gather( allOldBlockSizes, numOldBlocks, rootPE, oldBlockSizes.data() );
+		std::vector<IndexType> allOldSizesVec( allOldBlockSizes, allOldBlockSizes + arraySize );
 		SCAI_ASSERT_EQ_ERROR( globalN,
-		 	std::accumulate(allOldBlockSizes.begin(), allOldBlockSizes.end(), 0), "Mismatch in gatheres array for sizes of all blocks");
+		 	std::accumulate(allOldSizesVec.begin(), allOldSizesVec.end(), 0), "Mismatch in gathered array for sizes of all blocks");
 
 PRINT0(numOldBlocks <<" old blocks, allOldBlockSizes:");
-for( IndexType x: allOldBlockSizes)
+for( IndexType x: allOldSizesVec)
 	PRINT0(x);
 
 		// only root PE calculates the prefixSum
