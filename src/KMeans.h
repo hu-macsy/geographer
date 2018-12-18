@@ -54,7 +54,7 @@ using point = std::vector<ValueType>;
  DenseVector<IndexType> computePartition(
  	const std::vector<DenseVector<ValueType>> &coordinates, \
  	const DenseVector<ValueType> &nodeWeights, \
- 	const std::vector<std::vector<IndexType>> &blockSizes, \
+ 	const std::vector<ValueType> &blockSizes, \
  	const DenseVector<IndexType>& partition,\
  	std::vector<std::vector<point>> centers, \
  	const Settings settings, \
@@ -232,7 +232,10 @@ std::vector<point> findCenters(
  * @param[in] nodeWeights node weights
  * @param[in] previousAssignment previous assignment of points
  * @param[in] oldBlock The block from the previous hierarchy that every point
- belongs to. In case of the non-hierarchical version, this is 0 for all points.
+ belongs to. In case of the non-hierarchical version, this is 0 for all points. This is different from previousAssignment 
+ because it does not chacge inbetween kmeans iteration while
+ previousAssignement changes until it converges and the
+ algorithm stops.
  * @param[in] blockSizesPerCent A value indicating a percentage per block of
  the points weight. If, W is the sum of weights of all the points, then
  for block i, its weight (sum of the weight of points in the block) must
@@ -248,17 +251,16 @@ std::vector<point> findCenters(
 template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(
 	const std::vector<std::vector<ValueType>> &coordinates,
-	const std::vector<std::vector<point>> &centers,
-//hierar: maybe this is not needed and we use previousAssignment	
-	//const DenseVector<IndexType>& partition, 
-	
+	//const std::vector<std::vector<point>> &centers,
+const std::vector<point>& centers,
+const std::vector<IndexType>& blockSizesPrefixSum,
+
 	const Iterator firstIndex,
 	const Iterator lastIndex,
 	const DenseVector<ValueType> &nodeWeights, 
 	const DenseVector<IndexType> &previousAssignment,
 	const DenseVector<IndexType> &oldBlocks,
-	//const std::vector<IndexType> &blockSizes,
-	const std::vector<std::vector<IndexType>> &blockSizesPerCent,
+	const std::vector<ValueType> &optWeightAllBlocks,
 	const SpatialCell &boundingBox,
 	std::vector<ValueType> &upperBoundOwnCenter,
 	std::vector<ValueType> &lowerBoundNextCenter,
@@ -283,8 +285,8 @@ of size numPoints; in other words, the returned vector has size
 numPoints*dimensions. In general, if the given 2D vector has size
 A*B, the returned vector has size B*A.
 */
-template<typename IndexType, typename ValueType, typename Iterator>
-std::vector<point> vectorTranspose(std::vector<std::vector<ValueType>>& points);
+template<typename IndexType, typename ValueType>
+std::vector<point> vectorTranspose( const std::vector<std::vector<ValueType>>& points);
 
 } /* namespace KMeans */
 } /* namespace ITI */

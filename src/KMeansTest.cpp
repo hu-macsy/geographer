@@ -186,7 +186,8 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 
 
 TEST_F(KMeansTest, testHierarchicalPartition) {
-	std::string fileName = "bubbles-00010.graph";
+	//std::string fileName = "bubbles-00010.graph";
+	std::string fileName = "Grid8x8";
 	std::string graphFile = graphPath + fileName;
 	std::string coordFile = graphFile + ".xyz";
 	const IndexType dimensions = 2;

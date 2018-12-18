@@ -486,11 +486,11 @@ std::vector<point> findCenters(
 }
 
 
-template<typename IndexType, typename ValueType, typename Iterator>
-std::vector<point> vectorTranspose(std::vector<std::vector<ValueType>>& points){
+template<typename IndexType, typename ValueType>
+std::vector<point> vectorTranspose( const std::vector<std::vector<ValueType>>& points){
 	const IndexType dim = points.size();
 	SCAI_ASSERT_GT_ERROR( dim, 0, "Dimension of points cannot be 0" );
-PRINT("points have dimension " << dim);	
+
 	const IndexType numPoints = points[0].size();
 	SCAI_ASSERT_GT_ERROR( numPoints, 0, "Empty vector of points" );
 
@@ -509,8 +509,10 @@ PRINT("points have dimension " << dim);
 template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(
 		const std::vector<std::vector<ValueType>>& coordinates,
-const std::vector<std::vector<point>>& centersPerBlock,
-//		const std::vector<std::vector<point>>& centers,
+//const std::vector<std::vector<point>>& centersPerBlock,
+const std::vector<point>& centers,
+const std::vector<IndexType>& blockSizesPrefixSum,
+
 		const Iterator firstIndex,
 		const Iterator lastIndex,
 		const DenseVector<ValueType> &nodeWeights,
@@ -540,8 +542,9 @@ const std::vector<ValueType> &optWeightAllBlocks,
 
 //hierar: also k should be adapted
 	//const IndexType k = targetBlockSizes.size();
-	const IndexType numOldBlocks= centersPerBlock.size();
-	assert( centersPerBlock.size() == numOldBlocks );
+	//const IndexType numOldBlocks= centersPerBlock.size();
+	const IndexType numOldBlocks= blockSizesPrefixSum.size()-1;
+	//assert( centersPerBlock.size() == numOldBlocks );
 
 	//this check is done before. TODO: remove?
 	if( settings.debugMode ){
@@ -552,22 +555,27 @@ const std::vector<ValueType> &optWeightAllBlocks,
 	//the new number of block each old blocks contains
 	//std::vector<IndexType> numNewBlocksPerOldBlock( numOldBlocks );
 	//the prefix sum of the vector above
-	std::vector<IndexType> blockSizesPrefixSum( numOldBlocks+1, 0 );
-	// numNewBlocks is equivalent to 'k' in the classic version
-	IndexType numNewBlocks = 0; //probably not really needed
+//std::vector<IndexType> blockSizesPrefixSum( numOldBlocks+1, 0 );
 
+	// numNewBlocks is equivalent to 'k' in the classic version
+	IndexType numNewBlocks = centers.size(); //probably not really needed
+
+	/* //in this version, prefixSum is given as an input
 	for(IndexType b=0; b<numOldBlocks; b++){
 		blockSizesPrefixSum[b+1] += blockSizesPrefixSum[b]+centersPerBlock[b].size();
 		numNewBlocks += centersPerBlock[b].size();
 	}
+	*/
 	SCAI_ASSERT_EQ_ERROR( blockSizesPrefixSum.back(), numNewBlocks, "Total number of new blocks mismatch" );
-	SCAI_ASSERT_EQ_ERROR( optWeightAllBlocks.back(), numNewBlocks, "Total number of new blocks mismatch" );
-	assert( influence.size() == numOldBlocks );
+	assert( influence.size() == numNewBlocks );
 
 PRINT(*comm <<": num old blocks= "<< numOldBlocks << ", total number of new blocks " << numNewBlocks );
 
 	//convert 2D centersPerBlock and influence to 1D vectors (~arrays).
 	//TODO: Use one of the two versions
+
+/*
+//in this version, prefixSum is given as an input
 	std::vector<point> centers1DVector;
 	for(int b=0; b<numOldBlocks; b++){
 		//k for this (old) block
@@ -579,6 +587,11 @@ PRINT(*comm <<": num old blocks= "<< numOldBlocks << ", total number of new bloc
 			//influence1DVector.push_back( influence[b][i] );
 		}
 	}
+*/
+
+//temporarilly, to compile 
+const std::vector<point>& centers1DVector = centers;
+
 //TODO: decided that influence is gonna be a 1D vector from the beginning
 //		change and keep only influence
 //TODO?: rename to smth like influenceAllBlocks??
@@ -625,8 +638,9 @@ std::vector<ValueType> effectMinDistAllBlocks( numNewBlocks );
 		typename std::vector<IndexType>::iterator endIt = clusterIndicesAllBlocks.begin()+rangeEnd;
 		//TODO: remove not needed assertions
 		SCAI_ASSERT_LT_ERROR( rangeStart, rangeEnd, "Prefix sum vectos is wrong");
-		SCAI_ASSERT_LT_ERROR( rangeEnd, numNewBlocks, "Range out of bounds" );
-		SCAI_ASSERT_ERROR( endIt!=clusterIndicesAllBlocks.end(), "Iterator out of bounds");
+		SCAI_ASSERT_LE_ERROR( rangeEnd, numNewBlocks, "Range out of bounds" );
+//TODO: fot the last block, endIT is gonna be in end()
+//SCAI_ASSERT_ERROR( endIt!=clusterIndicesAllBlocks.end(), "Iterator out of bounds");
 
 		//sort the part of the indices that belong to this old block
 		std::sort( startIt, endIt, 
@@ -638,13 +652,14 @@ std::vector<ValueType> effectMinDistAllBlocks( numNewBlocks );
 		//sort also this part of the distances
 		//TODO: is this sorting needed?
 		//TODO: is it correct to sort? if we sort, effectMinDistAllBlocks[clusterInd[i]] will be wrong, I think effectMinDistAllBlocks[i] will be correct
+		//TODO: either not sort and get  minDistanceAllBlocks[c] or sort and get minDistanceAllBlocks[i]
 		std::sort( effectMinDistAllBlocks.begin()+rangeStart, effectMinDistAllBlocks.begin()+rangeStart);
 
 		//just for checking
 		for (IndexType i=rangeStart; i<rangeEnd; i++) {
-			IndexType c=clusterIndicesAllBlocks[i];
-			ValueType effectiveDist = minDistanceAllBlocks[c]\
-				*minDistanceAllBlocks[c]*influence[c];
+			//IndexType c=clusterIndicesAllBlocks[i];
+			ValueType effectiveDist = minDistanceAllBlocks[i]\
+				*minDistanceAllBlocks[i]*influence[i];
 			SCAI_ASSERT_LT_ERROR( std::abs(effectMinDistAllBlocks[i] - effectiveDist), 1e-5, "effectiveMinDistance[" << i << "] = " << effectMinDistAllBlocks[i] << " != " << effectiveDist << " = effectiveDist");
 		}
 	}
@@ -780,7 +795,8 @@ SCAI_ASSERT_LT_ERROR( fatherBlock, numOldBlocks, "Wrong father block index");
 							}
 							c++;
 						}
-						assert(bestBlock != secondBest);
+//assert(bestBlock != secondBest);
+SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and seconf best should be different" );
 						assert(secondBestValue >= bestValue);
 						//this point has a new center
 						if (bestBlock != oldCluster) {
@@ -831,7 +847,7 @@ SCAI_ASSERT_LT_ERROR( fatherBlock, numOldBlocks, "Wrong father block index");
 		}
 
 		//imbalace in the maximum imbalance of all new blocks
-		imbalance = std::max_element(imbalances.begin(), imbalances.end() );
+		imbalance = *std::max_element(imbalances.begin(), imbalances.end() );
 		
 		//TODO: adapt for multiple node weights
 
@@ -907,8 +923,8 @@ SCAI_ASSERT_LT_ERROR( fatherBlock, numOldBlocks, "Wrong father block index");
 				typename std::vector<IndexType>::iterator endIt = clusterIndicesAllBlocks.begin()+rangeEnd;
 				//TODO: remove not needed assertions
 				SCAI_ASSERT_LT_ERROR( rangeStart, rangeEnd, "Prefix sum vectos is wrong");
-				SCAI_ASSERT_LT_ERROR( rangeEnd, numNewBlocks, "Range out of bounds" );
-				SCAI_ASSERT_ERROR( endIt!=clusterIndicesAllBlocks.end(), "Iterator out of bounds");
+				SCAI_ASSERT_LE_ERROR( rangeEnd, numNewBlocks, "Range out of bounds" );
+				//SCAI_ASSERT_ERROR( endIt!=clusterIndicesAllBlocks.end(), "Iterator out of bounds");
 
 				//sort the part of the indices that belong to this old block
 				std::sort( startIt, endIt, 
@@ -1035,11 +1051,22 @@ DenseVector<IndexType> computeRepartition(
 	//just one group with all the centers; needed in the hierarchical version
 	std::vector<std::vector<point>> groupOfCenters = { initialCenters };
 
+	//must convert the block sizes to precentages,
+	std::vector<ValueType> blockSizesPerCent( blockSizes.size() );
+	//const totalWeight = std::accumulate( blockSizes.begin(), blockSizes.end(), 0);
+	const IndexType maxWeight = *std::max_element( blockSizes.begin(), blockSizes.end() );
+	for( IndexType i=0; i<blockSizes.size(); i++ ){
+		//blockSizesPerCent[i] = blockSizes[i]/totalWeight;
+		//use maxWeight instead of total to resemble the modelling from TEEC
+		blockSizesPerCent[i] = blockSizes[i]/maxWeight;
+	}
+
 	Metrics metrics;
+//
+//TODO: added previous here, not sure at all about it
+//
 
-TODO: added previous here, not sure at all about it
-
-return computePartition(coordinates, nodeWeights, blockSizes, /**/ previous /**/, groupOfCenters, settings, metrics);
+return computePartition(coordinates, nodeWeights, blockSizesPerCent, /**/ previous /**/, groupOfCenters, settings, metrics);
 }
 
 
@@ -1048,7 +1075,7 @@ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition( \
 	const std::vector<DenseVector<ValueType>> &coordinates, \
 	const DenseVector<ValueType> &nodeWeights, \
-	const std::vector<IndexType> &blockSizesPerCent, \
+	const std::vector<ValueType> &blockSizesPerCent, \
 	const DenseVector<IndexType> &partition, \
 	std::vector<std::vector<point>> centers, \
 	const Settings settings, \
@@ -1075,6 +1102,18 @@ DenseVector<IndexType> computePartition( \
 		blockSizesPrefixSum[b+1] += blockSizesPrefixSum[b]+centers[b].size();
 		totalNumNewBlocks += centers[b].size();
 	}
+//TODO: Use one of the two versions
+//TODO: merge for loops
+	std::vector<point> centers1DVector;
+	for(int b=0; b<numOldBlocks; b++){
+		const unsigned int k = blockSizesPrefixSum[b+1]-blockSizesPrefixSum[b];
+		assert( k==centers[b].size() ); //not really needed, TODO: remove?
+		for (IndexType i=0; i<k; i++) {
+			centers1DVector.push_back( centers[b][i] );
+		}
+	}
+	SCAI_ASSERT_EQ_ERROR( centers1DVector.size(), totalNumNewBlocks, "Vector size mismatch" );
+
 
 //hierar: new influence?? a vector<vector<ValueType>> of influences?
 //or a vector<ValueType> but of size totalNumNewBlocks?
@@ -1301,13 +1340,13 @@ const ValueType totalWeightSum = comm->sum(localSampleWeightSum);
 //TODO: adapt for multiple node weights
 std::vector<ValueType> optWeightAllBlocks( totalNumNewBlocks );
 for( IndexType newB=0; newB<totalNumNewBlocks; newB++ ){
-	optWeightAllBlocks = blockSizesPerCent[newB]*totalWeightSum;
+	optWeightAllBlocks[newB] = blockSizesPerCent[newB]*totalWeightSum;
 }
 
 
 		std::vector<ValueType> timePerPE( comm->getSize(), 0.0);
 //here, result.max()=numNewBlocks
-		result = assignBlocks(convertedCoords, centers, firstIndex, lastIndex, nodeWeights, result, partition, optWeightAllBlocks, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, imbalance, timePerPE, settings, metrics);
+		result = assignBlocks(convertedCoords, centers1DVector, blockSizesPrefixSum, firstIndex, lastIndex, nodeWeights, result, partition, optWeightAllBlocks, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, imbalance, timePerPE, settings, metrics);
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
 		if(settings.verbose){
@@ -1326,26 +1365,16 @@ for( IndexType newB=0; newB<totalNumNewBlocks; newB++ ){
 		}
 //does that need adaptattions for the hierarchical
 //reverse order of the vectors?
-
 		std::vector<std::vector<ValueType>> newCenters = findCenters(coordinates, result, totalNumNewBlocks, firstIndex, lastIndex, nodeWeights);
 
 //newCenters have reversed order of the vectors
 //maybe turn centers to a 1D vector already in computePartition?
 
-		std::vector<point> transCenters = vectorTranspose( newCenters );
+//TODO: why does vectorTranspose needs <IndexType> ??
+		std::vector<point> transCenters = vectorTranspose<IndexType>( newCenters );
 		assert( transCenters.size()==totalNumNewBlocks );
 		assert( transCenters[0].size()==dim );
 
-//TODO: Use one of the two versions
-std::vector<point> centers1DVector;
-for(int b=0; b<numOldBlocks; b++){
-	const unsigned int k = blockSizesPrefixSum[b+1]-blockSizesPrefixSum[b];
-	assert( k==centers[b].size() ); //not really needed, TODO: remove?
-	for (IndexType i=0; i<k; i++) {
-		centers1DVector.push_back( centers[b][i] );
-	}
-}
-SCAI_ASSERT_EQ_ERROR( centers1DVector.size(), totalNumNewBlocks, "Vector size mismatch" );
 
 		//keep centroids of empty blocks at their last known position
 		for (IndexType j = 0; j <totalNumNewBlocks; j++) {
@@ -1386,7 +1415,7 @@ SCAI_ASSERT_LT_ERROR( blockInBlockInd, blockSizesPrefixSum[oldBlockInd]-blockSiz
 				}
 			}
 		}
-		centers = newCenters;
+		centers1DVector = transCenters;
 
 		delta = *std::max_element(deltas.begin(), deltas.end());
 		assert(delta >= 0);
@@ -1523,7 +1552,15 @@ DenseVector<IndexType> computePartition(
 	//every point belongs to one block in the beginning
 	scai::lama::DenseVector<IndexType> partition( coordinates[0].getDistributionPtr(), 0);
 
-	return computePartition(coordinates, nodeWeights, blockSizes, partition, groupOfCenters, settings, metrics);
+	//must convert the block sizes to precentages,
+	std::vector<ValueType> blockSizesPerCent( blockSizes.size() );
+	//use maxWeight instead of totalWeight to resemble the modelling from TEEC
+	const IndexType maxWeight = *std::max_element( blockSizes.begin(), blockSizes.end() );
+	for( IndexType i=0; i<blockSizes.size(); i++ ){
+		blockSizesPerCent[i] = blockSizes[i]/maxWeight;
+	}
+
+	return computePartition(coordinates, nodeWeights, blockSizesPerCent, partition, groupOfCenters, settings, metrics);
 }
 
 
@@ -1672,6 +1709,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 	}
 
+	return partition;
 }
 
 //---------------------------------------
@@ -1719,6 +1757,8 @@ template DenseVector<IndexType> computeRepartition(const std::vector<DenseVector
 }; // namespace KMeans
 
 template std::vector<std::vector<ValueType> > KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>(const std::vector<ValueType> &maxCoords, Settings settings);
+
+//template std::vector<KMeans::point> KMeans::vectorTranspose( const std::vector<std::vector<ValueType>>& points);
 
 //instantiations needed or there is a undefined reference otherwise
 template DenseVector<IndexType> KMeans::computePartition(
