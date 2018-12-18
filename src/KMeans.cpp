@@ -112,7 +112,10 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		}
 		IndexType allOldBlockSizes[arraySize];
 		comm->gather( allOldBlockSizes, numOldBlocks, rootPE, oldBlockSizes.data() );
-PRINT0("allOldBlockSizes:");
+		SCAI_ASSERT_EQ_ERROR( globalN,
+		 	std::accumulate(allOldBlockSizes.begin(), allOldBlockSizes.end(), 0), "Mismatch in gatheres array for sizes of all blocks");
+
+PRINT0(numOldBlocks <<" old blocks, allOldBlockSizes:");
 for( IndexType x: allOldBlockSizes)
 	PRINT0(x);
 
@@ -131,6 +134,11 @@ for( IndexType x: allOldBlockSizes)
 		}
 
 		comm->bcast( concatPrefixSumArray.data() ,(numPEs+1)*numOldBlocks, rootPE);
+
+PRINT0(concatPrefixSumArray.size() <<"= concatPrefixSumArray.size(), concatPrefixSumArray:");
+for( IndexType x: concatPrefixSumArray)
+	PRINT0(x);
+
 /*
 for( unsigned int i=0; i<(numPEs+1)*numOldBlocks; i++){
 	PRINT(*comm << ": " << i << ", "<< concatPrefixSumArray[i] );
@@ -1629,7 +1637,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		std::vector<cNode> thisLevel = commTree.getHierLevel(h);
 		//IndexType numNewBlocks = thisLevel.size();
 
-		PRINT0("-- Hierarchy level " << h << " with " << thisLevel.size() << " number of nodes");
+		PRINT0("-- Hierarchy level " << h << " with " << thisLevel.size() << " nodes");
 		if( settings.debugMode ){
 			PRINT0("******* in debug mode");
 			for( cNode c: thisLevel){ //print all nodes of this level
@@ -1649,10 +1657,11 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		SCAI_ASSERT_EQ_ERROR( groupOfCenters.size(), commTree.getHierLevel(h-1).size(), "Wrong number of blocks calculated" );
 		if( settings.debugMode ){
 			PRINT0("******* in debug mode");
-			for( unsigned int b=0; b<thisLevel.size(); b++ ){
-				std::vector<point>& centers = groupOfCenters[b];
-				SCAI_ASSERT_EQ_ERROR( centers.size(), thisLevel[b].getNumChildren(), "Wrong number of centers for block " << b);
+			IndexType sumNumCenters = 0;
+			for(int g=0; g<groupOfCenters.size(); g++){
+				sumNumCenters += groupOfCenters[g].size();
 			}
+			SCAI_ASSERT_EQ_ERROR( sumNumCenters, thisLevel.size(), "Mismatch in number of new centers and hierarchy nodes")
 		}
 
 		//number of old, known blocks == previous level size
@@ -1705,7 +1714,23 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 //TODO: settings.numBlocks is needed, but now this is a vector
 // either set appropriately(?) or do not use it in computePartition
+//TODO: update, inside computePartition, setttings.numBlocks is not
+//used. We infer the number of new blocks from the groupOfCenters
+//maybe, set also numBlocks for clarity??
 		partition = computePartition( coordinates, nodeWeights, blockSpeedPercent, partition, groupOfCenters, settings, metrics );
+
+		//this check is done before. TODO: remove?
+		if( settings.debugMode ){
+			const IndexType maxPart = partition.max(); //global operation
+			SCAI_ASSERT_EQ_ERROR( totalNumNewBlocks-1, maxPart, "The provided old assignment must have equal number of blocks as the length of the vector with the new number of blocks per part");
+		}
+
+		//TODO?: remove?
+		ValueType imbalance =  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights );
+		//IndexType cut = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
+
+		PRINT0("\nFinished hierarchy level " << h <<", partitioned into " << totalNumNewBlocks << " blocks and imabalance is " << imbalance <<std::endl );
+
 
 	}
 
