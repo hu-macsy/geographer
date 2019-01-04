@@ -8,7 +8,7 @@ using scai::hmemo::HArray;
 namespace ITI{
     
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const Halo& halo, Settings settings) {
+DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const HaloExchangePlan& halo, Settings settings) {
 	
     SCAI_REGION( "MultiLevel.multiLevelStep" );
 	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
@@ -65,10 +65,10 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
 		DenseVector<ValueType> coarseWeights = sumToCoarse(nodeWeights, fineToCoarseMap);
 
-		Halo coarseHalo;
 		scai::hmemo::HArray<IndexType> haloData;
-		comm->updateHalo(haloData, fineToCoarseMap.getLocalValues(), halo);
-		scai::dmemo::HaloBuilder::coarsenHalo(coarseGraph.getRowDistribution(), halo, fineToCoarseMap.getLocalValues(), haloData, coarseHalo);
+        halo.updateHalo(haloData, fineToCoarseMap.getLocalValues(), *comm);
+
+        HaloExchangePlan coarseHalo = HaloExchangePlan::coarsenHalo(coarseGraph.getRowDistribution(), halo, fineToCoarseMap.getLocalValues(), haloData);
 
 		assert(coarseWeights.sum() == nodeWeights.sum());
 
@@ -90,7 +90,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 			// uncoarsening/refinement
 			std::chrono::time_point<std::chrono::system_clock> beforeUnCoarse =  std::chrono::system_clock::now();
 			DenseVector<IndexType> fineTargets = getFineTargets(coarseOrigin, fineToCoarseMap);
-			scai::dmemo::Redistributor redistributor(fineTargets.getLocalValues(), fineTargets.getDistributionPtr());
+			scai::dmemo::RedistributePlan redistributor(fineTargets.getLocalValues(), fineTargets.getDistributionPtr());
 			scai::dmemo::DistributionPtr projectedFineDist = redistributor.getTargetDistributionPtr();
 
 			assert(projectedFineDist->getGlobalSize() == globalN);
@@ -173,7 +173,7 @@ DenseVector<IndexType> MultiLevel<IndexType, ValueType>::getFineTargets(const De
 	const scai::dmemo::DistributionPtr oldFineDist = fineToCoarseMap.getDistributionPtr();
 
 	//get coarse reverse redistributor
-	scai::dmemo::Redistributor coarseReverseRedist(coarseOrigin.getLocalValues(), coarseDist);
+	scai::dmemo::RedistributePlan coarseReverseRedist(coarseOrigin.getLocalValues(), coarseDist);
 	const scai::dmemo::DistributionPtr oldCoarseDist = coarseReverseRedist.getTargetDistributionPtr();
 	SCAI_ASSERT_EQ_ERROR(oldCoarseDist->getGlobalSize(), coarseOrigin.size(), "Old coarse distribution has wrong size.");
 
@@ -191,7 +191,7 @@ DenseVector<IndexType> MultiLevel<IndexType, ValueType>::getFineTargets(const De
 		const IndexType oldFineLocalN = oldFineDist->getLocalSize();
 
 		for (IndexType i = 0; i < oldFineLocalN; i++) {
-			IndexType oldLocalCoarse =  oldCoarseDist->global2local(rMap[i]);//TODO: optimize this
+			IndexType oldLocalCoarse =  oldCoarseDist->global2Local(rMap[i]);//TODO: optimize this
 			SCAI_ASSERT_DEBUG(oldLocalCoarse != scai::invalidIndex, "Index " << rMap[i] << " maybe not local after all?");
 			SCAI_ASSERT_DEBUG(oldLocalCoarse < rTargets.size(), "Index " << oldLocalCoarse << " does not fit in " << rTargets.size());
 			wResult[i] = rTargets[oldLocalCoarse];
@@ -201,7 +201,7 @@ DenseVector<IndexType> MultiLevel<IndexType, ValueType>::getFineTargets(const De
 }
  
 template<typename IndexType, typename ValueType>
-void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, const DenseVector<ValueType> &nodeWeights,  const Halo& halo, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations) {
+void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, const DenseVector<ValueType> &nodeWeights,  const HaloExchangePlan& halo, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations) {
 	SCAI_REGION("MultiLevel.coarsen");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -298,7 +298,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
 				if (coarseNode >= 0) {
 					for (IndexType j = ia[i]; j < ia[i+1]; j++) {
 						IndexType edgeTarget = ja[j];
-						IndexType localTarget = distPtr->global2local(edgeTarget);//TODO: maybe optimize this
+						IndexType localTarget = distPtr->global2Local(edgeTarget);//TODO: maybe optimize this
 						if (localTarget != scai::invalidIndex && !localPreserved[localTarget]) {
 							localTarget = localMatchingPartner[localTarget];
 							edgeTarget = rIndex[localTarget];
@@ -353,7 +353,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     SCAI_REGION_START("MultiLevel.coarsen.newGlobalIndices")
     //get new global indices by computing a prefix sum over the preserved nodes
     //fill gaps in index list. To avoid redistribution, we assign a block distribution and live with the implicit reindexing
-    scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
+    scai::dmemo::DistributionPtr blockDist = scai::dmemo::genBlockDistribution(localN, comm);
     DenseVector<IndexType> distPreserved(blockDist, preserved);
     DenseVector<IndexType> blockFineToCoarse = computeGlobalPrefixSum(distPreserved, IndexType(-1) );
     const IndexType newGlobalN = blockFineToCoarse.max() + 1;
@@ -377,7 +377,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
 
     //build halo of new global indices
     HArray<IndexType> haloData;
-    comm->updateHalo(haloData, fineToCoarse.getLocalValues(), halo);
+    halo.updateHalo(haloData, fineToCoarse.getLocalValues(), *comm);
 
     //create new coarsened CSR matrix
     scai::hmemo::HArray<IndexType> newIA(newLocalN + 1);
@@ -409,13 +409,13 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
             	assert(jaIndex == newIAWrite[iaIndex]);
                 for (IndexType j = ia[i]; j < ia[i+1]; j++) {
                     //only need to reroute nonlocal edges
-                    IndexType localNeighbor = distPtr->global2local(ja[j]);
+                    IndexType localNeighbor = distPtr->global2Local(ja[j]);
 
                     if (localNeighbor != scai::invalidIndex) {
                         assert(outgoingEdges.count(rFineToCoarse[localNeighbor]) == 0);
                         outgoingEdges[rFineToCoarse[localNeighbor]] = values[j];
                     } else {
-                        IndexType haloIndex = halo.global2halo(ja[j]);
+                        IndexType haloIndex = halo.global2Halo(ja[j]);
                         assert(haloIndex != scai::invalidIndex);
                         if (outgoingEdges.count(rHalo[haloIndex]) == 0)  outgoingEdges[rHalo[haloIndex]] = 0;
                         outgoingEdges[rHalo[haloIndex]] += values[j];
@@ -452,7 +452,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
 
     const IndexType localEdgeCount = newJA.size();
 
-    const scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(newGlobalN, myGlobalIndices, comm));
+    const auto newDist = scai::dmemo::generalDistributionUnchecked(newGlobalN, myGlobalIndices, comm);
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(newGlobalN));
 
     CSRStorage<ValueType> storage( newLocalN, newGlobalN, std::move(newIA), std::move(csrJA), std::move(csrValues) );
@@ -533,7 +533,8 @@ scai::dmemo::DistributionPtr MultiLevel<IndexType, ValueType>::projectToCoarse(c
 	wIndices.resize(std::distance(wIndices.get(), newEnd));
 	wIndices.release();
 
-	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(newGlobalN, myCoarseGlobalIndices, fineToCoarse.getDistributionPtr()->getCommunicatorPtr()));
+	auto newDist = scai::dmemo::generalDistributionUnchecked(newGlobalN, myCoarseGlobalIndices, 
+                                                             fineToCoarse.getDistributionPtr()->getCommunicatorPtr());
 	return newDist;
 }   
 //---------------------------------------------------------------------------------------
@@ -556,7 +557,7 @@ DenseVector<ValueType> MultiLevel<IndexType, ValueType>::projectToCoarse(const D
 		scai::hmemo::ReadAccess<ValueType> rInput(input.getLocalValues());
 		scai::hmemo::ReadAccess<IndexType> rFineToCoarse(fineToCoarse.getLocalValues());
 		for (IndexType i = 0; i < fineLocalN; i++) {
-			const IndexType coarseTarget = coarseDist->global2local(rFineToCoarse[i]);
+			const IndexType coarseTarget = coarseDist->global2Local(rFineToCoarse[i]);
 			sum[coarseTarget] += rInput[i];
 			numFineNodes[coarseTarget] += 1;
 		}
@@ -590,7 +591,7 @@ DenseVector<ValueType> MultiLevel<IndexType, ValueType>::sumToCoarse(const Dense
 		scai::hmemo::ReadAccess<ValueType> rInput(input.getLocalValues());
 		scai::hmemo::ReadAccess<IndexType> rFineToCoarse(fineToCoarse.getLocalValues());
 		for (IndexType i = 0; i < fineLocalN; i++) {
-			const IndexType coarseTarget = coarseDist->global2local(rFineToCoarse[i]);
+			const IndexType coarseTarget = coarseDist->global2Local(rFineToCoarse[i]);
 			assert(coarseTarget < coarseLocalN);
 			wResult[coarseTarget] += rInput[i];
 		}
@@ -643,7 +644,7 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
         ValueType maxEdgeRating = -1;
         const IndexType endCols = ia[localNode+1];
         for (IndexType j = ia[localNode]; j < endCols; j++) {
-        	IndexType localNeighbor = distPtr->global2local(ja[j]);
+        	IndexType localNeighbor = distPtr->global2Local(ja[j]);
         	if (localNeighbor != scai::invalidIndex && localNeighbor != localNode && !matched[localNeighbor]) {
         		//neighbor is local and unmatched, possible partner
         		ValueType thisEdgeRating = values[j]*values[j]/(rLocalNodeWeights[localNode]*rLocalNodeWeights[localNeighbor]);
@@ -661,7 +662,7 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
 			// at this point -globalNgbr- is the local node with the heaviest edge
 			// and should be matched with -localNode-.
 			// So, actually, globalNgbr is also local....
-			IndexType localNgbr = distPtr->global2local(globalNgbr);
+			IndexType localNgbr = distPtr->global2Local(globalNgbr);
 			assert(localNgbr != scai::invalidIndex);
             //TODO: search neighbors for the heaviest edge
 			matching.push_back( std::pair<IndexType,IndexType> (localNode, localNgbr) );
@@ -772,10 +773,10 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
     }
     
     // get halo for the non-local coordinates
-    scai::dmemo::Halo coordHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(adjM);
+    scai::dmemo::HaloExchangePlan coordHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(adjM);
     std::vector<HArray<ValueType>> coordHaloData(dimensions);
     for(int d=0; d<dimensions; d++){        
-        comm->updateHalo( coordHaloData[d], coordinates[d].getLocalValues(), coordHalo );
+        coordHalo.updateHalo( coordHaloData[d], coordinates[d].getLocalValues(), *comm );
     }
   
     IndexType notCountedPixelEdges = 0; //edges between diagonal pixels are not counted
@@ -818,11 +819,11 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
                 // find the neighbor's pixel
                 ValueType ngbrX, ngbrY;
                 if( coordDist->isLocal(neighbor) ){
-                    ngbrX = coordAccess0[ coordDist->global2local(neighbor) ];
-                    ngbrY = coordAccess1[ coordDist->global2local(neighbor) ];
+                    ngbrX = coordAccess0[ coordDist->global2Local(neighbor) ];
+                    ngbrY = coordAccess1[ coordDist->global2Local(neighbor) ];
                 }else{
-                    ngbrX = coordHaloData[0][ coordHalo.global2halo(neighbor) ];
-                    ngbrY = coordHaloData[1][ coordHalo.global2halo(neighbor) ];
+                    ngbrX = coordHaloData[0][ coordHalo.global2Halo(neighbor) ];
+                    ngbrY = coordHaloData[1][ coordHalo.global2Halo(neighbor) ];
                 }
 
                 IndexType ngbrPixelIndex = sideLen*(IndexType (sideLen*ngbrX/maxX))  + sideLen*ngbrY/maxY;
@@ -893,13 +894,13 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
                 // find the neighbor's pixel
                 IndexType ngbrX, ngbrY, ngbrZ;
                 if( coordDist->isLocal(neighbor) ){
-                    ngbrX = coordAccess0[ coordDist->global2local(neighbor) ];
-                    ngbrY = coordAccess1[ coordDist->global2local(neighbor) ];
-                    ngbrZ = coordAccess2[ coordDist->global2local(neighbor) ];
+                    ngbrX = coordAccess0[ coordDist->global2Local(neighbor) ];
+                    ngbrY = coordAccess1[ coordDist->global2Local(neighbor) ];
+                    ngbrZ = coordAccess2[ coordDist->global2Local(neighbor) ];
                 }else{
-                    ngbrX = coordHaloData[0][ coordHalo.global2halo(neighbor) ];
-                    ngbrY = coordHaloData[1][ coordHalo.global2halo(neighbor) ];
-                    ngbrZ = coordHaloData[2][ coordHalo.global2halo(neighbor) ];
+                    ngbrX = coordHaloData[0][ coordHalo.global2Halo(neighbor) ];
+                    ngbrY = coordHaloData[1][ coordHalo.global2Halo(neighbor) ];
+                    ngbrZ = coordHaloData[2][ coordHalo.global2Halo(neighbor) ];
                 }
 
                 IndexType ngbrPixelIndex = sideLen*sideLen*(int (sideLen*ngbrX/maxX))  + sideLen*(int(sideLen*ngbrY/maxY)) + sideLen*ngbrZ/maxZ;

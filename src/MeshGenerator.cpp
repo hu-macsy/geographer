@@ -247,7 +247,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseM
     IndexType planeSize= numPoints[1]*numPoints[2]; // a YxZ plane
     
     // find which should be the first local coordinate in this processor
-    IndexType startingIndex = dist->local2global(0);
+    IndexType startingIndex = dist->local2Global(0);
     
     IndexType indX = (IndexType) (startingIndex/planeSize) ;
     IndexType indY = (IndexType) ((startingIndex%planeSize)/numPoints[2]);
@@ -305,7 +305,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseM
         IndexType nnzCounter = 0; // count non-zero elements
          
         for(IndexType i=0; i<localSize; i++){   // for all local nodes
-            IndexType globalInd = dist->local2global(i);    // get the corresponding global index
+            IndexType globalInd = dist->local2Global(i);    // get the corresponding global index
             // the global id of the neighbouring nodes
             IndexType ngb_node = globalInd;
             IndexType numRowElems= 0;     // the number of neighbours for each node. Can be less than 6.
@@ -394,7 +394,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(CSRSparseM
     IndexType localSize = dist->getLocalSize(); // the size of the local part
     
     // find which should be the first local coordinate in this processor
-    IndexType startingIndex = dist->local2global(0);
+    IndexType startingIndex = dist->local2Global(0);
     
     IndexType indX = (IndexType) (startingIndex/numPoints[1]) ;
     IndexType indY = (IndexType) (startingIndex%numPoints[1]);
@@ -445,7 +445,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(CSRSparseM
         IndexType nnzCounter = 0; // count non-zero elements
          
         for(IndexType i=0; i<localSize; i++){   // for all local nodes
-            IndexType globalInd = dist->local2global(i);    // get the corresponding global index
+            IndexType globalInd = dist->local2Global(i);    // get the corresponding global index
             // the global id of the neighbouring nodes
             IndexType ngb_node = globalInd;
             IndexType numRowElems= 0;     // the number of neighbours for each node. Can be less than 6.
@@ -535,7 +535,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
     IndexType planeSize= numY*numZ;             // a YxZ plane
     
     // find which should be the first local coordinate in this processor
-    IndexType startingIndex = dist->local2global(0);
+    IndexType startingIndex = dist->local2Global(0);
     
     IndexType indX = (IndexType) (startingIndex/planeSize) ;
     IndexType indY = (IndexType) ((startingIndex%planeSize)/numZ);
@@ -615,7 +615,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
         
     for(IndexType i=0; i<localSize; i++){                   // for all local nodes
         SCAI_REGION("MeshGenerator.createRandomStructured3DMesh_dist.findNgbrs");
-        IndexType thisGlobalInd = dist->local2global(i);    // get the corresponding global index
+        IndexType thisGlobalInd = dist->local2Global(i);    // get the corresponding global index
         IndexType ngbGlobalInd;                             // the global id of the neighbouring nodes
         //PRINT(*comm << ": i= " << i<< ", "<< thisGlobalInd);
         // the position of this node in 3D
@@ -715,8 +715,8 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
 
             // for the other/symmetric edge we must check if ngbGlobalInd is local or not
             if( dist->isLocal(ngbGlobalInd) ){          // if the neighbour is local
-                assert( dist->global2local(ngbGlobalInd) < localSize );
-                localNgbs[ dist->global2local(ngbGlobalInd) ].insert( dist->local2global(i) );
+                assert( dist->global2Local(ngbGlobalInd) < localSize );
+                localNgbs[ dist->global2Local(ngbGlobalInd) ].insert( dist->local2Global(i) );
             } else{                                     // the neighbour is not local
                 localNodeInd.push_back( thisGlobalInd );
                 nonLocalNodeInd.push_back( ngbGlobalInd );
@@ -820,8 +820,8 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
                 IndexType localIndex=  recvPartWrite[i+1];
                 IndexType nonLocalIndex= recvPartWrite[i];     
                 // 0< localIndex< globalN but localNgbs.size()= localN, so must convert it to local
-                SCAI_ASSERT( dist->global2local(localIndex) < localNgbs.size(),"too large index: "<< localIndex <<" while size= "<< localNgbs.size() )
-                localNgbs[dist->global2local(localIndex) ].insert( nonLocalIndex );      // indices are global
+                SCAI_ASSERT( dist->global2Local(localIndex) < localNgbs.size(),"too large index: "<< localIndex <<" while size= "<< localNgbs.size() )
+                localNgbs[dist->global2Local(localIndex) ].insert( nonLocalIndex );      // indices are global
             }
             // if not local do not do anything
         }

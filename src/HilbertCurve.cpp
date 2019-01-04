@@ -7,7 +7,6 @@
 
 #include "HilbertCurve.h"
 
-
 namespace ITI{
 
 template<typename IndexType, typename ValueType>//TODO: template this to help branch prediction
@@ -607,7 +606,7 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
             
             ValueType globalHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex( point, dimensions, recursionDepth, minCoords, maxCoords);
 			localPairs[i].value = globalHilbertIndex;
-        	localPairs[i].index = coordDist->local2global(i);
+        	localPairs[i].index = coordDist->local2Global(i);
         }
     }
     

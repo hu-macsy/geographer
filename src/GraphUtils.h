@@ -83,10 +83,10 @@ ValueType computeImbalance(const scai::lama::DenseVector<IndexType> &part, Index
  *
  * @param[in] input Adjacency Matrix
  *
- * @return Halo
+ * @return HaloExchangePlan
  */
 template<typename IndexType, typename ValueType>
-scai::dmemo::Halo buildNeighborHalo(const scai::lama::CSRSparseMatrix<ValueType> &input);
+scai::dmemo::HaloExchangePlan buildNeighborHalo(const scai::lama::CSRSparseMatrix<ValueType> &input);
 
 /**
  * Returns true if the node identified with globalID has a neighbor that is not local on this process.
@@ -216,11 +216,11 @@ scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::lama::CSRSparseMa
 /**Returns the process graph, as calculated from the local halos.
  *
  *
- * @param halo Halo objects in which all non-local neighbors are present
+ * @param halo HaloExchangePlan objects in which all non-local neighbors are present
  * @return A [#PE x #PE] adjacency matrix of the process graph, distributed with a Block distribution
  */
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::Halo& halo);
+scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::HaloExchangePlan& halo);
 
 /**
  * @Convert a set of unweighted adjacency lists into a CSR matrix

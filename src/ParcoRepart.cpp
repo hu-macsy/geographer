@@ -113,7 +113,7 @@ std::vector<IndexType>  ParcoRepart<IndexType, ValueType>::partitionGraph(
     }
 
     // pointer to the general block distribution created using the vtxDist array
-    const scai::dmemo::DistributionPtr genBlockDistPtr = scai::dmemo::DistributionPtr ( new scai::dmemo::GenBlockDistribution(N, partSize, comm ) );
+    const scai::dmemo::DistributionPtr genBlockDistPtr = genBlockDistribution( partSize, comm );
 
     //-----------------------------------------------------
     //
@@ -255,8 +255,7 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     SCAI_ASSERT_EQ_ERROR(sendPlan.totalQuantity(), localN,
             "wrong size of send plan")
     // allocate recvPlan - either with allocateTranspose, or directly
-    scai::dmemo::CommunicationPlan recvPlan;
-    recvPlan.allocateTranspose(sendPlan, *comm);
+    scai::dmemo::CommunicationPlan recvPlan = comm->transpose( sendPlan );
     IndexType newLocalN = recvPlan.totalQuantity();
     SCAI_REGION_END("ParcoRepart.hilbertRedistribution.communicationPlan")
 
@@ -279,11 +278,8 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
     comm->exchangeByPlan(recvIndices.data(), recvPlan, sendIndices.data(),
             sendPlan);
     //get new distribution
-    scai::hmemo::HArray<IndexType> indexTransport(newLocalN,
-            recvIndices.data());
-    scai::dmemo::DistributionPtr newDist(
-            new scai::dmemo::GeneralDistribution(globalN, indexTransport,
-                    comm));
+    scai::hmemo::HArray<IndexType> indexTransport(newLocalN, recvIndices.data());
+    auto newDist = scai::dmemo::generalDistributionUnchecked(globalN, std::move(indexTransport), comm);
     SCAI_ASSERT_EQUAL(newDist->getLocalSize(), newLocalN,
             "wrong size of new distribution");
     for (IndexType i = 0; i < newLocalN; i++) {
@@ -312,7 +308,7 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
                 scai::hmemo::WriteAccess<ValueType> wCoords(coordinates[d].getLocalValues());
                 assert(wCoords.size() == newLocalN);
                 for (IndexType i = 0; i < newLocalN; i++) {
-                    wCoords[newDist->global2local(recvIndices[i])] =
+                    wCoords[newDist->global2Local(recvIndices[i])] =
                             recvBuffer[i];
                 }
             }
@@ -335,7 +331,7 @@ void ParcoRepart<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseV
                 SCAI_REGION("ParcoRepart.hilbertRedistribution.redistribute.permute");
                 scai::hmemo::WriteAccess<ValueType> wWeights(nodeWeights.getLocalValues());
                 for (IndexType i = 0; i < newLocalN; i++) {
-                    wWeights[newDist->global2local(recvIndices[i])] = recvBuffer[i];
+                    wWeights[newDist->global2Local(recvIndices[i])] = recvBuffer[i];
                 }
             }
         }
@@ -480,7 +476,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 						tempResult = ITI::KMeans::computePartition(coordinates, convertedWeights, migrationBlockSizes, migrationSettings);
 					}
 					
-					initMigrationPtr = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( tempResult.getDistribution(), tempResult.getLocalValues() ) );
+					initMigrationPtr = scai::dmemo::generalDistributionNew( tempResult.getDistribution(), tempResult.getLocalValues() );
 					
 					if (settings.initialMigration == InitialPartitioningMethods::None) {
 						//nothing to do
@@ -494,7 +490,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 					
 					std::chrono::time_point<std::chrono::system_clock> beforeMigration =  std::chrono::system_clock::now();
 					
-					scai::dmemo::Redistributor prepareRedist(initMigrationPtr, nodeWeights.getDistributionPtr());
+					scai::dmemo::RedistributePlan prepareRedist(initMigrationPtr, nodeWeights.getDistributionPtr());
 					
 					std::chrono::time_point<std::chrono::system_clock> afterRedistConstruction =  std::chrono::system_clock::now();
 					
@@ -600,10 +596,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			 */
 			std::chrono::time_point<std::chrono::system_clock> beforeSecondRedistributiom =  std::chrono::system_clock::now();
 			
-			scai::dmemo::Redistributor resultRedist(result.getLocalValues(), result.getDistributionPtr());//TODO: Wouldn't it be faster to use a GeneralDistribution here?
+			scai::dmemo::RedistributePlan resultRedist(result.getLocalValues(), result.getDistributionPtr());//TODO: Wouldn't it be faster to use a GeneralDistribution here?
 			result = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
 			
-			scai::dmemo::Redistributor redistributor(resultRedist.getTargetDistributionPtr(), input.getRowDistributionPtr());
+			scai::dmemo::RedistributePlan redistributor(resultRedist.getTargetDistributionPtr(), input.getRowDistributionPtr());
 			input.redistribute(redistributor, noDist);
 			if (settings.useGeometricTieBreaking) {
 				for (IndexType d = 0; d < dimensions; d++) {
@@ -648,7 +644,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			//IndexType numRefinementRounds = 0;
 			
 			SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
-			scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(input);
+			scai::dmemo::HaloExchangePlan halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(input);
 			ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights, coordinates, halo, settings);
 			SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
 		}
@@ -743,7 +739,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         scai::hmemo::ReadAccess<ValueType> localIndices(hilbertIndices.getLocalValues());//Segfault happening here, likely due to stack overflow. TODO: fix
         for (IndexType i = 0; i < localN; i++) {
         	localPairs[i].value = localIndices[i];
-        	localPairs[i].index = coordDist->local2global(i);
+        	localPairs[i].index = coordDist->local2Global(i);
         	indexSum += localPairs[i].index;
         }
 
@@ -792,7 +788,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
 
         scai::hmemo::HArray<IndexType> indexTransport(newLocalIndices.size(), newLocalIndices.data());
         assert(comm->sum(indexTransport.size()) == globalN);
-        scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
+        auto newDistribution = scai::dmemo::generalDistributionUnchecked(globalN, std::move(indexTransport), comm);
         
         if (comm->getRank() == 0) std::cout << "Created distribution." << std::endl;
         result = fill<DenseVector<IndexType>>(newDistribution, comm->getRank());
@@ -1202,7 +1198,7 @@ void ITI::ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRS
 	std::vector<IndexType> inDegree(localN, 0);
 	std::vector<IndexType> outDegree(localN, 0);
 	for (IndexType i = 0; i < localN; i++) {
-		IndexType globalI = inputDist->local2global(i);
+		IndexType globalI = inputDist->local2Global(i);
 		const IndexType beginCols = localIa[i];
 		const IndexType endCols = localIa[i+1];
 
@@ -1210,7 +1206,7 @@ void ITI::ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRS
 			IndexType globalNeighbor = localJa[j];
 
 			if (globalNeighbor != globalI && inputDist->isLocal(globalNeighbor)) {
-				IndexType localNeighbor = inputDist->global2local(globalNeighbor);
+				IndexType localNeighbor = inputDist->global2Local(globalNeighbor);
 				outDegree[i]++;
 				inDegree[localNeighbor]++;
 			}
@@ -1220,11 +1216,11 @@ void ITI::ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRS
 	for (IndexType i = 0; i < localN; i++) {
 		if (inDegree[i] != outDegree[i]) {
 			//now check in detail:
-			IndexType globalI = inputDist->local2global(i);
+			IndexType globalI = inputDist->local2Global(i);
 			for (IndexType j = localIa[i]; j < localIa[i+1]; j++) {
 				IndexType globalNeighbor = localJa[j];
 				if (inputDist->isLocal(globalNeighbor)) {
-					IndexType localNeighbor = inputDist->global2local(globalNeighbor);
+					IndexType localNeighbor = inputDist->global2Local(globalNeighbor);
 					bool foundBackEdge = false;
 					for (IndexType y = localIa[localNeighbor]; y < localIa[localNeighbor+1]; y++) {
 						if (localJa[y] == globalI) {
