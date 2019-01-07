@@ -353,7 +353,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     SCAI_REGION_START("MultiLevel.coarsen.newGlobalIndices")
     //get new global indices by computing a prefix sum over the preserved nodes
     //fill gaps in index list. To avoid redistribution, we assign a block distribution and live with the implicit reindexing
-    scai::dmemo::DistributionPtr blockDist = scai::dmemo::genBlockDistribution(localN, comm);
+    scai::dmemo::DistributionPtr blockDist = scai::dmemo::genBlockDistribution(globalN, localN, comm);
     DenseVector<IndexType> distPreserved(blockDist, preserved);
     DenseVector<IndexType> blockFineToCoarse = computeGlobalPrefixSum(distPreserved, IndexType(-1) );
     const IndexType newGlobalN = blockFineToCoarse.max() + 1;

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <scai/lama.hpp>
-#include <scai/lama/Vector.hpp>
+#include <scai/tracing.hpp>
 
 #include <climits>
 #include <chrono>

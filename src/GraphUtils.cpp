@@ -12,12 +12,12 @@
 
 #include <scai/hmemo/ReadAccess.hpp>
 #include <scai/hmemo/WriteAccess.hpp>
-#include <scai/dmemo/Halo.hpp>
-#include <scai/dmemo/HaloBuilder.hpp>
+#include <scai/dmemo/HaloExchangePlan.hpp>
 #include <scai/dmemo/GenBlockDistribution.hpp>
 #include <scai/lama/matrix/DenseMatrix.hpp>
 #include <scai/lama/matrix/DIASparseMatrix.hpp>
-#include <scai/lama/expression/all.hpp>
+
+#include <scai/tracing.hpp>
 
 #include "GraphUtils.h"
 #include "RBC/Sort/SQuick.hpp"
@@ -25,6 +25,8 @@
 
 using std::vector;
 using std::queue;
+
+typedef std::pair<int,int> int_pair;
 
 namespace ITI {
 
@@ -45,15 +47,15 @@ scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType
     const IndexType globalN = inputDist->getGlobalSize();
     //const IndexType p = comm->getSize();
 
-    scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
+    scai::dmemo::DistributionPtr blockDist = scai::dmemo::genBlockDistribution(globalN, localN, comm);
     DenseVector<IndexType> result(blockDist,0);
     blockDist->getOwnedIndexes(result.getLocalValues());
 
     SCAI_ASSERT_EQUAL_ERROR(result.sum(), globalN*(globalN-1)/2);
 
-    scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(graph);
+    scai::dmemo::HaloExchangePlan partHalo = buildNeighborHalo<IndexType, ValueType>(graph);
     scai::hmemo::HArray<IndexType> haloData;
-    comm->updateHalo( haloData, result.getLocalValues(), partHalo );
+    partHalo.updateHalo( haloData, result.getLocalValues(), *comm );
 
     CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
     scai::hmemo::HArray<IndexType> newJA(localStorage.getJA());
@@ -63,12 +65,12 @@ scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType
         scai::hmemo::WriteAccess<IndexType> ja( newJA );//TODO: no longer allowed, change
         for (IndexType i = 0; i < ja.size(); i++) {
             IndexType oldNeighborID = ja[i];
-            IndexType localNeighbor = inputDist->global2local(oldNeighborID);
+            IndexType localNeighbor = inputDist->global2Local(oldNeighborID);
             if (localNeighbor != scai::invalidIndex) {
                 ja[i] = rResult[localNeighbor];
                 assert(blockDist->isLocal(ja[i]));
             } else {
-                IndexType haloIndex = partHalo.global2halo(oldNeighborID);
+                IndexType haloIndex = partHalo.global2Halo(oldNeighborID);
                 assert(haloIndex != scai::invalidIndex);
                 ja[i] = rHalo[haloIndex];
                 assert(!blockDist->isLocal(ja[i]));
@@ -116,7 +118,7 @@ std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &gr
             const IndexType endCols = localIa[v+1];
             for (IndexType j = beginCols; j < endCols; j++) {
                 IndexType globalNeighbor = localJa[j];
-                IndexType localNeighbor = inputDist->global2local(globalNeighbor);
+                IndexType localNeighbor = inputDist->global2Local(globalNeighbor);
                 if (localNeighbor != scai::invalidIndex && !visited[localNeighbor])  {
                     assert(localNeighbor < localN);
                     assert(localNeighbor >= 0);
@@ -225,9 +227,9 @@ ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<
 
 	scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
-	scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(input);
+	scai::dmemo::HaloExchangePlan partHalo = buildNeighborHalo<IndexType, ValueType>(input);
 	scai::hmemo::HArray<IndexType> haloData;
-	partDist->getCommunicatorPtr()->updateHalo( haloData, localData, partHalo );
+	partHalo.updateHalo( haloData, localData, partDist->getCommunicator() );
 
 	ValueType result = 0;
 	for (IndexType i = 0; i < localN; i++) {
@@ -235,7 +237,7 @@ ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<
 		const IndexType endCols = ia[i+1];
 		assert(ja.size() >= endCols);
 
-		const IndexType globalI = inputDist->local2global(i);
+		const IndexType globalI = inputDist->local2Global(i);
 		//assert(partDist->isLocal(globalI));
 		SCAI_ASSERT_ERROR(partDist->isLocal(globalI), "non-local index, globalI= " << globalI << " for PE " << comm->getRank() );
 		
@@ -248,9 +250,9 @@ ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<
 
 			IndexType neighborBlock;
 			if (partDist->isLocal(neighbor)) {
-				neighborBlock = partAccess[partDist->global2local(neighbor)];
+				neighborBlock = partAccess[partDist->global2Local(neighbor)];
 			} else {
-				neighborBlock = haloData[partHalo.global2halo(neighbor)];
+				neighborBlock = haloData[partHalo.global2Halo(neighbor)];
 			}
 
 			if (neighborBlock != thisBlock) {
@@ -385,21 +387,15 @@ ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, cons
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::dmemo::Halo buildNeighborHalo(const CSRSparseMatrix<ValueType>& input) {
+scai::dmemo::HaloExchangePlan buildNeighborHalo(const CSRSparseMatrix<ValueType>& input) {
 
 	SCAI_REGION( "ParcoRepart.buildPartHalo" )
 
-	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
-
 	std::vector<IndexType> requiredHaloIndices = nonLocalNeighbors<IndexType, ValueType>(input);
 
-	scai::dmemo::Halo halo;
-	{
-		scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
-		scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, halo );
-	}
+	scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
 
-	return halo;
+	return haloExchangePlan( input.getRowDistribution(), arrRequiredIndexes );
 }
 //---------------------------------------------------------------------------------------
 
@@ -444,7 +440,7 @@ inline bool hasNonLocalNeighbors(const CSRSparseMatrix<ValueType> &input, IndexT
 	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
-	const IndexType localID = inputDist->global2local(globalID);
+	const IndexType localID = inputDist->global2Local(globalID);
 	assert(localID != scai::invalidIndex);
 
 	const IndexType beginCols = ia[localID];
@@ -470,7 +466,7 @@ std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<Value
     const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
     for (IndexType globalI : candidates) {
-        const IndexType localI = inputDist->global2local(globalI);
+        const IndexType localI = inputDist->global2Local(globalI);
         if (localI == scai::invalidIndex) {
             continue;
         }
@@ -558,9 +554,10 @@ DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, c
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-	scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
-	scai::hmemo::HArray<IndexType> haloData;
-	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
+	auto partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
+	auto haloData = partHalo.updateHaloF( localPart, dist->getCommunicator() );
+
+    auto rHaloData = scai::hmemo::hostReadAccess( haloData );
 
     for(IndexType i=0; i<localN; i++){    // for all local nodes
     	IndexType thisBlock = localPart[i];
@@ -568,9 +565,9 @@ DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, c
     		IndexType neighbor = ja[j];
     		IndexType neighborBlock;
 			if (dist->isLocal(neighbor)) {
-				neighborBlock = partAccess[dist->global2local(neighbor)];
+				neighborBlock = partAccess[dist->global2Local(neighbor)];
 			} else {
-				neighborBlock = haloData[partHalo.global2halo(neighbor)];
+				neighborBlock = rHaloData[partHalo.global2Halo(neighbor)];
 			}
 			assert( neighborBlock < max +1 );
 			if (thisBlock != neighborBlock) {
@@ -623,9 +620,9 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes	
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-	scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
-	scai::hmemo::HArray<IndexType> haloData;
-	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
+	auto partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
+	auto haloData = partHalo.updateHaloF( localPart, dist->getCommunicator() );
+    auto rHaloData = scai::hmemo::hostReadAccess( haloData );
 
     for(IndexType i=0; i<localN; i++){    // for all local nodes
     	IndexType thisBlock = localPart[i];
@@ -636,9 +633,9 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes	
     		IndexType neighbor = ja[j];
     		IndexType neighborBlock;
 			if (dist->isLocal(neighbor)) {
-				neighborBlock = partAccess[dist->global2local(neighbor)];
+				neighborBlock = partAccess[dist->global2Local(neighbor)];
 			} else {
-				neighborBlock = haloData[partHalo.global2halo(neighbor)];
+				neighborBlock = rHaloData[partHalo.global2Halo(neighbor)];
 			}
 			SCAI_ASSERT_LE_ERROR( neighborBlock , max , "Wrong block id." );
 			if (thisBlock != neighborBlock) {
@@ -696,9 +693,9 @@ std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-	scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
-	scai::hmemo::HArray<IndexType> haloData;
-	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
+	auto partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
+    auto haloData = partHalo.updateHaloF( localPart, dist->getCommunicator() );
+    auto rHaloData = scai::hmemo::hostReadAccess( haloData );
 
     for(IndexType i=0; i<localN; i++){    // for all local nodes
     	IndexType thisBlock = localPart[i];
@@ -709,9 +706,9 @@ std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM
     		IndexType neighbor = ja[j];
     		IndexType neighborBlock;
 			if (dist->isLocal(neighbor)) {
-				neighborBlock = partAccess[dist->global2local(neighbor)];
+				neighborBlock = partAccess[dist->global2Local(neighbor)];
 			} else {
-				neighborBlock = haloData[partHalo.global2halo(neighbor)];
+				neighborBlock = rHaloData[partHalo.global2Halo(neighbor)];
 			}
 			SCAI_ASSERT_LE_ERROR( neighborBlock , numBlocks , "Wrong block id." );
             
@@ -782,9 +779,9 @@ std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 	const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-	scai::dmemo::Halo partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
-	scai::hmemo::HArray<IndexType> haloData;
-	dist->getCommunicatorPtr()->updateHalo( haloData, localPart, partHalo );
+	auto partHalo = buildNeighborHalo<IndexType, ValueType>(adjM);
+    auto haloData = partHalo.updateHaloF( localPart, dist->getCommunicator() );
+    auto rHaloData = scai::hmemo::hostReadAccess( haloData );
 
     for(IndexType i=0; i<localN; i++){    // for all local nodes
     	IndexType thisBlock = localPart[i];
@@ -796,9 +793,9 @@ std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType
     		IndexType neighbor = ja[j];
     		IndexType neighborBlock;
 			if (dist->isLocal(neighbor)) {
-				neighborBlock = partAccess[dist->global2local(neighbor)];
+				neighborBlock = partAccess[dist->global2Local(neighbor)];
 			} else {
-				neighborBlock = haloData[partHalo.global2halo(neighbor)];
+				neighborBlock = rHaloData[partHalo.global2Halo(neighbor)];
 			}
 			SCAI_ASSERT_LT_ERROR( neighborBlock , numBlocks , "Wrong block id." );
             
@@ -944,7 +941,7 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
         for(IndexType j=ia[i]; j<ia[i+1]; j++){ 
             if( dist->isLocal(ja[j]) ){ 
                 IndexType u = localPart[i];         // partition(i)
-                IndexType v = localPart[dist->global2local(ja[j])]; // partition(j), 0<j<N so take the local index of j
+                IndexType v = localPart[dist->global2Local(ja[j])]; // partition(j), 0<j<N so take the local index of j
                 assert( u < max +1);
                 assert( v < max +1);
                 if( u != v){    // the nodes belong to different blocks                  
@@ -1116,13 +1113,13 @@ scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSpars
 //----------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::Halo& halo) {
+scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::HaloExchangePlan& halo) {
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	scai::dmemo::DistributionPtr distPEs ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, comm->getSize()) );
 	assert(distPEs->getLocalSize() == 1);
 	scai::dmemo::DistributionPtr noDistPEs (new scai::dmemo::NoDistribution( comm->getSize() ));
 
-    const scai::dmemo::CommunicationPlan& plan = halo.getProvidesPlan();
+    const scai::dmemo::CommunicationPlan& plan = halo.getLocalCommunicationPlan();
     std::vector<IndexType> neighbors;
     std::vector<ValueType> edgeCount;
     for (IndexType i = 0; i < plan.size(); i++) {
@@ -1328,8 +1325,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	
 	PRINT0("allocated send plan");
 
-	scai::dmemo::CommunicationPlan recvPlan;
-	recvPlan.allocateTranspose( sendPlan, *comm );
+	scai::dmemo::CommunicationPlan recvPlan = comm->transpose( sendPlan );
 	
 	IndexType recvEdgesSize = recvPlan.totalQuantity();
 	SCAI_ASSERT_EQ_ERROR(recvEdgesSize % 2, 0, "List of received edges must have even length.");
@@ -1423,7 +1419,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 
 	PRINT0("assembled local indices");
 	
-	const scai::dmemo::DistributionPtr genDist(new scai::dmemo::GeneralDistribution(globalN, localIndices, comm));//this could be a GenBlockDistribution, right?
+	const auto genDist = scai::dmemo::generalDistributionUnchecked(globalN, localIndices, comm);//this could be a GenBlockDistribution, right?
 	
 	//-------------------------------------------------------------------
 	//
@@ -1496,7 +1492,7 @@ CSRSparseMatrix<ValueType> constructLaplacian(CSRSparseMatrix<ValueType> graph) 
 
     vector<ValueType> targetDegree(localN,0);
     for (IndexType i = 0; i < localN; i++) {
-        const IndexType globalI = dist->local2global(i);
+        const IndexType globalI = dist->local2Global(i);
         for (IndexType j = ia[i]; j < ia[i+1]; j++) {
             if (ja[j] == globalI) {
                 throw std::runtime_error("Forbidden self loop at " + std::to_string(globalI) + " with weight " + std::to_string(values[j]));
@@ -1622,7 +1618,7 @@ template std::vector<IndexType> localBFS(const CSRSparseMatrix<ValueType> &graph
 template IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const IndexType u, IndexType lowerBound, const IndexType k, IndexType maxRounds);
 template ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool weighted);
 template ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<ValueType> &nodeWeights);
-template scai::dmemo::Halo buildNeighborHalo<IndexType,ValueType>(const CSRSparseMatrix<ValueType> &input);
+template scai::dmemo::HaloExchangePlan buildNeighborHalo<IndexType,ValueType>(const CSRSparseMatrix<ValueType> &input);
 template bool hasNonLocalNeighbors(const CSRSparseMatrix<ValueType> &input, IndexType globalID);
 template std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
 template std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input, const std::set<IndexType>& candidates);

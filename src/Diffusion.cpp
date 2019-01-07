@@ -48,7 +48,7 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource( CS
 
 	ValueType weightSum = nodeWeights.sum();
 
-	IndexType sourceIndex = dist->global2local(source);
+	IndexType sourceIndex = dist->global2Local(source);
 
 	auto nullVector = fill<DenseVector<ValueType>>(dist,0);
 	auto d = eval<DenseVector<ValueType>>(nullVector - nodeWeights);

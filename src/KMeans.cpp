@@ -65,8 +65,7 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 	}
 
 	//setup general block distribution to model the space-filling curve
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	scai::dmemo::DistributionPtr blockDist(new scai::dmemo::GenBlockDistribution(globalN, localN, comm));
+	scai::dmemo::DistributionPtr blockDist = scai::dmemo::genBlockDistribution(globalN, localN );
 
 	//set local values in vector, leave non-local values with zero
 	std::vector<std::vector<ValueType> > result(dimensions);
@@ -75,7 +74,7 @@ std::vector<std::vector<ValueType> > findInitialCentersSFC(
 	}
 
 	for (IndexType j = 0; j < k; j++) {
-		IndexType localIndex = blockDist->global2local(wantedIndices[j]);
+		IndexType localIndex = blockDist->global2Local(wantedIndices[j]);
 		if (localIndex != scai::invalidIndex) {
 			assert(localIndex < localN);
 			IndexType permutedIndex = localIndices[localIndex];

@@ -422,7 +422,7 @@ void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<Inde
                 }
                             
                 for( IndexType i=0; i<localN; i++){                    
-                    outfile << dist->local2global(i) << " "<< localPart[i] << std::endl;
+                    outfile << dist->local2Global(i) << " "<< localPart[i] << std::endl;
                 }
 				/* TODO: resolve commented code         
                 // the last PE maybe has less local values

@@ -113,7 +113,7 @@ std::vector<IndexType>  ParcoRepart<IndexType, ValueType>::partitionGraph(
     }
 
     // pointer to the general block distribution created using the vtxDist array
-    const scai::dmemo::DistributionPtr genBlockDistPtr = genBlockDistribution( partSize, comm );
+    const scai::dmemo::DistributionPtr genBlockDistPtr = genBlockDistribution( N, partSize, comm );
 
     //-----------------------------------------------------
     //
