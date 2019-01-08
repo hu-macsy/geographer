@@ -3,6 +3,7 @@
 
 #include "LocalRefinement.h"
 #include "GraphUtils.h"
+#include "HaloPlanFns.h"
 
 #include <scai/utilskernel/TransferUtils.hpp>
 
@@ -216,7 +217,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			{
 				scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
 				scai::hmemo::HArrayRef<IndexType> arrProvidedIndexes( interfaceNodes );
-                graphHalo = scai::dmemo::HaloExchangePlan::buildWithPartner( *inputDist, arrRequiredIndexes, arrProvidedIndexes, partner );
+                graphHalo = buildWithPartner( *inputDist, arrRequiredIndexes, arrProvidedIndexes, partner );
 			}
 
 			//all required halo indices are in the halo

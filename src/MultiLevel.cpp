@@ -2,6 +2,7 @@
 
 #include "MultiLevel.h"
 #include "GraphUtils.h"
+#include "HaloPlanFns.h"
 
 using scai::hmemo::HArray;
 
@@ -68,7 +69,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 		scai::hmemo::HArray<IndexType> haloData;
         halo.updateHalo(haloData, fineToCoarseMap.getLocalValues(), *comm);
 
-        HaloExchangePlan coarseHalo = HaloExchangePlan::coarsenHalo(coarseGraph.getRowDistribution(), halo, fineToCoarseMap.getLocalValues(), haloData);
+        HaloExchangePlan coarseHalo = coarsenHalo(coarseGraph.getRowDistribution(), halo, fineToCoarseMap.getLocalValues(), haloData);
 
 		assert(coarseWeights.sum() == nodeWeights.sum());
 
