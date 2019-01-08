@@ -113,7 +113,7 @@ std::vector<IndexType>  ParcoRepart<IndexType, ValueType>::partitionGraph(
     }
 
     // pointer to the general block distribution created using the vtxDist array
-    const scai::dmemo::DistributionPtr genBlockDistPtr = genBlockDistribution( N, partSize, comm );
+    const auto genBlockDistPtr = genBlockDistributionBySizes( partSize, comm );
 
     //-----------------------------------------------------
     //
@@ -476,7 +476,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 						tempResult = ITI::KMeans::computePartition(coordinates, convertedWeights, migrationBlockSizes, migrationSettings);
 					}
 					
-					initMigrationPtr = scai::dmemo::generalDistributionNew( tempResult.getDistribution(), tempResult.getLocalValues() );
+					initMigrationPtr = scai::dmemo::generalDistributionByNewOwners( tempResult.getDistribution(), tempResult.getLocalValues() );
 					
 					if (settings.initialMigration == InitialPartitioningMethods::None) {
 						//nothing to do
@@ -490,7 +490,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 					
 					std::chrono::time_point<std::chrono::system_clock> beforeMigration =  std::chrono::system_clock::now();
 					
-					scai::dmemo::RedistributePlan prepareRedist(initMigrationPtr, nodeWeights.getDistributionPtr());
+					auto prepareRedist = scai::dmemo::redistributePlanByNewDistribution(initMigrationPtr, nodeWeights.getDistributionPtr());
 					
 					std::chrono::time_point<std::chrono::system_clock> afterRedistConstruction =  std::chrono::system_clock::now();
 					
@@ -596,10 +596,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			 */
 			std::chrono::time_point<std::chrono::system_clock> beforeSecondRedistributiom =  std::chrono::system_clock::now();
 			
-			scai::dmemo::RedistributePlan resultRedist(result.getLocalValues(), result.getDistributionPtr());//TODO: Wouldn't it be faster to use a GeneralDistribution here?
+			auto resultRedist = scai::dmemo::redistributePlanByNewOwners(result.getLocalValues(), result.getDistributionPtr());//TODO: Wouldn't it be faster to use a GeneralDistribution here?
 			result = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
 			
-			scai::dmemo::RedistributePlan redistributor(resultRedist.getTargetDistributionPtr(), input.getRowDistributionPtr());
+			auto redistributor = scai::dmemo::redistributePlanByNewDistribution(resultRedist.getTargetDistributionPtr(), input.getRowDistributionPtr());
 			input.redistribute(redistributor, noDist);
 			if (settings.useGeometricTieBreaking) {
 				for (IndexType d = 0; d < dimensions; d++) {

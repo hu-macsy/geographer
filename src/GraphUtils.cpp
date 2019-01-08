@@ -47,7 +47,7 @@ scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType
     const IndexType globalN = inputDist->getGlobalSize();
     //const IndexType p = comm->getSize();
 
-    scai::dmemo::DistributionPtr blockDist = scai::dmemo::genBlockDistribution(globalN, localN, comm);
+    scai::dmemo::DistributionPtr blockDist = scai::dmemo::genBlockDistributionBySize(globalN, localN, comm);
     DenseVector<IndexType> result(blockDist,0);
     blockDist->getOwnedIndexes(result.getLocalValues());
 

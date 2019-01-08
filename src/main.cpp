@@ -585,7 +585,7 @@ int main(int argc, char** argv) {
     if (settings.repartition && comm->getSize() == settings.numBlocks) {
     	//redistribute according to previous partition now to simulate the setting in a dynamic repartitioning
     	assert(previous.size() == N);
-    	scai::dmemo::Redistributor previousRedist(previous.getLocalValues(), previous.getDistributionPtr());
+    	auto previousRedist = scai::dmemo::redistributePlanByNewOwners(previous.getLocalValues(), previous.getDistributionPtr());
     	graph.redistribute(previousRedist, graph.getColDistributionPtr());
     	for (IndexType d = 0; d < settings.dimensions; d++) {
     		coordinates[d].redistribute(previousRedist);
@@ -759,7 +759,7 @@ int main(int argc, char** argv) {
     if (settings.writeDebugCoordinates) {
 		
 		std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
-		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
+		auto distFromPartition = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues() );
         for (IndexType dim = 0; dim < settings.dimensions; dim++) {
             assert( coordinateCopy[dim].size() == N);
 			coordinateCopy[dim].redistribute( distFromPartition );

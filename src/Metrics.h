@@ -141,8 +141,8 @@ struct Metrics{
 		
 		getAllMetrics( graph, partition, nodeWeights, settings);
 		
-		scai::dmemo::DistributionPtr newDist = scai::dmemo::generalDistributionNew( partition.getDistribution(), partition.getLocalValues() );	
-		scai::dmemo::DistributionPtr oldDist = graph.getRowDistributionPtr();
+		auto newDist = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues() );	
+		auto oldDist = graph.getRowDistributionPtr();
 		
 		std::tie( maxRedistVol, totRedistVol ) = getRedistributionVol( newDist, oldDist);
 		
@@ -275,7 +275,7 @@ struct Metrics{
 		const IndexType N = graph.getNumRows();
 	
 		//get the distribution from the partition
-		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::generalDistributionNew( partition.getDistribution(), partition.getLocalValues() );
+		auto distFromPartition = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues() );
 		
 		std::chrono::time_point<std::chrono::system_clock> beforeRedistribution = std::chrono::system_clock::now();
 
@@ -378,7 +378,7 @@ struct Metrics{
 		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 		
 		//get the distribution from the partition
-		scai::dmemo::RedistributePlan prepareRedist( newDist, oldDist );	
+		auto prepareRedist = scai::dmemo::redistributePlanByNewDistribution( newDist, oldDist );	
 				
 		// redistribution load
 		scai::hmemo::HArray<IndexType> sourceIndices = prepareRedist.getExchangeSourceIndexes();
@@ -413,7 +413,7 @@ struct Metrics{
 		const scai::dmemo::DistributionPtr initColDistPtr = graph.getColDistributionPtr();
 		
 		//get the distribution from the partition
-		auto distFromPartition = scai::dmemo::generalDistributionNew( partition.getDistribution(), partition.getLocalValues() );
+		auto distFromPartition = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues() );
 		
 		std::chrono::time_point<std::chrono::system_clock> beforeRedistribution = std::chrono::system_clock::now();
 		// redistribute graph according to partition distribution

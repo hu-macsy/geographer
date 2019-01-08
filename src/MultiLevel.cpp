@@ -90,7 +90,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 			// uncoarsening/refinement
 			std::chrono::time_point<std::chrono::system_clock> beforeUnCoarse =  std::chrono::system_clock::now();
 			DenseVector<IndexType> fineTargets = getFineTargets(coarseOrigin, fineToCoarseMap);
-			scai::dmemo::RedistributePlan redistributor(fineTargets.getLocalValues(), fineTargets.getDistributionPtr());
+			auto redistributor = scai::dmemo::redistributePlanByNewOwners( fineTargets.getLocalValues(), fineTargets.getDistributionPtr());
 			scai::dmemo::DistributionPtr projectedFineDist = redistributor.getTargetDistributionPtr();
 
 			assert(projectedFineDist->getGlobalSize() == globalN);
@@ -173,7 +173,7 @@ DenseVector<IndexType> MultiLevel<IndexType, ValueType>::getFineTargets(const De
 	const scai::dmemo::DistributionPtr oldFineDist = fineToCoarseMap.getDistributionPtr();
 
 	//get coarse reverse redistributor
-	scai::dmemo::RedistributePlan coarseReverseRedist(coarseOrigin.getLocalValues(), coarseDist);
+	auto coarseReverseRedist = scai::dmemo::redistributePlanByNewOwners(coarseOrigin.getLocalValues(), coarseDist);
 	const scai::dmemo::DistributionPtr oldCoarseDist = coarseReverseRedist.getTargetDistributionPtr();
 	SCAI_ASSERT_EQ_ERROR(oldCoarseDist->getGlobalSize(), coarseOrigin.size(), "Old coarse distribution has wrong size.");
 
@@ -353,7 +353,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     SCAI_REGION_START("MultiLevel.coarsen.newGlobalIndices")
     //get new global indices by computing a prefix sum over the preserved nodes
     //fill gaps in index list. To avoid redistribution, we assign a block distribution and live with the implicit reindexing
-    scai::dmemo::DistributionPtr blockDist = scai::dmemo::genBlockDistribution(globalN, localN, comm);
+    auto blockDist = scai::dmemo::genBlockDistributionBySize(globalN, localN, comm);
     DenseVector<IndexType> distPreserved(blockDist, preserved);
     DenseVector<IndexType> blockFineToCoarse = computeGlobalPrefixSum(distPreserved, IndexType(-1) );
     const IndexType newGlobalN = blockFineToCoarse.max() + 1;
