@@ -362,7 +362,7 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
     const DenseVector<IndexType> &part,
     IndexType k,
     const DenseVector<ValueType> &nodeWeights,
-    const std::vector<ValueType> &blockSizes){
+    const std::vector<ValueType> &optBlockSizes){
 
 	SCAI_REGION( "ParcoRepart.computeImbalance" )
 	const IndexType globalN = part.getDistributionPtr()->getGlobalSize();
@@ -370,8 +370,8 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
 	const IndexType weightsSize = nodeWeights.getDistributionPtr()->getGlobalSize();
 	
     const bool weighted = (weightsSize != 0);
-    //if a blockSizes vector is give, then we do not have homogeneous blocks weights
-    const bool homogeneous = (blockSizes.size()==0);
+    //if an optBlockSizes vector is give, then we do not have homogeneous blocks weights
+    const bool homogeneous = (optBlockSizes.size()==0);
 
     scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
     
@@ -458,16 +458,17 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
 
             //optSize = std::ceil(ValueType(weightSum) / k );
         }else{
-            //blockSizes is the optimum weight/size for every block
-            SCAI_ASSERT_EQ_ERROR( k, blockSizes.size(), "Number of blocks do not agree with the size of the vector of the block sizes");
+            //optBlockSizes is the optimum weight/size for every block
+            SCAI_ASSERT_EQ_ERROR( k, optBlockSizes.size(), "Number of blocks do not agree with the size of the vector of the block sizes");
             //TODO: vector not really needed, only the max value
 //TODO: recheck how imbalance is calculated            
             std::vector<ValueType> imbalances( k );
             for( IndexType i=0; i<k; i++){
-                imbalances[i] = (ValueType( globalSubsetSizes[i]- blockSizes[i]))/blockSizes[i];
+                imbalances[i] = (ValueType( globalSubsetSizes[i]- optBlockSizes[i]))/optBlockSizes[i];
             }
             imbalance = *std::max_element(imbalances.begin(), imbalances.end() );
         }
+//TODO: can we a have heterogeneous network but no node weights?
     } else {
         ValueType optSize = std::ceil(ValueType(globalN) / k);
         assert(maxBlockSize >= optSize);
@@ -476,6 +477,84 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
     }
 
 	return imbalance;
+}
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::pair<ValueType,ValueType> GraphUtils<IndexType,ValueType>::computeImbalance(
+    const DenseVector<IndexType> &part,
+    IndexType k,
+    const DenseVector<ValueType> &nodeWeights,
+    const ITI::CommTree<IndexType,ValueType> cTree){
+
+    //cNode is typedefed in CommTree.h
+    const std::vector<cNode> leaves = cTree.getLeaves();
+    const IndexType numLeaves = leaves.size();
+    SCAI_ASSERT_EQ_ERROR( numLeaves, k, "Number of blocks of the partition and number of leaves of the tree do not agree" );
+
+    //extract the memory and speed of every node in a vector each
+    std::vector<ValueType> memory( numLeaves );
+    std::vector<ValueType> relatSpeed( numLeaves );
+    for(unsigned int i=0; i<numLeaves; i++){
+        memory[i] = leaves[i].memMB;
+        relatSpeed[i] = leaves[i].relatSpeed;
+    }
+
+    std::vector<ValueType> optBlockWeight = getOptBlockWeights( leaves, nodeWeights);
+    SCAI_ASSERT_EQ_ERROR( optBlockWeight.size(), numLeaves, "Size mismatch");
+
+    ValueType speedImbalance = computeImbalance( part, k, nodeWeights, optBlockWeight );
+
+    //to measure imbalance according to memory constraints, we assume that
+    // every points has unit weight (this can be changed, for example,
+    //if we measure memory in MB, we can give each point a weight 
+    //of few bytes)
+    DenseVector<ValueType> unitWeights (nodeWeights.getDistributionPtr(), 1);
+
+    ValueType sizeImbalance = computeImbalance( part, k, unitWeights, memory );
+
+    return std::make_pair(speedImbalance, sizeImbalance);
+
+}
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<ValueType> GraphUtils<IndexType,ValueType>::getOptBlockWeights(
+    const std::vector<cNode> &hierLevel, 
+    const DenseVector<ValueType> &nodeWeights){
+
+    const IndexType numBlocks = hierLevel.size();
+
+    //the total node weight of the input
+    ValueType totalWeightSum;
+    {
+        scai::hmemo::ReadAccess<ValueType> rW( nodeWeights.getLocalValues() );
+        ValueType localW = 0;
+        for(int i=0; i<nodeWeights.getLocalValues().size(); i++ ){
+            localW += rW[i];
+        }
+        const scai::dmemo::CommunicatorPtr comm = nodeWeights.getDistributionPtr()->getCommunicatorPtr();
+        totalWeightSum = comm->sum(localW);
+    }
+
+    //the sum of the realtive speeds for all nodes
+    ValueType speedSum = 0;
+    for( cNode c: hierLevel){
+        speedSum += c.relatSpeed;
+    }
+
+    //the optimum size for every block
+    std::vector<ValueType> optBlockWeight( numBlocks );
+
+    //for each PE, we are given its relative speed compare to the fastest
+    //PE, a number between 0 and 1. The optimum weight it should have 
+    //is this:
+    // relative speed*( sum of input node weights / sum of all relative speeds)
+    for( int i=0; i<numBlocks; i++){
+        optBlockWeight[i] = totalWeightSum*(hierLevel[i].relatSpeed/speedSum);
+    }
+
+    return optBlockWeight;
 }
 //---------------------------------------------------------------------------------------
 

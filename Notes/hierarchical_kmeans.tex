@@ -1,5 +1,6 @@
 \documentclass[a4paper,10pt]{article}
 
+\usepackage[a4paper, total={6in, 9in}]{geometry}
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath}
 \usepackage{amsfonts}
@@ -248,13 +249,13 @@ minimize the difference between PE speed and block computational weight.
 
 Let $f$ be a mapping from a block $b$ to a PE $p$, then
 \begin{align*}
-\forall block\;b,\; & b.numPoints \leq f(b).memory \\
+\forall \;block\;b,\; & b.numPoints \leq f(b).memory \\
 & b.weight \leq (1+\epsilon)f(b).speed \\
 & or\\
 & (1-\epsilon)f(b).speed \leq b.weight \leq (1+\epsilon)f(b).speed \\
 \end{align*}
 
-This means that in the 2-constraint \km there are 2 imbalances that need to be calculated per block
+This means that in the 2-constraint \km\ there are 2 imbalances that need to be calculated per block
 while before it was only one. In the more general case, we have to maintain as many imbalances
 as the number of constraints. In the non-hierarchical version, (the one) imbalance was
 calculated as

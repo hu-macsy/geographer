@@ -1607,6 +1607,17 @@ DenseVector<IndexType> computeHierarchicalPartition(
     std::vector<ValueType> maxCoords(settings.dimensions);
     std::tie(minCoords, maxCoords) = getLocalMinMaxCoords( coordinates );
 
+    //used later for debugging and calculating imbalance
+    ValueType totalWeightSum;
+    {
+    	scai::hmemo::ReadAccess<ValueType> rW( nodeWeights.getLocalValues() );
+    	ValueType localW = 0;
+    	for(int i=0; i<nodeWeights.getLocalValues().size(); i++ ){
+    		localW += rW[i];
+    	}
+    	totalWeightSum = comm->sum(localW);
+    }
+
     //typedef of commNode from CommTree.h, see also KMeans.h
 	cNode root = commTree.getRoot();
 	if( settings.debugMode ){
@@ -1668,6 +1679,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		//number of old, known blocks == previous level size
 		IndexType numOldBlocks = groupOfCenters.size();
 
+		//number of new blocks each oald blocks must be partitioned to
 		std::vector<unsigned int> numNewBlocks = CommTree<IndexType, ValueType>::getGrouping( thisLevel );
 		SCAI_ASSERT_EQ_ERROR( numOldBlocks, numNewBlocks.size(), "Hierarchy level size mismatch" );
 		const IndexType totalNumNewBlocks = std::accumulate( numNewBlocks.begin(), numNewBlocks.end(), 0 );
@@ -1708,9 +1720,14 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		}
 		SCAI_ASSERT_EQ_ERROR( CNind, thisLevel.size(), "Not all comm nodes are accounted for");
 */
+
+//TODO: replace speedPercent with optBlockWeight
+//TODO: percentages make more sense		
+		std::vector<ValueType> optBlockWeight( totalNumNewBlocks );
 		std::vector<ValueType> blockSpeedPercent( totalNumNewBlocks );
 		for( int i=0; i<totalNumNewBlocks; i++){
 			blockSpeedPercent[i] = thisLevel[i].relatSpeed/speedSum;
+			optBlockWeight[i] = blockSpeedPercent[i]*totalWeightSum;
 		}
 
 //TODO: settings.numBlocks is needed, but now this is a vector
@@ -1727,7 +1744,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		}
 
 		//TODO?: remove?
-		ValueType imbalance =  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights );
+		ValueType imbalance =  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, totalNumNewBlocks, nodeWeights, optBlockWeight );
 		//IndexType cut = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
 
 		PRINT0("\nFinished hierarchy level " << h <<", partitioned into " << totalNumNewBlocks << " blocks and imabalance is " << imbalance <<std::endl );

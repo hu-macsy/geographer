@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Settings.h"
-//#include <iostream>
+#include <numeric>
 
 namespace ITI {
 
@@ -57,7 +57,7 @@ struct commNode{
 	}
 
 	//used to construct the father node from the children
-	commNode& operator+=( const commNode& c){
+	commNode& operator+=( const commNode& c ){
 		this->numCores += c.numCores;
 		this->memMB += c.memMB;
 		this->relatSpeed += c.relatSpeed;
@@ -69,6 +69,29 @@ struct commNode{
 		this->isLeaf = false;
 
 		return *this;
+	}
+
+	bool operator==( const commNode& c ){
+		if( this->hierarchy != c.hierarchy ){
+			return false;
+		}
+		if( this->numChildren != c.numChildren ){
+			return false;
+		}
+		if( this->numCores != c.numCores ){
+			return false;
+		}
+		if( this->memMB != c.memMB ){
+			return false;
+		}
+		if( this->relatSpeed != c.relatSpeed ){
+			return false;
+		}
+		return true;
+	}
+
+	bool operator!=( const commNode& c ){
+		return not (*this==c);
 	}
 
 	/* @brief Return the number of children this node has
@@ -118,7 +141,7 @@ std::vector<std::vector<commNode>> tree;
 
 //must be known how many levels the tree has
 //(well, it can infered but it is just easier)
-IndexType hierarchyLevels; //hierarchyLevels = tree,size()
+IndexType hierarchyLevels; //hierarchyLevels = tree.size()
 IndexType numNodes;
 IndexType numLeaves;
 
@@ -134,6 +157,12 @@ commNode getRoot() const{
 std::vector<commNode> getHierLevel( int level) const {
 	SCAI_ASSERT_LE_ERROR( level, hierarchyLevels, "Tree has less levels than requested" );
 	return tree[level];
+}
+
+/** @brief Return the leaves of the tree
+*/
+std::vector<commNode> getLeaves() const {
+	return tree.back();
 }
 
 /*@brief constructor to create tree from a vector of leaves

@@ -69,6 +69,16 @@ TEST_F(CommTreeTest, testTreeFromLeaves){
 
 		ITI::CommTree<IndexType,ValueType> cTree( leaves );
 
+		{//check getLeaves() function
+			std::vector<cNode> tmpLeaves = cTree.getLeaves();
+			EXPECT_EQ( leaves.size(), tmpLeaves.size());
+
+			for(unsigned int i=0; i<leaves.size(); i++ ){
+				if( leaves[i]!=tmpLeaves[i] ){
+					throw std::logic_error( "getLeaves function error" );
+				}
+			}
+		}
 		//cTree.print();
 
 		EXPECT_TRUE( cTree.checkTree() );

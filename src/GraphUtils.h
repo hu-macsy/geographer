@@ -21,6 +21,7 @@
 #include <boost/graph/properties.hpp>
 
 #include "Settings.h"
+#include "CommTree.h"
 
 namespace ITI {
 
@@ -110,6 +111,23 @@ static ValueType computeImbalance(
 	IndexType k,
 	const scai::lama::DenseVector<ValueType> &nodeWeights = scai::lama::DenseVector<ValueType>(0,0),
 	const std::vector<ValueType> &blockSizes = std::vector<ValueType>(0,0));
+
+/** Overloaded version that takes as input the communication tree
+*/
+static std::pair<ValueType,ValueType> computeImbalance(
+    const scai::lama::DenseVector<IndexType> &part,
+    IndexType k,
+    const scai::lama::DenseVector<ValueType> &nodeWeights,
+    const ITI::CommTree<IndexType,ValueType> cTree);
+
+/** @brief Given a hierarchy level, it extracts the relative speed
+of every PE (remember: every node in a hierarchy level is either a single
+PE, if the level is the leaves, or a group of PEs) and calculates what
+is the optimum weight each PE should have. Mainly used to comoute imbalance.
+*/
+static std::vector<ValueType> getOptBlockWeights(
+    const std::vector<cNode> &hierLevel, 
+    const scai::lama::DenseVector<ValueType> &nodeWeights);
 
 /**
  * @brief Builds a halo containing all non-local neighbors.
