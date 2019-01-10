@@ -62,7 +62,7 @@ struct commNode{
 		this->memMB += c.memMB;
 		this->relatSpeed += c.relatSpeed;
 		this->numChildren++;
-		// by concention, leaf nodes have their id as their only child
+		// by convention, leaf nodes have their id as their only child
 		this->children.insert( this->children.begin(), c.children.begin(), c.children.end() );
 		//nodes are added to form the upper level, so the result of
 		//the addition is not a leaf node

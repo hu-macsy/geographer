@@ -43,6 +43,7 @@ using point = std::vector<ValueType>;
  * @param[in] coordinates first level index specifies dimension, second level index the point id
  * @param[in] nodeWeights
  * @param[in] blockSizes target block sizes, not maximum sizes
+ * @param[in] prevPartition This is used for the hierarchical version, it is the partition from the previous hierarchy level.
  * @param[in] centers initial k-means centers
  * @param[in] settings Settings struct
  *
@@ -55,7 +56,7 @@ using point = std::vector<ValueType>;
  	const std::vector<DenseVector<ValueType>> &coordinates, \
  	const DenseVector<ValueType> &nodeWeights, \
  	const std::vector<ValueType> &blockSizes, \
- 	const DenseVector<IndexType>& partition,\
+ 	const DenseVector<IndexType>& prevPartition,\
  	std::vector<std::vector<point>> centers, \
  	const Settings settings, \
  	struct Metrics &metrics);

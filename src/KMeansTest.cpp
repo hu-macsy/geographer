@@ -208,18 +208,18 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 	//set CommTree
 	std::vector<cNode> leaves = {
 		// 				{hierachy ids}, numCores, mem, speed
-		cNode( std::vector<unsigned int>{0,0}, 4, 8, 50),
+		cNode( std::vector<unsigned int>{0,0}, 4, 8, 100),
 		cNode( std::vector<unsigned int>{0,1}, 4, 8, 90),
 
 		cNode( std::vector<unsigned int>{1,0}, 6, 10, 80),
 		cNode( std::vector<unsigned int>{1,1}, 6, 10, 90),
 		cNode( std::vector<unsigned int>{1,2}, 6, 10, 70),
 
-		cNode( std::vector<unsigned int>{2,0}, 8, 12, 80),
-		cNode( std::vector<unsigned int>{2,1}, 8, 12, 90),
-		cNode( std::vector<unsigned int>{2,2}, 8, 12, 90),
-		cNode( std::vector<unsigned int>{2,3}, 8, 12, 100),
-		cNode( std::vector<unsigned int>{2,4}, 8, 12, 90)
+		cNode( std::vector<unsigned int>{2,0}, 8, 12, 60),
+		cNode( std::vector<unsigned int>{2,1}, 8, 12, 70),
+		cNode( std::vector<unsigned int>{2,2}, 8, 12, 70),
+		cNode( std::vector<unsigned int>{2,3}, 8, 12, 50),
+		cNode( std::vector<unsigned int>{2,4}, 8, 12, 50)
 	};
 
 	ITI::CommTree<IndexType,ValueType> cTree( leaves );
@@ -228,6 +228,7 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 	settings.dimensions = dimensions;
 	settings.numBlocks = leaves.size();
 	settings.debugMode = true;
+	settings.epsilon = 0.05;
 	
 	Metrics metrics(settings);
 

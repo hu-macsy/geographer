@@ -41,14 +41,13 @@ CommTree<IndexType, ValueType>::CommTree(std::vector<commNode> leaves){
 template <typename IndexType, typename ValueType>
 IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vector<commNode> leaves){
 
-	//first, bottom level are the leaves
+	//bottom level are the leaves
 	std::vector<commNode> levelBelow = leaves;
 	tree.insert( tree.begin(), levelBelow );
 	IndexType size = levelBelow.size();
 
 	IndexType hierarchyLevels = leaves.front().hierarchy.size();
 	PRINT("There are " << hierarchyLevels << " levels of hierarchy and " << leaves.size() << " leaves");
-
 
 	for(int h = hierarchyLevels-1; h>=0; h--){
 		PRINT("starting level " << h);
@@ -81,6 +80,11 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 	unsigned int levelBelowsize = levelBelow.size();
 	std::vector<bool> seen(levelBelowsize, false);
 	PRINT("level below has size " << levelBelowsize );
+
+	//calculate the same of the relative speeds, this will be used later to normalize the speeds of every node
+	for( unsigned int i=0; i<levelBelowsize; i++){
+
+
 	std::vector<commNode> aboveLevel;
 
 	//assume nodes with the same parent are not necessarilly adjacent 
