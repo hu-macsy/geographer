@@ -11,9 +11,6 @@
 namespace ITI {
 
 
-//typedef typename CommTree<IndexType,ValueType>::commNode cNode;
-
-
 //initialize static leaf counter
 template <typename IndexType, typename ValueType>
 unsigned int ITI::CommTree<IndexType,ValueType>::commNode::leafCount = 0;
@@ -67,12 +64,6 @@ IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vecto
 template <typename IndexType, typename ValueType>
 std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType, ValueType>::createLevelAbove( const std::vector<commNode> levelBelow ){
 
-	//unsigned int h = hierLevel;
-	//unsigned int lvlBelowHierSize = levelBelow.begin()->hierarchy.size();
-	//SCAI_ASSERT_GT_ERROR(lvlBelowHierSize, h, "Hierarchy sizes mismatch for level "<< hierLevel);
-
-	//the level above has this many nodes
-	//unsigned int aboveLevelSize = 0;
 	//a hierarchy prefix is the hierarchy vector without the last element
 	//commNodes that have the same prefix, belong to the same father node
 	typedef std::vector<unsigned int> hierPrefix;
@@ -148,7 +139,6 @@ template <typename IndexType, typename ValueType>
 std::vector<unsigned int> CommTree<IndexType, ValueType>::getGrouping(const std::vector<commNode> thisLevel){
 
 	std::vector<unsigned int> groupSizes;
-	//unsigned int prevLvlSize;
 	unsigned int numNewTotalNodes;//for debugging, printing
 
 	std::vector<cNode> prevLevel = createLevelAbove(thisLevel);
@@ -157,13 +147,11 @@ std::vector<unsigned int> CommTree<IndexType, ValueType>::getGrouping(const std:
 		groupSizes.push_back( c.getNumChildren() );
 	}
 	//the number of old blocks from the previous, provided partition
-	//prevLvlSize = groupSizes.size();
+	
 	numNewTotalNodes = std::accumulate(groupSizes.begin(), groupSizes.end(), 0);
-	//PRINT0("There are "  <<  prevLvlSize << " blocks from the previous partition and " << numNewTotalBlocks << " new blocks in total");
+	
 	SCAI_ASSERT_EQ_ERROR( numNewTotalNodes, thisLevel.size(), "Vector size mismatch" );
 	SCAI_ASSERT_EQ_ERROR( groupSizes.size(), prevLevel.size(), "Vector size mismatch" );
-	//const IndexType maxPart = partition.max();
-	//SCAI_ASSERT_EQ_ERROR( prevLvlSize-1, maxPart, "The provided partition must have equal number of blocks as the length of the vector with the new number of blocks per part");
 	
 	return groupSizes;
 }//getGrouping

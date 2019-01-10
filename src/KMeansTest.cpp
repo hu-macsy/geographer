@@ -229,7 +229,9 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 	settings.numBlocks = leaves.size();
 	settings.debugMode = true;
 	settings.epsilon = 0.05;
-	
+	settings.balanceIterations = 5;
+	settings.maxKMeansIterations = 5;
+
 	Metrics metrics(settings);
 
 	scai::lama::DenseVector<IndexType> partition = KMeans::computeHierarchicalPartition( coords, unitNodeWeights, cTree, settings, metrics);
