@@ -81,9 +81,8 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 	std::vector<bool> seen(levelBelowsize, false);
 	PRINT("level below has size " << levelBelowsize );
 
-	//calculate the same of the relative speeds, this will be used later to normalize the speeds of every node
-	for( unsigned int i=0; i<levelBelowsize; i++){
-
+	//will be used later to normalize the speed
+	ValueType maxRelatSpeed = 0;
 
 	std::vector<commNode> aboveLevel;
 
@@ -124,10 +123,21 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 				numChildren++;
 			}
 		}
+		//update: changing the way we sum up the relative speeds.
 		//speed is relative, so take the average
-		fatherNode.relatSpeed /= numChildren;
+		//fatherNode.relatSpeed /= numChildren;
+		if( fatherNode.relatSpeed>maxRelatSpeed ){
+			maxRelatSpeed = fatherNode.relatSpeed;
+		}
 
 		aboveLevel.push_back(fatherNode);
+	}
+
+	//TODO:maybe this is not necessarily needed. This is how the input is given
+	//see also in computePartition the  optWeightAllBlocks vector
+	//normalize speeds so all are between 0 and 1
+	for( unsigned int i=0; i<aboveLevel.size(); i++){
+		aboveLevel[i].relatSpeed /= maxRelatSpeed;
 	}
 
 	return aboveLevel;

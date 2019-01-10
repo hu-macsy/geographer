@@ -682,8 +682,8 @@ std::vector<ValueType> effectMinDistAllBlocks( numNewBlocks );
 		}
 	}
 
-for( int i=0; i<numNewBlocks; i ++)	
-	PRINT(*comm << ": "<< clusterIndicesAllBlocks[i] );
+//for( int i=0; i<numNewBlocks; i ++)	
+//	PRINT(*comm << ": "<< clusterIndicesAllBlocks[i] );
 
 //TODO?:maybe clusterIndices makes sense to stay as a vector<vector<>> ?
 
@@ -867,7 +867,7 @@ SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be dif
 			//aux<IndexType,ValueType>::timeMeasurement(balanceStart);
 
 			comm->synchronize();
-		}// assignnment block
+		}// assignment block
 
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.blockWeightSum" );
@@ -882,7 +882,7 @@ SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be dif
 PRINT0( "block " << newB << " has weight " << blockWeights[newB] << " while its optWeight is " << optWeight << ", imbalance= " << imbalances[newB]  );
 		}
 
-		//imbalace in the maximum imbalance of all new blocks
+		//imbalance in the maximum imbalance of all new blocks
 		imbalance = *std::max_element(imbalances.begin(), imbalances.end() );
 PRINT(*comm << ": " << imbalance );
 		//TODO: adapt for multiple node weights
@@ -1383,11 +1383,12 @@ ValueType localSampleWeightSum = 0;
 const ValueType totalWeightSum = comm->sum(localSampleWeightSum);
 //the "optimum" weight every new block should have
 //TODO: adapt for multiple node weights
+//WARNING: this is related with how we store and add the relative speed
+//see also the ComMTree::createLevelAbove() function
 std::vector<ValueType> optWeightAllBlocks( totalNumNewBlocks );
 for( IndexType newB=0; newB<totalNumNewBlocks; newB++ ){
 	optWeightAllBlocks[newB] = blockSizesPerCent[newB]*totalWeightSum;
 }
-
 
 		std::vector<ValueType> timePerPE( comm->getSize(), 0.0);
 //here, result.max()=numNewBlocks
