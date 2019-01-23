@@ -44,16 +44,21 @@ IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vecto
 	IndexType size = levelBelow.size();
 
 	IndexType hierarchyLevels = leaves.front().hierarchy.size();
-	PRINT("There are " << hierarchyLevels << " levels of hierarchy and " << leaves.size() << " leaves");
+	{
+		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		if( comm->getRank()==0 ){
+			PRINT("There are " << hierarchyLevels << " levels of hierarchy and " << leaves.size() << " leaves");
+		}
+	}
 
 	for(int h = hierarchyLevels-1; h>=0; h--){
-		PRINT("starting level " << h);
+		//PRINT("starting level " << h);
 		std::vector<commNode> levelAbove = createLevelAbove(levelBelow);
 		//add the newly created level to the tree
 		tree.insert(tree.begin(), levelAbove );
 		size += levelAbove.size();
 		levelBelow = levelAbove;
-		PRINT("Size of level above (lvl " << h << ") is " << levelAbove.size() );
+		//PRINT("Size of level above (lvl " << h << ") is " << levelAbove.size() );
 	}
 	return size;
 }//createTreeFromLeaves
@@ -70,7 +75,7 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 
 	unsigned int levelBelowsize = levelBelow.size();
 	std::vector<bool> seen(levelBelowsize, false);
-	PRINT("level below has size " << levelBelowsize );
+	//PRINT("level below has size " << levelBelowsize );
 
 	//will be used later to normalize the speed
 	ValueType maxRelatSpeed = 0;

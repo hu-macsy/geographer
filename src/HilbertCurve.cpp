@@ -818,8 +818,12 @@ bool HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(
 	//the min and max local sfc value
 	ValueType sfcMinMax[2] = { localSFCInd.front(), localSFCInd.back() };
 
-const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();	
-PRINT(*comm <<": sending "<< sfcMinMax[0] << ", " << sfcMinMax[1] )	;
+	
+	const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
+
+	if( settings.debugMode ){	
+		PRINT(*comm <<": sending "<< sfcMinMax[0] << ", " << sfcMinMax[1] )	;
+	}
 
 	const IndexType p = comm->getSize();
 	const IndexType root = 0; //set PE 0 as root 
@@ -832,12 +836,14 @@ PRINT(*comm <<": sending "<< sfcMinMax[0] << ", " << sfcMinMax[1] )	;
 
 	comm->gather(allMinMax, 2, root, sfcMinMax );
 
-PRINT0("gathered: ");
-if( comm->getRank()==root )
-for(unsigned int i=0; i<arraySize; i++){
-	std::cout<< ", " << allMinMax[i];
-}
-std::cout<< std::endl;
+
+	if( settings.debugMode and comm->getRank()==root ){
+		PRINT0("gathered: ");
+		for(unsigned int i=0; i<arraySize; i++){
+			std::cout<< ", " << allMinMax[i];
+		}
+		std::cout<< std::endl;
+	}
 	
 	//check if array is sorted. For all PEs except the root, this is trivially
 	// true since their array has only one element

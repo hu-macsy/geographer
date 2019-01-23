@@ -242,8 +242,8 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 	struct Settings settings;
 	settings.dimensions = dimensions;
 	settings.numBlocks = leaves.size();
-	settings.debugMode = true;
-	settings.verbose = true;
+	settings.debugMode = false;
+	settings.verbose = false;
 	settings.epsilon = 0.05;
 	settings.balanceIterations = 5;
 	settings.maxKMeansIterations = 5;

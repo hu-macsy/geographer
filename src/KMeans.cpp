@@ -96,7 +96,7 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	//every "subarray" has size numPEs+1 (in this example numPEs=3)
 	std::vector<IndexType> concatPrefixSumArray;
 
-	//TODO: convert vector above to a vector<vector> of size numPEs and every
+	//TODO?: convert vector above to a vector<vector> of size numPEs and every
 	// inner vector of size numOldBlocks?
 
 	{
@@ -122,10 +122,6 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 			SCAI_ASSERT_EQ_ERROR( globalN, std::accumulate(allOldSizesVec.begin(), allOldSizesVec.end(), 0), "Mismatch in gathered array for sizes of all blocks for PE " << *comm);
 		}
 
-PRINT0(numOldBlocks <<" old blocks, allOldBlockSizes:");
-for( IndexType x: allOldSizesVec)
-	PRINT0(x);
-
 		// only root PE calculates the prefixSum
 		if( comm->getRank()==rootPE ){
 			for( unsigned int blockId=0; blockId<numOldBlocks; blockId++){
@@ -142,15 +138,8 @@ for( IndexType x: allOldSizesVec)
 
 		comm->bcast( concatPrefixSumArray.data() ,(numPEs+1)*numOldBlocks, rootPE);		
 
-PRINT0(concatPrefixSumArray.size() <<"= concatPrefixSumArray.size(), concatPrefixSumArray:");
-for( IndexType x: concatPrefixSumArray)
-	PRINT0(x);
-
 
 		for( unsigned int b=0; b<numOldBlocks; b++){
-//TODO: check if correct, maybe it is (b+1)*(numPEs+1)
-//		or numPEs*(b+1)+b = b*(numPEs+1)+numPEs
-			//concatPrefixSumArray[ numPEs*(b+1) ]
 			globalBlockSizes[b] = concatPrefixSumArray[(b+1)*numPEs+b];
 			SCAI_ASSERT_EQ_ERROR( concatPrefixSumArray[b*(numPEs+1)] , 0, "Wrong concat prefix sum array, values at indices b*(numPEs+1) must be zero, Failed for b=" << b);
 		}
@@ -174,11 +163,9 @@ for( IndexType x: concatPrefixSumArray)
 		//the number of centers for block b
 		IndexType k_b = numNewBlocksPerOldBlock[b]; 
 		newCenterIndWithinBLock[b].resize( k_b );
-PRINT( *comm << ": old block " << b << " has size " << globalBlockSizes[b] );	
 		for( IndexType i = 0; i < k_b; i++) {
 			//wantedIndices[i] = i * (globalN / k) + (globalN / k)/2;
 			newCenterIndWithinBLock[b][i] = i*(globalBlockSizes[b]/k_b) + (globalBlockSizes[b]/k_b)/2;
-PRINT( *comm << ": center ind " << newCenterIndWithinBLock[b][i]);
 		}
 	}
 
@@ -206,8 +193,6 @@ PRINT( *comm << ": center ind " << newCenterIndWithinBLock[b][i]);
 		//a block in this PE.
 		IndexType counter = rangeStart;
 
-PRINT(*comm <<": for block "<< b << " owns indices from " << rangeStart <<  " till " << rangeEnd);
-	
 		//center indices for block b, pass by reference so not to copy
 		const std::vector<IndexType>& centersForThisBlock = newCenterIndWithinBLock[b];
 
@@ -240,9 +225,9 @@ PRINT(*comm <<": for block "<< b << " owns indices from " << rangeStart <<  " ti
 					//desired center found
 					if( withinBlockIndex==centerInd ){
 						//store center coords
-PRINT(*comm <<": adding center "<< centerInd << " with coordinates " << convertedCoords[sortedIndex][0] << ", " << convertedCoords[sortedIndex][1] );			
 						centersPerNewBlock[b][j] = convertedCoords[ sortedIndex ];
 						numOwnedCenters++;
+						//PRINT(*comm <<": adding center "<< centerInd << " with coordinates " << convertedCoords[sortedIndex][0] << ", " << convertedCoords[sortedIndex][1] );			
 						break;
 					}
 					counter++;
@@ -253,16 +238,17 @@ PRINT(*comm <<": adding center "<< centerInd << " with coordinates " << converte
 	}//for b<numOldBlocks
 
 	SCAI_ASSERT_EQ_ERROR(sumOfRanges, localN, thisPE << ": Sum of owned number of points per block should be equal the total number of local points");
-PRINT( *comm << ": owns " << numOwnedCenters << " centers");
+
 	if( settings.debugMode ){
+		PRINT( *comm << ": owns " << numOwnedCenters << " centers");
 		unsigned int numNewTotalBlocks = std::accumulate(numNewBlocksPerOldBlock.begin(), numNewBlocksPerOldBlock.end(), 0);
 		SCAI_ASSERT_EQ_ERROR( comm->sum(numOwnedCenters), numNewTotalBlocks , "Not all centers were found");
 	}
 
 	//
 	//global sum operation. Doing it in a separate loop on purpose
-	//since different PEs own centers from different block and for most
-	//block they own no centers at all
+	//since different PEs own centers from different blocks and for most
+	//blocks they own no centers at all
 	//
 
 	for( IndexType b=0; b<numOldBlocks; b++){
@@ -311,7 +297,7 @@ std::vector<std::vector<ValueType>>  findInitialCentersSFC(
 
 	//homogeneous case, all PEs have the same memory and speed
 	//there is only hierarchy level
-//TODO: probably this needs some further adaptation
+	//TODO: probably this needs some further adaptation for the hierarchical version
 	IndexType mem = 1;
 	IndexType speed = 1;
 	IndexType cores = 1;
@@ -320,7 +306,6 @@ std::vector<std::vector<ValueType>>  findInitialCentersSFC(
 	for(int i=0; i<settings.numBlocks; i++){ 
 		leaves[i] = cNode(std::vector<unsigned int>{0}, cores, mem, speed);
 	}
-PRINT(settings.numBlocks);	
 
 	//every point belongs to one block in the beginning
 	scai::lama::DenseVector<IndexType> partition( coordinates[0].getDistributionPtr(), 0);
@@ -540,8 +525,7 @@ DenseVector<IndexType> assignBlocks(
 
 	//number of blocks from the previous hierarchy
 	const IndexType numOldBlocks= blockSizesPrefixSum.size()-1;
-	//assert( centersPerBlock.size() == numOldBlocks );
-
+	
 	//this check is done before. TODO: remove?
 	if( settings.debugMode ){
 		const IndexType maxPart = oldBlock.max(); //global operation
@@ -549,7 +533,7 @@ DenseVector<IndexType> assignBlocks(
 	}
 
 	// numNewBlocks is equivalent to 'k' in the classic version
-	IndexType numNewBlocks = centers.size(); //probably not really needed
+	IndexType numNewBlocks = centers.size(); 
 
 	SCAI_ASSERT_EQ_ERROR( blockSizesPrefixSum.back(), numNewBlocks, "Total number of new blocks mismatch" );
 	assert( influence.size() == numNewBlocks );
@@ -557,16 +541,8 @@ DenseVector<IndexType> assignBlocks(
 	//centers are given as a 1D vector alongside with a prefix sum vector
 	const std::vector<point>& centers1DVector = centers;
 
-//TODO: decided that influence is gonna be a 1D vector from the beginning
-//		change and keep only influence
-//TODO?: rename to smth like influenceAllBlocks??
-//std::vector<ValueType>& influence1DVector = influence;	
-
 	SCAI_ASSERT_EQ_ERROR( centers1DVector.size(), numNewBlocks, "Vector size mismatch" );
 	SCAI_ASSERT_EQ_ERROR( influence.size(), numNewBlocks, "Vector size mismatch" );
-
-	//if we use 1D arrays and the prefix sum, vectors above must be adapted too
-	//and clusterIndicesPerBlock below
 
 	//pre-filter possible closest blocks
 	std::vector<ValueType> minDistanceAllBlocks( numNewBlocks );
@@ -614,16 +590,11 @@ DenseVector<IndexType> assignBlocks(
 
 		//just for checking
 		for (IndexType i=rangeStart; i<rangeEnd; i++) {
-			//IndexType c=clusterIndicesAllBlocks[i];
 			ValueType effectiveDist = minDistanceAllBlocks[i]\
 				*minDistanceAllBlocks[i]*influence[i];
 			SCAI_ASSERT_LT_ERROR( std::abs(effectMinDistAllBlocks[i] - effectiveDist), 1e-5, "effectiveMinDistance[" << i << "] = " << effectMinDistAllBlocks[i] << " != " << effectiveDist << " = effectiveDist");
 		}
 	}
-for( int o=0; o<numNewBlocks; o++){
-	std::cout<< comm->getRank() << ": " << o << "-" << clusterIndicesAllBlocks[o] << " || ";
-}
-std::cout << std::endl;
 
 	//ValueType imbalance;
 	IndexType iter = 0;
@@ -661,12 +632,10 @@ std::cout << std::endl;
 				const IndexType oldCluster = wAssignment[i];
 				const IndexType fatherBlock = rOldBlock[i];
 
-//TODO: not needed assertion, this is checked in the beginning				
-SCAI_ASSERT_LT_ERROR( fatherBlock, numOldBlocks, "Wrong father block index");
-
+				//TODO: not needed assertion, this is checked in the beginning				
+				SCAI_ASSERT_LT_ERROR( fatherBlock, numOldBlocks, "Wrong father block index");
 
 				if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i]) {
-					//std::cout << upperBoundOwnCenter[i] << " " << lowerBoundNextCenter[i] << " " << distThreshold[oldCluster] << std::endl;
 					//cluster assignment cannot have changed.
 					//wAssignment[i] = wAssignment[i];
 					skippedLoops++;
@@ -689,8 +658,6 @@ SCAI_ASSERT_LT_ERROR( fatherBlock, numOldBlocks, "Wrong father block index");
 						ValueType bestValue = std::numeric_limits<ValueType>::max();
 						IndexType secondBest = 0;
 						ValueType secondBestValue = std::numeric_limits<ValueType>::max();
-
-						//IndexType c = 0;
 						
 						//where the range of indices starts for the father block
 						const IndexType rangeStart = blockSizesPrefixSum[fatherBlock];
@@ -698,19 +665,18 @@ SCAI_ASSERT_LT_ERROR( fatherBlock, numOldBlocks, "Wrong father block index");
 						//start with the first center index
 						IndexType c = rangeStart;
 
-						//check all centers belonging to the father block to find
-						//the closest
+						//check all centers belonging to the father block to find the closest
 						while(c < rangeEnd && secondBestValue > effectMinDistAllBlocks[c]) {
 							totalComps++;
 							//remember: cluster centers are sorted according to their distance from the bounding box of this PE	
 							//also, the cluster indices go from 0 till numNewBlocks
 							IndexType j = clusterIndicesAllBlocks[c];//maybe it would be useful to sort the whole centers array, aligning memory accesses.
+
+							//squared distance from previous assigned center
 							ValueType sqDist = 0;
 							point myCenter = centers1DVector[j];
 							//TODO: restructure arrays to align memory accesses better in inner loop
 							for (IndexType d = 0; d < dim; d++) {
-								//ValueType dist = centers[d][j] - coordinates[d][i];
-								//sqDist += dist*dist;
 								sqDist += std::pow(myCenter[d]-coordinates[d][i], 2);
 							}
 
@@ -727,9 +693,10 @@ SCAI_ASSERT_LT_ERROR( fatherBlock, numOldBlocks, "Wrong father block index");
 							}
 							c++;
 						} //while
-//assert(bestBlock != secondBest);
-SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be different" );
+
+						SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be different" );
 						assert(secondBestValue >= bestValue);
+
 						//this point has a new center
 						if (bestBlock != oldCluster) {
 							if (bestValue < lowerBoundNextCenter[i]) {
@@ -752,10 +719,10 @@ SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be dif
 			if (settings.verbose) {
 				std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
 				ValueType time = balanceTime.count() ;
-				//std::cout<< comm->getRank()<< ": time " << time << std::endl;
-				//PRINT(comm->getRank() << ": in assignBlocks, balanceIter time: " << time << ", for loops: " << forLoopCnt );
-				//ValueType maxTime = comm->max( time );
-				//PRINT0( "max time: " << maxTime << ", for loops: " << forLoopCnt );
+				std::cout<< comm->getRank()<< ": time " << time << std::endl;
+				PRINT(comm->getRank() << ": in assignBlocks, balanceIter time: " << time << ", for loops: " << forLoopCnt );
+				ValueType maxTime = comm->max( time );
+				PRINT0( "max time: " << maxTime << ", for loops: " << forLoopCnt );
 
 				SCAI_ASSERT_LT_ERROR( comm->getRank(), timePerPE.size(), "vector size mismatch" );
 				timePerPE[comm->getRank()] += time;
@@ -774,14 +741,11 @@ SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be dif
 		for( int newB=0; newB<numNewBlocks; newB++ ){
 			ValueType optWeight = optWeightAllBlocks[newB];
 			imbalances[newB] = (ValueType(blockWeights[newB] - optWeight)/optWeight);
-//PRINT0( "block " << newB << " has weight " << blockWeights[newB] << " while its optWeight is " << optWeight << ", imbalance= " << imbalances[newB] <<", influence= " << influence[newB] );
 		}
 
 		//imbalance in the maximum imbalance of all new blocks
 		imbalance = *std::max_element(imbalances.begin(), imbalances.end() );
-//PRINT(*comm << ": " << imbalance );
 		//TODO: adapt for multiple node weights
-
 
 		std::vector<ValueType> oldInfluence = influence;//size=newNewBlocks
 
@@ -820,7 +784,6 @@ SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be dif
 				//influence change switched direction
 				influenceChangeUpperBound[j] = 0.1 + 0.9*influenceChangeUpperBound[j];
 				influenceChangeLowerBound[j] = 0.1 + 0.9*influenceChangeLowerBound[j];
-				//if (comm->getRank() == 0) std::cout << "Block " << j << ": reduced bounds to " << influenceChangeUpperBound[j] << " and " << influenceChangeLowerBound[j] << std::endl;
 				assert(influenceChangeUpperBound[j] > 1);
 				assert(influenceChangeLowerBound[j] < 1);
 			}
@@ -844,7 +807,7 @@ SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be dif
 			for (IndexType newB=0; newB<numNewBlocks; newB++) {
 				effectMinDistAllBlocks[newB] = minDistanceAllBlocks[newB]*minDistanceAllBlocks[newB]*influence[newB];
 			}
-//duplicated code as in the beginning of the assignBlocks
+			//TODO: duplicated code as in the beginning of the assignBlocks
 			for( IndexType oldB=0; oldB<numOldBlocks; oldB++ ){
 				const unsigned int rangeStart = blockSizesPrefixSum[oldB];
 				const unsigned int rangeEnd = blockSizesPrefixSum[oldB+1];
@@ -1043,13 +1006,11 @@ DenseVector<IndexType> computePartition( \
 	}
 	
 	//the number of new blocks per old block and the total number of new blocks
-	//std::vector<IndexType> newNumBlocks( numOldBlocks );
 	std::vector<IndexType> blockSizesPrefixSum( numOldBlocks+1, 0 );
 	//in a sense, this is the new k = settings.numBlocks
 	IndexType totalNumNewBlocks = 0;
 
 	for( int b=0; b<numOldBlocks; b++ ){
-		//newNumBlocks[i] = centers[i].size();
 		blockSizesPrefixSum[b+1] += blockSizesPrefixSum[b]+centers[b].size();
 		totalNumNewBlocks += centers[b].size();
 	}
@@ -1064,23 +1025,9 @@ DenseVector<IndexType> computePartition( \
 		}
 	}
 
-/*
-//print centers
-for(int l=0; l<totalNumNewBlocks; l++){
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	std::cout << "KMeanscpp, ~1045: center " << l << ": ";
-	for(int d=0; d<settings.dimensions; d++){
-		std::cout << centers1DVector[l][d] << ", ";
-	}
-	std::cout<<std::endl;
-}
-*/
-
-
 	SCAI_ASSERT_EQ_ERROR( centers1DVector.size(), totalNumNewBlocks, "Vector size mismatch" );
 
 	std::vector<ValueType> influence(totalNumNewBlocks, 1);
-
 	
 	const IndexType dim = coordinates.size();
 	assert(dim > 0);
@@ -1095,7 +1042,6 @@ for(int l=0; l<totalNumNewBlocks; l++){
 	std::vector<ValueType> minCoords(dim);
 	std::vector<ValueType> maxCoords(dim);
 	std::vector<std::vector<ValueType> > convertedCoords(dim);
-
 
 	// copy and sort coordinates according to their hilbert index
 	{
@@ -1117,6 +1063,7 @@ for(int l=0; l<totalNumNewBlocks; l++){
 
 		for (IndexType d = 0; d < dim; d++) {
 			scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
+			//convertedCoords[d] = std::vector<ValueType>(rAccess.get(), rAccess.get()+localN);
 			assert(rAccess.size() == localN);				
 			
 			// copy coordinates sorted by their hilbert index
@@ -1124,6 +1071,7 @@ for(int l=0; l<totalNumNewBlocks; l++){
 			ValueType sumCoord = 0.0;
 			convertedCoords[d].resize(localN);
 			for(IndexType i=0; i<localN; i++){
+				//TODO: the permIndices vectors is not needed
 				IndexType ind = permIndices[i];
 				ValueType coord = rAccess[ ind ];
 				convertedCoords[d][i] = coord;
@@ -1143,7 +1091,6 @@ for(int l=0; l<totalNumNewBlocks; l++){
 			//or, do not take the hilbert index, do not sort and just copy coordinates
 			//TODO: test improvement, in some small inputs, the sorted version did less 
 			// iterations
-			//convertedCoords[d] = std::vector<ValueType>(rAccess.get(), rAccess.get()+localN);
 
 			assert(convertedCoords[d].size() == localN);
 		}
@@ -1187,13 +1134,13 @@ for(int l=0; l<totalNumNewBlocks; l++){
 	std::vector<IndexType> localIndices(localN);
 	std::iota(localIndices.begin(), localIndices.end(), 0);
 
-//hierar: in the heterogenous and hierarchical case, minSamplingNodes
-//makes more sense to be a percentage of the nodes, not a number. Or not?
-//hierar: number of sampling nodes is calculated per PE, right? not per block.
+	//hierar: in the heterogenous and hierarchical case, minSamplingNodes
+	//makes more sense to be a percentage of the nodes, not a number. Or not?
+	//hierar: number of sampling nodes is calculated per PE, right? not per block.
 
 	const ValueType avgBlocksPerPE = ValueType(totalNumNewBlocks)/p;
-//We can calculate precisely the number of local old blocks using "partition"
-//but we will have to go over all local points
+	//We can calculate precisely the number of local old blocks using "partition"
+	//but we will have to go over all local points
 	IndexType minNodes = settings.minSamplingNodes*avgBlocksPerPE;
 	if( settings.minSamplingNodes==-1 ){
 		minNodes = localN;
@@ -1209,7 +1156,7 @@ for(int l=0; l<totalNumNewBlocks; l++){
 	{
 		if (randomInitialization) {
 			//ITI::GraphUtils<IndexType, ValueType>::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
-			//TODO: the cantor shuffle is more stable, random suffling can yield better
+			//TODO: the cantor shuffle is more stable; random suffling can yield better
 			// results occasionally but has higher fluctuation/variance
 			localIndices = GraphUtils<IndexType,ValueType>::indexReorderCantor( localN );
 
@@ -1283,6 +1230,7 @@ for(int l=0; l<totalNumNewBlocks; l++){
 		//TODO: adapt for multiple node weights
 		//WARNING: this is related with how we store and add the relative speed
 		//see also the ComMTree::createLevelAbove() function
+
 		//the "optimum" weight every new block should have
 		std::vector<ValueType> optWeightAllBlocks( totalNumNewBlocks );
 		for( IndexType newB=0; newB<totalNumNewBlocks; newB++ ){
@@ -1329,7 +1277,7 @@ for(int l=0; l<totalNumNewBlocks; l++){
 		}
 		std::vector<ValueType> squaredDeltas(totalNumNewBlocks,0);
 		std::vector<ValueType> deltas(totalNumNewBlocks,0);
-		std::vector<ValueType> oldInfluence = influence; //size= totalNumNewBlocks
+		std::vector<ValueType> oldInfluence = influence; 
 		ValueType minRatio = std::numeric_limits<double>::max();
 
 		for (IndexType j = 0; j < totalNumNewBlocks; j++) {
@@ -1360,9 +1308,11 @@ for(int l=0; l<totalNumNewBlocks; l++){
 				const IndexType i = *it;
 				IndexType cluster = rResult[i];
 				assert( cluster<totalNumNewBlocks );
-//WARNING: erodeInfluence not supported for hierarchical version
-//TODO: or it is?? or it should be??
-				if (false and settings.erodeInfluence) {
+
+				if (settings.erodeInfluence) {
+					//WARNING: erodeInfluence not supported for hierarchical version
+					//TODO: or it is?? or it should be??
+
 					//update due to erosion
 					upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]) + 1e-12;
 					lowerBoundNextCenter[i] *= minRatio - 1e-12;
@@ -1424,9 +1374,9 @@ for(int l=0; l<totalNumNewBlocks; l++){
 
 		
 		//WARNING: when sampling, a (big!) part of the result vector is not changed
-		//	and keeps its initial value which is 0. So, the computeImbalance finds,
-		//	falsely, block 0 to be over weighted. We use the returned imbalance
-		//	from assign centers when sampling is used and we compute a new imbalance
+		// and keeps its initial value which is 0. So, the computeImbalance finds,
+		// falsely, block 0 to be over weighted. We use the returned imbalance
+		// from assign centers when sampling is used and we compute a new imbalance
 		// only when there is no sampling
 
 /*		//TODO: what imbalance should we compute for multiple weights?
@@ -1448,8 +1398,9 @@ for(int l=0; l<totalNumNewBlocks; l++){
 
 		iter++;
 
-		// WARNING-TODO: this stops the iterations prematurely, when the wanted balance
-		// is reached. It is possible that if we allow more iterations, the solution
+		// WARNING-TODO: this (the "if() break; code" ) stops the iterations prematurely,
+		// when the wanted balance is reached.
+		// It is possible that if we allow more iterations, the solution
 		// will converge to some optima regarding the cut/shape. Investigate that
 
 		//WARNING2: this is also needed to ensure that the required number of sampling
@@ -1458,19 +1409,7 @@ for(int l=0; l<totalNumNewBlocks; l++){
 		//if(imbalance<settings.epsilon)
 		//	break;
 
-/*
-//print last centers
-for(int l=0; l<totalNumNewBlocks; l++){
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	std::cout << "KMeanscpp, ~1460: center " << l << ": ";
-	for(int d=0; d<settings.dimensions; d++){
-		std::cout << centers1DVector[l][d] << ", ";
-	}
-	std::cout<<" , influence= " << influence[l];
-	std::cout<<std::endl;
-}
-*/
-aux<IndexType,ValueType>::print2DGrid(graph, result);
+		//aux<IndexType,ValueType>::print2DGrid(graph, result);
 
 	} while (iter < samplingRounds or (iter < maxIterations && (delta > threshold || !balanced)) ); // or (imbalance>settings.epsilon) );
 
@@ -1526,7 +1465,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 	std::vector<DenseVector<ValueType>> &coordinates,
 	DenseVector<ValueType> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,
-	const Settings settings,
+	Settings settings,
 	struct Metrics& metrics){
 
 	//check although numBlocks is not needed or used
@@ -1534,6 +1473,13 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 	//get global communicator
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+	if(settings.erodeInfluence){
+		if(comm->getRank()==0){
+			std::cout << "WARNING: erode influence is not supported for the hierarchical version. Will set it to false and continue." << std::endl;
+		}
+		settings.erodeInfluence = false;
+	}
 
 	//redistribute points based on their hilbert curve index
 	//warning: this functions redistributes the coordinates and
@@ -1642,7 +1588,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		/*for speed weight: the optimum block weight for a PE i is 
 		w = this.speed * totalWeightSum/(sum of all speed factors)
 		Because we use sampling, totalWeightSum is the sum of the weight
-		of the sampled nodes so it is  different in every iteration.
+		of the sampled nodes so it is different in every iteration.
 		*/
 		ValueType speedSum = 0;
 		for( cNode c: thisLevel){
@@ -1651,7 +1597,6 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 		//TODO: do the equivalent for the memory constraint
 		//later, optBlockWeight[i] = blockSpeedPercent[i]*samplePointsWeight
-
 
 		//TODO: replaced speedPercent with optBlockWeight. percentages make more sense?	
 		std::vector<ValueType> optBlockWeight( totalNumNewBlocks );
@@ -1666,13 +1611,18 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		//maybe, set also numBlocks for clarity??
 		partition = computePartition( graph, coordinates, nodeWeights, blockSpeedPercent, partition, groupOfCenters, settings, metrics );
 
-//ITI::FileIO<IndexType,ValueType>::writeDenseVectorCentral( partition, "//home/harry/geographer-dev/tmp/hkmLvl"+h );
-//std::cout<< "Press key to continue" << std::endl; int tmpInt; std::cin >> tmpInt;
 
 		//this check is done before. TODO: remove?
 		if( settings.debugMode ){
 			const IndexType maxPart = partition.max(); //global operation
 			SCAI_ASSERT_EQ_ERROR( totalNumNewBlocks-1, maxPart, "The provided old assignment must have equal number of blocks as the length of the vector with the new number of blocks per part");
+			if( settings.storeInfo){
+				ITI::FileIO<IndexType,ValueType>::writeDenseVectorCentral( partition, "//home/harry/geographer-dev/tmp/hkmLvl"+h );
+				if( comm->getRank()==0)
+					std::cout << "Partition for hierarchy level " << h << 
+				" stored in /home/harry/geographer-dev/tmp/hkmLvl"<<h <<std::endl;
+				//std::cout<< "Press key to continue" << std::endl; int tmpInt; std::cin >> tmpInt;
+			}
 		}
 
 		//TODO?: remove?
@@ -1680,8 +1630,6 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		//IndexType cut = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
 
 		PRINT0("\nFinished hierarchy level " << h <<", partitioned into " << totalNumNewBlocks << " blocks and imbalance is " << imbalance <<std::endl );
-
-
 	}
 
 	return partition;

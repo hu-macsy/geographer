@@ -103,7 +103,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 	std::vector<DenseVector<ValueType>> &coordinates,
 	DenseVector<ValueType> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,
-	const Settings settings,
+	Settings settings,
 	struct Metrics& metrics);
 
 /**
