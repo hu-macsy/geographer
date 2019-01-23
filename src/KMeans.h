@@ -61,6 +61,18 @@ using point = std::vector<ValueType>;
  	const Settings settings, \
  	struct Metrics &metrics);
 
+//TODO: graph is not needed, this is only for debugging
+ template<typename IndexType, typename ValueType>
+ DenseVector<IndexType> computePartition(
+ 	const CSRSparseMatrix<ValueType> &graph, \
+ 	const std::vector<DenseVector<ValueType>> &coordinates, \
+ 	const DenseVector<ValueType> &nodeWeights, \
+ 	const std::vector<ValueType> &blockSizes, \
+ 	const DenseVector<IndexType>& prevPartition,\
+ 	std::vector<std::vector<point>> centers, \
+ 	const Settings settings, \
+ 	struct Metrics &metrics);
+
 /**
  * @brief Partition a point set using balanced k-means
  *
@@ -87,6 +99,7 @@ DenseVector<IndexType> computePartition(
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierarchicalPartition(
+	CSRSparseMatrix<ValueType> &graph, //TODO: only for debugging
 	std::vector<DenseVector<ValueType>> &coordinates,
 	DenseVector<ValueType> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,
@@ -143,8 +156,7 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		const std::vector<ValueType> &minCoords,
 		const std::vector<ValueType> &maxCoords,
 		const scai::lama::DenseVector<IndexType> &partition,
-		const std::vector<cNode> hierLevel,
-//		std::vector<IndexType> numNewBlocksPerOldBlock,		
+		const std::vector<cNode> hierLevel,	
 		Settings settings);
 
 

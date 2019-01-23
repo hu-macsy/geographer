@@ -16,6 +16,8 @@
 #include "KMeans.h"
 #include "HilbertCurve.h"
 
+//temporary, for debugging
+#include "FileIO.h"
 
 namespace ITI{
 namespace KMeans{
@@ -172,11 +174,11 @@ for( IndexType x: concatPrefixSumArray)
 		//the number of centers for block b
 		IndexType k_b = numNewBlocksPerOldBlock[b]; 
 		newCenterIndWithinBLock[b].resize( k_b );
+PRINT( *comm << ": old block " << b << " has size " << globalBlockSizes[b] );	
 		for( IndexType i = 0; i < k_b; i++) {
 			//wantedIndices[i] = i * (globalN / k) + (globalN / k)/2;
-IndexType oldInd= i * (globalN / k) + (globalN / k)/2;
 			newCenterIndWithinBLock[b][i] = i*(globalBlockSizes[b]/k_b) + (globalBlockSizes[b]/k_b)/2;
-PRINT0(oldInd << " __ new " << newCenterIndWithinBLock[b][i]);
+PRINT( *comm << ": center ind " << newCenterIndWithinBLock[b][i]);
 		}
 	}
 
@@ -594,7 +596,7 @@ DenseVector<IndexType> assignBlocks(
 		typename std::vector<IndexType>::iterator startIt = clusterIndicesAllBlocks.begin()+rangeStart;
 		typename std::vector<IndexType>::iterator endIt = clusterIndicesAllBlocks.begin()+rangeEnd;
 		//TODO: remove not needed assertions
-		SCAI_ASSERT_LT_ERROR( rangeStart, rangeEnd, "Prefix sum vectos is wrong");
+		SCAI_ASSERT_LT_ERROR( rangeStart, rangeEnd, "Prefix sum vectors is wrong");
 		SCAI_ASSERT_LE_ERROR( rangeEnd, numNewBlocks, "Range out of bounds" );
 
 		//sort the part of the indices that belong to this old block
@@ -607,7 +609,7 @@ DenseVector<IndexType> assignBlocks(
 		//sort also this part of the distances
 		//TODO: is this sorting needed?
 		//TODO: is it correct to sort? if we sort, effectMinDistAllBlocks[clusterInd[i]] will be wrong, I think effectMinDistAllBlocks[i] will be correct
-		//TODO: either not sort and get  minDistanceAllBlocks[c] or sort and get minDistanceAllBlocks[i]
+		//TODO: either not sort and get minDistanceAllBlocks[c] or sort and get minDistanceAllBlocks[i]
 		std::sort( effectMinDistAllBlocks.begin()+rangeStart, effectMinDistAllBlocks.begin()+rangeStart);
 
 		//just for checking
@@ -618,7 +620,10 @@ DenseVector<IndexType> assignBlocks(
 			SCAI_ASSERT_LT_ERROR( std::abs(effectMinDistAllBlocks[i] - effectiveDist), 1e-5, "effectiveMinDistance[" << i << "] = " << effectMinDistAllBlocks[i] << " != " << effectiveDist << " = effectiveDist");
 		}
 	}
-
+for( int o=0; o<numNewBlocks; o++){
+	std::cout<< comm->getRank() << ": " << o << "-" << clusterIndicesAllBlocks[o] << " || ";
+}
+std::cout << std::endl;
 
 	//ValueType imbalance;
 	IndexType iter = 0;
@@ -769,12 +774,12 @@ SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be dif
 		for( int newB=0; newB<numNewBlocks; newB++ ){
 			ValueType optWeight = optWeightAllBlocks[newB];
 			imbalances[newB] = (ValueType(blockWeights[newB] - optWeight)/optWeight);
-PRINT0( "block " << newB << " has weight " << blockWeights[newB] << " while its optWeight is " << optWeight << ", imbalance= " << imbalances[newB]  );
+PRINT0( "block " << newB << " has weight " << blockWeights[newB] << " while its optWeight is " << optWeight << ", imbalance= " << imbalances[newB] <<", influence= " << influence[newB] );
 		}
 
 		//imbalance in the maximum imbalance of all new blocks
 		imbalance = *std::max_element(imbalances.begin(), imbalances.end() );
-PRINT(*comm << ": " << imbalance );
+//PRINT(*comm << ": " << imbalance );
 		//TODO: adapt for multiple node weights
 
 
@@ -866,7 +871,7 @@ PRINT(*comm << ": " << imbalance );
 
 		iter++;
 
-		if ( true /*settings.verbose*/ ) {
+		if ( settings.verbose ) {
 			const IndexType currentLocalN = std::distance(firstIndex, lastIndex);
 			const IndexType takenLoops = currentLocalN - skippedLoops;
 			const ValueType averageComps = ValueType(totalComps) / currentLocalN;
@@ -994,10 +999,31 @@ DenseVector<IndexType> computeRepartition(
 return computePartition(coordinates, nodeWeights, blockSizesPerCent, /**/ previous /**/, groupOfCenters, settings, metrics);
 }
 
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computePartition( \
+	const std::vector<DenseVector<ValueType>> &coordinates, \
+	const DenseVector<ValueType> &nodeWeights, \
+	const std::vector<ValueType> &blockSizesPerCent, \
+	const DenseVector<IndexType> &partition, \
+	std::vector<std::vector<point>> centers, \
+	const Settings settings, \
+	struct Metrics &metrics ) {
 
+	const IndexType N = nodeWeights.size();
+	scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
+
+	scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
+	auto graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDistPtr);
+
+	return computePartition( graph, coordinates, nodeWeights, blockSizesPerCent,
+		partition, centers, settings, metrics );
+}
+
+//TODO: graph is not needed, this is only for debugging
 //core implementation 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition( \
+	const CSRSparseMatrix<ValueType> &graph, \
 	const std::vector<DenseVector<ValueType>> &coordinates, \
 	const DenseVector<ValueType> &nodeWeights, \
 	const std::vector<ValueType> &blockSizesPerCent, \
@@ -1038,13 +1064,17 @@ DenseVector<IndexType> computePartition( \
 		}
 	}
 
+
+//print centers
 for(int l=0; l<totalNumNewBlocks; l++){
-	PRINT( *comm << ": center " << l << ": ");
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	std::cout << "KMeanscpp, ~1045: center " << l << ": ";
 	for(int d=0; d<settings.dimensions; d++){
 		std::cout << centers1DVector[l][d] << ", ";
 	}
 	std::cout<<std::endl;
 }
+
 
 	SCAI_ASSERT_EQ_ERROR( centers1DVector.size(), totalNumNewBlocks, "Vector size mismatch" );
 
@@ -1189,7 +1219,7 @@ for(int l=0; l<totalNumNewBlocks; l++){
 		}
 
 		if(settings.verbose){
-			PRINT(*comm << ": localN= "<< localN << ", samplingRounds= " << samplingRounds << ", lastIndex: " << *localIndices.end() );
+			PRINT(*comm << ": localN= "<< localN << ", minNodes= " << minNodes << ", samplingRounds= " << samplingRounds << ", lastIndex: " << *localIndices.end() );
 		}
 		if (samplingRounds > 0 && settings.verbose) {
 			if (comm->getRank() == 0) std::cout << "Starting with " << samplingRounds << " sampling rounds." << std::endl;
@@ -1244,7 +1274,7 @@ for(int l=0; l<totalNumNewBlocks; l++){
 			}
 		}
 
-		const ValueType totalWeightSum = comm->sum(localSampleWeightSum);
+		const ValueType totalSampledWeightSum = comm->sum(localSampleWeightSum);
 
 		//TODO: adapt for multiple node weights
 		//WARNING: this is related with how we store and add the relative speed
@@ -1252,7 +1282,7 @@ for(int l=0; l<totalNumNewBlocks; l++){
 		//the "optimum" weight every new block should have
 		std::vector<ValueType> optWeightAllBlocks( totalNumNewBlocks );
 		for( IndexType newB=0; newB<totalNumNewBlocks; newB++ ){
-			optWeightAllBlocks[newB] = blockSizesPerCent[newB]*totalWeightSum;
+			optWeightAllBlocks[newB] = blockSizesPerCent[newB]*totalSampledWeightSum;
 		}
 
 		std::vector<ValueType> timePerPE( comm->getSize(), 0.0);
@@ -1400,8 +1430,14 @@ for(int l=0; l<totalNumNewBlocks; l++){
 			imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( result, settings.numBlocks, nodeWeights );
 		}
 */
+
+		ValueType cut=-1;
+		if( settings.debugMode ){
+			cut = ITI::GraphUtils<IndexType, ValueType>::computeCut( graph, result, false );
+		}
+
 		if (comm->getRank() == 0) {
-			std::cout << "i: " << iter<< ", delta: " << delta << ", time : "<< maxTime << ", imbalance= " << imbalance<< std::endl;
+			std::cout << "i: " << iter<< ", delta: " << delta << ", time : "<< maxTime << ", imbalance= " << imbalance<< ", cut= " << cut << std::endl;
 		}
 
 		metrics.kmeansProfiling.push_back( std::make_tuple(delta, maxTime, imbalance) );
@@ -1417,6 +1453,18 @@ for(int l=0; l<totalNumNewBlocks; l++){
 
 		//if(imbalance<settings.epsilon)
 		//	break;
+
+//print last centers
+for(int l=0; l<totalNumNewBlocks; l++){
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	std::cout << "KMeanscpp, ~1460: center " << l << ": ";
+	for(int d=0; d<settings.dimensions; d++){
+		std::cout << centers1DVector[l][d] << ", ";
+	}
+	std::cout<<" , influence= " << influence[l];
+	std::cout<<std::endl;
+}
+aux<IndexType,ValueType>::print2DGrid(graph, result);
 
 	} while (iter < samplingRounds or (iter < maxIterations && (delta > threshold || !balanced)) ); // or (imbalance>settings.epsilon) );
 
@@ -1468,6 +1516,7 @@ DenseVector<IndexType> computePartition(
 //wrapper 2 - with CommTree
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierarchicalPartition(
+	CSRSparseMatrix<ValueType> &graph,	//TODO: graph is not needed
 	std::vector<DenseVector<ValueType>> &coordinates,
 	DenseVector<ValueType> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,
@@ -1493,6 +1542,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 	//calculate the centers, does not have the desired meaning.
 	bool hasHilbertDist = HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution( coordinates, nodeWeights, settings);
 	SCAI_ASSERT_EQ_ERROR( hasHilbertDist, true, "Input must be distributed according to a hilbert curve distribution");
+	graph.redistribute( coordinates[0].getDistributionPtr(), graph.getColDistributionPtr() );
 
 	std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
@@ -1608,8 +1658,9 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		//TODO: inside computePartition, settings.numBlocks is not
 		//used. We infer the number of new blocks from the groupOfCenters
 		//maybe, set also numBlocks for clarity??
-		partition = computePartition( coordinates, nodeWeights, blockSpeedPercent, partition, groupOfCenters, settings, metrics );
+		partition = computePartition( graph, coordinates, nodeWeights, blockSpeedPercent, partition, groupOfCenters, settings, metrics );
 
+//ITI::FileIO<IndexType,ValueType>::writeDenseVectorCentral( partition, "//home/harry/geographer-dev/tmp/hkmLvl"+h );
 //std::cout<< "Press key to continue" << std::endl; int tmpInt; std::cin >> tmpInt;
 
 		//this check is done before. TODO: remove?
@@ -1678,7 +1729,7 @@ template std::vector<std::vector<ValueType> > KMeans::findInitialCentersFromSFCO
 
 //template std::vector<KMeans::point> KMeans::vectorTranspose( const std::vector<std::vector<ValueType>>& points);
 
-//instantiations needed or there is a undefined reference otherwise
+//instantiations needed otherwise there is a undefined reference 
 template DenseVector<IndexType> KMeans::computePartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,
 	const scai::lama::DenseVector<ValueType> &nodeWeights,
@@ -1686,6 +1737,30 @@ template DenseVector<IndexType> KMeans::computePartition(
 	const Settings settings,
 	struct Metrics& metrics);
 
+/*
+using point = std::vector<ValueType>;
+//TODO: graph is not needed, this is only for debugging
+ template DenseVector<IndexType> KMeans::computePartition(
+ 	const CSRSparseMatrix<ValueType> &graph, \
+ 	const std::vector<DenseVector<ValueType>> &coordinates, \
+ 	const DenseVector<ValueType> &nodeWeights, \
+ 	const std::vector<ValueType> &blockSizes, \
+ 	const DenseVector<IndexType>& prevPartition,\
+ 	std::vector<std::vector<point>> centers, \
+ 	const Settings settings, \
+ 	struct Metrics &metrics);
+*/
+
+/*
+//instantiations needed or there is a undefined reference otherwise
+template DenseVector<IndexType> KMeans::computePartition(
+	const CSRSparseMatrix<ValueType> &graph,
+	const std::vector<DenseVector<ValueType>> &coordinates,
+	const scai::lama::DenseVector<ValueType> &nodeWeights,
+	const std::vector<IndexType> &blockSizes,
+	const Settings settings,
+	struct Metrics& metrics);
+*/
 template DenseVector<IndexType> KMeans::computeRepartition(
 	const std::vector<DenseVector<ValueType>>& coordinates,
 	const DenseVector<ValueType>& nodeWeights,
@@ -1693,12 +1768,15 @@ template DenseVector<IndexType> KMeans::computeRepartition(
 	const DenseVector<IndexType>& previous,
 	const Settings settings);
 
+
 template DenseVector<IndexType> KMeans::computeHierarchicalPartition(
+	CSRSparseMatrix<ValueType> &graph,
 	std::vector<DenseVector<ValueType>> &coordinates,
 	DenseVector<ValueType> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,
 	const Settings settings,
 	struct Metrics& metrics);
+
 
 } /* namespace ITI */
 

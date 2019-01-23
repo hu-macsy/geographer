@@ -187,7 +187,8 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 
 TEST_F(KMeansTest, testHierarchicalPartition) {
 	//std::string fileName = "bubbles-00010.graph";
-	std::string fileName = "Grid32x32";
+	//std::string fileName = "Grid32x32";
+	std::string fileName = "Grid8x8";
 	std::string graphFile = graphPath + fileName;
 	std::string coordFile = graphFile + ".xyz";
 	const IndexType dimensions = 2;
@@ -201,6 +202,20 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 
 	//set uniform node weights
 	scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+
+	//or fixed weights
+	scai::lama::DenseVector<ValueType> fixedNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+	{
+		scai::hmemo::WriteAccess<ValueType> localWeights( fixedNodeWeights.getLocalValues() );
+		int localN = localWeights.size();
+		for(int i=0; i<localN; i++){
+			localWeights[i] = dist->local2global(i);
+		}
+
+	}
+
+	//scai::lama::DenseVector<ValueType> nodeWeights = fixedNodeWeights;
+	scai::lama::DenseVector<ValueType> nodeWeights = unitNodeWeights;
 
 	//const IndexType k = comm->getSize();
 	//using KMeans::cNode;
@@ -228,18 +243,20 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 	settings.dimensions = dimensions;
 	settings.numBlocks = leaves.size();
 	settings.debugMode = true;
+	settings.verbose = true;
 	settings.epsilon = 0.05;
 	settings.balanceIterations = 5;
 	settings.maxKMeansIterations = 5;
+	settings.minSamplingNodes = -1;
 
 	Metrics metrics(settings);
 
-	scai::lama::DenseVector<IndexType> partition = KMeans::computeHierarchicalPartition( coords, unitNodeWeights, cTree, settings, metrics);
+	scai::lama::DenseVector<IndexType> partition = KMeans::computeHierarchicalPartition( graph, coords, nodeWeights, cTree, settings, metrics);
 
 	//checks - prints
 
 	ValueType speedImbalance, sizeImbalance;
-	std::tie( speedImbalance, sizeImbalance) =  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, unitNodeWeights, cTree );
+	std::tie( speedImbalance, sizeImbalance) =  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights, cTree );
 
 	std::cout << "final imbalance: speed= " << speedImbalance << " , size= " << sizeImbalance << std::endl;
 }

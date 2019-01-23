@@ -523,10 +523,13 @@ void FileIO<IndexType, ValueType>::writeDenseVectorCentral(DenseVector<IndexType
     part.redistribute( noDist );
     SCAI_ASSERT_EQ_ERROR( part.getLocalValues().size(), globalN, "Partition must be replicated");
     
-    if( comm->getRank() ){
+    if( comm->getRank()==0 ){
     
         std::ofstream f( filename );  
-        
+        if( f.fail() ){
+ 			throw std::runtime_error("Could not write to file " + filename);
+        }
+         
         const scai::hmemo::ReadAccess<IndexType> rPart( part.getLocalValues() );
         for( IndexType i=0; i<globalN; i++){
             f << rPart[i]<< std::endl;
