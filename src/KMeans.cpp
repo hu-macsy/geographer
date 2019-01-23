@@ -774,7 +774,7 @@ SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be dif
 		for( int newB=0; newB<numNewBlocks; newB++ ){
 			ValueType optWeight = optWeightAllBlocks[newB];
 			imbalances[newB] = (ValueType(blockWeights[newB] - optWeight)/optWeight);
-PRINT0( "block " << newB << " has weight " << blockWeights[newB] << " while its optWeight is " << optWeight << ", imbalance= " << imbalances[newB] <<", influence= " << influence[newB] );
+//PRINT0( "block " << newB << " has weight " << blockWeights[newB] << " while its optWeight is " << optWeight << ", imbalance= " << imbalances[newB] <<", influence= " << influence[newB] );
 		}
 
 		//imbalance in the maximum imbalance of all new blocks
@@ -1064,7 +1064,7 @@ DenseVector<IndexType> computePartition( \
 		}
 	}
 
-
+/*
 //print centers
 for(int l=0; l<totalNumNewBlocks; l++){
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -1074,6 +1074,7 @@ for(int l=0; l<totalNumNewBlocks; l++){
 	}
 	std::cout<<std::endl;
 }
+*/
 
 
 	SCAI_ASSERT_EQ_ERROR( centers1DVector.size(), totalNumNewBlocks, "Vector size mismatch" );
@@ -1108,8 +1109,11 @@ for(int l=0; l<totalNumNewBlocks; l++){
 
 		SCAI_ASSERT_EQ_ERROR(localN, localHilbertInd.size() , "vector size mismatch");
 
+		//WARNING: the next sorting is wrong as it is now. It messes up the point indices and coordinates:
+		// point i has different coordinates than in the beginning. Either leave it out or maybe also sort
+		// the point indices. I am leaving it here for future reference
 		// sort the point/vertex indices based on their hilbert index
-		std::sort(permIndices.begin(), permIndices.end(), [&](IndexType i, IndexType j){return localHilbertInd[i] < localHilbertInd[j];});
+		//std::sort(permIndices.begin(), permIndices.end(), [&](IndexType i, IndexType j){return localHilbertInd[i] < localHilbertInd[j];});
 
 		for (IndexType d = 0; d < dim; d++) {
 			scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
@@ -1165,9 +1169,9 @@ for(int l=0; l<totalNumNewBlocks; l++){
 
 	QuadNodeCartesianEuclid boundingBox(minCoords, maxCoords);
     if (settings.verbose) {
-		std::cout << "(" << comm->getRank() << ", "<< localN << ")" << std::endl;
+		std::cout << "(PE id, localN) = (" << comm->getRank() << ", "<< localN << ")" << std::endl;
 		comm->synchronize();
-		std::cout << "(" << comm->getRank() << ", "<< localVolume / (volume / p) << ")" << std::endl;
+		std::cout << "(PE id, localVolume/(volume/p) = (" << comm->getRank() << ", "<< localVolume / (volume / p) << ")" << std::endl;
     }
 
 	diagonalLength = std::sqrt(diagonalLength);
@@ -1454,6 +1458,7 @@ for(int l=0; l<totalNumNewBlocks; l++){
 		//if(imbalance<settings.epsilon)
 		//	break;
 
+/*
 //print last centers
 for(int l=0; l<totalNumNewBlocks; l++){
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -1464,6 +1469,7 @@ for(int l=0; l<totalNumNewBlocks; l++){
 	std::cout<<" , influence= " << influence[l];
 	std::cout<<std::endl;
 }
+*/
 aux<IndexType,ValueType>::print2DGrid(graph, result);
 
 	} while (iter < samplingRounds or (iter < maxIterations && (delta > threshold || !balanced)) ); // or (imbalance>settings.epsilon) );
