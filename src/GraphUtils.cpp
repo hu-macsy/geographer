@@ -26,7 +26,6 @@
 using std::vector;
 using std::queue;
 
-typedef std::pair<int,int> int_pair;
 
 namespace ITI {
 
@@ -979,7 +978,7 @@ std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::C
     }
     SCAI_REGION_START("ParcoRepart.getLocalBlockGraphEdges.gatherNonLocal")
     //gather all non-local indexes
-    gatheredPart.gather(part, nonLocalDV , scai::common::BinaryOp::COPY );
+    gatheredPart.gatherInto(part, nonLocalDV , scai::common::BinaryOp::COPY );
     SCAI_REGION_END("ParcoRepart.getLocalBlockGraphEdges.gatherNonLocal")
     
     assert( gatheredPart.size() == nonLocalInd.size() );
@@ -1223,6 +1222,8 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	const IndexType thisPE = comm->getRank();
 	IndexType localM = edgeList.size();
 		
+    typedef std::pair<int,int> int_pair;
+
     int typesize;
 	MPI_Type_size(SortingDatatype<int_pair>::getMPIDatatype(), &typesize);
 	assert(typesize == sizeof(int_pair));

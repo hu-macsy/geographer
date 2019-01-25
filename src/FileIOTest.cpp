@@ -283,7 +283,7 @@ TEST_F(FileIOTest, testReadBinaryEdgeList) {
     scai::hmemo::ReadAccess<IndexType> ja(graph.getLocalStorage().getJA());
 
     for (IndexType i = 0; i < graph.getLocalNumRows(); i++) {
-        const IndexType globalI = dist->local2global(i);//this can be optimized
+        const IndexType globalI = dist->local2Global(i);//this can be optimized
         outDegree[globalI] = ia[i+1] - ia[i];
     }
 
@@ -527,7 +527,7 @@ TEST_F(FileIOTest, testReadGraphAndCoordsBinary){
                 std::cout << std::endl;
             }
             
-         SCAI_ASSERT_LT_ERROR( localCoordsBin[i]-localCoordsMetis[i], 1e-6, "Coordinates in position " << coordsBinary[0].getDistributionPtr()->local2global(i) << " in processor " << comm->getRank() << " do not agree for dimension " << d);
+         SCAI_ASSERT_LT_ERROR( localCoordsBin[i]-localCoordsMetis[i], 1e-6, "Coordinates in position " << coordsBinary[0].getDistributionPtr()->local2Global(i) << " in processor " << comm->getRank() << " do not agree for dimension " << d);
         }      
     }
         
