@@ -73,7 +73,7 @@ TEST_F (MultiLevelTest, testCoarseningGrid_2D) {
     CSRSparseMatrix<ValueType> coarseGraph;
     DenseVector<IndexType> fineToCoarseMap;
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1.0);
-    scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
+    scai::dmemo::HaloExchangePlan halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
 
     MultiLevel<IndexType, ValueType>::coarsen(graph, uniformWeights, halo, coarseGraph, fineToCoarseMap);
     
@@ -171,7 +171,7 @@ TEST_F (MultiLevelTest, testComputeGlobalPrefixSum) {
 	{
 		scai::hmemo::ReadAccess<IndexType> rPrefixSum(prefixSum.getLocalValues());
 		for (IndexType i = 0; i < localN; i++) {
-			EXPECT_EQ(dist->local2global(i)+1, rPrefixSum[i]);
+			EXPECT_EQ(dist->local2Global(i)+1, rPrefixSum[i]);
 		}
 	}
 
@@ -244,7 +244,10 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 	    ASSERT_EQ(globalSum, settings.numBlocks*localSum);
 	}
 
-	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(partition.getLocalValues(), comm));
+	//01/19: changes because of new lama version
+	//scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(partition.getLocalValues(), comm));
+	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution( N, partition.getLocalValues(), true));
+
 	partition.redistribute( newDist );
 
     graph.redistribute( newDist , noDistPtr);
@@ -271,7 +274,7 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     settings.minGainForNextRound = 100;
     settings.minBorderNodes=100;
     
-    scai::dmemo::Halo halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
+    scai::dmemo::HaloExchangePlan halo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, halo, settings);
     
     EXPECT_EQ( graph.l1Norm() , beforel1Norm);

@@ -229,7 +229,9 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 	}
 
 	//redistribute according to partition
-	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(*dist, part.getLocalValues()));
+	//01/19: changes because of new lama version
+	//scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(*dist, part.getLocalValues()));
+	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution( n, part.getLocalValues(), true));
 
 	a.redistribute(newDist, a.getColDistributionPtr());
 	part.redistribute(newDist);
@@ -254,7 +256,9 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 		if (partner == thisBlock) {
 			scai::dmemo::HaloExchangePlan partHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(a);
 			scai::hmemo::HArray<IndexType> haloData;
-			comm->updateHalo( haloData, part.getLocalValues(), partHalo );
+			//01/19: changes because of new lama version
+			//comm->updateHalo( haloData, part.getLocalValues(), partHalo );
+			partHalo.updateHalo( haloData, part.getLocalValues(), *comm );
 
 		} else {
 			IndexType otherBlock = partner;
@@ -294,7 +298,8 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 
 			scai::dmemo::HaloExchangePlan partHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(a);
 			scai::hmemo::HArray<IndexType> haloData;
-			comm->updateHalo( haloData, localData, partHalo );
+			//comm->updateHalo( haloData, localData, partHalo ); //01/19: changes because of new lama version
+			partHalo.updateHalo( haloData, localData, *comm);
 
 			bool inFirstRound = true;
 			for (IndexType i = 0; i < interfaceNodes.size(); i++) {

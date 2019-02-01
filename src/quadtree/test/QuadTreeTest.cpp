@@ -340,13 +340,13 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
             }
             
             IndexType numEdges = 0;
-            IndexType maxDegree = 0;
-                //std::cout<< "\t Num of nodes"<< std::endl;
+            //IndexType maxDegree = 0; //not used
+            //std::cout<< "\t Num of nodes"<< std::endl;
             for(int i=0; i<degreeCount.size(); i++){
                 if(  degreeCount[i] !=0 ){
                     //std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
                     numEdges += i*degreeCount[i];
-                    maxDegree = i;
+                    //maxDegree = i;
                 }
             }
             EXPECT_EQ(numEdges, graph.getNumValues() );
@@ -588,13 +588,13 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
 		}
 
 		IndexType numEdges = 0;
-		IndexType maxDegree = 0;
+		//IndexType maxDegree = 0; //not used
 		//std::cout<< "\t Num of nodes"<< std::endl;
 		for(int i=0; i<degreeCount.size(); i++){
 			if(  degreeCount[i] !=0 ){
 				//std::cout << "degree " << i << ":   "<< degreeCount[i]<< std::endl;
 				numEdges += i*degreeCount[i];
-				maxDegree = i;
+				//maxDegree = i;
 			}
 		}
 		EXPECT_EQ(numEdges, graph.getNumValues() );
@@ -646,7 +646,8 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         for(int detail= 0; detail<np; detail++){           
             settings.pixeledSideLen= std::pow( 2, detail + np );
             sfcPartition = ITI::ParcoRepart<IndexType, ValueType>::hilbertPartition(coordsDV, settings);
-            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( sfcPartition.getDistribution(), sfcPartition.getLocalValues() ) );
+            //scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( sfcPartition.getDistribution(), sfcPartition.getLocalValues() ) );
+            scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( N, sfcPartition.getLocalValues(), true ) );
             sfcPartition.redistribute(newDist);
             graph.redistribute(newDist, noDist);
             cut = GraphUtils::computeCut<IndexType, ValueType>(graph, sfcPartition, true);
@@ -673,7 +674,8 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         }
         
         scai::lama::DenseVector<IndexType> hilbertPartition = ITI::ParcoRepart<IndexType, ValueType>::hilbertPartition(coordsDV, settings);
-        scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( hilbertPartition.getDistribution(), hilbertPartition.getLocalValues() ) );
+        //scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( hilbertPartition.getDistribution(), hilbertPartition.getLocalValues() ) );
+        scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( N, hilbertPartition.getLocalValues(), true) );
         graph.redistribute(newDist, noDist);
         hilbertPartition.redistribute(newDist);
 

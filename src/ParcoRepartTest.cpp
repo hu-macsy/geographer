@@ -479,12 +479,13 @@ TEST_F(ParcoRepartTest, testTwoWayCut) {
 	scai::lama::DenseVector<IndexType> part(inputDist, 0);
 	for (IndexType i = 0; i < localN; i++) {
 		IndexType blockId = rand() % k;
-		IndexType globalID = inputDist->local2global(i);
+		IndexType globalID = inputDist->local2Global(i);
 		part.setValue(globalID, blockId);
 	}
 
-  //redistribute according to partition
-	scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(*inputDist, part.getLocalValues()));
+    //redistribute according to partition
+	//scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(*inputDist, part.getLocalValues()));
+	scai::dmemo::DistributionPtr newDistribution( new scai::dmemo::GeneralDistribution( n, part.getLocalValues(),true) );
 
 	graph.redistribute(newDistribution, graph.getColDistributionPtr());
 	part.redistribute(newDistribution);
@@ -506,19 +507,20 @@ TEST_F(ParcoRepartTest, testTwoWayCut) {
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
 	const scai::hmemo::HArray<IndexType>& localData = part.getLocalValues();
-	scai::dmemo::Halo partHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
+	scai::dmemo::HaloExchangePlan partHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(graph);
 	scai::hmemo::HArray<IndexType> haloData;
-	comm->updateHalo( haloData, localData, partHalo );
+	//comm->updateHalo( haloData, localData, partHalo );
+	partHalo.updateHalo( haloData, localData, *comm);
 
 	ValueType localCutSum = 0;
 	for (IndexType round = 0; round < scheme.size(); round++) {
 		scai::hmemo::ReadAccess<IndexType> commAccess(scheme[round].getLocalValues());
 		ASSERT_EQ(k, commAccess.size());
-		IndexType partner = commAccess[scheme[round].getDistributionPtr()->global2local(comm->getRank())];
+		IndexType partner = commAccess[scheme[round].getDistributionPtr()->global2Local(comm->getRank())];
 
 		if (partner != comm->getRank()) {
 			for (IndexType j = 0; j < ja.size(); j++) {
-				IndexType haloIndex = partHalo.global2halo(ja[j]);
+				IndexType haloIndex = partHalo.global2Halo(ja[j]);
 				if (haloIndex != scai::invalidIndex && haloData[haloIndex] == partner) {
 					localCutSum++;
 				}
@@ -1060,13 +1062,20 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
     EXPECT_TRUE( blockGraph.isConsistent() );
     EXPECT_TRUE( blockGraph.checkSymmetry() );
         
+    //The code below is not doing anything. 
+    //Also, it does not compile with the new lama version (01/19) and I am not sure how to adapt it.
+    //So I am commenting it out. 
+    //TODO: fix or remove
+    /*
     //get halo (buildPartHalo) and check if block graphs is correct
-    scai::dmemo::Halo partHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(adjM);
+    scai::dmemo::HaloExchangePlan partHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(adjM);
     scai::hmemo::HArray<IndexType> reqIndices = partHalo.getRequiredIndexes();
     scai::hmemo::HArray<IndexType> provIndices = partHalo.getProvidesIndexes();
     
     const scai::hmemo::ReadAccess<IndexType> reqIndicesRead( reqIndices);
     const scai::hmemo::ReadAccess<IndexType> provIndicesRead( provIndices);
+    */
+
     /*
     for(IndexType i=0; i< reqIndicesRead.size(); i++){
         PRINT(i <<": " << *comm <<" , req= "<<  reqIndicesRead[i] );
