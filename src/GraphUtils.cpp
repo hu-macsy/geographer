@@ -1221,13 +1221,14 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType thisPE = comm->getRank();
 	IndexType localM = edgeList.size();
-		
-    typedef std::pair<int,int> int_pair;
+
+	//Cannot use this, getMPIDatatype() does not work. Look into RBC/SortingDataType.hpp
+    //typedef std::pair<int,int> int_pair;
 
     int typesize;
 	MPI_Type_size(SortingDatatype<int_pair>::getMPIDatatype(), &typesize);
-	assert(typesize == sizeof(int_pair));
-	
+	//SCAI_ASSERT_EQ_ERROR(typesize, sizeof(int_pair), "Wrong size"); //not valid for int_double, presumably due to padding
+
 	//-------------------------------------------------------------------
 	//
 	// add edges to the local_pairs vector for sorting
@@ -1241,7 +1242,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	
 	IndexType maxLocalVertex=0;
 	IndexType minLocalVertex=std::numeric_limits<IndexType>::max();
-	
+
 	for(IndexType i=0; i<localM; i++){
 		IndexType v1 = edgeList[i].first;
 		IndexType v2 = edgeList[i].second;
@@ -1286,7 +1287,7 @@ scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<Inde
 	}
 
 	//PRINT(thisPE << ": "<< localPairs.back().first << " - " << localPairs.back().second << " in total " <<  localPairs.size() );
-	
+
 	//-------------------------------------------------------------------
 	//
 	// communicate so each PE have all the edges of the last node

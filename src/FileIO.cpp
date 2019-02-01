@@ -1110,8 +1110,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
         edgeList.push_back( std::make_pair( v1, v2) );
 	}
 
-
-//	    std::cout << "Process " << comm->getRank() << ": maxFirstNode " << maxFirstNode << std::endl;
+	std::cout << "Process " << comm->getRank() << ": maxFirstNode " << maxFirstNode << std::endl;
 
 
 	maxEncounteredNode = comm->max(maxEncounteredNode);
@@ -1119,12 +1118,12 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 	    std::cout << "Warning: More than half of all nodes are isolated!" << std::endl;
 	    std::cout << "Max encountered node: " << maxEncounteredNode << std::endl;
 	}
-    
+
     scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils::edgeList2CSR<IndexType, ValueType>( edgeList );
     scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, globalN) );
     scai::dmemo::DistributionPtr noDist( new scai::dmemo::NoDistribution(globalN));
     graph.redistribute(rowDistPtr, noDist);
-    
+
     return graph;
 }
 //-------------------------------------------------------------------------------------------------
