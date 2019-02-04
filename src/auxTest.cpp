@@ -44,7 +44,7 @@ protected:
         std::string graphPath = "./meshes/";
 };
 
-TEST_F (auxTest, DISABLED_testInitialPartitions){
+TEST_F (auxTest, testInitialPartitions){
     
     std::string fileName = "trace-00008.graph";
     std::string file = graphPath + fileName;
@@ -109,7 +109,7 @@ TEST_F (auxTest, DISABLED_testInitialPartitions){
     
     //------------------------------------------- pixeled
     
-	// this produces an error in the general distribution constructor
+	settings.noRefinement = true;
 
     if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
     PRINT0("Get a pixeled partition");
@@ -118,7 +118,7 @@ TEST_F (auxTest, DISABLED_testInitialPartitions){
     EXPECT_EQ( pixeledPartition.size(), N );
     
     //scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( pixeledPartition.getDistribution(), pixeledPartition.getLocalValues() ) );
-    scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( N, pixeledPartition.getLocalValues(), true ) );
+    scai::dmemo::DistributionPtr newDist = scai::dmemo::generalDistributionByNewOwners( pixeledPartition.getDistribution(), pixeledPartition.getLocalValues() );
     pixeledPartition.redistribute(newDist);
     graph.redistribute(newDist, noDistPointer);
 	for (IndexType d = 0; d < dimensions; d++) {

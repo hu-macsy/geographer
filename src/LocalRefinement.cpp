@@ -320,7 +320,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				assert(otherSecondBlockWeightSum <= blockWeightSum);
 			}
 
-			if (otherGain <= 0 && gain <= 0) {
+			if (otherGain <= 0 && gain <= 0  /**/ && false /**/ ) {
 				//Oh well. None of the processors managed an improvement. No need to update data structures.
 
 			}else {
@@ -365,7 +365,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 						deletedNodes.push_back(interfaceNodes[i]);
 					}
 				}
-
+PRINT(*comm);
 				/**
 				 * add new nodes
 				 */
@@ -398,6 +398,9 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
 				SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.redistribute.generalDistribution" )
 				HArray<IndexType> indexTransport(myGlobalIndices.size(), myGlobalIndices.data());
+//WARNING, TODO: the next call just hangs when is not called by all PEs. 
+//This can happen when some pairs of PE did not achieve any gain
+// I guess the reason is the comm->sum() in the GeneralDistribition constructor
 				auto newDistribution = scai::dmemo::generalDistributionUnchecked(globalN, indexTransport, comm);
 				SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.redistribute.generalDistribution" )
 
@@ -405,6 +408,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 					SCAI_REGION( "LocalRefinement.distributedFMStep.loop.redistribute.updateDataStructures" )
 					redistributeFromHalo(input, newDistribution, graphHalo, haloMatrix);
 					part = scai::lama::fill<DenseVector<IndexType>>(newDistribution, localBlockID);
+
 					if (nodesWeighted) {
 						redistributeFromHalo<ValueType>(nodeWeights, newDistribution, graphHalo, nodeWeightHaloData);
 					}
@@ -412,7 +416,6 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				}
 				assert(input.getRowDistributionPtr()->isEqual(*part.getDistributionPtr()));
 				SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.redistribute" )
-
 				/**
 				 * update local border. This could probably be optimized by only updating the part that could have changed in the last round.
 				 */
@@ -445,6 +448,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 	for (IndexType color = 0; color < gainPerRound.size(); color++) {
 		gainPerRound[color] = comm->sum(gainPerRound[color]) / 2;
 	}
+
 	return gainPerRound;
 }
 //---------------------------------------------------------------------------------------
