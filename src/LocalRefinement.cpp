@@ -132,7 +132,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
 		if (partner != comm->getRank()) {
 			//processor is active this round
-                    
+
 			/**
 			 * get indices of border nodes with breadth-first search
 			 */
@@ -320,7 +320,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				assert(otherSecondBlockWeightSum <= blockWeightSum);
 			}
 
-			if (otherGain <= 0 && gain <= 0  /**/ && false /**/ ) {
+			if (otherGain <= 0 && gain <= 0  /* && false */ ) {
 				//Oh well. None of the processors managed an improvement. No need to update data structures.
 
 			}else {
@@ -365,7 +365,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 						deletedNodes.push_back(interfaceNodes[i]);
 					}
 				}
-PRINT(*comm);
+
 				/**
 				 * add new nodes
 				 */
@@ -406,9 +406,9 @@ PRINT(*comm);
 
 				{
 					SCAI_REGION( "LocalRefinement.distributedFMStep.loop.redistribute.updateDataStructures" )
+
 					redistributeFromHalo(input, newDistribution, graphHalo, haloMatrix);
 					part = scai::lama::fill<DenseVector<IndexType>>(newDistribution, localBlockID);
-
 					if (nodesWeighted) {
 						redistributeFromHalo<ValueType>(nodeWeights, newDistribution, graphHalo, nodeWeightHaloData);
 					}
@@ -441,7 +441,7 @@ PRINT(*comm);
 					distances = LocalRefinement<IndexType, ValueType>::distancesFromBlockCenter(coordinates);
 				}
 			}
-		}
+		} // if (partner != comm->getRank())
 	}
 
 	comm->synchronize();
@@ -1053,7 +1053,7 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 	{
 		SCAI_REGION( "LocalRefinement.redistributeFromHalo.setCSRData" )
 		//setting CSR data
-		// matrix.getLocalStorage().setCSRDataSwap(targetNumRows, globalN, numValues, targetIA, targetJA, targetValues, scai::hmemo::ContextPtr());
+		//matrix.getLocalStorage().setCSRDataSwap(targetNumRows, globalN, numValues, targetIA, targetJA, targetValues, scai::hmemo::ContextPtr());
                 // ThomasBrandes: optimize by std::move(targetIA), std::move(targetJA), std::move(targetValues) ??
                 // ThomasBrandes: col distribution is replicated !!!
                 matrix = CSRSparseMatrix<ValueType>( newDist, CSRStorage<ValueType>( targetNumRows, globalN, std::move(targetIA), std::move(targetJA), std::move(targetValues) ) );
