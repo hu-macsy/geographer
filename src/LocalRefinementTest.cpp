@@ -135,11 +135,11 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	DenseVector<IndexType> origin(graph.getRowDistributionPtr(), comm->getRank());
 	ASSERT_GE(cut, 0);
 	for (IndexType i = 0; i < iterations; i++) {
-PRINT(*comm);
+
 		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, coordinates, distances, origin, communicationScheme, settings);
 		IndexType gain = 0;
 		for (IndexType roundGain : gainPerRound) gain += roundGain;
-PRINT(*comm);
+
 		//check correct gain calculation
 		const ValueType newCut = GraphUtils::computeCut(graph, part, true);
 		EXPECT_EQ(cut - gain, newCut) << "Old cut " << cut << ", gain " << gain << " newCut " << newCut;
@@ -232,7 +232,7 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 	//redistribute according to partition
 	//01/19: changes because of new lama version
 	//scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(*dist, part.getLocalValues()));
-	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution( n, part.getLocalValues(), true));
+	scai::dmemo::DistributionPtr newDist = scai::dmemo::generalDistributionByNewOwners( *dist, part.getLocalValues() );
 
 	a.redistribute(newDist, a.getColDistributionPtr());
 	part.redistribute(newDist);
