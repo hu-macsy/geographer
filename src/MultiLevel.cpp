@@ -152,7 +152,6 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 				}
 			}
 
-PRINT(*comm << ": " << gain << " _" << settings.minGainForNextRound);
 			if (numRefinementRounds > 0) {
 				assert(gain >= 0);
 			}

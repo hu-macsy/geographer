@@ -485,7 +485,7 @@ TEST_F(ParcoRepartTest, testTwoWayCut) {
 
     //redistribute according to partition
 	//scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(*inputDist, part.getLocalValues()));
-	scai::dmemo::DistributionPtr newDistribution( new scai::dmemo::GeneralDistribution( n, part.getLocalValues(),true) );
+	scai::dmemo::DistributionPtr newDistribution = scai::dmemo::generalDistributionByNewOwners( *inputDist, part.getLocalValues() );
 
 	graph.redistribute(newDistribution, graph.getColDistributionPtr());
 	part.redistribute(newDistribution);
