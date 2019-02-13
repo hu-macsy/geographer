@@ -46,7 +46,8 @@ protected:
 
 TEST_F (auxTest, testInitialPartitions){
     
-    std::string fileName = "trace-00008.graph";
+    //std::string fileName = "trace-00008.graph";
+    std::string fileName = "Grid64x64";
     std::string file = graphPath + fileName;
     std::ifstream f(file);
     IndexType dimensions= 2;
@@ -164,7 +165,7 @@ TEST_F (auxTest, testInitialPartitions){
     scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
     
     //newDist = scai::dmemo::DistributionPtr( new scai::dmemo::GeneralDistribution ( hilbertPartition.getDistribution(), hilbertPartition.getLocalValues() ) );
-    /*scai::dmemo::DistributionPtr*/ newDist = scai::dmemo::DistributionPtr( new scai::dmemo::GeneralDistribution ( N, hilbertPartition.getLocalValues(), true) );
+    /*scai::dmemo::DistributionPtr*/ newDist = scai::dmemo::generalDistributionByNewOwners( hilbertPartition.getDistribution(), hilbertPartition.getLocalValues() );
     hilbertPartition.redistribute(newDist);
     graph.redistribute(newDist, noDistPointer);
 	for (IndexType d = 0; d < dimensions; d++) {
