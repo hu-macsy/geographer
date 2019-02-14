@@ -213,12 +213,14 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     std::string file = graphPath+ "trace-00008.graph";
     std::string coordFile = graphPath+ "trace-00008.graph.xyz";
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
-    const IndexType N = graph.getNumRows();
+    const IndexType globalN = graph.getNumRows();
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr distPtr ( graph.getRowDistributionPtr() );
-    scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( N ));
+    scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( globalN ));
     
+    const IndexType localN = distPtr->getLocalSize();
+
     struct Settings settings;
     settings.numBlocks= comm->getSize();
     settings.dimensions = 2;
@@ -233,20 +235,17 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     srand(seed[0]);
 
     //random partition
-	DenseVector<IndexType> partition( N , 0);
+	DenseVector<IndexType> partition( distPtr , 0);
 	{
 	    scai::hmemo::WriteAccess<IndexType> wPart(partition.getLocalValues());
-	    for(IndexType i=0; i<N; i++){
+	    for(IndexType i=0; i<localN; i++){
 	        wPart[i] = rand()%settings.numBlocks;
         }
-	    const IndexType localSum = std::accumulate(wPart.get(), wPart.get() + N, 0);
-	    const IndexType globalSum = comm->sum(localSum);
-	    ASSERT_EQ(globalSum, settings.numBlocks*localSum);
 	}
 
-	//01/19: changes because of new lama version
-	//scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(partition.getLocalValues(), comm));
-	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution( N, partition.getLocalValues(), true));
+	//changes due to new lama version
+	scai::dmemo::RedistributePlan redist = scai::dmemo::redistributePlanByNewOwners(partition.getLocalValues(), partition.getDistributionPtr());
+	scai::dmemo::DistributionPtr newDist = redist.getTargetDistributionPtr();
 
 	partition.redistribute( newDist );
 
@@ -258,10 +257,10 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     // node weights = 1
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1.0);
     //ValueType beforeSumWeigths = uniformWeights.l1Norm();
-    IndexType beforeSumWeights = N;
+    IndexType beforeSumWeights = globalN;
     
     //coordinates at random and redistribute
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType,ValueType>::readCoords(coordFile, N, settings.dimensions);
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType,ValueType>::readCoords(coordFile, globalN, settings.dimensions);
     for(IndexType i=0; i<settings.dimensions; i++){
         coords[i].redistribute( newDist );
     }
