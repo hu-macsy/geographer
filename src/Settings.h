@@ -80,8 +80,7 @@ inline std::ostream& operator<<(std::ostream& out, Format method){
 
 enum class Tool{ geographer, geoKmeans, geoSFC, parMetisGraph, parMetisGeom, parMetisSFC, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC};
 	
-//currently unused
-/* 
+/*	
 static std::string tool2string( Tool t){
 	switch( t){
 		case Tool::geographer:

@@ -13,6 +13,7 @@
 #include <scai/dmemo/Distribution.hpp>
 
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
+#include <scai/tracing.hpp>
 
 #include <assert.h>
 #include <cmath>

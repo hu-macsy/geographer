@@ -8,6 +8,7 @@
 #pragma once
 
 #include <scai/lama/matrix/all.hpp>
+#include <scai/tracing.hpp>
 
 #include <vector>
 #include <functional>

@@ -291,10 +291,10 @@ static scai::dmemo::DistributionPtr redistributeFromPartition(
     scai::dmemo::DistributionPtr distFromPartition;
 
     if( useRedistributor ){
-        scai::dmemo::Redistributor resultRedist(partition.getLocalValues(), partition.getDistributionPtr());//TODO: Wouldn't it be faster to use a GeneralDistribution here?
+        scai::dmemo::RedistributePlan resultRedist = scai::dmemo::redistributePlanByNewOwners(partition.getLocalValues(), partition.getDistributionPtr());
         
         partition = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
-        scai::dmemo::Redistributor redistributor(resultRedist.getTargetDistributionPtr(), graph.getRowDistributionPtr());
+        scai::dmemo::RedistributePlan redistributor = scai::dmemo::redistributePlanByNewDistribution(resultRedist.getTargetDistributionPtr(), graph.getRowDistributionPtr());
 
         for (IndexType d=0; d<settings.dimensions; d++) {
             coordinates[d].redistribute(redistributor);
@@ -305,7 +305,7 @@ static scai::dmemo::DistributionPtr redistributeFromPartition(
         distFromPartition = resultRedist.getTargetDistributionPtr();
     }else{
         // create new distribution from partition
-        distFromPartition = scai::dmemo::DistributionPtr( new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
+        distFromPartition = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues());
 
         partition.redistribute( distFromPartition );
         graph.redistribute( distFromPartition, noDist );

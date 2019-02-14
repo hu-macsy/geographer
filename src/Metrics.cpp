@@ -81,7 +81,7 @@
 		
 		getAllMetrics( graph, partition, nodeWeights, settings);
 		
-		scai::dmemo::DistributionPtr newDist = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );	
+		scai::dmemo::DistributionPtr newDist = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues() );
 		scai::dmemo::DistributionPtr oldDist = graph.getRowDistributionPtr();
 		
 		std::tie( maxRedistVol, totRedistVol ) = getRedistributionVol( newDist, oldDist);
@@ -215,7 +215,7 @@
 		const IndexType N = graph.getNumRows();
 	
 		//get the distribution from the partition
-		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
+		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues() );
 		
 		std::chrono::time_point<std::chrono::system_clock> beforeRedistribution = std::chrono::system_clock::now();
 
@@ -282,9 +282,9 @@
 		// comm time in SpMV
 		{
 			PRINT0("starting comm schedule...");
-			const scai::dmemo::Halo& matrixHalo = copyGraph.getHalo();
-			const scai::dmemo::CommunicationPlan& sendPlan  = matrixHalo.getProvidesPlan();
-			const scai::dmemo::CommunicationPlan& recvPlan  = matrixHalo.getRequiredPlan();
+			const scai::dmemo::HaloExchangePlan& matrixHaloPlan = copyGraph.getHaloExchangePlan();
+			const scai::dmemo::CommunicationPlan& sendPlan  = matrixHaloPlan.getLocalCommunicationPlan();
+			const scai::dmemo::CommunicationPlan& recvPlan  = matrixHaloPlan.getHaloCommunicationPlan();
 			
 			//PRINT(*comm << ": " << 	sendPlan.size() << " ++ " << sendPlan << " ___ " << recvPlan);
 			scai::hmemo::HArray<ValueType> sendData( sendPlan.totalQuantity(), 1.0 );
@@ -318,7 +318,7 @@
 		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 		
 		//get the distribution from the partition
-		scai::dmemo::Redistributor prepareRedist( newDist, oldDist );	
+		scai::dmemo::RedistributePlan prepareRedist = scai::dmemo::redistributePlanByNewDistribution( newDist, oldDist );	
 				
 		// redistribution load
 		scai::hmemo::HArray<IndexType> sourceIndices = prepareRedist.getExchangeSourceIndexes();
@@ -353,7 +353,7 @@
 		const scai::dmemo::DistributionPtr initColDistPtr = graph.getColDistributionPtr();
 		
 		//get the distribution from the partition
-		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );
+		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues() );
 		
 		std::chrono::time_point<std::chrono::system_clock> beforeRedistribution = std::chrono::system_clock::now();
 		// redistribute graph according to partition distribution
@@ -375,9 +375,9 @@
 		ValueType imbalance = ValueType( maxLocalN - optSize)/optSize;
 		PRINT0("minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", imbalance= " << imbalance);
 		
-		const scai::dmemo::Halo& matrixHalo = graph.getHalo();
-		const scai::dmemo::CommunicationPlan& sendPlan  = matrixHalo.getProvidesPlan();
-		const scai::dmemo::CommunicationPlan& recvPlan  = matrixHalo.getRequiredPlan();
+		const scai::dmemo::HaloExchangePlan& matrixHaloPlan = graph.getHaloExchangePlan();
+		const scai::dmemo::CommunicationPlan& sendPlan  = matrixHaloPlan.getLocalCommunicationPlan();
+		const scai::dmemo::CommunicationPlan& recvPlan  = matrixHaloPlan.getHaloCommunicationPlan();
 		
 		scai::hmemo::HArray<ValueType> sendData( sendPlan.totalQuantity(), 1.0 );
 		scai::hmemo::HArray<ValueType> recvData;

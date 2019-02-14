@@ -46,7 +46,8 @@ protected:
 
 TEST_F (auxTest, testInitialPartitions){
     
-    std::string fileName = "trace-00008.graph";
+    //std::string fileName = "trace-00008.graph";
+    std::string fileName = "Grid64x64";
     std::string file = graphPath + fileName;
     std::ifstream f(file);
     IndexType dimensions= 2;
@@ -109,12 +110,16 @@ TEST_F (auxTest, testInitialPartitions){
     
     //------------------------------------------- pixeled
     
+	settings.noRefinement = true;
+
     if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
     PRINT0("Get a pixeled partition");
     // get a pixeledPartition
     scai::lama::DenseVector<IndexType> pixeledPartition = ParcoRepart<IndexType, ValueType>::pixelPartition(coordinates, settings);
+    EXPECT_EQ( pixeledPartition.size(), N );
     
-    scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( pixeledPartition.getDistribution(), pixeledPartition.getLocalValues() ) );
+    //scai::dmemo::DistributionPtr newDist( new scai::dmemo::GeneralDistribution ( pixeledPartition.getDistribution(), pixeledPartition.getLocalValues() ) );
+    scai::dmemo::DistributionPtr newDist = scai::dmemo::generalDistributionByNewOwners( pixeledPartition.getDistribution(), pixeledPartition.getLocalValues() );
     pixeledPartition.redistribute(newDist);
     graph.redistribute(newDist, noDistPointer);
 	for (IndexType d = 0; d < dimensions; d++) {
@@ -132,7 +137,7 @@ TEST_F (auxTest, testInitialPartitions){
         logF<< "\tcut: " << cut << " , imbalance= "<< imbalance<< std::endl;
     }
     uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
-	scai::dmemo::Halo halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
+	scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
 	Metrics metrics;
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, halo, settings, metrics);
     if(dimensions==2){
@@ -146,7 +151,8 @@ TEST_F (auxTest, testInitialPartitions){
         std::cout << "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
         std::cout  << std::endl  << std::endl; 
     }
-    
+
+
     //------------------------------------------- hilbert/sfc
     
     // the partitioning may redistribute the input graph
@@ -159,7 +165,8 @@ TEST_F (auxTest, testInitialPartitions){
     // get a hilbertPartition
     scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
     
-    newDist = scai::dmemo::DistributionPtr( new scai::dmemo::GeneralDistribution ( hilbertPartition.getDistribution(), hilbertPartition.getLocalValues() ) );
+    //newDist = scai::dmemo::DistributionPtr( new scai::dmemo::GeneralDistribution ( hilbertPartition.getDistribution(), hilbertPartition.getLocalValues() ) );
+    /*scai::dmemo::DistributionPtr*/ newDist = scai::dmemo::generalDistributionByNewOwners( hilbertPartition.getDistribution(), hilbertPartition.getLocalValues() );
     hilbertPartition.redistribute(newDist);
     graph.redistribute(newDist, noDistPointer);
 	for (IndexType d = 0; d < dimensions; d++) {

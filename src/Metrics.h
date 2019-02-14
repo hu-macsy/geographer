@@ -3,6 +3,7 @@
 #include <numeric>
 #include <math.h>
 #include <scai/lama.hpp>
+#include <scai/dmemo/RedistributePlan.hpp>
 #include <chrono>
 #include <algorithm>
 

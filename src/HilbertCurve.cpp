@@ -7,7 +7,6 @@
 
 #include "HilbertCurve.h"
 
-
 namespace ITI{
 
 template<typename IndexType, typename ValueType>//TODO: template this to help branch prediction
@@ -194,11 +193,13 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const*
 template<typename IndexType, typename ValueType>
 std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndexVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth, const IndexType dimensions) {
 	
-    if(dimensions==2) 
+    if(dimensions==2){
         return HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVector( coordinates, recursionDepth);
+    }
 	
-	if(dimensions==3) 
+	if(dimensions==3) {
         return HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVector( coordinates, recursionDepth);
+	}
         
     throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
 }
@@ -607,7 +608,7 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
             
             ValueType globalHilbertIndex = HilbertCurve<IndexType, ValueType>::getHilbertIndex( point, dimensions, recursionDepth, minCoords, maxCoords);
 			localPairs[i].value = globalHilbertIndex;
-        	localPairs[i].index = coordDist->local2global(i);
+        	localPairs[i].index = coordDist->local2Global(i);
         }
     }
     

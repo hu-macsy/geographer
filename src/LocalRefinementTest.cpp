@@ -72,7 +72,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	scai::lama::DenseVector<IndexType> part(inputDist, 0);
 	for (IndexType i = 0; i < localN; i++) {
 		IndexType blockId = rand() % k;
-		IndexType globalID = inputDist->local2global(i);
+		IndexType globalID = inputDist->local2Global(i);
 		part.setValue(globalID, blockId);
 	}
 	//test initial partion for imbalance
@@ -88,7 +88,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	}
         
 	//redistribute according to partition
-	scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(part.getDistribution(), part.getLocalValues()));
+	scai::dmemo::DistributionPtr newDistribution = scai::dmemo::generalDistributionByNewOwners(part.getDistribution(), part.getLocalValues() );
 
 	graph.redistribute(newDistribution, graph.getColDistributionPtr());
 	part.redistribute(newDistribution);
@@ -135,6 +135,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	DenseVector<IndexType> origin(graph.getRowDistributionPtr(), comm->getRank());
 	ASSERT_GE(cut, 0);
 	for (IndexType i = 0; i < iterations; i++) {
+
 		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, coordinates, distances, origin, communicationScheme, settings);
 		IndexType gain = 0;
 		for (IndexType roundGain : gainPerRound) gain += roundGain;
@@ -193,7 +194,7 @@ TEST_F(LocalRefinementTest, testOriginArray) {
 	scai::hmemo::ReadAccess<IndexType> rOrigin(origin.getLocalValues());
 
 	for (IndexType i = 0; i < newDist->getLocalSize(); i++) {
-		IndexType origOwner = dist->getAnyOwner(newDist->local2global(i));
+		IndexType origOwner = dist->getAnyOwner(newDist->local2Global(i));
 		EXPECT_EQ(rOrigin[i], origOwner);
 	}
 }
@@ -229,7 +230,9 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 	}
 
 	//redistribute according to partition
-	scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(*dist, part.getLocalValues()));
+	//01/19: changes because of new lama version
+	//scai::dmemo::DistributionPtr newDist(new scai::dmemo::GeneralDistribution(*dist, part.getLocalValues()));
+	scai::dmemo::DistributionPtr newDist = scai::dmemo::generalDistributionByNewOwners( *dist, part.getLocalValues() );
 
 	a.redistribute(newDist, a.getColDistributionPtr());
 	part.redistribute(newDist);
@@ -251,12 +254,14 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 
 	for (IndexType round = 0; round < scheme.size(); round++) {
 		scai::hmemo::ReadAccess<IndexType> commAccess(scheme[round].getLocalValues());
-		IndexType partner = commAccess[scheme[round].getDistributionPtr()->global2local(comm->getRank())];
+		IndexType partner = commAccess[scheme[round].getDistributionPtr()->global2Local(comm->getRank())];
 
 		if (partner == thisBlock) {
-			scai::dmemo::Halo partHalo = GraphUtils<IndexType,ValueType>::buildNeighborHalo(a);
+			scai::dmemo::HaloExchangePlan partHalo = GraphUtils<IndexType,ValueType>::buildNeighborHalo(a);
 			scai::hmemo::HArray<IndexType> haloData;
-			comm->updateHalo( haloData, part.getLocalValues(), partHalo );
+			//01/19: changes because of new lama version
+			//comm->updateHalo( haloData, part.getLocalValues(), partHalo );
+			partHalo.updateHalo( haloData, part.getLocalValues(), *comm );
 
 		} else {
 			IndexType otherBlock = partner;
@@ -284,7 +289,7 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 			//test whether all returned nodes are of the specified block
 			for (IndexType node : interfaceNodes) {
 				ASSERT_TRUE(newDist->isLocal(node));
-				EXPECT_EQ(thisBlock, partAccess[newDist->global2local(node)]);
+				EXPECT_EQ(thisBlock, partAccess[newDist->global2Local(node)]);
 			}
 
 			//test whether rounds are consistent: first nodes should have neighbors of otherBlock, later nodes not
@@ -294,25 +299,26 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 			const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 			const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
-			scai::dmemo::Halo partHalo = GraphUtils<IndexType,ValueType>::buildNeighborHalo(a);
+			scai::dmemo::HaloExchangePlan partHalo = GraphUtils<IndexType,ValueType>::buildNeighborHalo(a);
 			scai::hmemo::HArray<IndexType> haloData;
-			comm->updateHalo( haloData, localData, partHalo );
+			//comm->updateHalo( haloData, localData, partHalo ); //01/19: changes because of new lama version
+			partHalo.updateHalo( haloData, localData, *comm);
 
 			bool inFirstRound = true;
 			for (IndexType i = 0; i < interfaceNodes.size(); i++) {
 				ASSERT_TRUE(newDist->isLocal(interfaceNodes[i]));
-				IndexType localID = newDist->global2local(interfaceNodes[i]);
+				IndexType localID = newDist->global2Local(interfaceNodes[i]);
 				bool directNeighbor = false;
 				for (IndexType j = ia[localID]; j < ia[localID+1]; j++) {
 					IndexType neighbor = ja[j];
 					if (newDist->isLocal(neighbor)) {
-						if (partAccess[newDist->global2local(neighbor)] == thisBlock && i < lastRoundMarker) {
+						if (partAccess[newDist->global2Local(neighbor)] == thisBlock && i < lastRoundMarker) {
 							EXPECT_EQ(1, std::count(interfaceNodes.begin(), interfaceNodes.end(), neighbor));
-						} else if (partAccess[newDist->global2local(neighbor)] == otherBlock) {
+						} else if (partAccess[newDist->global2Local(neighbor)] == otherBlock) {
 							directNeighbor = true;
 						}
 					} else {
-						IndexType haloIndex = partHalo.global2halo(neighbor);
+						IndexType haloIndex = partHalo.global2Halo(neighbor);
 						if (haloIndex != scai::invalidIndex && haloData[haloIndex] == otherBlock) {
 							directNeighbor = true;
 						}

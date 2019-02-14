@@ -5,8 +5,7 @@
 #include <scai/lama/Vector.hpp>
 #include <scai/lama/storage/MatrixStorage.hpp>
 
-#include <scai/dmemo/Halo.hpp>
-#include <scai/dmemo/HaloBuilder.hpp>
+#include <scai/dmemo/HaloExchangePlan.hpp>
 
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 
@@ -108,7 +107,7 @@ namespace ITI {
          * @param[in] haloMatrix
          *
          */
-        static void redistributeFromHalo(CSRSparseMatrix<ValueType>& matrix, scai::dmemo::DistributionPtr newDistribution, const scai::dmemo::Halo& halo, const CSRStorage<ValueType>& haloMatrix);
+        static void redistributeFromHalo(CSRSparseMatrix<ValueType>& matrix, scai::dmemo::DistributionPtr newDistribution, const scai::dmemo::HaloExchangePlan& halo, const CSRStorage<ValueType>& haloMatrix);
         
         /**
          * Redistributes a DenseVector from a local halo object without communication.
@@ -120,7 +119,7 @@ namespace ITI {
          *
          */
         template<typename T>
-        static void redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, const scai::dmemo::Halo& halo, const scai::hmemo::HArray<T>& haloData);
+        static void redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, const scai::dmemo::HaloExchangePlan& halo, const scai::hmemo::HArray<T>& haloData);
         
 		static std::vector<ValueType> distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates);
 
@@ -150,7 +149,7 @@ namespace ITI {
         static ValueType twoWayLocalFM(
             const CSRSparseMatrix<ValueType> &input, 
             const CSRStorage<ValueType> &haloStorage,
-            const scai::dmemo::Halo &Halo,
+            const scai::dmemo::HaloExchangePlan &Halo,
             const std::vector<IndexType>& borderRegionIDs,
             const std::vector<ValueType>& nodeWeights, 
             std::vector<bool>& assignedToSecondBlock,
@@ -176,7 +175,7 @@ namespace ITI {
         static std::vector<ValueType> twoWayLocalDiffusion(
             const CSRSparseMatrix<ValueType> &input, 
             const CSRStorage<ValueType> &haloStorage,
-            const scai::dmemo::Halo &halo,
+            const scai::dmemo::HaloExchangePlan &halo,
             const std::vector<IndexType>& borderRegionIDs, 
             std::pair<IndexType, IndexType> secondRoundMarkers,
             const std::vector<bool>& assignedToSecondBlock, 

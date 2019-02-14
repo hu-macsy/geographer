@@ -23,7 +23,7 @@
 
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
-using scai::dmemo::Halo;
+using scai::dmemo::HaloExchangePlan;
 
 namespace ITI{
     
@@ -45,7 +45,7 @@ namespace ITI{
          *
          * @return origin DenseVector that specifies for each element the original process before the multiLevelStep. Only needed when used to speed up redistribution.
          */
-        static DenseVector<IndexType> multiLevelStep(scai::lama::CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const Halo& halo, Settings settings, Metrics& metrics);
+        static DenseVector<IndexType> multiLevelStep(scai::lama::CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const HaloExchangePlan& halo, Settings settings, Metrics& metrics);
 
         /**
          * Given the origin array resulting from a multi-level step on a coarsened graph, compute where local elements on the current level have to be sent to recreate the coarse distribution on the current level.
@@ -70,7 +70,7 @@ namespace ITI{
          * @param[out] fineToCoarse DenseVector with as many entries as uncoarsened nodes. For each uncoarsened node, contains the corresponding coarsened node.
          * @param[in] iterations Number of contraction iterations
          */
-        static void coarsen(const CSRSparseMatrix<ValueType>& inputGraph, const DenseVector<ValueType> &nodeWeights, const Halo& halo, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations = 1);
+        static void coarsen(const CSRSparseMatrix<ValueType>& inputGraph, const DenseVector<ValueType> &nodeWeights, const HaloExchangePlan& halo, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations = 1);
 
         /**
          * @brief Perform a local maximum matching

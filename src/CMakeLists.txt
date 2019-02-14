@@ -9,7 +9,7 @@ set(SCAI_INCLUDE "${SCAI_DIR}/include/")
 set(SCAI_LIB "${SCAI_DIR}/lib/")
 
 ### set files ###
-set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp SpectralPartition.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp KMeans.cpp Metrics.cpp Settings.cpp)
+set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp SpectralPartition.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp KMeans.cpp HaloPlanFns.cpp Metrics.cpp Settings.cpp)
 set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp quadtree/test/QuadTreeTest.cpp SpectralPartitionTest.cpp)
 
 set(RBC_DIR "${PROJECT_SOURCE_DIR}/RBC")
@@ -43,6 +43,8 @@ set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11 -DBUILD_COMMIT=${
 ### define targets ###
 add_executable(Geographer ${FILES_COMMON} main.cpp)
 target_link_libraries(Geographer ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
+
+add_library(geographer SHARED ${FILES_COMMON})
 
 if (GTEST_FOUND)
 	add_executable(GeographerTest ${FILES_COMMON} ${FILES_TEST})

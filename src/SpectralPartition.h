@@ -5,7 +5,6 @@
  *      Author: tzovas
  */
 
-#include <scai/dmemo/HaloBuilder.hpp>
 #include <scai/dmemo/Distribution.hpp>
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/dmemo/GenBlockDistribution.hpp>

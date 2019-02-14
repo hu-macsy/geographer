@@ -5,8 +5,7 @@
 #include <scai/lama/Vector.hpp>
 #include <scai/lama/storage/MatrixStorage.hpp>
 
-#include <scai/dmemo/Halo.hpp>
-#include <scai/dmemo/HaloBuilder.hpp>
+#include <scai/dmemo/HaloExchangePlan.hpp>
 #include <scai/dmemo/Distribution.hpp>
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/dmemo/GenBlockDistribution.hpp>
@@ -23,7 +22,7 @@
 #include "FileIO.h"
 
 using namespace scai::lama;
-using scai::dmemo::Halo;
+using scai::dmemo::HaloExchangePlan;
 
 namespace ITI {
 

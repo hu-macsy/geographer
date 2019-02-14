@@ -3,6 +3,9 @@
 
 #include "LocalRefinement.h"
 #include "GraphUtils.h"
+#include "HaloPlanFns.h"
+
+#include <scai/utilskernel/TransferUtils.hpp>
 
 using scai::hmemo::HArray;
 
@@ -103,12 +106,12 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 		}
 		
 		scai::hmemo::ReadAccess<IndexType> commAccess(communicationScheme[color].getLocalValues());
-		IndexType partner = commAccess[commDist->global2local(comm->getRank())];
+		IndexType partner = commAccess[commDist->global2Local(comm->getRank())];
 
 		//check symmetry of communication scheme
 		assert(partner < comm->getSize());
 		if (commDist->isLocal(partner)) {
-			IndexType partnerOfPartner = commAccess[commDist->global2local(partner)];
+			IndexType partnerOfPartner = commAccess[commDist->global2Local(partner)];
 			if (partnerOfPartner != comm->getRank()) {
 				throw std::runtime_error("Process " + std::to_string(comm->getRank()) + ": Partner " + std::to_string(partner) + " has partner "
 						+ std::to_string(partnerOfPartner) + ".");
@@ -133,13 +136,13 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
 		IndexType gainThisRound = 0;
 
-		scai::dmemo::Halo graphHalo;
+		scai::dmemo::HaloExchangePlan graphHalo;
 		CSRStorage<ValueType> haloMatrix;
 		HArray<ValueType> nodeWeightHaloData;
 
 		if (partner != comm->getRank()) {
 			//processor is active this round
-                    
+
 			/**
 			 * get indices of border nodes with breadth-first search
 			 */
@@ -211,7 +214,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			ValueType distanceSwap[swapLength];
 			if (settings.useGeometricTieBreaking) {
 				for (IndexType i = 0; i < interfaceNodes.size(); i++) {
-					distanceSwap[i] = distances[inputDist->global2local(interfaceNodes[i])];
+					distanceSwap[i] = distances[inputDist->global2Local(interfaceNodes[i])];
 				}
 				comm->swap(distanceSwap, swapLength, partner);
 			}
@@ -224,12 +227,12 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			{
 				scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
 				scai::hmemo::HArrayRef<IndexType> arrProvidedIndexes( interfaceNodes );
-				scai::dmemo::HaloBuilder::build( *inputDist, arrRequiredIndexes, arrProvidedIndexes, partner, graphHalo );
+                graphHalo = buildWithPartner( *inputDist, arrRequiredIndexes, arrProvidedIndexes, partner );
 			}
 
 			//all required halo indices are in the halo
 			for (IndexType node : requiredHaloIndices) {
-				assert(graphHalo.global2halo(node) != scai::invalidIndex);
+				assert(graphHalo.global2Halo(node) != scai::invalidIndex);
 			}
 
 			/**
@@ -255,15 +258,15 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			if (nodesWeighted) {
 				const HArray<ValueType>& localWeights = nodeWeights.getLocalValues();
 				assert(localWeights.size() == localN);
-				comm->updateHalo( nodeWeightHaloData, localWeights, graphHalo );
+				graphHalo.updateHalo( nodeWeightHaloData, localWeights, *comm );
 				borderNodeWeights.resize(borderRegionSize,-1);
 				for (IndexType i = 0; i < borderRegionSize; i++) {
 					const IndexType globalI = borderRegionIDs[i];
-					const IndexType localI = inputDist->global2local(globalI);
+					const IndexType localI = inputDist->global2Local(globalI);
 					if (localI != scai::invalidIndex) {
 						borderNodeWeights[i] = localWeights[localI];
 					} else {
-						const IndexType localI = graphHalo.global2halo(globalI);
+						const IndexType localI = graphHalo.global2Halo(globalI);
 						assert(localI != scai::invalidIndex);
 						borderNodeWeights[i] = nodeWeightHaloData[localI];
 					}
@@ -273,7 +276,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
 			//origin data, for redistribution in uncoarsening step
 			scai::hmemo::HArray<IndexType> originData;
-			comm->updateHalo(originData, origin.getLocalValues(), graphHalo);
+			graphHalo.updateHalo(originData, origin.getLocalValues(), *comm);
 
 			//block sizes and capacities
 			std::pair<IndexType, IndexType> blockSizes = {blockWeightSum, otherBlockWeightSum};
@@ -287,7 +290,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
 			if (settings.useGeometricTieBreaking) {
 				for (IndexType i = 0; i < lastRoundMarker; i++) {
-					tieBreakingKeys[i] = -distances[inputDist->global2local(interfaceNodes[i])];
+					tieBreakingKeys[i] = -distances[inputDist->global2Local(interfaceNodes[i])];
 				}
 				for (IndexType i = lastRoundMarker; i < borderRegionSize; i++) {
 					tieBreakingKeys[i] = -distanceSwap[i-lastRoundMarker];
@@ -327,7 +330,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				assert(otherSecondBlockWeightSum <= blockWeightSum);
 			}
 
-			if (otherGain <= 0 && gain <= 0) {
+			if (otherGain <= 0 && gain <= 0  /* && false */ ) {
 				//Oh well. None of the processors managed an improvement. No need to update data structures.
 
 			}else {
@@ -390,7 +393,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
                     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
                     const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
                     for (IndexType globalI : deletedNodes) {
-                        IndexType localI = inputDist->global2local(globalI);
+                        IndexType localI = inputDist->global2Local(globalI);
                         for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
                             borderCandidates.insert(ja[j]);
                         }
@@ -405,11 +408,15 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
 				SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.redistribute.generalDistribution" )
 				HArray<IndexType> indexTransport(myGlobalIndices.size(), myGlobalIndices.data());
-				scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
+//WARNING, TODO: the next call just hangs when is not called by all PEs. 
+//This can happen when some pairs of PE did not achieve any gain
+// I guess the reason is the comm->sum() in the GeneralDistribition constructor
+				auto newDistribution = scai::dmemo::generalDistributionUnchecked(globalN, indexTransport, comm);
 				SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.redistribute.generalDistribution" )
 
 				{
 					SCAI_REGION( "LocalRefinement.distributedFMStep.loop.redistribute.updateDataStructures" )
+
 					redistributeFromHalo(input, newDistribution, graphHalo, haloMatrix);
 					part = scai::lama::fill<DenseVector<IndexType>>(newDistribution, localBlockID);
 					if (nodesWeighted) {
@@ -419,7 +426,6 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				}
 				assert(input.getRowDistributionPtr()->isEqual(*part.getDistributionPtr()));
 				SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.redistribute" )
-
 				/**
 				 * update local border. This could probably be optimized by only updating the part that could have changed in the last round.
 				 */
@@ -438,31 +444,21 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 					for (IndexType dim = 0; dim < coordinates.size(); dim++) {
 						HArray<ValueType>& localCoords = coordinates[dim].getLocalValues();
 						HArray<ValueType> haloData;
-						comm->updateHalo( haloData, localCoords, graphHalo );
+						graphHalo.updateHalo( haloData, localCoords, *comm );
 						redistributeFromHalo<ValueType>(coordinates[dim], newDistribution, graphHalo, haloData);
 					}
 
 					distances = LocalRefinement<IndexType, ValueType>::distancesFromBlockCenter(coordinates);
 				}
 			}
-		}
-		std::chrono::duration<double> oneLoop = std::chrono::system_clock::now() - loopStart;
-		ValueType t2 = comm->max(oneLoop.count());
-		if(settings.verbose){
-			PRINT0("time elapsed for loop " << color <<": " << t2 );
-		}
+		} // if (partner != comm->getRank())
 	}
 
 	comm->synchronize();
 	for (IndexType color = 0; color < gainPerRound.size(); color++) {
 		gainPerRound[color] = comm->sum(gainPerRound[color]) / 2;
 	}
-	
-	std::chrono::duration<double> finalTime = std::chrono::system_clock::now() - startTime;
-	ValueType tf = comm->max(finalTime.count());
-	//PRINT0("time elapsed for one distFM step: " << tf );
-	//metrics.timeDistFMStep.push_back( tf );
-	
+
 	return gainPerRound;
 }
 //---------------------------------------------------------------------------------------
@@ -471,7 +467,7 @@ template<typename IndexType, typename ValueType>
 ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
     const CSRSparseMatrix<ValueType> &input,
     const CSRStorage<ValueType> &haloStorage,
-    const scai::dmemo::Halo &matrixHalo,
+    const scai::dmemo::HaloExchangePlan &matrixHalo,
     const std::vector<IndexType>& borderRegionIDs,
     const std::vector<ValueType>& nodeWeights,
     std::vector<bool>& assignedToSecondBlock,
@@ -547,7 +543,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 		 * neighborhood information is either in local matrix or halo.
 		 */
 		const CSRStorage<ValueType>& storage = inputDist->isLocal(globalID) ? input.getLocalStorage() : haloStorage;
-		const IndexType localID = inputDist->isLocal(globalID) ? inputDist->global2local(globalID) : matrixHalo.global2halo(globalID);
+		const IndexType localID = inputDist->isLocal(globalID) ? inputDist->global2Local(globalID) : matrixHalo.global2Halo(globalID);
 		assert(localID != scai::invalidIndex);
 
 		//get locks
@@ -571,7 +567,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 			if (inputDist->isLocal(globalNeighbor)) {
 				//neighbor is in local block,
 				result += isInSecondBlock ? weight : -weight;
-			} else if (matrixHalo.global2halo(globalNeighbor) != scai::invalidIndex) {
+			} else if (matrixHalo.global2Halo(globalNeighbor) != scai::invalidIndex) {
 				//neighbor is in partner block
 				result += !isInSecondBlock ? weight : -weight;
 			} else {
@@ -704,7 +700,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 		 */
 		SCAI_REGION_START("LocalRefinement.twoWayLocalFM.queueloop.acquireLocks")
 		const CSRStorage<ValueType>& storage = inputDist->isLocal(topVertex) ? input.getLocalStorage() : haloStorage;
-		const IndexType localID = inputDist->isLocal(topVertex) ? inputDist->global2local(topVertex) : matrixHalo.global2halo(topVertex);
+		const IndexType localID = inputDist->isLocal(topVertex) ? inputDist->global2Local(topVertex) : matrixHalo.global2Halo(topVertex);
 		assert(localID != scai::invalidIndex);
 
 		const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
@@ -785,7 +781,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 
 template<typename IndexType, typename ValueType>
 std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalDiffusion(const CSRSparseMatrix<ValueType> &input, const CSRStorage<ValueType> &haloStorage,
-		const scai::dmemo::Halo &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
+		const scai::dmemo::HaloExchangePlan &matrixHalo, const std::vector<IndexType>& borderRegionIDs, std::pair<IndexType, IndexType> secondRoundMarkers,
 		const std::vector<bool>& assignedToSecondBlock, Settings settings) {
 
 	SCAI_REGION( "LocalRefinement.twoWayLocalDiffusion" )
@@ -831,7 +827,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalDi
 	{
 		const scai::hmemo::ReadAccess<IndexType> localIa(input.getLocalStorage().getIA());
 		for (IndexType i = 0; i < firstBlockSize; i++) {
-			const IndexType localI = inputDist->global2local(borderRegionIDs[i]);
+			const IndexType localI = inputDist->global2Local(borderRegionIDs[i]);
 			if (localIa[localI+1]-localIa[localI] > maxDegree) maxDegree = localIa[localI+1]-localIa[localI];
 		}
 	}
@@ -865,7 +861,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalDi
 			const ValueType oldDiffusionValue = result[i];
 			const IndexType globalID = borderRegionIDs[i];
 			const CSRStorage<ValueType>& storage = inputDist->isLocal(globalID) ? input.getLocalStorage() : haloStorage;
-			const IndexType localID = inputDist->isLocal(globalID) ? inputDist->global2local(globalID) : matrixHalo.global2halo(globalID);
+			const IndexType localID = inputDist->isLocal(globalID) ? inputDist->global2Local(globalID) : matrixHalo.global2Halo(globalID);
 			assert(localID != scai::invalidIndex);
 
 			const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
@@ -904,7 +900,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalDi
 
 template<typename IndexType, typename ValueType>
 template<typename T>
-void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, const scai::dmemo::Halo& halo, const scai::hmemo::HArray<T>& haloData) {
+void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, const scai::dmemo::HaloExchangePlan& halo, const scai::hmemo::HArray<T>& haloData) {
 	SCAI_REGION( "LocalRefinement.redistributeFromHalo.Vector" )
 
 	scai::dmemo::DistributionPtr oldDist = input.getDistributionPtr();
@@ -932,11 +928,11 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(DenseVecto
 		for (IndexType i = 0; i < newLocalN; i++) {
 			const IndexType globalI = newAcc[i];
 			while(oldLocalI < oldLocalN && oldAcc[oldLocalI] < globalI) oldLocalI++;
-			//const IndexType oldLocalI = oldDist->global2local(globalI);
+			//const IndexType oldLocalI = oldDist->global2Local(globalI);
 			if (oldLocalI < oldLocalN && oldAcc[oldLocalI] == globalI) {
 				wNewLocalValues[i] = rOldLocalValues[oldLocalI];
 			} else {
-				const IndexType localI = halo.global2halo(globalI);
+				const IndexType localI = halo.global2Halo(globalI);
 				assert(localI != scai::invalidIndex);
 				wNewLocalValues[i] = rHaloData[localI];
 			}
@@ -948,7 +944,7 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(DenseVecto
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseMatrix<ValueType>& matrix, scai::dmemo::DistributionPtr newDist, const scai::dmemo::Halo& halo, const CSRStorage<ValueType>& haloStorage) {
+void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseMatrix<ValueType>& matrix, scai::dmemo::DistributionPtr newDist, const scai::dmemo::HaloExchangePlan& halo, const CSRStorage<ValueType>& haloStorage) {
 	SCAI_REGION( "LocalRefinement.redistributeFromHalo" )
 
 	scai::dmemo::DistributionPtr oldDist = matrix.getRowDistributionPtr();
@@ -1022,7 +1018,7 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 				size = rSourceSizes[oldLocalIndex];
 			} else {
 				additionalLocalNodes.push_back(i);
-				const IndexType haloIndex = halo.global2halo(newGlobalIndex);
+				const IndexType haloIndex = halo.global2Halo(newGlobalIndex);
 				assert(haloIndex != scai::invalidIndex);
 				localHaloIndices.push_back(haloIndex);
 				size = rHaloSizes[haloIndex];
@@ -1067,7 +1063,7 @@ void ITI::LocalRefinement<IndexType, ValueType>::redistributeFromHalo(CSRSparseM
 	{
 		SCAI_REGION( "LocalRefinement.redistributeFromHalo.setCSRData" )
 		//setting CSR data
-		// matrix.getLocalStorage().setCSRDataSwap(targetNumRows, globalN, numValues, targetIA, targetJA, targetValues, scai::hmemo::ContextPtr());
+		//matrix.getLocalStorage().setCSRDataSwap(targetNumRows, globalN, numValues, targetIA, targetJA, targetValues, scai::hmemo::ContextPtr());
                 // ThomasBrandes: optimize by std::move(targetIA), std::move(targetJA), std::move(targetValues) ??
                 // ThomasBrandes: col distribution is replicated !!!
                 matrix = CSRSparseMatrix<ValueType>( newDist, CSRStorage<ValueType>( targetNumRows, globalN, std::move(targetIA), std::move(targetJA), std::move(targetValues) ) );
@@ -1147,7 +1143,7 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 
 	for (IndexType node : nodesWithNonLocalNeighbors) {
 		SCAI_REGION( "LocalRefinement.getInterfaceNodes.getBorderToPartner" )
-		IndexType localI = inputDist->global2local(node);
+		IndexType localI = inputDist->global2Local(node);
 		assert(localI != scai::invalidIndex);
 
 		for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
@@ -1173,7 +1169,7 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 		std::queue<IndexType> bfsQueue;
 		for (IndexType node : interfaceNodes) {
 			bfsQueue.push(node);
-			const IndexType localID = inputDist->global2local(node);
+			const IndexType localID = inputDist->global2Local(node);
 			assert(localID != scai::invalidIndex);
 			touched[localID] = true;
 		}
@@ -1188,7 +1184,7 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 			while (!bfsQueue.empty()) {
 				IndexType nextNode = bfsQueue.front();
 				bfsQueue.pop();
-				const IndexType localI = inputDist->global2local(nextNode);
+				const IndexType localI = inputDist->global2Local(nextNode);
 				assert(localI != scai::invalidIndex);
 				assert(touched[localI]);
 				const IndexType beginCols = ia[localI];
@@ -1196,7 +1192,7 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 
 				for (IndexType j = beginCols; j < endCols; j++) {
 					IndexType neighbor = ja[j];
-					IndexType localNeighbor = inputDist->global2local(neighbor);
+					IndexType localNeighbor = inputDist->global2Local(neighbor);
 					//assume k=p
 					if (localNeighbor != scai::invalidIndex && !touched[localNeighbor]) {
 						nextQueue.push(neighbor);
@@ -1240,7 +1236,7 @@ IndexType ITI::LocalRefinement<IndexType, ValueType>::getDegreeSum(const CSRSpar
 	IndexType result = 0;
 
 	for (IndexType node : nodes) {
-		IndexType localID = input.getRowDistributionPtr()->global2local(node);
+		IndexType localID = input.getRowDistributionPtr()->global2Local(node);
 		result += localIa[localID+1] - localIa[localID];
 	}
 	return result;

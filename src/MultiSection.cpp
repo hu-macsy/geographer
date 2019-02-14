@@ -370,7 +370,7 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
         
         for(IndexType i=0; i<localN; i++){
             SCAI_REGION_START("MultiSection.projection.localProjection.indexAndCopyCoords");
-            const IndexType globalIndex = inputDist->local2global(i);
+            const IndexType globalIndex = inputDist->local2Global(i);
             std::vector<ValueType> coords = indexToCoords<ValueType>(globalIndex, sideLen, dimension); // check the global index
             SCAI_REGION_END("MultiSection.projection.localProjection.indexAndCopyCoords");
             
@@ -959,7 +959,7 @@ ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const scai::la
         scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights.getLocalValues() );
         
         for(IndexType i=0; i<localN; i++){
-            const IndexType globalIndex = inputDist->local2global(i);
+            const IndexType globalIndex = inputDist->local2Global(i);
             std::vector<IndexType> coords = indexToCoords<IndexType>(globalIndex, sideLen, dimension); // check the global index
             if( inBBox(coords, bBox) ){ 
                 localWeight += localWeights[i];
