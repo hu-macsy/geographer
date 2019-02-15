@@ -561,7 +561,6 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 			*minDistanceAllBlocks[newB]\
 			*influence[newB];
 		assert( std::isfinite(effectMinDistAllBlocks[newB]) );	
-PRINT0( "center " << newB << ": " << center[0] <<", " << center[1] << " minDist= " << minDistanceAllBlocks[newB] << " effMinDist= " << effectMinDistAllBlocks[newB] );		
 	}
 
 	//sort centers according to their distance from the bounding box of this PE
@@ -590,8 +589,8 @@ PRINT0( "center " << newB << ": " << center[0] <<", " << center[1] << " minDist=
 		//TODO: is this sorting needed?
 		//TODO: is it correct to sort? if we sort, effectMinDistAllBlocks[clusterInd[i]] will be wrong, I think effectMinDistAllBlocks[i] will be correct
 		//TODO: either not sort and get minDistanceAllBlocks[c] or sort and get minDistanceAllBlocks[i]
+		//update 15/02: yes, sorting is needed and we access it as in the for loop below: effectMinDistAllBlocks[i]
 		std::sort( effectMinDistAllBlocks.begin()+rangeStart, effectMinDistAllBlocks.begin()+rangeEnd);
-for( int i=0; i<rangeEnd; i++) PRINT0( clusterIndicesAllBlocks[i]  << " __ " << effectMinDistAllBlocks[i] );
 
 		//just for checking
 		for (IndexType i=rangeStart; i<rangeEnd; i++) {
@@ -639,7 +638,7 @@ for( int i=0; i<rangeEnd; i++) PRINT0( clusterIndicesAllBlocks[i]  << " __ " << 
 
 				//TODO: not needed assertion, this is checked in the beginning				
 				SCAI_ASSERT_LT_ERROR( fatherBlock, numOldBlocks, "Wrong father block index");
-if( i==26) PRINT0( i<< " || " << lowerBoundNextCenter[i] << " <> " <<  upperBoundOwnCenter[i] );
+
 				if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i]) {
 					//cluster assignment cannot have changed.
 					//wAssignment[i] = wAssignment[i];
@@ -688,7 +687,7 @@ if( i==26) PRINT0( i<< " || " << lowerBoundNextCenter[i] << " <> " <<  upperBoun
 							}
 
 							const ValueType effectiveDistance = sqDist*influence[j];
-if( i==26 )	PRINT0( "cent " << c << " effDist= " << effectiveDistance << " bestValue = " << bestValue << " effectMinDistAllBlocks  "  <<  effectMinDistAllBlocks[c] );
+
 							//update best and second-best centers
 							if (effectiveDistance < bestValue) {
 								secondBest = bestBlock;
@@ -717,12 +716,10 @@ if( i==26 )	PRINT0( "cent " << c << " effDist= " << effectiveDistance << " bestV
 						upperBoundOwnCenter[i] = bestValue;
 						lowerBoundNextCenter[i] = secondBestValue;
 						wAssignment[i] = bestBlock;	
-if( i==26) PRINT0( i<< " || " << lowerBoundNextCenter[i] << " bestBlock: " << bestBlock << " secondBest " << secondBest);						
 					}
 				}
 				//we found the best block for this point; increase the weight of this block
 				//TODO: adapt for multiple weights
-//PRINT0( i << " -> " << wAssignment[i] );
 				blockWeights[wAssignment[i]] += rWeights[i];		
 			}//for sampled indices
 			
@@ -764,11 +761,11 @@ if( i==26) PRINT0( i<< " || " << lowerBoundNextCenter[i] << " bestBlock: " << be
 
 		double minRatio = std::numeric_limits<double>::max();
 		double maxRatio = -std::numeric_limits<double>::min();
-//PRINT( *comm << ": " <<  localN );
+
 		for (IndexType j=0; j<numNewBlocks; j++) {
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.influence" );
+
 			double ratio = ValueType(blockWeights[j])/optWeightAllBlocks[j];
-//PRINT0( j << " ++ " << blockWeights[j] << " / " << optWeightAllBlocks[j] << " ==" << ratio );
 			if (std::abs(ratio - 1) < settings.epsilon) {
 				balancedBlocks++;
 				if (settings.freezeBalancedInfluence) {
@@ -787,7 +784,6 @@ if( i==26) PRINT0( i<< " || " << lowerBoundNextCenter[i] << " bestBlock: " << be
 
 			double influenceRatio = influence[j] / oldInfluence[j];
 
-//PRINT0( j << " ++ " << " ==" << ratio << influence[j] << " / " << oldInfluence[j] << " _ " << influenceChangeLowerBound[j] << " ^^ " << influenceChangeUpperBound[j]);
 			assert(influenceRatio <= influenceChangeUpperBound[j] + 1e-10);
 			assert(influenceRatio >= influenceChangeLowerBound[j] - 1e-10);
 			if (influenceRatio < minRatio) minRatio = influenceRatio;
@@ -810,8 +806,7 @@ if( i==26) PRINT0( i<< " || " << lowerBoundNextCenter[i] << " bestBlock: " << be
 				const IndexType i = *it;
 				const IndexType cluster = wAssignment[i];
 				upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]) + 1e-12;
-				lowerBoundNextCenter[i] *= minRatio - 1e-12;//TODO: compute separate min ratio with respect to bounding box, only update that.
-if( i==26) PRINT0( i<< " || " << lowerBoundNextCenter[i] );					
+				lowerBoundNextCenter[i] *= minRatio - 1e-12;//TODO: compute separate min ratio with respect to bounding box, only update that.		
 			}
 		}
 
@@ -842,6 +837,7 @@ if( i==26) PRINT0( i<< " || " << lowerBoundNextCenter[i] );
 				//sort also this part of the distances
 				//TODO: is this sorting needed?
 				//TODO: is it correct to sort? if we sort, effectMinDistAllBlocks[clusterInd[i]] will be wrong, I think effectMinDistAllBlocks[i] will be correct
+				//update 15/02: yes, sorting is needed (see also above)
 				std::sort( effectMinDistAllBlocks.begin()+rangeStart, effectMinDistAllBlocks.begin()+rangeEnd);
 			}
 		}
@@ -1131,7 +1127,6 @@ DenseVector<IndexType> computePartition( \
 	}
 
 	//the bounding box is per PE. no need to change for the hierarchical version
-PRINT(*comm << ": " << minCoords[0] << ", " << minCoords[1] << " __ " << maxCoords[0] << ", " << maxCoords[1]);
 	QuadNodeCartesianEuclid boundingBox(minCoords, maxCoords);
     if (settings.verbose) {
 		std::cout << "(PE id, localN) = (" << comm->getRank() << ", "<< localN << ")" << std::endl;
@@ -1253,7 +1248,6 @@ PRINT(*comm << ": " << minCoords[0] << ", " << minCoords[1] << " __ " << maxCoor
 		std::vector<ValueType> optWeightAllBlocks( totalNumNewBlocks );
 		for( IndexType newB=0; newB<totalNumNewBlocks; newB++ ){
 			optWeightAllBlocks[newB] = blockSizesPerCent[newB]*totalSampledWeightSum;
-//PRINT0( optWeightAllBlocks[newB]  <<  " __ " << blockSizesPerCent[newB] );
 		}
 
 		std::vector<ValueType> timePerPE( comm->getSize(), 0.0);
@@ -1349,7 +1343,6 @@ PRINT(*comm << ": " << minCoords[0] << ", " << minCoords[1] << " __ " << maxCoor
 					if (!(lowerBoundNextCenter[i] > 0)) lowerBoundNextCenter[i] = 0;
 				}
 				assert(std::isfinite(lowerBoundNextCenter[i]));
-PRINT( lowerBoundNextCenter[i] );			
 			}
 		}
 		
@@ -1405,9 +1398,12 @@ PRINT( lowerBoundNextCenter[i] );
 		}
 */
 
+		//this does not seem to work. Even if it works, in the first iterations, almost all
+		//nodes belong to block 0.
+		//TODO: either fix or remove
 		ValueType cut=-1;
 		if( settings.debugMode ){
-			cut = ITI::GraphUtils<IndexType, ValueType>::computeCut( graph, result, false );
+			cut = ITI::GraphUtils<IndexType, ValueType>::computeCut( graph, result, false );			
 		}
 
 		if (comm->getRank() == 0) {

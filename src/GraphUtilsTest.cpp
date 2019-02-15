@@ -19,8 +19,8 @@ class GraphUtilsTest : public ::testing::Test {
 };
 
 TEST_F(GraphUtilsTest, testReindexCut){
-//    std::string fileName = "trace-00008.graph";
-	std::string fileName = "delaunayTest.graph";
+    std::string fileName = "trace-00008.graph";
+	//std::string fileName = "delaunayTest.graph";
 
     std::string file = graphPath + fileName;
     
@@ -41,8 +41,8 @@ TEST_F(GraphUtilsTest, testReindexCut){
     settings.numBlocks = k;
     settings.noRefinement = true;
     settings.dimensions = dimensions;
-//settings.verbose=true;
-//settings.debugMode=true;    
+settings.debugMode= true;
+
     DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
 	
 	//WARNING: with the noRefinement flag the partition is not destributed

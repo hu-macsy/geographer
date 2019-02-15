@@ -215,7 +215,7 @@ struct Settings{
     bool writeInFile = false;
     bool storeInfo = false;
     //TODO: turn to false by default
-    bool debugMode = true; //extra checks and prints
+    bool debugMode = false; //extra checks and prints
 	IndexType repeatTimes = 1;
     
     //calculate expensive performance metrics?
