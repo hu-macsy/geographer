@@ -561,6 +561,7 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 			*minDistanceAllBlocks[newB]\
 			*influence[newB];
 		assert( std::isfinite(effectMinDistAllBlocks[newB]) );	
+PRINT0( "center " << newB << ": " << center[0] <<", " << center[1] << " minDist= " << minDistanceAllBlocks[newB] << " effMinDist= " << effectMinDistAllBlocks[newB] );		
 	}
 
 	//sort centers according to their distance from the bounding box of this PE
@@ -584,16 +585,18 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 				|| (effectMinDistAllBlocks[a] == effectMinDistAllBlocks[b] && a < b);
 			}
 		);
+
 		//sort also this part of the distances
 		//TODO: is this sorting needed?
 		//TODO: is it correct to sort? if we sort, effectMinDistAllBlocks[clusterInd[i]] will be wrong, I think effectMinDistAllBlocks[i] will be correct
 		//TODO: either not sort and get minDistanceAllBlocks[c] or sort and get minDistanceAllBlocks[i]
-		std::sort( effectMinDistAllBlocks.begin()+rangeStart, effectMinDistAllBlocks.begin()+rangeStart);
+		std::sort( effectMinDistAllBlocks.begin()+rangeStart, effectMinDistAllBlocks.begin()+rangeEnd);
+for( int i=0; i<rangeEnd; i++) PRINT0( clusterIndicesAllBlocks[i]  << " __ " << effectMinDistAllBlocks[i] );
 
 		//just for checking
 		for (IndexType i=rangeStart; i<rangeEnd; i++) {
-			ValueType effectiveDist = minDistanceAllBlocks[i]\
-				*minDistanceAllBlocks[i]*influence[i];
+			IndexType c = clusterIndicesAllBlocks[i];
+			ValueType effectiveDist = minDistanceAllBlocks[c]*minDistanceAllBlocks[c]*influence[c];
 			SCAI_ASSERT_LT_ERROR( std::abs(effectMinDistAllBlocks[i] - effectiveDist), 1e-5, "effectiveMinDistance[" << i << "] = " << effectMinDistAllBlocks[i] << " != " << effectiveDist << " = effectiveDist");
 		}
 	}
@@ -636,7 +639,7 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 
 				//TODO: not needed assertion, this is checked in the beginning				
 				SCAI_ASSERT_LT_ERROR( fatherBlock, numOldBlocks, "Wrong father block index");
-//PRINT0( i<< " || " << lowerBoundNextCenter[i] << " <> " <<  upperBoundOwnCenter[i] );
+if( i==26) PRINT0( i<< " || " << lowerBoundNextCenter[i] << " <> " <<  upperBoundOwnCenter[i] );
 				if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i]) {
 					//cluster assignment cannot have changed.
 					//wAssignment[i] = wAssignment[i];
@@ -685,6 +688,7 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 							}
 
 							const ValueType effectiveDistance = sqDist*influence[j];
+if( i==26 )	PRINT0( "cent " << c << " effDist= " << effectiveDistance << " bestValue = " << bestValue << " effectMinDistAllBlocks  "  <<  effectMinDistAllBlocks[c] );
 							//update best and second-best centers
 							if (effectiveDistance < bestValue) {
 								secondBest = bestBlock;
@@ -713,10 +717,12 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 						upperBoundOwnCenter[i] = bestValue;
 						lowerBoundNextCenter[i] = secondBestValue;
 						wAssignment[i] = bestBlock;	
+if( i==26) PRINT0( i<< " || " << lowerBoundNextCenter[i] << " bestBlock: " << bestBlock << " secondBest " << secondBest);						
 					}
 				}
 				//we found the best block for this point; increase the weight of this block
 				//TODO: adapt for multiple weights
+//PRINT0( i << " -> " << wAssignment[i] );
 				blockWeights[wAssignment[i]] += rWeights[i];		
 			}//for sampled indices
 			
@@ -758,11 +764,11 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 
 		double minRatio = std::numeric_limits<double>::max();
 		double maxRatio = -std::numeric_limits<double>::min();
-PRINT( *comm << ": " <<  localN );
+//PRINT( *comm << ": " <<  localN );
 		for (IndexType j=0; j<numNewBlocks; j++) {
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.influence" );
 			double ratio = ValueType(blockWeights[j])/optWeightAllBlocks[j];
-PRINT0( j << " ++ " << blockWeights[j] << " / " << optWeightAllBlocks[j] << " ==" << ratio );
+//PRINT0( j << " ++ " << blockWeights[j] << " / " << optWeightAllBlocks[j] << " ==" << ratio );
 			if (std::abs(ratio - 1) < settings.epsilon) {
 				balancedBlocks++;
 				if (settings.freezeBalancedInfluence) {
@@ -780,6 +786,7 @@ PRINT0( j << " ++ " << blockWeights[j] << " / " << optWeightAllBlocks[j] << " ==
 			assert(influence[j] > 0);
 
 			double influenceRatio = influence[j] / oldInfluence[j];
+
 //PRINT0( j << " ++ " << " ==" << ratio << influence[j] << " / " << oldInfluence[j] << " _ " << influenceChangeLowerBound[j] << " ^^ " << influenceChangeUpperBound[j]);
 			assert(influenceRatio <= influenceChangeUpperBound[j] + 1e-10);
 			assert(influenceRatio >= influenceChangeLowerBound[j] - 1e-10);
@@ -804,6 +811,7 @@ PRINT0( j << " ++ " << blockWeights[j] << " / " << optWeightAllBlocks[j] << " ==
 				const IndexType cluster = wAssignment[i];
 				upperBoundOwnCenter[i] *= (influence[cluster] / oldInfluence[cluster]) + 1e-12;
 				lowerBoundNextCenter[i] *= minRatio - 1e-12;//TODO: compute separate min ratio with respect to bounding box, only update that.
+if( i==26) PRINT0( i<< " || " << lowerBoundNextCenter[i] );					
 			}
 		}
 
@@ -834,7 +842,7 @@ PRINT0( j << " ++ " << blockWeights[j] << " / " << optWeightAllBlocks[j] << " ==
 				//sort also this part of the distances
 				//TODO: is this sorting needed?
 				//TODO: is it correct to sort? if we sort, effectMinDistAllBlocks[clusterInd[i]] will be wrong, I think effectMinDistAllBlocks[i] will be correct
-				std::sort( effectMinDistAllBlocks.begin()+rangeStart, effectMinDistAllBlocks.begin()+rangeStart);
+				std::sort( effectMinDistAllBlocks.begin()+rangeStart, effectMinDistAllBlocks.begin()+rangeEnd);
 			}
 		}
 
@@ -1245,7 +1253,7 @@ PRINT(*comm << ": " << minCoords[0] << ", " << minCoords[1] << " __ " << maxCoor
 		std::vector<ValueType> optWeightAllBlocks( totalNumNewBlocks );
 		for( IndexType newB=0; newB<totalNumNewBlocks; newB++ ){
 			optWeightAllBlocks[newB] = blockSizesPerCent[newB]*totalSampledWeightSum;
-PRINT0( optWeightAllBlocks[newB]  <<  " __ " << blockSizesPerCent[newB] );
+//PRINT0( optWeightAllBlocks[newB]  <<  " __ " << blockSizesPerCent[newB] );
 		}
 
 		std::vector<ValueType> timePerPE( comm->getSize(), 0.0);
@@ -1341,6 +1349,7 @@ PRINT0( optWeightAllBlocks[newB]  <<  " __ " << blockSizesPerCent[newB] );
 					if (!(lowerBoundNextCenter[i] > 0)) lowerBoundNextCenter[i] = 0;
 				}
 				assert(std::isfinite(lowerBoundNextCenter[i]));
+PRINT( lowerBoundNextCenter[i] );			
 			}
 		}
 		

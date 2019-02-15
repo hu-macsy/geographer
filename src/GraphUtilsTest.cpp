@@ -21,6 +21,7 @@ class GraphUtilsTest : public ::testing::Test {
 TEST_F(GraphUtilsTest, testReindexCut){
 //    std::string fileName = "trace-00008.graph";
 	std::string fileName = "delaunayTest.graph";
+
     std::string file = graphPath + fileName;
     
     const IndexType dimensions= 2;
