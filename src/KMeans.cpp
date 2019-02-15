@@ -538,7 +538,6 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 	IndexType numNewBlocks = centers.size(); 
 
 	SCAI_ASSERT_EQ_ERROR( blockSizesPrefixSum.back(), numNewBlocks, "Total number of new blocks mismatch" );
-	assert( influence.size() == numNewBlocks );
 
 	//centers are given as a 1D vector alongside with a prefix sum vector
 	const std::vector<point>& centers1DVector = centers;
@@ -637,7 +636,7 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 
 				//TODO: not needed assertion, this is checked in the beginning				
 				SCAI_ASSERT_LT_ERROR( fatherBlock, numOldBlocks, "Wrong father block index");
-
+//PRINT0( i<< " || " << lowerBoundNextCenter[i] << " <> " <<  upperBoundOwnCenter[i] );
 				if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i]) {
 					//cluster assignment cannot have changed.
 					//wAssignment[i] = wAssignment[i];
@@ -665,6 +664,8 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 						//where the range of indices starts for the father block
 						const IndexType rangeStart = blockSizesPrefixSum[fatherBlock];
 						const IndexType rangeEnd = blockSizesPrefixSum[fatherBlock+1];
+						SCAI_ASSERT_LE_ERROR( rangeEnd, clusterIndicesAllBlocks.size(), "Range out of bounds");
+
 						//start with the first center index
 						IndexType c = rangeStart;
 
@@ -697,7 +698,8 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 							c++;
 						} //while
 
-						SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be different" );
+						//TODO: this is wrong when k=1
+						//SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be different" );
 						assert(secondBestValue >= bestValue);
 
 						//this point has a new center
@@ -756,11 +758,11 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 
 		double minRatio = std::numeric_limits<double>::max();
 		double maxRatio = -std::numeric_limits<double>::min();
-
+PRINT( *comm << ": " <<  localN );
 		for (IndexType j=0; j<numNewBlocks; j++) {
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.influence" );
 			double ratio = ValueType(blockWeights[j])/optWeightAllBlocks[j];
-
+PRINT0( j << " ++ " << blockWeights[j] << " / " << optWeightAllBlocks[j] << " ==" << ratio );
 			if (std::abs(ratio - 1) < settings.epsilon) {
 				balancedBlocks++;
 				if (settings.freezeBalancedInfluence) {
@@ -770,16 +772,15 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 				}
 			}
 
-			influence[j] = std::max( 
-				influence[j]*influenceChangeLowerBound[j],
-				std::min( 
-					influence[j] * std::pow(ratio, settings.influenceExponent),
-					influence[j]*influenceChangeUpperBound[j]
-					) 
+			influence[j] = 	std::max( influence[j]*influenceChangeLowerBound[j],
+								std::min( influence[j] * std::pow(ratio, settings.influenceExponent),
+									influence[j]*influenceChangeUpperBound[j]	
+								) 
 				);
 			assert(influence[j] > 0);
 
 			double influenceRatio = influence[j] / oldInfluence[j];
+//PRINT0( j << " ++ " << " ==" << ratio << influence[j] << " / " << oldInfluence[j] << " _ " << influenceChangeLowerBound[j] << " ^^ " << influenceChangeUpperBound[j]);
 			assert(influenceRatio <= influenceChangeUpperBound[j] + 1e-10);
 			assert(influenceRatio >= influenceChangeLowerBound[j] - 1e-10);
 			if (influenceRatio < minRatio) minRatio = influenceRatio;
@@ -1122,7 +1123,7 @@ DenseVector<IndexType> computePartition( \
 	}
 
 	//the bounding box is per PE. no need to change for the hierarchical version
-
+PRINT(*comm << ": " << minCoords[0] << ", " << minCoords[1] << " __ " << maxCoords[0] << ", " << maxCoords[1]);
 	QuadNodeCartesianEuclid boundingBox(minCoords, maxCoords);
     if (settings.verbose) {
 		std::cout << "(PE id, localN) = (" << comm->getRank() << ", "<< localN << ")" << std::endl;
@@ -1164,10 +1165,10 @@ DenseVector<IndexType> computePartition( \
 	//perform sampling
 	{
 		if (randomInitialization) {
-			//ITI::GraphUtils<IndexType, ValueType>::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
+			ITI::GraphUtils<IndexType, ValueType>::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
 			//TODO: the cantor shuffle is more stable; random suffling can yield better
 			// results occasionally but has higher fluctuation/variance
-			localIndices = GraphUtils<IndexType,ValueType>::indexReorderCantor( localN );
+			//localIndices = GraphUtils<IndexType,ValueType>::indexReorderCantor( localN );
 
 			SCAI_ASSERT_EQ_ERROR(*std::max_element(localIndices.begin(), localIndices.end()), localN -1, "Error in index reordering");
 			SCAI_ASSERT_EQ_ERROR(*std::min_element(localIndices.begin(), localIndices.end()), 0, "Error in index reordering");
@@ -1460,14 +1461,16 @@ DenseVector<IndexType> computePartition(
 
 	//must convert the block sizes to precentages,
 	std::vector<ValueType> blockSizesPerCent( blockSizes.size() );
+
+	//WARNING: obviously, for uniform block sizes, all sizes are tthe same, so size/max gives 1 for all,
+	//		which is not correct. 
 	//use maxWeight instead of totalWeight to resemble the modelling from TEEC
 	//const IndexType maxWeight = *std::max_element( blockSizes.begin(), blockSizes.end() );
 
-	//15/02: change to sum of weights instead of max weight
+	//15/02: change is back to sum of weights instead of max weight
 	const IndexType sumWeight = std::accumulate( blockSizes.begin(), blockSizes.end(), 0 );
 	for( IndexType i=0; i<blockSizes.size(); i++ ){
 		blockSizesPerCent[i] = ValueType(blockSizes[i])/sumWeight;
-PRINT( blockSizesPerCent[i] );
 	}
 
 	return computePartition(coordinates, nodeWeights, blockSizesPerCent, partition, groupOfCenters, settings, metrics);
