@@ -32,6 +32,7 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
 	const IndexType p = comm->getSize();
 	Settings settings;
 	settings.numBlocks = k;
+	settings.dimensions = dimensions;
 
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
@@ -41,7 +42,7 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
         SCAI_ASSERT_NE_ERROR( minCoords[dim], maxCoords[dim], "min=max for dimension "<< dim << ", this will cause problems to the hilbert index. local= " << coords[0].getLocalValues().size() );
     }
 
-	std::vector<std::vector<ValueType> > centers = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords,  minCoords, maxCoords, settings);
+	std::vector<std::vector<ValueType>> centers = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords,  minCoords, maxCoords, settings);
 
 	//check for size
 	EXPECT_EQ(dimensions, centers.size());
@@ -117,6 +118,9 @@ TEST_F(KMeansTest, testFindCenters) {
 	centers = KMeans::findCenters(coords, part, k, nodeIndices.begin(), nodeIndices.end(), uniformWeights);
 }
 
+//TODO: got undefined reference for getLocalMinMaxCoords and findInitialCentersFromSFCOnly
+//update: instantiation is needed
+
 
 TEST_F(KMeansTest, testCentersOnlySfc) {
 	std::string fileName = "bubbles-00010.graph";
@@ -178,6 +182,83 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 			std::cout<< "\b\b )" << std::endl;
 		}
 	}
+}
+
+
+TEST_F(KMeansTest, testHierarchicalPartition) {
+	//std::string fileName = "bubbles-00010.graph";
+	std::string fileName = "Grid32x32";
+	//std::string fileName = "Grid8x8";
+	std::string graphFile = graphPath + fileName;
+	std::string coordFile = graphFile + ".xyz";
+	const IndexType dimensions = 2;
+
+	//load graph and coords
+	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+	const IndexType n = graph.getNumRows();
+	std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
+
+	//set uniform node weights
+	scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+
+	//or fixed weights
+	scai::lama::DenseVector<ValueType> fixedNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+	{
+		scai::hmemo::WriteAccess<ValueType> localWeights( fixedNodeWeights.getLocalValues() );
+		int localN = localWeights.size();
+		for(int i=0; i<localN; i++){
+			localWeights[i] = dist->local2Global(i);
+		}
+
+	}
+
+	//scai::lama::DenseVector<ValueType> nodeWeights = fixedNodeWeights;
+	scai::lama::DenseVector<ValueType> nodeWeights = unitNodeWeights;
+
+	//const IndexType k = comm->getSize();
+	//using KMeans::cNode;
+
+	//set CommTree
+	std::vector<cNode> leaves = {
+		// 				{hierachy ids}, numCores, mem, speed
+		cNode( std::vector<unsigned int>{0,0}, 4, 8, 100),
+		cNode( std::vector<unsigned int>{0,1}, 4, 8, 90),
+
+		cNode( std::vector<unsigned int>{1,0}, 6, 10, 80),
+		cNode( std::vector<unsigned int>{1,1}, 6, 10, 90),
+		cNode( std::vector<unsigned int>{1,2}, 6, 10, 70),
+
+		cNode( std::vector<unsigned int>{2,0}, 8, 12, 60),
+		cNode( std::vector<unsigned int>{2,1}, 8, 12, 70),
+		cNode( std::vector<unsigned int>{2,2}, 8, 12, 70),
+		cNode( std::vector<unsigned int>{2,3}, 8, 12, 50),
+		cNode( std::vector<unsigned int>{2,4}, 8, 12, 50)
+	};
+
+	ITI::CommTree<IndexType,ValueType> cTree( leaves );
+
+	struct Settings settings;
+	settings.dimensions = dimensions;
+	settings.numBlocks = leaves.size();
+	settings.debugMode = false;
+	settings.verbose = false;
+	settings.epsilon = 0.05;
+	settings.balanceIterations = 5;
+	settings.maxKMeansIterations = 5;
+	settings.minSamplingNodes = -1;
+
+	Metrics metrics(settings);
+
+	scai::lama::DenseVector<IndexType> partition = KMeans::computeHierarchicalPartition( graph, coords, nodeWeights, cTree, settings, metrics);
+
+	//checks - prints
+
+	ValueType speedImbalance, sizeImbalance;
+	std::tie( speedImbalance, sizeImbalance) =  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights, cTree );
+
+	std::cout << "final imbalance: speed= " << speedImbalance << " , size= " << sizeImbalance << std::endl;
 }
 
 /*

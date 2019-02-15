@@ -169,7 +169,8 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     ValueType epsilon= 0.1;
 
     std::string file= "slowrot-00000.graph";
-    std::string grFile= graphPath +file, coordFile= graphPath +file +".xyz";  //graph file and coordinates file
+    std::string grFile= graphPath +file;
+    std::string coordFile= graphPath +file +".xyz";  //graph file and coordinates file
     std::fstream f(grFile);
     IndexType nodes, edges;
     f>> nodes>> edges;
@@ -188,7 +189,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     SCAI_REGION_START("testPartitionFromFile_local_2D.readGraphFromFile");
         graph = FileIO<IndexType, ValueType>::readGraph( grFile );
         graph.redistribute( distPtr , noDistPtr);
-        //std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
+        std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
     SCAI_REGION_END("testPartitionFromFile_local_2D.readGraphFromFile");
 
     // N is the number of nodes
@@ -221,7 +222,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
         settings.epsilon = epsilon;
         settings.dimensions = dim;
         settings.minGainForNextRound = 10;
-        struct Metrics metrics(settings.numBlocks);
+        struct Metrics metrics(settings);
         
         //partition the graph
         scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D, settings, metrics );

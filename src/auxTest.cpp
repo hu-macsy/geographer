@@ -138,7 +138,7 @@ TEST_F (auxTest, testInitialPartitions){
     }
     uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
 	scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
-	Metrics metrics;
+	Metrics metrics(settings);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, halo, settings, metrics);
     if(dimensions==2){
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"finalWithPixel");
@@ -151,8 +151,7 @@ TEST_F (auxTest, testInitialPartitions){
         std::cout << "\tfinal cut= "<< cut  << ", final imbalance= "<< imbalance;
         std::cout  << std::endl  << std::endl; 
     }
-
-
+    
     //------------------------------------------- hilbert/sfc
     
     // the partitioning may redistribute the input graph

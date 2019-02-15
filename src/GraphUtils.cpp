@@ -26,7 +26,6 @@
 using std::vector;
 using std::queue;
 
-
 namespace ITI {
 
 //namespace GraphUtils {
@@ -359,12 +358,21 @@ ValueType GraphUtils<IndexType,ValueType>::computeCut(const CSRSparseMatrix<Valu
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-ValueType GraphUtils<IndexType,ValueType>::computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<ValueType> &nodeWeights) {
+ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
+    const DenseVector<IndexType> &part,
+    IndexType k,
+    const DenseVector<ValueType> &nodeWeights,
+    const std::vector<ValueType> &optBlockSizes){
+
 	SCAI_REGION( "ParcoRepart.computeImbalance" )
 	const IndexType globalN = part.getDistributionPtr()->getGlobalSize();
 	const IndexType localN = part.getDistributionPtr()->getLocalSize();
 	const IndexType weightsSize = nodeWeights.getDistributionPtr()->getGlobalSize();
-	const bool weighted = (weightsSize != 0);
+	
+    const bool weighted = (weightsSize != 0);
+    //if an optBlockSizes vector is give, then we do not have homogeneous blocks weights
+    const bool homogeneous = (optBlockSizes.size()==0);
+
     scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
     
     /*
@@ -395,7 +403,7 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(const DenseVector<In
 		throw std::runtime_error("Negative node weights not supported.");
 	}
 
-	std::vector<ValueType> subsetSizes(k, 0.0);
+    //TODO: is this needed here? remove or wrap around settigns.debugMode?
 	const IndexType minK = part.min();
 	const IndexType maxK = part.max();
 
@@ -407,10 +415,12 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(const DenseVector<In
 		throw std::runtime_error("Block id " + std::to_string(maxK) + " found in partition with supposedly " + std::to_string(k) + " blocks.");
 	}
 
+    std::vector<ValueType> subsetSizes(k, 0.0);
 	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
 	scai::hmemo::ReadAccess<ValueType> localWeight(nodeWeights.getLocalValues());
 	assert(localPart.size() == localN);
 
+    //calculate weight of each block and global weight sum
 	ValueType weightSum = 0.0;
 	for (IndexType i = 0; i < localN; i++) {
 		IndexType partID = localPart[i];
@@ -419,17 +429,6 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(const DenseVector<In
 		weightSum += weight;
 	}
 	
-	ValueType optSize;
-	
-	if (weighted) {
-		//get global weight sum
-		weightSum = comm->sum(weightSum);
-		optSize = std::ceil(weightSum / k + (maxWeight - minWeight));
-        //optSize = std::ceil(ValueType(weightSum) / k );
-	} else {
-		optSize = std::ceil(ValueType(globalN) / k);
-	}
-
     std::vector<ValueType> globalSubsetSizes(k);
     const bool isReplicated = part.getDistribution().isReplicated();
     SCAI_ASSERT_EQ_ERROR(isReplicated, comm->any(isReplicated), "inconsistent distribution!");
@@ -447,22 +446,120 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(const DenseVector<In
 
 	ValueType maxBlockSize = *std::max_element(globalSubsetSizes.begin(), globalSubsetSizes.end());
 
-	if (!weighted) {
-		assert(maxBlockSize >= optSize);
-	}
+    //to be returned
+    ValueType imbalance;
+    
+    if (weighted) {
+        if( homogeneous){
+            //get global weight sum
+            weightSum = comm->sum(weightSum);
+            ValueType optSize = std::ceil(weightSum / k + (maxWeight - minWeight));
+            imbalance = (ValueType(maxBlockSize - optSize)/ optSize);
 
-	/**
-    if( comm->getRank()==0 ){
-        std::cout<<" done" << std::endl;
+            //optSize = std::ceil(ValueType(weightSum) / k );
+        }else{
+            //optBlockSizes is the optimum weight/size for every block
+            SCAI_ASSERT_EQ_ERROR( k, optBlockSizes.size(), "Number of blocks do not agree with the size of the vector of the block sizes");
+            //TODO: vector not really needed, only the max value
+//TODO: recheck how imbalance is calculated            
+            std::vector<ValueType> imbalances( k );
+            for( IndexType i=0; i<k; i++){
+                imbalances[i] = (ValueType( globalSubsetSizes[i]- optBlockSizes[i]))/optBlockSizes[i];
+            }
+            imbalance = *std::max_element(imbalances.begin(), imbalances.end() );
+        }
+//TODO: can we a have heterogeneous network but no node weights?
+    } else {
+        ValueType optSize = std::ceil(ValueType(globalN) / k);
+        assert(maxBlockSize >= optSize);
+
+        imbalance = (ValueType(maxBlockSize - optSize)/ optSize);
     }
-    */
 
-	return (ValueType(maxBlockSize - optSize)/ optSize);
+	return imbalance;
 }
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::dmemo::HaloExchangePlan GraphUtils<IndexType, ValueType>::buildNeighborHalo(const CSRSparseMatrix<ValueType>& input) {
+std::pair<ValueType,ValueType> GraphUtils<IndexType,ValueType>::computeImbalance(
+    const DenseVector<IndexType> &part,
+    IndexType k,
+    const DenseVector<ValueType> &nodeWeights,
+    const ITI::CommTree<IndexType,ValueType> cTree){
+
+    //cNode is typedefed in CommTree.h
+    const std::vector<cNode> leaves = cTree.getLeaves();
+    const IndexType numLeaves = leaves.size();
+    SCAI_ASSERT_EQ_ERROR( numLeaves, k, "Number of blocks of the partition and number of leaves of the tree do not agree" );
+
+    //extract the memory and speed of every node in a vector each
+    std::vector<ValueType> memory( numLeaves );
+    std::vector<ValueType> relatSpeed( numLeaves );
+    for(unsigned int i=0; i<numLeaves; i++){
+        memory[i] = leaves[i].memMB;
+        relatSpeed[i] = leaves[i].relatSpeed;
+    }
+
+    std::vector<ValueType> optBlockWeight = getOptBlockWeights( leaves, nodeWeights);
+    SCAI_ASSERT_EQ_ERROR( optBlockWeight.size(), numLeaves, "Size mismatch");
+
+    ValueType speedImbalance = computeImbalance( part, k, nodeWeights, optBlockWeight );
+
+    //to measure imbalance according to memory constraints, we assume that
+    // every points has unit weight (this can be changed, for example,
+    //if we measure memory in MB, we can give each point a weight 
+    //of few bytes)
+    DenseVector<ValueType> unitWeights (nodeWeights.getDistributionPtr(), 1);
+
+    ValueType sizeImbalance = computeImbalance( part, k, unitWeights, memory );
+
+    return std::make_pair(speedImbalance, sizeImbalance);
+
+}
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<ValueType> GraphUtils<IndexType,ValueType>::getOptBlockWeights(
+    const std::vector<cNode> &hierLevel, 
+    const DenseVector<ValueType> &nodeWeights){
+
+    const IndexType numBlocks = hierLevel.size();
+
+    //the total node weight of the input
+    ValueType totalWeightSum;
+    {
+        scai::hmemo::ReadAccess<ValueType> rW( nodeWeights.getLocalValues() );
+        ValueType localW = 0;
+        for(int i=0; i<nodeWeights.getLocalValues().size(); i++ ){
+            localW += rW[i];
+        }
+        const scai::dmemo::CommunicatorPtr comm = nodeWeights.getDistributionPtr()->getCommunicatorPtr();
+        totalWeightSum = comm->sum(localW);
+    }
+
+    //the sum of the realtive speeds for all nodes
+    ValueType speedSum = 0;
+    for( cNode c: hierLevel){
+        speedSum += c.relatSpeed;
+    }
+
+    //the optimum size for every block
+    std::vector<ValueType> optBlockWeight( numBlocks );
+
+    //for each PE, we are given its relative speed compare to the fastest
+    //PE, a number between 0 and 1. The optimum weight it should have 
+    //is this:
+    // relative speed*( sum of input node weights / sum of all relative speeds)
+    for( int i=0; i<numBlocks; i++){
+        optBlockWeight[i] = totalWeightSum*(hierLevel[i].relatSpeed/speedSum);
+    }
+
+    return optBlockWeight;
+}
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+scai::dmemo::HaloExchangePlan GraphUtils<IndexType,ValueType>::buildNeighborHalo(const CSRSparseMatrix<ValueType>& input) {
 
 	SCAI_REGION( "ParcoRepart.buildPartHalo" )
 
@@ -1981,7 +2078,38 @@ std::vector<ValueType> GraphUtils<IndexType, ValueType>::getBetweennessCentralit
 
 	return centrality;
 }
+//-----------------------------------------------------------------------------------
 
+template <typename IndexType, typename ValueType>
+std::vector<IndexType> GraphUtils<IndexType, ValueType>::indexReorderCantor(const IndexType maxIndex){
+    IndexType index = 0;
+    std::vector<IndexType> ret(maxIndex, -1);
+    std::vector<bool> chosen(maxIndex, false);
+    //TODO: change vector of booleans?
+    //bool chosen2[maxIndex]=1;
+    
+    IndexType denom;
+    for( denom=1; denom<maxIndex; denom*=2){
+        for( IndexType numer=1; numer<denom; numer+=2){
+            IndexType val = maxIndex*((ValueType)numer/denom); 
+            //std::cout << numer <<"/" << denom << " = "<< val <<" <> ";
+            ret[index++] = val;
+            chosen[val]=true;
+            //++index;
+        }
+    }
+    //PRINT("Index= " << index <<", still "<< maxIndex-index << " to fill");
+    for(IndexType i=0; i<maxIndex; i++){
+        if( chosen[i]==false ){
+            ret[index] = i;
+            ++index;
+            SCAI_ASSERT_LE_ERROR( index, maxIndex, "index too high");
+        }
+    }
+    SCAI_ASSERT_EQ_ERROR( index, maxIndex, "index mismatch");
+    
+    return ret;
+}
 //-----------------------------------------------------------------------------------
 
 /*

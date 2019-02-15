@@ -21,6 +21,7 @@
 #include <boost/graph/properties.hpp>
 
 #include "Settings.h"
+#include "CommTree.h"
 
 namespace ITI {
 
@@ -97,9 +98,36 @@ static ValueType computeCut(const scai::lama::CSRSparseMatrix<ValueType> &input,
  *
  * @param[in] part partition
  * @param[in] k number of blocks in partition.
+ * @param[in] nodeWeights The weight of every point/vertex if available
+ * @param[in] blockSizes The optimum size/weight for every block
  */
+
+//TODO: this does not include the case where we can have different
+//blocks sizes but no node weights; adapt
+
 //template<typename IndexType, typename ValueType>
-static ValueType computeImbalance(const scai::lama::DenseVector<IndexType> &part, IndexType k, const scai::lama::DenseVector<ValueType> &nodeWeights = scai::lama::DenseVector<ValueType>(0,0));
+static ValueType computeImbalance(
+	const scai::lama::DenseVector<IndexType> &part,
+	IndexType k,
+	const scai::lama::DenseVector<ValueType> &nodeWeights = scai::lama::DenseVector<ValueType>(0,0),
+	const std::vector<ValueType> &blockSizes = std::vector<ValueType>(0,0));
+
+/** Overloaded version that takes as input the communication tree
+*/
+static std::pair<ValueType,ValueType> computeImbalance(
+    const scai::lama::DenseVector<IndexType> &part,
+    IndexType k,
+    const scai::lama::DenseVector<ValueType> &nodeWeights,
+    const ITI::CommTree<IndexType,ValueType> cTree);
+
+/** @brief Given a hierarchy level, it extracts the relative speed
+of every PE (remember: every node in a hierarchy level is either a single
+PE, if the level is the leaves, or a group of PEs) and calculates what
+is the optimum weight each PE should have. Mainly used to comoute imbalance.
+*/
+static std::vector<ValueType> getOptBlockWeights(
+    const std::vector<cNode> &hierLevel, 
+    const scai::lama::DenseVector<ValueType> &nodeWeights);
 
 /**
  * @brief Builds a halo containing all non-local neighbors.
@@ -350,37 +378,9 @@ static std::vector<ValueType> getBetweennessCentrality(const scai::lama::CSRSpar
 
 
 //TODO: verify that it works properly
-/*
-static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex){
-	IndexType index = 0;
-	std::vector<IndexType> ret(maxIndex, -1);
-	std::vector<bool> chosen(maxIndex, false);
-	//TODO: change vector of booleans?
-	//bool chosen2[maxIndex]=1;
-	
-	IndexType denom;
-    for( denom=1; denom<maxIndex; denom*=2){
-		for( IndexType numer=1; numer<denom; numer+=2){
-			IndexType val = maxIndex*((ValueType)numer/denom); 
-			//std::cout << numer <<"/" << denom << " = "<< val <<" <> ";
-			ret[index++] = val;
-			chosen[val]=true;
-			//++index;
-		}
-	}
-	//PRINT("Index= " << index <<", still "<< maxIndex-index << " to fill");
-	for(IndexType i=0; i<maxIndex; i++){
-		if( chosen[i]==false ){
-			ret[index] = i;
-			++index;
-			SCAI_ASSERT_LE_ERROR( index, maxIndex, "index too high");
-		}
-	}
-	SCAI_ASSERT_EQ_ERROR( index, maxIndex, "index mismatch");
-	
-	return ret;
-}
-*/
+
+static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex);
+
 
 
 }; //class GraphUtils

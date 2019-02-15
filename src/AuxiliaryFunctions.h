@@ -13,10 +13,11 @@
 #include <scai/lama/DenseVector.hpp>
 #include <scai/lama/Vector.hpp>
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
+#include <scai/dmemo/RedistributePlan.hpp>
 
 #include "GraphUtils.h"
 #include "Settings.h"
-#include "Metrics.h"
+
 
 using namespace scai::lama;
 
@@ -273,7 +274,6 @@ static scai::dmemo::DistributionPtr redistributeFromPartition(
                 std::vector<DenseVector<ValueType>>& coordinates,
                 DenseVector<ValueType>& nodeWeights,
                 Settings settings, 
-                struct Metrics& metrics,
                 bool useRedistributor = true ){
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -292,10 +292,11 @@ static scai::dmemo::DistributionPtr redistributeFromPartition(
 
     if( useRedistributor ){
         scai::dmemo::RedistributePlan resultRedist = scai::dmemo::redistributePlanByNewOwners(partition.getLocalValues(), partition.getDistributionPtr());
-        
+        //auto resultRedist = scai::dmemo::redistributePlanByNewOwners(partition.getLocalValues(), partition.getDistributionPtr());
+
         partition = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
         scai::dmemo::RedistributePlan redistributor = scai::dmemo::redistributePlanByNewDistribution(resultRedist.getTargetDistributionPtr(), graph.getRowDistributionPtr());
-
+        
         for (IndexType d=0; d<settings.dimensions; d++) {
             coordinates[d].redistribute(redistributor);
         }

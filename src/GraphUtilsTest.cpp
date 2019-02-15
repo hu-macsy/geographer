@@ -22,7 +22,7 @@ TEST_F(GraphUtilsTest, testReindexCut){
     std::string fileName = "trace-00008.graph";
     std::string file = graphPath + fileName;
     
-    IndexType dimensions= 2;
+    const IndexType dimensions= 2;
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     const IndexType n = graph.getNumRows();
 
@@ -38,6 +38,9 @@ TEST_F(GraphUtilsTest, testReindexCut){
     Settings settings;
     settings.numBlocks = k;
     settings.noRefinement = true;
+    settings.dimensions = dimensions;
+settings.verbose=true;
+settings.debugMode=true;    
     DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
 	
 	//WARNING: with the noRefinement flag the partition is not destributed
@@ -426,6 +429,124 @@ TEST_F(GraphUtilsTest, testBetweennessCentrality){
     for(int i=0; i<N; i++)
         std::cout<<IDs[i] << ": " << betwCentr[IDs[i]] << std::endl;
 
+}
+//------------------------------------------------------------------------------------ 
+
+TEST_F(GraphUtilsTest, testImbalance){
+
+    std::string file = graphPath + "Grid8x8";
+    const IndexType dimensions = 2;
+    const IndexType k = 4;
+
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    const IndexType N = graph.getNumRows();
+    const IndexType localN = graph.getLocalNumRows();
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const IndexType thisPE = comm->getRank();
+
+    scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+
+    //the partition
+    DenseVector<IndexType> partition(dist, 0);
+
+    //uniform node weights
+    DenseVector<ValueType> nodeWeights( dist, 1);
+    
+    ValueType imbalance = -1.0;
+
+    //
+    // --------- balanced, no node weights
+    //
+    {
+        scai::hmemo::WriteAccess<IndexType> wPart(partition.getLocalValues() );
+        for(int i=0; i<localN; i++){
+            IndexType globalID = dist->local2Global(i);
+            wPart[i] = globalID%k;
+        }
+    }
+
+    imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, k );
+
+    EXPECT_EQ( imbalance, 0 ); //for Grid8x8 and k=4
+
+    //
+    // --------- balanced, with uniform node weights
+    //
+    imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, k, nodeWeights );
+
+    EXPECT_EQ( imbalance, 0 ); //for Grid8x8 and k=4
+
+    //
+    // --------- imbalanced, no node weights
+    //
+    {
+        scai::hmemo::WriteAccess<IndexType> wPart(partition.getLocalValues() );
+        for(int i=0; i<localN; i++){
+            IndexType globalID = dist->local2Global(i);
+            wPart[i] = globalID%k;
+            //For Grid8x8, with N=64, block 1 will have 24 point and block 0, 8
+            if( globalID%(2*k)==0 ){
+                wPart[i] = 1;
+            }
+        }
+    }
+
+    imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, k );
+
+    //std::cout << "imbalance= " << imbalance << std::endl;
+    EXPECT_EQ( imbalance, 0.5 ); //for Grid8x8 and k=4
+
+    //
+    // --------- balanced, with node weights
+    //
+    {
+        scai::hmemo::WriteAccess<IndexType> wPart(partition.getLocalValues() );
+        scai::hmemo::WriteAccess<ValueType> wWeights(nodeWeights.getLocalValues() );
+        for(int i=0; i<localN; i++){
+            IndexType globalID = dist->local2Global(i);
+            wPart[i] = globalID%k;
+            wWeights[i] = globalID%k+1;
+        }
+    }
+    imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, k, nodeWeights );
+
+    std::cout << "imbalance= " << imbalance << std::endl;
+    //total sum: 16+32+48+64 = 160
+    //max block weight = 64
+    //optimum size = total/k +(max-min) = 160/4 + (4-1) = 43
+    //imbalance = (max-opt)/opt
+    EXPECT_EQ( imbalance, (64-43)/43.0 ); //for Grid8x8 and k=4
+
+    //
+    // --------- heterogeneous
+    //
+
+    //std::vector<ValueType> blockSizes = { 16.0/160, 32.0/160, 48.0/160, 64.0/160 };
+
+    //balanced for the previous case
+    std::vector<ValueType> blockSizes = { 16, 32, 48, 64 };
+    imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, k, nodeWeights, blockSizes );
+
+    //std::cout << "imbalance= " << imbalance << std::endl;
+    EXPECT_EQ( imbalance, 0 );
+
+    //imbalanced 
+
+    blockSizes = { 16.0, 32.0, 40.0, 64.0 };
+    imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, k, nodeWeights, blockSizes );
+
+    // (48-40)/48 = 8/40
+    EXPECT_EQ( imbalance, 8.0/40 );
+
+    //imbalanced 2
+
+    // all weights changed but the most imbalanced is the first, its actual weight is 16
+    blockSizes = { 10.0, 30.0, 40.0, 60.0 };
+    imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, k, nodeWeights, blockSizes );
+
+    // (16-10)/10 = 6/10
+    EXPECT_EQ( imbalance, 6.0/10 );
 }
 
 
