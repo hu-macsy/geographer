@@ -62,6 +62,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
     assert(settings.storeInfo == false); // Cannot return timing information. Better throw an error than silently drop it.
     
     auto uniformWeights = fill<DenseVector<ValueType>>(input.getRowDistributionPtr(), 1);
+    SCAI_ASSERT_EQ_ERROR( uniformWeights.sum(), input.getNumRows(), "Uniform weights are not correct" );
+
     return partitionGraph(input, coordinates, uniformWeights, settings, metrics);
 }
 

@@ -703,7 +703,9 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 						//this point has a new center
 						if (bestBlock != oldCluster) {
 							//assert(bestValue >= lowerBoundNextCenter[i]);
-							SCAI_ASSERT_GE_ERROR( bestValue , lowerBoundNextCenter[i], "difference " << std::abs(bestValue - lowerBoundNextCenter[i])  );
+							SCAI_ASSERT_GE_ERROR( bestValue , lowerBoundNextCenter[i], \
+								"PE " << comm->getRank() << ": difference " << std::abs(bestValue - lowerBoundNextCenter[i]) << \
+								" for i= " << i << ", oldCluster: " << oldCluster << ", newCluster: " << bestBlock);
 						}
 
 						upperBoundOwnCenter[i] = bestValue;
@@ -747,7 +749,10 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 		imbalance = *std::max_element(imbalances.begin(), imbalances.end() );
 		//TODO: adapt for multiple node weights
 
-		std::vector<ValueType> oldInfluence = influence;//size=newNewBlocks
+		SCAI_ASSERT_GE_ERROR( imbalance, 0, "Imbalance cannot be negative");
+
+		std::vector<ValueType> oldInfluence = influence;//size=numNewBlocks
+		assert( oldInfluence.size()== numNewBlocks );
 
 		double minRatio = std::numeric_limits<double>::max();
 		double maxRatio = -std::numeric_limits<double>::min();
@@ -1239,6 +1244,7 @@ DenseVector<IndexType> computePartition( \
 		std::vector<ValueType> optWeightAllBlocks( totalNumNewBlocks );
 		for( IndexType newB=0; newB<totalNumNewBlocks; newB++ ){
 			optWeightAllBlocks[newB] = blockSizesPerCent[newB]*totalSampledWeightSum;
+PRINT0( optWeightAllBlocks[newB]  <<  " __ " << blockSizesPerCent[newB] );
 		}
 
 		std::vector<ValueType> timePerPE( comm->getSize(), 0.0);
@@ -1455,9 +1461,13 @@ DenseVector<IndexType> computePartition(
 	//must convert the block sizes to precentages,
 	std::vector<ValueType> blockSizesPerCent( blockSizes.size() );
 	//use maxWeight instead of totalWeight to resemble the modelling from TEEC
-	const IndexType maxWeight = *std::max_element( blockSizes.begin(), blockSizes.end() );
+	//const IndexType maxWeight = *std::max_element( blockSizes.begin(), blockSizes.end() );
+
+	//15/02: change to sum of weights instead of max weight
+	const IndexType sumWeight = std::accumulate( blockSizes.begin(), blockSizes.end(), 0 );
 	for( IndexType i=0; i<blockSizes.size(); i++ ){
-		blockSizesPerCent[i] = blockSizes[i]/maxWeight;
+		blockSizesPerCent[i] = ValueType(blockSizes[i])/sumWeight;
+PRINT( blockSizesPerCent[i] );
 	}
 
 	return computePartition(coordinates, nodeWeights, blockSizesPerCent, partition, groupOfCenters, settings, metrics);
