@@ -38,6 +38,8 @@ TEST_F(GraphUtilsTest, testReindexCut){
     Settings settings;
     settings.numBlocks = k;
     settings.noRefinement = true;
+    settings.dimensions = dimensions;
+
     DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
 	
 	//WARNING: with the noRefinement flag the partition is not destributed
@@ -127,7 +129,13 @@ TEST_F (GraphUtilsTest, testLocalDijkstra){
     IndexType N;
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    IndexType k =comm->getSize();
+    
+	if( comm->getSize() != 1 ){
+		if( comm->getRank() == 0){
+			std::cout << "\n\t\t### WARNING: this test, " << __FUNCTION__ << " will fail if run with multiple PES" << std::endl<< std::endl;
+		}		
+	}
+	ASSERT_EQ( comm->getSize(), 1) << "Specific number of processors needed for this test: 1";
 
     // read graph
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
@@ -203,7 +211,7 @@ TEST_F (GraphUtilsTest, testComputeCommVolumeAndBoundaryNodes){
     settings.minGainForNextRound = 10;
     settings.storeInfo = false;
     
-    struct Metrics metrics(settings.numBlocks);
+    struct Metrics metrics(settings);
     
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
     
@@ -395,10 +403,7 @@ TEST_F(GraphUtilsTest, testMEColoring_local){
 
 TEST_F(GraphUtilsTest, testBetweennessCentrality){
     //std::string file = graphPath + "trace-00008.graph";
-    //std::string file = graphPath + "delaunayTest.graph";
-    //std::string file = graphPath + "bigtrace-00000.graph";
-    //std::string file = "/home/harry/ParcoRepart/localMeshes/airfoil1.graph";
-    std::string file = "/home/harry/ParcoRepart/meshes/PEgraphs/333SP.graph_k64.PEgraph";
+    std::string file = graphPath + "Grid8x8";
 
     IndexType dimensions = 2;
 
@@ -423,7 +428,8 @@ TEST_F(GraphUtilsTest, testBetweennessCentrality){
     std::iota( IDs.begin(), IDs.end(), 0);
     std::sort(IDs.begin(), IDs.end(), [&](IndexType i, IndexType j){return betwCentr[i] > betwCentr[j];});
 
-    for(int i=0; i<N; i++)
+    std::cout << "Top-5 nodes" << std::endl;
+    for(int i=0; i<5; i++)
         std::cout<<IDs[i] << ": " << betwCentr[IDs[i]] << std::endl;
 
 }

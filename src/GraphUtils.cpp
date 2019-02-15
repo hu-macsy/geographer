@@ -196,7 +196,7 @@ std::vector<ValueType> GraphUtils<IndexType,ValueType>::localDijkstra(const scai
                     //weight of edge (v, localNeighbor)
                 	ValueType edgeWeight = localValues[j]; 
 
-                	if( dist[localNeighbor] > dist[v] + edgeWeight ){
+                	if( dist[localNeighbor] > dist[v] + edgeWeight ){       		
                 		dist[localNeighbor] = dist[v] + edgeWeight;
                 		alternateQueue.push( std::make_pair( dist[localNeighbor],localNeighbor) );
                 		//queue.push( std::make_pair( dist[localNeighbor],localNeighbor) );
