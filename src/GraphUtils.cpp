@@ -1678,34 +1678,59 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(
     const ReadAccess<ValueType> values(storage.getValues());
     assert(ia.size() == localN+1);
 
+    std::vector<IndexType> newIA(ia.size());
+    std::vector<IndexType> newJA(ja.size()+localN);
+    std::vector<ValueType> newValues(ja.size()+localN);
+
     vector<ValueType> targetDegree(localN,0);
     for (IndexType i = 0; i < localN; i++) {
         const IndexType globalI = dist->local2Global(i);
+        bool rightOfDiagonal = false;
+        newIA[i] = ia[i] + i;//adding values at the diagonal
+        newIA[i+1] = ia[i+1] + i + 1;
+
         for (IndexType j = ia[i]; j < ia[i+1]; j++) {
             if (ja[j] == globalI) {
                 throw std::runtime_error("Forbidden self loop at " + std::to_string(globalI) + " with weight " + std::to_string(values[j]));
             }
+            //if (ja[j] < globalI && rightOfDiagonal)  {
+            //    throw std::runtime_error("Outgoing edges are not sorted.");
+            //}
+            if (ja[j] > globalI) {
+                if (!rightOfDiagonal) {
+                    newJA[j + i] = globalI;
+                }
+                rightOfDiagonal = true;
+            }
+
+            const IndexType jaOffset = i + rightOfDiagonal;
+            newJA[j+jaOffset] = ja[j];
+            newValues[j+jaOffset] = -values[j];
+
             targetDegree[i] += values[j];
         }
+
+        if (!rightOfDiagonal) {
+            newJA[ia[i+1] + i] = globalI;
+        }
+
+        //edge weights are summed, can now enter value at diagonal
+        bool foundDiagonal = false;
+        for (IndexType j = newIA[i]; j < newIA[i+1]; j++) {
+            if (newJA[j] == globalI) {
+                assert(!foundDiagonal);
+                foundDiagonal = true;
+                newValues[j] = targetDegree[i];
+            }
+        }
+        assert(foundDiagonal);
     }
 
-    //in the diagonal matrix, each node has one loop
-    scai::hmemo::HArray<IndexType> dIA(localN+1, IndexType(0));
-    scai::utilskernel::HArrayUtils::setSequence(dIA, IndexType(0), IndexType(1), dIA.size());
-    //... to itself
-    scai::hmemo::HArray<IndexType> dJA(localN, IndexType(0));
-    dist->getOwnedIndexes(dJA);
-    // with the degree as value
-    scai::hmemo::HArray<ValueType> dValues(localN, targetDegree.data());
+    assert(newIA[localN] == newJA.size());
 
-    CSRStorage<ValueType> dStorage(localN, globalN, dIA, dJA, dValues );
+    const CSRStorage<ValueType> resultStorage(localN, globalN, newIA, newJA, newValues);
 
-    CSRSparseMatrix<ValueType> D(dist, std::move(dStorage));
-
-    auto result = scai::lama::eval<CSRSparseMatrix<ValueType>>(D - graph);
-    assert(result.getNumValues() == graph.getNumValues() + globalN);
-
-    return result;
+    return CSRSparseMatrix<ValueType>(dist, resultStorage);
 }
 
 //--------------------------------------------------------------------------------------- 
