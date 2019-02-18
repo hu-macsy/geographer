@@ -691,6 +691,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     	throw std::logic_error("Hilbert curve partition only implemented for same number of blocks and processes.");
     }
  
+    if (comm->getSize() == 1) {
+        return scai::lama::DenseVector<IndexType>(globalN, 0);
+    }
  
     //
     // vector of size k, each element represents the size of each block
