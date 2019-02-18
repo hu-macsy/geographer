@@ -791,7 +791,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
 
         scai::hmemo::HArray<IndexType> indexTransport(newLocalIndices.size(), newLocalIndices.data());
         assert(comm->sum(indexTransport.size()) == globalN);
-        auto newDistribution = scai::dmemo::generalDistributionUnchecked(globalN, std::move(indexTransport), comm);
+        scai::dmemo::DistributionPtr newDistribution( new scai::dmemo::GeneralDistribution ( globalN, std::move(indexTransport), true) );
         
         if (comm->getRank() == 0) std::cout << "Created distribution." << std::endl;
         result = fill<DenseVector<IndexType>>(newDistribution, comm->getRank());
