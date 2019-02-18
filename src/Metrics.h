@@ -67,14 +67,6 @@ struct Metrics{
 	
 	//constructors
 	//
-
-//	Metrics(){
-//		initialize(1);
-//	}
-	
-	Metrics( IndexType k = 1) {
-		initialize(k);
-	}
 	
 	Metrics( Settings settings) {
 		initialize( settings.numBlocks );

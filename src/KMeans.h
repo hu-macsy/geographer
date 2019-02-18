@@ -223,7 +223,7 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 	    initialCenters = findCenters(coordinates, previous, settings.numBlocks, indices.begin(), indices.end(), nodeWeights);
 	}
 
-	Metrics metrics;
+	Metrics metrics(settings);
 	return computePartition(coordinates, nodeWeights, blockSizes, initialCenters, settings, metrics);
 }
 
