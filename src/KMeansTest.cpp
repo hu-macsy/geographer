@@ -45,8 +45,8 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
 	std::vector<std::vector<ValueType>> centers = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords,  minCoords, maxCoords, settings);
 
 	//check for size
-	EXPECT_EQ(dimensions, centers.size());
-	EXPECT_EQ(k, centers[0].size());
+	EXPECT_EQ(k, centers.size());
+	EXPECT_EQ(dimensions, centers[0].size());
 
 	//check for distinctness
 	bool allDistinct = true;
