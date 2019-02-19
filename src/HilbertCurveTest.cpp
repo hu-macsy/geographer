@@ -499,13 +499,10 @@ TEST_F(HilbertCurveTest, testGetSortedHilbertIndices_Distributed){
   std::vector<std::string> fileNames = { 
     graphPath+"Grid8x8",
     //graphPath+"bubbles-00010.graph",
-    graphPath+"3off.graph" 
+    graphPath+"353off.graph" 
   };
 
-  std::vector<int> dims = { 2,
-   //2,
-    3
-  };
+  std::vector<int> dims = { 2, 3 };
 
   for(int i=0; i<fileNames.size(); i++){
     std::string fileName = fileNames[i];
