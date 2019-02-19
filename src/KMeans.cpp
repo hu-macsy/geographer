@@ -964,7 +964,7 @@ DenseVector<IndexType> computeRepartition(
 		blockSizesPerCent[i] = blockSizes[i]/maxWeight;
 	}
 
-	Metrics metrics;
+	Metrics metrics(settings);
 //
 //TODO: added previous here, not sure at all about it
 //

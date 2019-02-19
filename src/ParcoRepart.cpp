@@ -45,7 +45,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings) {
     
-    struct Metrics metrics(settings.numBlocks);
+    struct Metrics metrics(settings);
     
     assert(settings.storeInfo == false); // Cannot return timing information. Better throw an error than silently drop it.
     
@@ -58,7 +58,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings){
     
-    struct Metrics metrics(settings.numBlocks);
+    struct Metrics metrics(settings);
     assert(settings.storeInfo == false); // Cannot return timing information. Better throw an error than silently drop it.
     
     auto uniformWeights = fill<DenseVector<ValueType>>(input.getRowDistributionPtr(), 1);
@@ -305,7 +305,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 						tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, migrationSettings);
 					} else if (settings.initialMigration == InitialPartitioningMethods::KMeans) {
 						std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );
-                        struct Metrics tmpMetrics;
+                        struct Metrics tmpMetrics(migrationSettings);
 						tempResult = ITI::KMeans::computePartition(coordinates, convertedWeights, migrationBlockSizes, migrationSettings, tmpMetrics);
 					}
 					
@@ -528,6 +528,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     	throw std::logic_error("Hilbert curve partition only implemented for same number of blocks and processes.");
     }
  
+    if (comm->getSize() == 1) {
+        return scai::lama::DenseVector<IndexType>(globalN, 0);
+    }
  
     //
     // vector of size k, each element represents the size of each block
@@ -633,7 +636,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
 
         scai::hmemo::HArray<IndexType> indexTransport(newLocalIndices.size(), newLocalIndices.data());
         assert(comm->sum(indexTransport.size()) == globalN);
-        auto newDistribution = scai::dmemo::generalDistributionUnchecked(globalN, std::move(indexTransport), comm);
+        scai::dmemo::DistributionPtr newDistribution( new scai::dmemo::GeneralDistribution ( globalN, std::move(indexTransport), true) );
         
         if (comm->getRank() == 0) std::cout << "Created distribution." << std::endl;
         result = fill<DenseVector<IndexType>>(newDistribution, comm->getRank());

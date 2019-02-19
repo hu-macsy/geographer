@@ -202,8 +202,8 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
     settings.noRefinement=  true;  //does not work when we do local refinement
     settings.minSamplingNodes = -1; // used as flag in order to use all local nodes to minimize random behavior
 
-    struct Metrics metrics1(settings.numBlocks);
-    struct Metrics metrics2(settings.numBlocks);
+    struct Metrics metrics1(settings);
+    struct Metrics metrics2(settings);
 
     //scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );
     std::vector<IndexType> localPartition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );

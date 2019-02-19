@@ -400,7 +400,7 @@ TEST_F(HilbertCurveTest, testHilbertRedistribution) {
     scai::lama::DenseVector<ValueType> nodeWeights(graph.getRowDistributionPtr(), 1);
 
     std::vector<DenseVector<ValueType>> coordCopy(coords);
-    Metrics metrics(settings.numBlocks);
+    Metrics metrics(settings);
 
     //check sums
     std::vector<ValueType> coordSum(settings.dimensions);

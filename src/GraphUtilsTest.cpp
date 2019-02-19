@@ -80,6 +80,7 @@ TEST_F(GraphUtilsTest, testConstructLaplacian) {
 
     scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
     scai::dmemo::DistributionPtr cyclidCist(new scai::dmemo::CyclicDistribution(n, 10, comm));
+    ASSERT_TRUE(graph.isConsistent());
 
     CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
 
