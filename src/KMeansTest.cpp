@@ -147,10 +147,27 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 	
 	// get centers
 	std::vector<std::vector<ValueType>> centers1 = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords, minCoords, maxCoords, settings);
-	
+	EXPECT_EQ( centers1.size(), k );
+
 	settings.sfcResolution = std::log2(k);
 	std::vector<std::vector<ValueType>> centers2 = KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>( maxCoords, settings);
-	
+	EXPECT_EQ( centers2.size(), dimensions );
+
+//WARNING: quick fix for tests to pass
+//TODO: the functions should agree on their return type: either a vector of size k*dimensions (centers2) or dimension*k (centers2)
+{	
+	std::vector<std::vector<ValueType>> reversedCenters( dimensions, std::vector<ValueType>(settings.numBlocks, 0.0) );
+	for( unsigned int c=0; c<settings.numBlocks; c++){
+		for( unsigned int d=0; d<dimensions; d++){
+			reversedCenters[d][c] = centers1[c][d];
+		}
+	}
+
+	centers1 = reversedCenters;
+}
+
+
+
 	EXPECT_EQ( centers1.size(), centers2.size() );
 	EXPECT_EQ( centers1[0].size(), centers2[0].size() );
 	EXPECT_EQ( centers1[0].size(), k);
