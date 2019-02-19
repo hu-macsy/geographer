@@ -24,9 +24,15 @@ TEST_F(MappingTest, testTorstenMapping){
     settings.numBlocks = 1;
 
     scai::lama::CSRSparseMatrix<ValueType> blockGraph = FileIO<IndexType, ValueType>::readGraph(file );
-    //scai::lama::CSRSparseMatrix<ValueType> PEGraph = FileIO<IndexType, ValueType>::readGraph(file );
-    scai::lama::CSRSparseMatrix<ValueType> PEGraph (blockGraph);
     const IndexType N = blockGraph.getNumRows();
+
+    //This tests works only when np=1. Replicate the graph
+    //TODO: of add error message to execute the test only whne np=1
+    scai::dmemo::DistributionPtr noDist (new scai::dmemo::NoDistribution( N ));
+    blockGraph.redistribute( noDist, noDist );
+
+    scai::lama::CSRSparseMatrix<ValueType> PEGraph (blockGraph);
+    
 
     blockGraph.setValue( 4, 8, 2 );
     blockGraph.setValue( 9, 10, 3 );
@@ -50,7 +56,8 @@ TEST_F(MappingTest, testTorstenMapping){
 	metrics.getMappingMetrics( blockGraph, PEGraph, identityMapping );
 
 	//print mapping
-	if( N<65 ){
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	if( N<65 and comm->getRank()==0 ){
 		std::cout << "Mapping:" << std::endl;
 		for(int i=0; i<N; i++){
 			std::cout << i << " <--> " << mapping[i] << std::endl;
