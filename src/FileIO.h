@@ -213,19 +213,19 @@ public:
 		return readQuadTree(filename, coords);
 	}
 
-        static std::pair<IndexType, IndexType> getMatrixMarketCoordsInfos(const std::string filename);
+	static std::pair<IndexType, IndexType> getMatrixMarketCoordsInfos(const std::string filename);
         
-        /** Read a file with numBLocks number of blocks. The file should contain in its first row the number of blocks and
-         *  in each line contains a number that is the size of this block.
-         *  Only PE 0 reads the given file, constructs the std::vector with the block sizes and then broadcasts the vector to
-         *  the rest of the PEs.
-         *  Example of a file with 3 blocks:
-         * 3
-         * 100
-         * 120
-         * 97
-        */
-        static std::vector<IndexType> readBlockSizes(const std::string filename , const IndexType numBlocks);
+	/** Read a file with numBLocks number of blocks. The file should contain in its first row the number of blocks and
+	 *  in each line contains a number that is the size of this block.
+	 *  Only PE 0 reads the given file, constructs the std::vector with the block sizes and then broadcasts the vector to
+	 *  the rest of the PEs.
+	 *  Example of a file with 3 blocks:
+	 * 3
+	 * 100
+	 * 120
+	 * 97
+	*/
+	static std::vector<std::vector<IndexType> > readBlockSizes(const std::string filename , const IndexType numBlocks, const IndexType numWeights = 1);
 
 	static DenseVector<IndexType> readPartition(const std::string filename, IndexType n);
     
