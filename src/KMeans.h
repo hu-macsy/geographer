@@ -315,7 +315,7 @@ DenseVector<IndexType> computePartition( \
 
 	QuadNodeCartesianEuclid boundingBox(minCoords, maxCoords);
     if (settings.verbose) {
-    	/*
+    	
         std::cout << "Process " << comm->getRank() << ": ( ";
         for (auto coord : minCoords) std::cout << coord << " ";
         std::cout << ") , ( ";
@@ -324,10 +324,10 @@ DenseVector<IndexType> computePartition( \
         std::cout << ", " << localN << " nodes, " << scai::utilskernel::HArrayUtils::sum(nodeWeights.getLocalValues()) << ", " << ((ValueType)localN)/globalN *100<< "%, total weight";
         std::cout << ", volume ratio " << localVolume / (volume / p);
         std::cout << std::endl;
-		*/
-		std::cout << "(" << comm->getRank() << ", "<< localN << ")" << std::endl;
+		
+		std::cout << "(PE: " << comm->getRank() << ", localN= "<< localN << ")" << std::endl;
 		comm->synchronize();
-		std::cout << "(" << comm->getRank() << ", "<< localVolume / (volume / p) << ")" << std::endl;
+		//std::cout << "(PE: " << comm->getRank() << ", "<< localVolume / (volume / p) << ")" << std::endl;
     }
 
 	diagonalLength = std::sqrt(diagonalLength);
@@ -442,6 +442,8 @@ SCAI_ASSERT_EQ_ERROR( indexSumFY, indexSumC, "Erros in index reordering");
 		//keep centroids of empty blocks at their last known position
 		for (IndexType j = 0; j < k; j++) {
 		    for (int d = 0; d < dim; d++) {
+		    	SCAI_ASSERT_LE_ERROR( newCenters[d][j], globalMaxCoords[d], "New center coordinate out of bounds" );
+		    	SCAI_ASSERT_GE_ERROR( newCenters[d][j], globalMinCoords[d], "New center coordinate out of bounds" );
 		        if (std::isnan(newCenters[d][j])) {
 		            newCenters[d][j] = centers[d][j];
 		        }
@@ -457,6 +459,7 @@ SCAI_ASSERT_EQ_ERROR( indexSumFY, indexSumC, "Erros in index reordering");
 				ValueType diff = (centers[d][j] - newCenters[d][j]);
 				squaredDeltas[j] += diff*diff;
 			}
+
 			deltas[j] = std::sqrt(squaredDeltas[j]);
 			if (settings.erodeInfluence) {
 				const ValueType erosionFactor = 2/(1+exp(-std::max(deltas[j]/expectedBlockDiameter-0.1, 0.0))) - 1;
@@ -549,6 +552,14 @@ SCAI_ASSERT_EQ_ERROR( indexSumFY, indexSumC, "Erros in index reordering");
 		metrics.kmeansProfiling.push_back( std::make_tuple(delta, maxTime, imbalance) );
 
 		iter++;
+
+		//this writes the partittion into a file
+		if( settings.writeInFile){
+			std::string filename = "part_kmeans_"+ std::to_string(iter)+".mtx";
+			//for (int i=0; i<influence.size(); i++)
+			//	PRINT0( "iter " << iter << ", i: " << i << " influence= " << influence[i]  << ", blockWeights= " <<  blockWeights[i] << ",  adjustedBlockSizes= " << adjustedBlockSizes[i] );
+			result.writeToFile( filename );
+		}
 
 		// WARNING-TODO: this stops the iterations prematurely, when the wanted balance
 		// is reached. It is possible that if we allow more iterations, the solution
