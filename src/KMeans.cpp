@@ -424,7 +424,7 @@ std::vector<point> findCenters(
 	//TODO: check that distributions align
 
 	std::vector<std::vector<ValueType> > result(dim);
-	std::vector<IndexType> weightSum(k, 0);
+	std::vector<ValueType> weightSum(k, 0);
 
 	scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
 	scai::hmemo::ReadAccess<IndexType> rPartition(partition.getLocalValues());
@@ -433,7 +433,7 @@ std::vector<point> findCenters(
 	for (Iterator it = firstIndex; it != lastIndex; it++) {
 		const IndexType i = *it;
 		const IndexType part = rPartition[i];
-		const IndexType weight = rWeights[i];
+		const ValueType weight = rWeights[i];
 		weightSum[part] += weight;
 		//the lines above are equivalent to: weightSum[rPartition[*it]] += rWeights[*it];
 	}
@@ -451,8 +451,8 @@ std::vector<point> findCenters(
 	}
 
 	//communicate local centers and weight sums
-	std::vector<IndexType> totalWeight(k, 0);
-	comm->sumImpl(totalWeight.data(), weightSum.data(), k, scai::common::TypeTraits<IndexType>::stype);
+	std::vector<ValueType> totalWeight(k, 0);
+	comm->sumImpl(totalWeight.data(), weightSum.data(), k, scai::common::TypeTraits<ValueType>::stype);
 
 	//compute updated centers as weighted average
 	for (IndexType d = 0; d < dim; d++) {
@@ -1295,6 +1295,10 @@ DenseVector<IndexType> computePartition( \
 
 		for (IndexType j = 0; j < totalNumNewBlocks; j++) {
 			for (int d = 0; d < dim; d++) {
+				//TODO: copied from the Dev branch, commit 94e40203248c9e981af98c80fb47ba60e4c77ec2
+				// the same code does not exist in this version so I added the assertion here
+				SCAI_ASSERT_LE_ERROR( transCenters[d][j], globalMaxCoords[d], "New center coordinate out of bounds" );
+		    	SCAI_ASSERT_GE_ERROR( transCenters[d][j], globalMinCoords[d], "New center coordinate out of bounds" );
 				ValueType diff = (centers1DVector[j][d] - transCenters[j][d]);
 				squaredDeltas[j] += diff*diff;
 			}
