@@ -25,6 +25,7 @@
 
 
 using namespace scai;
+using scai::lama::DenseVector;
 
 namespace ITI {
 
@@ -221,7 +222,7 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
 
     scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
-    scai::lama::DenseVector<ValueType> nodeWeights( blockDist, 1);
+    std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, scai::lama::DenseVector<ValueType>(blockDist, 1));
 
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*blockDist));
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*graph.getRowDistributionPtr() ));
@@ -290,7 +291,7 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
     // this required from parmetis but why int node weights and not double?
     IndexType vwgt[localN];
     {
-        scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights.getLocalValues() );
+        scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights[0].getLocalValues() );
         SCAI_ASSERT_EQ_ERROR( localN, localWeights.size(), "Local weights size mismatch. Are node weights distributed correctly?");
         for(unsigned int i=0; i<localN; i++){
             vwgt[i] = IndexType (localWeights[i]);
@@ -312,12 +313,12 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
 
     scai::lama::DenseVector<IndexType> partition( graph.getRowDistributionPtr(), scai::hmemo::HArray<IndexType>(  localPartition.size(), localPartition.data()) );
 	
-    metrics1.getAllMetrics(graph, partition, nodeWeights, settings);
+    metrics1.getAllMetrics(graph, partition, nodeWeights[0], settings);
     
     scai::lama::DenseVector<IndexType> partition2 = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( graph, coords, nodeWeights, settings, metrics2);
     partition2.redistribute( graph.getRowDistributionPtr() );
 
-    metrics2.getAllMetrics(graph, partition2, nodeWeights, settings);
+    metrics2.getAllMetrics(graph, partition2, nodeWeights[0], settings);
 
     if( comm->getRank()==0){
       std::cout<< "Metrics for first partition:"<< std::endl;
@@ -1358,7 +1359,8 @@ TEST_F(ParcoRepartTest, testRedistributeFromPartition){
     struct Metrics metrics(settings);
 
     // set uniform weights
-    scai::lama::DenseVector<ValueType> nodeWeights(graph.getRowDistributionPtr(), 1);
+    std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, DenseVector<ValueType>(graph.getRowDistributionPtr(), 1));
+    ASSERT_EQ(1, nodeWeights.size());
     
     // get partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, nodeWeights, settings, metrics);
@@ -1367,20 +1369,20 @@ TEST_F(ParcoRepartTest, testRedistributeFromPartition){
 	bool useRedistributor = false;
 
 	std::chrono::time_point<std::chrono::system_clock> beforeRedistribution =  std::chrono::system_clock::now();
-    scai::dmemo::DistributionPtr retDist = aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings, metrics, useRedistributor);
+    scai::dmemo::DistributionPtr retDist = aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights[0], settings, metrics, useRedistributor);
 	std::chrono::duration<double> redistTime = std::chrono::system_clock::now() - beforeRedistribution;
 	ValueType maxTime = comm->max( redistTime.count() );
 	if( comm->getRank()==0)
 		std::cout << "Time to redistribute (useRedistributor= " << useRedistributor <<"): " << maxTime << std::endl;
 
-    EXPECT_TRUE( coords[0].getDistribution().isEqual(nodeWeights.getDistribution()) );
+    EXPECT_TRUE( coords[0].getDistribution().isEqual(nodeWeights[0].getDistribution()) );
     EXPECT_TRUE( coords[0].getDistribution().isEqual(graph.getRowDistribution()) );
     EXPECT_TRUE( coords[0].getDistribution().isEqual(partition.getDistribution()) );
 
 
 	useRedistributor = !useRedistributor;
 	beforeRedistribution =  std::chrono::system_clock::now();
-	scai::dmemo::DistributionPtr retDist2 = aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings, metrics, useRedistributor);
+	scai::dmemo::DistributionPtr retDist2 = aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights[0], settings, metrics, useRedistributor);
 	redistTime = std::chrono::system_clock::now() - beforeRedistribution;
 	maxTime = comm->max( redistTime.count() );
 	if( comm->getRank()==0)
