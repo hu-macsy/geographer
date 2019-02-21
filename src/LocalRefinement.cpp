@@ -12,7 +12,7 @@ using scai::hmemo::HArray;
 namespace ITI{
 
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFMStep(
+std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFMStep(
     CSRSparseMatrix<ValueType>& input, 
     DenseVector<IndexType>& part,
     std::vector<IndexType>& nodesWithNonLocalNeighbors,
@@ -68,8 +68,8 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     			+ std::to_string(input.getRowDistributionPtr()->getLocalSize()));
     }
 
-    IndexType gainSum = 0;
-    std::vector<IndexType> gainPerRound(communicationScheme.size(), 0);
+    ValueType gainSum = 0;
+    std::vector<ValueType> gainPerRound(communicationScheme.size(), 0);
 
     //copy into usable data structure with iterators
 	std::vector<IndexType> myGlobalIndices(input.getRowDistributionPtr()->getLocalSize());
@@ -134,7 +134,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			}
 		}
 
-		IndexType gainThisRound = 0;
+		ValueType gainThisRound = 0;
 
 		scai::dmemo::HaloExchangePlan graphHalo;
 		CSRStorage<ValueType> haloMatrix;
@@ -164,7 +164,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
 			const ValueType blockWeightSum = scai::utilskernel::HArrayUtils::sum(nodeWeights.getLocalValues());
 
-			IndexType swapField[5];
+			ValueType swapField[5];
 			swapField[0] = interfaceNodes.size();
 			swapField[1] = secondRoundMarker;
 			swapField[2] = lastRoundMarker;
@@ -176,6 +176,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			const IndexType otherSecondRoundMarker = swapField[1];
 			const IndexType otherLastRoundMarker = swapField[2];
 			//const IndexType otherBlockSize = swapField[3];
+//WARNING/TODO: this assumes that node weights (and thus block weights) are integers
 			const IndexType otherBlockWeightSum = swapField[4];
 
 			if (interfaceNodes.size() == 0) {
@@ -239,6 +240,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			 * Exchange Halo. This only requires communication with the partner process.
 			 */
 			haloMatrix.exchangeHalo( graphHalo, input.getLocalStorage(), *comm );
+PRINT0( scai::utilskernel::HArrayUtils::sum(haloMatrix.getValues()) ) ;
 			//local part should stay unchanged, check edge number as proxy for that
 			assert(input.getLocalStorage().getValues().size() == numValues);
 
@@ -278,6 +280,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			scai::hmemo::HArray<IndexType> originData;
 			graphHalo.updateHalo(originData, origin.getLocalValues(), *comm);
 
+//WARNING/TODO: this assumes that node weights (and thus block weights) are integers?
 			//block sizes and capacities
 			std::pair<IndexType, IndexType> blockSizes = {blockWeightSum, otherBlockWeightSum};
 			std::pair<IndexType, IndexType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
@@ -309,7 +312,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			/**
 			 * execute FM locally
 			 */
-			IndexType gain = twoWayLocalFM(input, haloMatrix, graphHalo, borderRegionIDs, borderNodeWeights, assignedToSecondBlock, maxBlockSizes, blockSizes, tieBreakingKeys, settings);
+			ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, borderRegionIDs, borderNodeWeights, assignedToSecondBlock, maxBlockSizes, blockSizes, tieBreakingKeys, settings);
 
 			{
 				SCAI_REGION( "LocalRefinement.distributedFMStep.loop.swapFMResults" )
@@ -322,8 +325,8 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				swapField[1] = otherBlockWeightSum;
 				comm->swap(swapField, 2, partner);
 			}
-			const IndexType otherGain = swapField[0];
-			const IndexType otherSecondBlockWeightSum = swapField[1];
+			const ValueType otherGain = swapField[0];
+			const ValueType otherSecondBlockWeightSum = swapField[1];
 
 			if (otherSecondBlockWeightSum > maxBlockSizes.first) {
 				//If a block is too large after the refinement, it is only because it was too large to begin with.
@@ -336,8 +339,8 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			}else {
 				SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.prepareRedist" )
 
-				gainThisRound = std::max(IndexType(otherGain), IndexType(gain));
-
+				gainThisRound = std::max( otherGain, gain);
+//PRINT(comm->getRank() << ": " << gainThisRound );
 				assert(gainThisRound > 0);
 				gainPerRound[color] = gainThisRound;
 
@@ -452,11 +455,13 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				}
 			}
 		} // if (partner != comm->getRank())
+//PRINT( comm->getRank() << ": gain for round " << color << "= " << gainThisRound );
 	}
 
 	comm->synchronize();
 	for (IndexType color = 0; color < gainPerRound.size(); color++) {
 		gainPerRound[color] = comm->sum(gainPerRound[color]) / 2;
+//PRINT( comm->getRank() << ": " << gainPerRound[color] );
 	}
 
 	return gainPerRound;
@@ -487,7 +492,8 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 
 	assert(blockCapacities.first == blockCapacities.second);
 	const bool nodesWeighted = (nodeWeights.size() != 0);
-	const bool edgesWeighted = nodesWeighted;//TODO: adapt this, change interface
+	//const bool edgesWeighted = nodesWeighted;//TODO: adapt this, change interface
+	const bool edgesWeighted = ( scai::utilskernel::HArrayUtils::max(input.getLocalStorage().getValues()) !=1 );
 
 	if (edgesWeighted) {
 		ValueType maxWeight = scai::utilskernel::HArrayUtils::max(input.getLocalStorage().getValues());
@@ -513,7 +519,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 	if (nodesWeighted) {
 		assert(nodeWeights.size() == veryLocalN);
 	}
-
+//PRINT(comm->getRank() << ": " << veryLocalN << " -- " << edgesWeighted );
 	//TODO: not used variable
 	//const IndexType firstBlockSize = std::distance(assignedToSecondBlock.begin(), std::lower_bound(assignedToSecondBlock.begin(), assignedToSecondBlock.end(), 1));
 
@@ -562,7 +568,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 				continue;
 			}
 
-			const IndexType weight = edgesWeighted ? values[j] : 1;
+			const ValueType weight = edgesWeighted ? values[j] : 1;
 
 			if (inputDist->isLocal(globalNeighbor)) {
 				//neighbor is in local block,
@@ -585,7 +591,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 	PrioQueue<std::pair<IndexType, ValueType>, IndexType> firstQueue(veryLocalN);
 	PrioQueue<std::pair<IndexType, ValueType>, IndexType> secondQueue(veryLocalN);
 
-	std::vector<IndexType> gain(veryLocalN);
+	std::vector<ValueType> gain(veryLocalN);
 
 	for (IndexType i = 0; i < veryLocalN; i++) {
 		gain[i] = computeInitialGain(i);
@@ -598,6 +604,8 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 		}
 	}
 
+//if( gain.size()>0 ) PRINT( comm->getRank() << ": " << *std::max_element( gain.begin(), gain.end() ) );
+
 	//whether a node was already moved
 	std::vector<bool> moved(veryLocalN, false);
 	//which node was transfered in each round
@@ -605,7 +613,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 	transfers.reserve(veryLocalN);
 
 	ValueType gainSum = 0;
-	std::vector<IndexType> gainSumList, sizeList;
+	std::vector<ValueType> gainSumList, sizeList;
 	gainSumList.reserve(veryLocalN);
 	sizeList.reserve(veryLocalN);
 
@@ -688,7 +696,8 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 		//update gain sum
 		gainSum += topGain;
 		gainSumList.push_back(gainSum);
-
+//PRINT(comm->getRank() << ": " << gainSum );
+//PRINT0( gainSum << " += " << topGain);
 		//update sizes
 		const ValueType nodeWeight = nodesWeighted ? nodeWeights[veryLocalID] : 1;
 		blockSizes.first += bestQueueIndex == 0 ? -nodeWeight : nodeWeight;
@@ -706,6 +715,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 		const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
 		const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());
 		const scai::hmemo::ReadAccess<ValueType> localValues(storage.getValues());
+//PRINT(comm->getRank() << ": " << (DenseVector<ValueType>(storage.getValues())).max() );		
 		const IndexType beginCols = localIa[localID];
 		const IndexType endCols = localIa[localID+1];
 		SCAI_REGION_END("LocalRefinement.twoWayLocalFM.queueloop.acquireLocks")
@@ -724,7 +734,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 				const ValueType oldGain = gain[veryLocalNeighborID];
 				//gain change is twice the value of the affected edge. Direction depends on block assignment.
 				gain[veryLocalNeighborID] = oldGain + 2*(2*wasInSameBlock - 1)*edgeWeight;
-
+//PRINT( oldGain << " ++++ " << edgeWeight );
 				const ValueType tieBreakingKey = tieBreakingKeys[veryLocalNeighborID];
 				const std::pair<IndexType, ValueType> oldKey = std::make_pair(-oldGain, tieBreakingKey);
 				const std::pair<IndexType, ValueType> newKey = std::make_pair(-gain[veryLocalNeighborID], tieBreakingKey);
@@ -737,6 +747,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 			}
 		}
 		iter++;
+//PRINT( comm->getRank() << ": " << *std::max_element(gain.begin(), gain.end()) );
 	}
 
 	/**
@@ -774,7 +785,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 
 	}
 	SCAI_REGION_END( "LocalRefinement.twoWayLocalFM.recoverBestCut" )
-
+//PRINT( comm->getRank() << ": " << maxGain );
 	return maxGain;
 }
 //---------------------------------------------------------------------------------------

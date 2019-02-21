@@ -217,7 +217,7 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
 	for(IndexType run=0; run<numRuns; run++){
 		Metrics thisMetric = metricsVec[ run ];
 		
-		SCAI_ASSERT_EQ_ERROR(thisMetric.timeMigrationAlgo.size(), comm->getSize(), "Wrong vector size" );
+		SCAI_ASSERT_EQ_ERROR(thisMetric.timeMigrationAlgo.size(), (unsigned int)comm->getSize(), "Wrong vector size" );
 		
 		// for these time we have one measurement per PE and must make a max
 		ValueType maxTimeMigrationAlgo = *std::max_element( thisMetric.timeMigrationAlgo.begin(), thisMetric.timeMigrationAlgo.end() );
@@ -313,11 +313,11 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
 			<< std::endl;
 		
 		out<< "localRefinement detail" << std::endl;
-		for( int i=0; i<sumLocalRefDetails.size(); i++){
+		for( unsigned int i=0; i<sumLocalRefDetails.size(); i++){
 			if( sumLocalRefDetails[i][0].first != 0){
 				out << "MLRound " << i << std::endl;
 			}
-			for( int j=0; j<sumLocalRefDetails[i].size(); j++){
+			for( unsigned int j=0; j<sumLocalRefDetails[i].size(); j++){
 				if( sumLocalRefDetails[i][j].first != 0 or sumLocalRefDetails[i][j].first != 0){
 //PRINT0( sumLocalRefDetails[i][j].first << "  + + + " << sumLocalRefDetails[i][j].second  );
 					SCAI_ASSERT_NE_ERROR(counter[i][j], 0 , "wrong counter value for i,j= " << i << ", "<< j);
@@ -389,7 +389,7 @@ inline void printVectorMetricsShort( std::vector<struct Metrics>& metricsVec, st
 	for(IndexType run=0; run<numRuns; run++){
 		Metrics thisMetric = metricsVec[ run ];
 		
-		SCAI_ASSERT_EQ_ERROR(thisMetric.timeMigrationAlgo.size(), comm->getSize(), "Wrong vector size" );
+		SCAI_ASSERT_EQ_ERROR(thisMetric.timeMigrationAlgo.size(), (unsigned int) comm->getSize(), "Wrong vector size" );
 		
 		// these times are global, no need to max
 		ValueType timeFinal = thisMetric.timeFinalPartition;
