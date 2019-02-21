@@ -245,7 +245,7 @@ DenseVector<IndexType> assignBlocks(
 		const Iterator lastIndex,
 		const DenseVector<ValueType> &nodeWeights,
 		const DenseVector<IndexType> &previousAssignment,
-		const std::vector<IndexType> &targetBlockSizes,
+		const std::vector<ValueType> &targetBlockSizes,
 		const SpatialCell &boundingBox,
 		std::vector<ValueType> &upperBoundOwnCenter,
 		std::vector<ValueType> &lowerBoundNextCenter,
@@ -493,7 +493,6 @@ DenseVector<IndexType> assignBlocks(
 }
 
 
-
 template std::vector<std::vector<ValueType> > findInitialCentersSFC<IndexType, ValueType>( const std::vector<DenseVector<ValueType> >& coordinates, const std::vector<ValueType> &minCoords,    const std::vector<ValueType> &maxCoords, Settings settings);
 
 template std::vector<std::vector<ValueType> > findLocalCenters<IndexType,ValueType>(const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights);
@@ -506,7 +505,7 @@ template DenseVector<IndexType> assignBlocks(
 		const std::vector<std::vector<ValueType>> &coordinates,
 		const std::vector<std::vector<ValueType> > &centers,
         std::vector<IndexType>::iterator firstIndex, std::vector<IndexType>::iterator lastIndex,
-        const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment, const std::vector<IndexType> &blockSizes, const SpatialCell &boundingBox,
+        const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment, const std::vector<ValueType> &blockSizes, const SpatialCell &boundingBox,
         std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter, std::vector<ValueType> &influence, Settings settings);
 
 }

@@ -162,7 +162,7 @@ template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(const std::vector<std::vector<ValueType>> &coordinates, const std::vector<std::vector<ValueType> > &centers,
 		const Iterator firstIndex, const Iterator lastIndex,
 		const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment,
-		const std::vector<IndexType> &blockSizes,  const SpatialCell &boundingBox,
+		const std::vector<ValueType> &blockSizes,  const SpatialCell &boundingBox,
 		std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter,
 		std::vector<ValueType> &influence,
 		Settings settings);
@@ -189,7 +189,7 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights,
-		const std::vector<IndexType> &blockSizes, const Settings settings) {
+		const std::vector<ValueType> &blockSizes, const Settings settings) {
 
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
@@ -225,7 +225,7 @@ DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueTyp
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &  nodeWeights,
-		const std::vector<IndexType> &blockSizes, std::vector<std::vector<ValueType> > centers, const Settings settings) {
+		const std::vector<ValueType> &blockSizes, std::vector<std::vector<ValueType> > centers, const Settings settings) {
 	SCAI_REGION( "KMeans.computePartition" );
 
 	const IndexType k = settings.numBlocks;
@@ -301,7 +301,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 	assert(minNodes > 0);
 	IndexType samplingRounds = 0;
 	std::vector<IndexType> samples;
-	std::vector<IndexType> adjustedBlockSizes(blockSizes);
+	std::vector<ValueType> adjustedBlockSizes(blockSizes);
 	const bool randomInitialization = comm->all(localN > minNodes);
 
 	if (randomInitialization) {
@@ -412,7 +412,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		}
 		centers = newCenters;
 
-		std::vector<IndexType> blockWeights(k,0);
+		std::vector<ValueType> blockWeights(k,0.0);
 		for (auto it = firstIndex; it != lastIndex; it++) {
 			const IndexType i = *it;
 			IndexType cluster = rResult[i];
@@ -420,7 +420,7 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 		}
 		{
 			SCAI_REGION( "KMeans.computePartition.blockWeightSum" );
-			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<IndexType>::stype);
+			comm->sumImpl(blockWeights.data(), blockWeights.data(), k, scai::common::TypeTraits<ValueType>::stype);
 		}
 
 		balanced = true;
@@ -434,6 +434,11 @@ DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>
 			std::cout << "i: " << iter << ", delta: " << delta << std::endl;
 		}
 		iter++;
+std::string filename = "part_kmeans_"+ std::to_string(iter)+".mtx";
+for (int i=0; i<influence.size(); i++)
+PRINT0( "iter " << iter << ", i: " << i << " influence= " << influence[i]  << ", blockWeights= " <<  blockWeights[i] << ",  adjustedBlockSizes= " << adjustedBlockSizes[i] );
+result.writeToFile( filename );
+
 	} while (iter < samplingRounds or (iter < maxIterations && (delta > threshold || !balanced)) );
 
 	return result;
