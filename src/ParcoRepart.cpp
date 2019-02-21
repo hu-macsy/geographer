@@ -592,27 +592,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			 * redistribute to prepare for local refinement
 			 */
             bool useRedistributor = true;
-            scai::dmemo::DistributionPtr distFromPartition = aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights, settings, metrics, useRedistributor);
-
-            /*
-			std::chrono::time_point<std::chrono::system_clock> beforeSecondRedistributiom =  std::chrono::system_clock::now();
-			
-			auto resultRedist = scai::dmemo::redistributePlanByNewOwners(result.getLocalValues(), result.getDistributionPtr());//TODO: Wouldn't it be faster to use a GeneralDistribution here?
-			result = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
-			
-			auto redistributor = scai::dmemo::redistributePlanByNewDistribution(resultRedist.getTargetDistributionPtr(), input.getRowDistributionPtr());
-			input.redistribute(redistributor, noDist);
-			if (settings.useGeometricTieBreaking) {
-				for (IndexType d = 0; d < dimensions; d++) {
-					coordinates[d].redistribute(redistributor);
-				}
-			}
-			nodeWeights.redistribute(redistributor);
-			
-			secondRedistributionTime =  std::chrono::system_clock::now() - beforeSecondRedistributiom;
-            */
-            
-			//ValueType timeForSecondRedistr = ValueType ( comm->max(secondRedistributionTime.count() ));
+            aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights, settings, metrics, useRedistributor);
 			
 			partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
 			//ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
