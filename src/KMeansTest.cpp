@@ -54,15 +54,15 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
 		for (IndexType j = i+1; j < k; j++) {
 			bool differenceFound = false;
 			for (IndexType d = 0; d < dimensions; d++) {
-				if (centers[d][i] != centers[d][j]) {
+				if (centers[i][d] != centers[j][d]) {
 					differenceFound = true;
 				}
 			}
-			if (!differenceFound) {
+			if (differenceFound) {
 				allDistinct = false;
 				std::cout << "Centers " << i << " and " << j << " are both at ";
 				for (IndexType d = 0; d < dimensions; d++) {
-					std::cout << "(" << centers[d][i] << "|" << centers[d][j] << ") ";
+					std::cout << "(" << centers[i][d] << "|" << centers[j][d] << ") ";
 				}
 				std::cout << std::endl;
 			}
@@ -71,8 +71,8 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
 	EXPECT_TRUE(allDistinct);
 
 	//check for equality across processors
-	for (IndexType d = 0; d < dimensions; d++) {
-		ValueType coordSum = std::accumulate(centers[d].begin(), centers[d].end(), 0.0);
+	for (IndexType i=0; i<k; i++) {
+		ValueType coordSum = std::accumulate(centers[i].begin(), centers[i].end(), 0.0);
 		ValueType totalSum = comm->sum(coordSum);
 		EXPECT_LT(std::abs(p*coordSum - totalSum), 1e-5);
 	}
