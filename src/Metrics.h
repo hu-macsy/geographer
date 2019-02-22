@@ -29,7 +29,7 @@ struct Metrics{
     //std::map< std::pair<int,int>, int, ValueType > localRefDetails;
 
     //std::pair<int,ValueType> ;
-    std::vector< std::vector<std::pair<int,ValueType>> > localRefDetails;
+    std::vector< std::vector<std::pair<ValueType,ValueType>> > localRefDetails;
 
    	ValueType inputTime = 0;
 	ValueType timeFinalPartition = 0;

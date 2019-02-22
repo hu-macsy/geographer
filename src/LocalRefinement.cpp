@@ -340,7 +340,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.prepareRedist" )
 
 				gainThisRound = std::max( otherGain, gain);
-//PRINT(comm->getRank() << ": " << gainThisRound );
+
 				assert(gainThisRound > 0);
 				gainPerRound[color] = gainThisRound;
 
@@ -414,6 +414,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 //WARNING, TODO: the next call just hangs when is not called by all PEs. 
 //This can happen when some pairs of PE did not achieve any gain
 // I guess the reason is the comm->sum() in the GeneralDistribition constructor
+//TODO: update 22/02: this should be fixed by a previous lama update				
 				auto newDistribution = scai::dmemo::generalDistributionUnchecked(globalN, indexTransport, comm);
 				SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.redistribute.generalDistribution" )
 
@@ -455,13 +456,11 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 				}
 			}
 		} // if (partner != comm->getRank())
-//PRINT( comm->getRank() << ": gain for round " << color << "= " << gainThisRound );
 	}
 
 	comm->synchronize();
 	for (IndexType color = 0; color < gainPerRound.size(); color++) {
 		gainPerRound[color] = comm->sum(gainPerRound[color]) / 2;
-//PRINT( comm->getRank() << ": " << gainPerRound[color] );
 	}
 
 	return gainPerRound;
@@ -519,7 +518,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 	if (nodesWeighted) {
 		assert(nodeWeights.size() == veryLocalN);
 	}
-//PRINT(comm->getRank() << ": " << veryLocalN << " -- " << edgesWeighted );
+
 	//TODO: not used variable
 	//const IndexType firstBlockSize = std::distance(assignedToSecondBlock.begin(), std::lower_bound(assignedToSecondBlock.begin(), assignedToSecondBlock.end(), 1));
 
@@ -603,8 +602,6 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 			firstQueue.insert(std::make_pair(-gain[i], tieBreakingKey), i);
 		}
 	}
-
-//if( gain.size()>0 ) PRINT( comm->getRank() << ": " << *std::max_element( gain.begin(), gain.end() ) );
 
 	//whether a node was already moved
 	std::vector<bool> moved(veryLocalN, false);
@@ -696,8 +693,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 		//update gain sum
 		gainSum += topGain;
 		gainSumList.push_back(gainSum);
-//PRINT(comm->getRank() << ": " << gainSum );
-//PRINT0( gainSum << " += " << topGain);
+
 		//update sizes
 		const ValueType nodeWeight = nodesWeighted ? nodeWeights[veryLocalID] : 1;
 		blockSizes.first += bestQueueIndex == 0 ? -nodeWeight : nodeWeight;
@@ -715,7 +711,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 		const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
 		const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());
 		const scai::hmemo::ReadAccess<ValueType> localValues(storage.getValues());
-//PRINT(comm->getRank() << ": " << (DenseVector<ValueType>(storage.getValues())).max() );		
+
 		const IndexType beginCols = localIa[localID];
 		const IndexType endCols = localIa[localID+1];
 		SCAI_REGION_END("LocalRefinement.twoWayLocalFM.queueloop.acquireLocks")
@@ -734,7 +730,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 				const ValueType oldGain = gain[veryLocalNeighborID];
 				//gain change is twice the value of the affected edge. Direction depends on block assignment.
 				gain[veryLocalNeighborID] = oldGain + 2*(2*wasInSameBlock - 1)*edgeWeight;
-//PRINT( oldGain << " ++++ " << edgeWeight );
+
 				const ValueType tieBreakingKey = tieBreakingKeys[veryLocalNeighborID];
 				const std::pair<IndexType, ValueType> oldKey = std::make_pair(-oldGain, tieBreakingKey);
 				const std::pair<IndexType, ValueType> newKey = std::make_pair(-gain[veryLocalNeighborID], tieBreakingKey);
@@ -747,7 +743,6 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 			}
 		}
 		iter++;
-//PRINT( comm->getRank() << ": " << *std::max_element(gain.begin(), gain.end()) );
 	}
 
 	/**
@@ -785,7 +780,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 
 	}
 	SCAI_REGION_END( "LocalRefinement.twoWayLocalFM.recoverBestCut" )
-//PRINT( comm->getRank() << ": " << maxGain );
+
 	return maxGain;
 }
 //---------------------------------------------------------------------------------------

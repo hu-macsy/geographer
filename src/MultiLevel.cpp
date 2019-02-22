@@ -52,7 +52,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 			std::cout << "Beginning coarsening, still " << settings.multiLevelRounds << " levels to go." << std::endl;
 		}
 		MultiLevel<IndexType, ValueType>::coarsen(input, nodeWeights, halo, coarseGraph, fineToCoarseMap, settings.coarseningStepsBetweenRefinement);
-PRINT(comm->getRank() << ": " << (DenseVector<ValueType>(input.getLocalStorage().getValues())).sum() );
+
 		scai::dmemo::DistributionPtr oldCoarseDist = input.getRowDistributionPtr();
 		if (comm->getRank() == 0) {
 			std::cout << "Coarse graph has " << coarseGraph.getNumRows() << " nodes." << std::endl;
