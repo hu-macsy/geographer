@@ -320,6 +320,8 @@ std::vector<std::vector<ValueType>>  findInitialCentersSFC(
 	//where initialCenters[0][d][i] is the d-th coordinate of the i-th center
 	IndexType dimensions = settings.dimensions;
 
+	SCAI_ASSERT_EQ_ERROR( minCoords.size(), settings.dimensions, "Wrong center dimensions");
+
 //TODO: check/verify if we do not need to revert the vector order
 	//reverse vector order here
 	std::vector<std::vector<ValueType>> reversedCenters( dimensions, std::vector<ValueType>(settings.numBlocks, 0.0) );

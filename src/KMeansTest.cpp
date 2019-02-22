@@ -58,7 +58,7 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
 					differenceFound = true;
 				}
 			}
-			if (differenceFound) {
+			if (!differenceFound) {
 				allDistinct = false;
 				std::cout << "Centers " << i << " and " << j << " are both at ";
 				for (IndexType d = 0; d < dimensions; d++) {
@@ -148,6 +148,7 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 	// get centers
 	std::vector<std::vector<ValueType>> centers1 = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords, minCoords, maxCoords, settings);
 	EXPECT_EQ( centers1.size(), k );
+	EXPECT_EQ( centers1[0].size(), dimensions );
 
 	settings.sfcResolution = std::log2(k);
 	std::vector<std::vector<ValueType>> centers2 = KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>( maxCoords, settings);
