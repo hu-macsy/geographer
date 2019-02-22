@@ -1297,8 +1297,8 @@ DenseVector<IndexType> computePartition( \
 			for (int d = 0; d < dim; d++) {
 				//TODO: copied from the Dev branch, commit 94e40203248c9e981af98c80fb47ba60e4c77ec2
 				// the same code does not exist in this version so I added the assertion here
-				SCAI_ASSERT_LE_ERROR( transCenters[d][j], globalMaxCoords[d], "New center coordinate out of bounds" );
-		    	SCAI_ASSERT_GE_ERROR( transCenters[d][j], globalMinCoords[d], "New center coordinate out of bounds" );
+				SCAI_ASSERT_LE_ERROR( transCenters[j][d], globalMaxCoords[d], "New center coordinate out of bounds" );
+		    	SCAI_ASSERT_GE_ERROR( transCenters[j][d], globalMinCoords[d], "New center coordinate out of bounds" );
 				ValueType diff = (centers1DVector[j][d] - transCenters[j][d]);
 				squaredDeltas[j] += diff*diff;
 			}

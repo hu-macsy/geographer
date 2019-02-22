@@ -70,10 +70,7 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
     // in order to keep input array unchanged, create new tmp array by coping
     // adjM.redistribute( noDist , noDist);
     
-    auto tmpAdjM = scai::lama::distribute<scai::lama::CSRSparseMatrix<ValueType>>( adjM.getLocalStorage(),
-                                                                                   adjM.getRowDistributionPtr(),
-                                                                                   adjM.getColDistributionPtr()
-                                                                                );
+    CSRSparseMatrix<ValueType> tmpAdjM( adjM );                 
     tmpAdjM.redistribute( noDist , noDist);
 
     if(comm->getRank()==root){
@@ -523,13 +520,10 @@ void FileIO<IndexType, ValueType>::writeDenseVectorCentral(DenseVector<IndexType
     part.redistribute( noDist );
     SCAI_ASSERT_EQ_ERROR( part.getLocalValues().size(), globalN, "Partition must be replicated");
     
-    if( comm->getRank()==0 ){
+    if( comm->getRank() ){
     
         std::ofstream f( filename );  
-        if( f.fail() ){
- 			throw std::runtime_error("Could not write to file " + filename);
-        }
-         
+        
         const scai::hmemo::ReadAccess<IndexType> rPart( part.getLocalValues() );
         for( IndexType i=0; i<globalN; i++){
             f << rPart[i]<< std::endl;
