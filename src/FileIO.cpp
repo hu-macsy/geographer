@@ -70,10 +70,7 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
     // in order to keep input array unchanged, create new tmp array by coping
     // adjM.redistribute( noDist , noDist);
     
-    auto tmpAdjM = scai::lama::distribute<scai::lama::CSRSparseMatrix<ValueType>>( adjM.getLocalStorage(),
-                                                                                   adjM.getRowDistributionPtr(),
-                                                                                   adjM.getColDistributionPtr()
-                                                                                );
+    CSRSparseMatrix<ValueType> tmpAdjM( adjM );                 
     tmpAdjM.redistribute( noDist , noDist);
 
     if(comm->getRank()==root){

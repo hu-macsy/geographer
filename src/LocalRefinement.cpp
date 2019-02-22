@@ -240,7 +240,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			 * Exchange Halo. This only requires communication with the partner process.
 			 */
 			haloMatrix.exchangeHalo( graphHalo, input.getLocalStorage(), *comm );
-PRINT0( scai::utilskernel::HArrayUtils::sum(haloMatrix.getValues()) ) ;
+
 			//local part should stay unchanged, check edge number as proxy for that
 			assert(input.getLocalStorage().getValues().size() == numValues);
 
