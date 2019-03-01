@@ -113,7 +113,6 @@ std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(const std::ve
 	std::vector<ValueType> centerCoords(dimensions,0);
 	for (IndexType i = 0; i < k; i++) {
 		ValueType centerHilbInd = i/ValueType(k) + offset;
-//PRINT( centerHilbInd );		
 		centerCoords = HilbertCurve<IndexType,ValueType>::HilbertIndex2Point( centerHilbInd, settings.sfcResolution, settings.dimensions);
 		SCAI_ASSERT_EQ_ERROR( centerCoords.size(), dimensions, "Wrong dimensions for center.");
 		
@@ -187,7 +186,7 @@ std::vector<std::vector<ValueType> > findCenters(
 	//TODO: check that distributions align
 
 	std::vector<std::vector<ValueType> > result(dim);
-	std::vector<IndexType> weightSum(k, 0);
+	std::vector<ValueType> weightSum(k, 0.0);
 
 	scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
 	scai::hmemo::ReadAccess<IndexType> rPartition(partition.getLocalValues());
@@ -196,16 +195,16 @@ std::vector<std::vector<ValueType> > findCenters(
 	for (Iterator it = firstIndex; it != lastIndex; it++) {
 		const IndexType i = *it;
 		const IndexType part = rPartition[i];
-		const IndexType weight = rWeights[i];
+		const ValueType weight = rWeights[i];
 		weightSum[part] += weight;
 	}
 
 	//find local centers
 	for (IndexType d = 0; d < dim; d++) {
-		result[d].resize(k);
+		result[d].resize(k,0);
 		scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
 
-		for (Iterator it = firstIndex; it != lastIndex; it++) {
+		for (Iterator it = firstIndex; it != lastIndex; it++) {			
 			const IndexType i = *it;
 			const IndexType part = rPartition[i];
 			//const IndexType weight = rWeights[i];
@@ -214,8 +213,8 @@ std::vector<std::vector<ValueType> > findCenters(
 	}
 
 	//communicate local centers and weight sums
-	std::vector<IndexType> totalWeight(k, 0);
-	comm->sumImpl(totalWeight.data(), weightSum.data(), k, scai::common::TypeTraits<IndexType>::stype);
+	std::vector<ValueType> totalWeight(k, 0);
+	comm->sumImpl(totalWeight.data(), weightSum.data(), k, scai::common::TypeTraits<ValueType>::stype);
 
 	//compute updated centers as weighted average
 	for (IndexType d = 0; d < dim; d++) {
@@ -415,7 +414,7 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 				timePerPE[comm->getRank()] += time;
 			}
 
-			//aux<IndexType,ValueType>::timeMeasurement(balanceStart);
+			//aux<IndexType,ValueType>::timeMeasurement(balanceStart); 
 
 			comm->synchronize();
 		}
@@ -448,8 +447,8 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 			}
 
 			influence[j] = std::max(influence[j]*influenceChangeLowerBound[j], std::min(influence[j] * std::pow(ratio, settings.influenceExponent), influence[j]*influenceChangeUpperBound[j]));
-			assert(influence[j] > 0);
 
+			assert(influence[j] > 0);
 			double influenceRatio = influence[j] / oldInfluence[j];
 			assert(influenceRatio <= influenceChangeUpperBound[j] + 1e-10);
 			assert(influenceRatio >= influenceChangeLowerBound[j] - 1e-10);
