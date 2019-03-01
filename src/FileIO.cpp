@@ -47,14 +47,8 @@ namespace ITI {
  *
  */
 template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename, const IndexType option){
+void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename, const bool edgeWeights){
     SCAI_REGION( "FileIO.writeGraph" )
-	
-	SCAI_ASSERT_GE_ERROR(option, 0, "Wrong -options- parameter for writeGraph function");
-	SCAI_ASSERT_LE_ERROR(option, 1, "Wrong -options- parameter for writeGraph function");
-	//so, option is either 0 or 1
-	//0: no weights
-	//1: edge weights
 	
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
@@ -87,7 +81,7 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
         // first line is number of nodes and edges
         IndexType cols= tmpAdjM.getNumColumns();
         fNew << cols <<" "<< tmpAdjM.getNumValues()/2; 
-        if(option==1){
+        if(edgeWeights){
             fNew << " 001";
         }
         fNew<< std::endl;
@@ -97,9 +91,9 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
         for(IndexType i=0; i< globalN; i++){        // for all local nodes
             for(IndexType j= rGlobalIA[i]; j<rGlobalIA[i+1]; j++){             // for all the edges of a node
                 SCAI_ASSERT_LE_ERROR( rGlobalJA[j], globalN , rGlobalJA[j] << " must be < "<< globalN );
-				if( option==0){
+				if(!edgeWeights){
 					fNew << rGlobalJA[j]+1 << " ";
-				}else if(option==1){
+				} else {
 					fNew << rGlobalJA[j]+1 << " "<< rGlobalVal[j]<< " ";
 				}
             }

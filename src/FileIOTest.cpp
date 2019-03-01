@@ -155,7 +155,7 @@ TEST_F(FileIOTest, testWriteGraphWithEdgeWeights){
 	FileIO<IndexType, ValueType>::writeGraph( graph, filename );
 	
 	filename = "./meshes/dgeWeights.graph";
-	FileIO<IndexType, ValueType>::writeGraph( graph, filename, 1 );
+	FileIO<IndexType, ValueType>::writeGraph( graph, filename, true );
 	
 }
 
