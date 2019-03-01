@@ -136,7 +136,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	ASSERT_GE(cut, 0);
 	for (IndexType i = 0; i < iterations; i++) {
 
-		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, coordinates, distances, origin, communicationScheme, settings);
+		std::vector<ValueType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, coordinates, distances, origin, communicationScheme, settings);
 		IndexType gain = 0;
 		for (IndexType roundGain : gainPerRound) gain += roundGain;
 
@@ -181,7 +181,7 @@ TEST_F(LocalRefinementTest, testOriginArray) {
 	ValueType gain = 0;
 	IndexType iter = 0;
 	do {
-		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, coordinates, distances, origin, communicationScheme, settings);
+		std::vector<ValueType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, coordinates, distances, origin, communicationScheme, settings);
 		gain = std::accumulate(gainPerRound.begin(), gainPerRound.end(), 0);
 		if (comm->getRank() == 0) std::cout << "Found gain " << gain << " with " << gainPerRound.size() << " colors." << std::endl;
 		iter++;
