@@ -41,7 +41,6 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType k = comm->getSize();
 	const ValueType epsilon = 0.1;
-	const IndexType iterations = 1;
 
 	srand(time(NULL));
 
@@ -85,6 +84,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
         
 	if(initialImbalance > epsilon){
 		PRINT0("Warning, initial random partition too imbalanced: "<< initialImbalance);
+		//epsilon = initialImbalance;
 	}
         
 	//redistribute according to partition
@@ -134,11 +134,19 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	ValueType cut = GraphUtils<IndexType,ValueType>::computeCut(graph, part, true);
 	DenseVector<IndexType> origin(graph.getRowDistributionPtr(), comm->getRank());
 	ASSERT_GE(cut, 0);
+	const IndexType iterations = 2;
+
 	for (IndexType i = 0; i < iterations; i++) {
 
 		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, coordinates, distances, origin, communicationScheme, settings);
 		IndexType gain = 0;
 		for (IndexType roundGain : gainPerRound) gain += roundGain;
+
+
+scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( GraphUtils<IndexType,ValueType>::nonLocalNeighbors(graph) );
+scai::hmemo::HArray<IndexType> owners;	
+graph.getRowDistribution().computeOwners( owners, arrRequiredIndexes );
+
 
 		//check correct gain calculation
 		const ValueType newCut = GraphUtils<IndexType,ValueType>::computeCut(graph, part, true);

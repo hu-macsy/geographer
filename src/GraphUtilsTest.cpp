@@ -315,8 +315,25 @@ TEST_F(GraphUtilsTest, testIndexReordering){
 */
 //------------------------------------------------------------------------------------ 
 
+TEST_F(GraphUtilsTest, testNonLocalNeighbors){
+	std::string file = graphPath + "trace-00008.graph";
+	IndexType dimensions = 2;
+
+	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+
+	std::vector<IndexType> nonLocalN = GraphUtils<IndexType, ValueType>::nonLocalNeighbors( graph );
+	
+	scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+
+	//kind of "obviously correct" test since this the same condition checked inside nonLocalNeighbors
+	for( IndexType ind : nonLocalN ){
+		EXPECT_TRUE( not dist->isLocal(ind) );
+	}
+
+}
+//------------------------------------------------------------------------------------ 
+
 TEST_F(GraphUtilsTest, testMEColoring_local){
-    
     std::string file = graphPath + "Grid8x8";
     //std::string file = graphPath + "delaunayTest.graph";
     //std::string file = graphPath + "bigtrace-00000.graph";

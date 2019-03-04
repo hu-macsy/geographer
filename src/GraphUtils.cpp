@@ -301,8 +301,9 @@ ValueType GraphUtils<IndexType,ValueType>::computeCut(const CSRSparseMatrix<Valu
 	scai::hmemo::ReadAccess<IndexType> partAccess(localData);
 
 	scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
-
+PRINT(*comm);
 	scai::dmemo::HaloExchangePlan partHalo = buildNeighborHalo(input);
+PRINT(*comm);	
 	scai::hmemo::HArray<IndexType> haloData;
 	partHalo.updateHalo( haloData, localData, partDist->getCommunicator() );
 
@@ -567,7 +568,7 @@ scai::dmemo::HaloExchangePlan GraphUtils<IndexType,ValueType>::buildNeighborHalo
 
 	scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
 
-	return haloExchangePlan( input.getRowDistribution(), arrRequiredIndexes );
+	return haloExchangePlan( input.getRowDistribution(), arrRequiredIndexes, false );
 }
 //---------------------------------------------------------------------------------------
 
