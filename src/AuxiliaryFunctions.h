@@ -275,7 +275,7 @@ static std::tuple<IndexType, IndexType> index2_2DPoint(IndexType index,  std::ve
 
 	The partititon itself is redistributed.
 
-	Afterwards, partition[i]=comm->getRank(), i.e., every PE gets its owned data.
+
 
 	It can also be done using a redistributor object.
 
@@ -299,32 +299,11 @@ static scai::dmemo::DistributionPtr redistributeFromPartition(
     const IndexType globalN = coordinates[0].getDistributionPtr()->getGlobalSize();
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
 
-    SCAI_ASSERT_EQ_ERROR( graph.getNumRows(), globalN, "Mismatch in graph and coordinates size" );
+    SCAI_ASSERT_EQ_ERROR( graph.getNumRows(), globalN, "Mismatch in graph and     coordinates size" );
     SCAI_ASSERT_EQ_ERROR( nodeWeights.getDistributionPtr()->getGlobalSize(), globalN , "Mismatch in nodeWeights vector" );
     SCAI_ASSERT_EQ_ERROR( partition.size(), globalN, "Mismatch in partition size");
     SCAI_ASSERT_EQ_ERROR( partition.min(), 0, "Minimum entry in partition should be 0" );
     SCAI_ASSERT_EQ_ERROR( partition.max(), numPEs-1, "Maximum entry in partition must be equal the number of processors.")
-
-    //possible optimization: go over your local partition, calculate size of each local block and claim the PE rank of the majority block
-
-    {
-		scai::hmemo::ReadAccess<IndexType> rPart( partition.getLocalValues() );
-		//std::vector< std::pair<IndexType,IndexType> > blockSize
-		//std::map<IndexType,IndexType> blockSizes;
-		scai::lama::SparseVector<IndexType> blockSizes( numPEs, 0 );
-		for (IndexType i = 0; i < localN; i++) {
-			//blockSizes.insert( std::pair<IndexType,IndexType>( ))
-			blockSizes[ rPart[i] ]++;
-		}
-
-		//sort block IDs based on their local size
-		std::vector<IndexType> indices( numPEs );
-  		std::iota( indices.begin(), indices.end(), 0);
-  		std::sort( indices.begin(), indices.end(), [&v](IndexType i1, IndexType i2) {return blockSizes[i1] < blockSizes[i2];});
-
-	}
-
-
 
     scai::dmemo::DistributionPtr distFromPartition;
 
