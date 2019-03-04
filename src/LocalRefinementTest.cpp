@@ -42,11 +42,17 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	const IndexType k = comm->getSize();
 	const ValueType epsilon = 0.1;
 
-	srand(time(NULL));
+	//srand(2); //WARNING/TODO 04/03: hangs for p=4
+	//srand(3); //WARNING/TODO 04/03: hangs for p=6
+	//srand(4); //WARNING/TODO 04/03: hangs for p=6
+	//srand(9); //WARNING/TODO 04/03: hangs for p=4
+	//srand(11); //WARNING/TODO 04/03: hangs for p=5
+	srand(14); //WARNING/TODO 04/03: hangs for p=5
+
+	IndexType dimensions = 3;
 
 	IndexType nroot = 16;
 	IndexType n = nroot * nroot * nroot;
-	IndexType dimensions = 3;
 
 	scai::dmemo::DistributionPtr inputDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, n) );
 	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
@@ -62,6 +68,17 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	}
 
 	MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(graph, coordinates, maxCoord, numPoints);
+	//MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(graph, coordinates, maxCoord, numPoints);
+
+
+/*
+	//try reading from file instead of generating the mesh
+	std::string file = graphPath + "Grid8x8";
+	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+	const IndexType n = graph.getNumRows();
+	std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), n, dimensions);
+	scai::dmemo::DistributionPtr inputDist  = graph.getRowDistributionPtr();
+*/
 
 	ASSERT_EQ(n, inputDist->getGlobalSize());
 
@@ -71,6 +88,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	scai::lama::DenseVector<IndexType> part(inputDist, 0);
 	for (IndexType i = 0; i < localN; i++) {
 		IndexType blockId = rand() % k;
+		//IndexType blockId = comm->getRank(); //simpler, balanced partition
 		IndexType globalID = inputDist->local2Global(i);
 		part.setValue(globalID, blockId);
 	}
@@ -134,20 +152,39 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	ValueType cut = GraphUtils<IndexType,ValueType>::computeCut(graph, part, true);
 	DenseVector<IndexType> origin(graph.getRowDistributionPtr(), comm->getRank());
 	ASSERT_GE(cut, 0);
-	const IndexType iterations = 2;
+	const IndexType iterations = 1;
+
+
 
 	for (IndexType i = 0; i < iterations; i++) {
 
-		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, coordinates, distances, origin, communicationScheme, settings);
+PRINT(comm->getRank() << ": dist= " << graph.getRowDistribution() );
+
 		IndexType gain = 0;
+		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, coordinates, distances, origin, communicationScheme, settings);
+		
 		for (IndexType roundGain : gainPerRound) gain += roundGain;
+/*
+{
+std::vector<IndexType> nonLocalN = GraphUtils<IndexType,ValueType>::nonLocalNeighbors(graph);
+std::cout<< comm->getRank() << ": ";
+for(IndexType x:nonLocalN ) 
+	std::cout << x << ", ";
+std::cout << std::endl;
 
+scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( nonLocalN );
 
-scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( GraphUtils<IndexType,ValueType>::nonLocalNeighbors(graph) );
 scai::hmemo::HArray<IndexType> owners;	
+PRINT(comm->getRank() << ": " << arrRequiredIndexes.size()  << ", dist= " << graph.getRowDistribution() );
 graph.getRowDistribution().computeOwners( owners, arrRequiredIndexes );
-
-
+std::cout<< comm->getRank() << ": owners:";
+scai::hmemo::ReadAccess<IndexType> rOwners(owners);
+for(IndexType i=0; i< rOwners.size(); i++ ) 
+	std::cout << rOwners[i] << ", ";
+std::cout << std::endl;
+PRINT(comm->getRank() << ": " << owners.size() );
+}
+*/
 		//check correct gain calculation
 		const ValueType newCut = GraphUtils<IndexType,ValueType>::computeCut(graph, part, true);
 		EXPECT_EQ(cut - gain, newCut) << "Old cut " << cut << ", gain " << gain << " newCut " << newCut;
@@ -388,3 +425,4 @@ TEST_F(LocalRefinementTest, testDistancesFromBlockCenter) {
 
 
 }// namespace ITI
+

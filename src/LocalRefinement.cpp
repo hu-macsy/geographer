@@ -408,9 +408,7 @@ std::vector<IndexType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
 				SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.redistribute.generalDistribution" )
 				HArray<IndexType> indexTransport(myGlobalIndices.size(), myGlobalIndices.data());
-//WARNING, TODO: the next call just hangs when is not called by all PEs. 
-//This can happen when some pairs of PE did not achieve any gain
-// I guess the reason is the comm->sum() in the GeneralDistribition constructor
+
 				auto newDistribution = scai::dmemo::generalDistributionUnchecked(globalN, indexTransport, comm);
 				SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.redistribute.generalDistribution" )
 

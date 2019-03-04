@@ -583,8 +583,8 @@ std::vector<IndexType> GraphUtils<IndexType, ValueType>::nonLocalNeighbors(const
 	scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
-	//std::set<IndexType> neighborSet;	//does not allows duplicates, we count vertices
-	std::multiset<IndexType> neighborSet; //since this allows duplicates,  we count edges
+	std::set<IndexType> neighborSet;	//does not allows duplicates, we count vertices
+	//std::multiset<IndexType> neighborSet; //since this allows duplicates,  we count edges
 
 	for (IndexType i = 0; i < localN; i++) {
 		const IndexType beginCols = ia[i];
