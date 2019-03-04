@@ -568,7 +568,7 @@ scai::dmemo::HaloExchangePlan GraphUtils<IndexType,ValueType>::buildNeighborHalo
 
 	scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
 
-	return haloExchangePlan( input.getRowDistribution(), arrRequiredIndexes, false );
+	return haloExchangePlan( input.getRowDistribution(), arrRequiredIndexes );
 }
 //---------------------------------------------------------------------------------------
 
