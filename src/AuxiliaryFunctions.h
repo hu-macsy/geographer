@@ -267,6 +267,23 @@ static std::tuple<IndexType, IndexType> index2_2DPoint(IndexType index,  std::ve
 } 
 //------------------------------------------------------------------------------
 
+/** Redistribute all data according to the given a partition.
+	This basically equivallen to:
+	scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues());
+	graph.redistribute( distFromPartition, noDist );
+	...
+
+	The partititon itself is redistributed.
+
+
+
+	It can also be done using a redistributor object.
+
+	@param[in,out] partition The partition according to which we redistribute.
+	@param[out] graph 
+
+	@return The distribution pointer of the created distribution.
+**/
 
 static scai::dmemo::DistributionPtr redistributeFromPartition( 
                 DenseVector<IndexType>& partition,

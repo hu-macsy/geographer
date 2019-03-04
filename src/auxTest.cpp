@@ -38,7 +38,7 @@ using namespace scai;
 
 namespace ITI {
 
-class auxTest : public ::testing::Test {
+class auxTest : public ::testing::TestWithParam<int> {
 protected:
         // the directory of all the meshes used
         std::string graphPath = "./meshes/";
@@ -340,5 +340,73 @@ TEST_F(auxTest, testBenchIndexReordering){
 */
 
 //-----------------------------------------------------------------
+
+
+TEST_P(auxTest, testRedistributeFromPartition){
+	std::string fileName = "bubbles-00010.graph";
+    std::string file = graphPath + fileName;
+    
+    const IndexType dimensions= 2;        
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    // for now local refinement requires k = P
+    const IndexType k = comm->getSize();
+    //
+    
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );   
+    const IndexType N = graph.getNumRows();
+    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+
+    const scai::dmemo::DistributionPtr inputDist  = graph.getRowDistributionPtr();
+    const IndexType localN = inputDist->getLocalSize();
+
+    DenseVector<ValueType> nodeWeights( inputDist, 1 ); //unit weights
+
+    EXPECT_TRUE( coordinates[0].getDistributionPtr()->isEqual( *inputDist ) );
+
+    srand(1);
+    //create a random partition
+    DenseVector<IndexType> partition(inputDist, 0);
+	for (IndexType i = 0; i < localN; i++) {
+		IndexType blockId = rand() % k;
+		IndexType globalID = inputDist->local2Global(i);
+		partition.setValue(globalID, blockId);
+	}
+
+	Settings settings;
+	const bool useRedistributor = GetParam();
+
+	//redistribute 
+
+	scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition(
+                partition,
+                graph,
+                coordinates,
+                nodeWeights,
+                settings, 
+                useRedistributor);
+
+	//checks
+
+	const scai::dmemo::DistributionPtr newDist = graph.getRowDistributionPtr();
+    EXPECT_TRUE( nodeWeights.getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
+    SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*newDist), "Distribution mismatch" );
+    SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*newDist), "Distribution mismatch" );
+
+    const IndexType newLocalN = newDist->getLocalSize();
+    //PRINT( comm->getRank() <<": " << newLocalN );
+
+    EXPECT_EQ( comm->sum(newLocalN), N);
+
+    for (IndexType i = 0; i < newLocalN; i++) {
+    	SCAI_ASSERT_EQ_ERROR( partition.getLocalValues()[i], comm->getRank(), "error for i= " << i <<" and localN= "<< newLocalN );
+    	//PRINT(comm->getRank() << " : " << i << "- " << partition.getLocalValues()[i] );
+    }
+
+}
+
+INSTANTIATE_TEST_CASE_P(InstantiationName,
+                        auxTest,
+                        testing::Values(true, false) );
+
 
 }
