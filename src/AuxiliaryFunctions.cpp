@@ -139,6 +139,7 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
 	  				finalMapping[index] = allClaimedIDs[index];
 	  				mappedPEs[index]= true; //this PE got mapped for this round
 	  				availableIDs[ allClaimedIDs[index]  ] = false; 
+	  				PRINT0( index << ": claims ID " << allClaimedIDs[index] << " with size " << allClaimedSizes[index] );
 	  			}
 	  		}//for i<numPEs-1
 
@@ -161,21 +162,38 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
 	  	//instead of renumber the PEs, renumber the blocks
 		std::vector<IndexType> blockRenumbering( numPEs ); //this should be k, but the whole functions works only when k=p
 
+		//if every PE got the same ID as the one laready has
+		bool nothingChanged = true;
+
 	  	//reverse the renumbering from PEs to blocks: if PE 3 claimed ID 5, then renumber block 5 to 3
 	  	for( IndexType i=0; i<numPEs; i++){
 	  		blockRenumbering[ finalMapping[i] ] = i;
 			//PRINT0("block " << finalMapping[i] << " is mapped to " << i );
+			if( finalMapping[i]!=i )
+				nothingChanged = false;
 	  	}
 
-	  	//go over local partition and renumber
-		scai::hmemo::WriteAccess<IndexType> partAccess( partition.getLocalValues() );
-
-	  	for( IndexType i=0; i<localN; i++){
-	  		partAccess[i] = blockRenumbering[ partAccess[i] ];
-	  	}
+	  	//go over local partition and renumber if some IDs changes
+	  	if( not nothingChanged ){
+			scai::hmemo::WriteAccess<IndexType> partAccess( partition.getLocalValues() );
+		  	for( IndexType i=0; i<localN; i++){
+		  		partAccess[i] = blockRenumbering[ partAccess[i] ];
+		  	}
+		}
 
 	}// if( renumberPEs )
 
+	if( settings.debugMode ){
+		IndexType numSamePart = 0;
+		scai::hmemo::ReadAccess<IndexType> partAccess( partition.getLocalValues() );
+		for( IndexType i=0; i<localN; i++){
+			if( partAccess[i]==thisPE ){
+				numSamePart++;
+			}
+		}
+		ValueType percentSame = ((ValueType)numSamePart)/localN;
+		PRINT( comm->getRank() <<": renumber= "<< renumberPEs << ", percent of points with part=rank: "<< percentSame <<", numPoints= "<< numSamePart );
+	}
 
 	//----------------------------------------------------------------
 	// create the new distribution and redistribute data

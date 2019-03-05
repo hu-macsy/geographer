@@ -864,7 +864,9 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 		}
 
 	} while (imbalance > settings.epsilon - 1e-12 && iter < settings.balanceIterations);
-	std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
+	
+	if( settings.verbose )
+		std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
 	//aux<IndexType,ValueType>::timeMeasurement(assignStart);
 	
 	//for kmeans profiling
