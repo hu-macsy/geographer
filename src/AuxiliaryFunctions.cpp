@@ -1,6 +1,7 @@
 
 #include "AuxiliaryFunctions.h"
 
+//#include <scai/hmemo/WriteAccess.hpp>
 
 namespace ITI {
 
@@ -28,7 +29,10 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
     SCAI_ASSERT_EQ_ERROR( partition.min(), 0, "Minimum entry in partition should be 0" );
     SCAI_ASSERT_EQ_ERROR( partition.max(), numPEs-1, "Maximum entry in partition must be equal the number of processors.")
 
-    //possible optimization: go over your local partition, calculate size of each local block and claim the PE rank of the majority block
+	//----------------------------------------------------------------
+	// renumber blocks according to which block is the majority in every PE
+	// in order to reduce redistribution costs
+	//
 
     if( renumberPEs ){
 		scai::hmemo::ReadAccess<IndexType> rPart( partition.getLocalValues() );
@@ -38,9 +42,7 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
 		for (IndexType i = 0; i < localN; i++) {
 			blockSizes[ rPart[i] ] += (IndexType) 1;
 		}
-for(int ii=0; ii<numPEs; ii++ ){
-	PRINT( thisPE << ": for block " << ii << " size= " << blockSizes[ii] );
-}
+
 		//sort block IDs based on their local size
 		std::vector<IndexType> indices( numPEs );
   		std::iota( indices.begin(), indices.end(), 0);
@@ -55,11 +57,8 @@ for(int ii=0; ii<numPEs; ii++ ){
 
   		//the claimed PE id and size for the claimed block  		
   		std::vector<IndexType> allClaimedIDs( numPEs, 0 );
-  		std::vector<IndexType> allClaimedSizes( numPEs, 0 );
-
-  		//the claimed PE id and size for the claimed block  		
-  		std::vector<IndexType> gatheredClaimedIDs( numPEs, 0 );
-  		std::vector<IndexType> gatheredClaimedSizes( numPEs, 0 );
+		std::vector<IndexType> allClaimedSizes( numPEs, 0 );
+		std::vector<IndexType> finalMapping( numPEs, 0 );
 
   		//TODO: check bitset
   		std::vector<bool> mappedPEs ( numPEs, false); //none is mapped
@@ -70,18 +69,19 @@ for(int ii=0; ii<numPEs; ii++ ){
   		while( std::accumulate(mappedPEs.begin(), mappedPEs.end(), 0)!=numPEs ){ //all 1's
 
 	  		//TODO: send 2-3 claimed indices at once so you have less global sum rounds
-	  		
+
 	  		//need to set to 0 because of the global sum 
 	  		allClaimedIDs.assign( numPEs, 0);
 	  		allClaimedSizes.assign( numPEs, 0);
 
+			//TODO: find a better way to solve this problem
   			//set the ID you claim and its weight
 
 	  		//if I am already mapped send previous choice
 	  		if( mappedPEs[thisPE] ){
 	  			//set again otherwise the global sum will destroy the old values
-	  			allClaimedIDs[thisPE] = indices[preference]; //the block id that I claim
-	  			allClaimedSizes[thisPE] = blockSizes[preference];
+	  			allClaimedIDs[thisPE] = finalMapping[thisPE]; //the block id that I claim
+	  			allClaimedSizes[thisPE] = thisPE;  //it does not matter
 	  		}else{
 	  			//no point of asking an ID of a block I own nothing
 	  			while( preference<numBlocksOwned ){
@@ -94,37 +94,29 @@ for(int ii=0; ii<numPEs; ii++ ){
 						preference++;
 					}
 	  			}
-
+	  			//TODO: not so great solution, can pick non local blocks
 	  			//that means that all the block IDs that I want are already taken. pick one ID at random
 	  			if( preference==numBlocksOwned){
-	  				PRINT( thisPE <<": all preferences are taken, pick ID at random" );
-	  				srand( thisPE );
+	  				srand( thisPE*thisPE ); //TODO: do something better here
 	  				IndexType ind = rand()%numPEs;
 	  				while( not availableIDs[ind] ){
 	  					ind = (ind+1)%numPEs;
 	  				}
 	  				allClaimedIDs[thisPE] = ind;
 	  				allClaimedSizes[thisPE] = thisPE;	  				
+	  				PRINT( thisPE <<": all preferences are taken, pick ID " << ind << " at random" );
 	  			}
 	  		}
-
 	  		SCAI_ASSERT_LE_ERROR( preference, numBlocksOwned, "index out of bounds" );
 
-			PRINT( thisPE <<": claims ID " << allClaimedIDs[thisPE] << " with size " << allClaimedSizes[thisPE] );
+			//PRINT( thisPE <<": claims ID " << allClaimedIDs[thisPE] << " with size " << allClaimedSizes[thisPE] );
 
-for( IndexType i=0; i<numPEs;i++ )
-	PRINT0( i << ": is PE i mapped: " << mappedPEs[i] << " -- is ID i available: " << availableIDs[i] );
 	  		//global sum to gather all claimed IDs for all PEs
 	  		comm->sumImpl( allClaimedIDs.data(), allClaimedIDs.data(), numPEs, scai::common::TypeTraits<IndexType>::stype );
 	  		comm->sumImpl( allClaimedSizes.data(), allClaimedSizes.data(), numPEs, scai::common::TypeTraits<IndexType>::stype );
-	  		//comm->sumImpl( mappedPEs.data(), mappedPEs.data(), numPEs, scai::common::TypeTraits<bool>::stype );
-
-//for( IndexType i=0; i<numPEs;i++ )
-//	PRINT0( i << ": " << allClaimedIDs[i] );
 
 	  		//go over the gathered claims and resolve conflicts
 
-	  		//TODO, try: lexicographic sorting, first based in claimedID and then by size
 	  		std::vector<IndexType> indicesAfterSum( numPEs );
 	  		std::iota( indicesAfterSum.begin(), indicesAfterSum.end(), 0); 
 	  		std::sort( indicesAfterSum.begin(), indicesAfterSum.end(), 
@@ -140,48 +132,54 @@ for( IndexType i=0; i<numPEs;i++ )
 	  			IndexType index = indicesAfterSum[i]; //go over according to sorting
 	  			IndexType nextIndex = indicesAfterSum[i+1];
 	  			//since we sort them, only adjacent claimed IDs can have a conflict
-				PRINT0( index << ": claims ID " << allClaimedIDs[index] << " with size " << allClaimedSizes[index] );	  			
 	  			if( allClaimedIDs[index]==allClaimedIDs[nextIndex] ){
-	  				// coflict: the first one will stay since it has larger size
+	  				// coflict: the last one will be mapped since it has larger size
 	  				SCAI_ASSERT_LE_ERROR( allClaimedSizes[index], allClaimedSizes[nextIndex], "for index " << index << "; sorting gonne wrong?");
-				//TODO: will this work if there are more than 2 consecutive PEs that claim the same ID?
 	  			}else{
-PRINT0(">>>>> mapped " << index << " to " << allClaimedIDs[index] );
+	  				finalMapping[index] = allClaimedIDs[index];
 	  				mappedPEs[index]= true; //this PE got mapped for this round
 	  				availableIDs[ allClaimedIDs[index]  ] = false; 
 	  			}
 	  		}//for i<numPEs-1
 
-	  		//check last PE that is not included in the loop
 	  		{
-	  	//this way, the last index always takes what it asked for
+	  			//this way, the last index always takes what it asked for
 		  		const IndexType lastIndex = indicesAfterSum.back();
-		  		//const IndexType secondlastIndex = indicesAfterSum[numPEs-2];
-		  		PRINT0( lastIndex << ": claims ID " << allClaimedIDs[lastIndex] << " with size " << allClaimedSizes[lastIndex] );
-		  		//if( allClaimedIDs[lastIndex]==allClaimedIDs[secondlastIndex] ){
-		  			// coflict: the first one will stay since it has larger size
-		  		//	SCAI_ASSERT_LE_ERROR( allClaimedSizes[secondlastIndex], allClaimedSizes[lastIndex], "for index " << lastIndex << "; sorting gonne wrong?");
-		  		//}
+		  		//PRINT0( lastIndex << ": claims ID " << allClaimedIDs[lastIndex] << " with size " << allClaimedSizes[lastIndex] );
+		  		finalMapping[lastIndex] = allClaimedIDs[lastIndex];
 		  		mappedPEs[lastIndex] = true; //this PE got mapped for this round
 		  		availableIDs[ allClaimedIDs[lastIndex] ] = false;  //ID becomes unavailable
 	  		}
 
 	  		PRINT0("there are " << std::accumulate(mappedPEs.begin(), mappedPEs.end(), 0) << " mapped PEs");
 
-	  		//if this PE did not manage to get mapped, change your prefered ID
-	  		//if( not mappedPEs[thisPE] ){
-	  		//	preference++;
-	  		//}
-
 	  	}//while //TODO/WARNING:not sure at all that this will always finish
-	
-		IndexType newRank = allClaimedIDs[thisPE];
-		scai::dmemo::CommunicatorPtr newComm = comm->split(0, newRank);
-		//comm->setSizeAndRank( numPEs, );
-		std::cout << *comm << ": new rank claimed= " << newRank << ", new communicator = " << *newComm << std::endl;
 
-	}
+	  	//here. allClaimedIDs should have the final claimed ID for every PE
+	  	SCAI_ASSERT_EQ_ERROR( std::accumulate(finalMapping.begin(), finalMapping.end(), 0), numPEs*(numPEs-1)/2, "wrong indices vector" );
 
+	  	//instead of renumber the PEs, renumber the blocks
+		std::vector<IndexType> blockRenumbering( numPEs ); //this should be k, but the whole functions works only when k=p
+
+	  	//reverse the renumbering from PEs to blocks: if PE 3 claimed ID 5, then renumber block 5 to 3
+	  	for( IndexType i=0; i<numPEs; i++){
+	  		blockRenumbering[ finalMapping[i] ] = i;
+			//PRINT0("block " << finalMapping[i] << " is mapped to " << i );
+	  	}
+
+	  	//go over local partition and renumber
+		scai::hmemo::WriteAccess<IndexType> partAccess( partition.getLocalValues() );
+
+	  	for( IndexType i=0; i<localN; i++){
+	  		partAccess[i] = blockRenumbering[ partAccess[i] ];
+	  	}
+
+	}// if( renumberPEs )
+
+
+	//----------------------------------------------------------------
+	// create the new distribution and redistribute data
+	//
 
     scai::dmemo::DistributionPtr distFromPartition;
 

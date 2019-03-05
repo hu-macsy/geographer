@@ -367,14 +367,21 @@ TEST_P(auxTest, testRedistributeFromPartition){
     //create a random partition
     DenseVector<IndexType> partition(inputDist, 0);
 	for (IndexType i = 0; i < localN; i++) {
-		IndexType blockId = rand() % k;
-		//IndexType blockId = (comm->getRank()+1) %k;
-		IndexType globalID = inputDist->local2Global(i);
-		partition.setValue(globalID, blockId);
+		IndexType blockId = ( (rand() % k) % (comm->getRank()+1) )%k; //hevily imbalanced partition
+		partition.getLocalValues()[i] = blockId;
 	}
 
 	Settings settings;
+	settings.numBlocks = comm->getSize();
+
 	const bool useRedistributor = GetParam();
+	const bool renumberPEs = GetParam();
+
+	//get some metrics of the current partition to verify that it does not change after renumbering
+	std::pair<std::vector<IndexType>,std::vector<IndexType>> borderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( graph, partition, settings);
+	ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( graph, partition );
+	ValueType imbalance = GraphUtils<IndexType,ValueType>::computeImbalance( partition, settings.numBlocks );
+	PRINT0( "imbalance: " << imbalance );
 
 	//redistribute 
 
@@ -384,7 +391,8 @@ TEST_P(auxTest, testRedistributeFromPartition){
                 coordinates,
                 nodeWeights,
                 settings, 
-                useRedistributor);
+                useRedistributor,
+                renumberPEs);
 
 	//checks
 
@@ -392,9 +400,27 @@ TEST_P(auxTest, testRedistributeFromPartition){
     EXPECT_TRUE( nodeWeights.getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
     SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*newDist), "Distribution mismatch" );
     SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*newDist), "Distribution mismatch" );
+    SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*distFromPart), "Distribution mismatch" );
 
     const IndexType newLocalN = newDist->getLocalSize();
     //PRINT( comm->getRank() <<": " << newLocalN );
+
+    //the border nodes, inner nodes, cut and imbalance shoulb be the same
+   	std::pair<std::vector<IndexType>,std::vector<IndexType>> newborderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( graph, partition, settings);
+
+   	std::sort( borderAndInnerNodes.first.begin(), borderAndInnerNodes.first.end(), std::greater<IndexType>() ) ;
+   	std::sort( newborderAndInnerNodes.first.begin(), newborderAndInnerNodes.first.end(), std::greater<IndexType>() );
+   	EXPECT_EQ( borderAndInnerNodes.first, borderAndInnerNodes.first );
+
+   	std::sort( borderAndInnerNodes.second.begin(), borderAndInnerNodes.second.end() ) ;
+   	std::sort( newborderAndInnerNodes.second.begin(), newborderAndInnerNodes.second.end() );
+   	EXPECT_EQ( borderAndInnerNodes.second, borderAndInnerNodes.second );
+
+   	ValueType newCut = GraphUtils<IndexType,ValueType>::computeCut( graph, partition );
+   	EXPECT_EQ( cut, newCut );
+
+   	ValueType newImbalance = GraphUtils<IndexType,ValueType>::computeImbalance( partition, settings.numBlocks );
+   	EXPECT_EQ( imbalance, newImbalance );
 
     EXPECT_EQ( comm->sum(newLocalN), N);
 
