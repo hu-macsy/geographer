@@ -375,7 +375,7 @@ TEST_P(auxTest, testRedistributeFromPartition){
 	settings.numBlocks = comm->getSize();
 
 	const bool useRedistributor = GetParam();
-	const bool renumberPEs = GetParam();
+	const bool renumberPEs = not GetParam();
 
 	//get some metrics of the current partition to verify that it does not change after renumbering
 	std::pair<std::vector<IndexType>,std::vector<IndexType>> borderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( graph, partition, settings);
