@@ -511,38 +511,18 @@ std::string fileName = "bigtrace-00000.graph";
     SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*distFromPart), "Distribution mismatch" );
 
     const IndexType newLocalN = newDist->getLocalSize();
-    //PRINT( comm->getRank() <<": " << newLocalN );
+    PRINT( comm->getRank() <<": new localN= " << newLocalN << " , newLocalN-localN = " << newLocalN-localN );
 
     //the border nodes, inner nodes, cut and imbalance shoulb be the same
    	std::pair<std::vector<IndexType>,std::vector<IndexType>> newborderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( graph, partition, settings);
-/*
-   	std::sort( borderAndInnerNodes.first.begin(), borderAndInnerNodes.first.end(), std::greater<IndexType>() ) ;
-   	std::sort( newborderAndInnerNodes.first.begin(), newborderAndInnerNodes.first.end(), std::greater<IndexType>() );
-   	EXPECT_EQ( borderAndInnerNodes.first, borderAndInnerNodes.first );
 
-   	std::sort( borderAndInnerNodes.second.begin(), borderAndInnerNodes.second.end() ) ;
-   	std::sort( newborderAndInnerNodes.second.begin(), newborderAndInnerNodes.second.end() );
-   	EXPECT_EQ( borderAndInnerNodes.second, borderAndInnerNodes.second );
-
-   	ValueType newCut = GraphUtils<IndexType,ValueType>::computeCut( graph, partition );
-   	EXPECT_EQ( cut, newCut );
-
-   	ValueType newImbalance = GraphUtils<IndexType,ValueType>::computeImbalance( partition, settings.numBlocks );
-   	EXPECT_EQ( imbalance, newImbalance );
-
-    EXPECT_EQ( comm->sum(newLocalN), N);
-
-    for (IndexType i = 0; i < newLocalN; i++) {
-    	SCAI_ASSERT_EQ_ERROR( partition.getLocalValues()[i], comm->getRank(), "error for i= " << i <<" and localN= "<< newLocalN );
-    	//PRINT(comm->getRank() << " : " << i << "- " << partition.getLocalValues()[i] );
-    }
-*/
 
     //TODO: move to separate test?
     //benchmarking
 
     comm->synchronize();
 
+    																				//(targetDistribution, sourceDistribution)
     scai::dmemo::RedistributePlan redistPlan = scai::dmemo::redistributePlanByNewDistribution( distFromPart, inputDist );
     const IndexType sourceSz = redistPlan.getExchangeSourceSize();
     const IndexType targetSz = redistPlan.getExchangeTargetSize();
@@ -551,7 +531,7 @@ std::string fileName = "bigtrace-00000.graph";
     IndexType globalTargetSz = comm->sum( targetSz );
 
     PRINT0( "renumbering: " <<renumberPEs  << ", globalSourceSz= " << globalSourceSz << ", globalTargetSz= " << globalTargetSz);
-    PRINT(*comm << " : " << sourceSz << " __ " << targetSz );
+    PRINT(*comm << " : " << sourceSz << " -- " << targetSz << " = " << sourceSz-targetSz);
 
     comm->synchronize();
 
