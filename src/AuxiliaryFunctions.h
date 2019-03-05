@@ -8,6 +8,7 @@
 #include <chrono>
 #include <fstream>
 #include <chrono>
+#include <algorithm>
 
 #include <scai/lama.hpp>
 #include <scai/lama/DenseVector.hpp>
@@ -291,81 +292,11 @@ static scai::dmemo::DistributionPtr redistributeFromPartition(
                 std::vector<DenseVector<ValueType>>& coordinates,
                 DenseVector<ValueType>& nodeWeights,
                 Settings settings, 
-                bool useRedistributor = true ){
-
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    const IndexType numPEs = comm->getSize();
-    //const IndexType thisPE = comm->getRank();
-    const IndexType globalN = coordinates[0].getDistributionPtr()->getGlobalSize();
-    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
-
-    SCAI_ASSERT_EQ_ERROR( graph.getNumRows(), globalN, "Mismatch in graph and coordinates size" );
-    SCAI_ASSERT_EQ_ERROR( nodeWeights.getDistributionPtr()->getGlobalSize(), globalN , "Mismatch in nodeWeights vector" );
-    SCAI_ASSERT_EQ_ERROR( partition.size(), globalN, "Mismatch in partition size");
-    SCAI_ASSERT_EQ_ERROR( partition.min(), 0, "Minimum entry in partition should be 0" );
-    SCAI_ASSERT_EQ_ERROR( partition.max(), numPEs-1, "Maximum entry in partition must be equal the number of processors.")
-
-    //possible optimization: go over your local partition, calculate size of each local block and claim the PE rank of the majority block
-
-    {
-		scai::hmemo::ReadAccess<IndexType> rPart( partition.getLocalValues() );
-		//std::vector< std::pair<IndexType,IndexType> > blockSize
-		//std::map<IndexType,IndexType> blockSizes;
-		scai::lama::SparseVector<IndexType> blockSizes( numPEs, 0 );
-		for (IndexType i = 0; i < localN; i++) {
-			//blockSizes.insert( std::pair<IndexType,IndexType>( ))
-			blockSizes[ rPart[i] ]++;
-		}
-
-		//sort block IDs based on their local size
-		std::vector<IndexType> indices( numPEs );
-  		std::iota( indices.begin(), indices.end(), 0);
-  		std::sort( indices.begin(), indices.end(), [&v](IndexType i1, IndexType i2) {return blockSizes[i1] < blockSizes[i2];});
-
-	}
-
-
-
-    scai::dmemo::DistributionPtr distFromPartition;
-
-    if( useRedistributor ){
-        scai::dmemo::RedistributePlan resultRedist = scai::dmemo::redistributePlanByNewOwners(partition.getLocalValues(), partition.getDistributionPtr());
-        //auto resultRedist = scai::dmemo::redistributePlanByNewOwners(partition.getLocalValues(), partition.getDistributionPtr());
-
-        partition = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
-        scai::dmemo::RedistributePlan redistributor = scai::dmemo::redistributePlanByNewDistribution(resultRedist.getTargetDistributionPtr(), graph.getRowDistributionPtr());
-        
-        for (IndexType d=0; d<settings.dimensions; d++) {
-            coordinates[d].redistribute(redistributor);
-        }
-        nodeWeights.redistribute(redistributor);    
-        graph.redistribute( redistributor, noDist );
-
-        distFromPartition = resultRedist.getTargetDistributionPtr();
-    }else{
-        // create new distribution from partition
-        distFromPartition = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues());
-
-        partition.redistribute( distFromPartition );
-        graph.redistribute( distFromPartition, noDist );
-        nodeWeights.redistribute( distFromPartition );
-
-        // redistribute coordinates
-        for (IndexType d = 0; d < settings.dimensions; d++) {
-            //assert( coordinates[dim].size() == globalN);
-            coordinates[d].redistribute( distFromPartition );
-        }
-    }
-
-    const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
-    SCAI_ASSERT_ERROR( nodeWeights.getDistribution().isEqual(*inputDist), "Distribution mismatch" );
-    SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*inputDist), "Distribution mismatch" );
-    SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*inputDist), "Distribution mismatch" );
-
-    return distFromPartition;
-}
+                bool useRedistributor = true,
+                bool renumberPEs = false );
 
 }; //class aux
 
 template class aux<IndexType, ValueType>;
 }// namespace ITI
+

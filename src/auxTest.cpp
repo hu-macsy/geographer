@@ -363,11 +363,12 @@ TEST_P(auxTest, testRedistributeFromPartition){
 
     EXPECT_TRUE( coordinates[0].getDistributionPtr()->isEqual( *inputDist ) );
 
-    srand(1);
+    srand( comm->getRank() ); //so not all PEs claim the same IDs
     //create a random partition
     DenseVector<IndexType> partition(inputDist, 0);
 	for (IndexType i = 0; i < localN; i++) {
 		IndexType blockId = rand() % k;
+		//IndexType blockId = (comm->getRank()+1) %k;
 		IndexType globalID = inputDist->local2Global(i);
 		partition.setValue(globalID, blockId);
 	}

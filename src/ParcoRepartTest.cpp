@@ -20,7 +20,7 @@
 #include "FileIO.h"
 #include "ParcoRepart.h"
 #include "gtest/gtest.h"
-#include "AuxiliaryFunctions.h"
+//#include "AuxiliaryFunctions.h"
 #include "HilbertCurve.h"
 
 
