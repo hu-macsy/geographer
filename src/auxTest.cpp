@@ -451,7 +451,7 @@ TEST_P(auxTest, testRedistributeFromPartition){
 
 
 TEST_P(auxTest, benchmarkRedistributeFromPartition){
-std::string fileName = "bigtrace-00000.graph";
+std::string fileName = "353off.graph";
     std::string file = graphPath + fileName;
     
     const IndexType dimensions= 2;        
@@ -477,64 +477,65 @@ std::string fileName = "bigtrace-00000.graph";
     settings.noRefinement = true;
     settings.dimensions = dimensions;
     settings.verbose = false;
-	settings.debugMode = false;
+	settings.debugMode = true;
 	//settings.initialPartition = InitialPartitioningMethods::SFC;
 
-    DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordinates, settings);
+    const DenseVector<IndexType> initPartition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordinates, settings);
 	
-	const bool useRedistributor = false;
-	const bool renumberPEs = GetParam();
+	scai::dmemo::DistributionPtr intermediateDist = initPartition.getDistributionPtr();
 
-	//get some metrics of the current partition to verify that it does not change after renumbering
-	//std::pair<std::vector<IndexType>,std::vector<IndexType>> borderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( graph, partition, settings);
-	ValueType cut = 0.1; //GraphUtils<IndexType,ValueType>::computeCut( graph, partition );
-	ValueType imbalance = 0.1; // GraphUtils<IndexType,ValueType>::computeImbalance( partition, settings.numBlocks );
-	//PRINT0( "imbalance: " << imbalance );
+	const bool useRedistributor = GetParam;
+	
 
-	//redistribute 
+	for( bool renumberPEs: vector<bool>({false, true}) ){
+		
+		DenseVector<IndexType> partition = initPartition;
+	
+		std::chrono::time_point<std::chrono::steady_clock> start= std::chrono::steady_clock::now();
+		//redistribute 
+		scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition(
+	                partition,
+	                graph,
+	                coordinates,
+	                nodeWeights,
+	                settings, 
+	                useRedistributor,
+	                renumberPEs);
 
-	scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition(
-                partition,
-                graph,
-                coordinates,
-                nodeWeights,
-                settings, 
-                useRedistributor,
-                renumberPEs);
+		std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - start;
+    	ValueType time = elapTime.count();
+    	ValueType globTime = comm->max( time );
+    	PRINT0("max elapsed time with redistributor: " << useRedistributor << " and renumber: " << renumberPEs << " is " << globTime );
 
-	//checks
+		//checks
 
-	const scai::dmemo::DistributionPtr newDist = graph.getRowDistributionPtr();
-    EXPECT_TRUE( nodeWeights.getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
-    SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*newDist), "Distribution mismatch" );
-    SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*newDist), "Distribution mismatch" );
-    SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*distFromPart), "Distribution mismatch" );
+		const scai::dmemo::DistributionPtr newDist = graph.getRowDistributionPtr();
+	    EXPECT_TRUE( nodeWeights.getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
+	    SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*newDist), "Distribution mismatch" );
+	    SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*newDist), "Distribution mismatch" );
+	    SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*distFromPart), "Distribution mismatch" );
 
-    const IndexType newLocalN = newDist->getLocalSize();
-    PRINT( comm->getRank() <<": new localN= " << newLocalN << " , newLocalN-localN = " << newLocalN-localN );
+	    const IndexType newLocalN = newDist->getLocalSize();
+	    //PRINT( comm->getRank() <<": new localN= " << newLocalN << " , newLocalN-localN = " << newLocalN-localN );
 
-    //the border nodes, inner nodes, cut and imbalance shoulb be the same
-   	std::pair<std::vector<IndexType>,std::vector<IndexType>> newborderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( graph, partition, settings);
+	    //the border nodes, inner nodes, cut and imbalance shoulb be the same
+	   	std::pair<std::vector<IndexType>,std::vector<IndexType>> newborderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( graph, partition, settings);
 
+	    comm->synchronize();
+	    																				//(targetDistribution, sourceDistribution)
+	    scai::dmemo::RedistributePlan redistPlan = scai::dmemo::redistributePlanByNewDistribution( distFromPart, intermediateDist );
+	    const IndexType sourceSz = redistPlan.getExchangeSourceSize();
+	    const IndexType targetSz = redistPlan.getExchangeTargetSize();
 
-    //TODO: move to separate test?
-    //benchmarking
+	    IndexType globalSourceSz = comm->sum( sourceSz );
+	    IndexType globalTargetSz = comm->sum( targetSz );
 
-    comm->synchronize();
+	    PRINT0( "renumbering: " <<renumberPEs  << ", globalSourceSz= " << globalSourceSz << ", globalTargetSz= " << globalTargetSz);
+	    //PRINT(*comm << " : " << sourceSz << " -- " << targetSz << " = " << sourceSz-targetSz);
 
-    																				//(targetDistribution, sourceDistribution)
-    scai::dmemo::RedistributePlan redistPlan = scai::dmemo::redistributePlanByNewDistribution( distFromPart, inputDist );
-    const IndexType sourceSz = redistPlan.getExchangeSourceSize();
-    const IndexType targetSz = redistPlan.getExchangeTargetSize();
+	    comm->synchronize();
 
-    IndexType globalSourceSz = comm->sum( sourceSz );
-    IndexType globalTargetSz = comm->sum( targetSz );
-
-    PRINT0( "renumbering: " <<renumberPEs  << ", globalSourceSz= " << globalSourceSz << ", globalTargetSz= " << globalTargetSz);
-    PRINT(*comm << " : " << sourceSz << " -- " << targetSz << " = " << sourceSz-targetSz);
-
-    comm->synchronize();
-
+	}
 
 }
 

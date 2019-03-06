@@ -139,7 +139,7 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
 	  				finalMapping[index] = allClaimedIDs[index];
 	  				mappedPEs[index]= true; //this PE got mapped for this round
 	  				availableIDs[ allClaimedIDs[index]  ] = false; 
-	  				PRINT0( index << ": claims ID " << allClaimedIDs[index] << " with size " << allClaimedSizes[index] );
+	  				//PRINT0( index << ": claims ID " << allClaimedIDs[index] << " with size " << allClaimedSizes[index] );
 	  			}
 	  		}//for i<numPEs-1
 
@@ -193,6 +193,8 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
 		}
 		ValueType percentSame = ((ValueType)numSamePart)/localN;
 		PRINT( comm->getRank() <<": renumber= "<< renumberPEs << ", percent of points with part=rank: "<< percentSame <<", numPoints= "<< numSamePart );
+		IndexType totalNotMovedPoints = comm->sum( numSamePart );
+		PRINT0(">>> the total number of non-migrating points is " << totalNotMovedPoints );
 	}
 
 	//----------------------------------------------------------------
