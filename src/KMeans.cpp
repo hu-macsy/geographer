@@ -864,7 +864,9 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 		}
 
 	} while (imbalance > settings.epsilon - 1e-12 && iter < settings.balanceIterations);
-	std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
+	
+	if( settings.verbose )
+		std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
 	//aux<IndexType,ValueType>::timeMeasurement(assignStart);
 	
 	//for kmeans profiling
@@ -1099,7 +1101,8 @@ DenseVector<IndexType> computePartition( \
 
 			SCAI_ASSERT_EQ_ERROR(checkSum, (localN*(localN-1)/2), "Checksum error");
 			ValueType sumCoord2 = std::accumulate( convertedCoords[d].begin(), convertedCoords[d].end(), 0.0);
-			SCAI_ASSERT_GE_ERROR( sumCoord, 0.999*sumCoord2, "Error in sorting local coordinates");
+			//added std::abs since some coordinates can be negative and have a negative sum
+			SCAI_ASSERT_GE_ERROR( std::abs(sumCoord), std::abs(0.999*sumCoord2), "Error in sorting local coordinates");
 
 			minCoords[d] = *std::min_element(convertedCoords[d].begin(), convertedCoords[d].end());
 			maxCoords[d] = *std::max_element(convertedCoords[d].begin(), convertedCoords[d].end());
