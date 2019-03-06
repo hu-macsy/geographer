@@ -197,8 +197,8 @@ for( int i=0; i<N; i++){
    	* The actual mapping code                            
    	********************************************************/
 
-  	//in the original code, this is given as input; here picj at random
-  	//TODO: possible opt: as for blockGraph, pick from PEGraph the node with
+  	//in the original code, this is given as input; here pick at random
+  	//TODO: possible opt: as for the blockGraph, pick from PEGraph the node with
   	// the maximum weighted degree?
   	srand(time(NULL));
    	IndexType peNode = rand()%N; // the current vertex in PEGraph to be mapped to
@@ -223,7 +223,7 @@ for( int i=0; i<N; i++){
 
   	//while there are unmapped nodes
   	while(numMappedNodes < N) {
-  		//TODO: instead of storing all weights and ten call max_element,
+  		//TODO: instead of storing all weights and then call max_element,
   		// just find the max directly
   		//compute weighted node degrees in block graph and store them in comFrom
 		//std::fill( comFrom.begin(), comFrom.end(), 0);

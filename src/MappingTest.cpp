@@ -47,10 +47,12 @@ TEST_F(MappingTest, testTorstenMapping){
 	bool valid = Mapping<IndexType,ValueType>::isValid(blockGraph, PEGraph, mapping);
 	EXPECT_TRUE( valid );
 
+	PRINT("torsten mapping");
 	//WARNING: if we call it as "Metrics metrics();" it throws an error
 	Metrics metrics(settings);
 	metrics.getMappingMetrics( blockGraph, PEGraph, mapping );
 
+	PRINT("identity mapping");
 	std::vector<IndexType> identityMapping(N,0);
 	std::iota( identityMapping.begin(), identityMapping.end(), 0);
 	metrics.getMappingMetrics( blockGraph, PEGraph, identityMapping );
@@ -63,6 +65,8 @@ TEST_F(MappingTest, testTorstenMapping){
 			std::cout << i << " <--> " << mapping[i] << std::endl;
 		}
 	}
+
+	//metrics.print( std::cout );
 }
 
 }//namespace ITI

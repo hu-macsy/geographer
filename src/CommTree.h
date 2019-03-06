@@ -218,6 +218,22 @@ static std::vector<unsigned int> getGrouping(const std::vector<commNode> thisLev
 */
 static ValueType distance( const commNode node1, const commNode node2 );
 
+
+/** Export the tree as a weighted graph. The edge weigth between to nodes
+	is the distance of the nodes in the tree as it is calculates by the
+	function distance.
+	Remember: only leaves are nodes in the graph. This means that the
+	number of nodes in the graph is equal the number of leaves and the
+	graph is complete: it inludes all possible edges.
+
+	This is not distributed, it works only localy in every PE.
+*/
+//TODO: since this a complete matrix, the CSRSparsematrix is not very efficient
+
+static scai::lama::CSRSparseMatrix<ValueType> exportAsGraph_local(const std::vector<commNode> leaves);
+
+scai::lama::CSRSparseMatrix<ValueType> exportAsGraph_local();
+
 /*@brief Print information for the tree
 */
 void print();
@@ -230,7 +246,7 @@ bool checkTree();
 //------------------------------------------------------------------------
 
 
-};//class CommGraph
+};//class CommTree
 
 typedef typename ITI::CommTree<IndexType,ValueType>::commNode cNode;
 

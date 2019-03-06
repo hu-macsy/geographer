@@ -74,7 +74,13 @@
 		out<< timeComm << std::endl;
 		
 		out.precision(oldprecision);
+
+//TESTING
+	out<<"TEST print" << std::endl;
+for( auto mapIt= metricsMap.begin(); mapIt!=metricsMap.end(); mapIt++ ){
+	out<< mapIt->first <<": " << mapIt->second << std::endl;
 	}
+}
 //---------------------------------------------------------------------------
 
 	void Metrics::getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
@@ -411,10 +417,10 @@
 		const IndexType N = blockGraph.getNumRows();
 		const IndexType M = blockGraph.getNumValues();
 
-		IndexType sumDilation = 0;
-		IndexType maxDilation = 0;
-		IndexType maxCongestion = 0;
-		std::vector<IndexType> congestion( M, 0 );
+		ValueType sumDilation = 0;
+		ValueType maxDilation = 0;
+		ValueType maxCongestion = 0;
+		std::vector<ValueType> congestion( M, 0 );
 
 		//calculate all shortest paths in PE graph
 		std::vector<std::vector<ValueType>> APSP( N, std::vector<ValueType> (N, 0.0));
@@ -447,7 +453,7 @@
 					// this edge is (v,blockNeighbor)
 					IndexType start = mapping[v];
 					IndexType target = mapping[neighbor];
-					IndexType currDilation = APSP[start][target]*thisEdgeWeight;
+					ValueType currDilation = APSP[start][target]*thisEdgeWeight;
 					sumDilation += currDilation;
 					if( currDilation>maxDilation ){
 						maxDilation = currDilation;
@@ -489,5 +495,12 @@
 
 		std::cout<< "Maximum congestion: " << maxCongestion << std::endl;
 		std::cout<< "Maximum dilation: " << maxDilation << std::endl;
-		std::cout << "Average dilation: " << avgDilation << std::endl;
+		std::cout<< "Average dilation: " << avgDilation << std::endl;
+
+		this->maxCongestion = maxCongestion;
+		metricsMap["maxCongestion"] = maxCongestion;
+		this->maxDilation = maxDilation;
+		metricsMap["maxDilation"] = maxDilation;
+		this->avgDilation = avgDilation;
+		metricsMap["avgDilation"] = avgDilation;
 	}//getMappingMetrics

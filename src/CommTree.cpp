@@ -5,6 +5,10 @@
  *      Author: tzovas
  */
 
+#include <scai/lama.hpp>
+#include <scai/lama/storage/MatrixStorage.hpp>
+#include <scai/lama/matrix/CSRSparseMatrix.hpp>
+
 #include "CommTree.h"
 
 
@@ -185,6 +189,57 @@ ValueType CommTree<IndexType, ValueType>::distance( const commNode node1, const 
 
 	return labelSize-i;
 }//distance
+//------------------------------------------------------------------------
+
+//TODO: since this a complete matrix, the CSRSparsematrix is not very efficient
+template <typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> CommTree<IndexType, ValueType>::exportAsGraph_local(const std::vector<commNode> leaves){
+
+	const IndexType numLeaves = leaves.size();
+
+	//TODO: since this should be a complete graph we already know the size of ja and values
+	std::vector<IndexType> ia(numLeaves+1, 0);
+    std::vector<IndexType> ja;
+    std::vector<ValueType> values;
+
+    for( IndexType i=0; i<numLeaves; i++ ){
+    	const commNode thisLeaf = leaves[i];
+    	//to keep matrix symmetric
+    	for( IndexType j=0; j<numLeaves; j++ ){
+    		if( i==j )	//explicitly avoid self loops
+    			continue;
+
+    		const commNode otherLeaf = leaves[j];
+    		const ValueType dist = distance( thisLeaf, otherLeaf );
+
+    		ja.push_back(j);
+    		values.push_back(dist);
+		}
+		//edges to all other nodes
+		ia[i+1] = ia[i]+numLeaves-1;
+    }
+    assert(ja.size() == ia[numLeaves]);
+
+    SCAI_ASSERT_EQ_ERROR( ia.size(), numLeaves+1, "Wrong ia size" );
+    SCAI_ASSERT_EQ_ERROR( ja.size(), values.size(), "ja and values sizes must agree" );
+    SCAI_ASSERT_EQ_ERROR( values.size(), numLeaves*(numLeaves-1)/2, "It should be a complete graph" );
+
+    //assign matrix
+    scai::lama::CSRStorage<ValueType> myStorage(numLeaves, numLeaves, 
+            scai::hmemo::HArray<IndexType>(ia.size(), ia.data()),
+    		scai::hmemo::HArray<IndexType>(ja.size(), ja.data()),
+    		scai::hmemo::HArray<ValueType>(values.size(), values.data()));
+
+    return scai::lama::CSRSparseMatrix<ValueType>( myStorage );
+}//exportAsGraph
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType> CommTree<IndexType, ValueType>::exportAsGraph_local(){
+	std::vector<commNode> leaves = this->getLeaves();
+
+	return exportAsGraph_local(leaves);
+}
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>

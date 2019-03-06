@@ -63,6 +63,15 @@ struct Metrics{
 	
 	// various other needed info
 	IndexType numBlocks = -1;
+
+	//mapping metrics
+	ValueType maxCongestion = 0.0;
+	ValueType maxDilation = 0.0;
+	ValueType avgDilation = 0.0;
+
+	std::map<std::string,ValueType> metricsMap = {
+		{"inputTime",0.0} , {"timeFinalPartition",0.0}, {"maxCongestion",0.0}, {"maxDilation",0.0}, {"avgDilation",0.0}
+	};
 	
 	//constructors
 	//
