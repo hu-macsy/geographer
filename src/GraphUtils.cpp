@@ -290,7 +290,7 @@ ValueType GraphUtils<IndexType,ValueType>::computeCut(const CSRSparseMatrix<Valu
 	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
     
 	if (partDist->getLocalSize() != localN) {
-		PRINT0("Local g mismatch for matrix and partition");
+		PRINT(comm->getRank() << ": Local mismatch for matrix and partition");
 		throw std::runtime_error("partition has " + std::to_string(partDist->getLocalSize()) + " local values, but matrix has " + std::to_string(localN));
 	}
 	
