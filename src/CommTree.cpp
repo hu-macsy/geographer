@@ -163,6 +163,31 @@ std::vector<unsigned int> CommTree<IndexType, ValueType>::getGrouping(const std:
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
+ValueType CommTree<IndexType, ValueType>::distance( const commNode node1, const commNode node2 ){
+
+	const std::vector<unsigned int> hier1 = node1.hierarchy;
+	const std::vector<unsigned int> hier2 = node2.hierarchy;
+	const IndexType labelSize = hier1.size();
+
+	SCAI_ASSERT_EQ_ERROR( labelSize, hier2.size(), "Hierarchy label size mismatch" );
+	
+	IndexType i=0;
+	for( i=0; i<labelSize; i++){
+		if( hier1[i]!=hier2[i] ){
+			break;
+		}
+	}
+	
+	//TODO?: turn that to an error?
+	if( i==labelSize and node1.leafID!=node2.leafID ){
+		PRINT("WARNING: labels are identical but nodes have different leafIDs: " << node1.leafID <<"!="<<node2.leafID );
+	}
+
+	return labelSize-i;
+}//distance
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
 void CommTree<IndexType, ValueType>::print(){
 
 	if( checkTree() ){

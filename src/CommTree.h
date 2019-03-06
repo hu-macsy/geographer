@@ -11,12 +11,28 @@ class CommTree{
 
 public:
 
+/** Hierarchy is a vector of size ewual to the levels of the tree. Every possition
+	indicates the tree-node in which this leaf belongs to.
+	For example, if hierarchy={1, 0, 2} it means that this PE belongs to tree-node 1
+	in the first level; then, within tree-node 1, it belongs to tree-node 0 and inside 0,
+	it is leaf-node 2.
+	implicit level 0    o
+                      / | \
+	level 1         o   o   o .... in 1
+                       /|\
+	level 2           o o o ....   in 0
+                      ... | ...
+    level 3               o        in 2, leaves
+
+**/    
+
+
 struct commNode{
 	std::vector<unsigned int> hierarchy;
 	//TODO: probably, keeping all chidren is not necessary and uses a lot of space
 	// replace by keeping only the number of children
 	std::vector<unsigned int> children;
-	//this the number of direct children this nodes has
+	//this is the number of direct children this nodes has
 	unsigned int numChildren;
 	unsigned int numCores;
 	unsigned int memMB;
@@ -26,10 +42,8 @@ struct commNode{
 	unsigned int leafID = std::numeric_limits<unsigned int>::max();
 
 	commNode( std::vector<unsigned int> hier,
-		// std::vector<unsigned int> children,
-		 unsigned int c, unsigned int m, ValueType rSp, bool isLeaf=true)
+		unsigned int c, unsigned int m, ValueType rSp, bool isLeaf=true)
 	:	hierarchy(hier),
-		//children(children),
 		numChildren(0),
 		numCores(c),
 		memMB(m),
@@ -129,7 +143,7 @@ struct commNode{
 		std::cout<< "---" << std::endl;
 	}
 
-}; //struct commNode{
+}; //struct commNode
 
 
 //structure used to store the communication tree. used for hierarchical
@@ -192,15 +206,25 @@ static std::vector<commNode> createLevelAbove( const std::vector<commNode> level
 */
 static std::vector<unsigned int> getGrouping(const std::vector<commNode> thisLevel);
 
+/** @brief Calculates the distance of two nodes using their hierarchy labels.
+	We assume that leaves with the same father have distance 1. 
+	Comparing two hierarchy labels, the distance is their first mismatch.
+	In other words, the height of their least common ancestor.
+	For example:
+	hierarchy1 = { 3, 3, 1, 4, 2}
+	hierarchy2 = { 3, 3, 0, 0, 1}
+	hierarchy3 = { 0, 3, 1, 4, 2}
+	distances(1,2)=3, distacne(1,3)=5, distance(2,3)=5
+*/
+static ValueType distance( const commNode node1, const commNode node2 );
+
 /*@brief Print information for the tree
 */
-
 void print();
 
 /* @brief Basic sanity checks for the tree.
 */
 bool checkTree();
-
 
 
 //------------------------------------------------------------------------

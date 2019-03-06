@@ -106,6 +106,7 @@ TEST_F(CommTreeTest, testTreeFromLeaves){
 	}
 }// TEST_F(CommTreeTest, testTreeFromLeaves)
 
+//------------------------------------------------------------------------
 
 TEST_F(CommTreeTest, testTreeforHomogeneous){
 
@@ -129,5 +130,33 @@ TEST_F(CommTreeTest, testTreeforHomogeneous){
 	EXPECT_EQ( cTree.numLeaves, leaves.size() );
 	EXPECT_EQ( cTree.tree[0].size(), 1 ); 
 }//TEST_F(CommTreeTest, testTreeforHomogeneous)
+
+//------------------------------------------------------------------------
+
+TEST_F(CommTreeTest, testLabelDistance){
+
+	std::vector<cNode> nodes = {
+		// 				      {hierachy ids}, numCores, mem, speed
+		cNode( std::vector<unsigned int>{0,0,0,0,0}, 4, 8, 60),//0
+		cNode( std::vector<unsigned int>{0,0,1,2,3}, 4, 8, 60),//1
+		cNode( std::vector<unsigned int>{2,0,2,1,3}, 4, 8, 60),//2
+		cNode( std::vector<unsigned int>{2,0,2,1,0}, 4, 8, 60),//3
+		cNode( std::vector<unsigned int>{2,1,0,0,0}, 4, 8, 60),//4
+		cNode( std::vector<unsigned int>{2,1,0,0,0}, 4, 8, 60)
+	};
+
+
+	EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[0], nodes[1])), 3 );
+	EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[0], nodes[2])), 5 );
+	EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[2], nodes[3])), 1 );
+	EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[1], nodes[3])), 5 );
+	EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[3], nodes[4])), 4 );
+	EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[2], nodes[4])), 4 );
+	EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[4], nodes[4])), 0 );
+	//this throws a warning too
+	EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[4], nodes[5])), 0 );
+
+
+}//TEST_F(CommTreeTest, testLabelDistance)
 
 }//namespace ITI
