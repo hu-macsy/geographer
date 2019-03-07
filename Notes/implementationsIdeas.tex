@@ -1,0 +1,72 @@
+\documentclass[a4paper,10pt]{article}
+
+\usepackage[a4paper, total={6in, 9in}]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{color}
+\usepackage{subcaption}
+
+\author{Harry Tzovas}
+
+\definecolor{blue1}{RGB}{44,127,184}
+
+\newcommand{\wave}{$\mathcal{WAVE}$ }
+
+\newcommand{\bull}{$\bullet$}
+\newcommand{\red}[1]{{\color{red}{#1}}}
+\newcommand{\blue}[1]{{\color{blue1}{#1}}}
+\newcommand{\mz}{\mathbb{Z}}
+\newcommand{\quot}[1]{``#1''}
+\newcommand{\km}{$k$-means}
+\newcommand{\todo}[1]{{\red{TODO}}: #1}
+\newcommand\noIndent[1]{
+  \par\vbox{\parbox[t]{\linewidth}{#1}}
+}
+
+\graphicspath{{/home/harry/wave/figures/}}
+
+
+
+\begin{document}
+
+This is meant as a place to document problems and TODOs, possible solutions and ideas and, when some
+idea is implemented, what are the results.
+
+\section*{PE renumbering}
+Given a partition, we want to redistribute data based on that. A function for this  exists in
+aux::redistributeFromPartition. Theoretically, it can happen that PE $P_j$ have local points that belong
+to other PEs, that is, $\text{localPart}(i)\neq j,\; \forall i\in P_j$. So it will send local data and receive new.
+
+\paragraph*{Idea:}  Before redistribution, every PE goes over its local points and counts how many points
+are belong to each block. Then, if for PE $P_j$, the majority of its local points belong to block $k$,
+we will renumber block $k$ to $j$. This way, $P_j$ will keep as many points as possible. 
+
+The problem is that many PEs can request for different renumbering of the same block. 
+For example, in PE $P_0$ the majority of its local points, say $30\%$ belong to block $3$ 
+but also, the majority of points in $P_1$ belongs also block $3$ with $40\%$ of the points in $P_1$. 
+So $P_0$ want the renumbering 3 to 0 and $P_1$ the renumbering
+3 to 1. For that, every PE claims a new label and this are globally summed to avoid conflicts.
+For every conflicting request, we accept the one with the largest weight. In the example above,
+we will pick 3 to 1 since $P_1$'s weight is 0.4 and $P_0$'s is 0.3. The PE that did not get claimed
+id will request another id in the next round. If all wanted ids are taken, it will pick one
+at random. We repeat until every PEs has picked an id.
+
+\paragraph*{Result:} The idea is implemented in aux::redistributeFromPartition. For random partitions
+it works, but it does not do anything for k-means. That is, every PE claims its own id.
+
+After the hilbert curve sorting, every PE has points that are local, i.e., $\forall i \in P_j,
+\text{localPart}(i)=j$. After k-means, PEs can have points from different blocks but usually
+the majority of their local points still belong to them. For the renumbering to work, at least
+2 PEs must claim a different id but this rarely happens (I noticed that most blocks still own
+$50-70\%$ of their points after k-means). This makes sense. I did not test that in detail, but in
+a few graph I tried, every PE claimed its own id, so no renumbering occurred. Maybe with smaller 
+blocks this can have some effect.
+
+
+
+\end{document}

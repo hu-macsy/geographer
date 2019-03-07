@@ -6,6 +6,7 @@
  */
 
 #include "FileIO.h"
+#include "CommTree.h"
 
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>
@@ -2252,6 +2253,81 @@ std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::s
     return blockSizes;
 }
 //-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+//template<typename CommTree>
+//template<typename T, typename U>
+CommTree<IndexType,ValueType> FileIO<IndexType, ValueType>::readPETree( const std::string& filename ){
+
+	if( not fileExists(filename) ){
+		std::cout<<"Erros, file " << filename << " to read processor tree does not exists.\nAborting..." << std::endl;
+		throw std::runtime_error("File "+ filename+ " failed.");
+	}else{
+		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		if( comm->getRank()==0 ){
+			std::cout<< "Reading from file "<< filename << std::endl;
+		}
+	}
+
+	std::ifstream file(filename);
+
+	//skip the first lines that have comments starting with '%' or '#'
+    std::string line;
+    std::getline(file, line);
+
+    while( line[0]== '%' or line[0]== '#' ){
+       std::getline(file, line);
+    }
+    std::stringstream ss;
+    ss.str( line );
+
+    IndexType numPEs;
+
+    //first line after comments should have the number of PEs
+    ss>> numPEs;
+
+    std::vector<cNode> leaves(numPEs);
+
+    for(int i=0;i<numPEs; i++){
+         bool read = !std::getline(file, line).fail();
+                 
+        if (!read and i!=numPEs-1 ) {
+			throw std::runtime_error("In FileIO.cpp, line " + std::to_string(__LINE__) +": Unexpected end of block sizes file " + filename + ". Was the number of PEs correct?");
+        }
+        //TODO: this (with all the stings and streams) is probably a stupid and not efficient way; fix
+
+        std::stringstream ss;    
+        ss.str( line );
+
+        std::vector<unsigned int> hierarchy;
+
+        std::string label; 
+        std::getline(ss, label, '#');
+        std::stringstream ss2;
+        ss2.str(label);
+        std::string l;
+        while( getline(ss2, l, ',') ){
+        	hierarchy.push_back( std::stoi(l) );
+        }
+
+        std::string mem;
+        std::getline(ss, mem, ',');
+        ValueType iMem = std::stod( mem );
+
+        std::string cpu;
+        std::getline(ss, cpu, ',');
+        ValueType iCpu = std::stod( cpu );
+      
+//TODO: we assume that all leaves are cores.        
+IndexType numCores = 1;
+
+		cNode node(hierarchy, numCores, iMem, iCpu );
+		leaves[i]= node;
+     }
+
+     return CommTree<IndexType,ValueType>( leaves );
+}
+
 
 // taken from https://stackoverflow.com/questions/4316442/stdofstream-check-if-file-exists-before-writing
 /** Check if a file exists

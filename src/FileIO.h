@@ -243,12 +243,25 @@ public:
 	*/
     static void readAlyaCentral( scai::lama::CSRSparseMatrix<ValueType>& graph, std::vector<DenseVector<ValueType>>& coords, const IndexType N, const IndexType dimensions, const std::string filename);
 	
+
+	/** Reads a processor tree. Comments are allowed in the beginning with '#' or '%' and the first line
+		after the comments must contain the number of PE in the file. Then, every line contains the 
+		information of one PE: first are number indicating the label of this PE in the tree (for more details
+		see CommTree.h) that ends with a '#'. Then there are two numbers, the first one is the memory of
+		this PE in GB and then the relative speed of the cpu: a positive number x less than 1 indicating that
+		this PE has speed x*maxCPUSpeed. Typically, at least one PE will have speed 1 (the fastest one)
+		although this is not enforced or checked.
+	*/
+	//template<typename T, typename U>
+	static CommTree<IndexType,ValueType> readPETree( const std::string& filename);
+
+	
 	// taken from https://stackoverflow.com/questions/4316442/stdofstream-check-if-file-exists-before-writing
 	/** Check if a file exists
 	 @ *param[in] filename - the name of the file to check
 	 @return    true if the file exists, else false
 	 */
-	static bool fileExists(const std::string& filename);
+    static bool fileExists(const std::string& filename);
 	
 private:
 	/**

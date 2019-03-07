@@ -35,14 +35,14 @@ struct commNode{
 	//this is the number of direct children this nodes has
 	unsigned int numChildren;
 	unsigned int numCores;
-	unsigned int memMB;
+	ValueType memMB;
 	ValueType relatSpeed;
 	bool isLeaf;
 	static unsigned int leafCount;
 	unsigned int leafID = std::numeric_limits<unsigned int>::max();
 
 	commNode( std::vector<unsigned int> hier,
-		unsigned int c, unsigned int m, ValueType rSp, bool isLeaf=true)
+		unsigned int c, ValueType m, ValueType rSp, bool isLeaf=true)
 	:	hierarchy(hier),
 		numChildren(0),
 		numCores(c),
@@ -62,12 +62,13 @@ struct commNode{
 	:	hierarchy( std::vector<unsigned int>(1,1)), //TODO: is this right?
 		numChildren(0), //TODO: check
 		numCores(0),
-		memMB(0),
+		memMB(0.0),
 		relatSpeed(0.0),
 		isLeaf(false)
 	{
-		leafID = leafCount;
-		leafCount++;
+		//TODO/check: if this is not a lef node why it has a leaf id?
+		//leafID = leafCount;
+		//leafCount++;
 	}
 
 	//used to construct the father node from the children

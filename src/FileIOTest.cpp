@@ -651,5 +651,18 @@ TEST_F (FileIOTest, testReadEdgeListDistributed){
     // only for graph: graphPath + "tmp4/out"
     EXPECT_EQ( graph.getNumRows(), 16) << "for files tmp4/out N must be 16";
 }
+//-------------------------------------------------------------------------------------------------
+
+TEST_F (FileIOTest, testReadPETree){
+
+	std::string file = graphPath+ "processorTrees/testPEgraph106.txt";
+
+	ITI::CommTree<IndexType, ValueType> tree =  FileIO<IndexType, ValueType>::readPETree( file );
+
+	tree.checkTree();
+
+	tree.getRoot().print();
+
+}
 
 } /* namespace ITI */
