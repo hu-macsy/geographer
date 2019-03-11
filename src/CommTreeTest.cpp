@@ -206,6 +206,16 @@ TEST_F(CommTreeTest, testExportGraph){
 	//This tree has depth 3 so this should be the maximum edge weight in the graph.
 	EXPECT_EQ( max, 3 );
 
+	//test specific edge weights
+	EXPECT_EQ( values.getValue(0,2), 1 );
+	EXPECT_EQ( values.getValue(12,13), 1 );
+
+	EXPECT_EQ( values.getValue(2,4), 2 );
+	EXPECT_EQ( values.getValue(8,10), 2 );
+
+	EXPECT_EQ( values.getValue(3,12), 3 );
+	EXPECT_EQ( values.getValue(0,17), 3 );
+
 }//TEST_F(CommTreeTest, testExportGraph)
 
 }//namespace ITI
