@@ -153,10 +153,59 @@ TEST_F(CommTreeTest, testLabelDistance){
 	EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[3], nodes[4])), 4 );
 	EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[2], nodes[4])), 4 );
 	EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[4], nodes[4])), 0 );
-	//this throws a warning too
+	//this throws a warning too because nodes 4 and 5 have identical hierarchy label
+	//but have different leaf IDs
 	EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[4], nodes[5])), 0 );
 
 
 }//TEST_F(CommTreeTest, testLabelDistance)
+//------------------------------------------------------------------------
+
+TEST_F(CommTreeTest, testExportGraph){
+	
+	std::vector<cNode> leaves = {
+		// 				{hierachy ids}, numCores, mem, speed , //leaf IDs
+		cNode( std::vector<unsigned int>{0,0,0}, 4, 8, 50),//0
+		cNode( std::vector<unsigned int>{0,0,1}, 4, 8, 90),
+		cNode( std::vector<unsigned int>{0,0,2}, 4, 8, 60),
+
+		cNode( std::vector<unsigned int>{0,1,0}, 4, 8, 90),//3
+		cNode( std::vector<unsigned int>{0,1,1}, 4, 8, 90),
+		//deliberately wrong order
+		cNode( std::vector<unsigned int>{1,0,1}, 6, 10, 80),//5
+		cNode( std::vector<unsigned int>{1,0,2}, 6, 10, 80),
+		cNode( std::vector<unsigned int>{1,0,0}, 6, 10, 80),
+
+		cNode( std::vector<unsigned int>{1,2,0}, 6, 10, 70),//8
+		cNode( std::vector<unsigned int>{1,2,1}, 6, 10, 70),
+
+		cNode( std::vector<unsigned int>{1,1,0}, 6, 10, 90),//10
+		cNode( std::vector<unsigned int>{1,1,1}, 6, 10, 90),
+
+		cNode( std::vector<unsigned int>{2,0,0}, 8, 12, 80),//12
+		cNode( std::vector<unsigned int>{2,0,3}, 8, 12, 80),
+		cNode( std::vector<unsigned int>{2,0,2}, 8, 12, 80),
+		cNode( std::vector<unsigned int>{2,0,1}, 8, 12, 80),
+
+		cNode( std::vector<unsigned int>{2,1,0}, 8, 12, 90),//16
+		cNode( std::vector<unsigned int>{2,1,1}, 8, 12, 90),
+	};
+
+	ITI::CommTree<IndexType,ValueType> cTree( leaves );
+
+	scai::lama::CSRSparseMatrix<ValueType> PEgraph = cTree.exportAsGraph_local();
+
+	IndexType N = PEgraph.getNumRows(); 
+	EXPECT_EQ( N, cTree.getNumLeaves() );
+
+	//complete graph
+	EXPECT_EQ( PEgraph.getNumValues(), N*(N-1) ); 
+
+	scai::hmemo::HArray<ValueType> values = PEgraph.getLocalStorage().getValues();
+	ValueType max = scai::utilskernel::HArrayUtils::max( values );
+	//This tree has depth 3 so this should be the maximum edge weight in the graph.
+	EXPECT_EQ( max, 3 );
+
+}//TEST_F(CommTreeTest, testExportGraph)
 
 }//namespace ITI

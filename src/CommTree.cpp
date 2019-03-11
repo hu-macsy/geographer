@@ -222,7 +222,7 @@ scai::lama::CSRSparseMatrix<ValueType> CommTree<IndexType, ValueType>::exportAsG
 
     SCAI_ASSERT_EQ_ERROR( ia.size(), numLeaves+1, "Wrong ia size" );
     SCAI_ASSERT_EQ_ERROR( ja.size(), values.size(), "ja and values sizes must agree" );
-    SCAI_ASSERT_EQ_ERROR( values.size(), numLeaves*(numLeaves-1)/2, "It should be a complete graph" );
+    SCAI_ASSERT_EQ_ERROR( values.size(), numLeaves*(numLeaves-1), "It should be a complete graph" );
 
     //assign matrix
     scai::lama::CSRStorage<ValueType> myStorage(numLeaves, numLeaves, 
@@ -268,6 +268,9 @@ bool CommTree<IndexType, ValueType>::checkTree(){
 	//check sum of sizes for every level
 	SCAI_ASSERT_EQ_ERROR( tree.front().size(), 1 , "Top level of the tree should have size 1, only the root");
 	SCAI_ASSERT_EQ_ERROR( numLeaves, tree.front()[0].children.size(), "The root should contain all leaves as children");
+
+	//TODO: add more "expensive" checks like, all leaf IDs are unique, or all hierarchy labels are unique
+	//	or check the size of every subtree according to its label...
 
 	return true;
 }

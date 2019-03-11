@@ -58,6 +58,7 @@ struct commNode{
 	}
 
 	//this constructor is supposed to be used for non-leaf nodes
+	//TODO: how to enforce that?
 	commNode()
 	:	hierarchy( std::vector<unsigned int>(1,1)), //TODO: is this right?
 		numChildren(0), //TODO: check
@@ -160,6 +161,11 @@ IndexType hierarchyLevels; //hierarchyLevels = tree.size()
 IndexType numNodes;
 IndexType numLeaves;
 
+
+/*@brief constructor to create tree from a vector of leaves
+*/
+CommTree(std::vector<commNode> leaves);
+
 /* @brief Return the root, i.e., hierarchy level 0.
 */
 commNode getRoot() const{ 
@@ -180,9 +186,11 @@ std::vector<commNode> getLeaves() const {
 	return tree.back();
 }
 
-/*@brief constructor to create tree from a vector of leaves
+/** @brief The number of leaves of the tree.
 */
-CommTree(std::vector<commNode> leaves);
+IndexType getNumLeaves() const {
+	return tree.back().size();
+}
 
 /* @brief Takes a vector of leaves and creates the tree
 */

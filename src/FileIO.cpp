@@ -2255,8 +2255,6 @@ std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::s
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-//template<typename CommTree>
-//template<typename T, typename U>
 CommTree<IndexType,ValueType> FileIO<IndexType, ValueType>::readPETree( const std::string& filename ){
 
 	if( not fileExists(filename) ){
@@ -2294,8 +2292,8 @@ CommTree<IndexType,ValueType> FileIO<IndexType, ValueType>::readPETree( const st
         if (!read and i!=numPEs-1 ) {
 			throw std::runtime_error("In FileIO.cpp, line " + std::to_string(__LINE__) +": Unexpected end of block sizes file " + filename + ". Was the number of PEs correct?");
         }
-        //TODO: this (with all the stings and streams) is probably a stupid and not efficient way; fix
 
+        //TODO: this (with all the stings and streams) is probably a stupid and not efficient way; fix
         std::stringstream ss;    
         ss.str( line );
 
