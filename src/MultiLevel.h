@@ -17,7 +17,6 @@
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/tracing.hpp>
 
-#include "ParcoRepart.h"
 #include "LocalRefinement.h"
 #include "Settings.h"
 

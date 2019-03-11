@@ -17,6 +17,7 @@
 #include "quadtree/QuadTreeCartesianEuclid.h"
 #include "Settings.h"
 #include "GraphUtils.h"
+#include "CommTree.h"
 
 #include <vector>
 #include <set>

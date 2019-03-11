@@ -274,7 +274,8 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 	//checks - prints
 
 	ValueType speedImbalance, sizeImbalance;
-	std::tie( speedImbalance, sizeImbalance) =  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights, cTree );
+	//std::tie( speedImbalance, sizeImbalance) =  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights, cTree );
+	std::tie( speedImbalance, sizeImbalance) =  cTree.computeImbalance( partition, settings.numBlocks, nodeWeights );
 
 	std::cout << "final imbalance: speed= " << speedImbalance << " , size= " << sizeImbalance << std::endl;
 }

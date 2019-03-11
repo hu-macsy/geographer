@@ -1,7 +1,6 @@
-
 #include "AuxiliaryFunctions.h"
+#include <numeric> 
 
-//#include <scai/hmemo/WriteAccess.hpp>
 
 namespace ITI {
 

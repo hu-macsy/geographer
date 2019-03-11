@@ -3,6 +3,10 @@
 #include "MultiLevel.h"
 #include "GraphUtils.h"
 #include "HaloPlanFns.h"
+#include "ParcoRepart.h"
+
+//TODO: needed monstly(only?) for debugging, to store the PE graph
+#include "FileIO.h"
 
 using scai::hmemo::HArray;
 
@@ -40,7 +44,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 	//only needed to store local refinement specific metrics
 	settings.thisRound++;
 
-	auto origin = fill<DenseVector<IndexType>>(input.getRowDistributionPtr(), comm->getRank());//to track node movements through the hierarchies
+	auto origin = scai::lama::fill<DenseVector<IndexType>>(input.getRowDistributionPtr(), comm->getRank());//to track node movements through the hierarchies
         
 	if (settings.multiLevelRounds > 0) {
 		SCAI_REGION_START( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
@@ -65,7 +69,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 			}
 		}
 
-		DenseVector<IndexType> coarsePart = fill<DenseVector<IndexType>>(coarseGraph.getRowDistributionPtr(), comm->getRank());
+		DenseVector<IndexType> coarsePart =  scai::lama::fill<DenseVector<IndexType>>(coarseGraph.getRowDistributionPtr(), comm->getRank());
 
 		DenseVector<ValueType> coarseWeights = sumToCoarse(nodeWeights, fineToCoarseMap);
 

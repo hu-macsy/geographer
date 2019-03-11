@@ -10,7 +10,7 @@
 #include <scai/lama/matrix/CSRSparseMatrix.hpp>
 
 #include "CommTree.h"
-
+#include "GraphUtils.h"
 
 namespace ITI {
 
@@ -193,7 +193,7 @@ ValueType CommTree<IndexType, ValueType>::distance( const commNode node1, const 
 
 //TODO: since this a complete matrix, the CSRSparsematrix is not very efficient
 template <typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> CommTree<IndexType, ValueType>::exportAsGraph_local(const std::vector<commNode> leaves){
+scai::lama::CSRSparseMatrix<ValueType> CommTree<IndexType, ValueType>::exportAsGraph_local(const std::vector<commNode> leaves) const{
 
 	const IndexType numLeaves = leaves.size();
 
@@ -235,10 +235,87 @@ scai::lama::CSRSparseMatrix<ValueType> CommTree<IndexType, ValueType>::exportAsG
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> CommTree<IndexType, ValueType>::exportAsGraph_local(){
+scai::lama::CSRSparseMatrix<ValueType> CommTree<IndexType, ValueType>::exportAsGraph_local() const {
 	std::vector<commNode> leaves = this->getLeaves();
 
 	return exportAsGraph_local(leaves);
+}
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::pair<ValueType,ValueType> CommTree<IndexType,ValueType>::computeImbalance(
+    const scai::lama::DenseVector<IndexType> &part,
+    IndexType k,
+    const scai::lama::DenseVector<ValueType> &nodeWeights) const{
+
+    //cNode is typedefed in CommTree.h
+    const std::vector<cNode> leaves = this->getLeaves();
+    const IndexType numLeaves = leaves.size();
+    SCAI_ASSERT_EQ_ERROR( numLeaves, k, "Number of blocks of the partition and number of leaves of the tree do not agree" );
+
+    //extract the memory and speed of every node in a vector each
+    std::vector<ValueType> memory( numLeaves );
+    std::vector<ValueType> relatSpeed( numLeaves );
+    for(unsigned int i=0; i<numLeaves; i++){
+        memory[i] = leaves[i].memMB;
+        relatSpeed[i] = leaves[i].relatSpeed;
+    }
+
+    std::vector<ValueType> optBlockWeight = getOptBlockWeights( /*leaves,*/ nodeWeights);
+    SCAI_ASSERT_EQ_ERROR( optBlockWeight.size(), numLeaves, "Size mismatch");
+
+    ValueType speedImbalance = GraphUtils<IndexType, ValueType>::computeImbalance( part, k, nodeWeights, optBlockWeight );
+
+    //to measure imbalance according to memory constraints, we assume that
+    // every points has unit weight (this can be changed, for example,
+    //if we measure memory in MB, we can give each point a weight 
+    //of few bytes)
+    scai::lama::DenseVector<ValueType> unitWeights (nodeWeights.getDistributionPtr(), 1);
+
+    ValueType sizeImbalance = GraphUtils<IndexType, ValueType>::computeImbalance( part, k, unitWeights, memory );
+
+    return std::make_pair(speedImbalance, sizeImbalance);
+
+}
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<ValueType> CommTree<IndexType,ValueType>::getOptBlockWeights(
+	const scai::lama::DenseVector<ValueType> &nodeWeights) const {
+
+	const std::vector<commNode> hierLevel = this->getLeaves();
+    const IndexType numBlocks = hierLevel.size();
+
+    //the total node weight of the input
+    ValueType totalWeightSum;
+    {
+        scai::hmemo::ReadAccess<ValueType> rW( nodeWeights.getLocalValues() );
+        ValueType localW = 0;
+        for(int i=0; i<nodeWeights.getLocalValues().size(); i++ ){
+            localW += rW[i];
+        }
+        const scai::dmemo::CommunicatorPtr comm = nodeWeights.getDistributionPtr()->getCommunicatorPtr();
+        totalWeightSum = comm->sum(localW);
+    }
+
+    //the sum of the realtive speeds for all nodes
+    ValueType speedSum = 0;
+    for( cNode c: hierLevel){
+        speedSum += c.relatSpeed;
+    }
+
+    //the optimum size for every block
+    std::vector<ValueType> optBlockWeight( numBlocks );
+
+    //for each PE, we are given its relative speed compare to the fastest
+    //PE, a number between 0 and 1. The optimum weight it should have 
+    //is this:
+    // relative speed*( sum of input node weights / sum of all relative speeds)
+    for( int i=0; i<numBlocks; i++){
+        optBlockWeight[i] = totalWeightSum*(hierLevel[i].relatSpeed/speedSum);
+    }
+
+    return optBlockWeight;
 }
 //------------------------------------------------------------------------
 

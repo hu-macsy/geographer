@@ -191,30 +191,31 @@ TEST_F(CommTreeTest, testExportGraph){
 		cNode( std::vector<unsigned int>{2,1,1}, 8, 12, 90),
 	};
 
-	ITI::CommTree<IndexType,ValueType> cTree( leaves );
+	const ITI::CommTree<IndexType,ValueType> cTree( leaves );
 
-	scai::lama::CSRSparseMatrix<ValueType> PEgraph = cTree.exportAsGraph_local();
+	const scai::lama::CSRSparseMatrix<ValueType> PEgraph = cTree.exportAsGraph_local();
 
-	IndexType N = PEgraph.getNumRows(); 
+	const IndexType N = PEgraph.getNumRows(); 
 	EXPECT_EQ( N, cTree.getNumLeaves() );
 
 	//complete graph
 	EXPECT_EQ( PEgraph.getNumValues(), N*(N-1) ); 
 
-	scai::hmemo::HArray<ValueType> values = PEgraph.getLocalStorage().getValues();
-	ValueType max = scai::utilskernel::HArrayUtils::max( values );
+	const scai::lama::CSRStorage<ValueType>& PEstorage = PEgraph.getLocalStorage();
+	const scai::hmemo::HArray<ValueType> values = PEstorage.getValues();
+	const ValueType max = scai::utilskernel::HArrayUtils::max( values );
 	//This tree has depth 3 so this should be the maximum edge weight in the graph.
 	EXPECT_EQ( max, 3 );
 
 	//test specific edge weights
-	EXPECT_EQ( values.getValue(0,2), 1 );
-	EXPECT_EQ( values.getValue(12,13), 1 );
+	EXPECT_EQ( PEstorage.getValue(0,2), 1 );
+	EXPECT_EQ( PEstorage.getValue(12,13), 1 );
 
-	EXPECT_EQ( values.getValue(2,4), 2 );
-	EXPECT_EQ( values.getValue(8,10), 2 );
+	EXPECT_EQ( PEstorage.getValue(2,4), 2 );
+	EXPECT_EQ( PEstorage.getValue(8,10), 2 );
 
-	EXPECT_EQ( values.getValue(3,12), 3 );
-	EXPECT_EQ( values.getValue(0,17), 3 );
+	EXPECT_EQ( PEstorage.getValue(3,12), 3 );
+	EXPECT_EQ( PEstorage.getValue(0,17), 3 );
 
 }//TEST_F(CommTreeTest, testExportGraph)
 

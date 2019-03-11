@@ -205,7 +205,7 @@ static std::vector<commNode> createLevelAbove( const std::vector<commNode> level
  is just a vector of nodes. Using the hierarchy prefix of a node, this
  function computes how nodes of this level are grouped together.
  ret.size() = the size of the previous level
- ret.accumulate() = the size of this level
+ ret.accumulate() = the size of this level 
  Example, if ret[0]=3, ret[1]=2 and ret[2]=3 that means that thisLevel[0,1,2] 
  belonged  to the same node in the previous level, i.e., have the same father,
  thisLevel[3,4] belonged to the same node, the same for thisLevel[5,6,7]  etc.
@@ -239,9 +239,29 @@ static ValueType distance( const commNode node1, const commNode node2 );
 */
 //TODO: since this a complete matrix, the CSRSparsematrix is not very efficient
 
-static scai::lama::CSRSparseMatrix<ValueType> exportAsGraph_local(const std::vector<commNode> leaves);
+scai::lama::CSRSparseMatrix<ValueType> exportAsGraph_local(const std::vector<commNode> leaves) const;
 
-scai::lama::CSRSparseMatrix<ValueType> exportAsGraph_local();
+scai::lama::CSRSparseMatrix<ValueType> exportAsGraph_local() const;
+
+/** Overloaded version that takes as input the communication tree
+*/
+
+//TODO: turn to static? move to other class?
+std::pair<ValueType,ValueType> computeImbalance(
+    const scai::lama::DenseVector<IndexType> &part,
+    IndexType k,
+    const scai::lama::DenseVector<ValueType> &nodeWeights) const;
+
+
+/** @brief Given a hierarchy level, it extracts the relative speed
+of every PE (remember: every node in a hierarchy level is either a single
+PE, if the level is the leaves, or a group of PEs) and calculates what
+is the optimum weight each PE should have. Mainly used to comoute imbalance.
+*/
+//TODO: leave as static?
+std::vector<ValueType> getOptBlockWeights(
+    const scai::lama::DenseVector<ValueType> &nodeWeights) const;
+
 
 /*@brief Print information for the tree
 */
