@@ -411,10 +411,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
 				SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.redistribute.generalDistribution" )
 				HArray<IndexType> indexTransport(myGlobalIndices.size(), myGlobalIndices.data());
-//WARNING, TODO: the next call just hangs when is not called by all PEs. 
-//This can happen when some pairs of PE did not achieve any gain
-// I guess the reason is the comm->sum() in the GeneralDistribition constructor
-//TODO: update 22/02: this should be fixed by a previous lama update				
+
 				auto newDistribution = scai::dmemo::generalDistributionUnchecked(globalN, indexTransport, comm);
 				SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.redistribute.generalDistribution" )
 
@@ -459,6 +456,18 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 	}
 
 	comm->synchronize();
+
+	scai::dmemo::DistributionPtr sameDist = scai::dmemo::generalDistributionUnchecked(globalN, input.getRowDistributionPtr()->ownedGlobalIndexes(), comm);
+	input = CSRSparseMatrix<ValueType>(sameDist, input.getLocalStorage());
+
+	for (IndexType d = 0; d < settings.dimensions; d++) {
+		coordinates[d].swap(coordinates[d].getLocalValues(), sameDist);
+	}
+
+	part.swap(part.getLocalValues(), sameDist);
+	nodeWeights.swap(nodeWeights.getLocalValues(), sameDist);
+	origin.swap(origin.getLocalValues(), sameDist);
+
 	for (IndexType color = 0; color < gainPerRound.size(); color++) {
 		gainPerRound[color] = comm->sum(gainPerRound[color]) / 2;
 	}
