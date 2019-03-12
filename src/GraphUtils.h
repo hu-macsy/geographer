@@ -21,7 +21,7 @@
 #include <boost/graph/properties.hpp>
 
 #include "Settings.h"
-//#include "CommTree.h"
+
 
 namespace ITI {
 

@@ -87,7 +87,7 @@ struct commNode{
 		return *this;
 	}
 
-	bool operator==( const commNode& c ){
+	bool operator==( const commNode& c ) const{
 		if( this->hierarchy != c.hierarchy ){
 			return false;
 		}

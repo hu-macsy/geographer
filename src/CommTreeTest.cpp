@@ -201,6 +201,10 @@ TEST_F(CommTreeTest, testExportGraph){
 	//complete graph
 	EXPECT_EQ( PEgraph.getNumValues(), N*(N-1) ); 
 
+	SCAI_ASSERT_LE_ERROR( \
+		scai::utilskernel::HArrayUtils::max(PEgraph.getLocalStorage().getIA()) ,\
+		PEgraph.getNumValues(), "some ia value is too large" );
+
 	const scai::lama::CSRStorage<ValueType>& PEstorage = PEgraph.getLocalStorage();
 	const scai::hmemo::HArray<ValueType> values = PEstorage.getValues();
 	const ValueType max = scai::utilskernel::HArrayUtils::max( values );
@@ -216,6 +220,10 @@ TEST_F(CommTreeTest, testExportGraph){
 
 	EXPECT_EQ( PEstorage.getValue(3,12), 3 );
 	EXPECT_EQ( PEstorage.getValue(0,17), 3 );
+
+	const std::vector<cNode> getLeaves = cTree.getLeaves();
+	EXPECT_EQ( leaves, getLeaves );
+
 
 }//TEST_F(CommTreeTest, testExportGraph)
 

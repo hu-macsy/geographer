@@ -253,7 +253,7 @@ public:
 		this PE has speed x*maxCPUSpeed. Typically, at least one PE will have speed 1 (the fastest one)
 		although this is not enforced or checked.
 	*/
-	//template<typename T, typename U>
+	//TODO: move to CommTree as, for example, importFromFile oder so?
 	static CommTree<IndexType,ValueType> readPETree( const std::string& filename);
 
 	

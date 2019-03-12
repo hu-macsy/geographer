@@ -90,14 +90,14 @@ cpu = [1]*numPEs #all PEs have the same cpu speed
 
 ## create and store in a file a random tree
 
-numLevels = 4 # actual number of levels is -1 since the first level is a ghost node 
+numLevels = 2 # actual number of levels is -1 since the first level is a ghost node 
 firstLevel = 4 
 maxChildren = 16
 minChildren = 2 #turn also minChildren to minChildrenPerLevel?
 #variable firstLevel will not adhere to maxChildrenPerLevel, 
 #i.e., maxChildrenPerLevel[0] is not considered
 #maxChildrenPerLevel = [maxChildren]*numLevels
-maxChildrenPerLevel = [2, 3, 4, 5] 
+maxChildrenPerLevel = [2, 4] 
 
 assert( len(maxChildrenPerLevel)==numLevels)
 

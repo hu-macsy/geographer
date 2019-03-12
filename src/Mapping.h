@@ -47,7 +47,7 @@ public:
 		const scai::lama::CSRSparseMatrix<ValueType>& blockGraph,
 		const scai::lama::CSRSparseMatrix<ValueType>& PEGraph);
 
-	/**Check if a given mappinf is valid
+	/**Check if a given mapping is valid.
 	*/
 	static bool isValid( 
 		const scai::lama::CSRSparseMatrix<ValueType>& blockGraph,

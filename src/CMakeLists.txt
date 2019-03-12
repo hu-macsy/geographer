@@ -11,7 +11,7 @@ set(SCAI_LIB "${SCAI_DIR}/lib/")
 ### set files ###
 set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp SpectralPartition.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp KMeans.cpp HaloPlanFns.cpp Metrics.cpp Settings.cpp CommTree.cpp Mapping.cpp AuxiliaryFunctions.cpp )
 set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp quadtree/test/QuadTreeTest.cpp SpectralPartitionTest.cpp CommTreeTest.cpp MappingTest.cpp)
-set(FILES_TEST_TMP test_main.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp  MultiLevelTest.cpp ParcoRepartTest.cpp auxTest.cpp CommTreeTest.cpp MappingTest.cpp)
+set(FILES_TEST_TMP test_main.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp  MultiLevelTest.cpp ParcoRepartTest.cpp auxTest.cpp CommTreeTest.cpp MappingTest.cpp benchmarks.cpp)
 
 
 set(RBC_DIR "${PROJECT_SOURCE_DIR}/RBC")

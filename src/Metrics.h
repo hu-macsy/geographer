@@ -114,10 +114,28 @@ struct Metrics{
 
 	ValueType getCommScheduleTime( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, const IndexType repeatTimes);
 
+	/** 
+	@param[in] blockGraph The block (or communication) graph.
+	@param[in] PEGraph The processor graph (or physical network).
+	@param[in] mapping A mapping from blocks to PEs.
+	**/
 	void getMappingMetrics(
 		const scai::lama::CSRSparseMatrix<ValueType> blockGraph, 
 		const scai::lama::CSRSparseMatrix<ValueType> PEGraph, 
 		const std::vector<IndexType> mapping);
+
+	/** 
+	Internally, the identity mapping is assumed.
+	@param[in] appGraph The application graph
+	@param[in] partition A partition of the application graph. The number of blocks
+	should be equal to the number of nodes of the PE graph.
+	@param[in] PEGraph The processor graph (or physical network).
+
+	**/
+	void getMappingMetrics(
+		const scai::lama::CSRSparseMatrix<ValueType> appGraph,
+		const scai::lama::DenseVector<IndexType> partition,
+		const scai::lama::CSRSparseMatrix<ValueType> PEGraph );
 
 }; //struct Metrics
 
