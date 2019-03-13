@@ -1272,32 +1272,24 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getPEGr
     std::vector<IndexType> neighborPEs(rOwners.get(), rOwners.get()+rOwners.size());
     rOwners.release();
     
-    std::map<IndexType, unsigned int> edgeWeights;
+    //first count how many edges are between PEs and then remove duplicates   
+
+    //we use map because, for example, a PE can have only 2 neighbors but with high ranks
+    std::map<IndexType, ValueType> edgeWeights;
+    //initialize map
+    for( int i=0; i<neighborPEs.size(); i++){
+	   	edgeWeights[ neighborPEs[i] ] = 0;
+  	}
     for( int i=0; i<neighborPEs.size(); i++){
 	   	edgeWeights[ neighborPEs[i] ]++;
   	}
-    
-    /*
-    {	
-    	for(int i=0; i< neighborPEs.size(); i++)
-    		PRINT(*comm << ": " << neighborPEs[i] );
-
-	    int c=0;
-    	for( auto edge = edgeWeights.begin(); edge!=edgeWeights.end(); edge++ ){
-    		PRINT(comm->getRank() << "-" << edge->first << " , weight= " << edge->second);
-    		//PRINT( *comm << ": " << edgeWeights[edge->first] );
-    	}
-    }
-    */
-
-    //TODO: maybe no need to sort and remove duplicates...
-    
+    	
     std::sort(neighborPEs.begin(), neighborPEs.end());
 
     //remove duplicates
     neighborPEs.erase(std::unique(neighborPEs.begin(), neighborPEs.end()), neighborPEs.end());
     const IndexType numNeighbors = neighborPEs.size();
-    SCAI_ASSERT_EQ_ERROR(edgeWeights.size(), numNeighbors, "Num neighbors mismatch");
+	SCAI_ASSERT_EQ_ERROR(edgeWeights.size(), numNeighbors, "Num neighbors mismatch");    
 
     // create the PE adjacency matrix to be returned
     scai::dmemo::DistributionPtr distPEs ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, numPEs) );
@@ -1308,9 +1300,10 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getPEGr
     scai::hmemo::HArray<IndexType> ia( { 0, numNeighbors } );
     scai::hmemo::HArray<IndexType> ja(numNeighbors, neighborPEs.data());
     scai::hmemo::HArray<ValueType> values(numNeighbors, 1);
+
     int ii=0;
-    for( auto edge = edgeWeights.begin(); edge!=edgeWeights.end(); edge++ ){
-    	values[ii] = edge->second;
+    for( auto edgeW = edgeWeights.begin(); edgeW!=edgeWeights.end(); edgeW++ ){
+    	values[ii] = edgeW->second;
     	//PRINT(*comm << ": values[" << ii << "]= " << values[ii] );
     	ii++;
     }
