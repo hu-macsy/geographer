@@ -226,7 +226,7 @@ public:
          * 120
          * 97
         */
-        static std::vector<IndexType> readBlockSizes(const std::string filename , const IndexType numBlocks);
+        static std::vector<ValueType> readBlockSizes(const std::string filename , const IndexType numBlocks);
 
 	static DenseVector<IndexType> readPartition(const std::string filename, IndexType n);
     

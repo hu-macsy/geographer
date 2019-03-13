@@ -958,6 +958,8 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = 3;
+    //settings.debugMode = true;
+    //settings.verbose = true;
     struct Metrics metrics(settings);
     
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(adjM, coords, settings, metrics);

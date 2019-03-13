@@ -304,9 +304,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 					if (settings.initialMigration == InitialPartitioningMethods::Multisection) {
 						tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, migrationSettings);
 					} else if (settings.initialMigration == InitialPartitioningMethods::KMeans) {
-						std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );
+						std::vector<ValueType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );
                         struct Metrics tmpMetrics(migrationSettings);
-						tempResult = ITI::KMeans::computePartition(coordinates, convertedWeights, migrationBlockSizes, migrationSettings, tmpMetrics);
+						tempResult = ITI::KMeans::computePartition<IndexType, ValueType>(coordinates, convertedWeights, migrationBlockSizes, migrationSettings, tmpMetrics);
 					}
 					
 					initMigrationPtr = scai::dmemo::generalDistributionByNewOwners( tempResult.getDistribution(), tempResult.getLocalValues() );
@@ -354,19 +354,20 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		const ValueType weightSum = nodeWeights.sum();
 		
 		// vector of size k, each element represents the size of one block
-		std::vector<IndexType> blockSizes;
-		if( settings.blockSizes.empty() ){
-			blockSizes.assign( settings.numBlocks, weightSum/settings.numBlocks );
-		}else{
-			blockSizes = settings.blockSizes;
+		std::vector<ValueType> blockSizes = settings.blockSizes;
+		if( blockSizes.empty() ){
+			blockSizes = std::vector<ValueType>(settings.numBlocks, weightSum/settings.numBlocks );
+            if (settings.verbose) {
+                PRINT0("Setting each block size to " + std::to_string(weightSum/settings.numBlocks));
+            }
 		}
 		SCAI_ASSERT( blockSizes.size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
 		
 		std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
 		if (settings.repartition) {
-			result = ITI::KMeans::computeRepartition(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
+			result = ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
 		} else {
-			result = ITI::KMeans::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
+			result = ITI::KMeans::computePartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
 		}
 		
 		kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
@@ -542,7 +543,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     //
     // vector of size k, each element represents the size of each block
     //
-    std::vector<IndexType> blockSizes;
+    std::vector<ValueType> blockSizes;
 	//TODO: for nowm assume uniform nodeweights
     IndexType weightSum = globalN;// = nodeWeights.sum();
     if( settings.blockSizes.empty() ){
