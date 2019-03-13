@@ -484,7 +484,7 @@ std::string fileName = "353off.graph";
 	
 	scai::dmemo::DistributionPtr intermediateDist = initPartition.getDistributionPtr();
 
-	const bool useRedistributor = GetParam;
+	const bool useRedistributor = GetParam();
 	
 
 	for( bool renumberPEs: vector<bool>({false, true}) ){
