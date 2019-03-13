@@ -429,7 +429,7 @@ void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<Inde
                 }
                             
                 for( IndexType i=0; i<localN; i++){                    
-                    outfile << dist->local2Global(i) << " "<< localPart[i] << std::endl;
+                    outfile << localPart[i] << std::endl;
                 }
 				/* TODO: resolve commented code         
                 // the last PE maybe has less local values
@@ -518,6 +518,10 @@ void FileIO<IndexType, ValueType>::writeDenseVectorCentral(DenseVector<IndexType
     if( comm->getRank() ){
     
         std::ofstream f( filename );  
+
+        if( f.fail() ){
+			throw std::runtime_error("Could not write to file " + filename);
+		}
         
         const scai::hmemo::ReadAccess<IndexType> rPart( part.getLocalValues() );
         for( IndexType i=0; i<globalN; i++){
@@ -2229,7 +2233,7 @@ std::vector<ValueType> FileIO<IndexType, ValueType>::readBlockSizes(const std::s
             }
             std::stringstream ss;    
             ss.str( line );
-            IndexType bSize;
+            ValueType bSize;
             ss >> bSize;
             //blockSizes.push_back(bSize);
             blockSizes[i]= bSize;

@@ -544,7 +544,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     // vector of size k, each element represents the size of each block
     //
     std::vector<ValueType> blockSizes;
-	//TODO: for nowm assume uniform nodeweights
+	//TODO: for now assume uniform nodeweights
     IndexType weightSum = globalN;// = nodeWeights.sum();
     if( settings.blockSizes.empty() ){
         blockSizes.assign( settings.numBlocks, weightSum/settings.numBlocks );

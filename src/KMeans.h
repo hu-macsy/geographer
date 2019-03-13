@@ -62,6 +62,7 @@ using point = std::vector<ValueType>;
  	struct Metrics &metrics);
 
 //TODO: graph is not needed, this is only for debugging
+//TODO/WARNING: here is percentage, elsewhere is block weight
  template<typename IndexType, typename ValueType>
  DenseVector<IndexType> computePartition(
  	const CSRSparseMatrix<ValueType> &graph, \
@@ -88,7 +89,8 @@ using point = std::vector<ValueType>;
  */
 
 //wrapper 1- no centers
-template<typename IndexType, typename ValueType>
+//template<typename IndexType, typename ValueType>
+ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,
 	const DenseVector<ValueType> &nodeWeights,

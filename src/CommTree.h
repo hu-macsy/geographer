@@ -192,6 +192,15 @@ IndexType getNumLeaves() const {
 	return tree.back().size();
 }
 
+/** Returns a vector for every balance constrain.
+	return.size()==the number of constrains
+	return[i].size()==number of leaves, for all i
+*/
+//	03/19: We have two constrains: memory and cpu speed for every PE.
+//	These two vectors are returned.
+//First is the memory and then the cpu speed
+std::vector<std::vector<ValueType>> getBalanceVectors();
+
 /* @brief Takes a vector of leaves and creates the tree
 */
 IndexType createTreeFromLeaves( const std::vector<commNode> leaves);

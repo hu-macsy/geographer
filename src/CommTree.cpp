@@ -167,6 +167,25 @@ std::vector<unsigned int> CommTree<IndexType, ValueType>::getGrouping(const std:
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
+std::vector<std::vector<ValueType>> CommTree<IndexType, ValueType>::getBalanceVectors(){
+
+	const std::vector<cNode> leaves = getLeaves();
+	const IndexType numLeaves = leaves.size();
+
+	std::vector<std::vector<ValueType>> constrains(2, std::vector<ValueType>(numLeaves,0.0) );
+
+	for(IndexType i=0; i<numLeaves; i++){
+		cNode c = leaves[i];
+		constrains[0][i] = c.memMB;
+		constrains[1][i] = c.relatSpeed;
+	}
+
+	return constrains;
+
+}//getBalanceVectors
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
 ValueType CommTree<IndexType, ValueType>::distance( const commNode node1, const commNode node2 ){
 
 	const std::vector<unsigned int> hier1 = node1.hierarchy;

@@ -542,6 +542,4 @@ std::string fileName = "353off.graph";
 INSTANTIATE_TEST_CASE_P(InstantiationName,
                         auxTest,
                         testing::Values(true, false) );
-
-
 }

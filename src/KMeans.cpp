@@ -30,7 +30,6 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		const std::vector<ValueType> &maxCoords,
 		const scai::lama::DenseVector<IndexType> &partition,
 		const std::vector<cNode> hierLevel,
-
 		Settings settings) {
 
 	SCAI_REGION( "KMeans.findInitialCentersSFC" );
@@ -901,7 +900,7 @@ DenseVector<IndexType> computeRepartition(
 		globalWeightSum = comm->sum(localWeightSum);
 	}
 	
-	const std::vector<IndexType> blockSizes(settings.numBlocks, globalWeightSum/settings.numBlocks);
+	const std::vector<ValueType> blockSizes(settings.numBlocks, globalWeightSum/settings.numBlocks);
 
 	std::chrono::time_point<std::chrono::high_resolution_clock> startCents = std::chrono::high_resolution_clock::now();
 	//
@@ -993,6 +992,9 @@ DenseVector<IndexType> computePartition( \
 }
 
 //TODO: graph is not needed, this is only for debugging
+//TODO/WARNING: in some version of computePartition, blockSizes are the actual wanted size,
+//	in other versions (like below) we use the percentage of the block according to the total weight sum
+
 //core implementation 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition( \
@@ -1568,6 +1570,17 @@ DenseVector<IndexType> computeHierarchicalPartition(
 			}
 			SCAI_ASSERT_EQ_ERROR( sumNumCenters, thisLevel.size(), "Mismatch in number of new centers and hierarchy nodes")
 		}
+for(int i=0; i<groupOfCenters.size(); i++ ){
+	std::cout<< "group "<< i << std::endl;
+	for( int j=0; j<groupOfCenters[i].size(); j++ ){
+		std::cout<< "center " << j << ": ";
+		for( int d=0; d<settings.dimensions; d++ ){
+			std::cout<< groupOfCenters[i][j][d] << ", ";
+		}
+		std::cout << std::endl;	
+	}
+	std::cout << std::endl;	
+}
 
 		//number of old, known blocks == previous level size
 		IndexType numOldBlocks = groupOfCenters.size();
@@ -1614,6 +1627,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		//maybe, set also numBlocks for clarity??
 		partition = computePartition( graph, coordinates, nodeWeights, optBlockWeight, partition, groupOfCenters, settings, metrics );
 
+FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/partHKM"+std::to_string(settings.numBlocks)+"_h"+std::to_string(h)+".out");
 
 		//this check is done before. TODO: remove?
 		if( settings.debugMode ){

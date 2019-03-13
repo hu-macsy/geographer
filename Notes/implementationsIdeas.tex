@@ -28,8 +28,7 @@
   \par\vbox{\parbox[t]{\linewidth}{#1}}
 }
 
-\graphicspath{{/home/harry/wave/figures/}}
-
+\graphicspath{{/home/harry/wave/figures/}{../figures/}}
 
 
 \begin{document}
@@ -67,6 +66,24 @@ $50-70\%$ of their points after k-means). This makes sense. I did not test that 
 a few graph I tried, every PE claimed its own id, so no renumbering occurred. Maybe with smaller 
 blocks this can have some effect.
 
+\section*{Hierarchical k-means results}
+
+In some case, a block can be completely inside another one.
+
+\begin{figure}
+\includegraphics[scale=0.3]{slowrot_KMeans_k8.png}
+\includegraphics[scale=0.3]{slowrot_HKMeans_k8.png}
+\caption{Graph slowrot0 partitioned  with k-means and the hierarchical version }.
+\end{figure}
+
+
+\begin{figure}
+\includegraphics[scale=0.2]{slowrot_RecursiveKMeans_k2}
+\includegraphics[scale=0.2]{slowrot_RecursiveKMeans_k4}
+
+\includegraphics[scale=0.2]{slowrot_RecursiveKMeans_k8}
+\caption{Graph slowrot0 partitioned recursively into 8 blocks. }
+\end{figure}
 
 
 \end{document}
