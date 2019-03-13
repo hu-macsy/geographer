@@ -29,7 +29,7 @@ TEST_F( benchmarkTest, testMapping ){
 
     Settings settings;
     settings.dimensions = dimensions;
-    settings.numBlocks = 28;
+    settings.numBlocks = 10;
     settings.noRefinement = true;
 
     scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
@@ -44,10 +44,10 @@ TEST_F( benchmarkTest, testMapping ){
     const scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
     ASSERT_EQ(globalN, partition.size());
 
-FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partition, settings.numBlocks), "blockKM"+std::to_string(settings.numBlocks)+".graph", 1);
+//FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partition, settings.numBlocks), "blockKM"+std::to_string(settings.numBlocks)+".graph", 1);
 
 //2 - read PE graph
-    std::string PEfile = "./tools/testPEgraph28.txt";
+    std::string PEfile = "./tools/myPEgraph10.txt";
     CommTree<IndexType,ValueType> cTree = FileIO<IndexType, ValueType>::readPETree( PEfile );
 PRINT( cTree.getNumLeaves() << ", " );
     const scai::lama::CSRSparseMatrix<ValueType> PEGraph = cTree.exportAsGraph_local();

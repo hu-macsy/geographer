@@ -15,7 +15,7 @@
 
 #include "KMeans.h"
 #include "HilbertCurve.h"
-
+#include "MultiLevel.h"
 //temporary, for debugging
 #include "FileIO.h"
 
@@ -1659,6 +1659,16 @@ DenseVector<IndexType> computeHierarchicalPartition(
 			}
 		}
 
+//TODO: this is an attempt to do local refinement after every step. But local refinement demands k=p,
+//	so this cannot be done inbetween steps.
+/*
+if( true or not settings.noRefinement ){
+	bool useRedistributor = true;
+	scai::dmemo::DistributionPtr distFromPartition = aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coordinates, nodeWeights, settings, useRedistributor);
+	scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo( graph );
+	ITI::MultiLevel<IndexType, ValueType>::multiLevelStep( graph, partition, nodeWeights, coordinates, halo, settings, metrics);
+}
+*/
 		//TODO?: remove?
 		ValueType imbalance =  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, totalNumNewBlocks, nodeWeights, optBlockWeight );
 		//IndexType cut = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
