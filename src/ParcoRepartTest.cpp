@@ -946,7 +946,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
     std::vector<DenseVector<ValueType>> coords(3);
     for(IndexType i=0; i<3; i++){ 
 	  coords[i].allocate(dist);
-	  coords[i] = static_cast<ValueType>( 0 );
+	  coords[i] = static_cast<ValueType>( 0.0 );
     }
     
     auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
@@ -965,7 +965,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
     //check distributions
     assert( partition.getDistribution().isEqual( adjM.getRowDistribution()) );
     // the next assertion fails in "this version" (commit a2fc03ab73f3af420123c491fbf9afb84be4a0c4) because partition 
-    //f redistributes the graph nodes so every block is in one PE (k=P) but does NOT redistributes the coordinates.
+    // redistributes the graph nodes so every block is in one PE (k=P) but does NOT redistributes the coordinates.
     //assert( partition.getDistribution().isEqual( coords[0].getDistribution()) );
     
     //test getBlockGraph

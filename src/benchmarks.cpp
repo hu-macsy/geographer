@@ -21,7 +21,7 @@ class benchmarkTest : public ::testing::Test {
 
 TEST_F( benchmarkTest, testMapping ){
 
-//1 - read and partition graph without using the PEgraph
+
 	//std::string fileName = "Grid32x32";
 	std::string fileName = "trace-00008.graph";
     std::string file = graphPath + fileName;
@@ -32,15 +32,41 @@ TEST_F( benchmarkTest, testMapping ){
     settings.numBlocks = 10;
     settings.noRefinement = true;
 
+    const IndexType k = settings.numBlocks;
+
     scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     IndexType globalN = graph.getNumRows();
 
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), globalN, dimensions);
 
+//1 - read PE graph
+    std::string PEfile = "./tools/myPEgraph10.txt";
+    CommTree<IndexType,ValueType> cTree = FileIO<IndexType, ValueType>::readPETree( PEfile );
+	PRINT( cTree.getNumLeaves() << ", " );
+    const scai::lama::CSRSparseMatrix<ValueType> PEGraph = cTree.exportAsGraph_local();
+
+	SCAI_ASSERT_EQ_ERROR( PEGraph.getNumRows(), k , "Wrong number of rows/vertices" );
+	SCAI_ASSERT_LE_ERROR( scai::utilskernel::HArrayUtils::max(PEGraph.getLocalStorage().getIA() ) , PEGraph.getNumValues(), "some ia value is too large" );
+	FileIO<IndexType,ValueType>::writeGraph( PEGraph, "peFromTree"+std::to_string(k)+".graph", 1);
+
+//2 - read and partition graph without using the PEgraph
     settings.initialPartition = InitialPartitioningMethods::KMeans;
     struct Metrics metrics(settings);
 
-    // get partition
+    std::vector<std::vector<ValueType>> balances = cTree.getBalanceVectors();
+    SCAI_ASSERT_EQ_ERROR( balances.size(), 2, "Wrong number of balance constrains");
+    SCAI_ASSERT_EQ_ERROR( balances[0].size(), k, "Wrong size of balance vector");
+
+    //cpu speed is given as the relative speed compared to the fastest cpu.
+    //convert it to absolute number
+    std::vector<ValueType> wantedBlockSizes( k, 0 );
+    for(IndexType i=0; i<k; i++ ){
+    	wantedBlockSizes[i] = balances[i]*globalN; //we assume unit node weights
+    }
+
+    settings.blockSizes = wantedBlockSizes;
+
+    // get partition ParcoRepart::partitionGraph to accept constrains
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
     ASSERT_EQ(globalN, partition.size());
 
@@ -48,15 +74,6 @@ FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/p
 
 //FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partition, settings.numBlocks), "blockKM"+std::to_string(settings.numBlocks)+".graph", 1);
 
-//2 - read PE graph
-    std::string PEfile = "./tools/myPEgraph10.txt";
-    CommTree<IndexType,ValueType> cTree = FileIO<IndexType, ValueType>::readPETree( PEfile );
-PRINT( cTree.getNumLeaves() << ", " );
-    const scai::lama::CSRSparseMatrix<ValueType> PEGraph = cTree.exportAsGraph_local();
-
-SCAI_ASSERT_EQ_ERROR( PEGraph.getNumRows(), settings.numBlocks , "Wrong number of rows/vertices" );
-SCAI_ASSERT_LE_ERROR( scai::utilskernel::HArrayUtils::max(PEGraph.getLocalStorage().getIA() ) , PEGraph.getNumValues(), "some ia value is too large" );
-FileIO<IndexType,ValueType>::writeGraph( PEGraph, "peFromTree"+std::to_string(settings.numBlocks)+".graph", 1);
 
 
 //3 - partition graph with the PEgraph

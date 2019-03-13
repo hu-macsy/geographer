@@ -998,6 +998,9 @@ DenseVector<IndexType> computePartition( \
 }
 
 //TODO: graph is not needed, this is only for debugging
+//TODO/WARNING: in some version of computePartition, blockSizes are the actual wanted size,
+//	in other versions (like below) we use the percentage of the block according to the total weight sum
+
 //core implementation 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition( \
