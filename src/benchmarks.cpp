@@ -23,7 +23,7 @@ TEST_F( benchmarkTest, testMapping ){
 
 //1 - read and partition graph without using the PEgraph
 	//std::string fileName = "Grid32x32";
-	std::string fileName = "bigtrace-00000.graph";
+	std::string fileName = "trace-00008.graph";
     std::string file = graphPath + fileName;
     const IndexType dimensions = 2;
 
@@ -41,8 +41,10 @@ TEST_F( benchmarkTest, testMapping ){
     struct Metrics metrics(settings);
 
     // get partition
-    const scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
     ASSERT_EQ(globalN, partition.size());
+
+FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/partKM"+std::to_string(settings.numBlocks)+".out");
 
 //FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partition, settings.numBlocks), "blockKM"+std::to_string(settings.numBlocks)+".graph", 1);
 
@@ -56,6 +58,7 @@ SCAI_ASSERT_EQ_ERROR( PEGraph.getNumRows(), settings.numBlocks , "Wrong number o
 SCAI_ASSERT_LE_ERROR( scai::utilskernel::HArrayUtils::max(PEGraph.getLocalStorage().getIA() ) , PEGraph.getNumValues(), "some ia value is too large" );
 FileIO<IndexType,ValueType>::writeGraph( PEGraph, "peFromTree"+std::to_string(settings.numBlocks)+".graph", 1);
 
+
 //3 - partition graph with the PEgraph
     //read graph again or redistribute because the previous partition might have change it
     scai::lama::CSRSparseMatrix<ValueType> graph2 = FileIO<IndexType, ValueType>::readGraph(file );
@@ -64,6 +67,8 @@ FileIO<IndexType,ValueType>::writeGraph( PEGraph, "peFromTree"+std::to_string(se
 
     scai::lama::DenseVector<IndexType> partitionWithPE = ITI::KMeans::computeHierarchicalPartition(  \
     	graph2, coords, unitWeights, cTree, settings, metrics );
+
+FileIO<IndexType,ValueType>::writePartitionParallel( partitionWithPE, "./partResults/partHKM"+std::to_string(settings.numBlocks)+".out");
 
 FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partitionWithPE, settings.numBlocks), "blockHKM"+std::to_string(settings.numBlocks)+".graph", 1);
 
