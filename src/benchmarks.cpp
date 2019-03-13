@@ -21,15 +21,14 @@ class benchmarkTest : public ::testing::Test {
 
 TEST_F( benchmarkTest, testMapping ){
 
-
 	//std::string fileName = "Grid32x32";
-	std::string fileName = "trace-00008.graph";
+	std::string fileName = "slowrot-00000.graph";
     std::string file = graphPath + fileName;
     const IndexType dimensions = 2;
 
     Settings settings;
     settings.dimensions = dimensions;
-    settings.numBlocks = 10;
+    settings.numBlocks = 8;
     settings.noRefinement = true;
 
     const IndexType k = settings.numBlocks;
@@ -40,7 +39,7 @@ TEST_F( benchmarkTest, testMapping ){
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), globalN, dimensions);
 
 //1 - read PE graph
-    std::string PEfile = "./tools/myPEgraph10.txt";
+    std::string PEfile = "./tools/myPEgraph8_2.txt";
     CommTree<IndexType,ValueType> cTree = FileIO<IndexType, ValueType>::readPETree( PEfile );
 	PRINT( cTree.getNumLeaves() << ", " );
     const scai::lama::CSRSparseMatrix<ValueType> PEGraph = cTree.exportAsGraph_local();
@@ -53,6 +52,7 @@ TEST_F( benchmarkTest, testMapping ){
     settings.initialPartition = InitialPartitioningMethods::KMeans;
     struct Metrics metrics(settings);
 
+    //balances[0] is memory, balances[1] is cpu speed
     std::vector<std::vector<ValueType>> balances = cTree.getBalanceVectors();
     SCAI_ASSERT_EQ_ERROR( balances.size(), 2, "Wrong number of balance constrains");
     SCAI_ASSERT_EQ_ERROR( balances[0].size(), k, "Wrong size of balance vector");
@@ -61,7 +61,7 @@ TEST_F( benchmarkTest, testMapping ){
     //convert it to absolute number
     std::vector<ValueType> wantedBlockSizes( k, 0 );
     for(IndexType i=0; i<k; i++ ){
-    	wantedBlockSizes[i] = balances[i]*globalN; //we assume unit node weights
+    	wantedBlockSizes[i] = balances[1][i]*globalN; //we assume unit node weights
     }
 
     settings.blockSizes = wantedBlockSizes;
@@ -87,14 +87,18 @@ FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/p
 
 FileIO<IndexType,ValueType>::writePartitionParallel( partitionWithPE, "./partResults/partHKM"+std::to_string(settings.numBlocks)+".out");
 
-FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partitionWithPE, settings.numBlocks), "blockHKM"+std::to_string(settings.numBlocks)+".graph", 1);
+//FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partitionWithPE, settings.numBlocks), "blockHKM"+std::to_string(settings.numBlocks)+".graph", 1);
 
 //4 - compare quality
     PRINT("--------- Metrics for regular partition");
     metrics.getMappingMetrics( graph, partition, PEGraph);
+    metrics.getEasyMetrics( graph, partition, unitWeights, settings );
+    metrics.print( std::cout );
 
     PRINT("--------- Metrics for hierarchical partition");
     metrics2.getMappingMetrics( graph2, partitionWithPE, PEGraph);
+    metrics2.getEasyMetrics( graph2, partitionWithPE, unitWeights, settings );
+    metrics2.print( std::cout );
 
 
 }//TEST_F( benchmarkTest, testMapping )

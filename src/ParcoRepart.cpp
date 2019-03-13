@@ -304,8 +304,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 					if (settings.initialMigration == InitialPartitioningMethods::Multisection) {
 						tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, migrationSettings);
 					} else if (settings.initialMigration == InitialPartitioningMethods::KMeans) {
-						std::vector<IndexType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );
+						std::vector<ValueType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );
                         struct Metrics tmpMetrics(migrationSettings);
+//TODO: below, if I do not use <IndexType,ValueType> I get a "couldn't deduce template parameter" error.  why??? <IndexType,ValueType>
 						tempResult = ITI::KMeans::computePartition(coordinates, convertedWeights, migrationBlockSizes, migrationSettings, tmpMetrics);
 					}
 					
@@ -354,7 +355,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		const ValueType weightSum = nodeWeights.sum();
 		
 		// vector of size k, each element represents the size of one block
-		std::vector<IndexType> blockSizes;
+		std::vector<ValueType> blockSizes;
 		if( settings.blockSizes.empty() ){
 			blockSizes.assign( settings.numBlocks, weightSum/settings.numBlocks );
 		}else{
@@ -366,6 +367,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		if (settings.repartition) {
 			result = ITI::KMeans::computeRepartition(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
 		} else {
+//TODO: below, if I do not use <IndexType,ValueType> I get a "couldn't deduce template parameter" error.  why???			<IndexType,ValueType>
 			result = ITI::KMeans::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
 		}
 		
@@ -542,8 +544,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     //
     // vector of size k, each element represents the size of each block
     //
-    std::vector<IndexType> blockSizes;
-	//TODO: for nowm assume uniform nodeweights
+    std::vector<ValueType> blockSizes;
+	//TODO: for now assume uniform nodeweights
     IndexType weightSum = globalN;// = nodeWeights.sum();
     if( settings.blockSizes.empty() ){
         blockSizes.assign( settings.numBlocks, weightSum/settings.numBlocks );

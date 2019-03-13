@@ -685,7 +685,7 @@ TEST_F (ParcoRepartTest, testPEGraphBlockGraph_k_equal_p_Distributed) {
     //std::string file = graphPath + "Grid16x16";
     std::string file = graphPath + "trace-00008.graph";
     std::ifstream f(file);
-    IndexType dimensions= 2, k=8;
+    IndexType dimensions= 2, k;
     IndexType N, edges;
     f >> N >> edges; 
     

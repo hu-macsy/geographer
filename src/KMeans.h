@@ -89,11 +89,12 @@ using point = std::vector<ValueType>;
  */
 
 //wrapper 1- no centers
-template<typename IndexType, typename ValueType>
+//template<typename IndexType, typename ValueType>
+ template<typename ValueType>
 DenseVector<IndexType> computePartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,
 	const DenseVector<ValueType> &nodeWeights,
-	const std::vector<IndexType> &blockSizes,
+	const std::vector<ValueType> &blockSizes,
 	const Settings settings,
 	struct Metrics &metrics);
 
@@ -122,7 +123,7 @@ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeRepartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,
 	const DenseVector<ValueType> &nodeWeights,
-	const std::vector<IndexType> &blockSizes,
+	const std::vector<ValueType> &blockSizes,
 	const DenseVector<IndexType> &previous,
 	const Settings settings);
 
