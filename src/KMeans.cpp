@@ -1415,27 +1415,18 @@ DenseVector<IndexType> computePartition( \
 		}
 
 		if (comm->getRank() == 0) {
-			std::cout << "i: " << iter<< ", delta: " << delta << ", time : "<< maxTime << ", imbalance= " << imbalance<< ", cut= " << cut << std::endl;
+			std::cout << "i: " << iter<< ", delta: " << delta << ", time : "<< maxTime << ", imbalance= " << imbalance;
+			if (settings.debugMode) {
+				std::cout << ", cut= " << cut;
+			}
+			std::cout << std::endl;
 		}
 
 		metrics.kmeansProfiling.push_back( std::make_tuple(delta, maxTime, imbalance) );
 
 		iter++;
 
-		// WARNING-TODO: this (the "if() break; code" ) stops the iterations prematurely,
-		// when the wanted balance is reached.
-		// It is possible that if we allow more iterations, the solution
-		// will converge to some optima regarding the cut/shape. Investigate that
-
-		//WARNING2: this is also needed to ensure that the required number of sampling
-		//	rounds will be performed so at the end, all nodes are accounted for
-
-		//if(imbalance<settings.epsilon)
-		//	break;
-
-		//aux<IndexType,ValueType>::print2DGrid(graph, result);
-
-	} while (iter < samplingRounds or (iter < maxIterations && (delta > threshold || !balanced)) ); // or (imbalance>settings.epsilon) );
+	} while (iter < samplingRounds or (iter < maxIterations && (delta > threshold || !balanced)) );
 
 
 	std::chrono::duration<ValueType,std::ratio<1>> KMeansTime = std::chrono::high_resolution_clock::now() - KMeansStart;
