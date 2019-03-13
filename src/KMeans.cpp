@@ -353,7 +353,6 @@ std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(const std::ve
 	std::vector<ValueType> centerCoords(dimensions,0);
 	for (IndexType i = 0; i < k; i++) {
 		ValueType centerHilbInd = i/ValueType(k) + offset;
-
 		centerCoords = HilbertCurve<IndexType,ValueType>::HilbertIndex2Point( centerHilbInd, settings.sfcResolution, settings.dimensions);
 		SCAI_ASSERT_EQ_ERROR( centerCoords.size(), dimensions, "Wrong dimensions for center.");
 		
@@ -426,7 +425,7 @@ std::vector<point> findCenters(
 	//TODO: check that distributions align
 
 	std::vector<std::vector<ValueType> > result(dim);
-	std::vector<ValueType> weightSum(k, 0);
+	std::vector<ValueType> weightSum(k, 0.0);
 
 	scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
 	scai::hmemo::ReadAccess<IndexType> rPartition(partition.getLocalValues());
@@ -442,10 +441,10 @@ std::vector<point> findCenters(
 
 	//find local centers
 	for (IndexType d = 0; d < dim; d++) {
-		result[d].resize(k);
+		result[d].resize(k,0);
 		scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
 
-		for (Iterator it = firstIndex; it != lastIndex; it++) {
+		for (Iterator it = firstIndex; it != lastIndex; it++) {			
 			const IndexType i = *it;
 			const IndexType part = rPartition[i];
 			result[d][part] += rCoords[i]*rWeights[i] / weightSum[part];//this is more expensive than summing first and dividing later, but avoids overflows
