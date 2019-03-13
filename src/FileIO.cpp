@@ -2204,11 +2204,11 @@ std::pair<IndexType, IndexType> FileIO<IndexType, ValueType>::getMatrixMarketCoo
 
 //-------------------------------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::string filename , const IndexType numBlocks){
+std::vector<ValueType> FileIO<IndexType, ValueType>::readBlockSizes(const std::string filename , const IndexType numBlocks){
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
-    std::vector<IndexType> blockSizes(numBlocks, 0);
+    std::vector<ValueType> blockSizes(numBlocks, 0);
     
     if( comm->getRank()==0 ){
         std::ifstream file(filename);
@@ -2233,7 +2233,7 @@ std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::s
             }
             std::stringstream ss;    
             ss.str( line );
-            IndexType bSize;
+            ValueType bSize;
             ss >> bSize;
             //blockSizes.push_back(bSize);
             blockSizes[i]= bSize;
