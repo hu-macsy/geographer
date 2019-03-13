@@ -459,14 +459,18 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
 	scai::dmemo::DistributionPtr sameDist = scai::dmemo::generalDistributionUnchecked(globalN, input.getRowDistributionPtr()->ownedGlobalIndexes(), comm);
 	input = CSRSparseMatrix<ValueType>(sameDist, input.getLocalStorage());
+	part.swap(part.getLocalValues(), sameDist);
+	origin.swap(origin.getLocalValues(), sameDist);
 
-	for (IndexType d = 0; d < settings.dimensions; d++) {
-		coordinates[d].swap(coordinates[d].getLocalValues(), sameDist);
+	if (settings.useGeometricTieBreaking) {
+		for (IndexType d = 0; d < settings.dimensions; d++) {
+			coordinates[d].swap(coordinates[d].getLocalValues(), sameDist);
+		}
 	}
 
-	part.swap(part.getLocalValues(), sameDist);
-	nodeWeights.swap(nodeWeights.getLocalValues(), sameDist);
-	origin.swap(origin.getLocalValues(), sameDist);
+	if (nodesWeighted) {
+		nodeWeights.swap(nodeWeights.getLocalValues(), sameDist);
+	}
 
 	for (IndexType color = 0; color < gainPerRound.size(); color++) {
 		gainPerRound[color] = comm->sum(gainPerRound[color]) / 2;
