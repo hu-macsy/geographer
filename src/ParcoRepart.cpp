@@ -424,6 +424,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	if (comm->getSize() == k) {
 		//WARNING: the result  is not redistributed. must redistribute afterwards
 		if(  !settings.noRefinement ) {
+
+			//uncomment to store the first, geometric partition into a file that then can be visualized using matlab and GPI's code
+			//std::string filename = "geomPart.mtx";
+			//result.writeToFile( filename );		
+
 			SCAI_REGION("ParcoRepart.partitionGraph.initialRedistribution")
 			/**
 			 * redistribute to prepare for local refinement
@@ -450,6 +455,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
             */
             
 			//ValueType timeForSecondRedistr = ValueType ( comm->max(secondRedistributionTime.count() ));
+
+			
 			
 			partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
 			//ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
@@ -1006,7 +1013,7 @@ ValueType ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(const CSRSpar
 	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
     const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
-	IndexType sumOutgoingEdgeWeights = 0;
+	ValueType sumOutgoingEdgeWeights = 0;
 	for (IndexType j = 0; j < ja.size(); j++) {
 		if (!input.getRowDistributionPtr()->isLocal(ja[j])) sumOutgoingEdgeWeights += weighted ? values[j] : 1;
 	}

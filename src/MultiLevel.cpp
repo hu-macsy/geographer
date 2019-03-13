@@ -56,6 +56,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 			std::cout << "Beginning coarsening, still " << settings.multiLevelRounds << " levels to go." << std::endl;
 		}
 		MultiLevel<IndexType, ValueType>::coarsen(input, nodeWeights, halo, coarseGraph, fineToCoarseMap, settings.coarseningStepsBetweenRefinement);
+
 		scai::dmemo::DistributionPtr oldCoarseDist = input.getRowDistributionPtr();
 		if (comm->getRank() == 0) {
 			std::cout << "Coarse graph has " << coarseGraph.getNumRows() << " nodes." << std::endl;
@@ -182,9 +183,9 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 			}
 			*/
 
-			std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(input, part, nodesWithNonLocalNeighbors, nodeWeights, coordinates, distances, origin, communicationScheme, settings);
+			std::vector<ValueType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(input, part, nodesWithNonLocalNeighbors, nodeWeights, coordinates, distances, origin, communicationScheme, settings);
 			gain = 0;
-			for (IndexType roundGain : gainPerRound) gain += roundGain;
+			for (ValueType roundGain : gainPerRound) gain += roundGain;
 
 			if (settings.skipNoGainColors) {
 				IndexType i = 0;
@@ -228,6 +229,8 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 		ValueType refineTime = comm->max( elapTime2.count() );
 		PRINT0("local refinement time: " << refineTime );
 	}
+	std::string filename = "mlRound_"+ std::to_string(settings.thisRound)+".mtx";
+	part.writeToFile( filename );
 	return origin;
 }
 //---------------------------------------------------------------------------------------

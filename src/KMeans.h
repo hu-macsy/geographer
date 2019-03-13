@@ -1,7 +1,7 @@
 /*
  * KMeans.h
  *
- *  Created on: 19.07.2017O
+ *  Created on: 19.07.2017
  *      Author: Moritz von Looz
  */
 

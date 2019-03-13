@@ -157,20 +157,9 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 
 	for (IndexType i = 0; i < iterations; i++) {
 
+		std::vector<ValueType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, coordinates, distances, origin, communicationScheme, settings);
 		IndexType gain = 0;
-		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, coordinates, distances, origin, communicationScheme, settings);
-		
 		for (IndexType roundGain : gainPerRound) gain += roundGain;
-
-{
-//WARNING/TODO: this code is not supposed to be here; it was added to find a problem with PEs hanging
-std::vector<IndexType> nonLocalN = GraphUtils<IndexType,ValueType>::nonLocalNeighbors(graph);
-scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( nonLocalN );
-scai::hmemo::HArray<IndexType> owners;	
-
-//this is the problematic call
-graph.getRowDistribution().computeOwners( owners, arrRequiredIndexes ); 
-}
 
 		//check correct gain calculation
 		const ValueType newCut = GraphUtils<IndexType,ValueType>::computeCut(graph, part, true);
@@ -213,7 +202,7 @@ TEST_F(LocalRefinementTest, testOriginArray) {
 	ValueType gain = 0;
 	IndexType iter = 0;
 	do {
-		std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, coordinates, distances, origin, communicationScheme, settings);
+		std::vector<ValueType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(graph, part, localBorder, weights, coordinates, distances, origin, communicationScheme, settings);
 		gain = std::accumulate(gainPerRound.begin(), gainPerRound.end(), 0);
 		if (comm->getRank() == 0) std::cout << "Found gain " << gain << " with " << gainPerRound.size() << " colors." << std::endl;
 		iter++;
