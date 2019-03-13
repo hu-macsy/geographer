@@ -1399,19 +1399,6 @@ DenseVector<IndexType> computePartition( \
 			maxTime = comm->max( balanceTime.count() );
 		}
 
-		
-		//WARNING: when sampling, a (big!) part of the result vector is not changed
-		// and keeps its initial value which is 0. So, the computeImbalance finds,
-		// falsely, block 0 to be over weighted. We use the returned imbalance
-		// from assign centers when sampling is used and we compute a new imbalance
-		// only when there is no sampling
-
-/*		//TODO: what imbalance should we compute for multiple weights?
-		if( !randomInitialization ){
-			imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( result, settings.numBlocks, nodeWeights );
-		}
-*/
-
 		//this does not seem to work. Even if it works, in the first iterations, almost all
 		//nodes belong to block 0.
 		//TODO: either fix or remove
