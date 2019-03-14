@@ -156,7 +156,7 @@ struct Settings{
     ITI::Format coordFormat = ITI::Format::AUTO; 
     bool useDiffusionCoordinates = false;
     IndexType diffusionRounds = 20;
-    std::vector<ValueType> blockSizes;
+    std::vector<std::vector<ValueType> > blockSizes;
     std::string machine;
     
     //mesh generation

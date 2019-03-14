@@ -431,9 +431,9 @@ TEST_F(FileIOTest, testReadBlockSizes){
     std::string path = "testing/";
     std::string blocksFile = path + "blockSizes.txt";
 
-    std::vector<ValueType> blockSizes = FileIO<IndexType,ValueType>::readBlockSizes(blocksFile, 16);
+    std::vector<std::vector<ValueType> > blockSizes = FileIO<IndexType,ValueType>::readBlockSizes(blocksFile, 16);
     
-    SCAI_ASSERT( blockSizes.size()==16 , "Wrong number of blocks, should be 16 but is " << blockSizes.size() );
+    SCAI_ASSERT( blockSizes[0].size()==16 , "Wrong number of blocks, should be 16 but is " << blockSizes.size() );
 
 }
 //-------------------------------------------------------------------------------------------------

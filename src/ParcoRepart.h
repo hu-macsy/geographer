@@ -41,7 +41,7 @@ namespace ITI {
              *
              * @return partition Distributed DenseVector of length n, partition[i] contains the block ID of node i
              */
-			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights,
+			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights,
 					struct Settings settings, struct Metrics& metrics);
 
 			/**
@@ -57,7 +57,7 @@ namespace ITI {
 			 *
 			 * @return partition Distributed DenseVector of length n, partition[i] contains the block ID of node i
 			 */
-			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights,
+			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights,
 					DenseVector<IndexType>& previous, struct Settings settings, struct Metrics& metrics);
 
 			/**
@@ -73,7 +73,7 @@ namespace ITI {
             /**
 			 * Wrapper without metrics.
 			 */
-			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, struct Settings settings);
+			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights, struct Settings settings);
 
 		/**
 		* Wrapper for metis-like input.

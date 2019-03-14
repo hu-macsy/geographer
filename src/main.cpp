@@ -117,7 +117,7 @@ int main(int argc, char** argv) {
     
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
-	scai::lama::DenseVector<ValueType> nodeWeights;		//the weights for each node
+	std::vector<scai::lama::DenseVector<ValueType>> nodeWeights;		//the weights for each node
 	
 	
     if (vm.count("graphFile")) {
@@ -170,16 +170,11 @@ int main(int argc, char** argv) {
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
         assert(graph.getColDistribution().isEqual(*noDistPtr));
 
+        nodeWeights = vectorOfNodeWeights;
         IndexType numNodeWeights = vectorOfNodeWeights.size();
         if (numNodeWeights == 0) {
-			nodeWeights = fill<DenseVector<ValueType>>(rowDistPtr, 1);
-		}
-		else if (numNodeWeights == 1) {
-			nodeWeights = vectorOfNodeWeights[0];
-		} else {
-			IndexType index = vm["nodeWeightIndex"].as<int>();
-			assert(index < numNodeWeights);
-			nodeWeights = vectorOfNodeWeights[index];
+        	nodeWeights.resize(1);
+			nodeWeights[0] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
 		}
 
         // for 2D we do not know the size of every dimension
@@ -214,7 +209,7 @@ int main(int argc, char** argv) {
         	coordinates.resize(settings.dimensions);
 
 			for (IndexType i = 0; i < settings.dimensions; i++) {
-				coordinates[i] = ITI::Diffusion<IndexType, ValueType>::potentialsFromSource(L, nodeWeights, nodeIndices[i]);
+				coordinates[i] = ITI::Diffusion<IndexType, ValueType>::potentialsFromSource(L, nodeWeights[0], nodeIndices[i]);
 			}
 
         } else {
@@ -277,7 +272,8 @@ int main(int argc, char** argv) {
             std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
         }
         
-        nodeWeights = scai::lama::fill<scai::lama::DenseVector<ValueType>>(graph.getRowDistributionPtr(), 1);
+        nodeWeights.resize(1);
+        nodeWeights[0] = scai::lama::fill<scai::lama::DenseVector<ValueType>>(graph.getRowDistributionPtr(), 1);
         
     } else if (vm.count("quadTreeFile")) {
         //if (comm->getRank() == 0) {
@@ -296,7 +292,9 @@ int main(int argc, char** argv) {
         for (IndexType i = 0; i < settings.dimensions; i++) {
         	coordinates[i].redistribute(rowDistPtr);
         }
-        nodeWeights = scai::lama::fill<scai::lama::DenseVector<ValueType>>(graph.getRowDistributionPtr(), 1);
+
+        nodeWeights.resize(1);
+        nodeWeights[0] = scai::lama::fill<scai::lama::DenseVector<ValueType>>(graph.getRowDistributionPtr(), 1);
 
     } else{
     	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;
@@ -310,9 +308,11 @@ int main(int argc, char** argv) {
     
     if( vm.count("blockSizesFile") ){
         settings.blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
-        ValueType blockSizesSum  = std::accumulate( settings.blockSizes.begin(), settings.blockSizes.end(), 0);
-        ValueType nodeWeightsSum = nodeWeights.sum();
-        SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
+        for (IndexType i = 0; i < nodeWeights.size(); i++) {
+        	const ValueType blockSizesSum  = std::accumulate( settings.blockSizes[i].begin(), settings.blockSizes[i].end(), 0);
+			const ValueType nodeWeightsSum = nodeWeights[i].sum();
+			SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
+        }
     }
     
     //---------------------------------------------------------------
@@ -354,8 +354,8 @@ int main(int argc, char** argv) {
     		coordinates[d].redistribute(previousRedist);
     	}
 
-    	if (nodeWeights.size() > 0) {
-    		nodeWeights.redistribute(previousRedist);
+    	for (IndexType i = 0; i < nodeWeights.size(); i++) {
+    		nodeWeights[i].redistribute(previousRedist);
     	}
     	previous = fill<DenseVector<IndexType>>(previousRedist.getTargetDistributionPtr(), comm->getRank());
 
@@ -371,8 +371,10 @@ int main(int argc, char** argv) {
     if( repeatTimes>0 ){
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
         // SCAI_ASSERT_ERROR(rowDistPtr->isEqual( new scai::dmemo::BlockDistribution(N, comm) ) , "Graph row distribution should (?) be a block distribution." );
-        SCAI_ASSERT_ERROR( coordinates[0].getDistributionPtr()->isEqual( *rowDistPtr ) , "rowDistribution and coordinates distribution must be equal" ); 
-        SCAI_ASSERT_ERROR( nodeWeights.getDistributionPtr()->isEqual( *rowDistPtr ) , "rowDistribution and nodeWeights distribution must be equal" ); 
+        SCAI_ASSERT_ERROR( coordinates[0].getDistributionPtr()->isEqual( *rowDistPtr ) , "rowDistribution and coordinates distribution must be equal" );
+        for (IndexType i = 0; i < nodeWeights.size(); i++) {
+        	SCAI_ASSERT_ERROR( nodeWeights[i].getDistributionPtr()->isEqual( *rowDistPtr ) , "rowDistribution and nodeWeights distribution must be equal" );
+        }
     }
     
     //store distributions to use later
@@ -397,7 +399,9 @@ int main(int argc, char** argv) {
             for(int d=0; d<settings.dimensions; d++){
                 coordinates[d].redistribute( rowDistPtr );
             }
-            nodeWeights.redistribute( rowDistPtr );
+            for (IndexType i = 0; i < nodeWeights.size(); i++) {
+            		nodeWeights[i].redistribute( rowDistPtr );
+            }
         }
           
         //metricsVec.push_back( Metrics( comm->getSize()) );
@@ -417,7 +421,7 @@ int main(int argc, char** argv) {
         }
 		
         metricsVec[r].finalCut = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
-        metricsVec[r].finalImbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(partition, settings.numBlocks ,nodeWeights);
+        metricsVec[r].finalImbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(partition, settings.numBlocks ,nodeWeights[0]);
         metricsVec[r].inputTime = ValueType ( comm->max(inputTime.count() ));
         metricsVec[r].timeFinalPartition = ValueType (comm->max(partitionTime.count()));
 
@@ -444,10 +448,10 @@ int main(int argc, char** argv) {
         std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
 		if( metricsDetail=="all" ){
-			metricsVec[r].getAllMetrics( graph, partition, nodeWeights, settings );
+			metricsVec[r].getAllMetrics( graph, partition, nodeWeights[0], settings );
 		}
         if( metricsDetail=="easy" ){
-			metricsVec[r].getEasyMetrics( graph, partition, nodeWeights, settings );
+			metricsVec[r].getEasyMetrics( graph, partition, nodeWeights[0], settings );
 		}
         std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
         
@@ -518,7 +522,7 @@ int main(int argc, char** argv) {
 
 				//printVectorMetrics( metricsVec, outF ); 
                 std::cout<< "Output information written to file " << settings.outFile << " in total time " << totalT << std::endl;
-            }else{
+            }	else	{
                 std::cout<< "Could not open file " << settings.outFile << " information not stored"<< std::endl;
             }            
         }
