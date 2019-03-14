@@ -237,8 +237,9 @@ static std::pair<IndexType, IndexType> computeBlockGraphComm( const scai::lama::
 //template<typename IndexType, typename ValueType>
 static std::pair<IndexType,IndexType> computeCommVolume_p_equals_k( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part);
     
-/**Returns the process graph. Every processor traverses its local part of adjM: and for every
- * edge (u,v) that one node, say u, is not local it gets the owner processor of u. The returned graph is distributed with a BLOCK distribution.
+/**Returns the process graph. Every processor traverses its local part of adjM and for every
+ * edge (u,v) that one node, say u, is not local it gets the owner processor of u.
+ * The returned graph is distributed with a BLOCK distribution where each PE owns one row.
  *
  * @param[in] adjM The adjacency matrix of the input graph.
  * @return A [#PE x #PE] adjacency matrix of the process graph, distributed with a Block distribution

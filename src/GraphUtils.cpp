@@ -504,7 +504,7 @@ std::vector<IndexType> GraphUtils<IndexType, ValueType>::nonLocalNeighbors(const
 	scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
-	//WARNING: this can affect how other funcitons behave. For example, getPEGraphTest
+	//WARNING: this can affect how other functions behave. For example, getPEGraphTest
 	//	fails if we use a set
 	//TODO: template or add an option so it can be called both ways?
 	//std::set<IndexType> neighborSet;	//does not allows duplicates, we count vertices
@@ -1047,20 +1047,22 @@ std::vector<std::vector<IndexType>> GraphUtils<IndexType, ValueType>::getLocalBl
                 assert( u < max +1);
                 assert( v < max +1);
                 if( u != v){    // the nodes belong to different blocks                  
-                        bool add_edge = true;
-                        for(IndexType k=0; k<edges[0].size(); k++){ //check that this edge is not already in
-                            if( edges[0][k]==u && edges[1][k]==v ){
-                            	// the edge (u,v) already exists, increase weight
-                            	edges[2][k]++;
-                                add_edge= false;
-                                break;      
-                            }
+                    bool add_edge = true;
+                    for(IndexType k=0; k<edges[0].size(); k++){ //check that this edge is not already in
+                        if( edges[0][k]==u && edges[1][k]==v ){
+                        	// the edge (u,v) already exists, increase weight
+                        	edges[2][k]++;
+                        	// we are not doing the same for the gathered part below so just add 1
+                        	//edges[2][k]+= values[j];
+                            add_edge= false;
+                            break;      
                         }
-                        if( add_edge== true){       //if this edge does not exist, add it
-                            edges[0].push_back(u);
-                            edges[1].push_back(v);
-                            edges[2].push_back(1);
-                        }
+                    }
+                    if( add_edge== true){       //if this edge does not exist, add it
+                        edges[0].push_back(u);
+                        edges[1].push_back(v);
+                        edges[2].push_back(1);
+                    }
                 }
             } else{  // if(dist->isLocal(j)) 
                 // there is an edge between i and j but index j is not local in the partition so we cannot get part[j].
@@ -1156,7 +1158,7 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getBloc
                 IndexType u = blockEdges[0][i];
                 IndexType v = blockEdges[1][i];
                 //sendPartWrite[ u*k + v ] = 1;
-                sendPartWrite[ u*k + v ] = blockEdges[2][i];
+                sendPartWrite[ u*k + v ] += blockEdges[2][i];
             }
         }
         comm->shiftArray(recvPart , sendPart, 1);

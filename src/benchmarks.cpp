@@ -19,7 +19,7 @@ class benchmarkTest : public ::testing::Test {
 };
 
 
-TEST_F( benchmarkTest, testMapping ){
+TEST_F( benchmarkTest, benchMapping ){
 
 	//std::string fileName = "Grid32x32";
 	std::string fileName = "slowrot-00000.graph";
