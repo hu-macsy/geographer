@@ -94,11 +94,19 @@ TEST_F( benchmarkTest, benchMapping ){
 
 //4 - compare quality
     PRINT("--------- Metrics for regular partition");
+
+    //graph and partition are distributed inside partitionGraph; distributions must allign
+    unitWeights.redistribute( partition.getRowDistributionPtr() );
+
     metrics.getMappingMetrics( graph, partition, PEGraph);
     metrics.getEasyMetrics( graph, partition, unitWeights, settings );
     metrics.print( std::cout );
 
     PRINT("--------- Metrics for hierarchical partition");
+    
+    //graph and partition are distributed inside partitionGraph; distributions must allign
+    unitWeights.redistribute( partitionWithPE.getRowDistributionPtr() );
+
     metrics2.getMappingMetrics( graph2, partitionWithPE, PEGraph);
     metrics2.getEasyMetrics( graph2, partitionWithPE, unitWeights, settings );
     metrics2.print( std::cout );
