@@ -68,7 +68,7 @@ using point = std::vector<ValueType>;
  	const CSRSparseMatrix<ValueType> &graph, \
  	const std::vector<DenseVector<ValueType>> &coordinates, \
  	const DenseVector<ValueType> &nodeWeights, \
- 	const std::vector<ValueType> &blockSizesPerCent, \
+ 	const std::vector<ValueType> &blockSizes, \
  	const DenseVector<IndexType>& prevPartition,\
  	std::vector<std::vector<point>> centers, \
  	const Settings settings, \
