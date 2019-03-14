@@ -357,11 +357,7 @@ DenseVector<IndexType> computePartition( \
 	if (randomInitialization) {
 		ITI::GraphUtils<IndexType, ValueType>::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
 		//std::vector<IndexType> localIndices = GraphUtils::indexReorderCantor( localN );
-/*
-IndexType indexSumFY = std::accumulate( localIndices.begin(), localIndices.end(), 0);
-IndexType indexSumC = std::accumulate( localIndices2.begin(), localIndices2.end(), 0);
-SCAI_ASSERT_EQ_ERROR( indexSumFY, indexSumC, "Erros in index reordering");
-*/
+
 		SCAI_ASSERT_EQ_ERROR(*std::max_element(localIndices.begin(), localIndices.end()), localN -1, "Error in index reordering");
 		SCAI_ASSERT_EQ_ERROR(*std::min_element(localIndices.begin(), localIndices.end()), 0, "Error in index reordering");
 
@@ -535,16 +531,6 @@ SCAI_ASSERT_EQ_ERROR( indexSumFY, indexSumC, "Erros in index reordering");
 			maxTime = comm->max( balanceTime.count() );
 		}
 
-		
-		//WARNING: when sampling, a (big!) part of the result vector is not changed
-		//	and keeps its initial value which is 0. So, the computeImbalance finds,
-		//	falsely, block 0 to be over weighted. We use the returned imabalance
-		//	from assign centers when sampling is used and we compute a new imbalance
-		// only when thene is no sampling
-		if( !randomInitialization ){
-			imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( result, settings.numBlocks, nodeWeights );
-		}
-
 		if (comm->getRank() == 0) {
 			std::cout << "i: " << iter<< ", delta: " << delta << ", time : "<< maxTime << ", imbalance= " << imbalance<< std::endl;
 		}
@@ -560,16 +546,6 @@ SCAI_ASSERT_EQ_ERROR( indexSumFY, indexSumC, "Erros in index reordering");
 			//	PRINT0( "iter " << iter << ", i: " << i << " influence= " << influence[i]  << ", blockWeights= " <<  blockWeights[i] << ",  adjustedBlockSizes= " << adjustedBlockSizes[i] );
 			result.writeToFile( filename );
 		}
-
-		// WARNING-TODO: this stops the iterations prematurely, when the wanted balance
-		// is reached. It is possible that if we allow more iterations, the solution
-		// will converge to some optima reagaridng the cut/shape. Investigate that
-
-		//WARNING2: this is also needed to ensure that the required number of sampling
-		//	rounds will be performed so at the end, all nodes are accounted for
-
-		//if(imbalance<settings.epsilon)
-		//	break;
 
 	} while (iter < samplingRounds or (iter < maxIterations && (delta > threshold || !balanced)) ); // or (imbalance>settings.epsilon) );
 
