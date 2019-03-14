@@ -601,7 +601,6 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 		}
 	}
 
-	//ValueType imbalance;
 	IndexType iter = 0;
 	IndexType skippedLoops = 0;
 	ValueType time = 0;	// for timing/profiling
@@ -971,7 +970,7 @@ DenseVector<IndexType> computeRepartition(
 return computePartition(coordinates, nodeWeights, blockSizes, /**/ previous /**/, groupOfCenters, settings, metrics);
 }
 
-//usual call that does not take the garph as input
+//usual call that does not take the graph as input
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition( \
 	const std::vector<DenseVector<ValueType>> &coordinates, \
@@ -993,8 +992,6 @@ DenseVector<IndexType> computePartition( \
 }
 
 //TODO: graph is not needed, this is only for debugging
-//TODO/WARNING: in some version of computePartition, blockSizes are the actual wanted size,
-//	in other versions (like below) we use the percentage of the block according to the total weight sum
 
 //core implementation 
 template<typename IndexType, typename ValueType>
@@ -1019,8 +1016,8 @@ DenseVector<IndexType> computePartition( \
 	}
 
 	if (settings.erodeInfluence) {
-		std::pair<ValueType, ValueType> minMax = std::minmax_element(blockSizes.begin(), blockSizes.end());
-		if (minMax.first != minMax.second) {
+		auto minMax = std::minmax_element(blockSizes.begin(), blockSizes.end());
+		if (*minMax.first != *minMax.second) {
 			throw std::logic_error("ErodeInfluence setting is not supported for heterogeneous blocks");
 		}
 	}
@@ -1068,11 +1065,11 @@ DenseVector<IndexType> computePartition( \
 
 	const ValueType nodeWeightSum = nodeWeights.sum();
 	const ValueType blockSizeSum = std::accumulate(blockSizes.begin(), blockSizes.end(), 0.0);
-	if (nodeWeightSum > blockSizeSum) {
+	if (nodeWeightSum > blockSizeSum*(1+settings.epsilon)) {
 		for (ValueType blockSize : blockSizes) {
 			PRINT0(std::to_string(blockSize) + " ");
 		}
-		throw std::invalid_argument("Block size sum " + std::to_string(blockSizeSum) + " to small for node weight sum " + std::to_string(nodeWeightSum));
+		throw std::invalid_argument("Block size sum " + std::to_string(blockSizeSum) + " too small for node weight sum " + std::to_string(nodeWeightSum));
 	}
 
 	// copy and sort coordinates according to their hilbert index
@@ -1405,16 +1402,16 @@ DenseVector<IndexType> computePartition( \
 			maxTime = comm->max( balanceTime.count() );
 		}
 
-		//this does not seem to work. Even if it works, in the first iterations, almost all
-		//nodes belong to block 0.
-		//TODO: either fix or remove
 		ValueType cut=-1;
 		if( settings.debugMode && iter >= samplingRounds){
 			cut = ITI::GraphUtils<IndexType, ValueType>::computeCut( graph, result, false );			
 		}
 
 		if (comm->getRank() == 0) {
-			std::cout << "i: " << iter<< ", delta: " << delta << ", time : "<< maxTime << ", imbalance= " << imbalance;
+			std::cout << "i: " << iter<< ", delta: " << delta << ", imbalance= " << imbalance;
+			if (settings.verbose) {
+				std::cout << ", time : "<< maxTime;
+			}
 			if (settings.debugMode  && iter >= samplingRounds) {
 				std::cout << ", cut= " << cut;
 			}
