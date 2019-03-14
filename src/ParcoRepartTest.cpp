@@ -865,8 +865,8 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
     //
     std::vector<DenseVector<ValueType>> coords(3);
     for(IndexType i=0; i<3; i++){ 
-	  coords[i].allocate(dist);
-	  coords[i] = static_cast<ValueType>( 0.0 );
+	   coords[i].allocate(dist);
+	   coords[i] = static_cast<ValueType>( 0.0 );
     }
     
     auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
