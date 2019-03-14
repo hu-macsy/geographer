@@ -423,6 +423,10 @@ void Metrics::getMappingMetrics(
 	SCAI_ASSERT_EQ_ERROR( *std::max_element(mapping.begin(), mapping.end()), N-1, "Wrong mapping" );
 	SCAI_ASSERT_EQ_ERROR( std::accumulate(mapping.begin(), mapping.end(), 0), (N*(N-1)/2), "Wrong mapping" );
 
+	const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
+	SCAI_ASSERT_EQ_ERROR( PEGraph.getRowDistributionPtr(), noDist, "Function expects the graph to bre relicated" );
+	SCAI_ASSERT_EQ_ERROR( blockGraph.getRowDistributionPtr(), noDist, "Function expects the graph to bre relicated" );
+
 	ValueType sumDilation = 0;
 	ValueType maxDilation = 0;
 	ValueType minDilation = std::numeric_limits<ValueType>::max();

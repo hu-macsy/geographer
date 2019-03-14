@@ -504,8 +504,11 @@ std::vector<IndexType> GraphUtils<IndexType, ValueType>::nonLocalNeighbors(const
 	scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
 
-	std::set<IndexType> neighborSet;	//does not allows duplicates, we count vertices
-	//std::multiset<IndexType> neighborSet; //since this allows duplicates,  we count edges
+	//WARNING: this can affect how other funcitons behave. For example, getPEGraphTest
+	//	fails if we use a set
+	//TODO: template or add an option so it can be called both ways?
+	//std::set<IndexType> neighborSet;	//does not allows duplicates, we count vertices
+	std::multiset<IndexType> neighborSet; //since this allows duplicates,  we count edges
 
 	for (IndexType i = 0; i < localN; i++) {
 		const IndexType beginCols = ia[i];
@@ -1260,7 +1263,7 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getPEGr
     const IndexType numPEs = comm->getSize();
     
     const std::vector<IndexType> nonLocalIndices = GraphUtils<IndexType, ValueType>::nonLocalNeighbors(adjM);
-    
+
     SCAI_REGION_START("ParcoRepart.getPEGraph.getOwners");
     scai::hmemo::HArray<IndexType> indexTransport(nonLocalIndices.size(), nonLocalIndices.data());
     // find the PEs that own every non-local index
@@ -1271,7 +1274,9 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getPEGr
     scai::hmemo::ReadAccess<IndexType> rOwners(owners);
     std::vector<IndexType> neighborPEs(rOwners.get(), rOwners.get()+rOwners.size());
     rOwners.release();
-    
+
+    SCAI_ASSERT_EQ_ERROR( neighborPEs.size(), nonLocalIndices.size(), "Vector size mismatch");
+
     //first count how many edges are between PEs and then remove duplicates   
 
     //we use map because, for example, a PE can have only 2 neighbors but with high ranks

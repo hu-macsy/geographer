@@ -30,6 +30,8 @@ TEST_F( benchmarkTest, testMapping ){
     settings.dimensions = dimensions;
     settings.numBlocks = 8;
     settings.noRefinement = true;
+	settings.writePEgraph = true;
+	settings.writeInFile = true;
 
     const IndexType k = settings.numBlocks;
 
@@ -46,8 +48,10 @@ TEST_F( benchmarkTest, testMapping ){
 
 	SCAI_ASSERT_EQ_ERROR( PEGraph.getNumRows(), k , "Wrong number of rows/vertices" );
 	SCAI_ASSERT_LE_ERROR( scai::utilskernel::HArrayUtils::max(PEGraph.getLocalStorage().getIA() ) , PEGraph.getNumValues(), "some ia value is too large" );
-	FileIO<IndexType,ValueType>::writeGraph( PEGraph, "peFromTree"+std::to_string(k)+".graph", 1);
-
+	if( settings.writePEgraph ){
+    	FileIO<IndexType,ValueType>::writeGraph( PEGraph, "peFromTree"+std::to_string(k)+".graph", 1);	
+    }
+	
 //2 - read and partition graph without using the PEgraph
     settings.initialPartition = InitialPartitioningMethods::KMeans;
     struct Metrics metrics(settings);
@@ -70,11 +74,6 @@ TEST_F( benchmarkTest, testMapping ){
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
     ASSERT_EQ(globalN, partition.size());
 
-FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/partKM"+std::to_string(settings.numBlocks)+".out");
-
-//FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partition, settings.numBlocks), "blockKM"+std::to_string(settings.numBlocks)+".graph", 1);
-
-
 
 //3 - partition graph with the PEgraph
     //read graph again or redistribute because the previous partition might have change it
@@ -85,9 +84,13 @@ FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/p
     scai::lama::DenseVector<IndexType> partitionWithPE = ITI::KMeans::computeHierarchicalPartition(  \
     	graph2, coords, unitWeights, cTree, settings, metrics );
 
-FileIO<IndexType,ValueType>::writePartitionParallel( partitionWithPE, "./partResults/partHKM"+std::to_string(settings.numBlocks)+".out");
+	if(settings.writeInFile){
+		FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/partKM"+std::to_string(settings.numBlocks)+".out");
+		FileIO<IndexType,ValueType>::writePartitionParallel( partitionWithPE, "./partResults/partHKM"+std::to_string(settings.numBlocks)+".out");
 
-//FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partitionWithPE, settings.numBlocks), "blockHKM"+std::to_string(settings.numBlocks)+".graph", 1);
+		//FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partition, settings.numBlocks), "blockKM"+std::to_string(settings.numBlocks)+".graph", 1);
+		//FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partitionWithPE, settings.numBlocks), "blockHKM"+std::to_string(settings.numBlocks)+".graph", 1);
+	}
 
 //4 - compare quality
     PRINT("--------- Metrics for regular partition");
@@ -99,6 +102,8 @@ FileIO<IndexType,ValueType>::writePartitionParallel( partitionWithPE, "./partRes
     metrics2.getMappingMetrics( graph2, partitionWithPE, PEGraph);
     metrics2.getEasyMetrics( graph2, partitionWithPE, unitWeights, settings );
     metrics2.print( std::cout );
+
+
 
 
 }//TEST_F( benchmarkTest, testMapping )
