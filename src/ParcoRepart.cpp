@@ -356,7 +356,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		// vector of size k, each element represents the size of one block
 		std::vector<ValueType> blockSizes = settings.blockSizes;
 		if( blockSizes.empty() ){
-			blockSizes = std::vector<ValueType>(settings.numBlocks, weightSum/settings.numBlocks );
+			blockSizes = std::vector<ValueType>(settings.numBlocks, std::ceil(weightSum/settings.numBlocks) );
             if (settings.verbose) {
                 PRINT0("Setting each block size to " + std::to_string(weightSum/settings.numBlocks));
             }
