@@ -1127,8 +1127,7 @@ std::vector<std::vector<IndexType>> GraphUtils<IndexType, ValueType>::getLocalBl
  * @param[in] part The partition of the input garph.
  * @param[in] k Number of blocks.
  *
- * @return The "adjacency matrix" of the block graph. In this version is a 1-dimensional array
- * with size k*k and [i,j]= i*k+j.
+ * @return The adjacency matrix of the block graph.
  */
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k) {
@@ -1219,40 +1218,6 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getBloc
     SCAI_REGION_END("ParcoRepart.getBlockGraph.swapAndAssign");
     return matrix;
 }
-//----------------------------------------------------------------------------------------
-//WARNING: 17.10.18, commented it out, probably outdated lama version
-/* 
-template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::HaloExchangePlan& halo) {
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	scai::dmemo::DistributionPtr distPEs ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, comm->getSize()) );
-	assert(distPEs->getLocalSize() == 1);
-	scai::dmemo::DistributionPtr noDistPEs (new scai::dmemo::NoDistribution( comm->getSize() ));
-
-    const scai::dmemo::CommunicationPlan& plan = halo.getLocalCommunicationPlan();
-    std::vector<IndexType> neighbors;
-    std::vector<ValueType> edgeCount;
-    for (IndexType i = 0; i < plan.size(); i++) {
-    	if (plan[i].quantity > 0) {
-    		neighbors.push_back(plan[i].partitionId);
-    		edgeCount.push_back(plan[i].quantity);
-    	}
-    }
-    const IndexType numNeighbors = neighbors.size();
-
-    SCAI_REGION_START("ParcoRepart.getPEGraph.buildMatrix");
-	scai::hmemo::HArray<IndexType> ia(2, 0, numNeighbors);
-	scai::hmemo::HArray<IndexType> ja(numNeighbors, neighbors.data());
-	scai::hmemo::HArray<ValueType> values(edgeCount.size(), edgeCount.data());
-	scai::lama::CSRStorage<ValueType> myStorage(1, comm->getSize(), numNeighbors, ia, ja, values);
-	SCAI_REGION_END("ParcoRepart.getPEGraph.buildMatrix");
-
-    scai::lama::CSRSparseMatrix<ValueType> PEgraph(distPEs, noDistPEs);
-    PEgraph.swapLocalStorage(myStorage);
-
-    return PEgraph;
-}
-*/
 //-----------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>

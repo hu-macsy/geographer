@@ -612,6 +612,64 @@ TEST_F ( GraphUtilsTest, testGetPEGraph) {
     EXPECT_EQ( PEgraph.getNumColumns(), comm->getSize() );
     EXPECT_EQ( PEgraph.getNumRows(), comm->getSize() );
     EXPECT_TRUE( PEgraph.checkSymmetry() );
+
+    // if local number of columns and rows equal comm->getSize() must mean that graph is not distributed but replicated, TODO:not sure
+    EXPECT_EQ( PEgraph.getLocalNumColumns() , comm->getSize() );
+    EXPECT_EQ( PEgraph.getLocalNumRows() , comm->getSize() );
+    EXPECT_EQ( comm->getSize()* PEgraph.getLocalNumValues(),  comm->sum( PEgraph.getLocalNumValues()) );
+}
+//------------------------------------------------------------------------------
+
+TEST_F ( GraphUtilsTest, testGetBlockGraph) {
+	std::string file = graphPath + "trace-00008.graph";
+	//std::string file = graphPath + "Grid8x8";
+    std::ifstream f(file);
+    IndexType dimensions= 2, k;
+    IndexType N, edges;
+    f >> N >> edges; 
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    k = comm->getSize()+2; //just something not equal p
+    //
+    
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    
+    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
+    EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
+
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
+    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
+    
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.1;
+    settings.dimensions = dimensions;
+    //settings.minGainForNextRound = 100;
+    settings.noRefinement = true;
+    settings.initialPartition = InitialPartitioningMethods::KMeans;
+    struct Metrics metrics(settings);
+    
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
+
+	//test getBlockGraph
+    scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils<IndexType, ValueType>::getBlockGraph( graph, partition, k);
+    
+    //checks
+    EXPECT_EQ( blockGraph.getNumRows(), k );
+    EXPECT_TRUE( blockGraph.checkSymmetry() );
+
+    //checck if matrix is same in all PEs
+    for(int i=0; i<k; i++){
+    	for(int j=0; j<k; j++){
+    		ValueType myVal = blockGraph.getValue(i,j);
+    		ValueType sumVal = comm->sum(myVal);
+    		EXPECT_EQ( sumVal, myVal*k ) \
+    			<< " for position ["<<i <<"," << j << "]. PE " << comm->getRank() <<", myVal= " << myVal ;
+    	}
+    }
+
 }
 //------------------------------------------------------------------------------
 

@@ -424,8 +424,8 @@ void Metrics::getMappingMetrics(
 	SCAI_ASSERT_EQ_ERROR( std::accumulate(mapping.begin(), mapping.end(), 0), (N*(N-1)/2), "Wrong mapping" );
 
 	const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
-	SCAI_ASSERT_EQ_ERROR( PEGraph.getRowDistributionPtr(), noDist, "Function expects the graph to bre relicated" );
-	SCAI_ASSERT_EQ_ERROR( blockGraph.getRowDistributionPtr(), noDist, "Function expects the graph to bre relicated" );
+	SCAI_ASSERT( PEGraph.getRowDistributionPtr()->isEqual(*noDist), "Function expects the graph to bre relicated" );
+	SCAI_ASSERT( blockGraph.getRowDistributionPtr()->isEqual(*noDist), "Function expects the graph to bre relicated" );
 
 	ValueType sumDilation = 0;
 	ValueType maxDilation = 0;
@@ -542,7 +542,7 @@ void Metrics::getMappingMetrics(
 	const scai::lama::CSRSparseMatrix<ValueType> PEGraph ){	
 
 	const IndexType k = partition.max()+1;
-	SCAI_ASSERT_EQ_ERROR( k, PEGraph.getNumRows(), "Max value in partition (aka, k) should be equal witht the number of vertices of the PE graph." );
+	SCAI_ASSERT_EQ_ERROR( k, PEGraph.getNumRows(), "Max value in partition (aka, k) should be equal with the number of vertices of the PE graph." );
 
 	scai::lama::CSRSparseMatrix<ValueType> blockGraph = ITI::GraphUtils<IndexType,ValueType>::getBlockGraph(
 		appGraph, partition, k );

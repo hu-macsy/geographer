@@ -203,18 +203,17 @@ static std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<In
 //template<typename IndexType, typename ValueType>
 static std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part);
 
-/** Builds the block graph of the given partition.
+/** Builds the block (aka, communication) graph of the given partition.
  * Creates an HArray that is passed around in numPEs (=comm->getSize()) rounds and every time
  * a processor writes in the array its part.
  *
- * Not distributed.
+ * The returned matrix is replicated in all PEs.
  *
  * @param[in] adjM The adjacency matric of the input graph.
  * @param[in] part The partition of the input garph.
  * @param[in] k Number of blocks.
  *
- * @return The "adjacency matrix" of the block graph. In this version is a 1-dimensional array
- * with size k*k and [i,j]= i*k+j.
+ * @return The adjacency matrix of the block graph.
  */
 //template<typename IndexType, typename ValueType>
 static scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
