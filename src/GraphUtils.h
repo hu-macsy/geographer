@@ -218,6 +218,7 @@ static std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::
 //template<typename IndexType, typename ValueType>
 static scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 
+static scai::lama::CSRSparseMatrix<ValueType> getBlockGraph_new( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 
 /** Get the maximum degree of a graph.
  * */

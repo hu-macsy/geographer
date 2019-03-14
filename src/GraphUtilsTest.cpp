@@ -654,7 +654,8 @@ TEST_F ( GraphUtilsTest, testGetBlockGraph) {
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
 
 	//test getBlockGraph
-    scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils<IndexType, ValueType>::getBlockGraph( graph, partition, k);
+    //scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils<IndexType, ValueType>::getBlockGraph( graph, partition, k);
+    scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils<IndexType, ValueType>::getBlockGraph_new( graph, partition, k);
     
     //checks
     EXPECT_EQ( blockGraph.getNumRows(), k );

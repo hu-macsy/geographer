@@ -1052,7 +1052,7 @@ std::vector<std::vector<IndexType>> GraphUtils<IndexType, ValueType>::getLocalBl
                         if( edges[0][k]==u && edges[1][k]==v ){
                         	// the edge (u,v) already exists, increase weight
                         	edges[2][k]++;
-                        	// we are not doing the same for the gathered part below so just add 1
+                        	//for the gathered part below we do not use values, so just add 1 here
                         	//edges[2][k]+= values[j];
                             add_edge= false;
                             break;      
@@ -1116,6 +1116,135 @@ std::vector<std::vector<IndexType>> GraphUtils<IndexType, ValueType>::getLocalBl
         }
     }
     return edges;
+}
+
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlockGraph_new( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k) {
+	SCAI_REGION("ParcoRepart.getLocalBlockGraphEdges");
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
+    //TODO/check: should dist==partDist??
+    const IndexType localN = partDist->getLocalSize();
+    SCAI_ASSERT( partDist->isEqual(*dist), "Graph and partition distributions must agree" );
+   
+    if( !dist->isEqual( part.getDistribution() ) ){
+        std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and partition dist: "<< part.getDistribution() << std::endl;
+        throw std::runtime_error( "Distributions: should (?) be equal.");
+    }
+
+	//access to graph and partition
+	const scai::lama::CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+    const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+    const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+    const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+
+    //assert( max(ja)<globalN);
+
+    const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
+    const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
+
+    //get halo for non-local values
+    scai::dmemo::HaloExchangePlan partHalo = buildNeighborHalo( adjM );
+	scai::hmemo::HArray<IndexType> haloData;
+	partHalo.updateHalo( haloData, localPart, partDist->getCommunicator() );
+
+	//the vector to be returned
+	//edges[0]: first vetrex id, edges[1]: second vetrex id. edges[2]: the weight of the edge
+    std::vector<std::vector<IndexType>> blockEdges(3);	
+
+    // TODO: memory costly for big k
+    IndexType size= k*k;
+    //localBlockGraphEdges[i] = w, is the weight for edge (i/k,i%k)
+    scai::hmemo::HArray<ValueType> localBlockGraphEdges( size,  static_cast<ValueType>(0.0) );
+
+	//go over local data
+	for (IndexType i = 0; i < localN; i++) {
+		const IndexType beginCols = ia[i];
+		const IndexType endCols = ia[i+1];
+		assert(ja.size() >= endCols);
+
+		const IndexType globalI = dist->local2Global(i);
+		//assert(partDist->isLocal(globalI));
+		SCAI_ASSERT_ERROR(partDist->isLocal(globalI), "non-local index, globalI= " << globalI << " for PE " << comm->getRank() );	
+
+		IndexType thisBlock = partAccess[i];
+
+		for (IndexType j = beginCols; j < endCols; j++) {
+			IndexType neighbor = ja[j];
+			IndexType neighborBlock;
+			if (partDist->isLocal(neighbor)) {
+				neighborBlock = partAccess[partDist->global2Local(neighbor)];
+			} else {
+				neighborBlock = haloData[partHalo.global2Halo(neighbor)];
+			}
+
+			if (neighborBlock != thisBlock) {
+				IndexType index = thisBlock*k + neighborBlock;
+				localBlockGraphEdges[index] = values[j];
+			}
+		}
+	}//for
+
+	//now, localBlockGraphEdges contains the global summed values; it should be the same in every PE
+	comm->sumArray( localBlockGraphEdges );
+
+	//count number of edges
+	IndexType numEdges=0;
+	{
+		scai::hmemo::ReadAccess<ValueType> globalEdges( localBlockGraphEdges );
+	    for(IndexType i=0; i<globalEdges.size(); i++){
+	        if( globalEdges[i]>0 )
+	            ++numEdges;
+	    }
+	}
+
+    //convert the k*k HArray to a [k x k] CSRSparseMatrix
+    scai::lama::CSRStorage<ValueType> localMatrix;
+    localMatrix.allocate( k ,k );
+    
+    scai::hmemo::HArray<IndexType> csrIA;
+    scai::hmemo::HArray<IndexType> csrJA;
+    scai::hmemo::HArray<ValueType> csrValues( numEdges, 0.0 ); 
+    {
+        IndexType numNZ = numEdges;     // this equals the number of edges of the graph
+        scai::hmemo::WriteOnlyAccess<IndexType> ia( csrIA, k +1 );
+        scai::hmemo::WriteOnlyAccess<IndexType> ja( csrJA, numNZ );
+        scai::hmemo::WriteOnlyAccess<ValueType> values( csrValues );   
+        scai::hmemo::ReadAccess<ValueType> globalEdges( localBlockGraphEdges );
+        ia[0]= 0;
+        
+        IndexType rowCounter = 0; // count rows
+        IndexType nnzCounter = 0; // count non-zero elements
+        
+        for(IndexType i=0; i<k; i++){
+            IndexType rowNums=0;
+            // traverse the part of the HArray that represents a row and find how many elements are in this row
+            for(IndexType j=0; j<k; j++){
+                if( globalEdges[i*k+j] >0  ){
+                    ++rowNums;
+                }
+            }
+            ia[rowCounter+1] = ia[rowCounter] + rowNums;
+           
+            for(IndexType j=0; j<k; j++){
+                if( globalEdges[i*k +j] >0){   // there exist edge (i,j)
+                    ja[nnzCounter] = j;
+                    //values[nnzCounter] = 1;
+                    values[nnzCounter] = globalEdges[i*k +j];
+                    ++nnzCounter;
+                }
+            }
+            ++rowCounter;
+        }
+    }
+    SCAI_REGION_START("ParcoRepart.getBlockGraph.swapAndAssign");
+        scai::lama::CSRSparseMatrix<ValueType> matrix;
+        localMatrix.swap( csrIA, csrJA, csrValues );
+        matrix.assign(localMatrix);
+    SCAI_REGION_END("ParcoRepart.getBlockGraph.swapAndAssign");
+    return matrix;
 }
 //-----------------------------------------------------------------------------------
 
