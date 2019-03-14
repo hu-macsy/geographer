@@ -1405,13 +1405,13 @@ DenseVector<IndexType> computePartition( \
 		//nodes belong to block 0.
 		//TODO: either fix or remove
 		ValueType cut=-1;
-		if( settings.debugMode ){
+		if( settings.debugMode && iter >= samplingRounds){
 			cut = ITI::GraphUtils<IndexType, ValueType>::computeCut( graph, result, false );			
 		}
 
 		if (comm->getRank() == 0) {
 			std::cout << "i: " << iter<< ", delta: " << delta << ", time : "<< maxTime << ", imbalance= " << imbalance;
-			if (settings.debugMode) {
+			if (settings.debugMode  && iter >= samplingRounds) {
 				std::cout << ", cut= " << cut;
 			}
 			std::cout << std::endl;
