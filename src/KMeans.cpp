@@ -1072,55 +1072,14 @@ DenseVector<IndexType> computePartition( \
 		throw std::invalid_argument("Block size sum " + std::to_string(blockSizeSum) + " too small for node weight sum " + std::to_string(nodeWeightSum));
 	}
 
-	// copy and sort coordinates according to their hilbert index
+	// copy coordinates
 	{
-		// a vector of the indices
-		std::vector<IndexType> permIndices(localN);
-		std::iota(permIndices.begin(), permIndices.end(), 0);
-
-		// sfc indices of all local points
-		const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(globalN), double(21));
-		std::vector<ValueType> localHilbertInd = HilbertCurve<IndexType,ValueType>::getHilbertIndexVector(coordinates, recursionDepth, settings.dimensions);
-
-		SCAI_ASSERT_EQ_ERROR(localN, localHilbertInd.size() , "vector size mismatch");
-
-		//WARNING: the next sorting is wrong as it is now. It messes up the point indices and coordinates:
-		// point i has different coordinates than in the beginning. Either leave it out or maybe also sort
-		// the point indices. I am leaving it here for future reference
-		// sort the point/vertex indices based on their hilbert index
-		//std::sort(permIndices.begin(), permIndices.end(), [&](IndexType i, IndexType j){return localHilbertInd[i] < localHilbertInd[j];});
-
 		for (IndexType d = 0; d < dim; d++) {
 			scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
-			//convertedCoords[d] = std::vector<ValueType>(rAccess.get(), rAccess.get()+localN);
-			assert(rAccess.size() == localN);				
+			convertedCoords[d] = std::vector<ValueType>(rAccess.get(), rAccess.get()+localN);
 			
-			// copy coordinates sorted by their hilbert index
-			IndexType checkSum = 0;
-			ValueType sumCoord = 0.0;
-			convertedCoords[d].resize(localN);
-			for(IndexType i=0; i<localN; i++){
-				//TODO: the permIndices vectors is not needed
-				IndexType ind = permIndices[i];
-				ValueType coord = rAccess[ ind ];
-				convertedCoords[d][i] = coord;
-
-				//meant for debugging reasons, remove or add debug macros
-				checkSum += ind;
-				sumCoord += coord;
-			}
-
-			SCAI_ASSERT_EQ_ERROR(checkSum, (localN*(localN-1)/2), "Checksum error");
-			ValueType sumCoord2 = std::accumulate( convertedCoords[d].begin(), convertedCoords[d].end(), 0.0);
-			//added std::abs since some coordinates can be negative and have a negative sum
-			SCAI_ASSERT_GE_ERROR( std::abs(sumCoord), std::abs(0.999*sumCoord2), "Error in sorting local coordinates");
-
 			minCoords[d] = *std::min_element(convertedCoords[d].begin(), convertedCoords[d].end());
 			maxCoords[d] = *std::max_element(convertedCoords[d].begin(), convertedCoords[d].end());
-
-			//or, do not take the hilbert index, do not sort and just copy coordinates
-			//TODO: test improvement, in some small inputs, the sorted version did less 
-			// iterations
 
 			assert(convertedCoords[d].size() == localN);
 		}
@@ -1313,8 +1272,8 @@ DenseVector<IndexType> computePartition( \
 			for (int d = 0; d < dim; d++) {
 				//TODO: copied from the Dev branch, commit 94e40203248c9e981af98c80fb47ba60e4c77ec2
 				// the same code does not exist in this version so I added the assertion here
-				SCAI_ASSERT_LE_ERROR( transCenters[j][d], globalMaxCoords[d], "New center coordinate out of bounds" );
-		    	SCAI_ASSERT_GE_ERROR( transCenters[j][d], globalMinCoords[d], "New center coordinate out of bounds" );
+				SCAI_ASSERT_LE_ERROR( transCenters[j][d], globalMaxCoords[d]+ 1e-12, "New center coordinate out of bounds" );
+		    	SCAI_ASSERT_GE_ERROR( transCenters[j][d], globalMinCoords[d]- 1e-12, "New center coordinate out of bounds" );
 				ValueType diff = (centers1DVector[j][d] - transCenters[j][d]);
 				squaredDeltas[j] += diff*diff;
 			}
