@@ -702,8 +702,11 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 							c++;
 						} //while
 
-						//TODO: this is wrong when k=1
-						//SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be different" );
+						
+						if (rangeEnd - rangeStart > 1) {
+							SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be different" );
+						}
+							
 						assert(secondBestValue >= bestValue);
 
 						//this point has a new center
@@ -724,10 +727,8 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 				blockWeights[wAssignment[i]] += rWeights[i];		
 			}//for sampled indices
 			
-			
 			std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
 			timePerPE[comm->getRank()] += balanceTime.count();
-			
 
 			comm->synchronize();
 		}// assignment block
@@ -891,7 +892,7 @@ DenseVector<IndexType> computeRepartition(
 	{
 		ValueType localWeightSum = 0;
 		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
-		SCAI_ASSERT_EQ_ERROR( rWeights.size(), localN, "Mismatch of nodeWeights and coordinates size. Chech distributions.");
+		SCAI_ASSERT_EQ_ERROR( rWeights.size(), localN, "Mismatch of nodeWeights and coordinates size. Check distributions.");
 		
 		for (IndexType i=0; i<localN; i++) {
 			localWeightSum += rWeights[i];
@@ -1018,7 +1019,10 @@ DenseVector<IndexType> computePartition( \
 	}
 
 	if (settings.erodeInfluence) {
-		throw std::logic_error("ErodeInfluence setting is not supported in the heterogeneous or hierarchical version");
+		std::pair<ValueType, ValueType> minMax = std::minmax_element(blockSizes.begin(), blockSizes.end());
+		if (minMax.first != minMax.second) {
+			throw std::logic_error("ErodeInfluence setting is not supported for heterogeneous blocks");
+		}
 	}
 	
 	//the number of new blocks per old block and the total number of new blocks
@@ -1320,7 +1324,7 @@ DenseVector<IndexType> computePartition( \
 			deltas[j] = std::sqrt(squaredDeltas[j]);
 			if (settings.erodeInfluence) {
 				const ValueType erosionFactor = 2/(1+exp(-std::max(deltas[j]/expectedBlockDiameter-0.1, 0.0))) - 1;
-				influence[j] = exp((1-erosionFactor)*log(influence[j]));//TODO: will only work for uniform target block sizes
+				influence[j] = exp((1-erosionFactor)*log(influence[j]));
 				if (oldInfluence[j] / influence[j] < minRatio) minRatio = oldInfluence[j] / influence[j];
 			}
 		}
