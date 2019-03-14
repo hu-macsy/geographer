@@ -1117,6 +1117,7 @@ std::vector<std::vector<IndexType>> GraphUtils<IndexType, ValueType>::getLocalBl
     }
     return edges;
 }
+//-----------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlockGraph_new( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k) {
@@ -1183,6 +1184,9 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 			if (neighborBlock != thisBlock) {
 				IndexType index = thisBlock*k + neighborBlock;
 				localBlockGraphEdges[index] = values[j];
+				// to keep matrix symemtric, add also the other edge
+				index = thisBlock + neighborBlock*k;
+				localBlockGraphEdges[index] = values[j];
 			}
 		}
 	}//for
@@ -1233,6 +1237,7 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
                     ja[nnzCounter] = j;
                     //values[nnzCounter] = 1;
                     values[nnzCounter] = globalEdges[i*k +j];
+					//PRINT0("edge ["<< i <<", "<< j << "]= " << values[nnzCounter] ); 
                     ++nnzCounter;
                 }
             }
@@ -1247,6 +1252,11 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
     return matrix;
 }
 //-----------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlockGraph_dist( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k){
+
+}
 
 /** Builds the block graph of the given partition.
  * Creates an HArray that is passed around in numPEs (=comm->getSize()) rounds and every time

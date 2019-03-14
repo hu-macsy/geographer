@@ -220,6 +220,7 @@ static scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::C
 
 static scai::lama::CSRSparseMatrix<ValueType> getBlockGraph_new( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 
+static scai::lama::CSRSparseMatrix<ValueType>  getBlockGraph_dist( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 /** Get the maximum degree of a graph.
  * */
 //template<typename IndexType, typename ValueType>
