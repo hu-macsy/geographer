@@ -516,10 +516,6 @@ DenseVector<IndexType> assignBlocks(
 		Metrics &metrics) {
 	SCAI_REGION( "KMeans.assignBlocks" );
 
-//
-std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::chrono::high_resolution_clock::now();
-//
-
 	const IndexType dim = coordinates.size();
 	const scai::dmemo::DistributionPtr dist = nodeWeights.getDistributionPtr();
 	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
@@ -528,7 +524,6 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 	//number of blocks from the previous hierarchy
 	const IndexType numOldBlocks= blockSizesPrefixSum.size()-1;
 	
-	//this check is done before. TODO: remove?
 	if( settings.debugMode ){
 		const IndexType maxPart = oldBlock.max(); //global operation
 		SCAI_ASSERT_EQ_ERROR( numOldBlocks-1, maxPart, "The provided old assignment must have equal number of blocks as the length of the vector with the new number of blocks per part");
@@ -857,10 +852,10 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 
 	} while (imbalance > settings.epsilon - 1e-12 && iter < settings.balanceIterations);
 	
-	if( settings.verbose )
+	if( settings.verbose ) {
 		std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
-	//aux<IndexType,ValueType>::timeMeasurement(assignStart);
-	
+	}
+
 	//for kmeans profiling
 	metrics.numBalanceIter.push_back(iter);
 
@@ -1641,29 +1636,6 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 	}
 	return {minCoords, maxCoords};
 }
-
-
-/*
-template std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
-
-template std::vector<std::vector<ValueType> > findInitialCentersSFC<IndexType, ValueType>( const std::vector<DenseVector<ValueType> >& coordinates, const std::vector<ValueType> &minCoords,    const std::vector<ValueType> &maxCoords, Settings settings);
-
-template std::vector<std::vector<ValueType> > findLocalCenters<IndexType,ValueType>(const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights);
-
-template std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly<IndexType,ValueType>(const std::vector<ValueType> &maxCoords, Settings settings);
-
-template std::vector<std::vector<ValueType> > findCenters(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<IndexType> &partition, const IndexType k, std::vector<IndexType>::iterator firstIndex, std::vector<IndexType>::iterator lastIndex, const DenseVector<ValueType> &nodeWeights);
-
-template DenseVector<IndexType> assignBlocks(
-		const std::vector<std::vector<ValueType>> &coordinates,
-		const std::vector<std::vector<ValueType> > &centers,
-        std::vector<IndexType>::iterator firstIndex, std::vector<IndexType>::iterator lastIndex,
-        const DenseVector<ValueType> &nodeWeights, const DenseVector<IndexType> &previousAssignment, const std::vector<IndexType> &blockSizes, const SpatialCell &boundingBox,
-        std::vector<ValueType> &upperBoundOwnCenter, std::vector<ValueType> &lowerBoundNextCenter, std::vector<ValueType> &influence, ValueType &imbalance, std::vector<ValueType> &timePerPE, Settings settings, Metrics &metrics);
-
-
-template DenseVector<IndexType> computeRepartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, const Settings settings, struct Metrics& metrics);
-*/
 
 }; // namespace KMeans
 
