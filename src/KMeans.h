@@ -90,7 +90,7 @@ using point = std::vector<ValueType>;
 
 //wrapper 1- no centers
 //template<typename IndexType, typename ValueType>
- template<typename ValueType>
+ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,
 	const DenseVector<ValueType> &nodeWeights,

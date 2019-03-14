@@ -600,7 +600,6 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 		}
 	}
 
-	//ValueType imbalance;
 	IndexType iter = 0;
 	IndexType skippedLoops = 0;
 	ValueType time = 0;	// for timing/profiling
@@ -701,8 +700,11 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 							c++;
 						} //while
 
-						//TODO: this is wrong when k=1
-						//SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be different" );
+						
+						if (rangeEnd - rangeStart > 1) {
+							SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be different" );
+						}
+							
 						assert(secondBestValue >= bestValue);
 
 						//this point has a new center
@@ -723,17 +725,8 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 				blockWeights[wAssignment[i]] += rWeights[i];		
 			}//for sampled indices
 			
-			if (settings.verbose) {
-				std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
-				ValueType time = balanceTime.count() ;
-				std::cout<< comm->getRank()<< ": time " << time << std::endl;
-				PRINT(comm->getRank() << ": in assignBlocks, balanceIter time: " << time << ", for loops: " << forLoopCnt );
-				ValueType maxTime = comm->max( time );
-				PRINT0( "max time: " << maxTime << ", for loops: " << forLoopCnt );
-
-				SCAI_ASSERT_LT_ERROR( comm->getRank(), timePerPE.size(), "vector size mismatch" );
-				timePerPE[comm->getRank()] += time;
-			}
+			std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
+			timePerPE[comm->getRank()] += balanceTime.count();
 
 			comm->synchronize();
 		}// assignment block
@@ -897,7 +890,7 @@ DenseVector<IndexType> computeRepartition(
 	{
 		ValueType localWeightSum = 0;
 		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
-		SCAI_ASSERT_EQ_ERROR( rWeights.size(), localN, "Mismatch of nodeWeights and coordinates size. Chech distributions.");
+		SCAI_ASSERT_EQ_ERROR( rWeights.size(), localN, "Mismatch of nodeWeights and coordinates size. Check distributions.");
 		
 		for (IndexType i=0; i<localN; i++) {
 			localWeightSum += rWeights[i];
@@ -974,7 +967,7 @@ DenseVector<IndexType> computeRepartition(
 return computePartition(coordinates, nodeWeights, blockSizesPerCent, /**/ previous /**/, groupOfCenters, settings, metrics);
 }
 
-//usual call that does not take the garph as input
+//usual call that does not take the graph as input
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition( \
 	const std::vector<DenseVector<ValueType>> &coordinates, \
@@ -1019,6 +1012,13 @@ DenseVector<IndexType> computePartition( \
 	if( settings.debugMode ){
 		const IndexType maxPart = partition.max(); //global operation
 		SCAI_ASSERT_EQ_ERROR( numOldBlocks-1, maxPart, "The provided partition must have equal number of blocks as the length of the vector with the new number of blocks per part");
+	}
+
+	if (settings.erodeInfluence) {
+		auto minMax = std::minmax_element(blockSizesPerCent.begin(), blockSizesPerCent.end());
+		if (*minMax.first != *minMax.second) {
+			throw std::logic_error("ErodeInfluence setting is not supported for heterogeneous blocks");
+		}
 	}
 	
 	//the number of new blocks per old block and the total number of new blocks
@@ -1202,9 +1202,6 @@ DenseVector<IndexType> computePartition( \
 		    samples[samplingRounds-1] = localN;
 		}
 	}
-	//
-	//aux<IndexType,ValueType>::timeMeasurement(KMeansStart);
-	//
 
 	scai::hmemo::ReadAccess<ValueType> rWeight(nodeWeights.getLocalValues());
 	IndexType iter = 0;
@@ -1310,12 +1307,9 @@ DenseVector<IndexType> computePartition( \
 			}
 			deltas[j] = std::sqrt(squaredDeltas[j]);
 			if (settings.erodeInfluence) {
-				std::cout<< "WARNING: erodeInfluence setting is not supported in the heterogeneous or hierarchical version" <<std::endl;
-				if( false ){
-					const ValueType erosionFactor = 2/(1+exp(-std::max(deltas[j]/expectedBlockDiameter-0.1, 0.0))) - 1;
-					influence[j] = exp((1-erosionFactor)*log(influence[j]));//TODO: will only work for uniform target block sizes
-					if (oldInfluence[j] / influence[j] < minRatio) minRatio = oldInfluence[j] / influence[j];
-				}
+				const ValueType erosionFactor = 2/(1+exp(-std::max(deltas[j]/expectedBlockDiameter-0.1, 0.0))) - 1;
+				influence[j] = exp((1-erosionFactor)*log(influence[j]));
+				if (oldInfluence[j] / influence[j] < minRatio) minRatio = oldInfluence[j] / influence[j];
 			}
 		}
 		centers1DVector = transCenters;
@@ -1395,30 +1389,17 @@ DenseVector<IndexType> computePartition( \
 			maxTime = comm->max( balanceTime.count() );
 		}
 
-		
-		//WARNING: when sampling, a (big!) part of the result vector is not changed
-		// and keeps its initial value which is 0. So, the computeImbalance finds,
-		// falsely, block 0 to be over weighted. We use the returned imbalance
-		// from assign centers when sampling is used and we compute a new imbalance
-		// only when there is no sampling
-
-/*		//TODO: what imbalance should we compute for multiple weights?
-		if( !randomInitialization ){
-			imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( result, settings.numBlocks, nodeWeights );
-		}
-*/
-
-		//this does not seem to work. Even if it works, in the first iterations, almost all
-		//nodes belong to block 0.
-		//TODO: either fix or remove
 		ValueType cut=-1;
-		if( settings.debugMode ){
+		if( settings.debugMode && iter >= samplingRounds){
 			cut = ITI::GraphUtils<IndexType, ValueType>::computeCut( graph, result, false );			
 		}
 
 		if (comm->getRank() == 0) {
-			std::cout << "i: " << iter<< ", delta: " << delta << ", time : "<< maxTime << ", imbalance= " << imbalance;
-			if (settings.debugMode) {
+			std::cout << "i: " << iter<< ", delta: " << delta << ", imbalance= " << imbalance;
+			if (settings.verbose) {
+				std::cout << ", time : "<< maxTime;
+			}
+			if (settings.debugMode  && iter >= samplingRounds) {
 				std::cout << ", cut= " << cut;
 			}
 			std::cout << std::endl;
@@ -1443,7 +1424,7 @@ DenseVector<IndexType> computePartition( \
 
 
 //wrapper 1 - called initially with no centers parameter
-template<typename ValueType>
+template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,
 	const DenseVector<ValueType> &nodeWeights,

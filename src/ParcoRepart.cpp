@@ -306,8 +306,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 					} else if (settings.initialMigration == InitialPartitioningMethods::KMeans) {
 						std::vector<ValueType> migrationBlockSizes( migrationSettings.numBlocks, n/migrationSettings.numBlocks );
                         struct Metrics tmpMetrics(migrationSettings);
-//TODO: below, if I do not use <IndexType,ValueType> I get a "couldn't deduce template parameter" error.  why??? <IndexType,ValueType>
-						tempResult = ITI::KMeans::computePartition(coordinates, convertedWeights, migrationBlockSizes, migrationSettings, tmpMetrics);
+						tempResult = ITI::KMeans::computePartition<IndexType, ValueType>(coordinates, convertedWeights, migrationBlockSizes, migrationSettings, tmpMetrics);
 					}
 					
 					initMigrationPtr = scai::dmemo::generalDistributionByNewOwners( tempResult.getDistribution(), tempResult.getLocalValues() );
@@ -355,20 +354,20 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		const ValueType weightSum = nodeWeights.sum();
 		
 		// vector of size k, each element represents the size of one block
-		std::vector<ValueType> blockSizes;
-		if( settings.blockSizes.empty() ){
-			blockSizes.assign( settings.numBlocks, weightSum/settings.numBlocks );
-		}else{
-			blockSizes = settings.blockSizes;
+		std::vector<ValueType> blockSizes = settings.blockSizes;
+		if( blockSizes.empty() ){
+			blockSizes = std::vector<ValueType>(settings.numBlocks, std::ceil(weightSum/settings.numBlocks) );
+            if (settings.verbose) {
+                PRINT0("Setting each block size to " + std::to_string(weightSum/settings.numBlocks));
+            }
 		}
 		SCAI_ASSERT( blockSizes.size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
 		
 		std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
 		if (settings.repartition) {
-			result = ITI::KMeans::computeRepartition(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
+			result = ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
 		} else {
-//TODO: below, if I do not use <IndexType,ValueType> I get a "couldn't deduce template parameter" error.  why???			<IndexType,ValueType>
-			result = ITI::KMeans::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
+			result = ITI::KMeans::computePartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
 		}
 		
 		kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
