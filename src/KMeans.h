@@ -54,8 +54,8 @@ using point = std::vector<ValueType>;
  template<typename IndexType, typename ValueType>
  DenseVector<IndexType> computePartition(
  	const std::vector<DenseVector<ValueType>> &coordinates, \
- 	const DenseVector<ValueType> &nodeWeights, \
- 	const std::vector<ValueType> &blockSizes, \
+ 	const std::vector<DenseVector<ValueType>> &nodeWeights, \
+ 	const std::vector<std::vector<ValueType>> &blockSizes, \
  	const DenseVector<IndexType>& prevPartition,\
  	std::vector<std::vector<point>> centers, \
  	const Settings settings, \
@@ -67,8 +67,8 @@ using point = std::vector<ValueType>;
  DenseVector<IndexType> computePartition(
  	const CSRSparseMatrix<ValueType> &graph, \
  	const std::vector<DenseVector<ValueType>> &coordinates, \
- 	const DenseVector<ValueType> &nodeWeights, \
- 	const std::vector<ValueType> &blockSizes, \
+ 	const std::vector<DenseVector<ValueType>> &nodeWeights, \
+ 	const std::vector<std::vector<ValueType>> &blockSizes, \
  	const DenseVector<IndexType>& prevPartition,\
  	std::vector<std::vector<point>> centers, \
  	const Settings settings, \
@@ -93,8 +93,8 @@ using point = std::vector<ValueType>;
  template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,
-	const DenseVector<ValueType> &nodeWeights,
-	const std::vector<ValueType> &blockSizes,
+	const std::vector<DenseVector<ValueType>> &nodeWeights,
+	const std::vector<std::vector<ValueType>> &blockSizes,
 	const Settings settings,
 	struct Metrics &metrics);
 
@@ -103,7 +103,7 @@ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierarchicalPartition(
 	CSRSparseMatrix<ValueType> &graph, //TODO: only for debugging
 	std::vector<DenseVector<ValueType>> &coordinates,
-	DenseVector<ValueType> &nodeWeights,
+	std::vector<DenseVector<ValueType>> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,
 	Settings settings,
 	struct Metrics& metrics);
@@ -122,15 +122,15 @@ DenseVector<IndexType> computeHierarchicalPartition(
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeRepartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,
-	const DenseVector<ValueType> &nodeWeights,
-	const std::vector<ValueType> &blockSizes,
+	const std::vector<DenseVector<ValueType>> &nodeWeights,
+	const std::vector<std::vector<ValueType>> &blockSizes,
 	const DenseVector<IndexType> &previous,
 	const Settings settings);
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeRepartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,
-	const DenseVector<ValueType> &nodeWeights,
+	const std::vector<DenseVector<ValueType>> &nodeWeights,
 	const Settings settings,
 	struct Metrics& metrics);
 
@@ -267,21 +267,19 @@ template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(
 	const std::vector<std::vector<ValueType>> &coordinates,
 	//const std::vector<std::vector<point>> &centers,
-const std::vector<point>& centers,
-const std::vector<IndexType>& blockSizesPrefixSum,
-
+	const std::vector<point>& centers,
+	const std::vector<IndexType>& blockSizesPrefixSum,
 	const Iterator firstIndex,
 	const Iterator lastIndex,
-	const DenseVector<ValueType> &nodeWeights, 
+	const std::vector<DenseVector<ValueType>> &nodeWeights, 
 	const DenseVector<IndexType> &previousAssignment,
 	const DenseVector<IndexType> &oldBlocks,
-	const std::vector<ValueType> &optWeightAllBlocks,
+	const std::vector<std::vector<ValueType>> &targetBlockWeights,
 	const SpatialCell &boundingBox,
 	std::vector<ValueType> &upperBoundOwnCenter,
 	std::vector<ValueType> &lowerBoundNextCenter,
 	std::vector<ValueType> &influence,
 	ValueType &imbalance,
-	std::vector<ValueType> &timePerPE,
 	Settings settings,
 	Metrics &metrics);
 

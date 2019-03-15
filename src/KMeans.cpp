@@ -502,32 +502,37 @@ DenseVector<IndexType> assignBlocks(
 		const std::vector<IndexType>& blockSizesPrefixSum,
 		const Iterator firstIndex,
 		const Iterator lastIndex,
-		const DenseVector<ValueType> &nodeWeights,
+		const std::vector<DenseVector<ValueType>> &nodeWeights,
 		const DenseVector<IndexType> &previousAssignment,
 		const DenseVector<IndexType> &oldBlock,
-		const std::vector<ValueType> &optWeightAllBlocks,
+		const std::vector<std::vector<ValueType>> &targetBlockWeights,
 		const SpatialCell &boundingBox,
 		std::vector<ValueType> &upperBoundOwnCenter,
 		std::vector<ValueType> &lowerBoundNextCenter,
 		std::vector<ValueType> &influence,
 		ValueType &imbalance,
-		std::vector<ValueType> &timePerPE,
 		Settings settings,
 		Metrics &metrics) {
 	SCAI_REGION( "KMeans.assignBlocks" );
 
 	const IndexType dim = coordinates.size();
-	const scai::dmemo::DistributionPtr dist = nodeWeights.getDistributionPtr();
+	const scai::dmemo::DistributionPtr dist = nodeWeights[0].getDistributionPtr();
 	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
-	const IndexType localN = nodeWeights.getLocalValues().size();
+	const IndexType localN = dist->getLocalSize();
 
 	//number of blocks from the previous hierarchy
 	const IndexType numOldBlocks= blockSizesPrefixSum.size()-1;
+
+	const IndexType numNodeWeights = nodeWeights.size();
+
+	if (numNodeWeights > 1) {
+		throw std::logic_error("Multiple node weights not yet implemented in assignBlocks.");
+	}
 	
 	if( settings.debugMode ){
 		const IndexType maxPart = oldBlock.max(); //global operation
 		SCAI_ASSERT_EQ_ERROR( numOldBlocks-1, maxPart, "The provided old assignment must have equal number of blocks as the length of the vector with the new number of blocks per part");
-		SCAI_ASSERT_LT_ERROR( comm->getRank(), timePerPE.size(), "vector size mismatch" );
+		//SCAI_ASSERT_LT_ERROR( comm->getRank(), timePerPE.size(), "vector size mismatch" );
 	}
 
 	// numNewBlocks is equivalent to 'k' in the classic version
@@ -618,7 +623,7 @@ DenseVector<IndexType> assignBlocks(
 		IndexType totalComps = 0;		
 		skippedLoops = 0;
 		IndexType balancedBlocks = 0;
-		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
+		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[0].getLocalValues());
 		scai::hmemo::ReadAccess<IndexType> rOldBlock( oldBlock.getLocalValues());
 		scai::hmemo::WriteAccess<IndexType> wAssignment(assignment.getLocalValues());
 		{
@@ -722,7 +727,7 @@ DenseVector<IndexType> assignBlocks(
 			}//for sampled indices
 			
 			std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
-			timePerPE[comm->getRank()] += balanceTime.count();
+			//timePerPE[comm->getRank()] += balanceTime.count();
 
 			comm->synchronize();
 		}// assignment block
@@ -735,7 +740,7 @@ DenseVector<IndexType> assignBlocks(
 		//calculate imbalance for every new block
 		std::vector<ValueType> imbalances( numNewBlocks );
 		for( int newB=0; newB<numNewBlocks; newB++ ){
-			ValueType optWeight = optWeightAllBlocks[newB];
+			ValueType optWeight = targetBlockWeights[0][newB];
 			imbalances[newB] = (ValueType(blockWeights[newB] - optWeight)/optWeight);
 		}
 
@@ -754,7 +759,7 @@ DenseVector<IndexType> assignBlocks(
 		for (IndexType j=0; j<numNewBlocks; j++) {
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.influence" );
 
-			double ratio = ValueType(blockWeights[j])/optWeightAllBlocks[j];
+			double ratio = ValueType(blockWeights[j])/targetBlockWeights[0][j];
 			if (std::abs(ratio - 1) < settings.epsilon) {
 				balancedBlocks++;
 				if (settings.freezeBalancedInfluence) {
@@ -870,33 +875,29 @@ DenseVector<IndexType> assignBlocks(
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeRepartition(
 	const std::vector<DenseVector<ValueType>>& coordinates,
-	const DenseVector<ValueType>& nodeWeights,
+	const std::vector<DenseVector<ValueType>>& nodeWeights,
 	const Settings settings,
 	struct Metrics& metrics) {
 	
 	const IndexType localN = nodeWeights.getLocalValues().size();
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	const IndexType k = comm->getSize();
-	SCAI_ASSERT_EQ_ERROR(k, settings.numBlocks, "Deriving the previous partition from the distribution cannot work for p == k");
+	const IndexType p = comm->getSize();
+	SCAI_ASSERT_EQ_ERROR(p, settings.numBlocks, "Deriving the previous partition from the distribution cannot work for p != k");
+	const IndexType numNodeWeights = nodeWeights.size();
 	
 	// calculate the global weight sum to set the block sizes
 	//TODO: the local weight sums are already calculated in findLocalCenters, maybe extract info from there
-	ValueType globalWeightSum;
+	std::vector<std::vector<ValueType>> blockSizes(numNodeWeights);
 	
+	for (IndexType i = 0; i < numNodeWeights; i++)
 	{
-		ValueType localWeightSum = 0;
-		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
+		scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[i].getLocalValues());
 		SCAI_ASSERT_EQ_ERROR( rWeights.size(), localN, "Mismatch of nodeWeights and coordinates size. Check distributions.");
-		
-		for (IndexType i=0; i<localN; i++) {
-			localWeightSum += rWeights[i];
-		}
-	
-		globalWeightSum = comm->sum(localWeightSum);
+		const ValueType localWeightSum = std::accumulate(rWeights.begin(), rWeights.end(), 0.0);
+		const ValueType globalWeightSum = comm->sum(localWeightSum);
+		blockSizes[i] = std::vector<ValueType>(settings.numBlocks, globalWeightSum/settings.numBlocks);
 	}
 	
-	const std::vector<ValueType> blockSizes(settings.numBlocks, globalWeightSum/settings.numBlocks);
-
 	std::chrono::time_point<std::chrono::high_resolution_clock> startCents = std::chrono::high_resolution_clock::now();
 	//
 	//TODO: change to findCenters
@@ -921,12 +922,12 @@ DenseVector<IndexType> computeRepartition(
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeRepartition(
 	const std::vector<DenseVector<ValueType>>& coordinates,
-	const DenseVector<ValueType>& nodeWeights,
-	const std::vector<ValueType>& blockSizes,
+	const std::vector<DenseVector<ValueType>>& nodeWeights,
+	const std::vector<std::vector<ValueType>>& blockSizes,
 	const DenseVector<IndexType>& previous,
 	const Settings settings) {
 
-	const IndexType localN = nodeWeights.getLocalValues().size();
+	const IndexType localN = previous.getLocalValues().size();
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	std::vector<std::vector<ValueType> > initialCenters;
 
@@ -935,11 +936,11 @@ DenseVector<IndexType> computeRepartition(
 	        && comm->all(scai::utilskernel::HArrayUtils::min(previous.getLocalValues()) == comm->getRank())) {
 	    //partition is equal to distribution
 	    //TODO:: change with findCenters
-	    initialCenters = findLocalCenters<IndexType,ValueType>(coordinates, nodeWeights);
+	    initialCenters = findLocalCenters<IndexType,ValueType>(coordinates, nodeWeights[0]);
 	} else {
 	    std::vector<IndexType> indices(localN);
 	    std::iota(indices.begin(), indices.end(), 0);
-	    initialCenters = findCenters(coordinates, previous, settings.numBlocks, indices.begin(), indices.end(), nodeWeights);
+	    initialCenters = findCenters(coordinates, previous, settings.numBlocks, indices.begin(), indices.end(), nodeWeights[0]);
 	}
 
 	//just one group with all the centers; needed in the hierarchical version
@@ -969,17 +970,15 @@ return computePartition(coordinates, nodeWeights, blockSizes, /**/ previous /**/
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition( \
 	const std::vector<DenseVector<ValueType>> &coordinates, \
-	const DenseVector<ValueType> &nodeWeights, \
-	const std::vector<ValueType> &blockSizes, \
+	const std::vector<DenseVector<ValueType>> &nodeWeights, \
+	const std::vector<std::vector<ValueType>> &blockSizes, \
 	const DenseVector<IndexType> &partition, \
 	std::vector<std::vector<point>> centers, \
 	const Settings settings, \
 	struct Metrics &metrics ) {
 
-	const IndexType N = nodeWeights.size();
-	scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
-
 	scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
+	scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(dist->getGlobalSize()));
 	auto graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDistPtr);
 
 	return computePartition( graph, coordinates, nodeWeights, blockSizes,
@@ -993,8 +992,8 @@ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition( \
 	const CSRSparseMatrix<ValueType> &graph, \
 	const std::vector<DenseVector<ValueType>> &coordinates, \
-	const DenseVector<ValueType> &nodeWeights, \
-	const std::vector<ValueType> &blockSizes, \
+	const std::vector<DenseVector<ValueType>> &nodeWeights, \
+	const std::vector<std::vector<ValueType>> &targetBlockWeights, \
 	const DenseVector<IndexType> &partition, \
 	std::vector<std::vector<point>> centers, \
 	const Settings settings, \
@@ -1011,11 +1010,16 @@ DenseVector<IndexType> computePartition( \
 	}
 
 	if (settings.erodeInfluence) {
-		auto minMax = std::minmax_element(blockSizes.begin(), blockSizes.end());
-		if (*minMax.first != *minMax.second) {
-			throw std::logic_error("ErodeInfluence setting is not supported for heterogeneous blocks");
+		for (IndexType i = 0; i < targetBlockWeights.size(); i++) {
+			auto minMax = std::minmax_element(targetBlockWeights[i].begin(), targetBlockWeights[i].end());
+			if (*minMax.first != *minMax.second) {
+				throw std::logic_error("ErodeInfluence setting is not supported for heterogeneous blocks");
+			}
 		}
 	}
+
+	const IndexType numNodeWeights = nodeWeights.size();
+	assert(targetBlockWeights.size() == numNodeWeights);
 	
 	//the number of new blocks per old block and the total number of new blocks
 	std::vector<IndexType> blockSizesPrefixSum( numOldBlocks+1, 0 );
@@ -1043,9 +1047,11 @@ DenseVector<IndexType> computePartition( \
 	
 	const IndexType dim = coordinates.size();
 	assert(dim > 0);
-	const IndexType localN = nodeWeights.getLocalValues().size();
-	const IndexType globalN = nodeWeights.size();
-	assert(nodeWeights.getLocalValues().size() == coordinates[0].getLocalValues().size());
+	const IndexType localN = coordinates[0].getLocalValues().size();
+	const IndexType globalN = coordinates[0].size();
+	for (IndexType i = 0; i < numNodeWeights; i++) {
+		SCAI_ASSERT_EQ_ERROR(nodeWeights[i].getLocalValues().size(), localN, "Mismatch between node weights and coordinate size.");
+	}
 	SCAI_ASSERT_EQ_ERROR( centers[0][0].size(), dim, "Center dimensions mismatch" );
 	SCAI_ASSERT_EQ_ERROR( centers1DVector[0].size(), dim, "Center dimensions mismatch" );
 
@@ -1058,13 +1064,17 @@ DenseVector<IndexType> computePartition( \
 	std::vector<ValueType> maxCoords(dim);
 	std::vector<std::vector<ValueType> > convertedCoords(dim);
 
-	const ValueType nodeWeightSum = nodeWeights.sum();
-	const ValueType blockSizeSum = std::accumulate(blockSizes.begin(), blockSizes.end(), 0.0);
-	if (nodeWeightSum > blockSizeSum*(1+settings.epsilon)) {
-		for (ValueType blockSize : blockSizes) {
-			PRINT0(std::to_string(blockSize) + " ");
+	std::vector<ValueType> nodeWeightSum(nodeWeights.size());
+
+	for (IndexType i = 0; i < numNodeWeights; i++) {
+		nodeWeightSum[i] = nodeWeights[i].sum();
+		const ValueType blockWeightSum = std::accumulate(targetBlockWeights[i].begin(), targetBlockWeights[i].end(), 0.0);
+		if (nodeWeightSum[i] > blockWeightSum*(1+settings.epsilon)) {
+			for (ValueType blockSize : targetBlockWeights[i]) {
+				PRINT0(std::to_string(blockSize) + " ");
+			}
+			throw std::invalid_argument("Block weight sum " + std::to_string(blockWeightSum) + " too small for node weight sum " + std::to_string(nodeWeightSum[i]));
 		}
-		throw std::invalid_argument("Block size sum " + std::to_string(blockSizeSum) + " too small for node weight sum " + std::to_string(nodeWeightSum));
 	}
 
 	// copy coordinates
@@ -1167,7 +1177,6 @@ DenseVector<IndexType> computePartition( \
 		}
 	}
 
-	scai::hmemo::ReadAccess<ValueType> rWeight(nodeWeights.getLocalValues());
 	IndexType iter = 0;
 	ValueType delta = 0;
 	bool balanced = false;
@@ -1175,7 +1184,7 @@ DenseVector<IndexType> computePartition( \
 	const IndexType maxIterations = settings.maxKMeansIterations;
 	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
 	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
-	ValueType imbalance = 1;
+	std::vector<ValueType> imbalances(numNodeWeights, 1);
 
 	// result[i]=b, means that point i belongs to cluster/block b
 	DenseVector<IndexType> result(coordinates[0].getDistributionPtr(), 0);
@@ -1194,35 +1203,37 @@ DenseVector<IndexType> computePartition( \
 			assert(lastIndex == localIndices.end());
 		}
 
-		//moving here the sum of weights of the sampled points from assignBlock
-		ValueType localSampleWeightSum = 0;
-		{
-			scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
-			for (auto it = firstIndex; it != lastIndex; it++) {
-				localSampleWeightSum += rWeights[*it];
+		std::vector<std::vector<ValueType>> adjustedBlockSizes(numNodeWeights);
+
+		for (IndexType i = 0; i < numNodeWeights; i++) {
+
+			ValueType localSampleWeightSum = 0;
+			{
+				scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[i].getLocalValues());
+				for (auto it = firstIndex; it != lastIndex; it++) {
+					localSampleWeightSum += rWeights[*it];
+				}
+			}
+
+			const ValueType totalSampledWeightSum = comm->sum(localSampleWeightSum);
+			const ValueType ratio = totalSampledWeightSum / nodeWeightSum[i];
+			adjustedBlockSizes[i].resize(targetBlockWeights[i].size());
+
+			assert(ratio <= 1);
+			for (IndexType j = 0; j < targetBlockWeights[i].size(); j++) {
+				adjustedBlockSizes[i][j] = ValueType(targetBlockWeights[i][j]) * ratio;
+				if (settings.verbose) {
+					PRINT0("Adjusted " + std::to_string(targetBlockWeights[i][j]) + " down to " + std::to_string(adjustedBlockSizes[i][j]) );
+				}
 			}
 		}
 
-		const ValueType totalSampledWeightSum = comm->sum(localSampleWeightSum);
-		const ValueType ratio = totalSampledWeightSum / nodeWeightSum;
-
-		std::vector<ValueType> adjustedBlockSizes(blockSizes.size());
-
-		assert(ratio <= 1);
-		for (IndexType j = 0; j < blockSizes.size(); j++) {
-			adjustedBlockSizes[j] = ValueType(blockSizes[j]) * ratio;
-			if (settings.verbose) {
-				PRINT0("Adjusted " + std::to_string(blockSizes[j]) + " down to " + std::to_string(adjustedBlockSizes[j]) );
-			}
-		}
-
-		//TODO: adapt for multiple node weights
 		//WARNING: this is related with how we store and add the relative speed
 		//see also the ComMTree::createLevelAbove() function
 
 		std::vector<ValueType> timePerPE( comm->getSize(), 0.0);
 
-		result = assignBlocks(convertedCoords, centers1DVector, blockSizesPrefixSum, firstIndex, lastIndex, nodeWeights, result, partition, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, imbalance, timePerPE, settings, metrics);
+		result = assignBlocks(convertedCoords, centers1DVector, blockSizesPrefixSum, firstIndex, lastIndex, nodeWeights, result, partition, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, imbalances[0], settings, metrics);
 
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
@@ -1241,7 +1252,7 @@ DenseVector<IndexType> computePartition( \
 			}
 		}
 
-		std::vector<std::vector<ValueType>> newCenters = findCenters(coordinates, result, totalNumNewBlocks, firstIndex, lastIndex, nodeWeights);
+		std::vector<std::vector<ValueType>> newCenters = findCenters(coordinates, result, totalNumNewBlocks, firstIndex, lastIndex, nodeWeights[0]);
 
 		//newCenters have reversed order of the vectors
 		//maybe turn centers to a 1D vector already in computePartition?
@@ -1318,11 +1329,14 @@ DenseVector<IndexType> computePartition( \
 		}
 		
 		//find local weight of each block
-		std::vector<ValueType> blockWeights(totalNumNewBlocks,0.0);
-		for (auto it = firstIndex; it != lastIndex; it++) {
-			const IndexType i = *it;
-			IndexType cluster = rResult[i];
-			blockWeights[cluster] += rWeight[i];
+		std::vector<std::vector<ValueType>> currentBlockWeights(numNodeWeights, std::vector<ValueType>(totalNumNewBlocks,0.0));
+		for (IndexType j = 0; j < numNodeWeights; j++) {
+			scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[j].getLocalValues());
+			for (auto it = firstIndex; it != lastIndex; it++) {
+				const IndexType i = *it;
+				IndexType cluster = rResult[i];
+				currentBlockWeights[j][cluster] += rWeights[i];
+			}
 		}
 
 		// print times before global reduce step
@@ -1335,18 +1349,19 @@ DenseVector<IndexType> computePartition( \
 		}
 
 		{
-			SCAI_REGION( "KMeans.computePartition.blockWeightSum" );
-			comm->sumImpl(blockWeights.data(), blockWeights.data(), totalNumNewBlocks, scai::common::TypeTraits<ValueType>::stype);
+			SCAI_REGION( "KMeans.computePartition.currentBlockWeightSum" );
+			for (IndexType i = 0; i < numNodeWeights; i++) {
+				comm->sumImpl(currentBlockWeights[i].data(), currentBlockWeights[i].data(), totalNumNewBlocks, scai::common::TypeTraits<ValueType>::stype);
+			}
 		}
-
-		//TODO: adapt for heterogeneous weights
-		//TODO: adapt for multiple node weights
 
 		//check if all blocks are balanced
 		balanced = true;
-		for (IndexType j=0; j<totalNumNewBlocks; j++) {
-			if (blockWeights[j] > adjustedBlockSizes[j]*(1+settings.epsilon)) {
-				balanced = false;
+		for (IndexType i = 0; i < numNodeWeights; i++) {
+			for (IndexType j=0; j<totalNumNewBlocks; j++) {
+				if (currentBlockWeights[i][j] > adjustedBlockSizes[i][j]*(1+settings.epsilon)) {
+					balanced = false;
+				}
 			}
 		}
 
@@ -1362,7 +1377,7 @@ DenseVector<IndexType> computePartition( \
 		}
 
 		if (comm->getRank() == 0) {
-			std::cout << "i: " << iter<< ", delta: " << delta << ", imbalance= " << imbalance;
+			std::cout << "i: " << iter<< ", delta: " << delta << ", imbalance= " << imbalances[0];
 			if (settings.verbose) {
 				std::cout << ", time : "<< maxTime;
 			}
@@ -1372,7 +1387,7 @@ DenseVector<IndexType> computePartition( \
 			std::cout << std::endl;
 		}
 
-		metrics.kmeansProfiling.push_back( std::make_tuple(delta, maxTime, imbalance) );
+		metrics.kmeansProfiling.push_back( std::make_tuple(delta, maxTime, imbalances[0]) );
 
 		iter++;
 
@@ -1394,8 +1409,8 @@ DenseVector<IndexType> computePartition( \
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,
-	const DenseVector<ValueType> &nodeWeights,
-	const std::vector<ValueType> &blockSizes,
+	const std::vector<DenseVector<ValueType>> &nodeWeights,
+	const std::vector<std::vector<ValueType>> &blockSizes,
 	const Settings settings,
 	struct Metrics &metrics) {
 
@@ -1423,7 +1438,7 @@ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierarchicalPartition(
 	CSRSparseMatrix<ValueType> &graph,	//TODO: graph is not needed
 	std::vector<DenseVector<ValueType>> &coordinates,
-	DenseVector<ValueType> &nodeWeights,
+	std::vector<DenseVector<ValueType>> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,
 	Settings settings,
 	struct Metrics& metrics){
@@ -1446,13 +1461,18 @@ DenseVector<IndexType> computeHierarchicalPartition(
 	//the node weights. 
 	//TODO: is this supposed to be here? it is also in the
 	// ParcoRepart::partitionGraph
+	const IndexType numNodeWeights = nodeWeights.size();
+	if (numNodeWeights > 1) {
+		throw std::logic_error("Hierarchical k-means not yet implemented for multiple node weights.");
+	}
+
 	HilbertCurve<IndexType,ValueType>::hilbertRedistribution(
-		coordinates, nodeWeights, settings, metrics);
+		coordinates, nodeWeights[0], settings, metrics);
 
 	//added check to verify that the points are indeed distributed 
 	//based on the hilbert curve. Otherwise, the prefix sum needed to 
 	//calculate the centers, does not have the desired meaning.
-	bool hasHilbertDist = HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution( coordinates, nodeWeights, settings);
+	bool hasHilbertDist = HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution( coordinates, nodeWeights[0], settings);//TODO: update if you get multiple node weights
 	SCAI_ASSERT_EQ_ERROR( hasHilbertDist, true, "Input must be distributed according to a hilbert curve distribution");
 	graph.redistribute( coordinates[0].getDistributionPtr(), graph.getColDistributionPtr() );
 
@@ -1461,14 +1481,15 @@ DenseVector<IndexType> computeHierarchicalPartition(
     std::tie(minCoords, maxCoords) = getLocalMinMaxCoords( coordinates );
 
     //used later for debugging and calculating imbalance
-    ValueType totalWeightSum;
+    std::vector<ValueType> totalWeightSum(numNodeWeights);
+    for (IndexType i = 0; i < numNodeWeights; i++)
     {
-    	scai::hmemo::ReadAccess<ValueType> rW( nodeWeights.getLocalValues() );
+    	scai::hmemo::ReadAccess<ValueType> rW( nodeWeights[i].getLocalValues() );
     	ValueType localW = 0;
-    	for(int i=0; i<nodeWeights.getLocalValues().size(); i++ ){
-    		localW += rW[i];
+    	for(IndexType j=0; j<rW.size(); j++ ){
+    		localW += rW[j];
     	}
-    	totalWeightSum = comm->sum(localW);
+    	totalWeightSum[i] = comm->sum(localW);
     }
 
     //typedef of commNode from CommTree.h, see also KMeans.h
@@ -1525,17 +1546,18 @@ DenseVector<IndexType> computeHierarchicalPartition(
 			}
 			SCAI_ASSERT_EQ_ERROR( sumNumCenters, thisLevel.size(), "Mismatch in number of new centers and hierarchy nodes")
 		}
-for(int i=0; i<groupOfCenters.size(); i++ ){
-	std::cout<< "group "<< i << std::endl;
-	for( int j=0; j<groupOfCenters[i].size(); j++ ){
-		std::cout<< "center " << j << ": ";
-		for( int d=0; d<settings.dimensions; d++ ){
-			std::cout<< groupOfCenters[i][j][d] << ", ";
+		
+		for(int i=0; i<groupOfCenters.size(); i++ ){
+			std::cout<< "group "<< i << std::endl;
+			for( int j=0; j<groupOfCenters[i].size(); j++ ){
+				std::cout<< "center " << j << ": ";
+				for( int d=0; d<settings.dimensions; d++ ){
+					std::cout<< groupOfCenters[i][j][d] << ", ";
+				}
+				std::cout << std::endl;	
+			}
+			std::cout << std::endl;	
 		}
-		std::cout << std::endl;	
-	}
-	std::cout << std::endl;	
-}
 
 		//number of old, known blocks == previous level size
 		IndexType numOldBlocks = groupOfCenters.size();
@@ -1569,20 +1591,25 @@ for(int i=0; i<groupOfCenters.size(); i++ ){
 		//TODO: do the equivalent for the memory constraint
 		//later, optBlockWeight[i] = blockSpeedPercent[i]*samplePointsWeight
 
-		//TODO: replaced speedPercent with optBlockWeight. percentages make more sense?	
-		std::vector<ValueType> optBlockWeight( totalNumNewBlocks );
-		std::vector<ValueType> blockSpeedPercent( totalNumNewBlocks );
-		for( int i=0; i<totalNumNewBlocks; i++){
-			blockSpeedPercent[i] = thisLevel[i].relatSpeed/speedSum;
-			optBlockWeight[i] = blockSpeedPercent[i]*totalWeightSum;
+		std::vector<std::vector<ValueType>> targetBlockWeights(numNodeWeights);
+
+		for (IndexType j = 0 ; j < numNodeWeights; j++) {
+			targetBlockWeights[j].resize(totalNumNewBlocks);
+			std::vector<ValueType> blockSpeedPercent( totalNumNewBlocks );
+
+			//TODO: adapt as soon as the commtree has multiple weights
+			for( IndexType i=0; i<totalNumNewBlocks; i++){
+				blockSpeedPercent[i] = thisLevel[i].relatSpeed/speedSum;
+				targetBlockWeights[j][i] = blockSpeedPercent[i]*totalWeightSum[j];
+			}
 		}
 
 		//TODO: inside computePartition, settings.numBlocks is not
 		//used. We infer the number of new blocks from the groupOfCenters
 		//maybe, set also numBlocks for clarity??
-		partition = computePartition( graph, coordinates, nodeWeights, optBlockWeight, partition, groupOfCenters, settings, metrics );
+		partition = computePartition( graph, coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics );
 
-FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/partHKM"+std::to_string(settings.numBlocks)+"_h"+std::to_string(h)+".out");
+		FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/partHKM"+std::to_string(settings.numBlocks)+"_h"+std::to_string(h)+".out");
 
 		//this check is done before. TODO: remove?
 		if( settings.debugMode ){
@@ -1608,10 +1635,13 @@ if( true or not settings.noRefinement ){
 }
 */
 		//TODO?: remove?
-		ValueType imbalance =  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, totalNumNewBlocks, nodeWeights, optBlockWeight );
+		std::vector<ValueType> imbalances(numNodeWeights);
+		for (IndexType i = 0; i < numNodeWeights; i++) {
+			imbalances[i] = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, totalNumNewBlocks, nodeWeights[i], targetBlockWeights[i] );
+		}
 		//IndexType cut = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
 
-		PRINT0("\nFinished hierarchy level " << h <<", partitioned into " << totalNumNewBlocks << " blocks and imbalance is " << imbalance <<std::endl );
+		PRINT0("\nFinished hierarchy level " << h <<", partitioned into " << totalNumNewBlocks << " blocks and imbalance is " << imbalances[0] <<std::endl );
 	}
 
 	return partition;
@@ -1646,8 +1676,8 @@ template std::vector<std::vector<ValueType> > KMeans::findInitialCentersFromSFCO
 //instantiations needed otherwise there is a undefined reference 
 template DenseVector<IndexType> KMeans::computePartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,
-	const scai::lama::DenseVector<ValueType> &nodeWeights,
-	const std::vector<ValueType> &blockSizes,
+	const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+	const std::vector<std::vector<ValueType>> &blockSizes,
 	const Settings settings,
 	struct Metrics& metrics);
 
@@ -1677,8 +1707,8 @@ template DenseVector<IndexType> KMeans::computePartition(
 */
 template DenseVector<IndexType> KMeans::computeRepartition(
 	const std::vector<DenseVector<ValueType>>& coordinates,
-	const DenseVector<ValueType>& nodeWeights,
-	const std::vector<ValueType>& blockSizes,
+	const std::vector<DenseVector<ValueType>>& nodeWeights,
+	const std::vector<std::vector<ValueType>>& blockSizes,
 	const DenseVector<IndexType>& previous,
 	const Settings settings);
 
@@ -1686,7 +1716,7 @@ template DenseVector<IndexType> KMeans::computeRepartition(
 template DenseVector<IndexType> KMeans::computeHierarchicalPartition(
 	CSRSparseMatrix<ValueType> &graph,
 	std::vector<DenseVector<ValueType>> &coordinates,
-	DenseVector<ValueType> &nodeWeights,
+	std::vector<DenseVector<ValueType>> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,
 	const Settings settings,
 	struct Metrics& metrics);

@@ -304,12 +304,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 						}
 						tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights[0], migrationSettings);
 					} else if (settings.initialMigration == InitialPartitioningMethods::KMeans) {
-						if (convertedWeights.size() > 1) {
-							throw std::logic_error("KMeans not implemented for multiple weights.");
-						}
 						std::vector<std::vector<ValueType>> migrationBlockSizes(1, std::vector<ValueType>(migrationSettings.numBlocks, n/migrationSettings.numBlocks ));
                         struct Metrics tmpMetrics(migrationSettings);
-						tempResult = ITI::KMeans::computePartition<IndexType, ValueType>(coordinates, convertedWeights[0], migrationBlockSizes[0], migrationSettings, tmpMetrics);
+						tempResult = ITI::KMeans::computePartition<IndexType, ValueType>(coordinates, convertedWeights, migrationBlockSizes, migrationSettings, tmpMetrics);
 					}
 					
 					initMigrationPtr = scai::dmemo::generalDistributionByNewOwners( tempResult.getDistribution(), tempResult.getLocalValues() );
@@ -377,9 +374,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 			throw std::logic_error("Not yet implemented for multiple node weights.");
 		}
 		if (settings.repartition) {
-			result = ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy[0], blockSizes[0], previous, settings);
+			result = ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
 		} else {
-			result = ITI::KMeans::computePartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy[0], blockSizes[0], settings, metrics);
+			result = ITI::KMeans::computePartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
 		}
 		
 		kMeansTime = std::chrono::system_clock::now() - beforeKMeans;

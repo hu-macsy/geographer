@@ -79,7 +79,7 @@ FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/p
 //3 - partition graph with the PEgraph
     //read graph again or redistribute because the previous partition might have change it
     scai::lama::CSRSparseMatrix<ValueType> graph2 = FileIO<IndexType, ValueType>::readGraph(file );
-    scai::lama::DenseVector<ValueType> unitWeights( graph.getRowDistributionPtr(), 1);
+    std::vector<scai::lama::DenseVector<ValueType>> unitWeights(1, scai::lama::DenseVector<ValueType>(graph.getRowDistributionPtr(), 1));
     struct Metrics metrics2( settings );
 
     scai::lama::DenseVector<IndexType> partitionWithPE = ITI::KMeans::computeHierarchicalPartition(  \
@@ -92,12 +92,12 @@ FileIO<IndexType,ValueType>::writePartitionParallel( partitionWithPE, "./partRes
 //4 - compare quality
     PRINT("--------- Metrics for regular partition");
     metrics.getMappingMetrics( graph, partition, PEGraph);
-    metrics.getEasyMetrics( graph, partition, unitWeights, settings );
+    metrics.getEasyMetrics( graph, partition, unitWeights[0], settings );
     metrics.print( std::cout );
 
     PRINT("--------- Metrics for hierarchical partition");
     metrics2.getMappingMetrics( graph2, partitionWithPE, PEGraph);
-    metrics2.getEasyMetrics( graph2, partitionWithPE, unitWeights, settings );
+    metrics2.getEasyMetrics( graph2, partitionWithPE, unitWeights[0], settings );
     metrics2.print( std::cout );
 
 

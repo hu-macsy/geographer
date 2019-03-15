@@ -233,7 +233,7 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 	}
 
 	//scai::lama::DenseVector<ValueType> nodeWeights = fixedNodeWeights;
-	scai::lama::DenseVector<ValueType> nodeWeights = unitNodeWeights;
+	std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { unitNodeWeights };
 
 	//const IndexType k = comm->getSize();
 	//using KMeans::cNode;
@@ -275,7 +275,7 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 
 	ValueType speedImbalance, sizeImbalance;
 	//std::tie( speedImbalance, sizeImbalance) =  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights, cTree );
-	std::tie( speedImbalance, sizeImbalance) =  cTree.computeImbalance( partition, settings.numBlocks, nodeWeights );
+	std::tie( speedImbalance, sizeImbalance) =  cTree.computeImbalance( partition, settings.numBlocks, nodeWeights[0] );
 
 	std::cout << "final imbalance: speed= " << speedImbalance << " , size= " << sizeImbalance << std::endl;
 }
