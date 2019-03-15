@@ -228,6 +228,23 @@ std::vector<point> findCenters(
 	const DenseVector<ValueType> &nodeWeights);
 
 /**
+ * Computes the weighted distance between a vertex and a cluster, given the geometric distance and the weights and influence values.
+ *
+ * @param[in] distance
+ * @param[in] nodeWeights
+ * @param[in] influence
+ * @param[in] vertex
+ * @param[in] cluster
+ */
+template<typename IndexType, typename ValueType>
+ValueType computeEffectiveDistance(
+	const ValueType distance,
+	const std::vector<DenseVector<ValueType>> &nodeWeights,
+	const std::vector<std::vector<ValueType>> &influence,
+	const IndexType vertex,
+	const IndexType cluster);
+
+/**
  * Assign points to block with smallest effective distance, adjusted for influence values.
  * Repeatedly adjusts influence values to adhere to the balance constraint given by settings.epsilon
  * To enable random initialization with a subset of the points, this function accepts iterators for the first and last local index that should be considered.
@@ -278,7 +295,7 @@ DenseVector<IndexType> assignBlocks(
 	const SpatialCell &boundingBox,
 	std::vector<ValueType> &upperBoundOwnCenter,
 	std::vector<ValueType> &lowerBoundNextCenter,
-	std::vector<ValueType> &influence,
+	std::vector<std::vector<ValueType>> &influence,
 	ValueType &imbalance,
 	Settings settings,
 	Metrics &metrics);
