@@ -63,9 +63,11 @@ TEST_F( benchmarkTest, benchMapping ){
 
     //cpu speed is given as the relative speed compared to the fastest cpu.
     //convert it to absolute number
-    std::vector<ValueType> wantedBlockSizes( k, 0 );
+    std::vector<std::vector<ValueType>> wantedBlockSizes( 1, std::vector<ValueType>(k, 0 ));
+    ValueType sumOfBalances = std::accumulate( balances[1].begin(), balances[1].end(), 0.0 );    
+    
     for(IndexType i=0; i<k; i++ ){
-    	wantedBlockSizes[i] = balances[1][i]*globalN; //we assume unit node weights
+    	wantedBlockSizes[0][i] = (balances[1][i]/sumOfBalances)*globalN; //we assume unit node weights
     }
 
     settings.blockSizes = wantedBlockSizes;
