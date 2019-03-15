@@ -748,7 +748,9 @@ std::chrono::time_point<std::chrono::high_resolution_clock> assignStart = std::c
 		imbalance = *std::max_element(imbalances.begin(), imbalances.end() );
 		//TODO: adapt for multiple node weights
 
-		SCAI_ASSERT_GE_ERROR( imbalance, 0, "Imbalance cannot be negative");
+		if( settings.verbose and imbalance<0 ){
+			PRINT0("Warning, imbalance is negative. Probably the given target block sizes are all too large.")
+		}
 
 		std::vector<ValueType> oldInfluence = influence;//size=numNewBlocks
 		assert( oldInfluence.size()== numNewBlocks );
