@@ -19,7 +19,7 @@ class benchmarkTest : public ::testing::Test {
 };
 
 
-TEST_F( benchmarkTest, testMapping ){
+TEST_F( benchmarkTest, benchMapping ){
 
 	//std::string fileName = "Grid32x32";
 	std::string fileName = "slowrot-00000.graph";
@@ -30,6 +30,8 @@ TEST_F( benchmarkTest, testMapping ){
     settings.dimensions = dimensions;
     settings.numBlocks = 8;
     settings.noRefinement = true;
+	settings.writePEgraph = true;
+	settings.writeInFile = true;
 
     const IndexType k = settings.numBlocks;
 
@@ -39,15 +41,17 @@ TEST_F( benchmarkTest, testMapping ){
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), globalN, dimensions);
 
 //1 - read PE graph
-    std::string PEfile = "./tools/myPEgraph8_2.txt";
+    std::string PEfile = "./meshes/PEgraphs/myPEgraph8.txt";
     CommTree<IndexType,ValueType> cTree = FileIO<IndexType, ValueType>::readPETree( PEfile );
 	PRINT( cTree.getNumLeaves() << ", " );
     const scai::lama::CSRSparseMatrix<ValueType> PEGraph = cTree.exportAsGraph_local();
 
 	SCAI_ASSERT_EQ_ERROR( PEGraph.getNumRows(), k , "Wrong number of rows/vertices" );
 	SCAI_ASSERT_LE_ERROR( scai::utilskernel::HArrayUtils::max(PEGraph.getLocalStorage().getIA() ) , PEGraph.getNumValues(), "some ia value is too large" );
-	FileIO<IndexType,ValueType>::writeGraph( PEGraph, "peFromTree"+std::to_string(k)+".graph", 1);
-
+	if( settings.writePEgraph ){
+    	FileIO<IndexType,ValueType>::writeGraph( PEGraph, "peFromTree"+std::to_string(k)+".graph", 1);	
+    }
+	
 //2 - read and partition graph without using the PEgraph
     settings.initialPartition = InitialPartitioningMethods::KMeans;
     struct Metrics metrics(settings);
@@ -60,8 +64,10 @@ TEST_F( benchmarkTest, testMapping ){
     //cpu speed is given as the relative speed compared to the fastest cpu.
     //convert it to absolute number
     std::vector<std::vector<ValueType>> wantedBlockSizes( 1, std::vector<ValueType>(k, 0 ));
+    ValueType sumOfBalances = std::accumulate( balances[1].begin(), balances[1].end(), 0.0 );    
+    
     for(IndexType i=0; i<k; i++ ){
-    	wantedBlockSizes[0][i] = balances[1][i]*globalN; //we assume unit node weights
+    	wantedBlockSizes[0][i] = (balances[1][i]/sumOfBalances)*globalN; //we assume unit node weights
     }
 
     settings.blockSizes = wantedBlockSizes;
@@ -69,11 +75,6 @@ TEST_F( benchmarkTest, testMapping ){
     // get partition ParcoRepart::partitionGraph to accept constrains
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
     ASSERT_EQ(globalN, partition.size());
-
-FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/partKM"+std::to_string(settings.numBlocks)+".out");
-
-//FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partition, settings.numBlocks), "blockKM"+std::to_string(settings.numBlocks)+".graph", 1);
-
 
 
 //3 - partition graph with the PEgraph
@@ -85,20 +86,36 @@ FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/p
     scai::lama::DenseVector<IndexType> partitionWithPE = ITI::KMeans::computeHierarchicalPartition(  \
     	graph2, coords, unitWeights, cTree, settings, metrics );
 
-FileIO<IndexType,ValueType>::writePartitionParallel( partitionWithPE, "./partResults/partHKM"+std::to_string(settings.numBlocks)+".out");
+	if(settings.writeInFile){
+		FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/partKM"+std::to_string(settings.numBlocks)+".out");
+		FileIO<IndexType,ValueType>::writePartitionParallel( partitionWithPE, "./partResults/partHKM"+std::to_string(settings.numBlocks)+".out");
 
-//FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partitionWithPE, settings.numBlocks), "blockHKM"+std::to_string(settings.numBlocks)+".graph", 1);
+		//FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partition, settings.numBlocks), "blockKM"+std::to_string(settings.numBlocks)+".graph", 1);
+		//FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partitionWithPE, settings.numBlocks), "blockHKM"+std::to_string(settings.numBlocks)+".graph", 1);
+	}
 
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	
 //4 - compare quality
-    PRINT("--------- Metrics for regular partition");
+    PRINT0("--------- Metrics for regular partition");
+
+    //graph and partition are distributed inside partitionGraph; distributions must allign
+    unitWeights[0].redistribute( partition.getDistributionPtr() );
+
     metrics.getMappingMetrics( graph, partition, PEGraph);
     metrics.getEasyMetrics( graph, partition, unitWeights[0], settings );
-    metrics.print( std::cout );
+    if(comm->getRank()==0) 
+    	metrics.print( std::cout );
 
-    PRINT("--------- Metrics for hierarchical partition");
+    PRINT0("--------- Metrics for hierarchical partition");
+    
+    //graph and partition are distributed inside partitionGraph; distributions must allign
+    unitWeights[0].redistribute( partitionWithPE.getDistributionPtr() );
+
     metrics2.getMappingMetrics( graph2, partitionWithPE, PEGraph);
     metrics2.getEasyMetrics( graph2, partitionWithPE, unitWeights[0], settings );
-    metrics2.print( std::cout );
+    if(comm->getRank()==0) 
+    	metrics2.print( std::cout );
 
 
 }//TEST_F( benchmarkTest, testMapping )

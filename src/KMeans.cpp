@@ -748,7 +748,9 @@ DenseVector<IndexType> assignBlocks(
 		imbalance = *std::max_element(imbalances.begin(), imbalances.end() );
 		//TODO: adapt for multiple node weights
 
-		SCAI_ASSERT_GE_ERROR( imbalance, 0, "Imbalance cannot be negative");
+		if( settings.verbose and imbalance<0 ){
+			PRINT0("Warning, imbalance is negative. Probably the given target block sizes are all too large.");
+		}
 
 		std::vector<ValueType> oldInfluence = influence;//size=numNewBlocks
 		assert( oldInfluence.size()== numNewBlocks );
@@ -1545,18 +1547,6 @@ DenseVector<IndexType> computeHierarchicalPartition(
 				sumNumCenters += groupOfCenters[g].size();
 			}
 			SCAI_ASSERT_EQ_ERROR( sumNumCenters, thisLevel.size(), "Mismatch in number of new centers and hierarchy nodes")
-		}
-		
-		for(int i=0; i<groupOfCenters.size(); i++ ){
-			std::cout<< "group "<< i << std::endl;
-			for( int j=0; j<groupOfCenters[i].size(); j++ ){
-				std::cout<< "center " << j << ": ";
-				for( int d=0; d<settings.dimensions; d++ ){
-					std::cout<< groupOfCenters[i][j][d] << ", ";
-				}
-				std::cout << std::endl;	
-			}
-			std::cout << std::endl;	
 		}
 
 		//number of old, known blocks == previous level size

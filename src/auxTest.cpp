@@ -443,7 +443,7 @@ TEST_P(auxTest, testRedistributeFromPartition){
     IndexType globalTargetSz = comm->sum( targetSz );
 
     PRINT0( "renumbering: " <<renumberPEs  << ", globalSourceSz= " << globalSourceSz << ", globalTargetSz= " << globalTargetSz);
-    PRINT(*comm << " : " << sourceSz << " __ " << targetSz );
+    //PRINT(*comm << " : " << sourceSz << " __ " << targetSz );
 
     comm->synchronize();
 
@@ -477,7 +477,7 @@ std::string fileName = "353off.graph";
     settings.noRefinement = true;
     settings.dimensions = dimensions;
     settings.verbose = false;
-	settings.debugMode = true;
+	settings.debugMode = false;
 	//settings.initialPartition = InitialPartitioningMethods::SFC;
 
     const DenseVector<IndexType> initPartition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordinates, settings);

@@ -189,35 +189,23 @@ static std::vector<IndexType> computeCommVolume( const scai::lama::CSRSparseMatr
 //template<typename IndexType, typename ValueType>
 static std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType>> computeCommBndInner( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, Settings settings );
 
-/** Returns the edges of the block graph only for the local part. Eg. if blocks 1 and 2 are local
- * in this processor it finds the edge (1,2) ( and the edge (2,1)).
- * Also if the other endpoint is in another processor it finds this edge: block 1 is local, it
- * shares an edge with block 3 that is not local, this edge is found and returned.
- *
- * @param[in] adjM The adjacency matrix of the input graph.
- * @param[in] part The partition of the input graph.
- *
- * @return A 2 dimensional vector with the edges of the local parts of the block graph:
- * edge (u,v) is (ret[0][i], ret[1][i]) if block u and block v are connected.
- */
-//template<typename IndexType, typename ValueType>
-static std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part);
 
-/** Builds the block graph of the given partition.
+/** Builds the block (aka, communication) graph of the given partition.
  * Creates an HArray that is passed around in numPEs (=comm->getSize()) rounds and every time
  * a processor writes in the array its part.
  *
- * Not distributed.
+ * The returned matrix is replicated in all PEs.
  *
  * @param[in] adjM The adjacency matric of the input graph.
  * @param[in] part The partition of the input garph.
  * @param[in] k Number of blocks.
  *
- * @return The "adjacency matrix" of the block graph. In this version is a 1-dimensional array
- * with size k*k and [i,j]= i*k+j.
+ * @return The adjacency matrix of the block graph.
  */
 //template<typename IndexType, typename ValueType>
 static scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
+
+static scai::lama::CSRSparseMatrix<ValueType>  getBlockGraph_dist( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 
 
 /** Get the maximum degree of a graph.
@@ -238,8 +226,9 @@ static std::pair<IndexType, IndexType> computeBlockGraphComm( const scai::lama::
 //template<typename IndexType, typename ValueType>
 static std::pair<IndexType,IndexType> computeCommVolume_p_equals_k( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part);
     
-/**Returns the process graph. Every processor traverses its local part of adjM: and for every
- * edge (u,v) that one node, say u, is not local it gets the owner processor of u. The returned graph is distributed with a BLOCK distribution.
+/**Returns the process graph. Every processor traverses its local part of adjM and for every
+ * edge (u,v) that one node, say u, is not local it gets the owner processor of u.
+ * The returned graph is distributed with a BLOCK distribution where each PE owns one row.
  *
  * @param[in] adjM The adjacency matrix of the input graph.
  * @return A [#PE x #PE] adjacency matrix of the process graph, distributed with a Block distribution

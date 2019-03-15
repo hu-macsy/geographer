@@ -423,6 +423,10 @@ void Metrics::getMappingMetrics(
 	SCAI_ASSERT_EQ_ERROR( *std::max_element(mapping.begin(), mapping.end()), N-1, "Wrong mapping" );
 	SCAI_ASSERT_EQ_ERROR( std::accumulate(mapping.begin(), mapping.end(), 0), (N*(N-1)/2), "Wrong mapping" );
 
+	const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
+	SCAI_ASSERT( PEGraph.getRowDistributionPtr()->isEqual(*noDist), "Function expects the graph to bre relicated" );
+	SCAI_ASSERT( blockGraph.getRowDistributionPtr()->isEqual(*noDist), "Function expects the graph to bre relicated" );
+
 	ValueType sumDilation = 0;
 	ValueType maxDilation = 0;
 	ValueType minDilation = std::numeric_limits<ValueType>::max();
@@ -514,14 +518,17 @@ void Metrics::getMappingMetrics(
 	ValueType avgDilation = ((ValueType) sumDilation)/((ValueType) peM/2);
 	ValueType avgCongestion = std::accumulate( congestion.begin(), congestion.end(), 0.0)/peM;
 
-	std::cout<< "Maximum congestion: " << maxCongestion << std::endl;
-	std::cout<< "Average congestion: " << avgCongestion << std::endl;
-	std::cout<< "Minimum congestion: " << minCongestion << std::endl;
-	std::cout<< " - - - - - - " << std::endl;
-	std::cout<< "Maximum dilation: " << maxDilation << std::endl;
-	std::cout<< "Average dilation: " << avgDilation << std::endl;
-	std::cout<< "Minimum dilation: " << minDilation << std::endl;
-
+	/*
+	if( comm->getRank()==0 ){
+		std::cout<< "Maximum congestion: " << maxCongestion << std::endl;
+		std::cout<< "Average congestion: " << avgCongestion << std::endl;
+		std::cout<< "Minimum congestion: " << minCongestion << std::endl;
+		std::cout<< " - - - - - - " << std::endl;
+		std::cout<< "Maximum dilation: " << maxDilation << std::endl;
+		std::cout<< "Average dilation: " << avgDilation << std::endl;
+		std::cout<< "Minimum dilation: " << minDilation << std::endl;
+	}
+	*/
 	this->maxCongestion = maxCongestion;
 	metricsMap["maxCongestion"] = maxCongestion;
 	this->maxDilation = maxDilation;
@@ -538,7 +545,7 @@ void Metrics::getMappingMetrics(
 	const scai::lama::CSRSparseMatrix<ValueType> PEGraph ){	
 
 	const IndexType k = partition.max()+1;
-	SCAI_ASSERT_EQ_ERROR( k, PEGraph.getNumRows(), "Max value in partition (aka, k) should be equal witht the number of vertices of the PE graph." );
+	SCAI_ASSERT_EQ_ERROR( k, PEGraph.getNumRows(), "Max value in partition (aka, k) should be equal with the number of vertices of the PE graph." );
 
 	scai::lama::CSRSparseMatrix<ValueType> blockGraph = ITI::GraphUtils<IndexType,ValueType>::getBlockGraph(
 		appGraph, partition, k );
