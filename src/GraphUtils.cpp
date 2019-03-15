@@ -1050,10 +1050,6 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 			if (neighborBlock != thisBlock) {
 				IndexType index = thisBlock*k + neighborBlock;
 				localBlockGraphEdges[index] = localBlockGraphEdges[index] + values[j];
-				//TODO: check:
-				// to keep matrix symemtric, add also the other edge
-				//index = thisBlock + neighborBlock*k;
-				//localBlockGraphEdges[index] = localBlockGraphEdges[index] + values[j];
 			}
 		}
 	}//for
@@ -1149,12 +1145,9 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 	scai::hmemo::HArray<IndexType> haloData;
 	partHalo.updateHalo( haloData, localPart, partDist->getCommunicator() );
 
-	//the vector to be returned
-	//edges[0]: first vetrex id, edges[1]: second vetrex id. edges[2]: the weight of the edge
-    //std::vector<std::vector<IndexType>> blockEdges(3);	
-    
     //use a map to store edge weights
     typedef std::pair<IndexType,IndexType> edge;
+	//TODO: check: this is supposedto be initialized to 0?
     std::map<edge,ValueType> edgeMap;
 
 	//go over local data
@@ -1181,9 +1174,7 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 			//found an edge between two blocks
 			if (neighborBlock != thisBlock) {
 				edge e1(thisBlock, neighborBlock);
-				edge e2(neighborBlock,thisBlock); //for symmetry
 				edgeMap[e1] += values[j];
-				edgeMap[e2] += values[j];
 			}
 		}
 	}//for
@@ -1191,6 +1182,32 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 	//use a distributed DenseMatrix for the blockGraph.
 	//each PE with set the value to a (possibly) non-local matrix position
 
+	scai::dmemo::DistributionPtr noDist( new scai::dmemo::NoDistribution(k) );
+	scai::lama::DenseMatrix<ValueType> denseBlockG( 
+		scai::dmemo::DistributionPtr( new scai::dmemo::BlockDistribution(k, comm) ),
+		noDist
+		);
+
+	//initialize with 0
+	{
+		const IndexType localNumRows = denseBlockG.getLocalNumRows();
+		const IndexType localNumColumns = denseBlockG.getLocalNumColumns();
+		scai::hmemo::HArray<ValueType> initData( localNumRows*localNumColumns, 0.0 );
+		scai::lama::DenseStorage<ValueType> initStorage( localNumRows, localNumColumns, initData );
+		denseBlockG.getLocalStorage().swap( initStorage );
+	}
+
+	//this setValue() can accedd non-local positions triggering communications with other PEs
+	for( auto edgeIt=edgeMap.begin(); edgeIt!=edgeMap.end(); edgeIt ++ ){
+PRINT( *comm<<": (" <<edgeIt->first.first <<" ," << edgeIt->first.second << "): " <<  edgeIt->second );
+		denseBlockG.setValue( edgeIt->first.first, edgeIt->first.second, edgeIt->second, scai::common::BinaryOp::ADD );
+	}
+
+	scai::lama::CSRSparseMatrix<ValueType> sparseBlockG(denseBlockG);
+	//replicate in every PE
+	sparseBlockG.redistribute(noDist,noDist);
+
+	return sparseBlockG;
 }
 //-----------------------------------------------------------------------------------
 
