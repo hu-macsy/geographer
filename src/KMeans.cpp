@@ -1591,17 +1591,6 @@ DenseVector<IndexType> computeHierarchicalPartition(
 			}
 			SCAI_ASSERT_EQ_ERROR( sumNumCenters, thisLevel.size(), "Mismatch in number of new centers and hierarchy nodes")
 		}
-for(int i=0; i<groupOfCenters.size(); i++ ){
-	std::cout<< "group "<< i << std::endl;
-	for( int j=0; j<groupOfCenters[i].size(); j++ ){
-		std::cout<< "center " << j << ": ";
-		for( int d=0; d<settings.dimensions; d++ ){
-			std::cout<< groupOfCenters[i][j][d] << ", ";
-		}
-		std::cout << std::endl;	
-	}
-	std::cout << std::endl;	
-}
 
 		//number of old, known blocks == previous level size
 		IndexType numOldBlocks = groupOfCenters.size();

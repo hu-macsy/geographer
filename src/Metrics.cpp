@@ -518,14 +518,17 @@ void Metrics::getMappingMetrics(
 	ValueType avgDilation = ((ValueType) sumDilation)/((ValueType) peM/2);
 	ValueType avgCongestion = std::accumulate( congestion.begin(), congestion.end(), 0.0)/peM;
 
-	std::cout<< "Maximum congestion: " << maxCongestion << std::endl;
-	std::cout<< "Average congestion: " << avgCongestion << std::endl;
-	std::cout<< "Minimum congestion: " << minCongestion << std::endl;
-	std::cout<< " - - - - - - " << std::endl;
-	std::cout<< "Maximum dilation: " << maxDilation << std::endl;
-	std::cout<< "Average dilation: " << avgDilation << std::endl;
-	std::cout<< "Minimum dilation: " << minDilation << std::endl;
-
+	/*
+	if( comm->getRank()==0 ){
+		std::cout<< "Maximum congestion: " << maxCongestion << std::endl;
+		std::cout<< "Average congestion: " << avgCongestion << std::endl;
+		std::cout<< "Minimum congestion: " << minCongestion << std::endl;
+		std::cout<< " - - - - - - " << std::endl;
+		std::cout<< "Maximum dilation: " << maxDilation << std::endl;
+		std::cout<< "Average dilation: " << avgDilation << std::endl;
+		std::cout<< "Minimum dilation: " << minDilation << std::endl;
+	}
+	*/
 	this->maxCongestion = maxCongestion;
 	metricsMap["maxCongestion"] = maxCongestion;
 	this->maxDilation = maxDilation;

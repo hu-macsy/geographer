@@ -1005,7 +1005,6 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
         throw std::runtime_error( "Distributions: should (?) be equal.");
     }
 
-
 	//access to graph and partition
 	const scai::lama::CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
@@ -1021,10 +1020,6 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
     scai::dmemo::HaloExchangePlan partHalo = buildNeighborHalo( adjM );
 	scai::hmemo::HArray<IndexType> haloData;
 	partHalo.updateHalo( haloData, localPart, partDist->getCommunicator() );
-
-	//the vector to be returned
-	//edges[0]: first vetrex id, edges[1]: second vetrex id. edges[2]: the weight of the edge
-    std::vector<std::vector<IndexType>> blockEdges(3);	
 
     // TODO: memory costly for big k
     IndexType size= k*k;
@@ -1127,7 +1122,73 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlockGraph_dist( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k){
 
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
+    //TODO/check: should dist==partDist??
+    const IndexType localN = partDist->getLocalSize();
+    SCAI_ASSERT( partDist->isEqual(*dist), "Graph and partition distributions must agree" );
+   
+    if( !dist->isEqual( part.getDistribution() ) ){
+        std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and partition dist: "<< part.getDistribution() << std::endl;
+        throw std::runtime_error( "Distributions: should (?) be equal.");
+    }
 
+	//access to graph and partition
+	const scai::lama::CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+    const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+    const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+    const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+
+    const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
+    const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
+
+    //get halo for non-local values
+    scai::dmemo::HaloExchangePlan partHalo = buildNeighborHalo( adjM );
+	scai::hmemo::HArray<IndexType> haloData;
+	partHalo.updateHalo( haloData, localPart, partDist->getCommunicator() );
+
+	//the vector to be returned
+	//edges[0]: first vetrex id, edges[1]: second vetrex id. edges[2]: the weight of the edge
+    //std::vector<std::vector<IndexType>> blockEdges(3);	
+    
+    //use a map to store edge weights
+    typedef std::pair<IndexType,IndexType> edge;
+    std::map<edge,ValueType> edgeMap;
+
+	//go over local data
+	for (IndexType i = 0; i < localN; i++) {
+		const IndexType beginCols = ia[i];
+		const IndexType endCols = ia[i+1];
+		assert(ja.size() >= endCols);
+
+		const IndexType globalI = dist->local2Global(i);
+		//assert(partDist->isLocal(globalI));
+		SCAI_ASSERT_ERROR(partDist->isLocal(globalI), "non-local index, globalI= " << globalI << " for PE " << comm->getRank() );	
+
+		IndexType thisBlock = partAccess[i];
+
+		for (IndexType j = beginCols; j < endCols; j++) {
+			IndexType neighbor = ja[j];
+			IndexType neighborBlock;
+			if (partDist->isLocal(neighbor)) {
+				neighborBlock = partAccess[partDist->global2Local(neighbor)];
+			} else {
+				neighborBlock = haloData[partHalo.global2Halo(neighbor)];
+			}
+
+			//found an edge between two blocks
+			if (neighborBlock != thisBlock) {
+				edge e1(thisBlock, neighborBlock);
+				edge e2(neighborBlock,thisBlock); //for symmetry
+				edgeMap[e1] += values[j];
+				edgeMap[e2] += values[j];
+			}
+		}
+	}//for
+
+	use a distributed DenseMatrix for the blockGraph.
+	each PE with set the value to a (possibly) non-local matrix position
 
 }
 //-----------------------------------------------------------------------------------

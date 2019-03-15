@@ -92,24 +92,28 @@ TEST_F( benchmarkTest, benchMapping ){
 		//FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partitionWithPE, settings.numBlocks), "blockHKM"+std::to_string(settings.numBlocks)+".graph", 1);
 	}
 
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	
 //4 - compare quality
-    PRINT("--------- Metrics for regular partition");
+    PRINT0("--------- Metrics for regular partition");
 
     //graph and partition are distributed inside partitionGraph; distributions must allign
-    unitWeights.redistribute( partition.getRowDistributionPtr() );
+    unitWeights.redistribute( partition.getDistributionPtr() );
 
     metrics.getMappingMetrics( graph, partition, PEGraph);
     metrics.getEasyMetrics( graph, partition, unitWeights, settings );
-    metrics.print( std::cout );
+    if(comm->getRank()==0) 
+    	metrics.print( std::cout );
 
-    PRINT("--------- Metrics for hierarchical partition");
+    PRINT0("--------- Metrics for hierarchical partition");
     
     //graph and partition are distributed inside partitionGraph; distributions must allign
-    unitWeights.redistribute( partitionWithPE.getRowDistributionPtr() );
+    unitWeights.redistribute( partitionWithPE.getDistributionPtr() );
 
     metrics2.getMappingMetrics( graph2, partitionWithPE, PEGraph);
     metrics2.getEasyMetrics( graph2, partitionWithPE, unitWeights, settings );
-    metrics2.print( std::cout );
+    if(comm->getRank()==0) 
+    	metrics2.print( std::cout );
 
 
 
