@@ -2204,11 +2204,11 @@ std::pair<IndexType, IndexType> FileIO<IndexType, ValueType>::getMatrixMarketCoo
 
 //-------------------------------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::string filename , const IndexType numBlocks){
+std::vector<std::vector<ValueType> > FileIO<IndexType, ValueType>::readBlockSizes(const std::string filename , const IndexType numBlocks, const IndexType numWeights){
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
-    std::vector<IndexType> blockSizes(numBlocks, 0);
+    std::vector<std::vector<ValueType> > blockSizes(numWeights, std::vector<ValueType>(numBlocks,0));
     
     if( comm->getRank()==0 ){
         std::ifstream file(filename);
@@ -2233,12 +2233,15 @@ std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::s
             }
             std::stringstream ss;    
             ss.str( line );
-            IndexType bSize;
-            ss >> bSize;
-            //blockSizes.push_back(bSize);
-            blockSizes[i]= bSize;
+
+            for (IndexType j = 0; j < numWeights; j++) {
+            	ValueType bSize;
+				ss >> bSize;
+				//blockSizes.push_back(bSize);
+				blockSizes[j][i]= bSize;
+            }
         }
-        SCAI_ASSERT( blockSizes.size()==numBlocks , "Wrong number of blocks: "  <<blockSizes.size() << " for file " << filename);
+        SCAI_ASSERT( blockSizes[0].size()==numBlocks , "Wrong number of blocks: "  <<blockSizes[0].size() << " for file " << filename);
         file.close();
         
         bool eof = std::getline(file, line).eof();
@@ -2246,8 +2249,11 @@ std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::s
             throw std::runtime_error(std::to_string(numBlocks) + " blocks read, but file continues.");
         }
     }
-    comm->bcast( blockSizes.data(), numBlocks, 0);
     
+    for (IndexType i = 0; i < numWeights; i++) {
+    	comm->bcast( blockSizes[0].data(), numBlocks, 0);
+    }
+
     return blockSizes;
 }
 //-------------------------------------------------------------------------------------------------

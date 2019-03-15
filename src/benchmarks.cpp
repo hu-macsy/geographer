@@ -19,7 +19,7 @@ class benchmarkTest : public ::testing::Test {
 };
 
 
-TEST_F( benchmarkTest, testMapping ){
+TEST_F( benchmarkTest, benchMapping ){
 
 	//std::string fileName = "Grid32x32";
 	std::string fileName = "slowrot-00000.graph";
@@ -63,9 +63,11 @@ TEST_F( benchmarkTest, testMapping ){
 
     //cpu speed is given as the relative speed compared to the fastest cpu.
     //convert it to absolute number
-    std::vector<ValueType> wantedBlockSizes( k, 0 );
+    std::vector<std::vector<ValueType>> wantedBlockSizes( 1, std::vector<ValueType>(k, 0 ));
+    ValueType sumOfBalances = std::accumulate( balances[1].begin(), balances[1].end(), 0.0 );    
+    
     for(IndexType i=0; i<k; i++ ){
-    	wantedBlockSizes[i] = balances[1][i]*globalN; //we assume unit node weights
+    	wantedBlockSizes[0][i] = (balances[1][i]/sumOfBalances)*globalN; //we assume unit node weights
     }
 
     settings.blockSizes = wantedBlockSizes;
@@ -92,16 +94,28 @@ TEST_F( benchmarkTest, testMapping ){
 		//FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partitionWithPE, settings.numBlocks), "blockHKM"+std::to_string(settings.numBlocks)+".graph", 1);
 	}
 
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	
 //4 - compare quality
-    PRINT("--------- Metrics for regular partition");
+    PRINT0("--------- Metrics for regular partition");
+
+    //graph and partition are distributed inside partitionGraph; distributions must allign
+    unitWeights.redistribute( partition.getDistributionPtr() );
+
     metrics.getMappingMetrics( graph, partition, PEGraph);
     metrics.getEasyMetrics( graph, partition, unitWeights, settings );
-    metrics.print( std::cout );
+    if(comm->getRank()==0) 
+    	metrics.print( std::cout );
 
-    PRINT("--------- Metrics for hierarchical partition");
+    PRINT0("--------- Metrics for hierarchical partition");
+    
+    //graph and partition are distributed inside partitionGraph; distributions must allign
+    unitWeights.redistribute( partitionWithPE.getDistributionPtr() );
+
     metrics2.getMappingMetrics( graph2, partitionWithPE, PEGraph);
     metrics2.getEasyMetrics( graph2, partitionWithPE, unitWeights, settings );
-    metrics2.print( std::cout );
+    if(comm->getRank()==0) 
+    	metrics2.print( std::cout );
 
 
 
