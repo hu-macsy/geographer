@@ -1049,10 +1049,11 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 
 			if (neighborBlock != thisBlock) {
 				IndexType index = thisBlock*k + neighborBlock;
-				localBlockGraphEdges[index] = values[j];
+				localBlockGraphEdges[index] = localBlockGraphEdges[index] + values[j];
+				//TODO: check:
 				// to keep matrix symemtric, add also the other edge
-				index = thisBlock + neighborBlock*k;
-				localBlockGraphEdges[index] = values[j];
+				//index = thisBlock + neighborBlock*k;
+				//localBlockGraphEdges[index] = localBlockGraphEdges[index] + values[j];
 			}
 		}
 	}//for
@@ -1187,8 +1188,8 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 		}
 	}//for
 
-	use a distributed DenseMatrix for the blockGraph.
-	each PE with set the value to a (possibly) non-local matrix position
+	//use a distributed DenseMatrix for the blockGraph.
+	//each PE with set the value to a (possibly) non-local matrix position
 
 }
 //-----------------------------------------------------------------------------------

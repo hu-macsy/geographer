@@ -653,15 +653,13 @@ TEST_F ( GraphUtilsTest, testGetBlockGraph) {
     
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
 
-	//test getBlockGraph
-    //scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils<IndexType, ValueType>::getBlockGraph( graph, partition, k);
-    scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils<IndexType, ValueType>::getBlockGraph( graph, partition, k);
+	scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils<IndexType, ValueType>::getBlockGraph( graph, partition, k);
     
     //checks
     EXPECT_EQ( blockGraph.getNumRows(), k );
     EXPECT_TRUE( blockGraph.checkSymmetry() );
 
-    //checck if matrix is same in all PEs
+    //check if matrix is same in all PEs
     for(int i=0; i<k; i++){
     	for(int j=0; j<k; j++){
     		ValueType myVal = blockGraph.getValue(i,j);
@@ -736,8 +734,8 @@ TEST_F ( GraphUtilsTest, testPEGraphBlockGraph_k_equal_p_Distributed) {
     // !! this check is extremly costly !!
     for(IndexType i=0; i<PEgraph.getNumRows() ; i++){
         for(IndexType j=0; j<PEgraph.getNumColumns(); j++){
-            EXPECT_EQ( PEgraph(i,j), blockGraph(i,j) );
-			//PRINT0( "("<<i <<", "<< j <<") = "<< PEgraph(i,j) << " __ " << blockGraph(i,j) );
+        	//PRINT0( "("<<i <<", "<< j <<") = "<< PEgraph(i,j) << " __ " << blockGraph(i,j) );
+            EXPECT_EQ( PEgraph(i,j), blockGraph(i,j) ) << "i, j: " << i << ", " << j;
         }
     }
 
