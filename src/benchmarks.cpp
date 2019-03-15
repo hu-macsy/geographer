@@ -41,7 +41,7 @@ TEST_F( benchmarkTest, benchMapping ){
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), globalN, dimensions);
 
 //1 - read PE graph
-    std::string PEfile = "./tools/myPEgraph8_2.txt";
+    std::string PEfile = "./meshes/PEgraphs/myPEgraph8.txt";
     CommTree<IndexType,ValueType> cTree = FileIO<IndexType, ValueType>::readPETree( PEfile );
 	PRINT( cTree.getNumLeaves() << ", " );
     const scai::lama::CSRSparseMatrix<ValueType> PEGraph = cTree.exportAsGraph_local();
