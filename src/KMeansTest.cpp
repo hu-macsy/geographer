@@ -306,7 +306,7 @@ TEST_F(KMeansTest, testComputePartitionWithMultipleWeights) {
 	//set first weight uniform, second weight random
 	const scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
 	scai::lama::DenseVector<ValueType> randomNodeWeights(dist, 0);
-	randomNodeWeights.fillRandom(3);
+	randomNodeWeights.fillRandom(10);
 
 	const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = {unitNodeWeights, randomNodeWeights};
 	std::vector<std::vector<ValueType>> blockSizes(numNodeWeights);
@@ -338,7 +338,7 @@ TEST_F(KMeansTest, testComputePartitionWithMultipleWeights) {
 			comm->sumImpl( blockWeights.data(), blockWeights.data(), settings.numBlocks, scai::common::TypeTraits<ValueType>::stype);
 
 			for (IndexType b = 0; b < settings.numBlocks; b++) {
-				if (settings.verbose) std::cout << "blockWeights[" << j << "][" << b << "] = " << blockWeights[b] << std::endl;
+				if (settings.verbose && comm->getRank() == 0) std::cout << "blockWeights[" << j << "][" << b << "] = " << blockWeights[b] << std::endl;
 				EXPECT_LE(blockWeights[b], std::ceil(blockSizes[j][b])*(1+settings.epsilon));
 			}
 		}
