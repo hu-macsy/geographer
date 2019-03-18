@@ -236,7 +236,7 @@ struct Settings{
 		//TODO: This should not be in settings, since the machine the code runs on is not a part of it.
 		
 		out<< "Git commit: " << version << " and machine: "<< machine << std::endl;
-		/**
+		
 		IndexType numPoints = numX* numY* numZ;
 		out<< "Setting: number of points= " << numPoints<< ", dimensions= "<< dimensions << ", filename: " << fileName << std::endl;
 		if( outFile!="-" ){
@@ -285,7 +285,6 @@ struct Settings{
 		}
 		out << "epsilon= "<< epsilon << std::endl;
 		out << "numBlocks= " << numBlocks << std::endl;
-		*/
 	}
 //--------------------------------------------------------------------------------------------
 
