@@ -518,6 +518,7 @@ DenseVector<IndexType> assignBlocks(
 	const scai::dmemo::DistributionPtr dist = previousAssignment.getDistributionPtr();
 	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 	const IndexType localN = dist->getLocalSize();
+	const IndexType currentLocalN = std::distance(firstIndex, lastIndex);
 
 	//number of blocks from the previous hierarchy
 	const IndexType numOldBlocks= blockSizesPrefixSum.size()-1;
@@ -631,6 +632,8 @@ DenseVector<IndexType> assignBlocks(
 		//the block weight for all new blocks
 		std::vector<std::vector<ValueType>> blockWeights( numNodeWeights, std::vector<ValueType>( numNewBlocks, 0.0 ));
 
+		std::vector<ValueType> influenceEffectOfOwn( currentLocalN, 0); //TODO: also potentially move to outer function
+
 		IndexType totalComps = 0;		
 		skippedLoops = 0;
 		IndexType balancedBlocks = 0;
@@ -639,16 +642,20 @@ DenseVector<IndexType> assignBlocks(
 		scai::hmemo::WriteAccess<IndexType> wAssignment(assignment.getLocalValues());
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.assign" );
-			IndexType forLoopCnt = 0;
 			//for the sampled range
 			for (Iterator it = firstIndex; it != lastIndex; it++) {
-				++forLoopCnt;
 				const IndexType i = *it;
 				const IndexType oldCluster = wAssignment[i];
 				const IndexType fatherBlock = rOldBlock[i];
+				const IndexType veryLocalI = std::distance(firstIndex, it);
 
 				//TODO: not needed assertion, this is checked in the beginning				
 				SCAI_ASSERT_LT_ERROR( fatherBlock, numOldBlocks, "Wrong father block index");
+
+				assert(influenceEffectOfOwn[veryLocalI] == 0);
+				for (IndexType j = 0; j < numNodeWeights; j++) {
+					influenceEffectOfOwn[veryLocalI] += influence[j][oldCluster]*normalizedNodeWeights[j][i];
+				}
 
 				if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i]) {
 					//cluster assignment cannot have changed.
@@ -660,12 +667,9 @@ DenseVector<IndexType> assignBlocks(
 					for (IndexType d = 0; d < dim; d++) {		
 						sqDistToOwn += std::pow(myCenter[d]-coordinates[d][i], 2);
 					}
-					ValueType influenceEffect = 0;
-					for (IndexType j = 0; j < numNodeWeights; j++) {
-						influenceEffect += influence[j][oldCluster]*normalizedNodeWeights[j][i];
-					}
-					ValueType newEffectiveDistance = sqDistToOwn*influenceEffect;
-					assert(upperBoundOwnCenter[i] >= newEffectiveDistance);
+					
+					ValueType newEffectiveDistance = sqDistToOwn*influenceEffectOfOwn[veryLocalI];
+					SCAI_ASSERT_LE_ERROR( newEffectiveDistance, upperBoundOwnCenter[i], "Distance upper bound was wrong");
 					upperBoundOwnCenter[i] = newEffectiveDistance;
 					if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i]) {
 						//cluster assignment cannot have changed.
@@ -673,8 +677,9 @@ DenseVector<IndexType> assignBlocks(
 						skippedLoops++;
 					} else {
 						//check the centers of this old block to find the closest one
-						int bestBlock = 0;
+						IndexType bestBlock = 0;
 						ValueType bestValue = std::numeric_limits<ValueType>::max();
+						ValueType influenceEffectOfBestBlock = -1;
 						IndexType secondBest = 0;
 						ValueType secondBestValue = std::numeric_limits<ValueType>::max();
 						
@@ -713,6 +718,7 @@ DenseVector<IndexType> assignBlocks(
 								secondBestValue = bestValue;
 								bestBlock = j;
 								bestValue = effectiveDistance;
+								influenceEffectOfBestBlock = influenceEffect;
 							} else if (effectiveDistance < secondBestValue) {
 								secondBest = j;
 								secondBestValue = effectiveDistance;
@@ -720,7 +726,6 @@ DenseVector<IndexType> assignBlocks(
 							c++;
 						} //while
 
-						
 						if (rangeEnd - rangeStart > 1) {
 							SCAI_ASSERT_NE_ERROR( bestBlock, secondBest, "Best and second best should be different" );
 						}
@@ -737,6 +742,7 @@ DenseVector<IndexType> assignBlocks(
 
 						upperBoundOwnCenter[i] = bestValue;
 						lowerBoundNextCenter[i] = secondBestValue;
+						influenceEffectOfOwn[veryLocalI] = influenceEffectOfBestBlock;
 						wAssignment[i] = bestBlock;	
 					}
 				}
@@ -763,7 +769,6 @@ DenseVector<IndexType> assignBlocks(
 		allWeightsBalanced = true;
 		std::vector<std::vector<ValueType>> imbalancesPerBlock( numNodeWeights, std::vector<ValueType>( numNewBlocks ));
 		for ( IndexType i = 0; i < numNodeWeights; i++) {
-			//if (numNodeWeights > 1) throw std::logic_error("Not yet implemented for multiple weights.");
 			for( IndexType newB=0; newB<numNewBlocks; newB++ ){
 				ValueType optWeight = targetBlockWeights[i][newB];
 				imbalancesPerBlock[i][newB] = (ValueType(blockWeights[i][newB] - optWeight)/optWeight);
@@ -778,7 +783,6 @@ DenseVector<IndexType> assignBlocks(
 			if (imbalance[i] > settings.epsilon) {//TODO: generalize with multiple epsilons
 				allWeightsBalanced = false;
 			}
-
 		}
 
 		// adapt influence values
@@ -833,8 +837,14 @@ DenseVector<IndexType> assignBlocks(
 			for (Iterator it = firstIndex; it != lastIndex; it++) {
 				const IndexType i = *it;
 				const IndexType cluster = wAssignment[i];
-				upperBoundOwnCenter[i] = std::numeric_limits<ValueType>::max();// *= (influence[0][cluster] / oldInfluence[0][cluster]) + 1e-12;
-				lowerBoundNextCenter[i] = 0;//*= minRatio - 1e-12;//TODO: compute separate min ratio with respect to bounding box, only update that.		
+				const IndexType veryLocalI = std::distance(firstIndex, it);//maybe optimize?
+				ValueType newInfluenceEffect = 0;
+				for (IndexType j = 0; j < numNodeWeights; j++) {
+					newInfluenceEffect += influence[j][cluster]*normalizedNodeWeights[j][i];
+				}
+
+				upperBoundOwnCenter[i] *= (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) + 1e-12;
+				lowerBoundNextCenter[i] *= minRatio - 1e-12;//TODO: compute separate min ratio with respect to bounding box, only update that.		
 			}
 		}
 
@@ -874,7 +884,6 @@ DenseVector<IndexType> assignBlocks(
 		iter++;
 
 		if ( settings.verbose ) {
-			const IndexType currentLocalN = std::distance(firstIndex, lastIndex);
 			const IndexType takenLoops = currentLocalN - skippedLoops;
 			const ValueType averageComps = ValueType(totalComps) / currentLocalN;
 			std::vector<ValueType> influenceSpread(numNodeWeights);
@@ -887,16 +896,18 @@ DenseVector<IndexType> assignBlocks(
 			totalBalanceTime += balanceTime.count() ;
 
 			auto oldprecision = std::cout.precision(3);
-			if (comm->getRank() == 0) std::cout << "Iter " << iter << ", loop: " << 100*ValueType(takenLoops) / currentLocalN << "%, average comparisons: "
+			if (comm->getRank() == 0) {
+				std::cout << "Iter " << iter << ", loop: " << 100*ValueType(takenLoops) / currentLocalN << "%, average comparisons: "
 					<< averageComps << ", balanced blocks: " << 100*ValueType(balancedBlocks) / numNewBlocks << "%, influence spread: ";
-					for (IndexType i = 0; i < numNodeWeights; i++) {
-						 std::cout << influenceSpread[i] << " ";
-					}
-					std::cout << ", imbalance : ";
-					for (IndexType i = 0; i < numNodeWeights; i++) {
-						std::cout << imbalance[i] << " ";
-					}
-					std::cout << ", time elapsed: " << totalBalanceTime << std::endl;
+				for (IndexType i = 0; i < numNodeWeights; i++) {
+					 std::cout << influenceSpread[i] << " ";
+				}
+				std::cout << ", imbalance : ";
+				for (IndexType i = 0; i < numNodeWeights; i++) {
+					std::cout << imbalance[i] << " ";
+				}
+				std::cout << ", time elapsed: " << totalBalanceTime << std::endl;
+			}
 			std::cout.precision(oldprecision);
 		}
 
@@ -1367,7 +1378,7 @@ DenseVector<IndexType> computePartition( \
 				}
 
 				//update due to delta
-				upperBoundOwnCenter[i] += (2*deltas[cluster]*std::sqrt(upperBoundOwnCenter[i]/influence[0][cluster]) + squaredDeltas[cluster])*(influence[0][cluster] + 1e-10);
+				upperBoundOwnCenter[i] = std::numeric_limits<ValueType>::max();// += (2*deltas[cluster]*std::sqrt(upperBoundOwnCenter[i]/influence[0][cluster]) + squaredDeltas[cluster])*(influence[0][cluster] + 1e-10);
 				ValueType pureSqrt(std::sqrt(lowerBoundNextCenter[i]/maxInfluence));
 				if (pureSqrt < delta) {
 					lowerBoundNextCenter[i] = 0;
