@@ -629,7 +629,7 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
 
 
 template<typename IndexType, typename ValueType>
-void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseVector<ValueType> >& coordinates, DenseVector<ValueType>& nodeWeights, Settings settings, struct Metrics& metrics) {
+void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseVector<ValueType> >& coordinates, std::vector<DenseVector<ValueType>>& nodeWeights, Settings settings, struct Metrics& metrics) {
     SCAI_REGION_START("ParcoRepart.hilbertRedistribution.sfc")
     scai::dmemo::DistributionPtr inputDist = coordinates[0].getDistributionPtr();
     scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
@@ -638,8 +638,12 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
     const IndexType rank = comm->getRank();
 
     std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
+    const IndexType numNodeWeights = nodeWeights.size();
 
-    bool nodesUnweighted = (nodeWeights.max() == nodeWeights.min());
+    bool nodesUnweighted = true;
+    for (IndexType w = 0; w < numNodeWeights; w++) {
+    	if (nodeWeights[w].max() != nodeWeights[w].min()) nodesUnweighted = false;
+    }
 
     std::chrono::duration<double> migrationCalculation, migrationTime;
 
@@ -770,26 +774,29 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
             }
         }
         // same for node weights
-        if (nodesUnweighted) {
-            nodeWeights = DenseVector<ValueType>(newDist, 1);
-        }
-        else {
-            {
-                SCAI_REGION("ParcoRepart.hilbertRedistribution.redistribute.permute");
-                scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
-                for (IndexType i = 0; i < localN; i++) {
-                    sendBuffer[i] = rWeights[permutation[i]]; //TODO: how to make this more cache-friendly? (Probably by using pairs and sorting them.)
-                }
-            }
-            comm->exchangeByPlan(recvBuffer.data(), recvPlan, sendBuffer.data(), sendPlan);
-            nodeWeights = DenseVector<ValueType>(newDist, 0);
-            {
-                SCAI_REGION("ParcoRepart.hilbertRedistribution.redistribute.permute");
-                scai::hmemo::WriteAccess<ValueType> wWeights(nodeWeights.getLocalValues());
-                for (IndexType i = 0; i < newLocalN; i++) {
-                    wWeights[newDist->global2Local(recvIndices[i])] = recvBuffer[i];
-                }
-            }
+        for (IndexType w = 0; w < numNodeWeights; w++) {
+	        if (nodesUnweighted) {
+	            nodeWeights[w] = DenseVector<ValueType>(newDist, nodeWeights[w].getLocalValues()[0]);
+	        }
+	        else 
+	        {
+		        {
+	                SCAI_REGION("ParcoRepart.hilbertRedistribution.redistribute.permute");
+	                scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[w].getLocalValues());
+	                for (IndexType i = 0; i < localN; i++) {
+	                    sendBuffer[i] = rWeights[permutation[i]]; //TODO: how to make this more cache-friendly? (Probably by using pairs and sorting them.)
+	                }
+	            }
+	            comm->exchangeByPlan(recvBuffer.data(), recvPlan, sendBuffer.data(), sendPlan);
+	            nodeWeights[w] = DenseVector<ValueType>(newDist, 0);
+	            {
+	                SCAI_REGION("ParcoRepart.hilbertRedistribution.redistribute.permute");
+	                scai::hmemo::WriteAccess<ValueType> wWeights(nodeWeights[w].getLocalValues());
+	                for (IndexType i = 0; i < newLocalN; i++) {
+	                    wWeights[newDist->global2Local(recvIndices[i])] = recvBuffer[i];
+	                }
+	            }
+	        }
         }
     }
     migrationTime = std::chrono::system_clock::now() - beforeMigration;

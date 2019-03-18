@@ -1547,7 +1547,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 	}
 
 	HilbertCurve<IndexType,ValueType>::hilbertRedistribution(
-		coordinates, nodeWeights[0], settings, metrics);
+		coordinates, nodeWeights, settings, metrics);
 
 	//added check to verify that the points are indeed distributed 
 	//based on the hilbert curve. Otherwise, the prefix sum needed to 
