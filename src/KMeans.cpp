@@ -545,6 +545,18 @@ DenseVector<IndexType> assignBlocks(
 		SCAI_ASSERT_EQ_ERROR( influence[i].size(), numNewBlocks, "Vector size mismatch" );
 	}
 
+	//calculate normalized node weights. TODO: possibly move to outer function
+	std::vector<std::vector<ValueType>> normalizedNodeWeights(numNodeWeights, std::vector<ValueType>(localN));
+	for (IndexType i = 0; i < localN; i++) {
+		ValueType weightSum = 0;
+		for (IndexType j = 0; j < numNodeWeights; j++) {
+			weightSum += nodeWeights[j][i];
+		}
+		for (IndexType j = 0; j < numNodeWeights; j++) {
+			normalizedNodeWeights[j][i] = nodeWeights[j][i] / weightSum;
+		}
+	}
+
 	//pre-filter possible closest blocks
 	std::vector<ValueType> minDistanceAllBlocks( numNewBlocks );
 	std::vector<ValueType> effectMinDistAllBlocks( numNewBlocks );
@@ -601,7 +613,7 @@ DenseVector<IndexType> assignBlocks(
 
 	IndexType iter = 0;
 	IndexType skippedLoops = 0;
-	ValueType time = 0;	// for timing/profiling
+	ValueType totalBalanceTime = 0;	// for timing/profiling
 	std::vector<std::vector<bool>> influenceGrew( numNodeWeights, std::vector<bool>(numNewBlocks ));
 	std::vector<ValueType> influenceChangeUpperBound(numNewBlocks, 1+settings.influenceChangeCap);
 	std::vector<ValueType> influenceChangeLowerBound(numNewBlocks, 1-settings.influenceChangeCap);
@@ -648,7 +660,11 @@ DenseVector<IndexType> assignBlocks(
 					for (IndexType d = 0; d < dim; d++) {		
 						sqDistToOwn += std::pow(myCenter[d]-coordinates[d][i], 2);
 					}
-					ValueType newEffectiveDistance = sqDistToOwn*influence[0][oldCluster];
+					ValueType influenceEffect = 0;
+					for (IndexType j = 0; j < numNodeWeights; j++) {
+						influenceEffect += influence[j][oldCluster]*normalizedNodeWeights[j][i];
+					}
+					ValueType newEffectiveDistance = sqDistToOwn*influenceEffect;
 					assert(upperBoundOwnCenter[i] >= newEffectiveDistance);
 					upperBoundOwnCenter[i] = newEffectiveDistance;
 					if (lowerBoundNextCenter[i] > upperBoundOwnCenter[i]) {
@@ -685,7 +701,11 @@ DenseVector<IndexType> assignBlocks(
 								sqDist += std::pow(myCenter[d]-coordinates[d][i], 2);
 							}
 
-							const ValueType effectiveDistance = sqDist*influence[0][j];
+							ValueType influenceEffect = 0;
+							for (IndexType w = 0; w < numNodeWeights; w++) {
+								influenceEffect += influence[w][j]*normalizedNodeWeights[w][i];
+							}
+							const ValueType effectiveDistance = sqDist*influenceEffect;
 
 							//update best and second-best centers
 							if (effectiveDistance < bestValue) {
@@ -864,7 +884,7 @@ DenseVector<IndexType> assignBlocks(
 			}
 			
 			std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
-			time += balanceTime.count() ;
+			totalBalanceTime += balanceTime.count() ;
 
 			auto oldprecision = std::cout.precision(3);
 			if (comm->getRank() == 0) std::cout << "Iter " << iter << ", loop: " << 100*ValueType(takenLoops) / currentLocalN << "%, average comparisons: "
@@ -876,7 +896,7 @@ DenseVector<IndexType> assignBlocks(
 					for (IndexType i = 0; i < numNodeWeights; i++) {
 						std::cout << imbalance[i] << " ";
 					}
-					std::cout << ", time elapsed: " << time << std::endl;
+					std::cout << ", time elapsed: " << totalBalanceTime << std::endl;
 			std::cout.precision(oldprecision);
 		}
 
@@ -1249,7 +1269,8 @@ DenseVector<IndexType> computePartition( \
 			const ValueType ratio = totalSampledWeightSum / nodeWeightSum[i];
 			adjustedBlockSizes[i].resize(targetBlockWeights[i].size());
 
-			assert(ratio <= 1);
+			SCAI_ASSERT_LE_ERROR( totalSampledWeightSum, nodeWeightSum[i]+ 1e-10, "Error in sampled weight sum." );
+			
 			for (IndexType j = 0; j < targetBlockWeights[i].size(); j++) {
 				adjustedBlockSizes[i][j] = ValueType(targetBlockWeights[i][j]) * ratio;
 				if (settings.verbose) {
@@ -1437,7 +1458,20 @@ DenseVector<IndexType> computePartition( \
 	return result;
 }//computePartition
 
-//moved (7.11.18) from KMeans.h
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computePartition(
+	const std::vector<DenseVector<ValueType>> &coordinates,
+	const Settings settings) {
+
+	const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
+	const IndexType globalN = dist->getGlobalSize();
+	const scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+	const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = {unitNodeWeights};
+	std::vector<std::vector<ValueType>> blockSizes(1, std::vector<ValueType>(settings.numBlocks, std::ceil(globalN/settings.numBlocks)));
+	Metrics metrics(settings);
+
+	return computePartition(coordinates, nodeWeights, blockSizes, settings, metrics);
+}
 
 
 //wrapper 1 - called initially with no centers parameter

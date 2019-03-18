@@ -74,6 +74,12 @@ using point = std::vector<ValueType>;
  	const Settings settings, \
  	struct Metrics &metrics);
 
+//minimal wrapper
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computePartition(
+	const std::vector<DenseVector<ValueType>> &coordinates,
+	const Settings settings);
+
 /**
  * @brief Partition a point set using balanced k-means
  *
@@ -97,7 +103,6 @@ DenseVector<IndexType> computePartition(
 	const std::vector<std::vector<ValueType>> &blockSizes,
 	const Settings settings,
 	struct Metrics &metrics);
-
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierarchicalPartition(
