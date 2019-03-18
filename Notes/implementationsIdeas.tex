@@ -66,6 +66,8 @@ $50-70\%$ of their points after k-means). This makes sense. I did not test that 
 a few graph I tried, every PE claimed its own id, so no renumbering occurred. Maybe with smaller 
 blocks this can have some effect.
 
+
+
 \section*{Hierarchical k-means results}
 
 In some case, a block can be completely inside another one.
@@ -84,6 +86,28 @@ In some case, a block can be completely inside another one.
 \includegraphics[scale=0.2]{slowrot_RecursiveKMeans_k8}
 \caption{Graph slowrot0 partitioned recursively into 8 blocks. }
 \end{figure}
+
+
+
+\section*{Get communication graph in parallel}
+
+We want to build the communication/block graph $G_c$ given the input, application graph $G_a$ and a
+partition into $k$ blocks. Notice that $V(G_c)=k$, edges $E(G_c)$ are weighted and every PE owns some subset 
+of $E(G_c)$. Even more,
+edges can be divided among PEs, for example, PE 1 can own edge $(4,5)$ with weight $10$ and the same
+edge can be present in other PEs with different weights. The actual weight of the edge $(4,5)$ is the
+sum of the weights.
+
+One solution is to create the complete graph of size $k^2$. Every PE sets the weights of the edges that
+it owns. Then, with a global sum operation the edge weights are added and scattered back to all PEs.
+This is problematic for large $k$.
+Maybe we could avoid the quadratic space if we know how many edges $G_c$ has. But this is not easy either.
+
+Another way is that every PE sends its own edges and weights to a root PE, the root PE gather all the
+edges, constructs the block graph and scatters the graph back to all PEs.
+
+
+
 
 
 \end{document}

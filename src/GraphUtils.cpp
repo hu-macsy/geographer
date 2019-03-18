@@ -1131,6 +1131,13 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
         throw std::runtime_error( "Distributions: should (?) be equal.");
     }
 
+	//use a map to store edge weights
+    typedef std::pair<IndexType,IndexType> edge;
+	//TODO: check: this is supposedto be initialized to 0?
+    std::map<edge,ValueType> edgeMap;
+ 
+// read local values and create the local edge list of the block graph
+{
 	//access to graph and partition
 	const scai::lama::CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
@@ -1145,10 +1152,7 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 	scai::hmemo::HArray<IndexType> haloData;
 	partHalo.updateHalo( haloData, localPart, partDist->getCommunicator() );
 
-    //use a map to store edge weights
-    typedef std::pair<IndexType,IndexType> edge;
-	//TODO: check: this is supposedto be initialized to 0?
-    std::map<edge,ValueType> edgeMap;
+
 
 	//go over local data
 	for (IndexType i = 0; i < localN; i++) {
@@ -1178,6 +1182,156 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 			}
 		}
 	}//for
+}
+
+	const IndexType mySize = edgeMap.size()*3 /*+1*/;  // [...,u,v,weight,..]
+
+	//convert map to a vector
+	std::vector<ValueType> edgeVec( mySize );
+//	edgeVec[0]=-1; //this is used later, after gathering, to signify the start of every PE's data
+	IndexType ind=0;
+	for( auto edgeIt=edgeMap.begin(); edgeIt!=edgeMap.end(); edgeIt ++ ){
+		edgeVec[ind] = edgeIt->first.first;
+		edgeVec[ind+1] = edgeIt->first.second;
+		edgeVec[ind+2] = edgeIt->second;
+		ind += 3;
+	}
+
+	const unsigned int numPEs = comm->getSize();
+	const IndexType rootPE = 0; // set PE 0 as root
+
+	//TODO: we can also have different sizes per PE. We would save space but this
+	// versios i simpler (I hope).
+//	IndexType maxSize = comm->max( mySize );
+	IndexType sumSize = comm->sum( mySize );
+	IndexType arraySize=1;
+	if( comm->getRank()==rootPE ){
+		//arraySize = numPEs*maxSize;
+		arraySize = sumSize;
+	}
+
+	std::vector<ValueType> allEdges(arraySize, -1); //set a dummy value of -1
+	comm->gather( allEdges.data(), mySize, rootPE, edgeVec.data() );
+
+	/**
+	allEdges is "separeted" into numPEs blocks of size maxSize. In every block every
+	PE stores its local edgelist. It is like a concatenation of edge lists. 
+Note that the edge list for every PE starts with a -1.
+	After gathering, the root PE traverses the gathered	edges lists and constructs 
+	the block graph.
+	 **/
+
+/*
+for(int i=0; i<mySize; i++)	{
+	PRINT(*comm <<": edgeVec[" <<i <<"] " << edgeVec[i]);
+}
+if( comm->getRank()==rootPE ){
+	for(int i=0; i<arraySize; i++)	{
+		PRINT(rootPE <<": allEdges[" <<i <<"] " <<allEdges[i] );
+	}
+}
+*/
+//std::map<int,ValueType> lala;
+//std::sort( lala.begin(), lala.end() );
+
+	IndexType numEdges = 0; //only root will change it
+
+	std::vector<IndexType> ia(k+1,0);
+	std::vector<IndexType> ja;
+	std::vector<ValueType> values;
+
+	if( comm->getRank()==rootPE ){ //only root constructs the graph
+
+		//sort map lexicographically by vertex ids
+		struct lexEdgeSort{
+			//bool operator()(const std::pair<edge,ValueType> u, const std::pair<edge,ValueType> v){ 
+			bool operator()(const edge u, const edge v){ 
+				//sort edges based on the first node of the edge or the second if the first is the same
+				if (u.first == v.first)
+					return u.second < v.second;
+				else
+					return u.first < v.first;
+			}
+		};
+
+		std::map<edge,ValueType,lexEdgeSort> allEdgeMap;
+
+		//edgeMap.clear(); //empty local edge map
+		for(IndexType i=0; i<arraySize; i+=3 ){
+			edge e( allEdges[i], allEdges[i+1] );
+PRINT0("inserting edge ("<< allEdges[i] << ", " << allEdges[i+1] << "), weight " << allEdges[i+2] );
+			ValueType w = allEdges[i+2];
+			allEdgeMap[e] += w;
+		}
+		allEdges.clear();//not needed anymore
+
+		numEdges = allEdgeMap.size();
+
+		//create CSR storage
+
+	// 	std::vector<IndexType> ia(k+1);
+	//	std::vector<IndexType> ja;
+	//	std::vector<ValueType> values;
+
+		ia[0] = 0;
+
+		auto edgeIt = allEdgeMap.begin();
+		for(IndexType v=0; v<k; v++ ){ //for every vertex of the block graph			
+			SCAI_ASSERT_EQ_ERROR( edgeIt->first.first, v , "Missing node id " << v );
+			SCAI_ASSERT( edgeIt!=allEdgeMap.end(), "Edge list iterator out of bounds" ); //not very helpfull assertion
+
+			IndexType degree = 0;
+			while( v==edgeIt->first.first ){
+				IndexType u = edgeIt->first.second;
+				ValueType w = edgeIt->second;
+				ja.push_back( u );
+				values.push_back( w );
+				degree++;
+				edgeIt++; //move iterator to next edge
+PRINT0("edge: " << v <<", "<< u);
+			}			
+			ia[v+1] = ia[v]+degree;
+PRINT(ia[v]);
+		}
+		SCAI_ASSERT_EQ_ERROR( ja.size(), numEdges, "Wrong CSR ja size" );
+		SCAI_ASSERT_EQ_ERROR( values.size(), numEdges, "Wrong CSR values size" );
+		SCAI_ASSERT( edgeIt==allEdgeMap.end(), "Edge list iterator did not reach the end. Some edges were not considered" );
+
+	}//if rootPE
+
+	//only in root it has a non-zero value
+	numEdges = comm->max( numEdges );
+
+	if( comm->getRank()!=rootPE ){
+		ja.resize( numEdges, 0);
+		values.resize( numEdges, 0 );
+	}
+PRINT(*comm<<": " << ia[1] );
+PRINT(*comm<<": " << ia[2] );
+PRINT(*comm<<": " << ia[3] );
+
+std::vector<IndexType> myIA(k+1,0);
+
+	//scatter CSR data from root to all other PEs
+	//comm->scatterImpl( ia.data(), k+1, rootPE, ia.data(), scai::common::TypeTraits<ValueType>::stype );
+comm->synchronize();
+comm->scatterImpl(myIA.data(), k+1, rootPE, ia.data(), scai::common::TypeTraits<ValueType>::stype );
+	comm->scatter( ja.data(), numEdges, rootPE, ja.data() );
+	comm->scatter( values.data(), numEdges, rootPE, values.data() );
+comm->synchronize();
+PRINT(*comm<<": " << myIA[1] );
+PRINT(*comm<<": " << myIA[2] );
+PRINT(*comm<<": " << myIA[3] );
+
+
+	scai::lama::CSRStorage<ValueType> storage ( k, k,
+		scai::hmemo::HArray<IndexType>(ia.size(), ia.data()),
+		scai::hmemo::HArray<IndexType>(ja.size(), ja.data()),
+		scai::hmemo::HArray<ValueType>(values.size(), values.data()));
+
+	scai::lama::CSRSparseMatrix<ValueType> blockG( storage );
+
+
 
 	//use a distributed DenseMatrix for the blockGraph.
 	//each PE with set the value to a (possibly) non-local matrix position
@@ -1197,17 +1351,23 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 		denseBlockG.getLocalStorage().swap( initStorage );
 	}
 
-	//this setValue() can accedd non-local positions triggering communications with other PEs
+	//this setValue() can access non-local positions triggering communications with other PEs
+	//setValue: only the local values are set, if (i,j) is not local the values is NOT send to the responsible PE
 	for( auto edgeIt=edgeMap.begin(); edgeIt!=edgeMap.end(); edgeIt ++ ){
-PRINT( *comm<<": (" <<edgeIt->first.first <<" ," << edgeIt->first.second << "): " <<  edgeIt->second );
+		//PRINT( *comm<<": (" <<edgeIt->first.first <<" ," << edgeIt->first.second << "): " <<  edgeIt->second );
 		denseBlockG.setValue( edgeIt->first.first, edgeIt->first.second, edgeIt->second, scai::common::BinaryOp::ADD );
 	}
+
+	
+	//receivePlan = allocateTranspose(sendPlal);
+
 
 	scai::lama::CSRSparseMatrix<ValueType> sparseBlockG(denseBlockG);
 	//replicate in every PE
 	sparseBlockG.redistribute(noDist,noDist);
 
-	return sparseBlockG;
+
+	return blockG;
 }
 //-----------------------------------------------------------------------------------
 

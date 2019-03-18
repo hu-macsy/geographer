@@ -658,14 +658,16 @@ TEST_F ( GraphUtilsTest, testGetBlockGraph) {
 
     if( useDist ){
 		blockGraph = GraphUtils<IndexType, ValueType>::getBlockGraph_dist( graph, partition, k);
+		//15/03: still not working properly
+		for(int i=0; i<k; i++ ){
+			for( int j=0; j<k; j++){
+				PRINT0(i << ", " << j << ": " << blockGraph.getValue(i,j) );
+			}
+		}		
     }else{
 		blockGraph = GraphUtils<IndexType, ValueType>::getBlockGraph( graph, partition, k);
 	}
-for(int i=0; i<k; i++ ){
-	for( int j=0; j<k; j++){
-		PRINT0(i << ", " << j << ": " << blockGraph.getValue(i,j) );
-	}
-}
+
     //checks
     EXPECT_EQ( blockGraph.getNumRows(), k );
     EXPECT_TRUE( blockGraph.checkSymmetry() );
