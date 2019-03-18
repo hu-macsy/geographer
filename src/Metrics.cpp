@@ -24,7 +24,7 @@ void Metrics::print( std::ostream& out){
 	std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
 	out << "date and time: " << std::ctime(&timeNow) << std::endl;
 	
-	out << "numBlocks= " << numBlocks << std::endl;
+	//out << "numBlocks= " << numBlocks << std::endl;
 
 	//TODO: this is quite ugly. Refactor as dictionary with key-value-pairs, much more extensible.
 	/** since this is printed already during the local refinement, I disabled it here. We can re-enable it here when disabling it in the local refinement.
