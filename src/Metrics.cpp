@@ -26,7 +26,8 @@ void Metrics::print( std::ostream& out){
 	
 	out << "numBlocks= " << numBlocks << std::endl;
 
-	//TODO: this is quite ugly. Refactor as dictionary with key-value-pairs, much more extensible.		
+	//TODO: this is quite ugly. Refactor as dictionary with key-value-pairs, much more extensible.
+	/** since this is printed already during the local refinement, I disabled it here. We can re-enable it here when disabling it in the local refinement.
 	if( maxBlockGraphDegree==-1 ){
 		out << " ### WARNING: setting dummy value -1 for expensive (and not used) metrics max and total blockGraphDegree ###" << std::endl;
 	}else if (maxBlockGraphDegree==0 ){
@@ -46,6 +47,7 @@ void Metrics::print( std::ostream& out){
 			}
 		}
 	}
+	*/
 			
 	out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxCommVol totCommVol maxDiameter harmMeanDiam numDisBlocks timeSpMV timeComm" << std::endl;
 
@@ -76,10 +78,10 @@ void Metrics::print( std::ostream& out){
 	out.precision(oldprecision);
 
 //TESTING
-out<<"TEST print" << std::endl;
-for( auto mapIt= metricsMap.begin(); mapIt!=metricsMap.end(); mapIt++ ){
-out<< mapIt->first <<": " << mapIt->second << std::endl;
-}
+//out<<"TEST print" << std::endl;
+//for( auto mapIt= metricsMap.begin(); mapIt!=metricsMap.end(); mapIt++ ){
+//out<< mapIt->first <<": " << mapIt->second << std::endl;
+//}
 }
 //---------------------------------------------------------------------------
 
