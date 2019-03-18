@@ -154,7 +154,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 		std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - before;
 		ValueType maxTime = comm->max( elapTime.count() );
 		ValueType minTime = comm->min( elapTime.count() );
-		PRINT0("getCommPairs and border nodes: time " << minTime << " -- " << maxTime );
+		if (settings.verbose) PRINT0("getCommPairs and border nodes: time " << minTime << " -- " << maxTime );
 		
 		std::vector<ValueType> distances;
 		if (settings.useGeometricTieBreaking) {
@@ -220,14 +220,14 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 				assert(gain >= 0);
 			}
 			if (comm->getRank() == 0) {
-				std::cout << "\nMultilevel round "<< settings.multiLevelRounds <<": In refinement round " << numRefinementRounds << ", gain was " << gain << " in time " << FMStepTime << std::endl;
+				std::cout << "Multilevel round "<< settings.multiLevelRounds <<": In refinement round " << numRefinementRounds << ", gain was " << gain << " in time " << FMStepTime << std::endl;
 			}
 			numRefinementRounds++;
 
 		}
 		std::chrono::duration<double> elapTime2 = std::chrono::system_clock::now() - before;
 		ValueType refineTime = comm->max( elapTime2.count() );
-		PRINT0("local refinement time: " << refineTime );
+		//PRINT0("local refinement time: " << refineTime );
 	}
 	std::string filename = "mlRound_"+ std::to_string(settings.thisRound)+".mtx";
 	part.writeToFile( filename );

@@ -1099,7 +1099,7 @@ std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraph
     
     if (!adjM.getRowDistributionPtr()->isReplicated()) {
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-        PRINT0("***WARNING: In getGraphEdgeColoring_local: given graph is not replicated; will replicate now");
+        //PRINT0("***WARNING: In getGraphEdgeColoring_local: given graph is not replicated; will replicate now");
         const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
     	adjM.redistribute(noDist, noDist);
     	//throw std::runtime_error("Input matrix must be replicated.");
@@ -1161,7 +1161,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 	{
 		std::chrono::time_point<std::chrono::system_clock> beforeColoring =  std::chrono::system_clock::now();
 		if (!adjM.getRowDistributionPtr()->isReplicated()) {
-			PRINT0("***WARNING: In getCommunicationPairs_local: given graph is not replicated; will replicate now");
+			//PRINT0("***WARNING: In getCommunicationPairs_local: given graph is not replicated; will replicate now");
 			const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
 			adjM.redistribute(noDist, noDist);
 			//throw std::runtime_error("Input matrix must be replicated.");
@@ -1177,7 +1177,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 		std::chrono::duration<double> coloringTime = std::chrono::system_clock::now() - beforeColoring;
 		ValueType maxTime = comm->max( coloringTime.count() );
 		ValueType minTime = comm->min( coloringTime.count() );
-		PRINT0("coloring done in time " << minTime << " -- " << maxTime << ", using " << colors << " colors" );
+		if (settings.verbose) PRINT0("coloring done in time " << minTime << " -- " << maxTime << ", using " << colors << " colors" );
 	}	
     std::vector<DenseVector<IndexType>> retG(colors);
     
