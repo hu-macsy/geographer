@@ -288,7 +288,7 @@ DenseVector<IndexType> assignBlocks(
 	const std::vector<IndexType>& blockSizesPrefixSum,
 	const Iterator firstIndex,
 	const Iterator lastIndex,
-	const std::vector<DenseVector<ValueType>> &nodeWeights, 
+	const std::vector<std::vector<ValueType>> &nodeWeights, 
 	const DenseVector<IndexType> &previousAssignment,
 	const DenseVector<IndexType> &oldBlocks,
 	const std::vector<std::vector<ValueType>> &targetBlockWeights,
