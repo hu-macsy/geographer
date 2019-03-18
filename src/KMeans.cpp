@@ -509,7 +509,7 @@ DenseVector<IndexType> assignBlocks(
 		std::vector<ValueType> &upperBoundOwnCenter,
 		std::vector<ValueType> &lowerBoundNextCenter,
 		std::vector<std::vector<ValueType>> &influence,
-		ValueType &imbalance,
+		std::vector<ValueType> &imbalance,
 		Settings settings,
 		Metrics &metrics) {
 	SCAI_REGION( "KMeans.assignBlocks" );
@@ -612,6 +612,7 @@ DenseVector<IndexType> assignBlocks(
 
 	//compute assignment and balance
 	DenseVector<IndexType> assignment = previousAssignment;
+	bool allWeightsBalanced = false; //balance over all weights and all blocks
 
 	//iterate if necessary to achieve balance
 	do
@@ -739,22 +740,27 @@ DenseVector<IndexType> assignBlocks(
 			comm->sumImpl( blockWeights.data(), blockWeights.data(), numNewBlocks, scai::common::TypeTraits<ValueType>::stype);
 		}
 		
-		//calculate imbalance for every new block
+		//calculate imbalance for every new block and every weight
 		if (numNodeWeights > 1) throw std::logic_error("Not yet implemented for multiple weights.");
-		std::vector<ValueType> imbalances( numNewBlocks );
-		for( int newB=0; newB<numNewBlocks; newB++ ){
-			ValueType optWeight = targetBlockWeights[0][newB];
-			imbalances[newB] = (ValueType(blockWeights[newB] - optWeight)/optWeight);
+		allWeightsBalanced = true;
+		std::vector<std::vector<ValueType>> imbalancesPerBlock( numNodeWeights, std::vector<ValueType>( numNewBlocks ));
+		for (IndexType i = 0; i < numNodeWeights; i++) {
+			for( int newB=0; newB<numNewBlocks; newB++ ){
+				ValueType optWeight = targetBlockWeights[i][newB];
+				imbalancesPerBlock[i][newB] = (ValueType(blockWeights[newB] - optWeight)/optWeight);
+			}
+			//imbalance for each weight is the maximum imbalance of all new blocks
+			imbalance[i] = *std::max_element(imbalancesPerBlock[i].begin(), imbalancesPerBlock[i].end() );
+
+			if( settings.verbose and imbalance[i]<0 ){
+				PRINT0("Warning, imbalance in weight " + std::to_string(i) + " is " + std::to_string(imbalance[i]) + ". Probably the given target block sizes are all too large.");
+			}
+
+			if (imbalance[i] > settings.epsilon) {//TODO: generalize with multiple epsilons
+				allWeightsBalanced = false;
+			}
+
 		}
-
-		//imbalance in the maximum imbalance of all new blocks
-		imbalance = *std::max_element(imbalances.begin(), imbalances.end() );
-		//TODO: adapt for multiple node weights
-
-		if( settings.verbose and imbalance<0 ){
-			PRINT0("Warning, imbalance is negative. Probably the given target block sizes are all too large.");
-		}
-
 
 		// adapt influence values
 		double minRatio = std::numeric_limits<double>::max();
@@ -867,11 +873,15 @@ DenseVector<IndexType> assignBlocks(
 					for (IndexType i = 0; i < numNodeWeights; i++) {
 						 std::cout << influenceSpread[i] << " ";
 					}
-					std::cout << ", imbalance : " << imbalance << ", time elapsed: " << time << std::endl;
+					std::cout << ", imbalance : ";
+					for (IndexType i = 0; i < numNodeWeights; i++) {
+						std::cout << imbalance[i] << " ";
+					}
+					std::cout << ", time elapsed: " << time << std::endl;
 			std::cout.precision(oldprecision);
 		}
 
-	} while (imbalance > settings.epsilon - 1e-12 && iter < settings.balanceIterations);
+	} while ((!allWeightsBalanced) && iter < settings.balanceIterations);
 	
 	if( settings.verbose ) {
 		std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
@@ -1249,7 +1259,7 @@ DenseVector<IndexType> computePartition( \
 
 		std::vector<ValueType> timePerPE( comm->getSize(), 0.0);
 
-		result = assignBlocks(convertedCoords, centers1DVector, blockSizesPrefixSum, firstIndex, lastIndex, nodeWeights, result, partition, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, imbalances[0], settings, metrics);
+		result = assignBlocks(convertedCoords, centers1DVector, blockSizesPrefixSum, firstIndex, lastIndex, nodeWeights, result, partition, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, imbalances, settings, metrics);
 
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 

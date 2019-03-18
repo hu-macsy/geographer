@@ -296,7 +296,7 @@ DenseVector<IndexType> assignBlocks(
 	std::vector<ValueType> &upperBoundOwnCenter,
 	std::vector<ValueType> &lowerBoundNextCenter,
 	std::vector<std::vector<ValueType>> &influence,
-	ValueType &imbalance,
+	std::vector<ValueType> &imbalance,
 	Settings settings,
 	Metrics &metrics);
 
