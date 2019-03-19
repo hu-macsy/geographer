@@ -115,6 +115,12 @@ the global sum and at every step edge weights are summed and duplicates are elim
 
 TODO: run a benchmark to see if and how faster this is.
 
+\paragraph*{A possibly} better approach is not everything to one PE but consider each PE responsible
+for some rows/vertices of the block graph. The, every PE, for every local edge will send the information 
+to the responsible PE for this row/vertex. Then, the PE will add up the edges they received and
+broadcast everything back. This is less centralized but may trigger more complicated communication 
+patterns. If the block graph needs to be replicated, the several broadcast at the last step may
+cause congestion.
 
 
 

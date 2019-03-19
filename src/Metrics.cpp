@@ -204,10 +204,10 @@ void Metrics::getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueT
 	PRINT0("minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", imbalance= " << imbalance);
 					
 	// diameter
-	if( maxBlockDiameter==0 or harmMeanDiam==0){
+	if( MM["maxBlockDiameter"]==0 or MM["harmMeanDiam"]==0){
 		scai::lama::DenseVector<IndexType> copyPartition( partition );
 		copyPartition.redistribute( distFromPartition );
-		std::tie( maxBlockDiameter, harmMeanDiam, numDisconBlocks ) = getDiameter(copyGraph, copyPartition, settings);
+		std::tie( MM["maxBlockDiameter"], MM["harmMeanDiam"], MM["numDisconBlocks"] ) = getDiameter(copyGraph, copyPartition, settings);
 	}
 	
 	// redistribute for SpMV and commTime
@@ -232,7 +232,7 @@ void Metrics::getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueT
 		//PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
 		
 		time = comm->max(SpMVTime.count());
-		timeSpMV = time/repeatTimes;
+		MM["timeSpMV"] = time/repeatTimes;
 		
 		ValueType minTime = comm->min( SpMVTime.count() );
 		PRINT0("max time for " << repeatTimes <<" SpMVs: " << time << " , min time " << minTime);
@@ -260,7 +260,7 @@ void Metrics::getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueT
 		
 		//PRINT(*comm << ": "<< sendPlan );		
 		time = comm->max(commTime.count());
-		timeComm = time/repeatTimes;
+		MM["timeComm"] = time/repeatTimes;
 		
 		ValueType minTime = comm->min( commTime.count() );
 		PRINT0("max time for " << repeatTimes <<" communications: " << time << " , min time " << minTime);
@@ -483,12 +483,12 @@ void Metrics::getMappingMetrics(
 		std::cout<< "Minimum dilation: " << minDilation << std::endl;
 	}
 	*/
-	this->maxCongestion = maxCongestion;
-	metricsMap["maxCongestion"] = maxCongestion;
-	this->maxDilation = maxDilation;
-	metricsMap["maxDilation"] = maxDilation;
-	this->avgDilation = avgDilation;
-	metricsMap["avgDilation"] = avgDilation;
+	//this->maxCongestion = maxCongestion;
+	MM["maxCongestion"] = maxCongestion;
+	//this->maxDilation = maxDilation;
+	MM["maxDilation"] = maxDilation;
+	//this->avgDilation = avgDilation;
+	MM["avgDilation"] = avgDilation;
 
 }//getMappingMetrics
 //---------------------------------------------------------------------------------------
