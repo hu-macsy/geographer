@@ -1050,10 +1050,6 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 			if (neighborBlock != thisBlock) {
 				IndexType index = thisBlock*k + neighborBlock;
 				localBlockGraphEdges[index] = localBlockGraphEdges[index] + values[j];
-				//TODO: check:
-				// to keep matrix symemtric, add also the other edge
-				//index = thisBlock + neighborBlock*k;
-				//localBlockGraphEdges[index] = localBlockGraphEdges[index] + values[j];
 			}
 		}
 	}//for
@@ -1135,62 +1131,176 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
         throw std::runtime_error( "Distributions: should (?) be equal.");
     }
 
-	//access to graph and partition
-	const scai::lama::CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-    const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-    const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-    const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
-
-    const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
-    const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
-
-    //get halo for non-local values
-    scai::dmemo::HaloExchangePlan partHalo = buildNeighborHalo( adjM );
-	scai::hmemo::HArray<IndexType> haloData;
-	partHalo.updateHalo( haloData, localPart, partDist->getCommunicator() );
-
-	//the vector to be returned
-	//edges[0]: first vetrex id, edges[1]: second vetrex id. edges[2]: the weight of the edge
-    //std::vector<std::vector<IndexType>> blockEdges(3);	
-    
-    //use a map to store edge weights
+	//use a map to store edge weights
     typedef std::pair<IndexType,IndexType> edge;
+	//TODO: check: this is supposedto be initialized to 0?
     std::map<edge,ValueType> edgeMap;
+ 
+	// read local values and create the local edge list of the block graph
+	{
+		//access to graph and partition
+		const scai::lama::CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+	    const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+	    const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+	    const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
-	//go over local data
-	for (IndexType i = 0; i < localN; i++) {
-		const IndexType beginCols = ia[i];
-		const IndexType endCols = ia[i+1];
-		assert(ja.size() >= endCols);
+	    const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
+	    const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-		const IndexType globalI = dist->local2Global(i);
-		//assert(partDist->isLocal(globalI));
-		SCAI_ASSERT_ERROR(partDist->isLocal(globalI), "non-local index, globalI= " << globalI << " for PE " << comm->getRank() );	
+	    //get halo for non-local values
+	    scai::dmemo::HaloExchangePlan partHalo = buildNeighborHalo( adjM );
+		scai::hmemo::HArray<IndexType> haloData;
+		partHalo.updateHalo( haloData, localPart, partDist->getCommunicator() );
 
-		IndexType thisBlock = partAccess[i];
+		//go over local data
+		for (IndexType i = 0; i < localN; i++) {
+			const IndexType beginCols = ia[i];
+			const IndexType endCols = ia[i+1];
+			assert(ja.size() >= endCols);
 
-		for (IndexType j = beginCols; j < endCols; j++) {
-			IndexType neighbor = ja[j];
-			IndexType neighborBlock;
-			if (partDist->isLocal(neighbor)) {
-				neighborBlock = partAccess[partDist->global2Local(neighbor)];
-			} else {
-				neighborBlock = haloData[partHalo.global2Halo(neighbor)];
+			const IndexType globalI = dist->local2Global(i);
+			//assert(partDist->isLocal(globalI));
+			SCAI_ASSERT_ERROR(partDist->isLocal(globalI), "non-local index, globalI= " << globalI << " for PE " << comm->getRank() );	
+
+			IndexType thisBlock = partAccess[i];
+
+			for (IndexType j = beginCols; j < endCols; j++) {
+				IndexType neighbor = ja[j];
+				IndexType neighborBlock;
+				if (partDist->isLocal(neighbor)) {
+					neighborBlock = partAccess[partDist->global2Local(neighbor)];
+				} else {
+					neighborBlock = haloData[partHalo.global2Halo(neighbor)];
+				}
+
+				//found an edge between two blocks
+				if (neighborBlock != thisBlock) {
+					edge e1(thisBlock, neighborBlock);
+					edgeMap[e1] += values[j];
+				}
 			}
+		}//for
+	}
 
-			//found an edge between two blocks
-			if (neighborBlock != thisBlock) {
-				edge e1(thisBlock, neighborBlock);
-				edge e2(neighborBlock,thisBlock); //for symmetry
-				edgeMap[e1] += values[j];
-				edgeMap[e2] += values[j];
+	const IndexType mySize = edgeMap.size()*3;  // [...,u,v,weight,..]
+
+	//convert map to a vector
+	std::vector<ValueType> edgeVec( mySize );
+
+	IndexType ind=0;
+	for( auto edgeIt=edgeMap.begin(); edgeIt!=edgeMap.end(); edgeIt ++ ){
+		edgeVec[ind] = edgeIt->first.first;		//first vertex
+		edgeVec[ind+1] = edgeIt->first.second;	//second
+		edgeVec[ind+2] = edgeIt->second;		//edge weight
+		ind += 3;
+	}
+
+	const unsigned int numPEs = comm->getSize();
+	const IndexType rootPE = 0; // set PE 0 as root
+
+	//TODO: the array size can get very big. Another way would be to use a custom
+	//communication plan where PE i sends to i+1 ... using logk rounds (similar to sum)
+	//and in every summation step duplicate edges are eliminated.
+	IndexType sumSize = comm->sum( mySize );
+	IndexType arraySize=1;
+	if( comm->getRank()==rootPE ){
+		arraySize = sumSize;
+		//PRINT(*comm <<": array size= " << arraySize );		
+	}
+
+	//every PE has different size to send, this is needed fot the gather
+	std::vector<IndexType> allSizes( comm->getSize(), 0 );
+	allSizes[comm->getRank()] = mySize;
+	comm->sumImpl( allSizes.data(), allSizes.data(), comm->getSize(),  scai::common::TypeTraits<IndexType>::stype );
+
+	std::vector<ValueType> allEdges(arraySize, -1); //set a dummy value of -1
+	comm->gatherV( allEdges.data(), mySize, rootPE, edgeVec.data(), allSizes.data() );
+	
+	/**
+	allEdges is a concatenation of edge lists. Every PE stores its local edgelist.
+	After gathering, the root PE traverses the gathered	edges lists and constructs 
+	the block graph.
+	 **/
+
+	IndexType numEdges = 0; //only root will change it
+
+	std::vector<IndexType> ia(k+1,0);
+	std::vector<IndexType> ja;
+	std::vector<ValueType> values;
+
+	if( comm->getRank()==rootPE ){ //only root constructs the graph
+
+		//sort map lexicographically by vertex ids
+		struct lexEdgeSort{
+			//bool operator()(const std::pair<edge,ValueType> u, const std::pair<edge,ValueType> v){ 
+			bool operator()(const edge u, const edge v){ 
+				//sort edges based on the first node of the edge or the second if the first is the same
+				if (u.first == v.first)
+					return u.second < v.second;
+				else
+					return u.first < v.first;
 			}
+		};
+
+		std::map<edge,ValueType,lexEdgeSort> allEdgeMap;
+
+		for(IndexType i=0; i<arraySize; i+=3 ){
+			edge e( allEdges[i], allEdges[i+1] );
+			ValueType w = allEdges[i+2];
+			allEdgeMap[e] += w;
+			//PRINT0("inserting edge ("<< allEdges[i] << ", " << allEdges[i+1] << "), weight " << allEdgeMap[e] );
 		}
-	}//for
+		allEdges.clear();//not needed anymore
 
-	//use a distributed DenseMatrix for the blockGraph.
-	//each PE with set the value to a (possibly) non-local matrix position
+		numEdges = allEdgeMap.size();
 
+		//create CSR storage
+
+		ia[0] = 0;
+
+		auto edgeIt = allEdgeMap.begin();
+		for(IndexType v=0; v<k; v++ ){ //for every vertex of the block graph			
+			SCAI_ASSERT_EQ_ERROR( edgeIt->first.first, v , "Missing node id " << v );
+			SCAI_ASSERT( edgeIt!=allEdgeMap.end(), "Edge list iterator out of bounds" ); //not very helpfull assertion
+
+			IndexType degree = 0;
+			while( v==edgeIt->first.first ){
+				IndexType u = edgeIt->first.second;
+				ValueType w = edgeIt->second;
+				ja.push_back( u );
+				values.push_back( w );
+				degree++;
+				edgeIt++; //move iterator to next edge
+			}			
+			ia[v+1] = ia[v]+degree;
+		}
+		SCAI_ASSERT_EQ_ERROR( ja.size(), numEdges, "Wrong CSR ja size" );
+		SCAI_ASSERT_EQ_ERROR( values.size(), numEdges, "Wrong CSR values size" );
+		SCAI_ASSERT( edgeIt==allEdgeMap.end(), "Edge list iterator did not reach the end. Some edges were not considered" );
+
+	}//if rootPE
+
+	//only in root it has a non-zero value
+	numEdges = comm->max( numEdges );
+
+	if( comm->getRank()!=rootPE ){
+		ja.resize( numEdges, 0);
+		values.resize( numEdges, 0 );
+	}
+
+	//broadcast CSR data from root to all other PEs
+	comm->bcast( ia.data(), k+1, rootPE );
+	comm->bcast( ja.data(), numEdges, rootPE );
+	comm->bcast( values.data(), numEdges, rootPE );
+
+	scai::lama::CSRStorage<ValueType> storage ( k, k,
+		scai::hmemo::HArray<IndexType>(ia.size(), ia.data()),
+		scai::hmemo::HArray<IndexType>(ja.size(), ja.data()),
+		scai::hmemo::HArray<ValueType>(values.size(), values.data()));
+
+	scai::lama::CSRSparseMatrix<ValueType> blockG( storage );
+
+	return blockG;
 }
 //-----------------------------------------------------------------------------------
 
