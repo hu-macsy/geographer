@@ -398,6 +398,7 @@ TEST_F(HilbertCurveTest, testHilbertRedistribution) {
     const IndexType N = graph.getNumRows();
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, settings.dimensions);
     scai::lama::DenseVector<ValueType> nodeWeights(graph.getRowDistributionPtr(), 1);
+    std::vector<scai::lama::DenseVector<ValueType>> nodeWeightsContainer(1, nodeWeights);
 
     std::vector<DenseVector<ValueType>> coordCopy(coords);
     Metrics metrics(settings);
@@ -409,7 +410,7 @@ TEST_F(HilbertCurveTest, testHilbertRedistribution) {
         coordSum[d] = coords[d].sum();
     }
 
-    HilbertCurve<IndexType, ValueType>::hilbertRedistribution(coords, nodeWeights, settings, metrics);
+    HilbertCurve<IndexType, ValueType>::hilbertRedistribution(coords, nodeWeightsContainer, settings, metrics);
 
     //redistribute also graph
     //graph.redistribute( coords[0].getDistributionPtr(), scai::dmemo::DistributionPtr(new scai::dmemo::NoDistribution(N)) );
