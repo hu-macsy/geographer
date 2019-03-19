@@ -4,9 +4,11 @@ void Metrics::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, 
 	
 	getEasyMetrics( graph, partition, nodeWeights, settings );
 	
-	int numIter = 100;
-	getRedistRequiredMetrics( graph, partition, settings, numIter );
-	
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	if (settings.numBlocks == comm->getSize()) {
+		int numIter = 100;
+		getRedistRequiredMetrics( graph, partition, settings, numIter );
+	}
 }
 
 void Metrics::print( std::ostream& out){
@@ -205,12 +207,13 @@ std::tuple<IndexType,IndexType,IndexType> Metrics::getDiameter( const scai::lama
 		}else{
 			PRINT0("\tWARNING: Not computing diameter, not all vertices are in same block everywhere");
 		}
+	
+		std::chrono::duration<ValueType,std::ratio<1>> diameterTime = std::chrono::high_resolution_clock::now() - diameterStart; 
+		ValueType time = comm->max( diameterTime.count() );
+		if (settings.verbose) {
+		    PRINT0("time to get the diameter: " <<  time );
+		}
 	}
-	std::chrono::duration<ValueType,std::ratio<1>> diameterTime = std::chrono::high_resolution_clock::now() - diameterStart; 
-	ValueType time = comm->max( diameterTime.count() );
-	//if (settings.verbose) {
-	    PRINT0("time to get the diameter: " <<  time );
-	//}
 
 	return std::make_tuple( maxBlockDiameter, harmMeanDiam, numDisconBlocks);
 }
