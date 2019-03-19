@@ -280,6 +280,73 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 	std::cout << "final imbalance: speed= " << speedImbalance << " , size= " << sizeImbalance << std::endl;
 }
 
+TEST_F(KMeansTest, testComputePartitionWithMultipleWeights) {
+	std::string fileName = "bubbles-00010.graph";
+	std::string graphFile = graphPath + fileName;
+	std::string coordFile = graphFile + ".xyz";
+
+	const IndexType numNodeWeights = 2;
+
+	//load graph
+	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+
+	struct Settings settings;
+	settings.dimensions = 2;
+	settings.epsilon = 0.05;
+	settings.numBlocks = comm->getSize();
+	settings.verbose = true;
+
+	//load coords
+	const IndexType globalN = graph.getNumRows();
+	const IndexType localN = dist->getLocalSize();
+	const std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), globalN, settings.dimensions);
+
+	//set first weight uniform, second weight random
+	const scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+	scai::lama::DenseVector<ValueType> randomNodeWeights(dist, 0);
+	randomNodeWeights.fillRandom(10);
+
+	const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = {unitNodeWeights, randomNodeWeights};
+	std::vector<std::vector<ValueType>> blockSizes(numNodeWeights);
+
+	std::vector<ValueType> nodeWeightSum(numNodeWeights);
+	for (IndexType i = 0; i < numNodeWeights; i++) {
+		nodeWeightSum[i] = nodeWeights[i].sum();
+
+		blockSizes[i].resize(settings.numBlocks, std::ceil(nodeWeightSum[i]/settings.numBlocks));
+	}
+
+	Metrics metrics(settings);
+	//use hilbert redistribution before?
+	scai::lama::DenseVector<IndexType> partition = ITI::KMeans::computePartition<IndexType, ValueType>( coords, nodeWeights, blockSizes, settings, metrics);
+
+	//assert that distributions are still the same
+
+	{
+		scai::hmemo::ReadAccess<IndexType> rPartition(partition.getLocalValues());
+		for (IndexType j = 0; j < numNodeWeights; j++) {
+			std::vector<ValueType> blockWeights(settings.numBlocks);
+			scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[j].getLocalValues());
+
+			for (IndexType i = 0; i < localN; i++) {
+				IndexType block = rPartition[i];
+				blockWeights[block] += rWeights[i];
+			}
+
+			comm->sumImpl( blockWeights.data(), blockWeights.data(), settings.numBlocks, scai::common::TypeTraits<ValueType>::stype);
+
+			for (IndexType b = 0; b < settings.numBlocks; b++) {
+				if (settings.verbose && comm->getRank() == 0) std::cout << "blockWeights[" << j << "][" << b << "] = " << blockWeights[b] << std::endl;
+				EXPECT_LE(blockWeights[b], std::ceil(blockSizes[j][b])*(1+settings.epsilon));
+			}
+		}
+	}
+
+	//check for correct error messages: block sizes not aligned to node weights, different distributions in coordinates and weights, weights not fitting into blocks, balance
+}
+
 /*
 TEST_F(KMeansTest, testPartitionWithNodeWeights) {
 	//std::string fileName = "Grid32x32";

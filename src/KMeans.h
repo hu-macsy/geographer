@@ -74,6 +74,12 @@ using point = std::vector<ValueType>;
  	const Settings settings, \
  	struct Metrics &metrics);
 
+//minimal wrapper
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computePartition(
+	const std::vector<DenseVector<ValueType>> &coordinates,
+	const Settings settings);
+
 /**
  * @brief Partition a point set using balanced k-means
  *
@@ -97,7 +103,6 @@ DenseVector<IndexType> computePartition(
 	const std::vector<std::vector<ValueType>> &blockSizes,
 	const Settings settings,
 	struct Metrics &metrics);
-
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierarchicalPartition(
@@ -228,6 +233,23 @@ std::vector<point> findCenters(
 	const DenseVector<ValueType> &nodeWeights);
 
 /**
+ * Computes the weighted distance between a vertex and a cluster, given the geometric distance and the weights and influence values.
+ *
+ * @param[in] distance
+ * @param[in] nodeWeights
+ * @param[in] influence
+ * @param[in] vertex
+ * @param[in] cluster
+ */
+template<typename IndexType, typename ValueType>
+ValueType computeEffectiveDistance(
+	const ValueType distance,
+	const std::vector<DenseVector<ValueType>> &nodeWeights,
+	const std::vector<std::vector<ValueType>> &influence,
+	const IndexType vertex,
+	const IndexType cluster);
+
+/**
  * Assign points to block with smallest effective distance, adjusted for influence values.
  * Repeatedly adjusts influence values to adhere to the balance constraint given by settings.epsilon
  * To enable random initialization with a subset of the points, this function accepts iterators for the first and last local index that should be considered.
@@ -271,18 +293,18 @@ DenseVector<IndexType> assignBlocks(
 	const std::vector<IndexType>& blockSizesPrefixSum,
 	const Iterator firstIndex,
 	const Iterator lastIndex,
-	const std::vector<DenseVector<ValueType>> &nodeWeights, 
+	const std::vector<std::vector<ValueType>> &nodeWeights,
+	const std::vector<std::vector<ValueType>> &normalizedNodeWeights, 
 	const DenseVector<IndexType> &previousAssignment,
 	const DenseVector<IndexType> &oldBlocks,
 	const std::vector<std::vector<ValueType>> &targetBlockWeights,
 	const SpatialCell &boundingBox,
 	std::vector<ValueType> &upperBoundOwnCenter,
 	std::vector<ValueType> &lowerBoundNextCenter,
-	std::vector<ValueType> &influence,
-	ValueType &imbalance,
+	std::vector<std::vector<ValueType>> &influence,
+	std::vector<ValueType> &imbalance,
 	Settings settings,
 	Metrics &metrics);
-
 
 /**
  * @brief Get local minimum and maximum coordinates

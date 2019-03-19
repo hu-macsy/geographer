@@ -291,10 +291,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				scai::dmemo::DistributionPtr initMigrationPtr;
 				
 				if (settings.initialMigration == InitialPartitioningMethods::SFC) {
-					if (nodeWeightCopy.size() > 1) {
-						throw std::logic_error("Hilbert redistribution not implemented for multiple weights.");
-					}
-					HilbertCurve<IndexType,ValueType>::hilbertRedistribution(coordinateCopy, nodeWeightCopy[0], settings, metrics);
+					HilbertCurve<IndexType,ValueType>::hilbertRedistribution(coordinateCopy, nodeWeightCopy, settings, metrics);
 				}else {
 					std::vector<DenseVector<ValueType> > convertedWeights(nodeWeights);
 					DenseVector<IndexType> tempResult;				
@@ -370,10 +367,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		SCAI_ASSERT( blockSizes[0].size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
 		
 		std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
-		if (nodeWeightCopy.size() > 1) {
-			throw std::logic_error("Not yet implemented for multiple node weights.");
-		}
+		
 		if (settings.repartition) {
+			if (nodeWeightCopy.size() > 1) {
+				throw std::logic_error("Not yet implemented for multiple node weights.");
+			}
 			result = ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
 		} else {
 			result = ITI::KMeans::computePartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
