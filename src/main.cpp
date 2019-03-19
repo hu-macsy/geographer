@@ -497,8 +497,10 @@ int main(int argc, char** argv) {
 				outF << "Running " << __FILE__ << std::endl;
 				settings.print( outF, comm);
 				
-				if( settings.noRefinement)
-					printVectorMetricsShort( metricsVec, outF ); 
+//TODO: remove if 
+				if( settings.noRefinement )
+					//printVectorMetricsShort( metricsVec, outF ); 
+					printVectorMetrics( metricsVec, outF ); 
 				else
 					printVectorMetrics( metricsVec, outF ); 
 			

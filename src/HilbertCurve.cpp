@@ -669,7 +669,7 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
     SQuick::sort<sort_pair>(mpi_comm, localPairs, -1); //could also do this with just the hilbert index - as a valueType
     //IndexType newLocalN = localPairs.size();
     migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
-    metrics.timeMigrationAlgo[rank] = migrationCalculation.count();
+    metrics.MM["timeMigrationAlgo"] = migrationCalculation.count();
     std::chrono::time_point < std::chrono::system_clock > beforeMigration = std::chrono::system_clock::now();
     assert(localPairs.size() > 0);
     SCAI_REGION_END("ParcoRepart.hilbertRedistribution.sort")
@@ -800,7 +800,7 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
         }
     }
     migrationTime = std::chrono::system_clock::now() - beforeMigration;
-    metrics.timeFirstDistribution[rank] = migrationTime.count();
+    metrics.MM["timeFirstDistribution"] = migrationTime.count();
 }
 //-------------------------------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
