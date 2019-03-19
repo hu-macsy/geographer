@@ -33,7 +33,25 @@ void Metrics::print( std::ostream& out){
 		}
 	}
 */	
+}
+//---------------------------------------------------------------------------
 
+void Metrics::printHorizontal( std::ostream& out){
+
+	for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ){
+		out<< mapIt->first << ", ";
+	}
+	out << std::endl;
+	for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ){
+		out<< mapIt->second << ", ";
+	}
+	out << std::endl;
+}
+//---------------------------------------------------------------------------
+
+void printKMeansProfiling( std::ostream& out ){
+	out << "KMeans::assignBlocks was called " << numBalanceIter.size() << " times" << std::endl;
+	out << "Average number of balance iterations: " << std::accumulate( numBalanceIter.begin(), numBalanceIter.end(), 0.0 )/numBalanceIter.size() << std::endl;
 }
 //---------------------------------------------------------------------------
 
@@ -55,10 +73,6 @@ void Metrics::getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph
 	
 	//TODO: getting the block graph probably fails for p>5000, removed this metric since we do not use it so much
 	//std::tie(maxBlockGraphDegree, totalBlockGraphEdges) = ITI::GraphUtils::computeBlockGraphComm<IndexType, ValueType>( graph, partition, settings.numBlocks );
-	
-	//set to dummy value -1
-	//maxBlockGraphDegree = -1;
-	//totalBlockGraphEdges = -1;
 
 	// communication volume
 
@@ -268,7 +282,6 @@ void Metrics::getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueT
 	
 	//redistibute back to initial distributions
 	//graph.redistribute( initRowDistPtr, initColDistPtr );
-	
 }
 
 /* Calculate the volume, aka the data that will be exchanged when redistributing from oldDist to newDist.
@@ -472,22 +485,8 @@ void Metrics::getMappingMetrics(
 	ValueType avgDilation = ((ValueType) sumDilation)/((ValueType) peM/2);
 	ValueType avgCongestion = std::accumulate( congestion.begin(), congestion.end(), 0.0)/peM;
 
-	/*
-	if( comm->getRank()==0 ){
-		std::cout<< "Maximum congestion: " << maxCongestion << std::endl;
-		std::cout<< "Average congestion: " << avgCongestion << std::endl;
-		std::cout<< "Minimum congestion: " << minCongestion << std::endl;
-		std::cout<< " - - - - - - " << std::endl;
-		std::cout<< "Maximum dilation: " << maxDilation << std::endl;
-		std::cout<< "Average dilation: " << avgDilation << std::endl;
-		std::cout<< "Minimum dilation: " << minDilation << std::endl;
-	}
-	*/
-	//this->maxCongestion = maxCongestion;
 	MM["maxCongestion"] = maxCongestion;
-	//this->maxDilation = maxDilation;
 	MM["maxDilation"] = maxDilation;
-	//this->avgDilation = avgDilation;
 	MM["avgDilation"] = avgDilation;
 
 }//getMappingMetrics

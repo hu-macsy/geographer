@@ -19,6 +19,7 @@
 
 #include "LocalRefinement.h"
 #include "Settings.h"
+#include "Metrics.h" //needed for profiling, remove is not used
 
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;

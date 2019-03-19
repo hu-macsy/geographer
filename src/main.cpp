@@ -419,10 +419,10 @@ int main(int argc, char** argv) {
             partition.redistribute( graph.getRowDistributionPtr());
         }
 		
-        metricsVec[r].finalCut = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
-        metricsVec[r].finalImbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(partition, settings.numBlocks ,nodeWeights[0]);
-        metricsVec[r].inputTime = ValueType ( comm->max(inputTime.count() ));
-        metricsVec[r].timeFinalPartition = ValueType (comm->max(partitionTime.count()));
+        metricsVec[r].MM["finalCut"] = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
+        metricsVec[r].MM["finalImbalance"] = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(partition, settings.numBlocks ,nodeWeights[0]);
+        metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
+        metricsVec[r].MM["timeFinalPartition"] = ValueType (comm->max(partitionTime.count()));
 
         //---------------------------------------------
         //
@@ -434,8 +434,9 @@ int main(int argc, char** argv) {
             auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
             std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
             std::cout.precision(oldprecision);
-            std::cout<< std::endl<< "\033[1;36mcut:"<< metricsVec[r].finalCut<< "   imbalance:"<< metricsVec[r].finalImbalance << std::endl;
-            std::cout<<"inputTime:" << metricsVec[r].inputTime << "   partitionTime:" << metricsVec[r].timeFinalPartition << " \033[0m" << std::endl;
+            //std::cout<< std::endl<< "\033[1;36mcut:"<< metricsVec[r].finalCut<< "   imbalance:"<< metricsVec[r].finalImbalance << std::endl;
+            //std::cout<<"inputTime:" << metricsVec[r].inputTime << "   partitionTime:" << metricsVec[r].timeFinalPartition << " \033[0m" << std::endl;
+            metricsVec[r].printHorizontal( std::cout );
         }
                 
         //---------------------------------------------
@@ -460,7 +461,7 @@ int main(int argc, char** argv) {
         // Reporting output to std::cout
         //
         
-        metricsVec[r].reportTime = ValueType (comm->max(reportTime.count()));
+        metricsVec[r].MM["reportTime"] = ValueType (comm->max(reportTime.count()));
         
         
         if (comm->getRank() == 0 && metricsDetail != "no") {
@@ -482,7 +483,7 @@ int main(int argc, char** argv) {
         if (comm->getRank() == 0) {
             std::cout<<  "\033[1;36m";
         }
-        printVectorMetrics( metricsVec, std::cout );
+        printVectorMetrics( metricsVec, std::cout, settings);
         if (comm->getRank() == 0) {
             std::cout << " \033[0m";
         }
@@ -500,9 +501,9 @@ int main(int argc, char** argv) {
 //TODO: remove if 
 				if( settings.noRefinement )
 					//printVectorMetricsShort( metricsVec, outF ); 
-					printVectorMetrics( metricsVec, outF ); 
+					printVectorMetrics( metricsVec, outF, settings ); 
 				else
-					printVectorMetrics( metricsVec, outF ); 
+					printVectorMetrics( metricsVec, outF, settings ); 
 			
 				//	profiling info for k-means
 				if(settings.verbose){
