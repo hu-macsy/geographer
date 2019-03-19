@@ -293,7 +293,8 @@ DenseVector<IndexType> assignBlocks(
 	const std::vector<IndexType>& blockSizesPrefixSum,
 	const Iterator firstIndex,
 	const Iterator lastIndex,
-	const std::vector<std::vector<ValueType>> &nodeWeights, 
+	const std::vector<std::vector<ValueType>> &nodeWeights,
+	const std::vector<std::vector<ValueType>> &normalizedNodeWeights, 
 	const DenseVector<IndexType> &previousAssignment,
 	const DenseVector<IndexType> &oldBlocks,
 	const std::vector<std::vector<ValueType>> &targetBlockWeights,
@@ -304,7 +305,6 @@ DenseVector<IndexType> assignBlocks(
 	std::vector<ValueType> &imbalance,
 	Settings settings,
 	Metrics &metrics);
-
 
 /**
  * @brief Get local minimum and maximum coordinates
