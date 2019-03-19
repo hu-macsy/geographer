@@ -590,11 +590,6 @@ DenseVector<IndexType> assignBlocks(
 			}
 		);
 
-		//sort also this part of the distances
-		//TODO: is this sorting needed?
-		//TODO: is it correct to sort? if we sort, effectMinDistAllBlocks[clusterInd[i]] will be wrong, I think effectMinDistAllBlocks[i] will be correct
-		//TODO: either not sort and get minDistanceAllBlocks[c] or sort and get minDistanceAllBlocks[i]
-		//update 15/02: yes, sorting is needed and we access it as in the for loop below: effectMinDistAllBlocks[i]
 		std::sort( effectMinDistAllBlocks.begin()+rangeStart, effectMinDistAllBlocks.begin()+rangeEnd);
 	}
 
@@ -823,7 +818,6 @@ DenseVector<IndexType> assignBlocks(
 
 		//update bounds
 		{
-			//TODO: repair bounds for multiple weights
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.updateBounds" );
 			for (Iterator it = firstIndex; it != lastIndex; it++) {
 				const IndexType i = *it;
@@ -838,7 +832,7 @@ DenseVector<IndexType> assignBlocks(
 				SCAI_ASSERT_GE_ERROR( (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) , minRatio - 1e12, "Error in calculation of influence effect");
 
 				upperBoundOwnCenter[i] *= (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) + 1e-12;
-				lowerBoundNextCenter[i] *= minRatio - 1e-12;//TODO: compute separate min ratio with respect to bounding box, only update that.		
+				lowerBoundNextCenter[i] *= minRatio - 1e-12;
 
 				//influenceEffectOfOwn[veryLocalI] = newInfluenceEffect;
 			}
@@ -849,9 +843,14 @@ DenseVector<IndexType> assignBlocks(
 			//TODO: repair once I have the equations figured out for the new boundaries
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.filterCenters" );
 			for (IndexType newB=0; newB<numNewBlocks; newB++) {
-				effectMinDistAllBlocks[newB] = minDistanceAllBlocks[newB]*minDistanceAllBlocks[newB]*influence[0][newB];
+				ValueType influenceMin = std::numeric_limits<ValueType>::max();
+				for (IndexType i = 0; i < numNodeWeights; i++) {
+					influenceMin = std::min(influenceMin, influence[i][newB]);
+				}
+
+				effectMinDistAllBlocks[newB] = minDistanceAllBlocks[newB]*minDistanceAllBlocks[newB]*influenceMin;
 			}
-			//TODO: duplicated code as in the beginning of the assignBlocks
+			//TODO: duplicated code as in the beginning of the assignBlocks, maybe move into lambda?
 			for( IndexType oldB=0; oldB<numOldBlocks; oldB++ ){
 				const unsigned int rangeStart = blockSizesPrefixSum[oldB];
 				const unsigned int rangeEnd = blockSizesPrefixSum[oldB+1];
@@ -870,9 +869,6 @@ DenseVector<IndexType> assignBlocks(
 					}
 				);
 				//sort also this part of the distances
-				//TODO: is this sorting needed?
-				//TODO: is it correct to sort? if we sort, effectMinDistAllBlocks[clusterInd[i]] will be wrong, I think effectMinDistAllBlocks[i] will be correct
-				//update 15/02: yes, sorting is needed (see also above)
 				std::sort( effectMinDistAllBlocks.begin()+rangeStart, effectMinDistAllBlocks.begin()+rangeEnd);
 			}
 		}
