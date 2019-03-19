@@ -397,7 +397,7 @@ TEST_F(HilbertCurveTest, testHilbertRedistribution) {
     scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     const IndexType N = graph.getNumRows();
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, settings.dimensions);
-    scai::lama::DenseVector<ValueType> nodeWeights(graph.getRowDistributionPtr(), 1);
+    scai::lama::DenseVector<ValueType> nodeWeights(coords[0].getDistributionPtr(), 1);
     std::vector<scai::lama::DenseVector<ValueType>> nodeWeightsContainer(1, nodeWeights);
 
     std::vector<DenseVector<ValueType>> coordCopy(coords);
@@ -411,10 +411,11 @@ TEST_F(HilbertCurveTest, testHilbertRedistribution) {
     }
 
     HilbertCurve<IndexType, ValueType>::hilbertRedistribution(coords, nodeWeightsContainer, settings, metrics);
+    nodeWeights = nodeWeightsContainer[0];
 
     //redistribute also graph
     //graph.redistribute( coords[0].getDistributionPtr(), scai::dmemo::DistributionPtr(new scai::dmemo::NoDistribution(N)) );
-
+    //TODO: adapt confirmhilbertDistribution to multiple node weights
     bool hasHilbertDist = HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution( coords, nodeWeights, settings);
     EXPECT_TRUE( hasHilbertDist );
 
