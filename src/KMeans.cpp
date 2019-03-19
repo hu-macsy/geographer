@@ -259,8 +259,7 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		std::vector<ValueType> allCenters( numCenters*dimensions );
 
 		for( unsigned int c=0; c<numCenters; c++ ){
-			//this copies the point, this is unnecessary, TODO: fix
-			point thisCenter = centersPerNewBlock[b][c];
+			const point& thisCenter = centersPerNewBlock[b][c];
 			//copy this center
 			std::copy( thisCenter.begin(), thisCenter.end(), allCenters.begin() +c*dimensions );
 		}
