@@ -1136,103 +1136,91 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 	//TODO: check: this is supposedto be initialized to 0?
     std::map<edge,ValueType> edgeMap;
  
-// read local values and create the local edge list of the block graph
-{
-	//access to graph and partition
-	const scai::lama::CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-    const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-    const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-    const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+	// read local values and create the local edge list of the block graph
+	{
+		//access to graph and partition
+		const scai::lama::CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+	    const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+	    const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+	    const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
 
-    const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
-    const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
+	    const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
+	    const scai::hmemo::ReadAccess<IndexType> partAccess(localPart);
 
-    //get halo for non-local values
-    scai::dmemo::HaloExchangePlan partHalo = buildNeighborHalo( adjM );
-	scai::hmemo::HArray<IndexType> haloData;
-	partHalo.updateHalo( haloData, localPart, partDist->getCommunicator() );
+	    //get halo for non-local values
+	    scai::dmemo::HaloExchangePlan partHalo = buildNeighborHalo( adjM );
+		scai::hmemo::HArray<IndexType> haloData;
+		partHalo.updateHalo( haloData, localPart, partDist->getCommunicator() );
 
+		//go over local data
+		for (IndexType i = 0; i < localN; i++) {
+			const IndexType beginCols = ia[i];
+			const IndexType endCols = ia[i+1];
+			assert(ja.size() >= endCols);
 
+			const IndexType globalI = dist->local2Global(i);
+			//assert(partDist->isLocal(globalI));
+			SCAI_ASSERT_ERROR(partDist->isLocal(globalI), "non-local index, globalI= " << globalI << " for PE " << comm->getRank() );	
 
-	//go over local data
-	for (IndexType i = 0; i < localN; i++) {
-		const IndexType beginCols = ia[i];
-		const IndexType endCols = ia[i+1];
-		assert(ja.size() >= endCols);
+			IndexType thisBlock = partAccess[i];
 
-		const IndexType globalI = dist->local2Global(i);
-		//assert(partDist->isLocal(globalI));
-		SCAI_ASSERT_ERROR(partDist->isLocal(globalI), "non-local index, globalI= " << globalI << " for PE " << comm->getRank() );	
+			for (IndexType j = beginCols; j < endCols; j++) {
+				IndexType neighbor = ja[j];
+				IndexType neighborBlock;
+				if (partDist->isLocal(neighbor)) {
+					neighborBlock = partAccess[partDist->global2Local(neighbor)];
+				} else {
+					neighborBlock = haloData[partHalo.global2Halo(neighbor)];
+				}
 
-		IndexType thisBlock = partAccess[i];
-
-		for (IndexType j = beginCols; j < endCols; j++) {
-			IndexType neighbor = ja[j];
-			IndexType neighborBlock;
-			if (partDist->isLocal(neighbor)) {
-				neighborBlock = partAccess[partDist->global2Local(neighbor)];
-			} else {
-				neighborBlock = haloData[partHalo.global2Halo(neighbor)];
+				//found an edge between two blocks
+				if (neighborBlock != thisBlock) {
+					edge e1(thisBlock, neighborBlock);
+					edgeMap[e1] += values[j];
+				}
 			}
+		}//for
+	}
 
-			//found an edge between two blocks
-			if (neighborBlock != thisBlock) {
-				edge e1(thisBlock, neighborBlock);
-				edgeMap[e1] += values[j];
-			}
-		}
-	}//for
-}
-
-	const IndexType mySize = edgeMap.size()*3 /*+1*/;  // [...,u,v,weight,..]
+	const IndexType mySize = edgeMap.size()*3;  // [...,u,v,weight,..]
 
 	//convert map to a vector
 	std::vector<ValueType> edgeVec( mySize );
-//	edgeVec[0]=-1; //this is used later, after gathering, to signify the start of every PE's data
+
 	IndexType ind=0;
 	for( auto edgeIt=edgeMap.begin(); edgeIt!=edgeMap.end(); edgeIt ++ ){
-		edgeVec[ind] = edgeIt->first.first;
-		edgeVec[ind+1] = edgeIt->first.second;
-		edgeVec[ind+2] = edgeIt->second;
+		edgeVec[ind] = edgeIt->first.first;		//first vertex
+		edgeVec[ind+1] = edgeIt->first.second;	//second
+		edgeVec[ind+2] = edgeIt->second;		//edge weight
 		ind += 3;
 	}
 
 	const unsigned int numPEs = comm->getSize();
 	const IndexType rootPE = 0; // set PE 0 as root
 
-	//TODO: we can also have different sizes per PE. We would save space but this
-	// versios i simpler (I hope).
-//	IndexType maxSize = comm->max( mySize );
+	//TODO: the array size can get very big. Another way would be to use a custom
+	//communication plan where PE i sends to i+1 ... using logk rounds (similar to sum)
+	//and in every summation step duplicate edges are eliminated.
 	IndexType sumSize = comm->sum( mySize );
 	IndexType arraySize=1;
 	if( comm->getRank()==rootPE ){
-		//arraySize = numPEs*maxSize;
 		arraySize = sumSize;
+		//PRINT(*comm <<": array size= " << arraySize );		
 	}
 
-	std::vector<ValueType> allEdges(arraySize, -1); //set a dummy value of -1
-	comm->gather( allEdges.data(), mySize, rootPE, edgeVec.data() );
+	//every PE has different size to send, this is needed fot the gather
+	std::vector<IndexType> allSizes( comm->getSize(), 0 );
+	allSizes[comm->getRank()] = mySize;
+	comm->sumImpl( allSizes.data(), allSizes.data(), comm->getSize(),  scai::common::TypeTraits<IndexType>::stype );
 
+	std::vector<ValueType> allEdges(arraySize, -1); //set a dummy value of -1
+	comm->gatherV( allEdges.data(), mySize, rootPE, edgeVec.data(), allSizes.data() );
+	
 	/**
-	allEdges is "separeted" into numPEs blocks of size maxSize. In every block every
-	PE stores its local edgelist. It is like a concatenation of edge lists. 
-Note that the edge list for every PE starts with a -1.
+	allEdges is a concatenation of edge lists. Every PE stores its local edgelist.
 	After gathering, the root PE traverses the gathered	edges lists and constructs 
 	the block graph.
 	 **/
-
-/*
-for(int i=0; i<mySize; i++)	{
-	PRINT(*comm <<": edgeVec[" <<i <<"] " << edgeVec[i]);
-}
-if( comm->getRank()==rootPE ){
-	for(int i=0; i<arraySize; i++)	{
-		PRINT(rootPE <<": allEdges[" <<i <<"] " <<allEdges[i] );
-	}
-}
-*/
-//std::map<int,ValueType> lala;
-//std::sort( lala.begin(), lala.end() );
 
 	IndexType numEdges = 0; //only root will change it
 
@@ -1256,22 +1244,17 @@ if( comm->getRank()==rootPE ){
 
 		std::map<edge,ValueType,lexEdgeSort> allEdgeMap;
 
-		//edgeMap.clear(); //empty local edge map
 		for(IndexType i=0; i<arraySize; i+=3 ){
 			edge e( allEdges[i], allEdges[i+1] );
-PRINT0("inserting edge ("<< allEdges[i] << ", " << allEdges[i+1] << "), weight " << allEdges[i+2] );
 			ValueType w = allEdges[i+2];
 			allEdgeMap[e] += w;
+			//PRINT0("inserting edge ("<< allEdges[i] << ", " << allEdges[i+1] << "), weight " << allEdgeMap[e] );
 		}
 		allEdges.clear();//not needed anymore
 
 		numEdges = allEdgeMap.size();
 
 		//create CSR storage
-
-	// 	std::vector<IndexType> ia(k+1);
-	//	std::vector<IndexType> ja;
-	//	std::vector<ValueType> values;
 
 		ia[0] = 0;
 
@@ -1288,10 +1271,8 @@ PRINT0("inserting edge ("<< allEdges[i] << ", " << allEdges[i+1] << "), weight "
 				values.push_back( w );
 				degree++;
 				edgeIt++; //move iterator to next edge
-PRINT0("edge: " << v <<", "<< u);
 			}			
 			ia[v+1] = ia[v]+degree;
-PRINT(ia[v]);
 		}
 		SCAI_ASSERT_EQ_ERROR( ja.size(), numEdges, "Wrong CSR ja size" );
 		SCAI_ASSERT_EQ_ERROR( values.size(), numEdges, "Wrong CSR values size" );
@@ -1306,23 +1287,11 @@ PRINT(ia[v]);
 		ja.resize( numEdges, 0);
 		values.resize( numEdges, 0 );
 	}
-PRINT(*comm<<": " << ia[1] );
-PRINT(*comm<<": " << ia[2] );
-PRINT(*comm<<": " << ia[3] );
 
-std::vector<IndexType> myIA(k+1,0);
-
-	//scatter CSR data from root to all other PEs
-	//comm->scatterImpl( ia.data(), k+1, rootPE, ia.data(), scai::common::TypeTraits<ValueType>::stype );
-comm->synchronize();
-comm->scatterImpl(myIA.data(), k+1, rootPE, ia.data(), scai::common::TypeTraits<ValueType>::stype );
-	comm->scatter( ja.data(), numEdges, rootPE, ja.data() );
-	comm->scatter( values.data(), numEdges, rootPE, values.data() );
-comm->synchronize();
-PRINT(*comm<<": " << myIA[1] );
-PRINT(*comm<<": " << myIA[2] );
-PRINT(*comm<<": " << myIA[3] );
-
+	//broadcast CSR data from root to all other PEs
+	comm->bcast( ia.data(), k+1, rootPE );
+	comm->bcast( ja.data(), numEdges, rootPE );
+	comm->bcast( values.data(), numEdges, rootPE );
 
 	scai::lama::CSRStorage<ValueType> storage ( k, k,
 		scai::hmemo::HArray<IndexType>(ia.size(), ia.data()),
@@ -1330,42 +1299,6 @@ PRINT(*comm<<": " << myIA[3] );
 		scai::hmemo::HArray<ValueType>(values.size(), values.data()));
 
 	scai::lama::CSRSparseMatrix<ValueType> blockG( storage );
-
-
-
-	//use a distributed DenseMatrix for the blockGraph.
-	//each PE with set the value to a (possibly) non-local matrix position
-
-	scai::dmemo::DistributionPtr noDist( new scai::dmemo::NoDistribution(k) );
-	scai::lama::DenseMatrix<ValueType> denseBlockG( 
-		scai::dmemo::DistributionPtr( new scai::dmemo::BlockDistribution(k, comm) ),
-		noDist
-		);
-
-	//initialize with 0
-	{
-		const IndexType localNumRows = denseBlockG.getLocalNumRows();
-		const IndexType localNumColumns = denseBlockG.getLocalNumColumns();
-		scai::hmemo::HArray<ValueType> initData( localNumRows*localNumColumns, 0.0 );
-		scai::lama::DenseStorage<ValueType> initStorage( localNumRows, localNumColumns, initData );
-		denseBlockG.getLocalStorage().swap( initStorage );
-	}
-
-	//this setValue() can access non-local positions triggering communications with other PEs
-	//setValue: only the local values are set, if (i,j) is not local the values is NOT send to the responsible PE
-	for( auto edgeIt=edgeMap.begin(); edgeIt!=edgeMap.end(); edgeIt ++ ){
-		//PRINT( *comm<<": (" <<edgeIt->first.first <<" ," << edgeIt->first.second << "): " <<  edgeIt->second );
-		denseBlockG.setValue( edgeIt->first.first, edgeIt->first.second, edgeIt->second, scai::common::BinaryOp::ADD );
-	}
-
-	
-	//receivePlan = allocateTranspose(sendPlal);
-
-
-	scai::lama::CSRSparseMatrix<ValueType> sparseBlockG(denseBlockG);
-	//replicate in every PE
-	sparseBlockG.redistribute(noDist,noDist);
-
 
 	return blockG;
 }

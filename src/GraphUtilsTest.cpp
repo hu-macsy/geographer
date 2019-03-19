@@ -653,36 +653,40 @@ TEST_F ( GraphUtilsTest, testGetBlockGraph) {
     
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
 
-    scai::lama::CSRSparseMatrix<ValueType> blockGraph;
+    scai::lama::CSRSparseMatrix<ValueType> blockGraph1, blockGraph2;
     bool useDist = true;
+    ValueType edgeSum = 0;
 
-    if( useDist ){
-		blockGraph = GraphUtils<IndexType, ValueType>::getBlockGraph_dist( graph, partition, k);
-		//15/03: still not working properly
-		for(int i=0; i<k; i++ ){
-			for( int j=0; j<k; j++){
-				PRINT0(i << ", " << j << ": " << blockGraph.getValue(i,j) );
-			}
-		}		
-    }else{
-		blockGraph = GraphUtils<IndexType, ValueType>::getBlockGraph( graph, partition, k);
+    blockGraph1 = GraphUtils<IndexType, ValueType>::getBlockGraph_dist( graph, partition, k);
+		
+	blockGraph2 = GraphUtils<IndexType, ValueType>::getBlockGraph( graph, partition, k);
+	
+	//graphs should be identical
+	for(int i=0; i<k; i++ ){
+		for( int j=0; j<k; j++){
+			//PRINT0(i << ", " << j << ": " << blockGraph.getValue(i,j) );
+			EXPECT_EQ( blockGraph1.getValue(i,j), blockGraph2.getValue(i,j) );
+			edgeSum += blockGraph1.getValue(i,j);
+		}
 	}
 
-    //checks
-    EXPECT_EQ( blockGraph.getNumRows(), k );
-    EXPECT_TRUE( blockGraph.checkSymmetry() );
+	//checks
+    EXPECT_EQ( blockGraph1.getNumRows(), k );
+    EXPECT_TRUE( blockGraph1.checkSymmetry() );
+    EXPECT_TRUE( blockGraph1.isConsistent() );
 
     //check if matrix is same in all PEs
     for(int i=0; i<k; i++){
     	for(int j=0; j<k; j++){
-    		ValueType myVal = blockGraph.getValue(i,j);
+    		ValueType myVal = blockGraph1.getValue(i,j);
     		ValueType sumVal = comm->sum(myVal);
-//    		EXPECT_EQ( sumVal, myVal*comm->getSize() ) \
+    		EXPECT_EQ( sumVal, myVal*comm->getSize() ) \
     			<< " for position ["<<i <<"," << j << "]. PE " << comm->getRank() <<", myVal= " << myVal ;
     	}
     }
-ValueType cut = GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
-PRINT0( cut );
+	
+	ValueType cut = GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
+	EXPECT_EQ( cut*2, edgeSum );
 }
 //------------------------------------------------------------------------------
 

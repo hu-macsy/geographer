@@ -106,6 +106,15 @@ Maybe we could avoid the quadratic space if we know how many edges $G_c$ has. Bu
 Another way is that every PE sends its own edges and weights to a root PE, the root PE gather all the
 edges, constructs the block graph and scatters the graph back to all PEs.
 
+Update, 19/03/19: The parallel version works now. One possible problem is that we need to create
+an array with the edges in one root PE where we gather all edges from all PEs. This arrays can have 
+big size since some edges of $G_c$ exist in many PEs. For example, if blocks 4 and 5 have a boundary 
+and are present in 4 PEs, then the edge $(4,5)$ will appear 4 times in this array. Still, this
+is much better than the quadratic size. One solution can be to have a communication pattern like
+the global sum and at every step edge weights are summed and duplicates are eliminated.
+
+TODO: run a benchmark to see if and how faster this is.
+
 
 
 
