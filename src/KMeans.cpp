@@ -840,7 +840,7 @@ DenseVector<IndexType> assignBlocks(
 				upperBoundOwnCenter[i] *= (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) + 1e-12;
 				lowerBoundNextCenter[i] *= minRatio - 1e-12;//TODO: compute separate min ratio with respect to bounding box, only update that.		
 
-				influenceEffectOfOwn[veryLocalI] = newInfluenceEffect;
+				//influenceEffectOfOwn[veryLocalI] = newInfluenceEffect;
 			}
 		}
 
@@ -1373,7 +1373,11 @@ DenseVector<IndexType> computePartition( \
 		delta = *std::max_element(deltas.begin(), deltas.end());
 		assert(delta >= 0);
 		const double deltaSq = delta*delta;
-		//const double maxInfluence = *std::max_element(influence[0].begin(), influence[0].end());
+		double maxInfluence = 0;
+		for (IndexType w = 0; w < numNodeWeights; w++) {
+			maxInfluence = std::max(maxInfluence, *std::max_element(influence[w].begin(), influence[w].end()));
+		}
+		
 		//const double minInfluence = *std::min_element(influence.begin(), influence.end());
 		{
 			SCAI_REGION( "KMeans.computePartition.updateBounds" );
@@ -1381,6 +1385,11 @@ DenseVector<IndexType> computePartition( \
 				const IndexType i = *it;
 				IndexType cluster = rResult[i];
 				assert( cluster<totalNumNewBlocks );
+
+				ValueType influenceEffect = 0;
+				for (IndexType w = 0; w < numNodeWeights; w++) {
+					influenceEffect += influence[w][cluster]*normalizedNodeWeights[w][i];
+				}
 
 				if (settings.erodeInfluence) {
 					//WARNING: erodeInfluence not supported for hierarchical version
@@ -1394,9 +1403,8 @@ DenseVector<IndexType> computePartition( \
 				}
 
 				//update due to delta
-				upperBoundOwnCenter[i] = std::numeric_limits<ValueType>::max();// += (2*deltas[cluster]*std::sqrt(upperBoundOwnCenter[i]/influence[0][cluster]) + squaredDeltas[cluster])*(influence[0][cluster] + 1e-10);
-				lowerBoundNextCenter[i] = 0;
-				/**
+				upperBoundOwnCenter[i] += (2*deltas[cluster]*std::sqrt(upperBoundOwnCenter[i]/influenceEffect) + squaredDeltas[cluster])*(influenceEffect + 1e-10);
+				
 				ValueType pureSqrt(std::sqrt(lowerBoundNextCenter[i]/maxInfluence));
 				if (pureSqrt < delta) {
 					lowerBoundNextCenter[i] = 0;
@@ -1406,7 +1414,7 @@ DenseVector<IndexType> computePartition( \
 					lowerBoundNextCenter[i] += diff;
 					if (!(lowerBoundNextCenter[i] > 0)) lowerBoundNextCenter[i] = 0;
 				}
-				*/
+				
 				assert(std::isfinite(lowerBoundNextCenter[i]));
 			}
 		}
