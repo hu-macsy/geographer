@@ -555,11 +555,16 @@ DenseVector<IndexType> assignBlocks(
 		SCAI_REGION( "KMeans.assignBlocks.filterCenters" );
 
 		point center = centers1DVector[newB];
+		ValueType influenceMin = std::numeric_limits<ValueType>::max();
+		for (IndexType i = 0; i < numNodeWeights; i++) {
+			influenceMin = std::min(influenceMin, influence[i][newB]);
+		}
+
 		minDistanceAllBlocks[newB] = boundingBox.distances(center).first;
 		assert( std::isfinite(minDistanceAllBlocks[newB]) );
 		effectMinDistAllBlocks[newB] = minDistanceAllBlocks[newB]\
 			*minDistanceAllBlocks[newB]\
-			*influence[0][newB];
+			*influenceMin;
 		assert( std::isfinite(effectMinDistAllBlocks[newB]) );	
 	}
 
@@ -591,13 +596,6 @@ DenseVector<IndexType> assignBlocks(
 		//TODO: either not sort and get minDistanceAllBlocks[c] or sort and get minDistanceAllBlocks[i]
 		//update 15/02: yes, sorting is needed and we access it as in the for loop below: effectMinDistAllBlocks[i]
 		std::sort( effectMinDistAllBlocks.begin()+rangeStart, effectMinDistAllBlocks.begin()+rangeEnd);
-
-		//just for checking
-		for (IndexType i=rangeStart; i<rangeEnd; i++) {
-			IndexType c = clusterIndicesAllBlocks[i];
-			ValueType effectiveDist = minDistanceAllBlocks[c]*minDistanceAllBlocks[c]*influence[0][c];
-			SCAI_ASSERT_LT_ERROR( std::abs(effectMinDistAllBlocks[i] - effectiveDist), 1e-5, "effectiveMinDistance[" << i << "] = " << effectMinDistAllBlocks[i] << " != " << effectiveDist << " = effectiveDist");
-		}
 	}
 
 	IndexType iter = 0;
@@ -725,7 +723,8 @@ DenseVector<IndexType> assignBlocks(
 							//assert(bestValue >= lowerBoundNextCenter[i]);
 							SCAI_ASSERT_GE_ERROR( bestValue , lowerBoundNextCenter[i], \
 								"PE " << comm->getRank() << ": difference " << std::abs(bestValue - lowerBoundNextCenter[i]) << \
-								" for i= " << i << ", oldCluster: " << oldCluster << ", newCluster: " << bestBlock);
+								" for i= " << i << ", oldCluster: " << oldCluster << ", newCluster: " << bestBlock << \
+								", influenceEffect: " << influenceEffectOfBestBlock);
 						}
 
 						upperBoundOwnCenter[i] = bestValue;
@@ -1062,17 +1061,19 @@ DenseVector<IndexType> computePartition( \
 		SCAI_ASSERT_EQ_ERROR( numOldBlocks-1, maxPart, "The provided partition must have equal number of blocks as the length of the vector with the new number of blocks per part");
 	}
 
-	if (settings.erodeInfluence) {
-		for (IndexType i = 0; i < targetBlockWeights.size(); i++) {
-			auto minMax = std::minmax_element(targetBlockWeights[i].begin(), targetBlockWeights[i].end());
-			if (*minMax.first != *minMax.second) {
+	const IndexType numNodeWeights = nodeWeights.size();
+	assert(targetBlockWeights.size() == numNodeWeights);
+
+	std::vector<bool> heterogeneousBlockSizes(numNodeWeights, false);
+	for (IndexType i = 0; i < targetBlockWeights.size(); i++) {
+		auto minMax = std::minmax_element(targetBlockWeights[i].begin(), targetBlockWeights[i].end());
+		if (*minMax.first != *minMax.second) {
+			heterogeneousBlockSizes[i] = true;
+			if (settings.erodeInfluence) {
 				throw std::logic_error("ErodeInfluence setting is not supported for heterogeneous blocks");
 			}
 		}
 	}
-
-	const IndexType numNodeWeights = nodeWeights.size();
-	assert(targetBlockWeights.size() == numNodeWeights);
 	
 	//the number of new blocks per old block and the total number of new blocks
 	std::vector<IndexType> blockSizesPrefixSum( numOldBlocks+1, 0 );
@@ -1296,7 +1297,9 @@ DenseVector<IndexType> computePartition( \
 			for (IndexType j = 0; j < targetBlockWeights[i].size(); j++) {
 				adjustedBlockSizes[i][j] = ValueType(targetBlockWeights[i][j]) * ratio;
 				if (settings.verbose && iter < samplingRounds) {
-					PRINT0("Adjusted " + std::to_string(targetBlockWeights[i][j]) + " down to " + std::to_string(adjustedBlockSizes[i][j]) );
+					if (j == 0 || heterogeneousBlockSizes[i]) {
+						PRINT0("Adjusted " + std::to_string(targetBlockWeights[i][j]) + " down to " + std::to_string(adjustedBlockSizes[i][j]) );
+					}
 				}
 			}
 		}
