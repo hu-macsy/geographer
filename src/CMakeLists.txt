@@ -45,6 +45,8 @@ set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11 -DBUILD_COMMIT=${
 ### define targets ###
 add_executable(Geographer ${FILES_COMMON} main.cpp)
 target_link_libraries(Geographer ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
+add_executable(analyze ${FILES_COMMON} analyzePartition.cpp)
+target_link_libraries(analyze ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
 
 add_library(geographer SHARED ${FILES_COMMON})
 
