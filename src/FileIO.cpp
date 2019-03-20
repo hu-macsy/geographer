@@ -1871,10 +1871,10 @@ DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::st
 
     //skip the first lines that have comments starting with '%'
     std::string line;
-    std::getline(file, line);
+    bool read = !std::getline(file, line).fail();
 
     while( line[0]== '%'){
-       std::getline(file, line);
+       read = !std::getline(file, line).fail();
     }
     std::stringstream ss;
     ss.str( line );
@@ -1888,17 +1888,17 @@ DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::st
 
 	//scroll to begin of local range.
 	for (IndexType i = 0; i < beginLocalRange; i++) {
-		std::getline(file, line);
+		read = !std::getline(file, line).fail();
 	}
 
 	std::vector<IndexType> localPart;
 
 	for (IndexType i = 0; i < localN; i++) {
-		bool read = !std::getline(file, line).fail();
 		if (!read) {
 			throw std::runtime_error("In FileIO.cpp, line " + std::to_string(__LINE__) +": Unexpected end of file " + filename + ". Was the number of nodes correct?");
 	    }
 		localPart.push_back(std::stoi(line));
+        read = !std::getline(file, line).fail();
 	}
 
 	scai::hmemo::HArray<IndexType> hLocal(localPart.size(), localPart.data());
