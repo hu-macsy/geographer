@@ -90,46 +90,6 @@ inline std::ostream& operator<<(std::ostream& out, Format method){
 //-----------------------------------------------------------------------------------
 
 enum class Tool{ geographer, geoKmeans, geoSFC, parMetisGraph, parMetisGeom, parMetisSFC, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC};
-	
-/*	
-static std::string tool2string( Tool t){
-	switch( t){
-		case Tool::geographer:
-			return "geographer";
-			
-		case Tool::geoKmeans:
-			return "geoKmeans";
-			
-		case Tool::geoSFC:
-			return "geoSFC";
-			
-		case Tool::parMetisGraph:
-			return "parMetisGraph";
-			
-		case Tool::parMetisGeom:
-			return "parMetisGeom";
-			
-		case Tool::parMetisSFC:
-			return "parMetisSFC";
-			
-		case Tool::zoltanRIB:
-			return "zoltanRib";
-		
-		case Tool::zoltanRCB:
-			return "zoltanRcb";
-		
-		case Tool::zoltanMJ:
-			return "zoltanMJ";
-			
-		case Tool::zoltanSFC:
-			return "zoltanHsfc";
-			
-		default:
-			throw std::runtime_error("Wrong tool given to convert to string.\nAborting...");
-			return NULL;
-	}
-}
-*/
 
 }// ITI
 
