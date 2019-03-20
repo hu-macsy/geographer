@@ -1464,13 +1464,19 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
 	std::chrono::duration<double> sortTmpTime = std::chrono::system_clock::now() - beforeSort;
 	ValueType sortTime = comm->max( sortTmpTime.count() );
 	PRINT0("time to sort edges: " << sortTime);
-	
+
 	//check for isolated nodes and wrong conversions
 	IndexType lastNode = localPairs[0].first;
 	for (int_pair edge : localPairs) {
-	    SCAI_ASSERT_LE_ERROR(edge.first, lastNode + 1, "Gap in sorted node IDs before edge exchange.");
-	    lastNode = edge.first;
+		//TODO: should we allow isolated vertices? (see also below)
+		//not necessarilly an error
+	    SCAI_ASSERT_LE_ERROR(edge.first, lastNode + 1, "Gap in sorted node IDs before edge exchange in PE " << comm->getRank() );    
+	    //if( edge.first>lastNode+1 /* and settings.verbose */ ){
+		//	std::cout<< "WARNING, node " << lastNode+1 << " has no edges" << std::endl;
+		//}
+	    lastNode = edge.first;	    
 	}
+
 
 	//PRINT(thisPE << ": "<< localPairs.back().first << " - " << localPairs.back().second << " in total " <<  localPairs.size() );
 
@@ -1568,7 +1574,12 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
 	IndexType checkSum = newMaxLocalVertex - newMinLocalVertex;
 	IndexType globCheckSum = comm->sum( checkSum ) + comm->getSize() -1;
 
+	//TODO: should we allow isolated vertices?
+	//this assertion triggers when the graph has isolated (with no edges) vertices 
 	SCAI_ASSERT_EQ_ERROR( globCheckSum, N , "Checksum mismatch, maybe some node id missing." );
+	//if( globCheckSum!=N ){
+	//	std::cout<<"WARNING, there is at least one node with no edges." << std::endl;
+	//}
 	
 	//PRINT( *comm << ": from "<< newMinLocalVertex << " to " << newMaxLocalVertex );
 	
