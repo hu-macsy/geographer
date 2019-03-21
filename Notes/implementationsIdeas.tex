@@ -98,15 +98,15 @@ edges can be divided among PEs, for example, PE 1 can own edge $(4,5)$ with weig
 edge can be present in other PEs with different weights. The actual weight of the edge $(4,5)$ is the
 sum of the weights.
 
-One solution is to create the complete graph of size $k^2$. Every PE sets the weights of the edges that
+\paragraph*{One solution} is to create the complete graph of size $k^2$. Every PE sets the weights of the edges that
 it owns. Then, with a global sum operation the edge weights are added and scattered back to all PEs.
 This is problematic for large $k$.
 Maybe we could avoid the quadratic space if we know how many edges $G_c$ has. But this is not easy either.
 
-Another way is that every PE sends its own edges and weights to a root PE, the root PE gather all the
+\paragraph*{Another} way is that every PE sends its own edges and weights to a root PE, the root PE gather all the
 edges, constructs the block graph and scatters the graph back to all PEs.
 
-Update, 19/03/19: The parallel version works now. One possible problem is that we need to create
+\paragraph*{Update, 19/03/19:} The parallel version works now. One possible problem is that we need to create
 an array with the edges in one root PE where we gather all edges from all PEs. This arrays can have 
 big size since some edges of $G_c$ exist in many PEs. For example, if blocks 4 and 5 have a boundary 
 and are present in 4 PEs, then the edge $(4,5)$ will appear 4 times in this array. Still, this
@@ -115,6 +115,12 @@ the global sum and at every step edge weights are summed and duplicates are elim
 
 TODO: run a benchmark to see if and how faster this is.
 
+\paragraph*{A possibly} better approach is not everything to one PE but consider each PE responsible
+for some rows/vertices of the block graph. The, every PE, for every local edge will send the information 
+to the responsible PE for this row/vertex. Then, the PE will add up the edges they received and
+broadcast everything back. This is less centralized but may trigger more complicated communication 
+patterns. If the block graph needs to be replicated, the several broadcast at the last step may
+cause congestion.
 
 
 

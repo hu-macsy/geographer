@@ -226,10 +226,10 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
       metrics2.print( std::cout );
     }
 
-    EXPECT_LE( std::abs(metrics1.finalCut-metrics2.finalCut)/std::max(metrics1.finalCut, metrics2.finalCut), 0.02) ;
-    EXPECT_LE( std::abs(metrics1.finalImbalance-metrics2.finalImbalance)/std::max(metrics1.finalImbalance, metrics2.finalImbalance), 0.02) ;
-    EXPECT_LE( std::abs(metrics1.maxCommVolume-metrics2.maxCommVolume)/std::max(metrics1.maxCommVolume, metrics2.maxCommVolume), 0.02) ;
-    EXPECT_LE( std::abs(metrics1.totalCommVolume-metrics2.totalCommVolume)/std::max(metrics1.totalCommVolume, metrics2.totalCommVolume), 0.02) ;
+    EXPECT_LE( std::abs(metrics1.MM["finalCut"]-metrics2.MM["finalCut"])/std::max(metrics1.MM["finalCut"], metrics2.MM["finalCut"]), 0.02) ;
+    EXPECT_LE( std::abs(metrics1.MM["finalImbalance"]-metrics2.MM["finalImbalance"])/std::max(metrics1.MM["finalImbalance"], metrics2.MM["finalImbalance"]), 0.02) ;
+    EXPECT_LE( std::abs(metrics1.MM["maxCommVolume"]-metrics2.MM["maxCommVolume"])/std::max(metrics1.MM["maxCommVolume"], metrics2.MM["maxCommVolume"]), 0.02) ;
+    EXPECT_LE( std::abs(metrics1.MM["totalCommVolume"]-metrics2.MM["totalCommVolume"])/std::max(metrics1.MM["totalCommVolume"], metrics2.MM["totalCommVolume"]), 0.02) ;
   }
 
 //--------------------------------------------------------------------------------------- 

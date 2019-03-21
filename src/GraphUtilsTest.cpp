@@ -283,8 +283,8 @@ TEST_F (GraphUtilsTest,testEdgeList2CSR){
 	srand( std::time(NULL)*thisPE );
 	
     for(int i=0; i<localM; i++){
-		//IndexType v1 = i;
-		IndexType v1 = (rand())%N;
+		//to ensure that there are no isolated vertices
+		IndexType v1 = (i + int(thisPE*2.5))%N; //(rand())%N;
 		IndexType v2 = (v1+rand())%N;
 		localEdgeList[i] = std::make_pair( v1, v2 );
 		//PRINT(thisPE << ": inserting edge " << v1 << " - " << v2 );

@@ -315,8 +315,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 						throw std::logic_error("Method not yet supported for preparing for K-Means");
 					}
 					
+					//every PE sets its oen time
 					migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
-					metrics.timeMigrationAlgo[rank]  = migrationCalculation.count();
+					metrics.MM["timeMigrationAlgo"] = migrationCalculation.count(); 
 					
 					std::chrono::time_point<std::chrono::system_clock> beforeMigration =  std::chrono::system_clock::now();
 					
@@ -325,7 +326,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 					std::chrono::time_point<std::chrono::system_clock> afterRedistConstruction =  std::chrono::system_clock::now();
 					
 					std::chrono::duration<double> redist = (afterRedistConstruction - beforeMigration);
-					metrics.timeConstructRedistributor[rank] = redist.count();
+//metrics.MM["timeConstructRedistributor"] = redist.count();
 					
 					if (nodesUnweighted) {
 						nodeWeightCopy[0] = DenseVector<ValueType>(initMigrationPtr, nodeWeights[0].getLocalValues()[0]);
@@ -342,9 +343,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 					if (settings.repartition) {
 						previous.redistribute(prepareRedist);
 					}
-					
+					//Each PE sets its own time
 					migrationTime = std::chrono::system_clock::now() - beforeMigration;
-					metrics.timeFirstDistribution[rank]  = migrationTime.count();
+					metrics.MM["timeFirstDistribution"] = migrationTime.count();
 				}
 			}
 			
@@ -378,7 +379,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		}
 		
 		kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
-		metrics.timeKmeans[rank] = kMeansTime.count();
+		metrics.MM["timeKmeans"] = kMeansTime.count();
 		//timeForKmeans = ValueType ( comm->max(kMeansTime.count() ));
         assert(scai::utilskernel::HArrayUtils::min(result.getLocalValues()) >= 0);
         assert(scai::utilskernel::HArrayUtils::max(result.getLocalValues()) < k);
@@ -430,7 +431,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	
 	// if noRefinement then these are the times, if we do refinement they will be overwritten
 	partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
-	metrics.timePreliminary[rank] = partitionTime.count();
+	metrics.MM["timePreliminary"] = partitionTime.count();
 	
 	if (comm->getSize() == k) {
 		//WARNING: the result  is not redistributed. must redistribute afterwards
@@ -474,11 +475,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 				}
 			}
 			
-			metrics.timeSecondDistribution[rank] = secondRedistributionTime.count();
-			metrics.timePreliminary[rank] = partitionTime.count();
+			metrics.MM["timeSecondDistribution"] = secondRedistributionTime.count();
+			metrics.MM["timePreliminary"] = partitionTime.count();
 			
-			metrics.preliminaryCut = cut;
-			metrics.preliminaryImbalance = imbalance;
+			metrics.MM["preliminaryCut"] = cut;
+			metrics.MM["preliminaryImbalance"] = imbalance;
 			
 			//IndexType numRefinementRounds = 0;
 			

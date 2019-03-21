@@ -14,7 +14,6 @@
 #include <assert.h>
 
 #include "Settings.h"
-#include "Metrics.h"
 #include "PrioQueue.h"
 
 using scai::lama::CSRSparseMatrix;

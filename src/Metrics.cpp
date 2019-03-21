@@ -13,29 +13,12 @@ void Metrics::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, 
 
 void Metrics::print( std::ostream& out){
 	
-	// for these time we have one measurement per PE and must make a max
-	//ValueType maxTimeMigrationAlgo = *std::max_element( timeMigrationAlgo.begin(), timeMigrationAlgo.end() );
-	//ValueType maxTimeFirstDistribution = *std::max_element( timeFirstDistribution.begin(), timeFirstDistribution.end() );
-	ValueType maxTimeKmeans = *std::max_element( timeKmeans.begin(), timeKmeans.end() );
-	//ValueType maxTimeSecondDistribution = *std::max_element( timeSecondDistribution.begin(), timeSecondDistribution.end() );
-	ValueType maxTimePreliminary = *std::max_element( timePreliminary.begin(), timePreliminary.end() );
-		
-	ValueType timeLocalRef = timeFinalPartition - maxTimePreliminary;
-	
-	std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
-	std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
-	out << "date and time: " << std::ctime(&timeNow) << std::endl;
-	
-	//out << "numBlocks= " << numBlocks << std::endl;
-
-	//TODO: this is quite ugly. Refactor as dictionary with key-value-pairs, much more extensible.
-	/** since this is printed already during the local refinement, I disabled it here. We can re-enable it here when disabling it in the local refinement.
-	if( maxBlockGraphDegree==-1 ){
-		out << " ### WARNING: setting dummy value -1 for expensive (and not used) metrics max and total blockGraphDegree ###" << std::endl;
-	}else if (maxBlockGraphDegree==0 ){
-		out << " ### WARNING: possibly not all metrics calculated ###" << std::endl;
+	//out<<"TEST print" << std::endl;
+	for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ){
+		out<< mapIt->first <<": " << mapIt->second << std::endl;
 	}
 
+/*
 	out<< "localRefinement details" << std::endl;
 	for( unsigned int i=0; i<this->localRefDetails.size(); i++){
 		if( this->localRefDetails[i][0].first != -1){
@@ -49,41 +32,26 @@ void Metrics::print( std::ostream& out){
 			}
 		}
 	}
-	*/
-			
-	out << "timeKmeans timeGeom timeGraph timeTotal prelCut finalCut imbalance maxCommVol totCommVol maxDiameter harmMeanDiam numDisBlocks timeSpMV timeComm" << std::endl;
+*/	
+}
+//---------------------------------------------------------------------------
 
-	auto oldprecision = out.precision();
-	out << std::setprecision(4) << std::fixed;
+void Metrics::printHorizontal( std::ostream& out){
 
-	//times
-	out<< maxTimeKmeans << " , ";
-	out<< maxTimePreliminary << " , ";
-	out<< timeLocalRef << " , ";
-	out<< timeFinalPartition << " , ";
-	
-	//solution quality
-	out<< preliminaryCut << " , ";
-	out<< finalCut << " , ";
-	out<< finalImbalance << " , ";
-	//out<< maxBoundaryNodes << " , ";
-	//out<< totalBoundaryNodes << " , ";
-	out<< maxCommVolume << " , ";
-	out<< totalCommVolume << " , ";
-	out<< maxBlockDiameter << " , ";
-	out<< harmMeanDiam<< " , ";
-	out<< numDisconBlocks<< " , ";
-	out<< std::setprecision(8) << std::fixed;
-	out<< timeSpMV << " , ";
-	out<< timeComm << std::endl;
-	
-	out.precision(oldprecision);
+	for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ){
+		out<< mapIt->first << ", ";
+	}
+	out << std::endl;
+	for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ){
+		out<< mapIt->second << ", ";
+	}
+	out << std::endl;
+}
+//---------------------------------------------------------------------------
 
-//TESTING
-//out<<"TEST print" << std::endl;
-//for( auto mapIt= metricsMap.begin(); mapIt!=metricsMap.end(); mapIt++ ){
-//out<< mapIt->first <<": " << mapIt->second << std::endl;
-//}
+void Metrics::printKMeansProfiling( std::ostream& out ){
+	out << "KMeans::assignBlocks was called " << numBalanceIter.size() << " times" << std::endl;
+	out << "Average number of balance iterations: " << std::accumulate( numBalanceIter.begin(), numBalanceIter.end(), 0.0 )/numBalanceIter.size() << std::endl;
 }
 //---------------------------------------------------------------------------
 
@@ -94,21 +62,17 @@ void Metrics::getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> gra
 	scai::dmemo::DistributionPtr newDist = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues() );
 	scai::dmemo::DistributionPtr oldDist = graph.getRowDistributionPtr();
 	
-	std::tie( maxRedistVol, totRedistVol ) = getRedistributionVol( newDist, oldDist);
+	std::tie( MM["maxRedistVol"], MM["totRedistVol"] ) = getRedistributionVol( newDist, oldDist);
 	
 }
 //---------------------------------------------------------------------------
 void Metrics::getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
 	
-	finalCut = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
-	finalImbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights );
+	MM["finalCut"] = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
+	MM["finalImbalance"] = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights );
 	
 	//TODO: getting the block graph probably fails for p>5000, removed this metric since we do not use it so much
 	//std::tie(maxBlockGraphDegree, totalBlockGraphEdges) = ITI::GraphUtils::computeBlockGraphComm<IndexType, ValueType>( graph, partition, settings.numBlocks );
-	
-	//set to dummy value -1
-	maxBlockGraphDegree = -1;
-	totalBlockGraphEdges = -1;
 
 	// communication volume
 
@@ -122,12 +86,12 @@ void Metrics::getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph
 	std::tie( commVolume, numBorderNodesPerBlock, numInnerNodesPerBlock ) = \
 			ITI::GraphUtils<IndexType, ValueType>::computeCommBndInner( graph, partition, settings );
 	
-	maxCommVolume = *std::max_element( commVolume.begin(), commVolume.end() );
-	totalCommVolume = std::accumulate( commVolume.begin(), commVolume.end(), 0 );
+	MM["maxCommVolume"] = *std::max_element( commVolume.begin(), commVolume.end() );
+	MM["totalCommVolume"] = std::accumulate( commVolume.begin(), commVolume.end(), 0 );
 	
 	//TODO: are num of boundary nodes needed ????         
-	maxBoundaryNodes = *std::max_element( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end() );
-	totalBoundaryNodes = std::accumulate( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end(), 0 );
+	MM["maxBoundaryNodes"] = *std::max_element( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end() );
+	MM["totalBoundaryNodes"] = std::accumulate( numBorderNodesPerBlock.begin(), numBorderNodesPerBlock.end(), 0 );
 	
 	std::vector<ValueType> percentBorderNodesPerBlock( settings.numBlocks, 0);
 	SCAI_ASSERT_EQ_ERROR( settings.numBlocks, numBorderNodesPerBlock.size(), "Vector size mismatch.");
@@ -137,11 +101,11 @@ void Metrics::getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph
 		percentBorderNodesPerBlock[i] = (ValueType (numBorderNodesPerBlock[i]))/(numBorderNodesPerBlock[i]+numInnerNodesPerBlock[i]);
 	}
 	
-	maxBorderNodesPercent = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
-	avgBorderNodesPercent = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(settings.numBlocks));
+	MM["maxBorderNodesPercent"] = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
+	MM["avgBorderNodesPercent"] = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(settings.numBlocks));
 	
 	//get diameter
-	std::tie( maxBlockDiameter, harmMeanDiam, numDisconBlocks ) = getDiameter(graph, partition, settings);
+	std::tie( MM["maxBlockDiameter"], MM["harmMeanDiam"], MM["numDisconBlocks"] ) = getDiameter(graph, partition, settings);
 	
 }
 //---------------------------------------------------------------------------
@@ -207,12 +171,11 @@ std::tuple<IndexType,IndexType,IndexType> Metrics::getDiameter( const scai::lama
 		}else{
 			PRINT0("\tWARNING: Not computing diameter, not all vertices are in same block everywhere");
 		}
-	
-		std::chrono::duration<ValueType,std::ratio<1>> diameterTime = std::chrono::high_resolution_clock::now() - diameterStart; 
-		ValueType time = comm->max( diameterTime.count() );
-		if (settings.verbose) {
-		    PRINT0("time to get the diameter: " <<  time );
-		}
+	}
+	std::chrono::duration<ValueType,std::ratio<1>> diameterTime = std::chrono::high_resolution_clock::now() - diameterStart; 
+	ValueType time = comm->max( diameterTime.count() );
+	if (settings.verbose) {
+	    PRINT0("time to get the diameter: " <<  time );
 	}
 
 	return std::make_tuple( maxBlockDiameter, harmMeanDiam, numDisconBlocks);
@@ -255,10 +218,10 @@ void Metrics::getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueT
 	PRINT0("minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", imbalance= " << imbalance);
 					
 	// diameter
-	if( maxBlockDiameter==0 or harmMeanDiam==0){
+	if( MM["maxBlockDiameter"]==0 or MM["harmMeanDiam"]==0){
 		scai::lama::DenseVector<IndexType> copyPartition( partition );
 		copyPartition.redistribute( distFromPartition );
-		std::tie( maxBlockDiameter, harmMeanDiam, numDisconBlocks ) = getDiameter(copyGraph, copyPartition, settings);
+		std::tie( MM["maxBlockDiameter"], MM["harmMeanDiam"], MM["numDisconBlocks"] ) = getDiameter(copyGraph, copyPartition, settings);
 	}
 	
 	// redistribute for SpMV and commTime
@@ -283,7 +246,7 @@ void Metrics::getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueT
 		//PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
 		
 		time = comm->max(SpMVTime.count());
-		timeSpMV = time/repeatTimes;
+		MM["timeSpMV"] = time/repeatTimes;
 		
 		ValueType minTime = comm->min( SpMVTime.count() );
 		PRINT0("max time for " << repeatTimes <<" SpMVs: " << time << " , min time " << minTime);
@@ -311,7 +274,7 @@ void Metrics::getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueT
 		
 		//PRINT(*comm << ": "<< sendPlan );		
 		time = comm->max(commTime.count());
-		timeComm = time/repeatTimes;
+		MM["timeComm"] = time/repeatTimes;
 		
 		ValueType minTime = comm->min( commTime.count() );
 		PRINT0("max time for " << repeatTimes <<" communications: " << time << " , min time " << minTime);
@@ -319,7 +282,6 @@ void Metrics::getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueT
 	
 	//redistibute back to initial distributions
 	//graph.redistribute( initRowDistPtr, initColDistPtr );
-	
 }
 
 /* Calculate the volume, aka the data that will be exchanged when redistributing from oldDist to newDist.
@@ -523,23 +485,9 @@ void Metrics::getMappingMetrics(
 	ValueType avgDilation = ((ValueType) sumDilation)/((ValueType) peM/2);
 	ValueType avgCongestion = std::accumulate( congestion.begin(), congestion.end(), 0.0)/peM;
 
-	/*
-	if( comm->getRank()==0 ){
-		std::cout<< "Maximum congestion: " << maxCongestion << std::endl;
-		std::cout<< "Average congestion: " << avgCongestion << std::endl;
-		std::cout<< "Minimum congestion: " << minCongestion << std::endl;
-		std::cout<< " - - - - - - " << std::endl;
-		std::cout<< "Maximum dilation: " << maxDilation << std::endl;
-		std::cout<< "Average dilation: " << avgDilation << std::endl;
-		std::cout<< "Minimum dilation: " << minDilation << std::endl;
-	}
-	*/
-	this->maxCongestion = maxCongestion;
-	metricsMap["maxCongestion"] = maxCongestion;
-	this->maxDilation = maxDilation;
-	metricsMap["maxDilation"] = maxDilation;
-	this->avgDilation = avgDilation;
-	metricsMap["avgDilation"] = avgDilation;
+	MM["maxCongestion"] = maxCongestion;
+	MM["maxDilation"] = maxDilation;
+	MM["avgDilation"] = avgDilation;
 
 }//getMappingMetrics
 //---------------------------------------------------------------------------------------
