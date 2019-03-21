@@ -1683,6 +1683,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 		std::vector<std::vector<ValueType>> targetBlockWeights(numNodeWeights);
 
+		//not correct yet but it should be something like that
 		targetBlockWeights = getConstrains( thisLevel );
 		
 		for (IndexType j = 0 ; j < numNodeWeights; j++) {
