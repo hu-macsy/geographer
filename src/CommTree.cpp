@@ -89,7 +89,7 @@ IndexType CommTree<IndexType, ValueType>::createFlatHomogeneous(
 	//in the homogeneous case we only have one weight
 	std::vector<std::vector<ValueType>> sizes(1); 
 	//and all leaves have the same weight
-	sizes[1].assign( numLeaves, 1 );
+	sizes[0].assign( numLeaves, 1 );
 
 	std::vector<cNode> leaves = createLeaves( sizes );
 	SCAI_ASSERT_EQ_ERROR( leaves.size(), numLeaves, "Wrong number of leaves" );
@@ -132,6 +132,7 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 			leafWeights[w] = sizes[w][i];
 		}
 		cNode leafNode( std::vector<unsigned int>{i}, leafWeights );
+		leaves[i] = leafNode;
 	}
 
 	return leaves;
