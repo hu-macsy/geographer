@@ -90,6 +90,8 @@ struct Metrics{
 	void print( std::ostream& out);
 
 	void printHorizontal( std::ostream& out );
+	
+	void printHorizontal2( std::ostream& out );
 
 	void printKMeansProfiling( std::ostream& out );
 

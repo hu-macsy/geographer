@@ -52,6 +52,16 @@ void Metrics::printHorizontal( std::ostream& out){
 }
 //---------------------------------------------------------------------------
 
+void Metrics::printHorizontal2( std::ostream& out){
+
+	for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ){
+		if( mapIt->second!=-1)
+			out<< mapIt->first <<" " << mapIt->second << " , ";
+	}
+	out << std::endl;
+}
+//---------------------------------------------------------------------------
+
 void Metrics::printKMeansProfiling( std::ostream& out ){
 	out << "KMeans::assignBlocks was called " << numBalanceIter.size() << " times" << std::endl;
 	out << "Average number of balance iterations: " << std::accumulate( numBalanceIter.begin(), numBalanceIter.end(), 0.0 )/numBalanceIter.size() << std::endl;
