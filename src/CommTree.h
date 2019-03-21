@@ -255,7 +255,7 @@ std::vector<commNode> createLeaves( const std::vector<std::vector<ValueType>> &s
 /* @brief Takes a level of the tree and creates the level above it by 
 grouping together nodes that have the same last hierarchy index
 */
-std::vector<commNode> createLevelAbove( const std::vector<commNode> &levelBelow) const;
+static std::vector<commNode> createLevelAbove( const std::vector<commNode> &levelBelow);
 
 /** Weights of leaf nodes can be given as relative values. Given specific
 node weights, adapt them so now, leaf weights are calculated according 

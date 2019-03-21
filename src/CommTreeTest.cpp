@@ -226,5 +226,31 @@ TEST_F(CommTreeTest, testExportGraph){
 
 
 }//TEST_F(CommTreeTest, testExportGraph)
+//------------------------------------------------------------------------
+
+TEST_F(CommTreeTest, testAdaptWeights){
+
+	std::vector<cNode> leaves = {
+		// 				{hierachy ids}, numCores, mem, speed
+		cNode( std::vector<unsigned int>{0,0}, 4, 0.2, 50),
+		cNode( std::vector<unsigned int>{0,1}, 4, 0.1, 90),
+
+		cNode( std::vector<unsigned int>{1,0}, 6, 0.01, 80),
+		cNode( std::vector<unsigned int>{1,1}, 6, 0.12, 90),
+		cNode( std::vector<unsigned int>{1,2}, 6, 0.13, 70),
+
+		cNode( std::vector<unsigned int>{2,0}, 8, 0.3, 80),
+		cNode( std::vector<unsigned int>{2,1}, 8, 0.04, 90),
+		cNode( std::vector<unsigned int>{2,2}, 8, 0.05, 90),
+		cNode( std::vector<unsigned int>{2,3}, 8, 0.11, 100),
+		cNode( std::vector<unsigned int>{2,4}, 8, 0.23, 90)
+	};
+
+	ITI::CommTree<IndexType,ValueType> cTree( leaves );
+
+	std::vector<bool> isProportional = { false, true, false };
+
+	cTree.isProportional = isProportional;
+}
 
 }//namespace ITI
