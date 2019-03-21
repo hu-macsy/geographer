@@ -52,7 +52,7 @@
 int main(int argc, char** argv) {
 	using namespace boost::program_options;
 	
-	bool writePartition = false;
+	//bool writePartition = false;
     
 	std::string metricsDetail = "all";
 	std::string blockSizesFile;
@@ -524,7 +524,7 @@ int main(int argc, char** argv) {
     }    
     
     
-    if( settings.outFile!="-" and writePartition ){
+    if( settings.outFile!="-" and settings.writeInFile ){
         std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
         std::string partOutFile = settings.outFile;
 		ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
