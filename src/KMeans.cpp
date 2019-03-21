@@ -1683,6 +1683,8 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 		std::vector<std::vector<ValueType>> targetBlockWeights(numNodeWeights);
 
+		targetBlockWeights = getConstrains( thisLevel );
+		
 		for (IndexType j = 0 ; j < numNodeWeights; j++) {
 			targetBlockWeights[j].resize(totalNumNewBlocks);
 			std::vector<ValueType> blockSpeedPercent( totalNumNewBlocks );

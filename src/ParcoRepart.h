@@ -19,7 +19,7 @@
 
 #include "Settings.h"
 #include "Metrics.h"
-//#include "FileIO.h"
+#include "CommTree.h"
 
 using namespace scai::lama;
 using scai::dmemo::HaloExchangePlan;
@@ -29,51 +29,76 @@ namespace ITI {
 	template <typename IndexType, typename ValueType>
 	class ParcoRepart {
 		public:
-            /**
-             * Partitions the given input graph
-             * If the number of blocks is equal to the number of processes, graph, coordinates and weights are redistributed according to the partition.
-             *
-             * @param[in,out] input Adjacency matrix of the input graph
-             * @param[in,out] coordinates Coordinates of input points
-             * @param[in,out] nodeWeights Optional node weights.
-             * @param[in] settings Settings struct
-             * @param[out] metrics struct into which time measurements are written
-             *
-             * @return partition Distributed DenseVector of length n, partition[i] contains the block ID of node i
-             */
-			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights,
-					struct Settings settings, struct Metrics& metrics);
 
-			/**
-			 * Repartitions the given input graph, starting from a given previous partition
-			 * If the number of blocks is equal to the number of processes, graph and coordinates are redistributed according to the partition.
-			 *
-			 * @param[in,out] input Adjacency matrix of the input graph
-			 * @param[in,out] coordinates Coordinates of input points
-			 * @param[in,out] nodeWeights Optional node weights.
-			 * @param[in] previous The previous partition
-			 * @param[in] settings Settings struct
-			 * @param[out] metrics Struct into which time measurements are written
-			 *
-			 * @return partition Distributed DenseVector of length n, partition[i] contains the block ID of node i
-			 */
-			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights,
-					DenseVector<IndexType>& previous, struct Settings settings, struct Metrics& metrics);
+        /**
+         * Partitions the given input graph
+         * If the number of blocks is equal to the number of processes, graph, coordinates and weights are redistributed according to the partition.
+         *
+         * @param[in,out] input Adjacency matrix of the input graph
+         * @param[in,out] coordinates Coordinates of input points
+         * @param[in,out] nodeWeights Optional node weights.
+         * @param[in] settings Settings struct
+         * @param[out] metrics struct into which time measurements are written
+         *
+         * @return partition Distributed DenseVector of length n, partition[i] contains the block ID of node i
+         */
+		static DenseVector<IndexType> partitionGraph(
+			CSRSparseMatrix<ValueType> &input,
+			std::vector<DenseVector<ValueType>> &coordinates,
+			std::vector<DenseVector<ValueType>> &nodeWeights,
+			struct Settings settings,
+			struct Metrics& metrics);
 
-			/**
-			 * Wrapper without node weights.
-			 */
-			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings, struct Metrics& metrics);
-			
-            /**
-			 * Wrapper without node weights and no metrics
-			 */
-			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings);
+		/**
+		 * Repartitions the given input graph, starting from a given previous partition
+		 * If the number of blocks is equal to the number of processes, graph and coordinates are redistributed according to the partition.
+		 *
+		 * @param[in,out] input Adjacency matrix of the input graph
+		 * @param[in,out] coordinates Coordinates of input points
+		 * @param[in,out] nodeWeights Optional node weights.
+		 * @param[in] previous The previous partition
+		 * @param[in] commTree A tree describing the communication graph.
+		 * @param[in] settings Settings struct
+		 * @param[out] metrics Struct into which time measurements are written
+		 *
+		 * @return partition Distributed DenseVector of length n, partition[i] contains the block ID of node i
+		 */
+		static DenseVector<IndexType> partitionGraph(
+			CSRSparseMatrix<ValueType> &input,
+			std::vector<DenseVector<ValueType>> &coordinates,
+			std::vector<DenseVector<ValueType>> &nodeWeights,
+			DenseVector<IndexType>& previous,
+			CommTree<IndexType,ValueType> commTree,
+			struct Settings settings,
+			struct Metrics& metrics);
 
-            /**
-			 * Wrapper without metrics.
-			 */
-			static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights, struct Settings settings);
+		/**
+		 * Wrapper without node weights.
+		 */
+		static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings, struct Metrics& metrics);
+		
+        /**
+		 * Wrapper without node weights and no metrics
+		 */
+		static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings);
+
+        /**
+		 * Wrapper without metrics.
+		 */
+		//TODO: remove?
+		static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights, struct Settings settings);
+
+		/**
+		*	Wrapper with block sizes.
+		*/
+		static DenseVector<IndexType> partitionGraph(
+			CSRSparseMatrix<ValueType> &input,
+			std::vector<DenseVector<ValueType>> &coordinates,
+			std::vector<DenseVector<ValueType>> &nodeWeights,
+			std::vector<std::vector<ValueType>> &blockSizes,
+			Settings settings,
+			struct Metrics& metrics);
+
 
 		/**
 		* Wrapper for metis-like input.

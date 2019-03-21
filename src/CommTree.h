@@ -29,14 +29,19 @@ public:
 
 struct commNode{
 	std::vector<unsigned int> hierarchy;
-	//TODO: probably, keeping all chidren is not necessary and uses a lot of space
-	// replace by keeping only the number of children
+	//probably, keeping all chidren is not necessary and uses a lot of space
+	//TODO: replace by keeping only the number of children
 	std::vector<unsigned int> children;
 	//this is the number of direct children this nodes has
 	unsigned int numChildren;
+
 	unsigned int numCores;
-	ValueType memMB;
-	ValueType relatSpeed;
+	//ValueType memMB;
+	//ValueType relatSpeed;
+
+	//replace specific variables, such as memMB, with a vector of weights
+	std::vector<ValueType> weights;
+
 	bool isLeaf;
 	static unsigned int leafCount;
 	unsigned int leafID = std::numeric_limits<unsigned int>::max();
@@ -46,8 +51,8 @@ struct commNode{
 	:	hierarchy(hier),
 		numChildren(0),
 		numCores(c),
-		memMB(m),
-		relatSpeed(rSp),
+		//memMB(m),
+		//relatSpeed(rSp),
 		isLeaf(isLeaf)
 	{
 		leafID = leafCount;
@@ -55,7 +60,15 @@ struct commNode{
 		//convention: leaf node have their ID as their only child
 		// this will speed up the += operator
 		children.resize(1,leafID);
+
+		weights.assign(1,0); //one weight of value 0
 	}
+
+	commNode( std::vector<unsigned int> hier, std::vector<ValueType> leafWeights)
+	:	hierarchy(hier),
+		weights(leafWeights)
+		{}
+
 
 	//this constructor is supposed to be used for non-leaf nodes
 	//TODO: how to enforce that?
@@ -63,10 +76,11 @@ struct commNode{
 	:	hierarchy( std::vector<unsigned int>(1,1)), //TODO: is this right?
 		numChildren(0), //TODO: check
 		numCores(0),
-		memMB(0.0),
-		relatSpeed(0.0),
+		//memMB(0.0),
+		//relatSpeed(0.0),
 		isLeaf(false)
 	{
+		weights.assign(1,0); //one weight of value 0
 		//TODO/check: if this is not a lef node why it has a leaf id?
 		//leafID = leafCount;
 		//leafCount++;
@@ -75,8 +89,12 @@ struct commNode{
 	//used to construct the father node from the children
 	commNode& operator+=( const commNode& c ){
 		this->numCores += c.numCores;
-		this->memMB += c.memMB;
-		this->relatSpeed += c.relatSpeed;
+		//this->memMB += c.memMB;
+		//this->relatSpeed += c.relatSpeed;
+		//sum up the weights of the node
+		for(unsigned int i=0; i<this->weights.size(); i++){
+			this->weights[i] += c.weights[i];
+		}
 		this->numChildren++;
 		// by convention, leaf nodes have their id as their only child
 		this->children.insert( this->children.begin(), c.children.begin(), c.children.end() );
@@ -87,6 +105,9 @@ struct commNode{
 		return *this;
 	}
 
+	/** @brief Check if two nodes are the same, i.e., if all their values
+	are the same except their leaf ID
+	*/
 	bool operator==( const commNode& c ) const{
 		if( this->hierarchy != c.hierarchy ){
 			return false;
@@ -97,11 +118,10 @@ struct commNode{
 		if( this->numCores != c.numCores ){
 			return false;
 		}
-		if( this->memMB != c.memMB ){
-			return false;
-		}
-		if( this->relatSpeed != c.relatSpeed ){
-			return false;
+		
+		for(unsigned int i=0; i<this->weights.size(); i++){
+			if( this->weights[i] != c.weights[i])
+				return false;
 		}
 		return true;
 	}
@@ -124,10 +144,13 @@ struct commNode{
 		return numChildren;
 	}
 
+	/** @brief The number of weights that its node has.
+	*/
+	IndexType getNumWeights() const{
+		return weights.size();
+	}
+
 	void print(){
-		std::cout 	<< "numCores= " << numCores \
-					<< ", memory= " << memMB 	\
-					<< ", speed= " << relatSpeed << std::endl;
 		std::cout << "hierarchy vector: ";
 		for(unsigned int i=0; i<hierarchy.size(); i++){
 			std::cout<< hierarchy[i] << ", ";
@@ -142,7 +165,11 @@ struct commNode{
 			}
 			std::cout<< std::endl;
 		}
-		std::cout<< "---" << std::endl;
+		std::cout << weights.size() << " weights:";
+		for(int i=0; i<weights.size(); i++){
+			std::cout << weights[i] << ", ";
+		}
+		std::cout << std::endl << "---" << std::endl;
 	}
 
 }; //struct commNode
@@ -160,7 +187,13 @@ std::vector<std::vector<commNode>> tree;
 IndexType hierarchyLevels; //hierarchyLevels = tree.size()
 IndexType numNodes;
 IndexType numLeaves;
+IndexType numWeights;
+bool areWeightsAdapted = false;
+std::vector<bool> relativeWeight;
 
+/*@brief Default constructor.
+*/
+CommTree();
 
 /*@brief constructor to create tree from a vector of leaves
 */
@@ -192,23 +225,44 @@ IndexType getNumLeaves() const {
 	return tree.back().size();
 }
 
-/** Returns a vector for every balance constrain.
-	return.size()==the number of constrains
-	return[i].size()==number of leaves, for all i
+/** @brief The number of weights that its node has.
 */
-//	03/19: We have two constrains: memory and cpu speed for every PE.
-//	These two vectors are returned.
-//First is the memory and then the cpu speed
-std::vector<std::vector<ValueType>> getBalanceVectors();
+IndexType getNumWeights() const{
+	return numWeights;
+}
 
 /* @brief Takes a vector of leaves and creates the tree
 */
 IndexType createTreeFromLeaves( const std::vector<commNode> leaves);
 
+/** @brief Creates an artificial flat tree with only one hierarchy level.
+This mainly used when no communication is provided. All leaf nodes have
+the same weight.
+*/
+IndexType createFlatHomogeneous( const IndexType numLeaves );
+
+/** @brief Given the desired sizes of the blocks, we construct a flat 
+tree with one level where every leaf node has different weight.
+This mainly used when  only block sizes are provided for partitioning.
+**/
+IndexType createFlatHeterogeneous( const std::vector<std::vector<ValueType>> &leafSizes );
+
+/** Creates a vector of leaves with only one hierarchy level, i.e., a flat
+tree. There can be multilpe weights for each leaf.
+**/
+std::vector<commNode> createLeaves( const std::vector<std::vector<ValueType>> &sizes);
+
 /* @brief Takes a level of the tree and creates the level above it by 
 grouping together nodes that have the same last hierarchy index
 */
-static std::vector<commNode> createLevelAbove( const std::vector<commNode> levelBelow);
+static std::vector<commNode> createLevelAbove( const std::vector<commNode> &levelBelow);
+
+/** Weights of leaf nodes can be given as relative values. Given specific
+node weights, adapt them so now, leaf weights are calculated according 
+to the provided node weights.
+*/
+
+static IndexType adaptWeights( const std::vector<scai::lama::DenseVector<ValueType>> &leafSizes );
 
 /** How nodes of a hierarchy level are grouped together. A hierarchy level
  is just a vector of nodes. Using the hierarchy prefix of a node, this
@@ -256,7 +310,7 @@ scai::lama::CSRSparseMatrix<ValueType> exportAsGraph_local() const;
 */
 
 //TODO: turn to static? move to other class?
-std::pair<ValueType,ValueType> computeImbalance(
+std::vector<ValueType> computeImbalance(
     const scai::lama::DenseVector<IndexType> &part,
     IndexType k,
     const scai::lama::DenseVector<ValueType> &nodeWeights) const;
@@ -271,6 +325,14 @@ is the optimum weight each PE should have. Mainly used to comoute imbalance.
 std::vector<ValueType> getOptBlockWeights(
     const scai::lama::DenseVector<ValueType> &nodeWeights) const;
 
+/** Returns a vector for every balance constrain.
+	return.size()==the number of constrains
+	return[i].size()==number of leaves, for all i
+*/
+//	03/19: We have two constrains: memory and cpu speed for every PE.
+//	These two vectors are returned.
+//First is the memory and then the cpu speed
+std::vector<std::vector<ValueType>> getBalanceVectors();
 
 /*@brief Print information for the tree
 */
@@ -279,6 +341,7 @@ void print();
 /* @brief Basic sanity checks for the tree.
 */
 bool checkTree();
+
 
 
 //------------------------------------------------------------------------

@@ -70,7 +70,7 @@ TEST_F( benchmarkTest, benchMapping ){
     	wantedBlockSizes[0][i] = (balances[1][i]/sumOfBalances)*globalN; //we assume unit node weights
     }
 
-    settings.blockSizes = wantedBlockSizes;
+    //settings.blockSizes = wantedBlockSizes;
 
     // get partition ParcoRepart::partitionGraph to accept constrains
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);

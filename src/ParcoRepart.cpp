@@ -36,15 +36,24 @@
 
 namespace ITI {
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings, struct Metrics& metrics)
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input,
+	std::vector<DenseVector<ValueType>> &coordinates,
+	Settings settings,
+	struct Metrics& metrics)
 {
 	std::vector<DenseVector<ValueType> > uniformWeights(1);
 	uniformWeights[0] = fill<DenseVector<ValueType>>(input.getRowDistributionPtr(), 1);
 	return partitionGraph(input, coordinates, uniformWeights, settings, metrics);
 }
 
+// no metrics, TODO: remove?
+/*
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights, Settings settings) {
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
+	CSRSparseMatrix<ValueType> &input,
+	std::vector<DenseVector<ValueType>> &coordinates,
+	std::vector<DenseVector<ValueType>> &nodeWeights,
+	Settings settings) {
     
     struct Metrics metrics(settings);
     
@@ -52,12 +61,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
     
     DenseVector<IndexType> previous;
     assert(!settings.repartition);
-    return partitionGraph(input, coordinates, nodeWeights, previous, settings, metrics);
-    
+    return partitionGraph(input, coordinates, nodeWeights, previous, settings, metrics);   
 }
+*/
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings){
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input,
+	std::vector<DenseVector<ValueType>> &coordinates,
+	struct Settings settings){
     
     struct Metrics metrics(settings);
     assert(settings.storeInfo == false); // Cannot return timing information. Better throw an error than silently drop it.
@@ -65,14 +76,43 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
     return partitionGraph(input, coordinates, settings, metrics);
 }
 
+
 // overloaded version with metrics
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights, Settings settings, struct Metrics& metrics) {
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input,
+	std::vector<DenseVector<ValueType>> &coordinates,
+	std::vector<DenseVector<ValueType>> &nodeWeights,
+	Settings settings,
+	struct Metrics& metrics) {
         
 	DenseVector<IndexType> previous;
 	assert(!settings.repartition);
+
+	CommTree<IndexType,ValueType> commTree;
+	commTree.createFlatHomogeneous( settings.numBlocks );
 	
-    return partitionGraph(input, coordinates, nodeWeights, previous, settings, metrics);
+    return partitionGraph(input, coordinates, nodeWeights, previous, commTree, settings, metrics);
+
+}
+
+//TODO: maybe we do not need that. But how to decide since we do not have
+// the settings.blockSizes anymore?
+//overloaded with blocksizes
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input,
+	std::vector<DenseVector<ValueType>> &coordinates,
+	std::vector<DenseVector<ValueType>> &nodeWeights,
+	std::vector<std::vector<ValueType>> &blockSizes,
+	Settings settings,
+	struct Metrics& metrics) {
+        
+	DenseVector<IndexType> previous;
+	assert(!settings.repartition);
+
+	CommTree<IndexType,ValueType> commTree;
+	commTree.createFlatHeterogeneous( blockSizes );
+	
+    return partitionGraph(input, coordinates, nodeWeights, previous, commTree, settings, metrics);
 
 }
 
@@ -172,7 +212,14 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights, DenseVector<IndexType>& previous, Settings settings,struct Metrics& metrics)
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
+	CSRSparseMatrix<ValueType> &input,
+	std::vector<DenseVector<ValueType>> &coordinates,
+	std::vector<DenseVector<ValueType>> &nodeWeights,
+	DenseVector<IndexType>& previous,
+	CommTree<IndexType,ValueType> commTree,
+	Settings settings,
+	struct Metrics& metrics)
 {
 	IndexType k = settings.numBlocks;
 	ValueType epsilon = settings.epsilon;
@@ -238,7 +285,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 		assert(nodeWeights[i].getDistribution().isEqual(*inputDist));
 	}
 
-	
 	
 	//-------------------------
 	//
@@ -358,7 +404,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 		
 		// vector of size k, each element represents the size of one block
-		std::vector<std::vector<ValueType> > blockSizes = settings.blockSizes;
+		std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
 		if( blockSizes.empty() ){
 			blockSizes = std::vector<std::vector<ValueType> >(nodeWeights.size());
 			for (int i = 0; i < nodeWeights.size(); i++) {
@@ -535,6 +581,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     //
     // vector of size k, each element represents the size of each block
     //
+//TODO: either adapt hilbert partition to consider node weights and block
+// sizes or add checks when used with nodeweights outside the function
+
+/*    
     std::vector<ValueType> blockSizes;
 	//TODO: for now assume uniform nodeweights
     IndexType weightSum = globalN;// = nodeWeights.sum();
@@ -547,7 +597,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         blockSizes = settings.blockSizes[0];
     }
     SCAI_ASSERT( blockSizes.size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
-    
+
+*/    
+
     /**
      * Several possibilities exist for choosing the recursion depth.
      * Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.

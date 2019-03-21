@@ -111,12 +111,12 @@ struct Settings{
     IndexType dimensions= 2;
     std::string fileName = "-";
     std::string outFile = "-";
+    std::string PEGraphFile = "-";
     std::string blockSizesFile = "-";
     ITI::Format fileFormat = ITI::Format::AUTO;   // 0 for METIS, 4 for MatrixMarket
     ITI::Format coordFormat = ITI::Format::AUTO; 
     bool useDiffusionCoordinates = false;
     IndexType diffusionRounds = 20;
-    std::vector<std::vector<ValueType> > blockSizes;
     std::string machine;
     
     //mesh generation
