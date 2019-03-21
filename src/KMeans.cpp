@@ -1231,7 +1231,7 @@ DenseVector<IndexType> computePartition( \
 		}
 
 		if(settings.verbose){
-			PRINT(*comm << ": localN= "<< localN << ", minNodes= " << minNodes << ", samplingRounds= " << samplingRounds << ", lastIndex: " << *localIndices.end() );
+			PRINT0(*comm << ": localN= "<< localN << ", minNodes= " << minNodes << ", samplingRounds= " << samplingRounds << ", lastIndex: " << *localIndices.end() );
 		}
 		if (samplingRounds > 0 && settings.verbose) {
 			if (comm->getRank() == 0) std::cout << "Starting with " << samplingRounds << " sampling rounds." << std::endl;
@@ -1318,7 +1318,7 @@ DenseVector<IndexType> computePartition( \
 
 				for(int i=0; i<comm->getSize(); i++){
 					//std::cout << indices[i]<< ": time for PE: " << timePerPE[indices[i]] << std::endl;
-					std::cout << "(" << indices[i] << "," << timePerPE[indices[i]] << ")" << std::endl;
+					//std::cout << "(" << indices[i] << "," << timePerPE[indices[i]] << ")" << std::endl;
 				}
 			}
 		}
@@ -1431,7 +1431,7 @@ DenseVector<IndexType> computePartition( \
 		ValueType time = balanceTime.count() ;
 
 		if(settings.verbose){
-			PRINT(*comm <<": in computePartition, iteration time: " << time );
+			PRINT0(*comm <<": in computePartition, iteration time: " << time );
 		}
 
 		{
