@@ -175,7 +175,7 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
 
 //WARNING: Needed that 'typename' to compile...
 template <typename IndexType, typename ValueType>
-std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType, ValueType>::createLevelAbove( const std::vector<commNode> &levelBelow ) const {
+std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType, ValueType>::createLevelAbove( const std::vector<commNode> &levelBelow ){
 
 	//a hierarchy prefix is the hierarchy vector without the last element
 	//commNodes that have the same prefix, belong to the same father node
@@ -230,13 +230,6 @@ SCAI_ASSERT_EQ_ERROR(
 				fatherNode += otherNode;		//operator += overloading
 				seen[j] = true;
 				//numChildren++;
-			}
-		}
-		//normalize weights. It could be done when in the commNode::operator+=
-		//but we have no information there if weights are proportional or not
-		for(unsigned int i=0; i<numWeights; i++){
-			if( isProportional[i] ){
-				fatherNode.weights[i] /= fatherNode.numChildren; 
 			}
 		}
 
