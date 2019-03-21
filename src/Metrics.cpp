@@ -15,7 +15,8 @@ void Metrics::print( std::ostream& out){
 	
 	//out<<"TEST print" << std::endl;
 	for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ){
-		out<< mapIt->first <<": " << mapIt->second << std::endl;
+		if( mapIt->second!=-1)
+			out<< mapIt->first <<": " << mapIt->second << std::endl;
 	}
 
 /*
@@ -39,11 +40,23 @@ void Metrics::print( std::ostream& out){
 void Metrics::printHorizontal( std::ostream& out){
 
 	for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ){
-		out<< mapIt->first << ", ";
+		if( mapIt->second!=-1)
+			out<< mapIt->first << ", ";
 	}
 	out << std::endl;
 	for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ){
-		out<< mapIt->second << ", ";
+		if( mapIt->second!=-1)
+			out<< mapIt->second << ", ";
+	}
+	out << std::endl;
+}
+//---------------------------------------------------------------------------
+
+void Metrics::printHorizontal2( std::ostream& out){
+
+	for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ){
+		if( mapIt->second!=-1)
+			out<< mapIt->first <<" " << mapIt->second << " , ";
 	}
 	out << std::endl;
 }

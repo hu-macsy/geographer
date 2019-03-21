@@ -52,7 +52,7 @@
 int main(int argc, char** argv) {
 	using namespace boost::program_options;
 	
-	bool writePartition = false;
+	//bool writePartition = false;
     
 	std::string metricsDetail = "all";
 	std::string blockSizesFile;
@@ -442,8 +442,11 @@ int main(int argc, char** argv) {
             partition.redistribute( graph.getRowDistributionPtr());
         }
 		
+		/*
         metricsVec[r].MM["finalCut"] = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
         metricsVec[r].MM["finalImbalance"] = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(partition, settings.numBlocks ,nodeWeights[0]);
+        */
+        metricsVec[r].getEasyMetrics( graph, partition, nodeWeights[0], settings );
         metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
         metricsVec[r].MM["timeFinalPartition"] = ValueType (comm->max(partitionTime.count()));
 
@@ -457,7 +460,7 @@ int main(int argc, char** argv) {
             auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
             std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
             std::cout.precision(oldprecision);
-            metricsVec[r].printHorizontal( std::cout ); //TODO: remove?
+            metricsVec[r].printHorizontal2( std::cout ); //TODO: remove?
         }
                 
         //---------------------------------------------
@@ -547,7 +550,7 @@ int main(int argc, char** argv) {
     }    
     
     
-    if( settings.outFile!="-" and writePartition ){
+    if( settings.outFile!="-" and settings.writeInFile ){
         std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
         std::string partOutFile = settings.outFile;
 		ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
