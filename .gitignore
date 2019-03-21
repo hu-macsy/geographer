@@ -3,6 +3,7 @@
 *.o
 Geographer
 GeographerTest
+build/
 
 # build system
 Makefile
@@ -10,7 +11,6 @@ Makefile
 .cproject
 CMakeCache.txt
 CMakeFiles/
-CMakeLists.txt
 cmake_install.cmake
 .depend
 
@@ -54,3 +54,7 @@ local/
 *.map
 octree_timestep_*.dat
 
+# latex notes
+*.aux
+*.log
+*.out
