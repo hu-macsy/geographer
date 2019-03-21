@@ -89,12 +89,12 @@ struct commNode{
 	//used to construct the father node from the children
 	commNode& operator+=( const commNode& c ){
 		this->numCores += c.numCores;
-		//this->memMB += c.memMB;
-		//this->relatSpeed += c.relatSpeed;
+
 		//sum up the weights of the node
 		for(unsigned int i=0; i<this->weights.size(); i++){
 			this->weights[i] += c.weights[i];
 		}
+
 		this->numChildren++;
 		// by convention, leaf nodes have their id as their only child
 		this->children.insert( this->children.begin(), c.children.begin(), c.children.end() );
@@ -189,7 +189,7 @@ IndexType numNodes;
 IndexType numLeaves;
 IndexType numWeights;
 bool areWeightsAdapted = false;
-std::vector<bool> relativeWeight;
+std::vector<bool> isProportional;
 
 /*@brief Default constructor.
 */
@@ -255,14 +255,14 @@ std::vector<commNode> createLeaves( const std::vector<std::vector<ValueType>> &s
 /* @brief Takes a level of the tree and creates the level above it by 
 grouping together nodes that have the same last hierarchy index
 */
-static std::vector<commNode> createLevelAbove( const std::vector<commNode> &levelBelow);
+std::vector<commNode> createLevelAbove( const std::vector<commNode> &levelBelow) const;
 
 /** Weights of leaf nodes can be given as relative values. Given specific
 node weights, adapt them so now, leaf weights are calculated according 
 to the provided node weights.
 */
 
-static IndexType adaptWeights( const std::vector<scai::lama::DenseVector<ValueType>> &leafSizes );
+void adaptWeights( const std::vector<scai::lama::DenseVector<ValueType>> &leafSizes );
 
 /** How nodes of a hierarchy level are grouped together. A hierarchy level
  is just a vector of nodes. Using the hierarchy prefix of a node, this
@@ -276,7 +276,7 @@ static IndexType adaptWeights( const std::vector<scai::lama::DenseVector<ValueTy
 @param[in] thisLevel The input hierarchy level of the the tree.
 @return A vector with the number of nodes for each group.
 */
-static std::vector<unsigned int> getGrouping(const std::vector<commNode> thisLevel);
+std::vector<unsigned int> getGrouping(const std::vector<commNode> thisLevel);
 
 /** @brief Calculates the distance of two nodes using their hierarchy labels.
 	We assume that leaves with the same father have distance 1. 
@@ -313,7 +313,7 @@ scai::lama::CSRSparseMatrix<ValueType> exportAsGraph_local() const;
 std::vector<ValueType> computeImbalance(
     const scai::lama::DenseVector<IndexType> &part,
     IndexType k,
-    const scai::lama::DenseVector<ValueType> &nodeWeights) const;
+    const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeight);
 
 
 /** @brief Given a hierarchy level, it extracts the relative speed
@@ -322,8 +322,8 @@ PE, if the level is the leaves, or a group of PEs) and calculates what
 is the optimum weight each PE should have. Mainly used to comoute imbalance.
 */
 //TODO: leave as static?
-std::vector<ValueType> getOptBlockWeights(
-    const scai::lama::DenseVector<ValueType> &nodeWeights) const;
+//std::vector<ValueType> getOptBlockWeights(
+//    const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights) const;
 
 /** Returns a vector for every balance constrain.
 	return.size()==the number of constrains
@@ -332,7 +332,7 @@ std::vector<ValueType> getOptBlockWeights(
 //	03/19: We have two constrains: memory and cpu speed for every PE.
 //	These two vectors are returned.
 //First is the memory and then the cpu speed
-std::vector<std::vector<ValueType>> getBalanceVectors();
+std::vector<std::vector<ValueType>> getBalanceVectors() const;
 
 /*@brief Print information for the tree
 */
