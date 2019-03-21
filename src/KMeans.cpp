@@ -43,7 +43,8 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	//the input is already partitioned into numOldBlocks number of blocks
 	//for every old block we must find a number of new centers/blocks
 
-	const std::vector<unsigned int> numNewBlocksPerOldBlock = CommTree<IndexType,ValueType>::getGrouping( hierLevel );
+	throw std::logic_error("Not yet implemented for new commtree.");
+	const std::vector<unsigned int> numNewBlocksPerOldBlock = CommTree<IndexType,ValueType>().getGrouping( hierLevel );
 	const unsigned int numOldBlocks = numNewBlocksPerOldBlock.size();
 
 	//convert coordinates, switch inner and outer order
@@ -1658,7 +1659,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		IndexType numOldBlocks = groupOfCenters.size();
 
 		//number of new blocks each old blocks must be partitioned to
-		std::vector<unsigned int> numNewBlocks = CommTree<IndexType, ValueType>::getGrouping( thisLevel );
+		std::vector<unsigned int> numNewBlocks = commTree.getGrouping( thisLevel );
 		SCAI_ASSERT_EQ_ERROR( numOldBlocks, numNewBlocks.size(), "Hierarchy level size mismatch" );
 		const IndexType totalNumNewBlocks = std::accumulate( numNewBlocks.begin(), numNewBlocks.end(), 0 );
 

@@ -38,7 +38,7 @@ CommTree<IndexType, ValueType>::CommTree(std::vector<commNode> leaves){
 	//thus the +1
 	hierarchyLevels = leaves.front().hierarchy.size()+1;
 	numLeaves = leaves.size();
-	numWeights = leaves.getNumWeights();
+	numWeights = leaves[0].getNumWeights();
 
 	//sanity check, TODO: remove?
 	for( commNode l: leaves){
@@ -139,19 +139,43 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-IndexType CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama::DenseVector<ValueType>> &leafSizes ){
+void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights ){
 
-// check getOptBlockWeights
+	const std::vector<commNode> hierLevel = this->getLeaves();
+    const IndexType numBlocks = hierLevel.size();
+    const IndexType numWeights = getNumWeights();
+    SCAI_ASSERT_EQ_ERROR( numWeights, nodeWeights.size(), "Given weights vector size and tree number of weights do not agree" );
 
-	throw std::logic_error("Not yet implemented.");
+	const std::vector<std::vector<ValueType>> hierWeights = getBalanceVectors();
+	SCAI_ASSERT_EQ_ERROR( numWeights, hierWeights.size(), "Number of weigths in tree do not agree" );
 
+    for( unsigned int i=0; i<numWeights; i++){
+
+    	const scai::lama::DenseVector<ValueType> &thisNodeWeight = nodeWeights[i];
+    	const std::vector<ValueType> &thisHierWeight = hierWeights[i];
+
+	    //the total node weight of the input graph
+	    ValueType sumNodeWeights = thisNodeWeight.sum();
+	    ValueType sumHierWeights = std::accumulate( thisHierWeight.begin(), thisHierWeight.end(), 0.0 );
+
+	    if( not isProportional[i] ){
+	    	SCAI_ASSERT_GE_ERROR( sumHierWeights, sumNodeWeights, "Provided node weights are do not fit in the given tree for weight " << i );
+	    }else{
+	    	//go over the nodes and adapt the weights
+	    	for( commNode cNode : hierLevel ){
+	    		cNode.weights[i] *= sumNodeWeights;
+	    	}
+	    }
+	}
+
+	areWeightsAdapted = true;
 }//adaptWeights
 
 //------------------------------------------------------------------------
 
 //WARNING: Needed that 'typename' to compile...
 template <typename IndexType, typename ValueType>
-std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType, ValueType>::createLevelAbove( const std::vector<commNode> &levelBelow ){
+std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType, ValueType>::createLevelAbove( const std::vector<commNode> &levelBelow ) const {
 
 	//a hierarchy prefix is the hierarchy vector without the last element
 	//commNodes that have the same prefix, belong to the same father node
@@ -166,7 +190,7 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 
 	std::vector<commNode> aboveLevel;
 
-	//assume nodes with the same parent are not necessarilly adjacent 
+	//assume nodes with the same parent are not necessarily adjacent 
 	//so we need to for loop
 	for( unsigned int i=0; i<levelBelowsize; i++){
 		//if this node is already accounted for
@@ -184,12 +208,17 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 		//update the hierarchy vector of the father
 		fatherNode.hierarchy = thisPrefix;
 
-		//num of children in the level below. This is needed to calculate
-		//the relative speed correctly
-		IndexType numChildren = 1;
-
 		//for debugging, remove or add macro or ...
 		//PRINT(i << ": thisNode.id is " << thisNode.leafID << " prefix size " << thisPrefix.size() );
+
+		IndexType numWeights=thisNode.getNumWeights();
+		//father.weights.resize( numWeights, 0.0 );
+		SCAI_ASSERT_EQ_ERROR( fatherNode.getNumWeights(), numWeights, "Number of weights mismatch");
+//not really needed
+SCAI_ASSERT_EQ_ERROR( 
+	std::accumulate( fatherNode.weights.begin(), fatherNode.weights.end(), 0.0),
+	std::accumulate( thisNode.weights.begin(), thisNode.weights.end(), 0.0), "Weights are not copied?"
+	);
 
 		for( unsigned int j=i+1; j<levelBelowsize; j++){
 			commNode otherNode = levelBelow[j];
@@ -200,24 +229,18 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 			if( thisPrefix==otherPrefix ){
 				fatherNode += otherNode;		//operator += overloading
 				seen[j] = true;
-				numChildren++;
+				//numChildren++;
 			}
 		}
-		//update: changing the way we sum up the relative speeds.
-		//speed is relative, so take the average
-		//fatherNode.relatSpeed /= numChildren;
-		if( fatherNode.relatSpeed>maxRelatSpeed ){
-			maxRelatSpeed = fatherNode.relatSpeed;
+		//normalize weights. It could be done when in the commNode::operator+=
+		//but we have no information there if weights are proportional or not
+		for(unsigned int i=0; i<numWeights; i++){
+			if( isProportional[i] ){
+				fatherNode.weights[i] /= fatherNode.numChildren; 
+			}
 		}
 
 		aboveLevel.push_back(fatherNode);
-	}
-
-	//TODO:maybe this is not necessarily needed. This is how the input is given
-	//see also in computePartition the  optWeightAllBlocks vector
-	//normalize speeds so all are between 0 and 1
-	for( unsigned int i=0; i<aboveLevel.size(); i++){
-		aboveLevel[i].relatSpeed /= maxRelatSpeed;
 	}
 
 	return aboveLevel;
@@ -225,7 +248,7 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-std::vector<unsigned int> CommTree<IndexType, ValueType>::getGrouping(const std::vector<commNode> thisLevel){
+std::vector<unsigned int> CommTree<IndexType, ValueType>::getGrouping(const std::vector<commNode> thisLevel) const {
 
 	std::vector<unsigned int> groupSizes;
 	unsigned int numNewTotalNodes;//for debugging, printing
@@ -247,7 +270,7 @@ std::vector<unsigned int> CommTree<IndexType, ValueType>::getGrouping(const std:
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType>> CommTree<IndexType, ValueType>::getBalanceVectors(){
+std::vector<std::vector<ValueType>> CommTree<IndexType, ValueType>::getBalanceVectors() const{
 
 	const std::vector<cNode> leaves = getLeaves();
 	const IndexType numLeaves = leaves.size();
@@ -347,79 +370,98 @@ template<typename IndexType, typename ValueType>
 std::vector<ValueType> CommTree<IndexType,ValueType>::computeImbalance(
     const scai::lama::DenseVector<IndexType> &part,
     IndexType k,
-    const scai::lama::DenseVector<ValueType> &nodeWeights) const{
+    const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights){
 
     //cNode is typedefed in CommTree.h
     const std::vector<cNode> leaves = this->getLeaves();
     const IndexType numLeaves = leaves.size();
     SCAI_ASSERT_EQ_ERROR( numLeaves, k, "Number of blocks of the partition and number of leaves of the tree do not agree" );
 
+    if( not areWeightsAdapted ){
+    	std::cout<<"Warning, tree weights are not adapted according to the input graph node weights. Will adapt first and then calculate imbalances." << std::endl;
+    	//this line can change the tree. Without it the function can be const
+    	this->adaptWeights( nodeWeights );
+    }
+
     const IndexType numWeights = getNumWeights();
+    SCAI_ASSERT_EQ_ERROR( numWeights, nodeWeights.size(), "Given weights vector size and tree number of weights do not agree" );
+
     const std::vector<std::vector<ValueType>> allConstrains = getBalanceVectors();
     std::vector<ValueType> imbalances( numWeights );
 
     //compute imbalance for all weights
     for( int i=0; i<numWeights; i++){
 
-	    std::vector<ValueType> optBlockWeight = getOptBlockWeights( /*leaves,*/ nodeWeights);
+	    std::vector<ValueType> optBlockWeight = allConstrains[i];
 	    SCAI_ASSERT_EQ_ERROR( optBlockWeight.size(), numLeaves, "Size mismatch");
 
-	    ValueType speedImbalance = GraphUtils<IndexType, ValueType>::computeImbalance( part, k, nodeWeights, optBlockWeight );
-
-	    //to measure imbalance according to memory constraints, we assume that
-	    // every points has unit weight (this can be changed, for example,
-	    //if we measure memory in MB, we can give each point a weight 
-	    //of few bytes)
-	    scai::lama::DenseVector<ValueType> unitWeights (nodeWeights.getDistributionPtr(), 1);
-	    throw std::logic_error("Not yet implemented for multiple weights.");
-	    //ValueType imba = GraphUtils<IndexType, ValueType>::computeImbalance( part, k, unitWeights, memory );
+	    ValueType imba = GraphUtils<IndexType, ValueType>::computeImbalance( part, k, nodeWeights[i], optBlockWeight );
 
     	imbalances[i] = imba;
 	}
 
     return imbalances;
-
 }
 //---------------------------------------------------------------------------------------
-
+/*
 template<typename IndexType, typename ValueType>
 std::vector<ValueType> CommTree<IndexType,ValueType>::getOptBlockWeights(
-	const scai::lama::DenseVector<ValueType> &nodeWeights) const {
+	const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights) const {
 
 	const std::vector<commNode> hierLevel = this->getLeaves();
     const IndexType numBlocks = hierLevel.size();
+    const IndexType numWeights = getNumWeights();
+    SCAI_ASSERT_EQ_ERROR( numWeights, nodeWeights.size(), "Given weights vector size and tree number of weights do not agree" );
 
-    //the total node weight of the input
-    ValueType totalWeightSum;
-    {
-        scai::hmemo::ReadAccess<ValueType> rW( nodeWeights.getLocalValues() );
-        ValueType localW = 0;
-        for(int i=0; i<nodeWeights.getLocalValues().size(); i++ ){
-            localW += rW[i];
-        }
-        const scai::dmemo::CommunicatorPtr comm = nodeWeights.getDistributionPtr()->getCommunicatorPtr();
-        totalWeightSum = comm->sum(localW);
-    }
+	const std::vector<std::vector<ValueType>> allLeafWeights = getBalanceVectors();
+	SCAI_ASSERT_EQ_ERROR( numWeights, allLeafWeights.size, "Number of weigths in tree do not agree" );
 
-    //the sum of the realtive speeds for all nodes
-    ValueType speedSum = 0;
-    for( cNode c: hierLevel){
-        speedSum += c.relatSpeed;
-    }
+    for( unsigned int i=0; i<numWeights; i++){
 
-    //the optimum size for every block
-    std::vector<ValueType> optBlockWeight( numBlocks );
+    	scai::lama::DenseVector<ValueType> &thisNodeWeight = nodeWeights[i];
+    	scai::lama::DenseVector<ValueType> &thisLeafWeight = allLeafWeights[i];
 
-    //for each PE, we are given its relative speed compare to the fastest
-    //PE, a number between 0 and 1. The optimum weight it should have 
-    //is this:
-    // relative speed*( sum of input node weights / sum of all relative speeds)
-    for( int i=0; i<numBlocks; i++){
-        optBlockWeight[i] = totalWeightSum*(hierLevel[i].relatSpeed/speedSum);
-    }
+	    //the total node weight of the input graph
+	    ValueType sumNodeWeights = thisWeight.sum();
+	    ValueType sumLeafWeights = std::Accumulate( thisLeafWeight.begin(), thisLeafWeight.end(), 0.0 );
+
+	    if( not isProportional[i] ){
+	    	SCAI_ASSERT_GE_ERROR( sumLeafWeights, sumNodeWeights, "Provided node weights are do not fit in the given tree for weight " << i );
+	    }else{
+
+	    }
+	    
+	    {
+	        scai::hmemo::ReadAccess<ValueType> rW( nodeWeights.getLocalValues() );
+	        ValueType localW = 0;
+	        for(int i=0; i<nodeWeights.getLocalValues().size(); i++ ){
+	            localW += rW[i];
+	        }
+	        const scai::dmemo::CommunicatorPtr comm = nodeWeights.getDistributionPtr()->getCommunicatorPtr();
+	        totalWeightSum = comm->sum(localW);
+	    }
+		
+	    //the sum of the realtive speeds for all nodes
+	    ValueType speedSum = 0;
+	    for( cNode c: hierLevel){
+	        speedSum += c.relatSpeed;
+	    }
+
+	    //the optimum size for every block
+	    std::vector<ValueType> optBlockWeight( numBlocks );
+
+	    //for each PE, we are given its relative speed compare to the fastest
+	    //PE, a number between 0 and 1. The optimum weight it should have 
+	    //is this:
+	    // relative speed*( sum of input node weights / sum of all relative speeds)
+	    for( int i=0; i<numBlocks; i++){
+	        optBlockWeight[i] = totalWeightSum*(hierLevel[i].relatSpeed/speedSum);
+	    }
+	}
 
     return optBlockWeight;
 }
+*/
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>

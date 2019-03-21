@@ -305,13 +305,14 @@ int main(int argc, char** argv) {
     //
 
     if( vm.count("PEgraphFile") and vm.count("blockSizesFile") ){
-    	throw std::runtime_error("You should provide either a file for a communication graph OR a file for block sizes. Not both.")
+    	throw std::runtime_error("You should provide either a file for a communication graph OR a file for block sizes. Not both.");
     }
 
     ITI::CommTree<IndexType,ValueType> commTree;
 
     if(vm.count("PEgraphFile")){
-    	commTree =  FileIO<IndexType, ValueType>::readPETree( settings.PEGraphFile );
+        throw std::logic_error("Reading of communication trees not yet implemented here.");
+    	//commTree =  FileIO<IndexType, ValueType>::readPETree( settings.PEGraphFile );
     }else if( vm.count("blockSizesFile") ){
     	//blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
         std::vector<std::vector<ValueType>> blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
@@ -326,7 +327,7 @@ int main(int argc, char** argv) {
     	commTree.createFlatHomogeneous( settings.numBlocks );
     }
     
-    commTree.adaptWeights( nodeWeights )
+    commTree.adaptWeights( nodeWeights );
 
     //---------------------------------------------------------------------
     //
@@ -431,7 +432,7 @@ int main(int argc, char** argv) {
             
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
         
-        partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, settings, metricsVec[r] );
+        partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, commTree, settings, metricsVec[r] );
         assert( partition.size() == N);
         assert( coordinates[0].size() == N);
         
