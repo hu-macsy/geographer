@@ -11,14 +11,14 @@ class CommTree{
 
 public:
 
-/** Hierarchy is a vector of size ewual to the levels of the tree. Every possition
-	indicates the tree-node in which this leaf belongs to.
-	For example, if hierarchy={1, 0, 2} it means that this PE belongs to tree-node 1
+/** Hierarchy is a vector of size equal to the levels of the tree. Every position
+	indicates the tree-node this leaf belongs to.
+	For example, if hierarchy={1, 0, 2}, it means that this PE belongs to tree-node 1
 	in the first level; then, within tree-node 1, it belongs to tree-node 0 and inside 0,
 	it is leaf-node 2.
 	implicit level 0    o
-                      / | \
-	level 1         o   o   o .... in 1
+                       /|\
+	level 1           o o o .... in 1
                        /|\
 	level 2           o o o ....   in 0
                       ... | ...
@@ -29,10 +29,10 @@ public:
 
 struct commNode{
 	std::vector<unsigned int> hierarchy;
-	//TODO: probably, keeping all chidren is not necessary and uses a lot of space
+	//TODO: probably, keeping all children is not necessary and uses a lot of space
 	// replace by keeping only the number of children
 	std::vector<unsigned int> children;
-	//this is the number of direct children this nodes has
+	//this is the number of direct children this node has
 	unsigned int numChildren;
 	unsigned int numCores;
 	ValueType memMB;
@@ -67,7 +67,7 @@ struct commNode{
 		relatSpeed(0.0),
 		isLeaf(false)
 	{
-		//TODO/check: if this is not a lef node why it has a leaf id?
+		//TODO/check: If this is not a leaf node, why does it have a leaf id?
 		//leafID = leafCount;
 		//leafCount++;
 	}

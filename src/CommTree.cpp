@@ -19,7 +19,6 @@ namespace ITI {
 template <typename IndexType, typename ValueType>
 unsigned int ITI::CommTree<IndexType,ValueType>::commNode::leafCount = 0;
 
-
 //constructor to create tree from a vector of leaves
 template <typename IndexType, typename ValueType>
 CommTree<IndexType, ValueType>::CommTree(std::vector<commNode> leaves){
