@@ -143,7 +143,7 @@ IndexType CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::
 
 // check getOptBlockWeights
 
-	areWeightsAdapted = true;
+	throw std::logic_error("Not yet implemented.");
 
 }//adaptWeights
 
@@ -253,16 +253,16 @@ std::vector<std::vector<ValueType>> CommTree<IndexType, ValueType>::getBalanceVe
 	const IndexType numLeaves = leaves.size();
 	const IndexType numWeights = getNumWeights();
 
-	std::vector<std::vector<ValueType>> constrains( numWeights, std::vector<ValueType>(numLeaves,0.0) );
+	std::vector<std::vector<ValueType>> constraints( numWeights, std::vector<ValueType>(numLeaves,0.0) );
 
 	for(IndexType i=0; i<numLeaves; i++){
 		cNode c = leaves[i];
 		for( unsigned int w=0; w<numWeights; w++){
-			constrains[w][i] = c.weights[w];
+			constraints[w][i] = c.weights[w];
 		}
 	}
 
-	return constrains;
+	return constraints;
 
 }//getBalanceVectors
 //------------------------------------------------------------------------
@@ -361,19 +361,18 @@ std::vector<ValueType> CommTree<IndexType,ValueType>::computeImbalance(
     //compute imbalance for all weights
     for( int i=0; i<numWeights; i++){
 
+	    std::vector<ValueType> optBlockWeight = getOptBlockWeights( /*leaves,*/ nodeWeights);
+	    SCAI_ASSERT_EQ_ERROR( optBlockWeight.size(), numLeaves, "Size mismatch");
 
-    std::vector<ValueType> optBlockWeight = getOptBlockWeights( /*leaves,*/ nodeWeights);
-    SCAI_ASSERT_EQ_ERROR( optBlockWeight.size(), numLeaves, "Size mismatch");
+	    ValueType speedImbalance = GraphUtils<IndexType, ValueType>::computeImbalance( part, k, nodeWeights, optBlockWeight );
 
-    ValueType speedImbalance = GraphUtils<IndexType, ValueType>::computeImbalance( part, k, nodeWeights, optBlockWeight );
-
-    //to measure imbalance according to memory constraints, we assume that
-    // every points has unit weight (this can be changed, for example,
-    //if we measure memory in MB, we can give each point a weight 
-    //of few bytes)
-    scai::lama::DenseVector<ValueType> unitWeights (nodeWeights.getDistributionPtr(), 1);
-
-    ValueType imba = GraphUtils<IndexType, ValueType>::computeImbalance( part, k, unitWeights, memory );
+	    //to measure imbalance according to memory constraints, we assume that
+	    // every points has unit weight (this can be changed, for example,
+	    //if we measure memory in MB, we can give each point a weight 
+	    //of few bytes)
+	    scai::lama::DenseVector<ValueType> unitWeights (nodeWeights.getDistributionPtr(), 1);
+	    throw std::logic_error("Not yet implemented for multiple weights.");
+	    //ValueType imba = GraphUtils<IndexType, ValueType>::computeImbalance( part, k, unitWeights, memory );
 
     	imbalances[i] = imba;
 	}
