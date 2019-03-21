@@ -43,7 +43,6 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	//the input is already partitioned into numOldBlocks number of blocks
 	//for every old block we must find a number of new centers/blocks
 
-	throw std::logic_error("Not yet implemented for new commtree.");
 	const std::vector<unsigned int> numNewBlocksPerOldBlock = CommTree<IndexType,ValueType>().getGrouping( hierLevel );
 	const unsigned int numOldBlocks = numNewBlocksPerOldBlock.size();
 

@@ -215,7 +215,7 @@ std::vector<commNode> getHierLevel( int level) const {
 
 /** @brief Return the leaves of the tree
 */
-std::vector<commNode> getLeaves() const {
+std::vector<commNode> getLeaves() const {//careful here, this creates a copy, but you treat it like it were a reference
 	return tree.back();
 }
 
@@ -239,7 +239,7 @@ IndexType createTreeFromLeaves( const std::vector<commNode> leaves);
 This mainly used when no communication is provided. All leaf nodes have
 the same weight.
 */
-IndexType createFlatHomogeneous( const IndexType numLeaves );
+IndexType createFlatHomogeneous( const IndexType numLeaves, const IndexType numNodeWeights = 1 );
 
 /** @brief Given the desired sizes of the blocks, we construct a flat 
 tree with one level where every leaf node has different weight.
