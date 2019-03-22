@@ -296,6 +296,7 @@ std::vector<std::vector<ValueType>>  findInitialCentersSFC(
 	//homogeneous case, all PEs have the same memory and speed
 	//there is only hierarchy level
 	//TODO: probably this needs some further adaptation for the hierarchical version
+/*	
 	IndexType mem = 1;
 	IndexType speed = 1;
 	IndexType cores = 1;
@@ -304,6 +305,14 @@ std::vector<std::vector<ValueType>>  findInitialCentersSFC(
 	for(int i=0; i<settings.numBlocks; i++){ 
 		leaves[i] = cNode(std::vector<unsigned int>{0}, cores, mem, speed);
 	}
+*/	
+
+//use commTree::createFlat?
+	std::vector<cNode> leaves( settings.numBlocks );
+	for(int i=0; i<settings.numBlocks; i++){ 
+		leaves[i] = cNode(std::vector<unsigned int>{0}, {1.0});
+	}
+
 
 	//every point belongs to one block in the beginning
 	scai::lama::DenseVector<IndexType> partition( coordinates[0].getDistributionPtr(), 0);

@@ -46,6 +46,7 @@ struct commNode{
 	static unsigned int leafCount;
 	unsigned int leafID = std::numeric_limits<unsigned int>::max();
 
+/*
 	commNode( std::vector<unsigned int> hier,
 		unsigned int c, ValueType m, ValueType rSp, bool isLeaf=true)
 	:	hierarchy(hier),
@@ -63,11 +64,20 @@ struct commNode{
 
 		weights.assign(1,0); //one weight of value 0
 	}
+*/
 
-	commNode( std::vector<unsigned int> hier, std::vector<ValueType> leafWeights)
+	commNode( std::vector<unsigned int> hier, std::vector<ValueType> leafWeights, bool isLeaf=true)
 	:	hierarchy(hier),
-		weights(leafWeights)
-		{}
+		weights(leafWeights),
+		isLeaf(isLeaf),
+		numChildren(0)
+	{
+		leafID = leafCount;
+		leafCount++;
+		//convention: leaf node have their ID as their only child
+		// this will speed up the += operator
+		children.resize(1,leafID);
+	}
 
 
 	//this constructor is supposed to be used for non-leaf nodes
@@ -150,7 +160,7 @@ struct commNode{
 		return weights.size();
 	}
 
-	void print(){
+	void print() const{
 		std::cout << "hierarchy vector: ";
 		for(unsigned int i=0; i<hierarchy.size(); i++){
 			std::cout<< hierarchy[i] << ", ";
@@ -195,9 +205,16 @@ std::vector<bool> isProportional;
 */
 CommTree();
 
-/*@brief constructor to create tree from a vector of leaves
+/*	@brief Constructor to create tree from a vector of leaves.
+	@param[in] leaves The leaf nodes of the tree
+	@param[in] isWeightProp A vector of size equal the number of weights
+		that each tree node has. It is used to indicate if the
+		corresponding weight is proportional or an absolute value.
+		For example, node weights can be {64, 0.01} and isWeightProp={ false, true}. An interpretation could be that this node has
+		64GB of memory and 1% of the total FLOPS of the system.
 */
-CommTree(std::vector<commNode> leaves);
+CommTree( std::vector<commNode> leaves,
+ std::vector<bool> isWeightProp );
 
 /* @brief Return the root, i.e., hierarchy level 0.
 */
@@ -336,11 +353,11 @@ std::vector<std::vector<ValueType>> getBalanceVectors() const;
 
 /*@brief Print information for the tree
 */
-void print();
+void print() const;
 
 /* @brief Basic sanity checks for the tree.
 */
-bool checkTree();
+bool checkTree( bool all=false ) const;
 
 
 

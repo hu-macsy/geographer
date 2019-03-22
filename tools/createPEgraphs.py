@@ -46,7 +46,7 @@ def createLeafLabels(tree):
 			prevLabel = prevLabelLvl[j]
 			numChildren = prevLevel[j]
 			for r in range(numChildren):
-				newLabelLevel.append( prevLabel+","+str(r) )
+				newLabelLevel.append( prevLabel+" "+str(r) )
 			
 		assert( sum(prevLevel)==len(newLabelLevel) )
 		labelTree.append( newLabelLevel )
@@ -55,74 +55,79 @@ def createLeafLabels(tree):
 
 #-----------------------------------------------------------------------------
 
-def writeInFile( filename, labels, cpu, mem):
+def writeInFile( filename, labels, weights, numWeights=5):
 
 	if os.path.exists(filename):
 		print("File", filename, "exists.\nAborting....")
 		return False
 
 	numPEs = len(labels) 
-	assert( numPEs==len(cpu) )
-	assert( numPEs==len(mem) )
+	
+	#numWeights = len(weights[0]+1)/3
+	
+	assert( numPEs==len(weights) )
 
 	with open(filename,"w+") as f:
-		f.write( "#(label), mem(GB), cpu(%)\n")
-		f.write( str(numPEs)+"\n" )
+		f.write( "%first line contains the number of leaves, the number of node weights\n")
+		f.write( "%and a bit per weights that indicates if the weight is proportional\n"
+			)
+		f.write( "%e.g., if bit 4 is 0 then weight 4 is not proportional\n")
+		f.write( "%(label), node weights \n")
+		f.write( str(numPEs) + " " + str(numWeights)  )
+		for w in range(numWeights):
+			f.write( " " + str( randint(0,1)) )
+		f.write("\n")
+
 		for i in range(numPEs):
 			thisLabel = labels[i]
-			line = thisLabel + " # " + str(mem[i])+", " + str(cpu[i]) +"\n"
+			thisWeight = weights[i] 
+			line = thisLabel + " # " + thisWeight +"\n"
 			f.write(line)
 
 	print("Data written in file", filename )
 	return True
 
 #-----------------------------------------------------------------------------
-'''
-tree= [ [3], 
-		[2,3,4],
-		[3,2, 4,1,2, 2,3,4,5]]
-
-numPEs =  sum( tree[-1] )
-
-mem = [64]*numPEs #all PEs have the same memory
-cpu = [1]*numPEs #all PEs have the same cpu speed
-'''
 
 ## create and store in a file a random tree
 
-numLevels = 2 # actual number of levels is -1 since the first level is a ghost node 
+numLevels = 3 # actual number of levels is -1 since the first level is a ghost node 
 firstLevel = 4 
 maxChildren = 16
 minChildren = 2 #turn also minChildren to minChildrenPerLevel?
 #variable firstLevel will not adhere to maxChildrenPerLevel, 
 #i.e., maxChildrenPerLevel[0] is not considered
 #maxChildrenPerLevel = [maxChildren]*numLevels
-maxChildrenPerLevel = [2, 4] 
+maxChildrenPerLevel = [2, 4, 4] 
 
 assert( len(maxChildrenPerLevel)==numLevels)
 
-tree2 = makeRandomTree( numLevels,firstLevel, maxChildrenPerLevel, minChildren )
-assert( len(tree2)==numLevels )
-numPEs2 =  sum( tree2[-1] )
+tree = makeRandomTree( numLevels,firstLevel, maxChildrenPerLevel, minChildren )
+assert( len(tree)==numLevels )
+numPEs =  sum( tree[-1] )
 
-mem = [64]*numPEs2 #all PEs have the same memory
-cpu = [1]*numPEs2 #all PEs have the same cpu speed
+numWeights = 5
+allWeights = [""]*numPEs #5 node weights
+
+#mem = [64]*numPEs #all PEs have the same memory
+#cpu = [1]*numPEs #all PEs have the same cpu speed
 
 percentages = [0, 0.2, 0.7, 1] #how many different groups we have and how large they are
 percentages2 = [0, 0.8, 1, 0.9] #how cpu and mem differs
 
-groupInds = [ int(perc*numPEs2) for perc in percentages ]
+groupInds = [ int(perc*numPEs) for perc in percentages ]
 print(groupInds)
 
 for g in range(1, len(groupInds) ):
 	start = groupInds[g-1]
 	end = groupInds[g]
 	for i in range(start,end):
-		mem[i] *= percentages2[g]
-		cpu[i] *= percentages2[g]
+		for w in range(numWeights):
+			#allWeights[i][w] *= percentages2[g]
+			allWeights[i] += str( randint(10, 100) )
+			allWeights[i] += " "
 
-finalLabels = [ label[1:] for label in createLeafLabels(tree2)[-1] ]
+finalLabels = [ label[1:] for label in createLeafLabels(tree)[-1] ]
 
-
-file = "testPEgraph" + str(numPEs2) + ".txt"
-writeInFile(  file, finalLabels, cpu, mem )
+file = "testPEgraph" + str(numPEs) + ".txt"
+writeInFile(  file, finalLabels, allWeights )

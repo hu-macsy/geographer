@@ -2284,9 +2284,30 @@ CommTree<IndexType,ValueType> FileIO<IndexType, ValueType>::readPETree( const st
     ss.str( line );
 
     IndexType numPEs;
+    IndexType numWeights;
 
     //first line after comments should have the number of PEs
-    ss>> numPEs;
+    //and number of weights
+    ss >> numPEs;
+    ss >> numWeights;
+{
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+    if( comm->getRank()==0 ){
+		std::cout<< "\t... with "<< numPEs << " and " << numWeights << " weights each"<< std::endl;
+	}
+}
+
+	//next entries should have a bit for every node weight indicating if it is  proportional
+	
+	std::vector<bool> isProp( numWeights );
+	for( unsigned int w=0; w<numWeights; w++ ){
+		std::string b;
+		ss >> b;
+		isProp[w] = bool( std::stoi(b) );
+	}
+
+	//read by line to create the leaves
 
     std::vector<cNode> leaves(numPEs);
 
@@ -2294,7 +2315,7 @@ CommTree<IndexType,ValueType> FileIO<IndexType, ValueType>::readPETree( const st
          bool read = !std::getline(file, line).fail();
                  
         if (!read and i!=numPEs-1 ) {
-			throw std::runtime_error("In FileIO.cpp, line " + std::to_string(__LINE__) +": Unexpected end of block sizes file " + filename + ". Was the number of PEs correct?");
+			throw std::runtime_error("In FileIO.cpp, line " + std::to_string(__LINE__) +": Unexpected end of processor tree file " + filename + ". Was the number of PEs correct?");
         }
 
         //TODO: this (with all the stings and streams) is probably a stupid and not efficient way; fix
@@ -2302,32 +2323,28 @@ CommTree<IndexType,ValueType> FileIO<IndexType, ValueType>::readPETree( const st
         ss.str( line );
 
         std::vector<unsigned int> hierarchy;
+        std::vector<ValueType> weights( numWeights );
 
-        std::string label; 
-        std::getline(ss, label, '#');
-        std::stringstream ss2;
-        ss2.str(label);
-        std::string l;
-        while( getline(ss2, l, ',') ){
-        	hierarchy.push_back( std::stoi(l) );
+        std::string tok;
+        ss >> tok;
+
+        while( tok!="#"){
+        	hierarchy.push_back( std::stoi(tok) );
+        	ss >> tok;
         }
 
-        std::string mem;
-        std::getline(ss, mem, ',');
-        ValueType iMem = std::stod( mem );
+        // found '#', create the weights
 
-        std::string cpu;
-        std::getline(ss, cpu, ',');
-        ValueType iCpu = std::stod( cpu );
-      
-//TODO: we assume that all leaves are cores.        
-IndexType numCores = 1;
+        for( unsigned int w=0; w<numWeights; w++){
+        	ss >> tok;
+        	weights[w] = std::stod(tok);
+        }
 
-		cNode node(hierarchy, numCores, iMem, iCpu );
+		cNode node(hierarchy, weights );
 		leaves[i]= node;
      }
 
-     return CommTree<IndexType,ValueType>( leaves );
+     return CommTree<IndexType,ValueType>( leaves, isProp );
 }
 
 
