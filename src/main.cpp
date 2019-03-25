@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
             if (settings.numNodeWeights < nodeWeights.size()) {
                 nodeWeights.resize(settings.numNodeWeights);
                 if (comm->getRank() == 0) {
-                    std::cout << "Read " << numReadNodeWeights << " node weights but " << settings.numNodeWeights << " weights were specified, thus discarding "
+                    std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, thus discarding "
                     << numReadNodeWeights - settings.numNodeWeights << std::endl;
                 }
             } else if (settings.numNodeWeights > nodeWeights.size()) {
@@ -187,7 +187,7 @@ int main(int argc, char** argv) {
                     nodeWeights[i] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
                 }
                 if (comm->getRank() == 0) {
-                    std::cout << "Read " << numReadNodeWeights << " node weights but " << settings.numNodeWeights << " weights were specified, padding with "
+                    std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, padding with "
                     << settings.numNodeWeights - numReadNodeWeights << " uniform weights. " << std::endl;
                 }
             }
