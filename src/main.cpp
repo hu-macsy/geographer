@@ -115,7 +115,7 @@ int main(int argc, char** argv) {
     //
     
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
-    std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
+    std::vector<scai::lama::DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
 	std::vector<scai::lama::DenseVector<ValueType>> nodeWeights;		//the weights for each node
 	
 	
@@ -299,20 +299,44 @@ int main(int argc, char** argv) {
     	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;
     	return 126;
     }
+
+    //
+    // read the communication graph or the block sizes if provided
+    //
+
+    if( vm.count("PEgraphFile") and vm.count("blockSizesFile") ){
+    	throw std::runtime_error("You should provide either a file for a communication graph OR a file for block sizes. Not both.");
+    }
+
+    ITI::CommTree<IndexType,ValueType> commTree;
+
+    if(vm.count("PEgraphFile")){
+        throw std::logic_error("Reading of communication trees not yet implemented here.");
+    	//commTree =  FileIO<IndexType, ValueType>::readPETree( settings.PEGraphFile );
+    }else if( vm.count("blockSizesFile") ){
+    	//blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
+        std::vector<std::vector<ValueType>> blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
+        for (IndexType i = 0; i < nodeWeights.size(); i++) {
+        	const ValueType blockSizesSum  = std::accumulate( blockSizes[i].begin(), blockSizes[i].end(), 0);
+			const ValueType nodeWeightsSum = nodeWeights[i].sum();
+			SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
+        }
+
+        commTree.createFlatHeterogeneous( blockSizes );
+    }else{
+    	commTree.createFlatHomogeneous( settings.numBlocks );
+    }
     
+    commTree.adaptWeights( nodeWeights );
+
     //---------------------------------------------------------------------
     //
     //  read block sizes from a file if it is passed as an argument
     //
     
-    if( vm.count("blockSizesFile") ){
-        settings.blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
-        for (IndexType i = 0; i < nodeWeights.size(); i++) {
-        	const ValueType blockSizesSum  = std::accumulate( settings.blockSizes[i].begin(), settings.blockSizes[i].end(), 0);
-			const ValueType nodeWeightsSum = nodeWeights[i].sum();
-			SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
-        }
-    }
+    std::vector<std::vector<ValueType> > blockSizes;
+
+    
     
     //---------------------------------------------------------------
     //
@@ -408,7 +432,7 @@ int main(int argc, char** argv) {
             
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
         
-        partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, settings, metricsVec[r] );
+        partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, commTree, settings, metricsVec[r] );
         assert( partition.size() == N);
         assert( coordinates[0].size() == N);
         

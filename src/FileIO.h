@@ -225,8 +225,10 @@ public:
 	 * 100
 	 * 120
 	 * 97
+
+	 @return return.size()= number of weights, and return[i].size()= number of blocks
 	*/
-	static std::vector<std::vector<ValueType> > readBlockSizes(const std::string filename , const IndexType numBlocks, const IndexType numWeights = 1);
+	static std::vector<std::vector<ValueType>> readBlockSizes(const std::string filename , const IndexType numBlocks, const IndexType numWeights = 1);
 
 	static DenseVector<IndexType> readPartition(const std::string filename, IndexType n);
     

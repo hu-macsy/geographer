@@ -22,7 +22,8 @@ class benchmarkTest : public ::testing::Test {
 TEST_F( benchmarkTest, benchMapping ){
 
 	//std::string fileName = "Grid32x32";
-	std::string fileName = "slowrot-00000.graph";
+	//std::string fileName = "slowrot-00000.graph";
+	std::string fileName = "bubbles-00010.graph";
     std::string file = graphPath + fileName;
     const IndexType dimensions = 2;
 
@@ -32,18 +33,29 @@ TEST_F( benchmarkTest, benchMapping ){
     settings.noRefinement = true;
 	settings.writePEgraph = true;
 	settings.writeInFile = true;
+	settings.storeInfo = true;
 
     const IndexType k = settings.numBlocks;
+
+    //
+    // 1 - read graph, coordiantes and create unit nodeweights
+    //
 
     scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     IndexType globalN = graph.getNumRows();
 
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), globalN, dimensions);
 
-//1 - read PE graph
+    std::vector<scai::lama::DenseVector<ValueType>> unitWeights(2, scai::lama::DenseVector<ValueType>(graph.getRowDistributionPtr(), 1));
+
+    //
+	// 2 - read the PE graph
+	//
+
     std::string PEfile = "./meshes/PEgraphs/myPEgraph8.txt";
     CommTree<IndexType,ValueType> cTree = FileIO<IndexType, ValueType>::readPETree( PEfile );
-	PRINT( cTree.getNumLeaves() << ", " );
+    cTree.adaptWeights( unitWeights );
+
     const scai::lama::CSRSparseMatrix<ValueType> PEGraph = cTree.exportAsGraph_local();
 
 	SCAI_ASSERT_EQ_ERROR( PEGraph.getNumRows(), k , "Wrong number of rows/vertices" );
@@ -52,35 +64,29 @@ TEST_F( benchmarkTest, benchMapping ){
     	FileIO<IndexType,ValueType>::writeGraph( PEGraph, "peFromTree"+std::to_string(k)+".graph", 1);	
     }
 	
-//2 - read and partition graph without using the PEgraph
+	//
+	// 3 - read and partition graph without using the PEgraph
+    //
+
     settings.initialPartition = InitialPartitioningMethods::KMeans;
     struct Metrics metrics(settings);
 
-    //balances[0] is memory, balances[1] is cpu speed
-    std::vector<std::vector<ValueType>> balances = cTree.getBalanceVectors();
+    std::vector<std::vector<ValueType>> balances = cTree.getBalanceVectors( -1 );
     SCAI_ASSERT_EQ_ERROR( balances.size(), 2, "Wrong number of balance constrains");
     SCAI_ASSERT_EQ_ERROR( balances[0].size(), k, "Wrong size of balance vector");
 
-    //cpu speed is given as the relative speed compared to the fastest cpu.
-    //convert it to absolute number
-    std::vector<std::vector<ValueType>> wantedBlockSizes( 1, std::vector<ValueType>(k, 0 ));
-    ValueType sumOfBalances = std::accumulate( balances[1].begin(), balances[1].end(), 0.0 );    
     
-    for(IndexType i=0; i<k; i++ ){
-    	wantedBlockSizes[0][i] = (balances[1][i]/sumOfBalances)*globalN; //we assume unit node weights
-    }
-
-    settings.blockSizes = wantedBlockSizes;
-
     // get partition ParcoRepart::partitionGraph to accept constrains
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, unitWeights, balances, settings, metrics);
     ASSERT_EQ(globalN, partition.size());
 
+    //
+	// 4 - partition graph with the PEgraph
+	//
 
-//3 - partition graph with the PEgraph
     //read graph again or redistribute because the previous partition might have change it
     scai::lama::CSRSparseMatrix<ValueType> graph2 = FileIO<IndexType, ValueType>::readGraph(file );
-    std::vector<scai::lama::DenseVector<ValueType>> unitWeights(1, scai::lama::DenseVector<ValueType>(graph.getRowDistributionPtr(), 1));
+    
     struct Metrics metrics2( settings );
 
     scai::lama::DenseVector<IndexType> partitionWithPE = ITI::KMeans::computeHierarchicalPartition(  \
@@ -94,10 +100,12 @@ TEST_F( benchmarkTest, benchMapping ){
 		//FileIO<IndexType,ValueType>::writeGraph( GraphUtils<IndexType,ValueType>::getBlockGraph(graph, partitionWithPE, settings.numBlocks), "blockHKM"+std::to_string(settings.numBlocks)+".graph", 1);
 	}
 
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	//
+	// 5 - compare quality
+	//
 	
-//4 - compare quality
-    PRINT0("--------- Metrics for regular partition");
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	PRINT0("--------- Metrics for regular partition");
 
     //graph and partition are distributed inside partitionGraph; distributions must allign
     unitWeights[0].redistribute( partition.getDistributionPtr() );

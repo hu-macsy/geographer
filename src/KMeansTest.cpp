@@ -232,36 +232,51 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 
 	}
 
-	//scai::lama::DenseVector<ValueType> nodeWeights = fixedNodeWeights;
-	std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { unitNodeWeights };
+	ValueType c = 2;
+	scai::lama::DenseVector<ValueType> constNodeWeights = unitNodeWeights;
+	constNodeWeights *= c;
 
+	//scai::lama::DenseVector<ValueType> nodeWeights = fixedNodeWeights;
+	std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { unitNodeWeights, unitNodeWeights, constNodeWeights };
+
+	std::cout << "Sum of node weights are: " << std::endl;
+	for( unsigned int i=0; i<nodeWeights.size(); i++ ){
+		std::cout << "weight " << i << ": " << nodeWeights[i].sum() << std::endl;
+	}
+		/*
+		std::transform( unitNodeWeights.begin(), unitNodeWeights.end(), unitNodeWeights.begin(), \
+			std::bind( std::multiplies<ValueType>(), 2) ) };
+		*/
 	//const IndexType k = comm->getSize();
 	//using KMeans::cNode;
 
 	//set CommTree
 	std::vector<cNode> leaves = {
 		// 				{hierachy ids}, numCores, mem, speed
-		cNode( std::vector<unsigned int>{0,0}, 4, 8, 100),
-		cNode( std::vector<unsigned int>{0,1}, 4, 8, 90),
+		cNode( std::vector<unsigned int>{0,0}, {141, 8, 0.3} ),
+		cNode( std::vector<unsigned int>{0,1}, {154, 8, 0.9} ),
 
-		cNode( std::vector<unsigned int>{1,0}, 6, 10, 80),
-		cNode( std::vector<unsigned int>{1,1}, 6, 10, 90),
-		cNode( std::vector<unsigned int>{1,2}, 6, 10, 70),
+		cNode( std::vector<unsigned int>{1,0}, {126, 10, 0.8} ),
+		cNode( std::vector<unsigned int>{1,1}, {276, 10, 0.9} ),
+		cNode( std::vector<unsigned int>{1,2}, {67, 10, 0.7} ),
 
-		cNode( std::vector<unsigned int>{2,0}, 8, 12, 60),
-		cNode( std::vector<unsigned int>{2,1}, 8, 12, 70),
-		cNode( std::vector<unsigned int>{2,2}, 8, 12, 70),
-		cNode( std::vector<unsigned int>{2,3}, 8, 12, 50),
-		cNode( std::vector<unsigned int>{2,4}, 8, 12, 50)
+		cNode( std::vector<unsigned int>{2,0}, {81, 12, 0.6} ),
+		cNode( std::vector<unsigned int>{2,1}, {88, 12, 0.7} ),
+		cNode( std::vector<unsigned int>{2,2}, {156, 12, 0.7} ),
+		cNode( std::vector<unsigned int>{2,3}, {108, 12, 0.5} ),
+		cNode( std::vector<unsigned int>{2,4}, {221, 12, 0.5} )
 	};
 
-	ITI::CommTree<IndexType,ValueType> cTree( leaves );
+	ITI::CommTree<IndexType,ValueType> cTree( leaves, { false, true, true } );
+
+	cTree.adaptWeights( nodeWeights );
 
 	struct Settings settings;
 	settings.dimensions = dimensions;
 	settings.numBlocks = leaves.size();
 	settings.debugMode = false;
 	settings.verbose = false;
+	settings.storeInfo = false;
 	settings.epsilon = 0.05;
 	settings.balanceIterations = 5;
 	settings.maxKMeansIterations = 5;
@@ -273,11 +288,15 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 
 	//checks - prints
 
-	ValueType speedImbalance, sizeImbalance;
-	//std::tie( speedImbalance, sizeImbalance) =  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights, cTree );
-	std::tie( speedImbalance, sizeImbalance) =  cTree.computeImbalance( partition, settings.numBlocks, nodeWeights[0] );
+	std::vector<ValueType> imbalances = cTree.computeImbalance( partition, settings.numBlocks, nodeWeights );
 
-	std::cout << "final imbalance: speed= " << speedImbalance << " , size= " << sizeImbalance << std::endl;
+	if (comm->getRank() == 0) {
+		std::cout << "final imbalances: ";
+		for (IndexType i = 0; i < imbalances.size(); i++) {
+			std::cout << " " << imbalances[i];
+		}
+		std::cout << std::endl;
+	}
 }
 
 TEST_F(KMeansTest, testComputePartitionWithMultipleWeights) {

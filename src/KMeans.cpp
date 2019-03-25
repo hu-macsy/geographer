@@ -43,7 +43,7 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 	//the input is already partitioned into numOldBlocks number of blocks
 	//for every old block we must find a number of new centers/blocks
 
-	const std::vector<unsigned int> numNewBlocksPerOldBlock = CommTree<IndexType,ValueType>::getGrouping( hierLevel );
+	const std::vector<unsigned int> numNewBlocksPerOldBlock = CommTree<IndexType,ValueType>().getGrouping( hierLevel );
 	const unsigned int numOldBlocks = numNewBlocksPerOldBlock.size();
 
 	//convert coordinates, switch inner and outer order
@@ -296,6 +296,7 @@ std::vector<std::vector<ValueType>>  findInitialCentersSFC(
 	//homogeneous case, all PEs have the same memory and speed
 	//there is only hierarchy level
 	//TODO: probably this needs some further adaptation for the hierarchical version
+/*	
 	IndexType mem = 1;
 	IndexType speed = 1;
 	IndexType cores = 1;
@@ -304,6 +305,14 @@ std::vector<std::vector<ValueType>>  findInitialCentersSFC(
 	for(int i=0; i<settings.numBlocks; i++){ 
 		leaves[i] = cNode(std::vector<unsigned int>{0}, cores, mem, speed);
 	}
+*/	
+
+//use commTree::createFlat?
+	std::vector<cNode> leaves( settings.numBlocks );
+	for(int i=0; i<settings.numBlocks; i++){ 
+		leaves[i] = cNode(std::vector<unsigned int>{0}, {1.0});
+	}
+
 
 	//every point belongs to one block in the beginning
 	scai::lama::DenseVector<IndexType> partition( coordinates[0].getDistributionPtr(), 0);
@@ -1127,7 +1136,7 @@ DenseVector<IndexType> computePartition( \
 			for (ValueType blockSize : targetBlockWeights[i]) {
 				PRINT0(std::to_string(blockSize) + " ");
 			}
-			throw std::invalid_argument("Block weight sum " + std::to_string(blockWeightSum) + " too small for node weight sum " + std::to_string(nodeWeightSum[i]));
+			throw std::invalid_argument("Block weight sum " + std::to_string(blockWeightSum) + " too small for node weight sum " + std::to_string(nodeWeightSum[i]) + ". Myabe you should try calling CommTree::adaptWeights().");
 		}
 	}
 
@@ -1563,19 +1572,26 @@ DenseVector<IndexType> computeHierarchicalPartition(
 	//the node weights. 
 	//TODO: is this supposed to be here? it is also in the
 	// ParcoRepart::partitionGraph
+	
 	const IndexType numNodeWeights = nodeWeights.size();
-	if (numNodeWeights > 1) {
+/*	if (numNodeWeights > 1) {
 		throw std::logic_error("Hierarchical k-means not yet implemented for multiple node weights.");
 	}
+*/	
+
+	const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
+	const IndexType localN = dist->getLocalSize();
 
 	HilbertCurve<IndexType,ValueType>::hilbertRedistribution(
 		coordinates, nodeWeights, settings, metrics);
 
-	//added check to verify that the points are indeed distributed 
-	//based on the hilbert curve. Otherwise, the prefix sum needed to 
-	//calculate the centers, does not have the desired meaning.
-	bool hasHilbertDist = HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution( coordinates, nodeWeights[0], settings);//TODO: update if you get multiple node weights
-	SCAI_ASSERT_EQ_ERROR( hasHilbertDist, true, "Input must be distributed according to a hilbert curve distribution");
+	if (settings.debugMode) {
+		//added check to verify that the points are indeed distributed 
+		//based on the hilbert curve. Otherwise, the prefix sum needed to 
+		//calculate the centers, does not have the desired meaning.
+		bool hasHilbertDist = HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution( coordinates, nodeWeights[0], settings);//TODO: update if you get multiple node weights
+		SCAI_ASSERT_EQ_ERROR( hasHilbertDist, true, "Input must be distributed according to a hilbert curve distribution");
+	}
 	graph.redistribute( coordinates[0].getDistributionPtr(), graph.getColDistributionPtr() );
 
 	std::vector<ValueType> minCoords(settings.dimensions);
@@ -1653,7 +1669,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		IndexType numOldBlocks = groupOfCenters.size();
 
 		//number of new blocks each old blocks must be partitioned to
-		std::vector<unsigned int> numNewBlocks = CommTree<IndexType, ValueType>::getGrouping( thisLevel );
+		std::vector<unsigned int> numNewBlocks = commTree.getGrouping( thisLevel );
 		SCAI_ASSERT_EQ_ERROR( numOldBlocks, numNewBlocks.size(), "Hierarchy level size mismatch" );
 		const IndexType totalNumNewBlocks = std::accumulate( numNewBlocks.begin(), numNewBlocks.end(), 0 );
 
@@ -1666,64 +1682,33 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		//2- main k-means loop
 		//
 
-		//TODO: probably blockSizes is not needed
 
-		/*for speed weight: the optimum block weight for a PE i is 
-		w = this.speed * totalWeightSum/(sum of all speed factors)
-		Because we use sampling, totalWeightSum is the sum of the weight
-		of the sampled nodes so it is different in every iteration.
-		*/
-		ValueType speedSum = 0;
-		for( cNode c: thisLevel){
-			speedSum += c.relatSpeed;
-		}
+		//TODO: this destroys the const-ness of the tree. Remove code or const
+		//if( not commTree.areWeightsAdapted ){
+		//	commTree.adaptWeights( nodeWeights );
+		//}
 
-		//TODO: do the equivalent for the memory constraint
-		//later, optBlockWeight[i] = blockSpeedPercent[i]*samplePointsWeight
-
-		std::vector<std::vector<ValueType>> targetBlockWeights(numNodeWeights);
-
-		for (IndexType j = 0 ; j < numNodeWeights; j++) {
-			targetBlockWeights[j].resize(totalNumNewBlocks);
-			std::vector<ValueType> blockSpeedPercent( totalNumNewBlocks );
-
-			//TODO: adapt as soon as the commtree has multiple weights
-			for( IndexType i=0; i<totalNumNewBlocks; i++){
-				blockSpeedPercent[i] = thisLevel[i].relatSpeed/speedSum;
-				targetBlockWeights[j][i] = blockSpeedPercent[i]*totalWeightSum[j];
-			}
-		}
-
+		//get the wanted block sizes for this level of the tree
+		std::vector<std::vector<ValueType>> targetBlockWeights = commTree.getBalanceVectors(h);
+		SCAI_ASSERT_EQ_ERROR( targetBlockWeights.size(), numNodeWeights, "Wrong number of weights" );
+		SCAI_ASSERT_EQ_ERROR( targetBlockWeights[0].size(), totalNumNewBlocks, "Wrong size of weights" );
+PRINT0( h << ": " << std::accumulate( targetBlockWeights[0].begin(), targetBlockWeights[0].end(), 0.0) );
 		//TODO: inside computePartition, settings.numBlocks is not
 		//used. We infer the number of new blocks from the groupOfCenters
 		//maybe, set also numBlocks for clarity??
 		partition = computePartition( graph, coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics );
 
-		FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/partHKM"+std::to_string(settings.numBlocks)+"_h"+std::to_string(h)+".out");
-
-		//this check is done before. TODO: remove?
-		if( settings.debugMode ){
+		if (settings.debugMode) {
+			//this check is done before. TODO: remove?
 			const IndexType maxPart = partition.max(); //global operation
 			SCAI_ASSERT_EQ_ERROR( totalNumNewBlocks-1, maxPart, "The provided old assignment must have equal number of blocks as the length of the vector with the new number of blocks per part");
-			if( settings.storeInfo){
-				ITI::FileIO<IndexType,ValueType>::writeDenseVectorCentral( partition, "//home/harry/geographer-dev/tmp/hkmLvl"+h );
-				if( comm->getRank()==0)
-					std::cout << "Partition for hierarchy level " << h << 
-				" stored in /home/harry/geographer-dev/tmp/hkmLvl"<<h <<std::endl;
-				//std::cout<< "Press key to continue" << std::endl; int tmpInt; std::cin >> tmpInt;
+			if( settings.storeInfo ){
+				//FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/partHKM"+std::to_string(settings.numBlocks)+"_h"+std::to_string(h)+".out");
+				FileIO<IndexType,ValueType>::writeDenseVectorCentral( partition, "./partResults/partHKM"+std::to_string(settings.numBlocks)+"_h"+std::to_string(h)+".out");
 			}
+			aux<IndexType,ValueType>::print2DGrid( graph, partition );
 		}
 
-//TODO: this is an attempt to do local refinement after every step. But local refinement demands k=p,
-//	so this cannot be done inbetween steps.
-/*
-if( true or not settings.noRefinement ){
-	bool useRedistributor = true;
-	scai::dmemo::DistributionPtr distFromPartition = aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coordinates, nodeWeights, settings, useRedistributor);
-	scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo( graph );
-	ITI::MultiLevel<IndexType, ValueType>::multiLevelStep( graph, partition, nodeWeights, coordinates, halo, settings, metrics);
-}
-*/
 		//TODO?: remove?
 		std::vector<ValueType> imbalances(numNodeWeights);
 		for (IndexType i = 0; i < numNodeWeights; i++) {
@@ -1731,7 +1716,13 @@ if( true or not settings.noRefinement ){
 		}
 		//IndexType cut = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
 
-		PRINT0("\nFinished hierarchy level " << h <<", partitioned into " << totalNumNewBlocks << " blocks and imbalance is " << imbalances[0] <<std::endl );
+		PRINT0("\nFinished hierarchy level " << h <<", partitioned into " << totalNumNewBlocks << " blocks and imbalance is:" );
+		if( comm->getRank()==0 ){
+			for (IndexType i = 0; i < imbalances.size(); i++) {
+				std::cout<< " " << imbalances[i] <<std::endl ;
+			}
+		}
+		
 	}
 
 	return partition;

@@ -80,10 +80,12 @@ int main(int argc, char** argv) {
     scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
     scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
 
+    std::vector<std::vector<ValueType>> blockSizes;
+
     if( vm.count("blockSizesFile") ){
-        settings.blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
+        blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
         for (IndexType i = 0; i < nodeWeights.size(); i++) {
-            const ValueType blockSizesSum  = std::accumulate( settings.blockSizes[i].begin(), settings.blockSizes[i].end(), 0);
+            const ValueType blockSizesSum  = std::accumulate( blockSizes[i].begin(), blockSizes[i].end(), 0);
             const ValueType nodeWeightsSum = nodeWeights[i].sum();
             SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
         }
