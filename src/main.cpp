@@ -168,11 +168,30 @@ int main(int argc, char** argv) {
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
         assert(graph.getColDistribution().isEqual(*noDistPtr));
 
-        IndexType numNodeWeights = nodeWeights.size();
-        if (numNodeWeights == 0) {
+        IndexType numReadNodeWeights = nodeWeights.size();
+        if (numReadNodeWeights == 0) {
         	nodeWeights.resize(1);
 			nodeWeights[0] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
 		}
+
+        if (!std::isnan(settings.numNodeWeights)) {
+            if (settings.numNodeWeights < nodeWeights.size()) {
+                nodeWeights.resize(settings.numNodeWeights);
+                if (comm->getRank() == 0) {
+                    std::cout << "Read " << numReadNodeWeights << " node weights but " << settings.numNodeWeights << " weights were specified, thus discarding "
+                    << numReadNodeWeights - settings.numNodeWeights << std::endl;
+                }
+            } else if (settings.numNodeWeights > nodeWeights.size()) {
+                nodeWeights.resize(settings.numNodeWeights);
+                for (IndexType i = numReadNodeWeights; i < settings.numNodeWeights; i++) {
+                    nodeWeights[i] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
+                }
+                if (comm->getRank() == 0) {
+                    std::cout << "Read " << numReadNodeWeights << " node weights but " << settings.numNodeWeights << " weights were specified, padding with "
+                    << settings.numNodeWeights - numReadNodeWeights << " uniform weights. " << std::endl;
+                }
+            }
+        }
 
         // for 2D we do not know the size of every dimension
         settings.numX = N;
@@ -316,8 +335,17 @@ int main(int argc, char** argv) {
         std::vector<std::vector<ValueType>> blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
         if (blockSizes.size() < nodeWeights.size()) {
             throw std::invalid_argument("Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + " weights per block, "
-                + "but nodes have " + std::to_string(nodeWeights.size()) + ".");
+                + "but nodes have " + std::to_string(nodeWeights.size()) + " weights.");
         }
+
+        if (blockSizes.size() > nodeWeights.size()) {
+            blockSizes.resize(nodeWeights.size());
+            if (comm->getRank() == 0) {
+                std::cout << "Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + " weights per block, "
+                + "but nodes have " + std::to_string(nodeWeights.size()) + " weights. Discarding surplus block sizes." << std::endl;
+            }
+        }
+
         for (IndexType i = 0; i < nodeWeights.size(); i++) {
         	const ValueType blockSizesSum  = std::accumulate( blockSizes[i].begin(), blockSizes[i].end(), 0);
 			const ValueType nodeWeightsSum = nodeWeights[i].sum();
@@ -325,20 +353,11 @@ int main(int argc, char** argv) {
         }
 
         commTree.createFlatHeterogeneous( blockSizes );
-    }else{
+    } else {
     	commTree.createFlatHomogeneous( settings.numBlocks, nodeWeights.size() );
     }
     
     commTree.adaptWeights( nodeWeights );
-
-    //---------------------------------------------------------------------
-    //
-    //  read block sizes from a file if it is passed as an argument
-    //
-    
-    std::vector<std::vector<ValueType> > blockSizes;
-
-    
     
     //---------------------------------------------------------------
     //
