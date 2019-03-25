@@ -905,7 +905,13 @@ DenseVector<IndexType> assignBlocks(
 	} while ((!allWeightsBalanced) && iter < settings.balanceIterations);
 	
 	if( settings.verbose ) {
-		std::cout << "Process " << comm->getRank() << " skipped " << ValueType(skippedLoops*100) / (iter*localN) << "% of inner loops." << std::endl;
+		ValueType percentageSkipped = ValueType(skippedLoops*100) / (iter*localN);
+		ValueType maxSkipped = comm->max(percentageSkipped);
+		ValueType minSkipped = comm->min(percentageSkipped);
+		ValueType avgSkipped = comm->sum(percentageSkipped) / comm->getSize();
+		if (comm->getRank() == 0) {
+			std::cout << "Skipped inner loops in %: " << "min: " << minSkipped << ", avg: " << avgSkipped << " " << ", max: " << maxSkipped << std::endl;
+		}
 	}
 
 	//for kmeans profiling
