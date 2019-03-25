@@ -1681,15 +1681,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		//
 		//2- main k-means loop
 		//
-/*
-		std::vector<std::vector<ValueType>> targetBlockWeights(numNodeWeights, std::vector<ValueType>(totalNumNewBlocks));
-		assert(thisLevel.size() == totalNumNewBlocks);
-		for (IndexType b = 0; b < thisLevel.size(); b++) {
-			for (IndexType w = 0; w < numNodeWeights; w++) {
-				targetBlockWeights[w][b] = thisLevel[b].weights[w];
-			}
-		}
-*/
+
 
 		//TODO: this destroys the const-ness of the tree. Remove code or const
 		//if( not commTree.areWeightsAdapted ){
@@ -1700,26 +1692,21 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		std::vector<std::vector<ValueType>> targetBlockWeights = commTree.getBalanceVectors(h);
 		SCAI_ASSERT_EQ_ERROR( targetBlockWeights.size(), numNodeWeights, "Wrong number of weights" );
 		SCAI_ASSERT_EQ_ERROR( targetBlockWeights[0].size(), totalNumNewBlocks, "Wrong size of weights" );
-
+PRINT0( h << ": " << std::accumulate( targetBlockWeights[0].begin(), targetBlockWeights[0].end(), 0.0) );
 		//TODO: inside computePartition, settings.numBlocks is not
 		//used. We infer the number of new blocks from the groupOfCenters
 		//maybe, set also numBlocks for clarity??
 		partition = computePartition( graph, coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics );
 
 		if (settings.debugMode) {
-			FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/partHKM"+std::to_string(settings.numBlocks)+"_h"+std::to_string(h)+".out");
-		}
-
-		//this check is done before. TODO: remove?
-		if( settings.debugMode ){
+			//this check is done before. TODO: remove?
 			const IndexType maxPart = partition.max(); //global operation
 			SCAI_ASSERT_EQ_ERROR( totalNumNewBlocks-1, maxPart, "The provided old assignment must have equal number of blocks as the length of the vector with the new number of blocks per part");
-			if( settings.storeInfo){
-				ITI::FileIO<IndexType,ValueType>::writeDenseVectorCentral( partition, "./tmp/hkmLvl"+h );
-				if( comm->getRank()==0)
-					std::cout << "Partition for hierarchy level " << h << 
-				" stored in ./geographer-dev/tmp/hkmLvl"<<h <<std::endl;
+			if( settings.storeInfo ){
+				//FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/partHKM"+std::to_string(settings.numBlocks)+"_h"+std::to_string(h)+".out");
+				FileIO<IndexType,ValueType>::writeDenseVectorCentral( partition, "./partResults/partHKM"+std::to_string(settings.numBlocks)+"_h"+std::to_string(h)+".out");
 			}
+			aux<IndexType,ValueType>::print2DGrid( graph, partition );
 		}
 
 		//TODO?: remove?
@@ -1735,6 +1722,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 				std::cout<< " " << imbalances[i] <<std::endl ;
 			}
 		}
+		
 	}
 
 	return partition;

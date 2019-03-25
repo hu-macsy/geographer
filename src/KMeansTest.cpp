@@ -253,8 +253,8 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 	//set CommTree
 	std::vector<cNode> leaves = {
 		// 				{hierachy ids}, numCores, mem, speed
-		cNode( std::vector<unsigned int>{0,0}, {241, 8, 0.1} ),
-		cNode( std::vector<unsigned int>{0,1}, {54, 8, 0.9} ),
+		cNode( std::vector<unsigned int>{0,0}, {141, 8, 0.3} ),
+		cNode( std::vector<unsigned int>{0,1}, {154, 8, 0.9} ),
 
 		cNode( std::vector<unsigned int>{1,0}, {126, 10, 0.8} ),
 		cNode( std::vector<unsigned int>{1,1}, {276, 10, 0.9} ),
@@ -275,8 +275,9 @@ cTree.print();
 	struct Settings settings;
 	settings.dimensions = dimensions;
 	settings.numBlocks = leaves.size();
-	settings.debugMode = false;
+	settings.debugMode = true;
 	settings.verbose = false;
+	settings.storeInfo = true;
 	settings.epsilon = 0.05;
 	settings.balanceIterations = 5;
 	settings.maxKMeansIterations = 5;

@@ -528,6 +528,8 @@ void FileIO<IndexType, ValueType>::writeDenseVectorCentral(DenseVector<IndexType
             f << rPart[i]<< std::endl;
         }
     }    
+    //redistribute back to original distribution
+    part.redistribute( dist );
 }
 
 //-------------------------------------------------------------------------------------------------
