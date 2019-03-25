@@ -2292,13 +2292,13 @@ CommTree<IndexType,ValueType> FileIO<IndexType, ValueType>::readPETree( const st
     //and number of weights
     ss >> numPEs;
     ss >> numWeights;
-{
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	{
+		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-    if( comm->getRank()==0 ){
-		std::cout<< "\t... with "<< numPEs << " and " << numWeights << " weights each"<< std::endl;
+	    if( comm->getRank()==0 ){
+			std::cout<< "\t... with "<< numPEs << " and " << numWeights << " weights each"<< std::endl;
+		}
 	}
-}
 
 	//next entries should have a bit for every node weight indicating if it is  proportional
 	

@@ -255,9 +255,7 @@ TEST_F(CommTreeTest, testAdaptWeights){
 		nodeWeights[i].setRandom( N, 1 );
 	}
 
-cTree.getRoot().print();
 	cTree.adaptWeights( nodeWeights );
-cTree.getRoot().print();
 
 	EXPECT_TRUE( cTree.checkTree( true ) );
 }

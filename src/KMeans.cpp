@@ -1136,7 +1136,7 @@ DenseVector<IndexType> computePartition( \
 			for (ValueType blockSize : targetBlockWeights[i]) {
 				PRINT0(std::to_string(blockSize) + " ");
 			}
-			throw std::invalid_argument("Block weight sum " + std::to_string(blockWeightSum) + " too small for node weight sum " + std::to_string(nodeWeightSum[i]));
+			throw std::invalid_argument("Block weight sum " + std::to_string(blockWeightSum) + " too small for node weight sum " + std::to_string(nodeWeightSum[i]) + ". Myabe you should try calling CommTree::adaptWeights().");
 		}
 	}
 

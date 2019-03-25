@@ -305,7 +305,7 @@ std::vector<unsigned int> getGrouping(const std::vector<commNode> thisLevel) con
 	hierarchy3 = { 0, 3, 1, 4, 2}
 	distances(1,2)=3, distacne(1,3)=5, distance(2,3)=5
 */
-static ValueType distance( const commNode node1, const commNode node2 );
+static ValueType distance( const commNode &node1, const commNode &node2 );
 
 
 /** Export the tree as a weighted graph. The edge weigth between to nodes
@@ -345,10 +345,9 @@ is the optimum weight each PE should have. Mainly used to comoute imbalance.
 /** Returns a vector for every balance constrain.
 	return.size()==the number of constrains
 	return[i].size()==number of leaves, for all i
+	If level==-1 it will retunr the the constraints of the leaves.
 */
-//	03/19: We have two constrains: memory and cpu speed for every PE.
-//	These two vectors are returned.
-//First is the memory and then the cpu speed
+
 std::vector<std::vector<ValueType>> getBalanceVectors( const IndexType level) const;
 
 /*@brief Print information for the tree

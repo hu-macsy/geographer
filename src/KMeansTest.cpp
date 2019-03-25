@@ -270,14 +270,13 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 	ITI::CommTree<IndexType,ValueType> cTree( leaves, { false, true, true } );
 
 	cTree.adaptWeights( nodeWeights );
-cTree.print();
 
 	struct Settings settings;
 	settings.dimensions = dimensions;
 	settings.numBlocks = leaves.size();
-	settings.debugMode = true;
+	settings.debugMode = false;
 	settings.verbose = false;
-	settings.storeInfo = true;
+	settings.storeInfo = false;
 	settings.epsilon = 0.05;
 	settings.balanceIterations = 5;
 	settings.maxKMeansIterations = 5;

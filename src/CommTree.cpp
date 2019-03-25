@@ -288,8 +288,8 @@ std::vector<unsigned int> CommTree<IndexType, ValueType>::getGrouping(const std:
 template <typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType>> CommTree<IndexType, ValueType>::getBalanceVectors( const IndexType level) const{
 
-	//const std::vector<cNode>& leaves = getLeaves();
-	const std::vector<cNode>& hierLvl = tree[level];
+	//for -1, return the leaves
+	const std::vector<cNode>& hierLvl = level==-1 ? tree.back() : tree[level];
 	const IndexType numNodes = hierLvl.size();
 	const IndexType numWeights = getNumWeights();
 
@@ -308,14 +308,14 @@ std::vector<std::vector<ValueType>> CommTree<IndexType, ValueType>::getBalanceVe
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-ValueType CommTree<IndexType, ValueType>::distance( const commNode node1, const commNode node2 ){
+ValueType CommTree<IndexType, ValueType>::distance( const commNode &node1, const commNode &node2 ){
 
-	const std::vector<unsigned int> hier1 = node1.hierarchy;
-	const std::vector<unsigned int> hier2 = node2.hierarchy;
+	const std::vector<unsigned int> &hier1 = node1.hierarchy;
+	const std::vector<unsigned int> &hier2 = node2.hierarchy;
 	const IndexType labelSize = hier1.size();
 
 	SCAI_ASSERT_EQ_ERROR( labelSize, hier2.size(), "Hierarchy label size mismatch" );
-	
+
 	IndexType i=0;
 	for( i=0; i<labelSize; i++){
 		if( hier1[i]!=hier2[i] ){
