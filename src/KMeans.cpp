@@ -1572,10 +1572,12 @@ DenseVector<IndexType> computeHierarchicalPartition(
 	//the node weights. 
 	//TODO: is this supposed to be here? it is also in the
 	// ParcoRepart::partitionGraph
+	
 	const IndexType numNodeWeights = nodeWeights.size();
-	if (numNodeWeights > 1) {
+/*	if (numNodeWeights > 1) {
 		throw std::logic_error("Hierarchical k-means not yet implemented for multiple node weights.");
 	}
+*/	
 
 	const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
 	const IndexType localN = dist->getLocalSize();
@@ -1679,7 +1681,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		//
 		//2- main k-means loop
 		//
-
+/*
 		std::vector<std::vector<ValueType>> targetBlockWeights(numNodeWeights, std::vector<ValueType>(totalNumNewBlocks));
 		assert(thisLevel.size() == totalNumNewBlocks);
 		for (IndexType b = 0; b < thisLevel.size(); b++) {
@@ -1687,6 +1689,17 @@ DenseVector<IndexType> computeHierarchicalPartition(
 				targetBlockWeights[w][b] = thisLevel[b].weights[w];
 			}
 		}
+*/
+
+		//TODO: this destroys the const-ness of the tree. Remove code or const
+		//if( not commTree.areWeightsAdapted ){
+		//	commTree.adaptWeights( nodeWeights );
+		//}
+
+		//get the wanted block sizes for this level of the tree
+		std::vector<std::vector<ValueType>> targetBlockWeights = commTree.getBalanceVectors(h);
+		SCAI_ASSERT_EQ_ERROR( targetBlockWeights.size(), numNodeWeights, "Wrong number of weights" );
+		SCAI_ASSERT_EQ_ERROR( targetBlockWeights[0].size(), totalNumNewBlocks, "Wrong size of weights" );
 
 		//TODO: inside computePartition, settings.numBlocks is not
 		//used. We infer the number of new blocks from the groupOfCenters
@@ -1709,7 +1722,6 @@ DenseVector<IndexType> computeHierarchicalPartition(
 			}
 		}
 
-
 		//TODO?: remove?
 		std::vector<ValueType> imbalances(numNodeWeights);
 		for (IndexType i = 0; i < numNodeWeights; i++) {
@@ -1717,7 +1729,12 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		}
 		//IndexType cut = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
 
-		PRINT0("\nFinished hierarchy level " << h <<", partitioned into " << totalNumNewBlocks << " blocks and imbalance is " << imbalances[0] <<std::endl );
+		PRINT0("\nFinished hierarchy level " << h <<", partitioned into " << totalNumNewBlocks << " blocks and imbalance is:" );
+		if( comm->getRank()==0 ){
+			for (IndexType i = 0; i < imbalances.size(); i++) {
+				std::cout<< " " << imbalances[i] <<std::endl ;
+			}
+		}
 	}
 
 	return partition;

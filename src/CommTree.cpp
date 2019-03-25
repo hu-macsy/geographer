@@ -31,7 +31,7 @@ CommTree<IndexType, ValueType>::CommTree(){
 
 //constructor to create tree from a vector of leaves
 template <typename IndexType, typename ValueType>
-CommTree<IndexType, ValueType>::CommTree( std::vector<commNode> leaves, std::vector<bool> isWeightProp ){
+CommTree<IndexType, ValueType>::CommTree( const std::vector<commNode> &leaves, std::vector<bool> isWeightProp ){
 	
 	isProportional = isWeightProp;
 
@@ -147,36 +147,51 @@ template <typename IndexType, typename ValueType>
 void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights ){
 
 	//throw std::logic_error("The method adaptWeights has multiple issues creating segfaults later.");
-	const std::vector<commNode> &hierLevel = this->getLeaves();//this creates a copy of the leaves and only applies changes to the copy
-    const IndexType numBlocks = hierLevel.size();
-    const IndexType numWeights = this->getNumWeights();
-    SCAI_ASSERT_EQ_ERROR( numWeights, nodeWeights.size(), "Given weights vector size and tree number of weights do not agree" );
 
-	const std::vector<std::vector<ValueType>> &hierWeights = getBalanceVectors();
-	SCAI_ASSERT_EQ_ERROR( numWeights, hierWeights.size(), "Number of weights in tree do not agree" );
-	SCAI_ASSERT_EQ_ERROR( numWeights, isProportional.size(), "Number of weights and proportionality information do not agree" );
+	if( areWeightsAdapted ){
+		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		if( comm->getRank()==0 )
+			std::cout<< " Tree node weights are already adapted, skipping adaptWeights " << std::endl;
+	}else{
+		//we need to access leaves like that because getLeaves is const
+		std::vector<commNode> hierLevel = this->tree.back();
 
-    for( unsigned int i=0; i<numWeights; i++){
+	    const IndexType numBlocks = hierLevel.size();
+	    const IndexType numWeights = this->getNumWeights();
+	    SCAI_ASSERT_EQ_ERROR( numWeights, nodeWeights.size(), "Given weights vector size and tree number of weights do not agree" );
 
-    	const scai::lama::DenseVector<ValueType> &thisNodeWeight = nodeWeights[i];
-    	const std::vector<ValueType> &thisHierWeight = hierWeights[i];
+//TODO: is 1 correct?
+const std::vector<std::vector<ValueType>> &hierWeights = getBalanceVectors(1);
+		SCAI_ASSERT_EQ_ERROR( numWeights, hierWeights.size(), "Number of weights in tree do not agree" );
+		SCAI_ASSERT_EQ_ERROR( numWeights, isProportional.size(), "Number of weights and proportionality information do not agree" );
 
-	    //the total node weight of the input graph
-	    ValueType sumNodeWeights = thisNodeWeight.sum();
-	    ValueType sumHierWeights = std::accumulate( thisHierWeight.begin(), thisHierWeight.end(), 0.0 );
-	    const ValueType scalingFactor = sumNodeWeights / sumHierWeights;
+	    for( unsigned int i=0; i<numWeights; i++){
 
-	    if( not isProportional[i] ){
-	    	SCAI_ASSERT_GE_ERROR( sumHierWeights, sumNodeWeights, "Provided node weights do not fit in the given tree for weight " << i );
-	    }else{
-	    	//go over the nodes and adapt the weights
-	    	for( commNode cNode : hierLevel ){//this creates a copy and only adjusts the weights in the copy, which is then discarded.
-	    		cNode.weights[i] *= scalingFactor;
-	    	}
-	    }
+	    	const scai::lama::DenseVector<ValueType> &thisNodeWeight = nodeWeights[i];
+	    	const std::vector<ValueType> &thisHierWeight = hierWeights[i];
+
+		    //the total node weight of the input graph
+		    ValueType sumNodeWeights = thisNodeWeight.sum();
+		    ValueType sumHierWeights = std::accumulate( thisHierWeight.begin(), thisHierWeight.end(), 0.0 );
+		    const ValueType scalingFactor = sumNodeWeights / sumHierWeights;
+scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		    if( not isProportional[i] ){
+		    	SCAI_ASSERT_GE_ERROR( sumHierWeights, sumNodeWeights, "Provided node weights do not fit in the given tree for weight " << i );
+		    }else{
+		    	//go over the nodes and adapt the weights
+		    	for( commNode &cNode : hierLevel ){//this creates a copy and only adjusts the weights in the copy, which is then discarded.
+		    		cNode.weights[i] *= scalingFactor;
+//PRINT0( cNode.weights[i] );			    		
+		    	}
+		    }
+		}
+
+		//clear tree and rebuild. This will correctly construct the intemediate levels
+		tree.clear();
+		IndexType size = createTreeFromLeaves( hierLevel );
+
+		areWeightsAdapted = true;
 	}
-
-	areWeightsAdapted = true;
 }//adaptWeights
 
 //------------------------------------------------------------------------
@@ -271,16 +286,17 @@ std::vector<unsigned int> CommTree<IndexType, ValueType>::getGrouping(const std:
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType>> CommTree<IndexType, ValueType>::getBalanceVectors() const{
+std::vector<std::vector<ValueType>> CommTree<IndexType, ValueType>::getBalanceVectors( const IndexType level) const{
 
-	const std::vector<cNode>& leaves = getLeaves();
-	const IndexType numLeaves = leaves.size();
+	//const std::vector<cNode>& leaves = getLeaves();
+	const std::vector<cNode>& hierLvl = tree[level];
+	const IndexType numNodes = hierLvl.size();
 	const IndexType numWeights = getNumWeights();
 
-	std::vector<std::vector<ValueType>> constraints( numWeights, std::vector<ValueType>(numLeaves,0.0) );
+	std::vector<std::vector<ValueType>> constraints( numWeights, std::vector<ValueType>(numNodes,0.0) );
 
-	for(IndexType i=0; i<numLeaves; i++){
-		cNode c = leaves[i];
+	for(IndexType i=0; i<numNodes; i++){
+		cNode c = hierLvl[i];
 		for( unsigned int w=0; w<numWeights; w++){
 			constraints[w][i] = c.weights[w];
 		}
@@ -386,8 +402,9 @@ std::vector<ValueType> CommTree<IndexType,ValueType>::computeImbalance(
 
     const IndexType numWeights = getNumWeights();
     SCAI_ASSERT_EQ_ERROR( numWeights, nodeWeights.size(), "Given weights vector size and tree number of weights do not agree" );
-
-    const std::vector<std::vector<ValueType>> allConstrains = getBalanceVectors();
+//TODO: is 1 correct?
+    //get leaf balance vectors
+const std::vector<std::vector<ValueType>> allConstrains = getBalanceVectors( hierarchyLevels-1 );
     std::vector<ValueType> imbalances( numWeights );
 
     //compute imbalance for all weights
@@ -499,29 +516,29 @@ bool CommTree<IndexType, ValueType>::checkTree( bool all ) const{
 
 	//add more "expensive" checks 
 
-	const IndexType numWeights = getNumWeights();
-
-	std::vector<std::vector<ValueType>> balanceVec = getBalanceVectors();
-	SCAI_ASSERT_EQ_ERROR( balanceVec.size(), numWeights, "Number of weights mismatch" );
-
-	std::vector<ValueType> weightSums(numWeights, 0.0);
-	for( int w=0; w<numWeights; w++ ){
-		weightSums[w] = std::accumulate( balanceVec[w].begin(), balanceVec[w].end(), 0.0 );
-	}
-
 	if( all ){
+		const IndexType numWeights = getNumWeights();
+//TODO: is 1 correct?
+const std::vector<std::vector<ValueType>> balanceVec = getBalanceVectors(1);
+		SCAI_ASSERT_EQ_ERROR( balanceVec.size(), numWeights, "Number of weights mismatch" );
+
+		std::vector<ValueType> weightSums(numWeights, 0.0);
+		for( int w=0; w<numWeights; w++ ){
+			weightSums[w] = std::accumulate( balanceVec[w].begin(), balanceVec[w].end(), 0.0 );
+		}
+	
 		for( int h=0; h<tree.size(); h++ ){
 			const std::vector<commNode> &hierLvl = tree[h];
 			std::vector<ValueType> weightSumsLvL(numWeights, 0.0);
 			for(auto nodeIt=hierLvl.begin(); nodeIt!=hierLvl.end(); nodeIt++ ){
 				SCAI_ASSERT_EQ_ERROR( nodeIt->getNumWeights(), numWeights, "Tree node has wrong number of weights" );
-				SCAI_ASSERT_EQ_ERROR( nodeIt->hierarchy.size(), hierarchyLevels, "Tree node has wrong label size" );
+				SCAI_ASSERT_EQ_ERROR( nodeIt->hierarchy.size(), h, "Tree node has wrong label size" );
 				for( int w=0; w<numWeights; w++ ){
 					weightSumsLvL[w] += nodeIt->weights[w];
 				}
 			}
 			for( int w=0; w<numWeights; w++ ){
-				SCAI_ASSERT_EQ_ERROR( weightSums[w], weightSumsLvL[w], "Weight sums must agree in all levels" );
+				SCAI_ASSERT( weightSums[w]-weightSumsLvL[w]<1e-8, "Weight sums must agree in all levels");
 			}
 		}
 	}

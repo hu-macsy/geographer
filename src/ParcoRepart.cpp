@@ -90,7 +90,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 
 	CommTree<IndexType,ValueType> commTree;
 	commTree.createFlatHomogeneous( settings.numBlocks );
-	
+	commTree.adaptWeights( nodeWeights );
+
     return partitionGraph(input, coordinates, nodeWeights, previous, commTree, settings, metrics);
 
 }
@@ -404,7 +405,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
 		
 		// vector of size k, each element represents the size of one block
-		std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
+std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors(1);
+SCAI_ASSERT_EQ_ERROR( blockSizes.size(), nodeWeights.size(), "Wrong number of weights");
+SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Wrong size of weights" );
 		if( blockSizes.empty() ){
 			blockSizes = std::vector<std::vector<ValueType> >(nodeWeights.size());
 			for (int i = 0; i < nodeWeights.size(); i++) {

@@ -57,7 +57,7 @@ TEST_F( benchmarkTest, benchMapping ){
     struct Metrics metrics(settings);
 
     //balances[0] is memory, balances[1] is cpu speed
-    std::vector<std::vector<ValueType>> balances = cTree.getBalanceVectors();
+    std::vector<std::vector<ValueType>> balances = cTree.getBalanceVectors(1);
     SCAI_ASSERT_EQ_ERROR( balances.size(), 2, "Wrong number of balance constrains");
     SCAI_ASSERT_EQ_ERROR( balances[0].size(), k, "Wrong size of balance vector");
 

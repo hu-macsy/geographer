@@ -213,7 +213,7 @@ CommTree();
 		For example, node weights can be {64, 0.01} and isWeightProp={ false, true}. An interpretation could be that this node has
 		64GB of memory and 1% of the total FLOPS of the system.
 */
-CommTree( std::vector<commNode> leaves,
+CommTree( const std::vector<commNode> &leaves,
  std::vector<bool> isWeightProp );
 
 /* @brief Return the root, i.e., hierarchy level 0.
@@ -349,7 +349,7 @@ is the optimum weight each PE should have. Mainly used to comoute imbalance.
 //	03/19: We have two constrains: memory and cpu speed for every PE.
 //	These two vectors are returned.
 //First is the memory and then the cpu speed
-std::vector<std::vector<ValueType>> getBalanceVectors() const;
+std::vector<std::vector<ValueType>> getBalanceVectors( const IndexType level) const;
 
 /*@brief Print information for the tree
 */

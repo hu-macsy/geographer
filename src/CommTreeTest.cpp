@@ -82,7 +82,7 @@ TEST_F(CommTreeTest, testTreeFromLeaves){
 		}
 		//cTree.print();
 
-		EXPECT_TRUE( cTree.checkTree() );
+		EXPECT_TRUE( cTree.checkTree(true) );
 		EXPECT_EQ( cTree.numLeaves, leaves.size() );
 		EXPECT_EQ( cTree.tree[0].size(), 1 ); //top level is just the root
 		
@@ -126,7 +126,7 @@ TEST_F(CommTreeTest, testTreeforHomogeneous){
 	cTree.createFlatHomogeneous( k );
 
 	//cTree.print();
-	EXPECT_TRUE( cTree.checkTree() );
+	EXPECT_TRUE( cTree.checkTree(true) );
 	EXPECT_EQ( cTree.numLeaves, k );
 	EXPECT_EQ( cTree.tree[0].size(), 1 ); 
 }//TEST_F(CommTreeTest, testTreeforHomogeneous)
@@ -255,10 +255,11 @@ TEST_F(CommTreeTest, testAdaptWeights){
 		nodeWeights[i].setRandom( N, 1 );
 	}
 
+cTree.getRoot().print();
 	cTree.adaptWeights( nodeWeights );
-	cTree.getRoot().print();
+cTree.getRoot().print();
 
-	EXPECT_TRUE( cTree.checkTree() );
+	EXPECT_TRUE( cTree.checkTree( true ) );
 }
 
 }//namespace ITI

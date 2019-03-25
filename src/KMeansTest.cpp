@@ -232,30 +232,45 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 
 	}
 
-	//scai::lama::DenseVector<ValueType> nodeWeights = fixedNodeWeights;
-	std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { unitNodeWeights };
+	ValueType c = 2;
+	scai::lama::DenseVector<ValueType> constNodeWeights = unitNodeWeights;
+	constNodeWeights *= c;
 
+	//scai::lama::DenseVector<ValueType> nodeWeights = fixedNodeWeights;
+	std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { unitNodeWeights, unitNodeWeights, constNodeWeights };
+
+	std::cout << "Sum of node weights are: " << std::endl;
+	for( unsigned int i=0; i<nodeWeights.size(); i++ ){
+		std::cout << "weight " << i << ": " << nodeWeights[i].sum() << std::endl;
+	}
+		/*
+		std::transform( unitNodeWeights.begin(), unitNodeWeights.end(), unitNodeWeights.begin(), \
+			std::bind( std::multiplies<ValueType>(), 2) ) };
+		*/
 	//const IndexType k = comm->getSize();
 	//using KMeans::cNode;
 
 	//set CommTree
 	std::vector<cNode> leaves = {
 		// 				{hierachy ids}, numCores, mem, speed
-		cNode( std::vector<unsigned int>{0,0}, {4, 8, 0.1} ),
-		cNode( std::vector<unsigned int>{0,1}, {4, 8, 0.9} ),
+		cNode( std::vector<unsigned int>{0,0}, {241, 8, 0.1} ),
+		cNode( std::vector<unsigned int>{0,1}, {54, 8, 0.9} ),
 
-		cNode( std::vector<unsigned int>{1,0}, {6, 10, 0.8} ),
-		cNode( std::vector<unsigned int>{1,1}, {6, 10, 0.9} ),
-		cNode( std::vector<unsigned int>{1,2}, {6, 10, 0.7} ),
+		cNode( std::vector<unsigned int>{1,0}, {126, 10, 0.8} ),
+		cNode( std::vector<unsigned int>{1,1}, {276, 10, 0.9} ),
+		cNode( std::vector<unsigned int>{1,2}, {67, 10, 0.7} ),
 
-		cNode( std::vector<unsigned int>{2,0}, {8, 12, 0.6} ),
-		cNode( std::vector<unsigned int>{2,1}, {8, 12, 0.7} ),
-		cNode( std::vector<unsigned int>{2,2}, {8, 12, 0.7} ),
-		cNode( std::vector<unsigned int>{2,3}, {8, 12, 0.5} ),
-		cNode( std::vector<unsigned int>{2,4}, {8, 12, 0.5} )
+		cNode( std::vector<unsigned int>{2,0}, {81, 12, 0.6} ),
+		cNode( std::vector<unsigned int>{2,1}, {88, 12, 0.7} ),
+		cNode( std::vector<unsigned int>{2,2}, {156, 12, 0.7} ),
+		cNode( std::vector<unsigned int>{2,3}, {108, 12, 0.5} ),
+		cNode( std::vector<unsigned int>{2,4}, {221, 12, 0.5} )
 	};
 
-	ITI::CommTree<IndexType,ValueType> cTree( leaves, { false, false, true } );
+	ITI::CommTree<IndexType,ValueType> cTree( leaves, { false, true, true } );
+
+	cTree.adaptWeights( nodeWeights );
+cTree.print();
 
 	struct Settings settings;
 	settings.dimensions = dimensions;
