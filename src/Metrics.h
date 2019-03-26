@@ -48,9 +48,6 @@ struct Metrics{
 	Metrics( ){	}
 
 
-	Metrics( const Metrics &m){ *this=m; }
-
-
 	Metrics operator=(const Metrics &m){
 		this->MM = m.MM;
 		return *this;

@@ -161,7 +161,7 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
 	    SCAI_ASSERT_EQ_ERROR( numWeights, nodeWeights.size(), "Given weights vector size and tree number of weights do not agree" );
 
 //TODO: is 1 correct?
-const std::vector<std::vector<ValueType>> &hierWeights = getBalanceVectors(1);
+const std::vector<std::vector<ValueType>> &hierWeights = getBalanceVectors( -1 );
 		SCAI_ASSERT_EQ_ERROR( numWeights, hierWeights.size(), "Number of weights in tree do not agree" );
 		SCAI_ASSERT_EQ_ERROR( numWeights, isProportional.size(), "Number of weights and proportionality information do not agree" );
 
@@ -404,7 +404,7 @@ std::vector<ValueType> CommTree<IndexType,ValueType>::computeImbalance(
     SCAI_ASSERT_EQ_ERROR( numWeights, nodeWeights.size(), "Given weights vector size and tree number of weights do not agree" );
 //TODO: is 1 correct?
     //get leaf balance vectors
-const std::vector<std::vector<ValueType>> allConstrains = getBalanceVectors( hierarchyLevels-1 );
+const std::vector<std::vector<ValueType>> allConstrains = getBalanceVectors( -1 );
     std::vector<ValueType> imbalances( numWeights );
 
     //compute imbalance for all weights
@@ -519,7 +519,7 @@ bool CommTree<IndexType, ValueType>::checkTree( bool all ) const{
 	if( all ){
 		const IndexType numWeights = getNumWeights();
 //TODO: is 1 correct?
-const std::vector<std::vector<ValueType>> balanceVec = getBalanceVectors(1);
+const std::vector<std::vector<ValueType>> balanceVec = getBalanceVectors(-1);
 		SCAI_ASSERT_EQ_ERROR( balanceVec.size(), numWeights, "Number of weights mismatch" );
 
 		std::vector<ValueType> weightSums(numWeights, 0.0);

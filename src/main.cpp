@@ -334,8 +334,7 @@ int main(int argc, char** argv) {
     //  read block sizes from a file if it is passed as an argument
     //
     
-    std::vector<std::vector<ValueType> > blockSizes;
-
+    //std::vector<std::vector<ValueType> > blockSizes;
     
     
     //---------------------------------------------------------------
@@ -383,9 +382,9 @@ int main(int argc, char** argv) {
     	previous = fill<DenseVector<IndexType>>(previousRedist.getTargetDistributionPtr(), comm->getRank());
 
     }
-    
+
     std::vector<struct Metrics> metricsVec;
-	
+
     //------------------------------------------------------------
     //
     // partition the graph
@@ -405,7 +404,7 @@ int main(int argc, char** argv) {
     const scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ) );
     
     scai::lama::DenseVector<IndexType> partition;
-    
+
     for( IndexType r=0; r<repeatTimes; r++){
                 
         // for the next runs the input is redistributed, so we must redistribute to the original distributions
@@ -426,12 +425,12 @@ int main(int argc, char** argv) {
             		nodeWeights[i].redistribute( rowDistPtr );
             }
         }
-          
+
         //metricsVec.push_back( Metrics( comm->getSize()) );
         metricsVec.push_back( Metrics( settings ) );
             
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
-        
+
         partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, commTree, settings, metricsVec[r] );
         assert( partition.size() == N);
         assert( coordinates[0].size() == N);
@@ -442,7 +441,7 @@ int main(int argc, char** argv) {
         if (!comm->all(partition.getDistribution().isEqual(graph.getRowDistribution()))) {
             partition.redistribute( graph.getRowDistributionPtr());
         }
-                
+
         //---------------------------------------------
         //
         // Get metrics
