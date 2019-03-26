@@ -284,7 +284,7 @@ static std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local
  * @return laplacian with same distribution as input
  */
 //template<typename IndexType, typename ValueType>
-static scai::lama::CSRSparseMatrix<ValueType> constructLaplacian(scai::lama::CSRSparseMatrix<ValueType> graph);
+static scai::lama::CSRSparseMatrix<ValueType> constructLaplacian(const scai::lama::CSRSparseMatrix<ValueType>& graph);
 
 /**
  * @brief Construct a replicated projection matrix for a fast Johnson-Lindenstrauß-Transform
