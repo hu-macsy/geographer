@@ -136,7 +136,7 @@ inline struct Metrics aggregateVectorMetrics( const std::vector<struct Metrics>&
 		aggregateMetrics.MM["timePreliminary"] += comm->max( thisMetric.MM["timePreliminary"] );
 		aggregateMetrics.MM["timePreliminary"] /= numRuns;
 		
-		// these times are global, no need to max
+		// these times are global, no need to max, TODO: make them local and max here for consistency?
 		aggregateMetrics.MM["timeFinalPartition"] += thisMetric.MM["timeFinalPartition"];
 		aggregateMetrics.MM["timeFinalPartition"] /= numRuns;
 
