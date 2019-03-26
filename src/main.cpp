@@ -404,9 +404,9 @@ int main(int argc, char** argv) {
     	previous = fill<DenseVector<IndexType>>(previousRedist.getTargetDistributionPtr(), comm->getRank());
 
     }
-    
+
     std::vector<struct Metrics> metricsVec;
-	
+
     //------------------------------------------------------------
     //
     // partition the graph
@@ -426,7 +426,7 @@ int main(int argc, char** argv) {
     const scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ) );
     
     scai::lama::DenseVector<IndexType> partition;
-    
+
     for( IndexType r=0; r<repeatTimes; r++){
                 
         // for the next runs the input is redistributed, so we must redistribute to the original distributions
@@ -447,12 +447,12 @@ int main(int argc, char** argv) {
             		nodeWeights[i].redistribute( rowDistPtr );
             }
         }
-          
+
         //metricsVec.push_back( Metrics( comm->getSize()) );
         metricsVec.push_back( Metrics( settings ) );
             
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
-        
+
         partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, commTree, settings, metricsVec[r] );
         assert( partition.size() == N);
         assert( coordinates[0].size() == N);
@@ -463,33 +463,11 @@ int main(int argc, char** argv) {
         if (!comm->all(partition.getDistribution().isEqual(graph.getRowDistribution()))) {
             partition.redistribute( graph.getRowDistributionPtr());
         }
-		
-		/*
-        metricsVec[r].MM["finalCut"] = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
-        metricsVec[r].MM["finalImbalance"] = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(partition, settings.numBlocks ,nodeWeights[0]);
-        */
-        metricsVec[r].getEasyMetrics( graph, partition, nodeWeights[0], settings );
-        metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
-        metricsVec[r].MM["timeFinalPartition"] = ValueType (comm->max(partitionTime.count()));
 
         //---------------------------------------------
         //
-        // Print some output
-        //
-        if (comm->getRank() == 0 ) {
-            std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
-            std::cout << " p:"<< comm->getSize() << " k:"<< settings.numBlocks;
-            auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
-            std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
-            std::cout.precision(oldprecision);
-            metricsVec[r].printHorizontal2( std::cout ); //TODO: remove?
-        }
-                
-        //---------------------------------------------
-        //
         // Get metrics
-        //
-        
+        //        
         
         std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
@@ -499,9 +477,26 @@ int main(int argc, char** argv) {
         if( metricsDetail=="easy" ){
 			metricsVec[r].getEasyMetrics( graph, partition, nodeWeights[0], settings );
 		}
-        std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
         
-        
+        metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
+        metricsVec[r].MM["timeFinalPartition"] = ValueType (comm->max(partitionTime.count()));
+
+		std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
+
+        //---------------------------------------------
+        //
+        // Print some output
+        //
+
+        if (comm->getRank() == 0 ) {
+            std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
+            std::cout << " p:"<< comm->getSize() << " k:"<< settings.numBlocks;
+            auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
+            std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
+            std::cout.precision(oldprecision);
+            metricsVec[r].printHorizontal2( std::cout ); //TODO: remove?
+        }
+       
         //---------------------------------------------------------------
         //
         // Reporting output to std::cout
@@ -524,18 +519,17 @@ int main(int argc, char** argv) {
     // writing results in a file and std::cout
     //
     
-    
+    //aggregate metrics in one struct
+    const struct Metrics aggrMetrics = aggregateVectorMetrics( metricsVec );
+
     if (repeatTimes > 1) {
         if (comm->getRank() == 0) {
-            std::cout<<  "\033[1;36m";
-        }
-        printVectorMetrics( metricsVec, std::cout, settings);
-        if (comm->getRank() == 0) {
+            std::cout<<  "\033[1;36m";    
+        	aggrMetrics.print( std::cout ); 
             std::cout << " \033[0m";
         }
     }
     
- 	//printVectorMetrics( metricsVec, std::cout );
 
     if( settings.storeInfo && settings.outFile!="-" ) {
         if( comm->getRank()==0){
@@ -544,7 +538,7 @@ int main(int argc, char** argv) {
 				outF << "Running " << __FILE__ << std::endl;
 				settings.print( outF, comm);
 				
-				printVectorMetrics( metricsVec, outF, settings ); 
+				aggrMetrics.print( outF ); 
 			
 				//	profiling info for k-means
 				if(settings.verbose){
@@ -628,10 +622,9 @@ int main(int argc, char** argv) {
         }
         */
     }
-      
-        
+      	  
     //this is needed for supermuc
-    //std::exit(0);   
+    std::exit(0);   
     
     return 0;
 }

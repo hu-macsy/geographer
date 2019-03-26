@@ -312,6 +312,13 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 			/**
 			 * execute FM locally
 			 */
+/*			
+borderNodesOwners: the owner PE for every node that participates in the LR. this is actually part[i]
+commTree: the physical network
+inside, precalculate the pairwise distances for every owner. We expect that the number
+of PEs involved is low so it makes sense to precompute the distances.
+Maybe distances can be computed here and given as an input
+*/
 			ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, borderRegionIDs, borderNodeWeights, assignedToSecondBlock, maxBlockSizes, blockSizes, tieBreakingKeys, settings);
 
 			{

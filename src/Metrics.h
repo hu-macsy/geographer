@@ -45,6 +45,15 @@ struct Metrics{
 	}
 
 
+	Metrics( ){	}
+
+
+	Metrics operator=(const Metrics &m){
+		this->MM = m.MM;
+		return *this;
+	}
+
+
 	void getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings );
 	
 	void getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings );
@@ -87,13 +96,13 @@ struct Metrics{
 	
 	//print metrics
 	//
-	void print( std::ostream& out);
+	void print( std::ostream& out) const ;
 
-	void printHorizontal( std::ostream& out );
+	void printHorizontal( std::ostream& out ) const ;
 	
-	void printHorizontal2( std::ostream& out );
+	void printHorizontal2( std::ostream& out ) const ;
 
-	void printKMeansProfiling( std::ostream& out );
+	void printKMeansProfiling( std::ostream& out ) const ;
 
 }; //struct Metrics
 
@@ -102,15 +111,17 @@ struct Metrics{
 
 //TODO: add default constructor and remove Settings
 
-inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::ostream& out, Settings settings){
+inline struct Metrics aggregateVectorMetrics( const std::vector<struct Metrics>& metricsVec ){
 	
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	
 	IndexType numRuns = metricsVec.size();
 
-	Metrics aggregateMetrics( settings );
+	Metrics aggregateMetrics( metricsVec[0] );
+	//aggregateMetrics  = metricsVec[0] ?
 	
 	for(IndexType run=0; run<numRuns; run++){
+		//this is copied because the compiler complains about the const-ness if we use a reference
 		Metrics thisMetric = metricsVec[ run ];
 		
 		// for these time we have one measurement per PE and must make a max
@@ -135,13 +146,16 @@ inline void printVectorMetrics( std::vector<struct Metrics>& metricsVec, std::os
 		aggregateMetrics.MM["timeComm"] /= numRuns;
 
 		//TODO: is this too much? maybe add a shorter print?
-		thisMetric.print( out );
+		//thisMetric.print( out );
 	}
 	
+	//this print must be called separetely now, TODO: remove
+	/*
 	if( comm->getRank()==0 ){
 		out << std::setprecision(4) << std::fixed;
 		aggregateMetrics.print( out );
 	}
-	
+	*/
+	return aggregateMetrics;
 }
 //-------------------------------------------------------------------------------------------------------------

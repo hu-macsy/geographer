@@ -5,14 +5,17 @@ if (NOT DEFINED SCAI_DIR)
 	message( FATAL_ERROR "Install Directory of LAMA not defined, specify with -DSCAI_DIR" )
 endif (NOT DEFINED SCAI_DIR)
 
+set(CMAKE_VERBOSE_MAKEFILE ON)
+
 set(SCAI_INCLUDE "${SCAI_DIR}/include/") 
 set(SCAI_LIB "${SCAI_DIR}/lib/")
 
-### set files ###
-set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp CommTree.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp SpectralPartition.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp KMeans.cpp HaloPlanFns.cpp Metrics.cpp Settings.cpp Mapping.cpp AuxiliaryFunctions.cpp )
-set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp quadtree/test/QuadTreeTest.cpp SpectralPartitionTest.cpp CommTreeTest.cpp MappingTest.cpp)
-set(FILES_TEST_TMP test_main.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp  MultiLevelTest.cpp ParcoRepartTest.cpp auxTest.cpp CommTreeTest.cpp MappingTest.cpp benchmarks.cpp)
+### set compiler manualy ###
+#set(CMAKE_CXX_COMPILER /lrz/sys/compilers/gcc/7.3.0/bin/c++)
 
+### set files ###
+set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp SpectralPartition.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp KMeans.cpp CommTree.cpp AuxiliaryFunctions.cpp HaloPlanFns.cpp Metrics.cpp Settings.cpp)
+set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp quadtree/test/QuadTreeTest.cpp SpectralPartitionTest.cpp)
 
 set(RBC_DIR "${PROJECT_SOURCE_DIR}/RBC")
 
@@ -51,6 +54,6 @@ target_link_libraries(analyze ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_
 add_library(geographer SHARED ${FILES_COMMON})
 
 if (GTEST_FOUND)
-	add_executable(GeographerTest ${FILES_COMMON} ${FILES_TEST_TMP})
+	add_executable(GeographerTest ${FILES_COMMON} ${FILES_TEST})
 	target_link_libraries(GeographerTest ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
 endif (GTEST_FOUND)
