@@ -144,54 +144,37 @@ int main(int argc, char** argv) {
         //
         // read the adjacency matrix and the coordinates from a file
         //
+        std::vector<DenseVector<ValueType> > vectorOfNodeWeights;
         if (vm.count("fileFormat")) {
         	if (settings.fileFormat == ITI::Format::TEEC) {
         		IndexType n = vm["numX"].as<IndexType>();
 				scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(n, comm));
 				scai::dmemo::DistributionPtr noDist( new scai::dmemo::NoDistribution(n));
 				graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDist);
-				ITI::FileIO<IndexType, ValueType>::readCoordsTEEC(graphFile, n, settings.dimensions, nodeWeights);
+				ITI::FileIO<IndexType, ValueType>::readCoordsTEEC(graphFile, n, settings.dimensions, vectorOfNodeWeights);
 				if (settings.verbose) {
-					ValueType minWeight = nodeWeights[0].min();
-					ValueType maxWeight = nodeWeights[0].max();
+					ValueType minWeight = vectorOfNodeWeights[0].min();
+					ValueType maxWeight = vectorOfNodeWeights[0].max();
 					if (comm->getRank() == 0) std::cout << "Min node weight:" << minWeight << ", max weight: " << maxWeight << std::endl;
 				}
 				coordFile = graphFile;
             }else {
-				graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights, settings.fileFormat );
+				graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights, settings.fileFormat );
 			}
         } else{
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights );
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights );
         }
         N = graph.getNumRows();
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
         assert(graph.getColDistribution().isEqual(*noDistPtr));
 
-        IndexType numReadNodeWeights = nodeWeights.size();
-        if (numReadNodeWeights == 0) {
+        nodeWeights = vectorOfNodeWeights;
+        IndexType numNodeWeights = vectorOfNodeWeights.size();
+        if (numNodeWeights == 0) {
         	nodeWeights.resize(1);
 			nodeWeights[0] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
 		}
-
-        if (!std::isnan(settings.numNodeWeights)) {
-            if (settings.numNodeWeights < nodeWeights.size()) {
-                nodeWeights.resize(settings.numNodeWeights);
-                if (comm->getRank() == 0) {
-                    std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, thus discarding "
-                    << numReadNodeWeights - settings.numNodeWeights << std::endl;
-                }
-            } else if (settings.numNodeWeights > nodeWeights.size()) {
-                nodeWeights.resize(settings.numNodeWeights);
-                for (IndexType i = numReadNodeWeights; i < settings.numNodeWeights; i++) {
-                    nodeWeights[i] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
-                }
-                if (comm->getRank() == 0) {
-                    std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, padding with "
-                    << settings.numNodeWeights - numReadNodeWeights << " uniform weights. " << std::endl;
-                }
-            }
-        }
 
         // for 2D we do not know the size of every dimension
         settings.numX = N;
@@ -333,19 +316,6 @@ int main(int argc, char** argv) {
     }else if( vm.count("blockSizesFile") ){
     	//blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
         std::vector<std::vector<ValueType>> blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
-        if (blockSizes.size() < nodeWeights.size()) {
-            throw std::invalid_argument("Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + " weights per block, "
-                + "but nodes have " + std::to_string(nodeWeights.size()) + " weights.");
-        }
-
-        if (blockSizes.size() > nodeWeights.size()) {
-            blockSizes.resize(nodeWeights.size());
-            if (comm->getRank() == 0) {
-                std::cout << "Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + " weights per block, "
-                + "but nodes have " + std::to_string(nodeWeights.size()) + " weights. Discarding surplus block sizes." << std::endl;
-            }
-        }
-
         for (IndexType i = 0; i < nodeWeights.size(); i++) {
         	const ValueType blockSizesSum  = std::accumulate( blockSizes[i].begin(), blockSizes[i].end(), 0);
 			const ValueType nodeWeightsSum = nodeWeights[i].sum();
@@ -353,11 +323,19 @@ int main(int argc, char** argv) {
         }
 
         commTree.createFlatHeterogeneous( blockSizes );
-    } else {
-    	commTree.createFlatHomogeneous( settings.numBlocks, nodeWeights.size() );
+    }else{
+    	commTree.createFlatHomogeneous( settings.numBlocks );
     }
     
     commTree.adaptWeights( nodeWeights );
+
+    //---------------------------------------------------------------------
+    //
+    //  read block sizes from a file if it is passed as an argument
+    //
+    
+    //std::vector<std::vector<ValueType> > blockSizes;
+    
     
     //---------------------------------------------------------------
     //
@@ -404,9 +382,9 @@ int main(int argc, char** argv) {
     	previous = fill<DenseVector<IndexType>>(previousRedist.getTargetDistributionPtr(), comm->getRank());
 
     }
-    
+
     std::vector<struct Metrics> metricsVec;
-	
+
     //------------------------------------------------------------
     //
     // partition the graph
@@ -426,7 +404,7 @@ int main(int argc, char** argv) {
     const scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ) );
     
     scai::lama::DenseVector<IndexType> partition;
-    
+
     for( IndexType r=0; r<repeatTimes; r++){
                 
         // for the next runs the input is redistributed, so we must redistribute to the original distributions
@@ -447,12 +425,12 @@ int main(int argc, char** argv) {
             		nodeWeights[i].redistribute( rowDistPtr );
             }
         }
-          
+
         //metricsVec.push_back( Metrics( comm->getSize()) );
         metricsVec.push_back( Metrics( settings ) );
             
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
-        
+
         partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, commTree, settings, metricsVec[r] );
         assert( partition.size() == N);
         assert( coordinates[0].size() == N);
@@ -463,33 +441,11 @@ int main(int argc, char** argv) {
         if (!comm->all(partition.getDistribution().isEqual(graph.getRowDistribution()))) {
             partition.redistribute( graph.getRowDistributionPtr());
         }
-		
-		/*
-        metricsVec[r].MM["finalCut"] = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
-        metricsVec[r].MM["finalImbalance"] = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(partition, settings.numBlocks ,nodeWeights[0]);
-        */
-        metricsVec[r].getEasyMetrics( graph, partition, nodeWeights[0], settings );
-        metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
-        metricsVec[r].MM["timeFinalPartition"] = ValueType (comm->max(partitionTime.count()));
 
         //---------------------------------------------
         //
-        // Print some output
-        //
-        if (comm->getRank() == 0 ) {
-            std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
-            std::cout << " p:"<< comm->getSize() << " k:"<< settings.numBlocks;
-            auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
-            std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
-            std::cout.precision(oldprecision);
-            metricsVec[r].printHorizontal2( std::cout ); //TODO: remove?
-        }
-                
-        //---------------------------------------------
-        //
         // Get metrics
-        //
-        
+        //        
         
         std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
@@ -499,9 +455,26 @@ int main(int argc, char** argv) {
         if( metricsDetail=="easy" ){
 			metricsVec[r].getEasyMetrics( graph, partition, nodeWeights[0], settings );
 		}
-        std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
         
-        
+        metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
+        metricsVec[r].MM["timeFinalPartition"] = ValueType (comm->max(partitionTime.count()));
+
+		std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
+
+        //---------------------------------------------
+        //
+        // Print some output
+        //
+
+        if (comm->getRank() == 0 ) {
+            std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
+            std::cout << " p:"<< comm->getSize() << " k:"<< settings.numBlocks;
+            auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
+            std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
+            std::cout.precision(oldprecision);
+            metricsVec[r].printHorizontal2( std::cout ); //TODO: remove?
+        }
+       
         //---------------------------------------------------------------
         //
         // Reporting output to std::cout
@@ -524,13 +497,13 @@ int main(int argc, char** argv) {
     // writing results in a file and std::cout
     //
     
-    
+    //aggregate metrics in one struct
+    const struct Metrics aggrMetrics = aggregateVectorMetrics( metricsVec );
+
     if (repeatTimes > 1) {
         if (comm->getRank() == 0) {
-            std::cout<<  "\033[1;36m";
-        }
-        printVectorMetrics( metricsVec, std::cout, settings);
-        if (comm->getRank() == 0) {
+            std::cout<<  "\033[1;36m";    
+        	aggrMetrics.print( std::cout ); 
             std::cout << " \033[0m";
         }
     }
@@ -544,7 +517,7 @@ int main(int argc, char** argv) {
 				outF << "Running " << __FILE__ << std::endl;
 				settings.print( outF, comm);
 				
-				printVectorMetrics( metricsVec, outF, settings ); 
+				aggrMetrics.print( outF ); 
 			
 				//	profiling info for k-means
 				if(settings.verbose){
@@ -628,10 +601,9 @@ int main(int argc, char** argv) {
         }
         */
     }
-      
-        
+      	  
     //this is needed for supermuc
-    //std::exit(0);   
+    std::exit(0);   
     
     return 0;
 }

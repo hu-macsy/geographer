@@ -11,7 +11,7 @@ void Metrics::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, 
 	}
 }
 
-void Metrics::print( std::ostream& out){
+void Metrics::print( std::ostream& out) const{
 	
 	//out<<"TEST print" << std::endl;
 	for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ){
@@ -37,7 +37,7 @@ void Metrics::print( std::ostream& out){
 }
 //---------------------------------------------------------------------------
 
-void Metrics::printHorizontal( std::ostream& out){
+void Metrics::printHorizontal( std::ostream& out) const{
 
 	for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ){
 		if( mapIt->second!=-1)
@@ -52,7 +52,7 @@ void Metrics::printHorizontal( std::ostream& out){
 }
 //---------------------------------------------------------------------------
 
-void Metrics::printHorizontal2( std::ostream& out){
+void Metrics::printHorizontal2( std::ostream& out) const {
 
 	for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ){
 		if( mapIt->second!=-1)
@@ -62,7 +62,7 @@ void Metrics::printHorizontal2( std::ostream& out){
 }
 //---------------------------------------------------------------------------
 
-void Metrics::printKMeansProfiling( std::ostream& out ){
+void Metrics::printKMeansProfiling( std::ostream& out ) const {
 	out << "KMeans::assignBlocks was called " << numBalanceIter.size() << " times" << std::endl;
 	out << "Average number of balance iterations: " << std::accumulate( numBalanceIter.begin(), numBalanceIter.end(), 0.0 )/numBalanceIter.size() << std::endl;
 }

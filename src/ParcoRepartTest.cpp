@@ -436,7 +436,7 @@ TEST_F(ParcoRepartTest, testTwoWayCut) {
 	EXPECT_EQ(globalCut, comm->sum(localCutSum) / 2);
 }
 //--------------------------------------------------------------------------------------- 
-
+//TODO: this test should be merged with some test in GraphUtils?
 TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
 	/**
 	 * Check for:
@@ -460,7 +460,7 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
 
 	a = scai::lama::eval<scai::lama::CSRSparseMatrix<ValueType>>(a+aT);
 
-	PRINT("num of edges= " <<a.getNumValues()/2 );
+	PRINT("num of edges= " << a.getNumValues()/2 );
 	EXPECT_TRUE( a.isConsistent() );
 	EXPECT_TRUE( a.checkSymmetry() );
 
@@ -476,7 +476,7 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
 
 	scai::lama::CSRSparseMatrix<ValueType> blockGraph =  GraphUtils<IndexType, ValueType>::getBlockGraph( a, part, k);
 	EXPECT_TRUE( blockGraph.isConsistent() );
-	EXPECT_TRUE( blockGraph.checkSymmetry() );
+	EXPECT_TRUE( blockGraph.checkSymmetry() ); //TODO: this fails occasionally
 	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local(blockGraph, settings);
 
 	IndexType rounds = scheme.size();
