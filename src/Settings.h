@@ -117,7 +117,7 @@ struct Settings{
     ITI::Format coordFormat = ITI::Format::AUTO; 
     bool useDiffusionCoordinates = false;
     IndexType diffusionRounds = 20;
-    IndexType numNodeWeights = std::numeric_limits<IndexType>::quiet_NaN();
+    IndexType numNodeWeights = -1;
     std::string machine;
     
     //mesh generation

@@ -62,7 +62,7 @@ variables_map Settings::parseInput(int argc, char** argv){
 				("fileFormat", value<ITI::Format>(&fileFormat)->default_value(fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
 				("coordFormat", value<ITI::Format>(&coordFormat), "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ")
 				("PEgraphFile", value<std::string>(&PEGraphFile), "read communication graph from file")
-				("numNodeWeights", value<int>(&numNodeWeights), "Number of node weights to use. If the input graph contains more node weights, only the first ones are used.")
+				("numNodeWeights", value<IndexType>(&numNodeWeights), "Number of node weights to use. If the input graph contains more node weights, only the first ones are used.")
 				("useDiffusionCoordinates", value<bool>(&useDiffusionCoordinates)->default_value(useDiffusionCoordinates), "Use coordinates based from diffusive systems instead of loading from file")
 				("dimensions", value<IndexType>(&dimensions)->default_value(dimensions), "Number of dimensions of generated graph")
 				("previousPartition", value<std::string>(), "file of previous partition, used for repartitioning")
