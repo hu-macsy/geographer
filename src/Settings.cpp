@@ -62,7 +62,7 @@ variables_map Settings::parseInput(int argc, char** argv){
 				("fileFormat", value<ITI::Format>(&fileFormat)->default_value(fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
 				("coordFormat", value<ITI::Format>(&coordFormat), "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ")
 				("PEgraphFile", value<std::string>(&PEGraphFile), "read communication graph from file")
-				("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
+				("numNodeWeights", value<int>(&numNodeWeights), "Number of node weights to use. If the input graph contains more node weights, only the first ones are used.")
 				("useDiffusionCoordinates", value<bool>(&useDiffusionCoordinates)->default_value(useDiffusionCoordinates), "Use coordinates based from diffusive systems instead of loading from file")
 				("dimensions", value<IndexType>(&dimensions)->default_value(dimensions), "Number of dimensions of generated graph")
 				("previousPartition", value<std::string>(), "file of previous partition, used for repartitioning")
@@ -101,7 +101,7 @@ variables_map Settings::parseInput(int argc, char** argv){
 				("tightenBounds", "Tuning parameter for K-Means")
 				("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
 				("initialMigration", value<InitialPartitioningMethods>(&initialMigration)->default_value(initialMigration), "Choose a method to get the first migration, 0: SFCs, 3:k-means, 4:Multisection")
-				("manhattanDistance", "Tuning parameter for K-Means")
+				//("manhattanDistance", "Tuning parameter for K-Means")
 				//output
 				("outFile", value<std::string>(&outFile), "write result partition into file")
 				//debug
@@ -111,7 +111,7 @@ variables_map Settings::parseInput(int argc, char** argv){
                 ("writePartition", "Writes the partition in the outFile.partition file")
                 // evaluation
                 ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
-                ("noComputeDiameter", "Compute Diameter of resulting block files.")
+                ("noComputeDiameter", "Compute diameter of resulting block files.")
                 ("maxDiameterRounds", value<IndexType>(&maxDiameterRounds)->default_value(maxDiameterRounds), "abort diameter algorithm after that many BFS rounds")
 				("metricsDetail", value<std::string>(&metricsDetail)->default_value("no"), "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV")
 				;
@@ -133,7 +133,6 @@ variables_map Settings::parseInput(int argc, char** argv){
 	store(command_line_parser(argc, argv).options(desc).run(), vm);
 	notify(vm);
 
-	
 	if (vm.count("help")) {
 		std::cout << desc << "\n";
 		return 0;
@@ -187,7 +186,7 @@ variables_map Settings::parseInput(int argc, char** argv){
 		}
 	}
 
-	// check if corrdFormat is provided
+	// check if coordFormat is provided
 	// if no coordFormat was given but was given a fileFormat assume they are the same
 	if( !vm.count("coordFormat") and vm.count("fileFormat") ){
 		coordFormat = fileFormat;
@@ -247,7 +246,6 @@ variables_map Settings::parseInput(int argc, char** argv){
 	}
 	
     if( vm.count("writePartition") ){
-    	//writePartition = true;
         writeInFile = true;
     }
    
