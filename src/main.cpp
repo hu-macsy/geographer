@@ -176,6 +176,25 @@ int main(int argc, char** argv) {
 			nodeWeights[0] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
 		}
 
+        if (settings.numNodeWeights > 0) {
+            if (settings.numNodeWeights < nodeWeights.size()) {
+                nodeWeights.resize(settings.numNodeWeights);
+                if (comm->getRank() == 0) {
+                    std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, thus discarding "
+                    << numReadNodeWeights - settings.numNodeWeights << std::endl;
+                }
+            } else if (settings.numNodeWeights > nodeWeights.size()) {
+                nodeWeights.resize(settings.numNodeWeights);
+                for (IndexType i = numReadNodeWeights; i < settings.numNodeWeights; i++) {
+                    nodeWeights[i] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
+                }
+                if (comm->getRank() == 0) {
+                    std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, padding with "
+                    << settings.numNodeWeights - numReadNodeWeights << " uniform weights. " << std::endl;
+                }
+            }
+        }
+
         // for 2D we do not know the size of every dimension
         settings.numX = N;
         settings.numY = 1;
@@ -316,6 +335,19 @@ int main(int argc, char** argv) {
     }else if( vm.count("blockSizesFile") ){
     	//blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
         std::vector<std::vector<ValueType>> blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
+        if (blockSizes.size() < nodeWeights.size()) {
+            throw std::invalid_argument("Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + " weights per block, "
+                + "but nodes have " + std::to_string(nodeWeights.size()) + " weights.");
+        }
+
+        if (blockSizes.size() > nodeWeights.size()) {
+            blockSizes.resize(nodeWeights.size());
+            if (comm->getRank() == 0) {
+                std::cout << "Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + " weights per block, "
+                + "but nodes have " + std::to_string(nodeWeights.size()) + " weights. Discarding surplus block sizes." << std::endl;
+            }
+        }
+
         for (IndexType i = 0; i < nodeWeights.size(); i++) {
         	const ValueType blockSizesSum  = std::accumulate( blockSizes[i].begin(), blockSizes[i].end(), 0);
 			const ValueType nodeWeightsSum = nodeWeights[i].sum();
@@ -508,7 +540,6 @@ int main(int argc, char** argv) {
         }
     }
     
- 	//printVectorMetrics( metricsVec, std::cout );
 
     if( settings.storeInfo && settings.outFile!="-" ) {
         if( comm->getRank()==0){
