@@ -174,7 +174,7 @@ int main(int argc, char** argv) {
 			nodeWeights[0] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
 		}
 
-        if (!std::isnan(settings.numNodeWeights)) {
+        if (settings.numNodeWeights > 0) {
             if (settings.numNodeWeights < nodeWeights.size()) {
                 nodeWeights.resize(settings.numNodeWeights);
                 if (comm->getRank() == 0) {
