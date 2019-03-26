@@ -229,8 +229,12 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 		ValueType refineTime = comm->max( elapTime2.count() );
 		//PRINT0("local refinement time: " << refineTime );
 	}
-	std::string filename = "mlRound_"+ std::to_string(settings.thisRound)+".mtx";
-	part.writeToFile( filename );
+
+	if( settings.debugMode and settings.writeInFile ){
+		std::string filename = "mlRound_"+ std::to_string(settings.thisRound)+".mtx";
+		part.writeToFile( filename );
+	}
+
 	return origin;
 }
 //---------------------------------------------------------------------------------------
