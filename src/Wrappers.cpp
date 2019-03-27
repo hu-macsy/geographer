@@ -389,7 +389,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
         std::cout<<"Number of runs: " << repeatTimes << std::endl;	
     }
     
-	metrics.timeFinalPartition = sumKwayTime/(ValueType)repeatTimes;
+	metrics.MM["timeFinalPartition"] = sumKwayTime/(ValueType)repeatTimes;
 	
      
     //
@@ -428,7 +428,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisRepartit
 	
 	// copy graph and reindex
 	scai::lama::CSRSparseMatrix<ValueType> copyGraph = graph;
-	GraphUtils::reindex<IndexType, ValueType>(copyGraph);
+	GraphUtils<IndexType, ValueType>::reindex(copyGraph);
 	
 	/*
 	{// check that inidces are consecutive, TODO: maybe not needed, remove?
@@ -670,7 +670,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
         std::cout<<"Number of runs: " << repeatTimes << std::endl;	
     }
     
-	metrics.timeFinalPartition = sumPartTime/(ValueType)repeatTimes;
+	metrics.MM["timeFinalPartition"] = sumPartTime/(ValueType)repeatTimes;
 	
 	//
 	// convert partition to a DenseVector

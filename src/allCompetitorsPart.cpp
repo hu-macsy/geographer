@@ -34,6 +34,7 @@ extern "C"{
 }
 
 
+
 //---------------------------------------------------------------------------------------------
 
 int main(int argc, char** argv) {
@@ -267,6 +268,11 @@ int main(int argc, char** argv) {
 	//WARNING: 1) removed parmetis sfc
 	//WARNING: 2) parMetisGraph should be last because it often crashes
 	std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRCB, ITI::Tool::zoltanRIB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph };
+
+	//used for printing and creating filenames
+	std::map<ITI::Tool, std::string> toolName = { 
+		{ITI::Tool::zoltanRCB,"zoltanRCB"}, {ITI::Tool::zoltanRIB,"zoltanRIB"}, {ITI::Tool::zoltanMJ,"zoltanMJ"}, {ITI::Tool::zoltanSFC,"zoltanSFC"},
+		{ITI::Tool::parMetisSFC,"parMetisSFC"}, {ITI::Tool::parMetisGeom,"parMetisGeom"}, {ITI::Tool::parMetisGraph,"parMetisGraph"} };
 	
 	std::vector<ITI::Tool> wantedTools;
 
@@ -303,8 +309,8 @@ int main(int argc, char** argv) {
 		scai::lama::DenseVector<IndexType> partition;
 		
 		// the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
-		struct Metrics metrics(1);
-		metrics.numBlocks = settings.numBlocks;
+		struct Metrics metrics( settings );
+		//metrics.numBlocks = settings.numBlocks;
 		
 		// if usign unit weights, set flag for wrappers
 		bool nodeWeightsUse = true;
@@ -316,29 +322,12 @@ int main(int argc, char** argv) {
 			settings.repeatTimes = 5;
 		}
 		int parMetisGeom=0	;
-		
-		//WARNING: in order for the SaGa scripts to work this must be done as in Saga/header.py::outFileSting
-		//create the outFile for this tool
-		//settings.outFile = outPath+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ thisTool + ".info";
-		if( storeInfo){
-			settings.outFile = outPath+ ITI::tool2string(thisTool)+"/"+ graphName + "_k"+ std::to_string(settings.numBlocks) + "_"+ ITI::tool2string(thisTool) + ".info";
-		}else{
-			settings.outFile ="-";
-		}
-		//PRINT0( "\n" << settings.outFile << "\n");
-		{
-			std::ifstream f(settings.outFile);
-			if( f.good() and storeInfo ){
-				comm->synchronize();	// maybe not needed
-				PRINT0("\n\tWARNING: File " << settings.outFile << " allready exists. Skipping partition with " << ITI::tool2string(thisTool));
-				continue;
-			}
-		}
+
 		
 		//get the partition
 		partition = ITI::Wrappers<IndexType,ValueType>::partition ( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
 		
-		PRINT0("time to get the partition: " <<  metrics.timeFinalPartition );
+		PRINT0("time to get the partition: " <<  metrics.MM["timeFinalPartition"] );
 		
 		// partition has the the same distribution as the graph rows 
 		SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
@@ -371,16 +360,16 @@ int main(int argc, char** argv) {
 			}
 			std::cout << "\nFinished tool" << std::endl;
 			std::cout << "\033[1;36m";
-			std::cout << "\n >>>> " << ITI::tool2string(thisTool);
+			std::cout << "\n >>>> " << toolName[thisTool];
 			std::cout<<  "\033[0m" << std::endl;
 
-			printMetricsShort( metrics, std::cout);
+			//printMetricsShort( metrics, std::cout);
 			
 			// write in a file
 			if( settings.outFile!="-" ){
 				std::ofstream outF( settings.outFile, std::ios::out);
 				if(outF.is_open()){
-					outF << "Running " << __FILE__ << " for tool " << ITI::tool2string(thisTool) << std::endl;
+					outF << "Running " << __FILE__ << " for tool " << toolName[thisTool] << std::endl;
 					if( vm.count("generate") ){
 						outF << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
 					}else{
@@ -388,7 +377,7 @@ int main(int argc, char** argv) {
 					}
 
 					//metrics.print( outF ); 
-					printMetricsShort( metrics, outF);
+					//printMetricsShort( metrics, outF);
 					std::cout<< "Output information written to file " << settings.outFile << std::endl;
 				}else{
 					std::cout<< "\n\tWARNING: Could not open file " << settings.outFile << " informations not stored.\n"<< std::endl;
@@ -403,14 +392,15 @@ int main(int argc, char** argv) {
 		
 		std::vector<DenseVector<ValueType> > coordinateCopy = coords;
 		
-		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );		
+		//scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );		
+		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues());
         for (IndexType dim = 0; dim < settings.dimensions; dim++) {
             assert( coordinateCopy[dim].size() == N);
             //coordinates[dim].redistribute(partition.getDistributionPtr());
 			coordinateCopy[dim].redistribute( distFromPartition );			
         }
         
-        std::string destPath = "partResults/" +  ITI::tool2string(thisTool) +"/blocks_" + std::to_string(settings.numBlocks) ;
+        std::string destPath = "partResults/" +  toolName[thisTool] +"/blocks_" + std::to_string(settings.numBlocks) ;
         boost::filesystem::create_directories( destPath );   
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, settings.dimensions, destPath + "/debugResult");
         comm->synchronize();
