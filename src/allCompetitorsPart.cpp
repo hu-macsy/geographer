@@ -58,33 +58,32 @@ int main(int argc, char** argv) {
 		("help", "display options")
 		("version", "show version")
 		("graphFile", value<std::string>(), "read graph from file")
-        ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
+		("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
 		("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
 		("coordFormat",  value<ITI::Format>(&coordFormat), "format of coordinate file")
-        ("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
-		
-        ("generate", "generate random graph. Currently, only uniform meshes are supported.")
-        ("numX", value<IndexType>(&settings.numX), "Number of points in x dimension of generated graph")
+		("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
+
+		("generate", "generate random graph. Currently, only uniform meshes are supported.")
+		("numX", value<IndexType>(&settings.numX), "Number of points in x dimension of generated graph")
 		("numY", value<IndexType>(&settings.numY), "Number of points in y dimension of generated graph")
 		("numZ", value<IndexType>(&settings.numZ), "Number of points in z dimension of generated graph")        
-        
+
 		("dimensions", value<IndexType>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
 		("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
-        ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
-        
+		("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
+
 		//TODO: parse the string to get these info automatically
 		("outPath", value<std::string>(&outPath), "write result partition into file")
 		("graphName", value<std::string>(&graphName), "this is needed to create the correct outFile for every tool. Must be the graphFile with the path and the ending")
-		
+
 		//("tool", value<std::string>(&tool), "The tool to partition with.")
 		("tools", value<std::vector<std::string>>(&tools)->multitoken(), "The tool to partition with.")
 
-
 		("computeDiameter", value<bool>(&settings.computeDiameter)->default_value(true), "Compute Diameter of resulting block files.")
-		("storeInfo", value<bool>(&storeInfo), "is this is false then no outFile is produced")
-		("metricsDetail", value<std::string>(&metricsDetail), "no: no metrics, easy:cut, imbalance, communication volume and diamter if possible, all: easy + SpMV time and communication time in SpMV")
-        //("writePartition", "Writes the partition in the outFile.partition file")
-        ("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
+		("storeInfo", value<bool>(&storeInfo), "if this is false then no outFile is produced")
+		("metricsDetail", value<std::string>(&metricsDetail), "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV")
+		//("writePartition", "Writes the partition in the outFile.partition file")
+		("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 		;
         
 	variables_map vm;
@@ -177,7 +176,7 @@ int main(int argc, char** argv) {
         SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
         SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
         		
-		// set the node weigths
+		// set the node weights
 		IndexType numNodeWeights = vectorOfNodeWeights.size();
         if (numNodeWeights == 0) {
 			nodeWeights = DenseVector<ValueType>( graph.getRowDistributionPtr() , 1);
