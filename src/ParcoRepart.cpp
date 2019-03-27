@@ -510,27 +510,31 @@ SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Wrong size of w
 			//
 			// output: in std and file
 			//
+
+			//now, every PE store its own times. These will be maxed afterwards, before printing in Metrics
+			ValueType timeToCalcInitMigration = migrationCalculation.count();
+			ValueType timeForFirstRedistribution = migrationTime.count();
+			ValueType timeForKmeans = kMeansTime.count();
+			ValueType timeForSecondRedistr = secondRedistributionTime.count();
+			ValueType timeForInitPart = partitionTime.count();
 			
+			metrics.MM["timeSecondDistribution"] = timeForSecondRedistr;
+			metrics.MM["timePreliminary"] = timeForInitPart;
+			metrics.MM["preliminaryCut"] = cut;
+			metrics.MM["preliminaryImbalance"] = imbalance;
+
 			if (settings.verbose ) {
-				ValueType timeToCalcInitMigration = comm->max(migrationCalculation.count()) ;   
-				ValueType timeForFirstRedistribution = comm->max( migrationTime.count() );
-				ValueType timeForKmeans = comm->max( kMeansTime.count() );
-				ValueType timeForSecondRedistr = comm->max( secondRedistributionTime.count() );
-				ValueType timeForInitPart = comm->max( partitionTime.count() );
-				
+				//TODO: do this comm->max here? otherwise it is just PE 0 times
+				timeToCalcInitMigration = comm->max(migrationCalculation.count()) ;   
+				timeForFirstRedistribution = comm->max( migrationTime.count() );
+				timeForKmeans = comm->max( kMeansTime.count() );
+				timeForSecondRedistr = comm->max( secondRedistributionTime.count() );
+				timeForInitPart = comm->max( partitionTime.count() );
 				if(comm->getRank() == 0 ){
 					std::cout<< std::endl << "\033[1;32mTiming: migration algo: "<< timeToCalcInitMigration << ", 1st redistr: " << timeForFirstRedistribution << ", only k-means: " << timeForKmeans <<", only 2nd redistr: "<< timeForSecondRedistr <<", total:" << timeForInitPart << std::endl;
 					std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
 				}
 			}
-			
-			metrics.MM["timeSecondDistribution"] = secondRedistributionTime.count();
-			metrics.MM["timePreliminary"] = partitionTime.count();
-			
-			metrics.MM["preliminaryCut"] = cut;
-			metrics.MM["preliminaryImbalance"] = imbalance;
-			
-			//IndexType numRefinementRounds = 0;
 			
 			SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
 			scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(input);

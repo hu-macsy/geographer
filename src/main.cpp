@@ -144,6 +144,7 @@ int main(int argc, char** argv) {
         //
         // read the adjacency matrix and the coordinates from a file
         //
+        
         if (vm.count("fileFormat")) {
         	if (settings.fileFormat == ITI::Format::TEEC) {
         		IndexType n = vm["numX"].as<IndexType>();
@@ -353,11 +354,19 @@ int main(int argc, char** argv) {
         }
 
         commTree.createFlatHeterogeneous( blockSizes );
-    } else {
+    }else{
     	commTree.createFlatHomogeneous( settings.numBlocks, nodeWeights.size() );
     }
     
     commTree.adaptWeights( nodeWeights );
+
+    //---------------------------------------------------------------------
+    //
+    //  read block sizes from a file if it is passed as an argument
+    //
+    
+    //std::vector<std::vector<ValueType> > blockSizes;
+    
     
     //---------------------------------------------------------------
     //
