@@ -17,21 +17,22 @@ template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
 	const scai::lama::CSRSparseMatrix<ValueType> &graph,
 	const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
-	const scai::lama::DenseVector<ValueType> &nodeWeights, 
+	const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 	bool nodeWeightsFlag,
 	Tool tool,
 	struct Settings &settings,
 	struct Metrics &metrics	){
 
+//TODO: for the metis wrappers, nodeWeights[0] is wrong, must adapt the protoypes 
 	switch( tool){
 		case Tool::parMetisGraph:
-			return metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 0, settings, metrics);
+			return metisPartition( graph, coordinates, nodeWeights[0], nodeWeightsFlag, 0, settings, metrics);
 		
 		case Tool::parMetisGeom:
-			return metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 1, settings, metrics);
+			return metisPartition( graph, coordinates, nodeWeights[0], nodeWeightsFlag, 1, settings, metrics);
 			
 		case Tool::parMetisSFC:
-			return metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 2, settings, metrics);
+			return metisPartition( graph, coordinates, nodeWeights[0], nodeWeightsFlag, 2, settings, metrics);
 			
 		case Tool::zoltanRIB:
 			return zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rib", settings, metrics);
@@ -56,7 +57,7 @@ template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::repartition (
 	const scai::lama::CSRSparseMatrix<ValueType> &graph,
 	const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
-	const scai::lama::DenseVector<ValueType> &nodeWeights, 
+	const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 	bool nodeWeightsFlag,
 	Tool tool,
 	struct Settings &settings,
@@ -67,7 +68,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::repartition (
 		case Tool::parMetisGraph:		
 		case Tool::parMetisGeom:			
 		case Tool::parMetisSFC:
-			return metisRepartition( graph, coordinates, nodeWeights, nodeWeightsFlag, settings, metrics);
+			//return metisRepartition( graph, coordinates, nodeWeights, nodeWeightsFlag, settings, metrics);
 			
 		case Tool::zoltanRIB:
 			return zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rib", settings, metrics);
@@ -493,7 +494,7 @@ template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanPartition (
 	const scai::lama::CSRSparseMatrix<ValueType> &graph,
 	const std::vector<scai::lama::DenseVector<ValueType>> &coords, 
-	const scai::lama::DenseVector<ValueType> &nodeWeights, 
+	const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 	bool nodeWeightsFlag,
 	std::string algo,
 	struct Settings &settings,
@@ -512,7 +513,7 @@ template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanRepartition (
 	const scai::lama::CSRSparseMatrix<ValueType> &graph,
 	const std::vector<scai::lama::DenseVector<ValueType>> &coords, 
-	const scai::lama::DenseVector<ValueType> &nodeWeights, 
+	const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 	bool nodeWeightsFlag,
 	std::string algo,
 	struct Settings &settings,
@@ -531,7 +532,7 @@ template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 	const scai::lama::CSRSparseMatrix<ValueType> &graph,
 	const std::vector<scai::lama::DenseVector<ValueType>> &coords, 
-	const scai::lama::DenseVector<ValueType> &nodeWeights, 
+	const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 	bool nodeWeightsFlag,
 	std::string algo,
 	bool repart,
@@ -617,21 +618,28 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 		globalIds[i] = offset++;
 
 	//set node weights
-	std::vector<ValueType> localUnitWeight(localN);
+	const IndexType numWeights = nodeWeights.size();
+	std::vector<std::vector<ValueType>> localWeights( numWeights, std::vector<ValueType>( localN, 1.0) );
+	//localWeights[i][j] is the j-th weight of the i-th vertex (i is local ID)
 	
 	if( nodeWeightsFlag ){
-		scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights.getLocalValues() );
-		for(unsigned int i=0; i<localN; i++){
-			localUnitWeight[i] = localWeights[i];
+		for( unsigned int w=0; w<numWeights; w++ ){
+			scai::hmemo::ReadAccess<ValueType> rLocalWeights( nodeWeights[w].getLocalValues() );
+			for(unsigned int i=0; i<localN; i++){
+				localWeights[w][i] = rLocalWeights[i];
+			}
 		}
 	}else{
-		localUnitWeight.assign( localN, 1.0);
+		//all weights are initiallized weigth unit weight
 	}
-	std::vector<const ValueType *>weightVec(1);
-	weightVec[0] = localUnitWeight.data();
 
-	std::vector<int> weightStrides(1);
-	weightStrides[0] = 1;
+	std::vector<const ValueType *>weightVec( numWeights );
+	for( unsigned int w=0; w<numWeights; w++ ){
+		weightVec[0] = localWeights[w].data();
+	}
+
+	std::vector<int> weightStrides( numWeights, 1);
+	//weightStrides[0] = 1;
 	
 	//create the problem and solve it
 	inputAdapter_t *ia= new inputAdapter_t(localN, globalIds, coordVec, 

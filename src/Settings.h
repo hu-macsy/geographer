@@ -111,6 +111,7 @@ struct Settings{
     IndexType dimensions= 2;
     std::string fileName = "-";
     std::string outFile = "-";
+    std::string outDir = "-"; //this is used by the competitors main
     std::string PEGraphFile = "-";
     std::string blockSizesFile = "-";
     ITI::Format fileFormat = ITI::Format::AUTO;   // 0 for METIS, 4 for MatrixMarket
@@ -183,6 +184,9 @@ struct Settings{
     bool computeDiameter = false;
     IndexType maxDiameterRounds = 2;
     std::string metricsDetail;
+
+    //this is used by the competitors main to set the tools we are gonna use
+    std::vector<std::string> tools;
 
     // variable to check if the settings given are valid or not
     bool isValid = true;

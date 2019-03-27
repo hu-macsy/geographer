@@ -40,10 +40,9 @@ extern "C"{
 int main(int argc, char** argv) {
 
 	using namespace boost::program_options;
-	options_description desc("Supported options");
+	//options_description desc("Supported options");
 
-	struct Settings settings;
-    //int parMetisGeom = 0;			//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
+	//int parMetisGeom = 0;			//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
     //bool writePartition = false;
 	bool storeInfo = true;
 	ITI::Format coordFormat;
@@ -53,7 +52,7 @@ int main(int argc, char** argv) {
     std::string metricsDetail = "all";
 	
 	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
-	
+/*	
 	desc.add_options()
 		("help", "display options")
 		("version", "show version")
@@ -79,27 +78,27 @@ int main(int argc, char** argv) {
 		//("tool", value<std::string>(&tool), "The tool to partition with.")
 		("tools", value<std::vector<std::string>>(&tools)->multitoken(), "The tool to partition with.")
 
-
 		("computeDiameter", value<bool>(&settings.computeDiameter)->default_value(true), "Compute Diameter of resulting block files.")
-		("storeInfo", value<bool>(&storeInfo), "is this is false then no outFile is produced")
+		("storeInfo", "is this is false then no outFile is produced")
 		("metricsDetail", value<std::string>(&metricsDetail), "no: no metrics, easy:cut, imbalance, communication volume and diamter if possible, all: easy + SpMV time and communication time in SpMV")
         //("writePartition", "Writes the partition in the outFile.partition file")
         ("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
 		;
-        
-	variables_map vm;
-	store(command_line_parser(argc, argv).
-	options(desc).run(), vm);
-	notify(vm);
+*/        
 
-    //parMetisGeom = vm.count("geom");
-    //writePartition = vm.count("writePartition");
-	//bool writeDebugCoordinates = settings.writeDebugCoordinates;
+	struct Settings settings;
+	variables_map vm = settings.parseInput( argc, argv);
+
+	if( !settings.isValid )
+		return -1;
 	
+PRINT( settings.tools[0] );
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType thisPE = comm->getRank();
     IndexType N;
-	
+
+/*
+
 	if (vm.count("help")) {
 		std::cout << desc << "\n";
 		return 0;
@@ -118,13 +117,13 @@ int main(int argc, char** argv) {
         settings.numBlocks = comm->getSize();
     }
 
-    if( (!vm.count("outPath")) and storeInfo ){
+    if( (!vm.count("outPath")) and vm.count("storeInfo") ){
     	if( comm->getRank() ==0 ){
 			std::cout<< "Must give parameter outPath to store metrics.\nAborting..." << std::endl;
 			return -1;
 		}
 	}
-	
+
 	if( vm.count("metricsDetail") ){
 		if( not (metricsDetail=="no" or metricsDetail=="easy" or metricsDetail=="all") ){
 			if(comm->getRank() ==0 ){
@@ -134,6 +133,8 @@ int main(int argc, char** argv) {
 		}
 	}
 			
+*/
+
     if( comm->getRank() ==0 ){
 		std::cout <<"Starting file " << __FILE__ << std::endl;
 		
@@ -149,7 +150,7 @@ int main(int argc, char** argv) {
     
     CSRSparseMatrix<ValueType> graph;
     std::vector<DenseVector<ValueType>> coords(settings.dimensions);
-    scai::lama::DenseVector<ValueType> nodeWeights;		//the weights for each node
+    std::vector<DenseVector<ValueType>> nodeWeights;	//the weights for each node
     
     std::string graphFile;
     
@@ -162,34 +163,47 @@ int main(int argc, char** argv) {
         } else {
             coordFile = graphFile + ".xyz";
         }
-        
-        std::vector<DenseVector<ValueType> > vectorOfNodeWeights;
-		
+              		
 		// read the graph
         if (vm.count("fileFormat")) {
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights, settings.fileFormat );
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights, settings.fileFormat );
         }else{
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights );
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights );
         }
         
         N = graph.getNumRows();
                 
         SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows() , "matrix not square");
         SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
+
+        scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
         		
 		// set the node weigths
-		IndexType numNodeWeights = vectorOfNodeWeights.size();
-        if (numNodeWeights == 0) {
-			nodeWeights = DenseVector<ValueType>( graph.getRowDistributionPtr() , 1);
+        IndexType numReadNodeWeights = nodeWeights.size();
+        if (numReadNodeWeights == 0) {
+        	nodeWeights.resize(1);
+			nodeWeights[0] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
 		}
-		else if (numNodeWeights == 1) {
-			nodeWeights = vectorOfNodeWeights[0];
-		} else {
-			IndexType index = vm["nodeWeightIndex"].as<int>();
-			assert(index < numNodeWeights);
-			nodeWeights = vectorOfNodeWeights[index];
-		}
-		
+
+        if (settings.numNodeWeights > 0) {
+            if (settings.numNodeWeights < nodeWeights.size()) {
+                nodeWeights.resize(settings.numNodeWeights);
+                if (comm->getRank() == 0) {
+                    std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, thus discarding "
+                    << numReadNodeWeights - settings.numNodeWeights << std::endl;
+                }
+            } else if (settings.numNodeWeights > nodeWeights.size()) {
+                nodeWeights.resize(settings.numNodeWeights);
+                for (IndexType i = numReadNodeWeights; i < settings.numNodeWeights; i++) {
+                    nodeWeights[i] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
+                }
+                if (comm->getRank() == 0) {
+                    std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, padding with "
+                    << settings.numNodeWeights - numReadNodeWeights << " uniform weights. " << std::endl;
+                }
+            }
+        }
+
         //read the coordinates file
 		if (vm.count("coordFormat")) {
 			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
@@ -252,6 +266,7 @@ int main(int argc, char** argv) {
     }
     
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+
 	/*
 	//TODO: must compile with mpicc and module mpi.ibm/1.4 and NOT mpi.ibm/1.4_gcc
 	size_t total=-1,used=-1,free=-1,buffers=-1, cached=-1;
@@ -324,6 +339,25 @@ int main(int argc, char** argv) {
 		int parMetisGeom=0	;
 
 		
+		if( vm.count("outPath") and vm.count("storeInfo") ){
+			//set the graphName in order to create the outFile name
+			std::string copyName = graphFile;
+			std::reverse( copyName.begin(), copyName.end() ); 
+			std::string delimiter = ".";
+			graphName = (copyName.substr(copyName.find("."), copyName.find("/"))).back();
+PRINT0( graphName );		
+			settings.outFile = outPath+ graphName+ "_k"+ std::to_string(settings.numBlocks)+ "_"+ toolName[thisTool]+ ".info";
+		}else{
+			settings.outFile ="-";
+		}
+
+		std::ifstream f(settings.outFile);
+		if( f.good() and storeInfo ){
+			comm->synchronize();	// maybe not needed
+			PRINT0("\n\tWARNING: File " << settings.outFile << " allready exists. Skipping partition with " << toolName[thisTool]);
+			continue;
+		}
+		
 		//get the partition
 		partition = ITI::Wrappers<IndexType,ValueType>::partition ( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
 		
@@ -364,9 +398,9 @@ int main(int argc, char** argv) {
 			std::cout<<  "\033[0m" << std::endl;
 
 			//printMetricsShort( metrics, std::cout);
-			
+
 			// write in a file
-			if( settings.outFile!="-" ){
+			if( settings.outFile!= "-" ){
 				std::ofstream outF( settings.outFile, std::ios::out);
 				if(outF.is_open()){
 					outF << "Running " << __FILE__ << " for tool " << toolName[thisTool] << std::endl;
@@ -376,7 +410,7 @@ int main(int argc, char** argv) {
 						outF << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
 					}
 
-					//metrics.print( outF ); 
+					metrics.print( outF ); 
 					//printMetricsShort( metrics, outF);
 					std::cout<< "Output information written to file " << settings.outFile << std::endl;
 				}else{

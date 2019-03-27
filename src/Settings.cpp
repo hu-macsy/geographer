@@ -114,6 +114,10 @@ variables_map Settings::parseInput(int argc, char** argv){
                 ("noComputeDiameter", "Compute diameter of resulting block files.")
                 ("maxDiameterRounds", value<IndexType>(&maxDiameterRounds)->default_value(maxDiameterRounds), "abort diameter algorithm after that many BFS rounds")
 				("metricsDetail", value<std::string>(&metricsDetail)->default_value("no"), "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV")
+				//used for the competitors main
+				("outDir", value<std::string>(&outDir), "write result partition into file")
+				//("tool", value<std::string>(&tool), "The tool to partition with.")
+				("tools", value<std::vector<std::string>>(&tools)->multitoken(), "The tool to partition with.")
 				;
 
     //------------------------------------------------
