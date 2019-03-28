@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
 
 	struct Settings settings;
 
-	IndexType numGridCells = 500;
+	IndexType numGridCells = 100;
 	IndexType globalN = -1;
 
 	desc.add_options()
@@ -162,7 +162,7 @@ int main(int argc, char** argv) {
 	file.open(outFileName.c_str());
 
 	//write column labels
-	file << "x" << "\t" << "y" << "\t" << "label" << std::endl;
+	file << "x" << "\t" << "y" << "\t" << "weight" << std::endl;
 
 	//write heat map
 	for (IndexType i = 0; i < weightsInCell.size(); i++) {
