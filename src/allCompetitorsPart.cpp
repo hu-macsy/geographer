@@ -41,50 +41,14 @@ extern "C"{
 int main(int argc, char** argv) {
 
 	using namespace boost::program_options;
-	//options_description desc("Supported options");
 
 	//int parMetisGeom = 0;			//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
-    //bool writePartition = false;
-	bool storeInfo = true;
-	ITI::Format coordFormat;
-	std::string outPath;
-	std::string graphName;
-    std::string metricsDetail = "all";
+//	bool storeInfo = true;
+//	ITI::Format coordFormat;
+//	std::string outPath;
+//    std::string metricsDetail = "all";
 	
 	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
-/*	
-	desc.add_options()
-		("help", "display options")
-		("version", "show version")
-		("graphFile", value<std::string>(), "read graph from file")
-        ("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
-		("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
-		("coordFormat",  value<ITI::Format>(&coordFormat), "format of coordinate file")
-        ("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
-		
-        ("generate", "generate random graph. Currently, only uniform meshes are supported.")
-        ("numX", value<IndexType>(&settings.numX), "Number of points in x dimension of generated graph")
-		("numY", value<IndexType>(&settings.numY), "Number of points in y dimension of generated graph")
-		("numZ", value<IndexType>(&settings.numZ), "Number of points in z dimension of generated graph")        
-        
-		("dimensions", value<IndexType>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
-		("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
-        ("numBlocks", value<IndexType>(&settings.numBlocks), "Number of blocks to partition to")
-        
-		//TODO: parse the string to get these info automatically
-		("outPath", value<std::string>(&outPath), "write result partition into file")
-		("graphName", value<std::string>(&graphName), "this is needed to create the correct outFile for every tool. Must be the graphFile with the path and the ending")
-		
-		//("tool", value<std::string>(&tool), "The tool to partition with.")
-		("tools", value<std::vector<std::string>>(&tools)->multitoken(), "The tool to partition with.")
-
-		("computeDiameter", value<bool>(&settings.computeDiameter)->default_value(true), "Compute Diameter of resulting block files.")
-		("storeInfo", "is this is false then no outFile is produced")
-		("metricsDetail", value<std::string>(&metricsDetail), "no: no metrics, easy:cut, imbalance, communication volume and diamter if possible, all: easy + SpMV time and communication time in SpMV")
-        //("writePartition", "Writes the partition in the outFile.partition file")
-        ("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
-		;
-*/        
 
 	struct Settings settings;
 	variables_map vm = settings.parseInput( argc, argv);
@@ -92,48 +56,10 @@ int main(int argc, char** argv) {
 	if( !settings.isValid )
 		return -1;
 	
-
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType thisPE = comm->getRank();
     IndexType N;
 
-/*
-
-	if (vm.count("help")) {
-		std::cout << desc << "\n";
-		return 0;
-	}
-
-	if (vm.count("version")) {
-		std::cout << "Git commit " << version << std::endl;
-		return 0;
-	}
-
-	if (! (vm.count("graphFile") or vm.count("generate")) ) {
-		std::cout << "Specify input file with --graphFile or mesh generation with --generate and number of points per dimension." << std::endl; //TODO: change into positional argument
-	}
-           
-	if( !vm.count("numBlocks") ){
-        settings.numBlocks = comm->getSize();
-    }
-
-    if( (!vm.count("outPath")) and vm.count("storeInfo") ){
-    	if( comm->getRank() ==0 ){
-			std::cout<< "Must give parameter outPath to store metrics.\nAborting..." << std::endl;
-			return -1;
-		}
-	}
-
-	if( vm.count("metricsDetail") ){
-		if( not (metricsDetail=="no" or metricsDetail=="easy" or metricsDetail=="all") ){
-			if(comm->getRank() ==0 ){
-				std::cout<<"WARNING: wrong value for parameter metricsDetail= " << metricsDetail << ". Setting to all" <<std::endl;
-				metricsDetail="all";
-			}
-		}
-	}
-			
-*/
 
     if( comm->getRank() ==0 ){
 		std::cout <<"Starting file " << __FILE__ << std::endl;
@@ -206,7 +132,7 @@ int main(int argc, char** argv) {
 
         //read the coordinates file
 		if (vm.count("coordFormat")) {
-			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
+			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.coordFormat);
 		}else if (vm.count("fileFormat")) {
 			coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
 		} else {
@@ -345,7 +271,7 @@ int main(int argc, char** argv) {
 			std::reverse( copyName.begin(), copyName.end() ); 
 			std::vector<std::string> strs;			
 			boost::split( strs, copyName, boost::is_any_of("./") );
-			graphName = strs[1]; //[0] is "hparg" (graph reversed)
+			std::string graphName = strs[1]; //[0] is "hparg" (graph reversed)
 			std::reverse( graphName.begin(), graphName.end() );
 			//PRINT0( graphName );		
 			settings.outFile = settings.outDir	+ graphName+ "_k"+ std::to_string(settings.numBlocks)+ "_"+ toolName[thisTool]+ ".info";
@@ -354,7 +280,7 @@ int main(int argc, char** argv) {
 		}
 
 		std::ifstream f(settings.outFile);
-		if( f.good() and storeInfo ){
+		if( f.good() and settings.storeInfo ){
 			comm->synchronize();	// maybe not needed
 			PRINT0("\n\tWARNING: File " << settings.outFile << " allready exists. Skipping partition with " << toolName[thisTool]);
 			continue;
@@ -369,10 +295,10 @@ int main(int argc, char** argv) {
 		SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
 		
 		
-		if( metricsDetail=="all" ){
+		if( settings.metricsDetail=="all" ){
 			metrics.getAllMetrics( graph, partition, nodeWeights, settings );
 		}
-        if( metricsDetail=="easy" ){
+        if( settings.metricsDetail=="easy" ){
 			metrics.getEasyMetrics( graph, partition, nodeWeights, settings );
 		}
 		
@@ -420,19 +346,19 @@ if( thisPE==0 ) metrics.printHorizontal2( std::cout );
 					std::cout<< "\n\tWARNING: Could not open file " << settings.outFile << " informations not stored.\n"<< std::endl;
 				}       
 			}
-
-		    if( settings.outFile!="-" and settings.writeInFile ){
-		        std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
-		        std::string partOutFile = settings.outFile+".part";
-				ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
-
-		        std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
-		        if( comm->getRank()==0 ){
-		            std::cout << " and last partition of the series in file " << partOutFile << std::endl;
-		            std::cout<< " Time needed to write .partition file: " << writePartTime.count() <<  std::endl;
-		        }
-		    }   
 		}
+
+	 	if( settings.outFile!="-" and settings.writeInFile ){
+	        std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
+	        std::string partOutFile = settings.outFile+".part";
+			ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+
+	        std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
+	        if( comm->getRank()==0 ){
+	            std::cout << " and last partition of the series in file " << partOutFile << std::endl;
+	            std::cout<< " Time needed to write .partition file: " << writePartTime.count() <<  std::endl;
+	        }
+	    } 
 		
 	// the code below writes the output coordinates in one file per processor for visualization purposes.
     //=================

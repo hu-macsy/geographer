@@ -406,43 +406,45 @@ void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<Inde
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	scai::dmemo::DistributionPtr dist = part.getDistributionPtr();
 
-        const IndexType localN = dist->getLocalSize();
-        const IndexType globalN = dist->getGlobalSize();
-        const IndexType numPEs = comm->getSize();
-        
-        scai::hmemo::ReadAccess<IndexType> localPart( part.getLocalValues() );
-        SCAI_ASSERT_EQ_ERROR( localPart.size(), localN, "Local sizes do not agree");
-        
-        std::ofstream outfile;
-	   
-        for(IndexType p=0; p<numPEs; p++){  // numPE rounds, in each round only one PE writes its part
-            if( comm->getRank()==p ){ 
-                if( p==0 ){
-                    outfile.open(filename.c_str(), std::ios::binary | std::ios::out);
-                    outfile << "% " << globalN << std::endl;    // the first line has a comment with the number of nodes
-                }else{
-                    // if not the first PE then append to file
-                    outfile.open(filename.c_str(), std::ios::binary | std::ios::app);
-                }
-                if( outfile.fail() ){
-                    throw std::runtime_error("Could not write to file " + filename);
-                }
-                            
-                for( IndexType i=0; i<localN; i++){                    
-                    outfile << localPart[i] << std::endl;
-                }
-				/* TODO: resolve commented code         
-                // the last PE maybe has less local values
-                if( p==numPEs-1 ){
-                    SCAI_ASSERT_EQ_ERROR( outfile.tellp(), globalN , "While writing coordinates in parallel: Position in file " << filename << " is not correct." );
-                }else{
-                    SCAI_ASSERT_EQ_ERROR( outfile.tellp(), localN*(comm->getRank()+1) , "While writing coordinates in parallel: Position in file " << filename << " is not correct for processor " << comm->getRank() );
-                }
-				*/              
-                outfile.close();
+    const IndexType localN = dist->getLocalSize();
+    const IndexType globalN = dist->getGlobalSize();
+    const IndexType numPEs = comm->getSize();
+    
+    scai::hmemo::ReadAccess<IndexType> localPart( part.getLocalValues() );
+    SCAI_ASSERT_EQ_ERROR( localPart.size(), localN, "Local sizes do not agree");
+    
+    std::ofstream outfile;
+   
+    for(IndexType p=0; p<numPEs; p++){  // numPE rounds, in each round only one PE writes its part
+
+        if( comm->getRank()==p ){ 
+            if( p==0 ){
+                outfile.open(filename.c_str(), std::ios::binary | std::ios::out);
+                outfile << "% " << globalN << std::endl;    // the first line has a comment with the number of nodes
+            }else{
+                // if not the first PE then append to file
+                outfile.open(filename.c_str(), std::ios::binary | std::ios::app);
             }
-            comm->synchronize();    //TODO: takes huge time here
+            if( outfile.fail() ){
+                throw std::runtime_error("Could not write to file " + filename);
+            }
+                        
+            for( IndexType i=0; i<localN; i++){                    
+                outfile << localPart[i] << std::endl;
+            }
+			/* TODO: resolve commented code         
+            // the last PE maybe has less local values
+            if( p==numPEs-1 ){
+                SCAI_ASSERT_EQ_ERROR( outfile.tellp(), globalN , "While writing coordinates in parallel: Position in file " << filename << " is not correct." );
+            }else{
+                SCAI_ASSERT_EQ_ERROR( outfile.tellp(), localN*(comm->getRank()+1) , "While writing coordinates in parallel: Position in file " << filename << " is not correct for processor " << comm->getRank() );
+            }
+            */
+			outfile.close();
+            //PRINT("PE " << p << " wrote its part");
         }
+        comm->synchronize();    //TODO: takes huge time here
+	}
 }
 //-------------------------------------------------------------------------------------------------
 
@@ -485,14 +487,15 @@ void FileIO<IndexType, ValueType>::writeDenseVectorParallel(const DenseVector<T>
             for( IndexType i=0; i<localN; i++){                    
                 outfile << localPart[i] << std::endl;
             }
-                          
+            
             // the last PE maybe has less local values
             if( p==numPEs-1 ){
                 SCAI_ASSERT_EQ_ERROR( outfile.tellp(), globalN , "While writing DenseVector in parallel: Position in file " << filename << " is not correct." );
             }else{
                 SCAI_ASSERT_EQ_ERROR( outfile.tellp(), localN*(comm->getRank()+1) , "While writing DenseVector in parallel: Position in file " << filename << " is not correct for processor " << comm->getRank() );
             }
-                
+
+            PRINT("PE " << p << " wrote its part");
             outfile.close();
         }
         comm->synchronize();    //TODO: takes huge time here
