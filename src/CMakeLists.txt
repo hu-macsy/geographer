@@ -15,16 +15,11 @@ if(USE_NETWORKIT)
   add_definitions(-DUSE_NETWORKIT)
 endif(USE_NETWORKIT)
 
-
 #set(NETWORKIT_DIR "/usr/local")
 set(SCAI_INCLUDE "${SCAI_DIR}/include/") 
 set(SCAI_LIB "${SCAI_DIR}/lib/")
 set(NETWORKIT_INCLUDE "${NETWORKIT_DIR}/include/") 
 set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
-
-
-
-
 
 ### set compiler manualy ###
 #set(CMAKE_CXX_COMPILER /lrz/sys/compilers/gcc/7.3.0/bin/c++)
@@ -67,14 +62,12 @@ target_link_libraries(Geographer ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_C
 add_executable(analyze ${FILES_COMMON} analyzePartition.cpp)
 target_link_libraries(analyze ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
 
-
 ### add networkit library ###
 if (USE_NETWORKIT)
   include_directories(${NETWORKIT_INCLUDE})
   link_directories(${NETWORKIT_LIB})
   target_link_libraries(Geographer networkit)
 endif (USE_NETWORKIT)
-
 
 add_library(geographer SHARED ${FILES_COMMON})
 
