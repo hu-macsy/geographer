@@ -51,6 +51,9 @@ target_link_libraries(Geographer ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_C
 add_executable(analyze ${FILES_COMMON} analyzePartition.cpp)
 target_link_libraries(analyze ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
 
+add_executable(heatMap FileIO.cpp Settings.cpp GraphUtils.cpp CommTree.cpp ../tools/graphToHeatmap.cpp)
+target_link_libraries(heatMap ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
+
 add_library(geographer SHARED ${FILES_COMMON})
 
 if (GTEST_FOUND)
