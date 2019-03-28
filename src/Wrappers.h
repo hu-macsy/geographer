@@ -103,7 +103,7 @@ private:
 	static scai::lama::DenseVector<IndexType> metisPartition (
 		const scai::lama::CSRSparseMatrix<ValueType> &graph,
 		const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
-		const scai::lama::DenseVector<ValueType> &nodeWeights, 
+		const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 		bool nodeWeightsFlag,
 		int parMetisGeom,
 		struct Settings &settings,
@@ -116,7 +116,7 @@ private:
 	static scai::lama::DenseVector<IndexType> metisRepartition (
 		const scai::lama::CSRSparseMatrix<ValueType> &graph,
 		const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
-		const scai::lama::DenseVector<ValueType> &nodeWeights, 
+		const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 		bool nodeWeightsFlag,
 		struct Settings &settings,
 		struct Metrics &metrics);	

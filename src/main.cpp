@@ -591,7 +591,7 @@ if(comm->getRank() == 0 ) metricsVec[r].printHorizontal2( std::cout );
     
     if( settings.outFile!="-" and settings.writeInFile ){
         std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
-        std::string partOutFile = settings.outFile;
+        std::string partOutFile = settings.outFile+".part";
 		ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
 
         std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;

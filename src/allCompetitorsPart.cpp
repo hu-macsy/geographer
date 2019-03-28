@@ -376,7 +376,7 @@ int main(int argc, char** argv) {
 			metrics.getEasyMetrics( graph, partition, nodeWeights, settings );
 		}
 		
-metrics.printHorizontal2( std::cout );
+if( thisPE==0 ) metrics.printHorizontal2( std::cout );
 		//---------------------------------------------------------------
 		//
 		// Reporting output to std::cout
@@ -420,6 +420,18 @@ metrics.printHorizontal2( std::cout );
 					std::cout<< "\n\tWARNING: Could not open file " << settings.outFile << " informations not stored.\n"<< std::endl;
 				}       
 			}
+
+		    if( settings.outFile!="-" and settings.writeInFile ){
+		        std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
+		        std::string partOutFile = settings.outFile+".part";
+				ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+
+		        std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
+		        if( comm->getRank()==0 ){
+		            std::cout << " and last partition of the series in file " << partOutFile << std::endl;
+		            std::cout<< " Time needed to write .partition file: " << writePartTime.count() <<  std::endl;
+		        }
+		    }   
 		}
 		
 	// the code below writes the output coordinates in one file per processor for visualization purposes.
