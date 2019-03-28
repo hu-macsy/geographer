@@ -18,6 +18,7 @@
  
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include <scai/dmemo/BlockDistribution.hpp>
 
@@ -48,7 +49,6 @@ int main(int argc, char** argv) {
 	ITI::Format coordFormat;
 	std::string outPath;
 	std::string graphName;
-	std::vector<std::string> tools;
     std::string metricsDetail = "all";
 	
 	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
 	if( !settings.isValid )
 		return -1;
 	
-PRINT( settings.tools[0] );
+
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType thisPE = comm->getRank();
     IndexType N;
@@ -279,7 +279,6 @@ PRINT( settings.tools[0] );
 	// start main for loop for all tools
 	//
 	
-	
 	//WARNING: 1) removed parmetis sfc
 	//WARNING: 2) parMetisGraph should be last because it often crashes
 	std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRCB, ITI::Tool::zoltanRIB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph };
@@ -290,6 +289,7 @@ PRINT( settings.tools[0] );
 		{ITI::Tool::parMetisSFC,"parMetisSFC"}, {ITI::Tool::parMetisGeom,"parMetisGeom"}, {ITI::Tool::parMetisGraph,"parMetisGraph"} };
 	
 	std::vector<ITI::Tool> wantedTools;
+	std::vector<std::string> tools = settings.tools; //not really needed
 
 	if( tools[0] == "all"){
 		wantedTools = allTools;
@@ -339,14 +339,16 @@ PRINT( settings.tools[0] );
 		int parMetisGeom=0	;
 
 		
-		if( vm.count("outPath") and vm.count("storeInfo") ){
+		if( vm.count("outDir") and vm.count("storeInfo") ){
 			//set the graphName in order to create the outFile name
 			std::string copyName = graphFile;
 			std::reverse( copyName.begin(), copyName.end() ); 
-			std::string delimiter = ".";
-			graphName = (copyName.substr(copyName.find("."), copyName.find("/"))).back();
-PRINT0( graphName );		
-			settings.outFile = outPath+ graphName+ "_k"+ std::to_string(settings.numBlocks)+ "_"+ toolName[thisTool]+ ".info";
+			std::vector<std::string> strs;			
+			boost::split( strs, copyName, boost::is_any_of("./") );
+			graphName = strs[1]; //[0] is "hparg" (graph reversed)
+			std::reverse( graphName.begin(), graphName.end() );
+			//PRINT0( graphName );		
+			settings.outFile = settings.outDir	+ graphName+ "_k"+ std::to_string(settings.numBlocks)+ "_"+ toolName[thisTool]+ ".info";
 		}else{
 			settings.outFile ="-";
 		}
@@ -374,6 +376,7 @@ PRINT0( graphName );
 			metrics.getEasyMetrics( graph, partition, nodeWeights, settings );
 		}
 		
+metrics.printHorizontal2( std::cout );
 		//---------------------------------------------------------------
 		//
 		// Reporting output to std::cout

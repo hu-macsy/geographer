@@ -84,6 +84,7 @@ void Metrics::getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph
 	MM["finalCut"] = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
 	for( unsigned int w=0; w<nodeWeights.size(); w++ ){
 		imbalances.push_back(  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights[w]) );
+		MM["finalImbalance_w"+std::to_string(w)] = imbalances.back();
 	}
 	MM["finalImbalance"] = *std::max_element( imbalances.begin(), imbalances.end() );
 	
@@ -190,7 +191,7 @@ std::tuple<IndexType,IndexType,IndexType> Metrics::getDiameter( const scai::lama
 			}
 			*/
 		}else{
-			PRINT0("\tWARNING: Not computing diameter, not all vertices are in same block everywhere");
+			PRINT0("WARNING: Not computing diameter, not all vertices are in same block everywhere");
 		}
 	}
 	std::chrono::duration<ValueType,std::ratio<1>> diameterTime = std::chrono::high_resolution_clock::now() - diameterStart; 

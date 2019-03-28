@@ -528,6 +528,8 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanReparti
 	}
 //---------------------------------------------------------------------------------------	
 
+//relevant code can be found in zoltan, in Trilinos/packages/zoltan2/test/partition
+
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 	const scai::lama::CSRSparseMatrix<ValueType> &graph,
@@ -618,6 +620,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 		globalIds[i] = offset++;
 
 	//set node weights
+	//see also: Trilinos/packages/zoltan2/test/partition/MultiJaggedTest.cpp, ~line 590
 	const IndexType numWeights = nodeWeights.size();
 	std::vector<std::vector<ValueType>> localWeights( numWeights, std::vector<ValueType>( localN, 1.0) );
 	//localWeights[i][j] is the j-th weight of the i-th vertex (i is local ID)
@@ -635,12 +638,12 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 
 	std::vector<const ValueType *>weightVec( numWeights );
 	for( unsigned int w=0; w<numWeights; w++ ){
-		weightVec[0] = localWeights[w].data();
+		weightVec[w] = localWeights[w].data();
 	}
 
-	std::vector<int> weightStrides( numWeights, 1);
-	//weightStrides[0] = 1;
-	
+	//if it is stride.size()==0, it assumed that all strides are 1
+	std::vector<int> weightStrides; //( numWeights, 1);
+		
 	//create the problem and solve it
 	inputAdapter_t *ia= new inputAdapter_t(localN, globalIds, coordVec, 
                                          coordStrides, weightVec, weightStrides);

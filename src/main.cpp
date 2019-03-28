@@ -57,7 +57,7 @@ int main(int argc, char** argv) {
 	std::string metricsDetail = "all";
 	std::string blockSizesFile;
 	//ITI::Format coordFormat;
-    IndexType repeatTimes = 1;
+    
         
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -420,6 +420,7 @@ int main(int argc, char** argv) {
     //
     // partition the graph
     //
+    IndexType repeatTimes = settings.repeatTimes;
     
     if( repeatTimes>0 ){
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
@@ -481,17 +482,18 @@ int main(int argc, char** argv) {
         std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
 		if( metricsDetail=="all" ){
-			metricsVec[r].getAllMetrics( graph, partition, nodeWeights[0], settings );
+			metricsVec[r].getAllMetrics( graph, partition, nodeWeights, settings );
 		}
         if( metricsDetail=="easy" ){
-			metricsVec[r].getEasyMetrics( graph, partition, nodeWeights[0], settings );
+			metricsVec[r].getEasyMetrics( graph, partition, nodeWeights, settings );
 		}
-        
+
         metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
         metricsVec[r].MM["timeFinalPartition"] = ValueType (comm->max(partitionTime.count()));
 
 		std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
 
+if(comm->getRank() == 0 ) metricsVec[r].printHorizontal2( std::cout );        
         //---------------------------------------------
         //
         // Print some output
@@ -508,16 +510,28 @@ int main(int argc, char** argv) {
        
         //---------------------------------------------------------------
         //
-        // Reporting output to std::cout
+        // Reporting output to std::cout and file for this repeatition
         //
         
         metricsVec[r].MM["reportTime"] = ValueType (comm->max(reportTime.count()));
         
-        
         if (comm->getRank() == 0 && metricsDetail != "no") {
             metricsVec[r].print( std::cout );            
         }
-        
+        if( settings.storeInfo && settings.outFile!="-" ) {
+        	//std::vector<std::string> strs;			
+			//boost::split( strs, settings.outFile, boost::is_any_of("./") );
+        	//TODO: create a better tmp name
+        	std::string fileName = settings.outFile+ "_r"+ std::to_string(r)
+	        if( comm->getRank()==0 ){
+	            std::ofstream outF( fileName, std::ios::out);
+	            if(outF.is_open()){
+					settings.print( outF, comm);					
+					metricsVec[r].print( outF ); 
+				}
+			}
+		}
+
         comm->synchronize();
     }// repeat loop
         

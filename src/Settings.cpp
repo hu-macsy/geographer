@@ -87,7 +87,7 @@ variables_map Settings::parseInput(int argc, char** argv){
 				("useDiffusionTieBreaking", value<bool>(&useDiffusionTieBreaking)->default_value(useDiffusionTieBreaking), "Tuning Parameter: Use diffusion to break ties in Fiduccia-Mattheyes algorithm")
 				("useGeometricTieBreaking", value<bool>(&useGeometricTieBreaking)->default_value(useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
 				("skipNoGainColors", value<bool>(&skipNoGainColors)->default_value(skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
-				("mec", "Use the MEC algorithm for the edge coloring of the PE graph instead of the classical boost algorithm" )
+				("mec", "Use the MEC algorithm for the edge coloring of the PE graphFile instead of the classical boost algorithm" )
 				//multisection
 				("bisect", value<bool>(&bisect)->default_value(bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
 				("cutsPerDim", value<std::vector<IndexType>>(&cutsPerDim)->multitoken(), "If MultiSection is chosen, then provide d values that define the number of cuts per dimension.")
