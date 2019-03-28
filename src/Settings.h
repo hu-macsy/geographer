@@ -33,7 +33,7 @@ namespace ITI{
 enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5, BINARY = 6, EDGELIST = 7, BINARYEDGELIST = 8, EDGELISTDIST = 9};
 
 inline std::istream& operator>>(std::istream& in, Format& format){
-	std::string token;
+	std::string token;//TODO: There must be a more elegant way to do this with a map!
 	in >> token;
 	if (token == "AUTO" or token == "0")
 		format = ITI::Format::AUTO ;
