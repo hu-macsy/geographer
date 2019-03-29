@@ -89,7 +89,7 @@ TEST_F(GraphUtilsTest, testConstructLaplacian) {
     ASSERT_TRUE(L.isConsistent());
 
     //test that L*1 = 0
-    DenseVector<ValueType> x( n, 1 );
+    DenseVector<ValueType> x( L.getRowDistributionPtr(), 1 );
     DenseVector<ValueType> y = scai::lama::eval<DenseVector<ValueType>>( L * x );
 
     ValueType norm = y.maxNorm();
@@ -101,9 +101,6 @@ TEST_F(GraphUtilsTest, testConstructLaplacian) {
     LFromReplicated.redistribute(L.getRowDistributionPtr(), L.getColDistributionPtr());
     CSRSparseMatrix<ValueType> diff = scai::lama::eval<CSRSparseMatrix<ValueType>> (LFromReplicated - L);
     EXPECT_EQ(0, diff.l2Norm());
-
-    //sum is zero
-    EXPECT_EQ(0, comm->sum(scai::utilskernel::HArrayUtils::sum(L.getLocalStorage().getValues())) );
 }
 
 TEST_F(GraphUtilsTest, benchConstructLaplacian) {
