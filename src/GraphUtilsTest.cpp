@@ -281,7 +281,7 @@ TEST_F (GraphUtilsTest,testEdgeList2CSR){
 	std::vector< std::pair<IndexType, IndexType>> localEdgeList( localM );
 
 	srand( std::time(NULL)*thisPE );
-	int x = thisPE*(N/(numPEs-1));
+	int x = numPEs==1 ? 1 : thisPE*(N/(numPEs-1));
 	
     for(int i=0; i<localM; i++){
 		//to ensure that there are no isolated vertices
