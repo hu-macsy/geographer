@@ -278,10 +278,11 @@ TEST_F (GraphUtilsTest,testEdgeList2CSR){
 	std::vector< std::pair<IndexType, IndexType>> localEdgeList( localM );
 
 	srand( std::time(NULL)*thisPE );
+	int x = thisPE*(N/(numPEs-1));
 	
     for(int i=0; i<localM; i++){
 		//to ensure that there are no isolated vertices
-		IndexType v1 = (i + int(thisPE*2.5))%N; //(rand())%N;
+		IndexType v1 = (i + x)%N; //(rand())%N;
 		IndexType v2 = (v1+rand())%N;
 		localEdgeList[i] = std::make_pair( v1, v2 );
 		//PRINT(thisPE << ": inserting edge " << v1 << " - " << v2 );
