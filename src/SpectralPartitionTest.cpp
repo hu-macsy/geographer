@@ -25,24 +25,22 @@
 #include "FileIO.h"
 #include "gtest/gtest.h"
 #include "SpectralPartition.h"
-#include "AuxiliaryFunctions.h"
-
 
 namespace ITI {
 
-class SpectralPartitionTest : public ::testing::Test {
+class DISABLED_SpectralPartitionTest : public ::testing::Test {
 protected:
         // the directory of all the meshes used
         std::string graphPath = "./meshes/";
 };
 
-TEST_F(SpectralPartitionTest, testFiedlerVector) {
+TEST_F(DISABLED_SpectralPartitionTest, testFiedlerVector) {
     using scai::hmemo::HArray;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     // for now local refinement requires k = P
     //
-    IndexType N = 40;
+    IndexType N = 20;
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
 
@@ -57,7 +55,8 @@ TEST_F(SpectralPartitionTest, testFiedlerVector) {
      * create random graph with weighted edges. We first store the edges in a dense adjacency matrix, then manually convert to CSR.
      * This is necessary since the Lama-supplied conversion to CSR adds zero-valued entries on the diagonal, which confuses constructLaplacian
      */
-    {
+
+     {
         std::vector<ValueType> denseAdjacencyMatrix(N*N, 0);
 
         for (IndexType i = 0; i < N; i++) {
@@ -106,7 +105,7 @@ TEST_F(SpectralPartitionTest, testFiedlerVector) {
     }
     ValueType fiedlerEigenvalue = -8;
     scai::lama::DenseVector<ValueType> fiedler;
-    
+
     {   // get the getFiedlerVector function
         std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
         fiedler = SpectralPartition<IndexType, ValueType>::getFiedlerVector( graph, fiedlerEigenvalue );
@@ -116,7 +115,7 @@ TEST_F(SpectralPartitionTest, testFiedlerVector) {
     
     //TODO: done in a hurry, add proper tests, assertions
     //prints - assertion
-    
+
     ValueType fiedlerMax = fiedler.max();
     ValueType fiedlerl1Norm = fiedler.l1Norm();
     ValueType fiedlerl2Norm = fiedler.l2Norm();
@@ -130,7 +129,7 @@ TEST_F(SpectralPartitionTest, testFiedlerVector) {
 
 //------------------------------------------------------------------------------
 
-TEST_F(SpectralPartitionTest, testGetPartition){
+TEST_F(DISABLED_SpectralPartitionTest, DISABLED_testGetPartition){
     //std::string file = "Grid32x32";
     std::string file = graphPath + "trace-00008.graph";
     std::ifstream f(file);
@@ -162,13 +161,7 @@ TEST_F(SpectralPartitionTest, testGetPartition){
     // get spectral partition
     settings.pixeledSideLen = 16;    // for a 16x16 coarsen graph
     scai::lama::DenseVector<IndexType> spectralPartition = SpectralPartition<IndexType, ValueType>::getPartition( graph, coordinates, settings);
-    
-	//TODO: remove code if not needed
-    //if(dimensions==2){
-    //    ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, N, dimensions, "SpectralPartition_trace01");
-    //}
-    //aux::print2DGrid( graph, spectralPartition );
-    
+        
     EXPECT_GE(k-1, scai::utilskernel::HArrayUtils::max(spectralPartition.getLocalValues()) );
     EXPECT_EQ(N, spectralPartition.size());
     EXPECT_EQ(0, spectralPartition.min());
@@ -177,7 +170,7 @@ TEST_F(SpectralPartitionTest, testGetPartition){
 }
 //------------------------------------------------------------------------------
 
-TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
+TEST_F(DISABLED_SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     //std::string file = "Grid32x32";
     std::string file = graphPath + "trace-00008.graph";
     std::ifstream f(file);
@@ -229,7 +222,7 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     ValueType eigenEigenValue =0;
     
     // get the laplacian of the pixeled graph , since the pixeled graph is replicated so should be the laplacian
-    scai::lama::CSRSparseMatrix<ValueType> pixelLaplacian = GraphUtils::constructLaplacian<IndexType, ValueType>( pixelGraph );
+    scai::lama::CSRSparseMatrix<ValueType> pixelLaplacian = GraphUtils<IndexType, ValueType>::constructLaplacian( pixelGraph );
     SCAI_ASSERT( pixelLaplacian.isConsistent() == 1 , "Laplacian graph not consistent.");
     SCAI_ASSERT( pixelLaplacian.getNumRows() == numPixels , "Wrong size of the laplacian.");
     ValueType sum=0;
@@ -285,13 +278,14 @@ TEST_F(SpectralPartitionTest, testGetPartitionFromPixeledGraph){
     eigenVec.sort(permutation, true);
     fiedler.sort(permutationF, true);
     
+    /*
     PRINT0("The permutation should be almost the same or the inverse: ");
     for(int i=0; i<fiedler.size(); i++){
         if( i<10 or i>fiedler.size()-10){
             PRINT0(i<<": "<< permutation.getValue(i) << " + " << permutationF.getValue(i) );
         }
     }
-    
+    */
 }
 
     

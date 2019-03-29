@@ -6,6 +6,7 @@
  */
 
 #include "FileIO.h"
+#include "CommTree.h"
 
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>
@@ -47,9 +48,9 @@ namespace ITI {
  *
  */
 template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename){
+void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename, const bool edgeWeights){
     SCAI_REGION( "FileIO.writeGraph" )
-    
+	
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
     IndexType root =0;
@@ -64,10 +65,7 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
     // in order to keep input array unchanged, create new tmp array by coping
     // adjM.redistribute( noDist , noDist);
     
-    auto tmpAdjM = scai::lama::distribute<scai::lama::CSRSparseMatrix<ValueType>>( adjM.getLocalStorage(),
-                                                                                   adjM.getRowDistributionPtr(),
-                                                                                   adjM.getColDistributionPtr()
-                                                                                );
+    CSRSparseMatrix<ValueType> tmpAdjM( adjM );                 
     tmpAdjM.redistribute( noDist , noDist);
 
     if(comm->getRank()==root){
@@ -79,17 +77,26 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
         const scai::lama::CSRStorage<ValueType>& localAdjM = tmpAdjM.getLocalStorage();
         const scai::hmemo::ReadAccess<IndexType> rGlobalIA( localAdjM.getIA() );
         const scai::hmemo::ReadAccess<IndexType> rGlobalJA( localAdjM.getJA() );
+		const scai::hmemo::ReadAccess<ValueType> rGlobalVal( localAdjM.getValues() );
         
         // first line is number of nodes and edges
         IndexType cols= tmpAdjM.getNumColumns();
-        fNew << cols <<" "<< tmpAdjM.getNumValues()/2 << std::endl;
+        fNew << cols <<" "<< tmpAdjM.getNumValues()/2; 
+        if(edgeWeights){
+            fNew << " 001";
+        }
+        fNew<< std::endl;
 
         // globlaIA.size() = globalN+1
         SCAI_ASSERT_EQ_ERROR( rGlobalIA.size() , globalN+1, "Wrong globalIA size.");
         for(IndexType i=0; i< globalN; i++){        // for all local nodes
             for(IndexType j= rGlobalIA[i]; j<rGlobalIA[i+1]; j++){             // for all the edges of a node
-                SCAI_ASSERT( rGlobalJA[j]<= globalN , rGlobalJA[j] << " must be < "<< globalN );
-                fNew << rGlobalJA[j]+1 << " ";
+                SCAI_ASSERT_LE_ERROR( rGlobalJA[j], globalN , rGlobalJA[j] << " must be < "<< globalN );
+				if(!edgeWeights){
+					fNew << rGlobalJA[j]+1 << " ";
+				} else {
+					fNew << rGlobalJA[j]+1 << " "<< rGlobalVal[j]<< " ";
+				}
             }
             fNew << std::endl;
         }
@@ -399,43 +406,45 @@ void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<Inde
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	scai::dmemo::DistributionPtr dist = part.getDistributionPtr();
 
-        const IndexType localN = dist->getLocalSize();
-        const IndexType globalN = dist->getGlobalSize();
-        const IndexType numPEs = comm->getSize();
-        
-        scai::hmemo::ReadAccess<IndexType> localPart( part.getLocalValues() );
-        SCAI_ASSERT_EQ_ERROR( localPart.size(), localN, "Local sizes do not agree");
-        
-        std::ofstream outfile;
-	   
-        for(IndexType p=0; p<numPEs; p++){  // numPE rounds, in each round only one PE writes its part
-            if( comm->getRank()==p ){ 
-                if( p==0 ){
-                    outfile.open(filename.c_str(), std::ios::binary | std::ios::out);
-                    outfile << "% " << globalN << std::endl;    // the first line has a comment with the number of nodes
-                }else{
-                    // if not the first PE then append to file
-                    outfile.open(filename.c_str(), std::ios::binary | std::ios::app);
-                }
-                if( outfile.fail() ){
-                    throw std::runtime_error("Could not write to file " + filename);
-                }
-                            
-                for( IndexType i=0; i<localN; i++){                    
-                    outfile << dist->local2Global(i) << " "<< localPart[i] << std::endl;
-                }
-				/* TODO: resolve commented code         
-                // the last PE maybe has less local values
-                if( p==numPEs-1 ){
-                    SCAI_ASSERT_EQ_ERROR( outfile.tellp(), globalN , "While writing coordinates in parallel: Position in file " << filename << " is not correct." );
-                }else{
-                    SCAI_ASSERT_EQ_ERROR( outfile.tellp(), localN*(comm->getRank()+1) , "While writing coordinates in parallel: Position in file " << filename << " is not correct for processor " << comm->getRank() );
-                }
-				*/              
-                outfile.close();
+    const IndexType localN = dist->getLocalSize();
+    const IndexType globalN = dist->getGlobalSize();
+    const IndexType numPEs = comm->getSize();
+    
+    scai::hmemo::ReadAccess<IndexType> localPart( part.getLocalValues() );
+    SCAI_ASSERT_EQ_ERROR( localPart.size(), localN, "Local sizes do not agree");
+    
+    std::ofstream outfile;
+   
+    for(IndexType p=0; p<numPEs; p++){  // numPE rounds, in each round only one PE writes its part
+
+        if( comm->getRank()==p ){ 
+            if( p==0 ){
+                outfile.open(filename.c_str(), std::ios::binary | std::ios::out);
+                outfile << "% " << globalN << std::endl;    // the first line has a comment with the number of nodes
+            }else{
+                // if not the first PE then append to file
+                outfile.open(filename.c_str(), std::ios::binary | std::ios::app);
             }
-            comm->synchronize();    //TODO: takes huge time here
+            if( outfile.fail() ){
+                throw std::runtime_error("Could not write to file " + filename);
+            }
+                        
+            for( IndexType i=0; i<localN; i++){                    
+                outfile << localPart[i] << std::endl;
+            }
+			/* TODO: resolve commented code         
+            // the last PE maybe has less local values
+            if( p==numPEs-1 ){
+                SCAI_ASSERT_EQ_ERROR( outfile.tellp(), globalN , "While writing coordinates in parallel: Position in file " << filename << " is not correct." );
+            }else{
+                SCAI_ASSERT_EQ_ERROR( outfile.tellp(), localN*(comm->getRank()+1) , "While writing coordinates in parallel: Position in file " << filename << " is not correct for processor " << comm->getRank() );
+            }
+            */
+			outfile.close();
+            //PRINT("PE " << p << " wrote its part");
         }
+        comm->synchronize();    //TODO: takes huge time here
+	}
 }
 //-------------------------------------------------------------------------------------------------
 
@@ -478,14 +487,15 @@ void FileIO<IndexType, ValueType>::writeDenseVectorParallel(const DenseVector<T>
             for( IndexType i=0; i<localN; i++){                    
                 outfile << localPart[i] << std::endl;
             }
-                          
+            
             // the last PE maybe has less local values
             if( p==numPEs-1 ){
                 SCAI_ASSERT_EQ_ERROR( outfile.tellp(), globalN , "While writing DenseVector in parallel: Position in file " << filename << " is not correct." );
             }else{
                 SCAI_ASSERT_EQ_ERROR( outfile.tellp(), localN*(comm->getRank()+1) , "While writing DenseVector in parallel: Position in file " << filename << " is not correct for processor " << comm->getRank() );
             }
-                
+
+            PRINT("PE " << p << " wrote its part");
             outfile.close();
         }
         comm->synchronize();    //TODO: takes huge time here
@@ -511,12 +521,18 @@ void FileIO<IndexType, ValueType>::writeDenseVectorCentral(DenseVector<IndexType
     if( comm->getRank() ){
     
         std::ofstream f( filename );  
+
+        if( f.fail() ){
+			throw std::runtime_error("Could not write to file " + filename);
+		}
         
         const scai::hmemo::ReadAccess<IndexType> rPart( part.getLocalValues() );
         for( IndexType i=0; i<globalN; i++){
             f << rPart[i]<< std::endl;
         }
     }    
+    //redistribute back to original distribution
+    part.redistribute( dist );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -597,7 +613,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 		std::getline(ss, item, ' ');
 		globalM = std::stoll(item);
 		
-		if( globalN<=0 or globalM<=0 ){
+		if( globalN<=0 or globalM<0 ){
 			throw std::runtime_error("Negative input, maybe int value is not big enough: globalN= "
 			+ std::to_string(globalN) + " , globalM= " + std::to_string(globalM));
 		}
@@ -676,7 +692,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     for (IndexType i = 0; i < localN; i++) {
     	bool read = !std::getline(file, line).fail();
         
-	if( !read) PRINT(*comm << ": " <<  i << " __ " << line << " || " << file.tellg() );        
+		if( !read) PRINT(*comm << ": " <<  i << " __ " << line << " || " << file.tellg() );        
     	//remove leading and trailing whitespace, since these can confuse the string splitter
     	boost::algorithm::trim(line);
     	assert(read);//if we have read past the end of the file, the node count was incorrect
@@ -762,7 +778,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
     //assign matrix
     scai::lama::CSRStorage<ValueType> myStorage(localN, globalN, 
-                HArray<IndexType>(ia.size(), ia.data()),
+            HArray<IndexType>(ia.size(), ia.data()),
     		HArray<IndexType>(ja.size(), ja.data()),
     		HArray<ValueType>(values.size(), values.data()));
 
@@ -843,6 +859,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             //std::cout << "Process " << thisPE << " reading from " << beginLocalRange << " to " << endLocalRange << ", in total, localN= " << localN << " nodes/lines" << std::endl;
             
             ia.resize( localN +1);
+            ia[0]=0;
             
             //
             // read the vertices offsets
@@ -1043,7 +1060,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
         globalM = std::stoll(item);
     }
 
-	if( globalN<=0 or globalM<=0 ){
+	if( globalN<=0 or globalM<0 ){
 		throw std::runtime_error("Negative input, maybe int value is not big enough: globalN= " + std::to_string(globalN) + " , globalM= " + std::to_string(globalM));
 	}
 	
@@ -1118,8 +1135,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 	    std::cout << "Warning: More than half of all nodes are isolated!" << std::endl;
 	    std::cout << "Max encountered node: " << maxEncounteredNode << std::endl;
 	}
+    scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils<IndexType, ValueType>::edgeList2CSR( edgeList );
 
-    scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils::edgeList2CSR<IndexType, ValueType>( edgeList );
     scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, globalN) );
     scai::dmemo::DistributionPtr noDist( new scai::dmemo::NoDistribution(globalN));
     graph.redistribute(rowDistPtr, noDist);
@@ -1169,7 +1186,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 		
 	}
 	
-	scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils::edgeList2CSR<IndexType, ValueType>( edgeList );
+	scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils<IndexType, ValueType>::edgeList2CSR( edgeList );
     
     return graph;
 	
@@ -1702,7 +1719,7 @@ void  FileIO<IndexType, ValueType>::readOFFTriangularCentral( scai::lama::CSRSpa
     // convert adjacency list to CSR matrix
     //
     
-    graph = GraphUtils::getCSRmatrixFromAdjList_NoEgdeWeights<IndexType, ValueType>( adjList );
+    graph = GraphUtils<IndexType, ValueType>::getCSRmatrixFromAdjList_NoEgdeWeights( adjList );
     SCAI_ASSERT_EQ_ERROR( graph.getNumColumns(), N, "Wrong number of columns");
     SCAI_ASSERT_EQ_ERROR( graph.getNumRows(), N, "Wrong number of rows");
     if( numEdges!=0 ){
@@ -1790,7 +1807,7 @@ void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix
 		// convert adjacency list to CSR matrix
 		//
 		
-		graph = GraphUtils::getCSRmatrixFromAdjList_NoEgdeWeights<IndexType, ValueType>( adjList );
+		graph = GraphUtils<IndexType, ValueType>::getCSRmatrixFromAdjList_NoEgdeWeights( adjList );
 	}
 	
     
@@ -1859,10 +1876,10 @@ DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::st
 
     //skip the first lines that have comments starting with '%'
     std::string line;
-    std::getline(file, line);
+    bool read = !std::getline(file, line).fail();
 
     while( line[0]== '%'){
-       std::getline(file, line);
+       read = !std::getline(file, line).fail();
     }
     std::stringstream ss;
     ss.str( line );
@@ -1876,17 +1893,17 @@ DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::st
 
 	//scroll to begin of local range.
 	for (IndexType i = 0; i < beginLocalRange; i++) {
-		std::getline(file, line);
+		read = !std::getline(file, line).fail();
 	}
 
 	std::vector<IndexType> localPart;
 
 	for (IndexType i = 0; i < localN; i++) {
-		bool read = !std::getline(file, line).fail();
 		if (!read) {
 			throw std::runtime_error("In FileIO.cpp, line " + std::to_string(__LINE__) +": Unexpected end of file " + filename + ". Was the number of nodes correct?");
 	    }
 		localPart.push_back(std::stoi(line));
+        read = !std::getline(file, line).fail();
 	}
 
 	scai::hmemo::HArray<IndexType> hLocal(localPart.size(), localPart.data());
@@ -2192,11 +2209,11 @@ std::pair<IndexType, IndexType> FileIO<IndexType, ValueType>::getMatrixMarketCoo
 
 //-------------------------------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
-std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::string filename , const IndexType numBlocks){
+std::vector<std::vector<ValueType> > FileIO<IndexType, ValueType>::readBlockSizes(const std::string filename , const IndexType numBlocks, const IndexType numWeights){
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
-    std::vector<IndexType> blockSizes(numBlocks, 0);
+    std::vector<std::vector<ValueType> > blockSizes(numWeights, std::vector<ValueType>(numBlocks,0));
     
     if( comm->getRank()==0 ){
         std::ifstream file(filename);
@@ -2221,12 +2238,15 @@ std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::s
             }
             std::stringstream ss;    
             ss.str( line );
-            IndexType bSize;
-            ss >> bSize;
-            //blockSizes.push_back(bSize);
-            blockSizes[i]= bSize;
+
+            for (IndexType j = 0; j < numWeights; j++) {
+            	ValueType bSize;
+				ss >> bSize;
+				//blockSizes.push_back(bSize);
+				blockSizes[j][i]= bSize;
+            }
         }
-        SCAI_ASSERT( blockSizes.size()==numBlocks , "Wrong number of blocks: "  <<blockSizes.size() << " for file " << filename);
+        SCAI_ASSERT( blockSizes[0].size()==numBlocks , "Wrong number of blocks: "  <<blockSizes[0].size() << " for file " << filename);
         file.close();
         
         bool eof = std::getline(file, line).eof();
@@ -2234,12 +2254,121 @@ std::vector<IndexType> FileIO<IndexType, ValueType>::readBlockSizes(const std::s
             throw std::runtime_error(std::to_string(numBlocks) + " blocks read, but file continues.");
         }
     }
-    comm->bcast( blockSizes.data(), numBlocks, 0);
     
+    for (IndexType i = 0; i < numWeights; i++) {
+    	comm->bcast( blockSizes[0].data(), numBlocks, 0);
+    }
+
     return blockSizes;
 }
 //-------------------------------------------------------------------------------------------------
- 
+
+template<typename IndexType, typename ValueType>
+CommTree<IndexType,ValueType> FileIO<IndexType, ValueType>::readPETree( const std::string& filename ){
+
+	if( not fileExists(filename) ){
+		std::cout<<"Erros, file " << filename << " to read processor tree does not exists.\nAborting..." << std::endl;
+		throw std::runtime_error("File "+ filename+ " failed.");
+	}else{
+		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		if( comm->getRank()==0 ){
+			std::cout<< "Reading from file "<< filename << std::endl;
+		}
+	}
+
+	std::ifstream file(filename);
+
+	//skip the first lines that have comments starting with '%' or '#'
+    std::string line;
+    std::getline(file, line);
+
+    while( line[0]== '%' or line[0]== '#' ){
+       std::getline(file, line);
+    }
+    std::stringstream ss;
+    ss.str( line );
+
+    IndexType numPEs;
+    IndexType numWeights;
+
+    //first line after comments should have the number of PEs
+    //and number of weights
+    ss >> numPEs;
+    ss >> numWeights;
+	{
+		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+	    if( comm->getRank()==0 ){
+			std::cout<< "\t... with "<< numPEs << " and " << numWeights << " weights each"<< std::endl;
+		}
+	}
+
+	//next entries should have a bit for every node weight indicating if it is  proportional
+	
+	std::vector<bool> isProp( numWeights );
+	for( unsigned int w=0; w<numWeights; w++ ){
+		std::string b;
+		ss >> b;
+		isProp[w] = bool( std::stoi(b) );
+	}
+
+	//read by line to create the leaves
+
+    std::vector<cNode> leaves(numPEs);
+
+    for(int i=0;i<numPEs; i++){
+         bool read = !std::getline(file, line).fail();
+                 
+        if (!read and i!=numPEs-1 ) {
+			throw std::runtime_error("In FileIO.cpp, line " + std::to_string(__LINE__) +": Unexpected end of processor tree file " + filename + ". Was the number of PEs correct?");
+        }
+
+        //TODO: this (with all the stings and streams) is probably a stupid and not efficient way; fix
+        std::stringstream ss;    
+        ss.str( line );
+
+        std::vector<unsigned int> hierarchy;
+        std::vector<ValueType> weights( numWeights );
+
+        std::string tok;
+        ss >> tok;
+
+        while( tok!="#"){
+        	hierarchy.push_back( std::stoi(tok) );
+        	ss >> tok;
+        }
+
+        // found '#', create the weights
+
+        for( unsigned int w=0; w<numWeights; w++){
+        	ss >> tok;
+        	weights[w] = std::stod(tok);
+        }
+
+		cNode node(hierarchy, weights );
+		leaves[i]= node;
+     }
+
+     return CommTree<IndexType,ValueType>( leaves, isProp );
+}
+
+
+// taken from https://stackoverflow.com/questions/4316442/stdofstream-check-if-file-exists-before-writing
+/** Check if a file exists
+@param[in] filename - the name of the file to check
+@return    true if the file exists, else false
+*/
+template<typename IndexType, typename ValueType>
+bool FileIO<IndexType, ValueType>::fileExists(const std::string& filename){
+    struct stat buf;
+    if (stat(filename.c_str(), &buf) != -1)
+    {
+        return true;
+    }
+    return false;
+}
+//------------------------------------------------------------------------------
+
  template class FileIO<IndexType, ValueType>;
 
 } /* namespace ITI */

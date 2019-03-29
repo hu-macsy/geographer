@@ -1,9 +1,5 @@
 #include "FileIO.h"
-
 #include "KMeans.h"
-#include "AuxiliaryFunctions.h"
-
-//#include "Repartition.h"
 
 #include "gtest/gtest.h"
 
@@ -36,6 +32,7 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
 	const IndexType p = comm->getSize();
 	Settings settings;
 	settings.numBlocks = k;
+	settings.dimensions = dimensions;
 
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
@@ -45,11 +42,11 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
         SCAI_ASSERT_NE_ERROR( minCoords[dim], maxCoords[dim], "min=max for dimension "<< dim << ", this will cause problems to the hilbert index. local= " << coords[0].getLocalValues().size() );
     }
 
-	std::vector<std::vector<ValueType> > centers = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords,  minCoords, maxCoords, settings);
+	std::vector<std::vector<ValueType>> centers = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords,  minCoords, maxCoords, settings);
 
 	//check for size
-	EXPECT_EQ(dimensions, centers.size());
-	EXPECT_EQ(k, centers[0].size());
+	EXPECT_EQ(k, centers.size());
+	EXPECT_EQ(dimensions, centers[0].size());
 
 	//check for distinctness
 	bool allDistinct = true;
@@ -57,7 +54,7 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
 		for (IndexType j = i+1; j < k; j++) {
 			bool differenceFound = false;
 			for (IndexType d = 0; d < dimensions; d++) {
-				if (centers[d][i] != centers[d][j]) {
+				if (centers[i][d] != centers[j][d]) {
 					differenceFound = true;
 				}
 			}
@@ -65,7 +62,7 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
 				allDistinct = false;
 				std::cout << "Centers " << i << " and " << j << " are both at ";
 				for (IndexType d = 0; d < dimensions; d++) {
-					std::cout << "(" << centers[d][i] << "|" << centers[d][j] << ") ";
+					std::cout << "(" << centers[i][d] << "|" << centers[j][d] << ") ";
 				}
 				std::cout << std::endl;
 			}
@@ -74,8 +71,8 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
 	EXPECT_TRUE(allDistinct);
 
 	//check for equality across processors
-	for (IndexType d = 0; d < dimensions; d++) {
-		ValueType coordSum = std::accumulate(centers[d].begin(), centers[d].end(), 0.0);
+	for (IndexType i=0; i<k; i++) {
+		ValueType coordSum = std::accumulate(centers[i].begin(), centers[i].end(), 0.0);
 		ValueType totalSum = comm->sum(coordSum);
 		EXPECT_LT(std::abs(p*coordSum - totalSum), 1e-5);
 	}
@@ -121,6 +118,9 @@ TEST_F(KMeansTest, testFindCenters) {
 	centers = KMeans::findCenters(coords, part, k, nodeIndices.begin(), nodeIndices.end(), uniformWeights);
 }
 
+//TODO: got undefined reference for getLocalMinMaxCoords and findInitialCentersFromSFCOnly
+//update: instantiation is needed
+
 
 TEST_F(KMeansTest, testCentersOnlySfc) {
 	std::string fileName = "bubbles-00010.graph";
@@ -147,10 +147,28 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 	
 	// get centers
 	std::vector<std::vector<ValueType>> centers1 = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords, minCoords, maxCoords, settings);
-	
+	EXPECT_EQ( centers1.size(), k );
+	EXPECT_EQ( centers1[0].size(), dimensions );
+
 	settings.sfcResolution = std::log2(k);
 	std::vector<std::vector<ValueType>> centers2 = KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>( maxCoords, settings);
-	
+	EXPECT_EQ( centers2.size(), dimensions );
+
+//WARNING: quick fix for tests to pass
+//TODO: the functions should agree on their return type: either a vector of size k*dimensions (centers2) or dimension*k (centers2)
+{	
+	std::vector<std::vector<ValueType>> reversedCenters( dimensions, std::vector<ValueType>(settings.numBlocks, 0.0) );
+	for( unsigned int c=0; c<settings.numBlocks; c++){
+		for( unsigned int d=0; d<dimensions; d++){
+			reversedCenters[d][c] = centers1[c][d];
+		}
+	}
+
+	centers1 = reversedCenters;
+}
+
+
+
 	EXPECT_EQ( centers1.size(), centers2.size() );
 	EXPECT_EQ( centers1[0].size(), centers2[0].size() );
 	EXPECT_EQ( centers1[0].size(), k);
@@ -182,6 +200,170 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 			std::cout<< "\b\b )" << std::endl;
 		}
 	}
+}
+
+
+TEST_F(KMeansTest, testHierarchicalPartition) {
+	//std::string fileName = "bubbles-00010.graph";
+	std::string fileName = "Grid32x32";
+	//std::string fileName = "Grid8x8";
+	std::string graphFile = graphPath + fileName;
+	std::string coordFile = graphFile + ".xyz";
+	const IndexType dimensions = 2;
+
+	//load graph and coords
+	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+	const IndexType n = graph.getNumRows();
+	std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
+
+	//set uniform node weights
+	scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+
+	//or fixed weights
+	scai::lama::DenseVector<ValueType> fixedNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+	{
+		scai::hmemo::WriteAccess<ValueType> localWeights( fixedNodeWeights.getLocalValues() );
+		int localN = localWeights.size();
+		for(int i=0; i<localN; i++){
+			localWeights[i] = dist->local2Global(i);
+		}
+
+	}
+
+	ValueType c = 2;
+	scai::lama::DenseVector<ValueType> constNodeWeights = unitNodeWeights;
+	constNodeWeights *= c;
+
+	//scai::lama::DenseVector<ValueType> nodeWeights = fixedNodeWeights;
+	std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { unitNodeWeights, unitNodeWeights, constNodeWeights };
+
+	std::cout << "Sum of node weights are: " << std::endl;
+	for( unsigned int i=0; i<nodeWeights.size(); i++ ){
+		std::cout << "weight " << i << ": " << nodeWeights[i].sum() << std::endl;
+	}
+		/*
+		std::transform( unitNodeWeights.begin(), unitNodeWeights.end(), unitNodeWeights.begin(), \
+			std::bind( std::multiplies<ValueType>(), 2) ) };
+		*/
+	//const IndexType k = comm->getSize();
+	//using KMeans::cNode;
+
+	//set CommTree
+	std::vector<cNode> leaves = {
+		// 				{hierachy ids}, numCores, mem, speed
+		cNode( std::vector<unsigned int>{0,0}, {141, 8, 0.3} ),
+		cNode( std::vector<unsigned int>{0,1}, {154, 8, 0.9} ),
+
+		cNode( std::vector<unsigned int>{1,0}, {126, 10, 0.8} ),
+		cNode( std::vector<unsigned int>{1,1}, {276, 10, 0.9} ),
+		cNode( std::vector<unsigned int>{1,2}, {67, 10, 0.7} ),
+
+		cNode( std::vector<unsigned int>{2,0}, {81, 12, 0.6} ),
+		cNode( std::vector<unsigned int>{2,1}, {88, 12, 0.7} ),
+		cNode( std::vector<unsigned int>{2,2}, {156, 12, 0.7} ),
+		cNode( std::vector<unsigned int>{2,3}, {108, 12, 0.5} ),
+		cNode( std::vector<unsigned int>{2,4}, {221, 12, 0.5} )
+	};
+
+	ITI::CommTree<IndexType,ValueType> cTree( leaves, { false, true, true } );
+
+	cTree.adaptWeights( nodeWeights );
+
+	struct Settings settings;
+	settings.dimensions = dimensions;
+	settings.numBlocks = leaves.size();
+	settings.debugMode = false;
+	settings.verbose = false;
+	settings.storeInfo = false;
+	settings.epsilon = 0.05;
+	settings.balanceIterations = 5;
+	settings.maxKMeansIterations = 5;
+	settings.minSamplingNodes = -1;
+
+	Metrics metrics(settings);
+
+	scai::lama::DenseVector<IndexType> partition = KMeans::computeHierarchicalPartition( graph, coords, nodeWeights, cTree, settings, metrics);
+
+	//checks - prints
+
+	std::vector<ValueType> imbalances = cTree.computeImbalance( partition, settings.numBlocks, nodeWeights );
+
+	if (comm->getRank() == 0) {
+		std::cout << "final imbalances: ";
+		for (IndexType i = 0; i < imbalances.size(); i++) {
+			std::cout << " " << imbalances[i];
+		}
+		std::cout << std::endl;
+	}
+}
+
+TEST_F(KMeansTest, testComputePartitionWithMultipleWeights) {
+	std::string fileName = "bubbles-00010.graph";
+	std::string graphFile = graphPath + fileName;
+	std::string coordFile = graphFile + ".xyz";
+
+	const IndexType numNodeWeights = 2;
+
+	//load graph
+	CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+
+	struct Settings settings;
+	settings.dimensions = 2;
+	settings.epsilon = 0.05;
+	settings.numBlocks = comm->getSize();
+	settings.verbose = true;
+
+	//load coords
+	const IndexType globalN = graph.getNumRows();
+	const IndexType localN = dist->getLocalSize();
+	const std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), globalN, settings.dimensions);
+
+	//set first weight uniform, second weight random
+	const scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+	scai::lama::DenseVector<ValueType> randomNodeWeights(dist, 0);
+	randomNodeWeights.fillRandom(10);
+
+	const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = {unitNodeWeights, randomNodeWeights};
+	std::vector<std::vector<ValueType>> blockSizes(numNodeWeights);
+
+	std::vector<ValueType> nodeWeightSum(numNodeWeights);
+	for (IndexType i = 0; i < numNodeWeights; i++) {
+		nodeWeightSum[i] = nodeWeights[i].sum();
+
+		blockSizes[i].resize(settings.numBlocks, std::ceil(nodeWeightSum[i]/settings.numBlocks));
+	}
+
+	Metrics metrics(settings);
+	//use hilbert redistribution before?
+	scai::lama::DenseVector<IndexType> partition = ITI::KMeans::computePartition<IndexType, ValueType>( coords, nodeWeights, blockSizes, settings, metrics);
+
+	//assert that distributions are still the same
+
+	{
+		scai::hmemo::ReadAccess<IndexType> rPartition(partition.getLocalValues());
+		for (IndexType j = 0; j < numNodeWeights; j++) {
+			std::vector<ValueType> blockWeights(settings.numBlocks);
+			scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[j].getLocalValues());
+
+			for (IndexType i = 0; i < localN; i++) {
+				IndexType block = rPartition[i];
+				blockWeights[block] += rWeights[i];
+			}
+
+			comm->sumImpl( blockWeights.data(), blockWeights.data(), settings.numBlocks, scai::common::TypeTraits<ValueType>::stype);
+
+			for (IndexType b = 0; b < settings.numBlocks; b++) {
+				if (settings.verbose && comm->getRank() == 0) std::cout << "blockWeights[" << j << "][" << b << "] = " << blockWeights[b] << std::endl;
+				EXPECT_LE(blockWeights[b], std::ceil(blockSizes[j][b])*(1+settings.epsilon));
+			}
+		}
+	}
+
+	//check for correct error messages: block sizes not aligned to node weights, different distributions in coordinates and weights, weights not fitting into blocks, balance
 }
 
 /*

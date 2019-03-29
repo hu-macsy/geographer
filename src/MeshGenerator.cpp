@@ -71,8 +71,10 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_seq(CSRSparseMa
     HArray<ValueType> csrValues;
     // ja and values have size= edges of the graph
     // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
-    IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
-                                -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
+    IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2]
+                         - numPoints[0]*numPoints[1]
+                         - numPoints[0]*numPoints[2]
+                         - numPoints[1]*numPoints[2];
     {    
         WriteOnlyAccess<IndexType> ia( csrIA, N +1 );
         WriteOnlyAccess<IndexType> ja( csrJA, numEdges*2);

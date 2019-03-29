@@ -42,7 +42,7 @@ scai::lama::DenseVector<IndexType> SpectralPartition<IndexType, ValueType>::getP
     SCAI_ASSERT( pixelGraph.isConsistent() == 1 , "Pixeled graph not consistent.");
     
     // get the laplacian of the pixeled graph , since the pixeled graph is replicated so should be the laplacian
-    scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils::constructLaplacian<IndexType, ValueType>(pixelGraph);
+    scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils<IndexType, ValueType>::constructLaplacian(pixelGraph);
     SCAI_ASSERT( laplacian.isConsistent() == 1 , "Laplacian graph not consistent.");
     SCAI_ASSERT( laplacian.getNumRows() == numPixels , "Wrong size of the laplacian.");
     
@@ -178,7 +178,7 @@ scai::lama::DenseVector<ValueType> SpectralPartition<IndexType, ValueType>::getF
     IndexType globalN= adjM.getNumRows();
     SCAI_ASSERT_EQ_ERROR( globalN, adjM.getNumColumns(), "Matrix not square, numRows != numColumns");
     
-    scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils::constructLaplacian<IndexType, ValueType>( adjM );
+    scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils<IndexType, ValueType>::constructLaplacian( adjM );
     
     // set u=[ 1+sqrt(n), 1, 1, 1, ... ]
     ValueType n12 = scai::common::Math::sqrt( ValueType( globalN ));

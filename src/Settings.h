@@ -1,5 +1,10 @@
 #pragma once
 
+#include <iostream>
+#include <scai/lama.hpp>
+#include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
+
 #define STRINGIZER(arg)     #arg
 #define STR_VALUE(arg)      STRINGIZER(arg)
 #define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
@@ -9,16 +14,26 @@
 const std::string version = BUILD_COMMIT_STRING;
 
 // typedef long int IndexType;
-
 using scai::IndexType;
-
+//using scai::ValueType;
 typedef double ValueType;
 
+/*The size of a point/vertex in the application. This is mainly (only)
+used for the mapping using the CommTree. Every node in the tree has a 
+memory variable that indicated the maximum allowed size of this PE or
+group of PEs. Remember, in the CommTree the leaves are the actual PEs
+and the other nodes are groups consisting of a number of PEs. Then,
+every PEs p, can contain at most p.memory/bytesPerVertex vertices.
+TODO: investigate the best value to use
+*/
+const IndexType bytesPerVertex = 8;
+
 namespace ITI{
+
 enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5, BINARY = 6, EDGELIST = 7, BINARYEDGELIST = 8, EDGELISTDIST = 9};
 
 inline std::istream& operator>>(std::istream& in, Format& format){
-	std::string token;
+	std::string token;//TODO: There must be a more elegant way to do this with a map!
 	in >> token;
 	if (token == "AUTO" or token == "0")
 		format = ITI::Format::AUTO ;
@@ -75,46 +90,6 @@ inline std::ostream& operator<<(std::ostream& out, Format method){
 //-----------------------------------------------------------------------------------
 
 enum class Tool{ geographer, geoKmeans, geoSFC, parMetisGraph, parMetisGeom, parMetisSFC, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC};
-	
-/*	
-static std::string tool2string( Tool t){
-	switch( t){
-		case Tool::geographer:
-			return "geographer";
-			
-		case Tool::geoKmeans:
-			return "geoKmeans";
-			
-		case Tool::geoSFC:
-			return "geoSFC";
-			
-		case Tool::parMetisGraph:
-			return "parMetisGraph";
-			
-		case Tool::parMetisGeom:
-			return "parMetisGeom";
-			
-		case Tool::parMetisSFC:
-			return "parMetisSFC";
-			
-		case Tool::zoltanRIB:
-			return "zoltanRib";
-		
-		case Tool::zoltanRCB:
-			return "zoltanRcb";
-		
-		case Tool::zoltanMJ:
-			return "zoltanMJ";
-			
-		case Tool::zoltanSFC:
-			return "zoltanHsfc";
-			
-		default:
-			throw std::runtime_error("Wrong tool given to convert to string.\nAborting...");
-			return NULL;
-	}
-}
-*/
 
 }// ITI
 
@@ -122,8 +97,9 @@ static std::string tool2string( Tool t){
 enum class InitialPartitioningMethods {SFC = 0, Pixel = 1, Spectral = 2, KMeans = 3, Multisection = 4, MJ = 5, None = 6};
 
 //-----------------------------------------------------------------------------------
+std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method);
 
-
+std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method);
 
 struct Settings{
     //partition settings
@@ -135,10 +111,14 @@ struct Settings{
     IndexType dimensions= 2;
     std::string fileName = "-";
     std::string outFile = "-";
+    std::string outDir = "-"; //this is used by the competitors main
+    std::string PEGraphFile = "-";
+    std::string blockSizesFile = "-";
     ITI::Format fileFormat = ITI::Format::AUTO;   // 0 for METIS, 4 for MatrixMarket
+    ITI::Format coordFormat = ITI::Format::AUTO; 
     bool useDiffusionCoordinates = false;
     IndexType diffusionRounds = 20;
-    std::vector<IndexType> blockSizes;
+    IndexType numNodeWeights = -1;
     std::string machine;
     
     //mesh generation
@@ -164,7 +144,10 @@ struct Settings{
     IndexType sfcResolution = 17;
 
     //tuning parameters balanced K-Means
-    IndexType minSamplingNodes = 100;
+//TODO?: in the heterogenous and hierarchical case, minSamplingNodes
+//makes more sense to be a percentage of the nodes, not a number. Or not?
+    IndexType minSamplingNodes = 100;	
+
     double influenceExponent = 0.5;
     double influenceChangeCap = 0.1;
     IndexType balanceIterations = 20;
@@ -184,27 +167,42 @@ struct Settings{
     bool noRefinement = false;
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
+    IndexType thisRound=-1;
+    bool mec = true;
 
     //debug and profiling parameters
     bool verbose = false;
     bool writeDebugCoordinates = false;
+    bool writePEgraph = false;
     bool writeInFile = false;
     bool storeInfo = false;
-	int repeatTimes = 1;
+    //TODO: turn to false by default
+    bool debugMode = false; //extra checks and prints
+	IndexType repeatTimes = 1;
     
     //calculate expensive performance metrics?
     bool computeDiameter = false;
     IndexType maxDiameterRounds = 2;
+    std::string metricsDetail;
 
+    //this is used by the competitors main to set the tools we are gonna use
+    std::vector<std::string> tools;
+
+    // variable to check if the settings given are valid or not
+    bool isValid = true;
+
+    //struct communicationTree commTree;
     //
     // print settings
     //
     
 	void print(std::ostream& out){
 		
-		IndexType numPoints = numX* numY* numZ;
+		//TODO: This should not be in settings, since the machine the code runs on is not a part of it.
 		
-		out<< "Code git version: " << version << " and machine: "<< machine << std::endl;
+		out<< "Git commit: " << version << " and machine: "<< machine << std::endl;
+		
+		IndexType numPoints = numX* numY* numZ;
 		out<< "Setting: number of points= " << numPoints<< ", dimensions= "<< dimensions << ", filename: " << fileName << std::endl;
 		if( outFile!="-" ){
 			out<< "outFile: " << outFile << std::endl;
@@ -252,7 +250,6 @@ struct Settings{
 		}
 		out << "epsilon= "<< epsilon << std::endl;
 		out << "numBlocks= " << numBlocks << std::endl;
-		
 	}
 //--------------------------------------------------------------------------------------------
 
@@ -262,7 +259,7 @@ struct Settings{
 		}
 	}
 
-
+	boost::program_options::variables_map parseInput(int argc, char** argv);
     
-};
+}; //struct Settings
 

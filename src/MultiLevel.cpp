@@ -3,13 +3,17 @@
 #include "MultiLevel.h"
 #include "GraphUtils.h"
 #include "HaloPlanFns.h"
+#include "ParcoRepart.h"
+
+//TODO: needed monstly(only?) for debugging, to store the PE graph
+#include "FileIO.h"
 
 using scai::hmemo::HArray;
 
 namespace ITI{
     
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const HaloExchangePlan& halo, Settings settings) {
+DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const HaloExchangePlan& halo, Settings settings, Metrics& metrics) {
 	
     SCAI_REGION( "MultiLevel.multiLevelStep" );
 	scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
@@ -37,7 +41,10 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 		}
 	}
 
-	auto origin = fill<DenseVector<IndexType>>(input.getRowDistributionPtr(), comm->getRank());//to track node movements through the hierarchies
+	//only needed to store local refinement specific metrics
+	settings.thisRound++;
+
+	auto origin = scai::lama::fill<DenseVector<IndexType>>(input.getRowDistributionPtr(), comm->getRank());//to track node movements through the hierarchies
         
 	if (settings.multiLevelRounds > 0) {
 		SCAI_REGION_START( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
@@ -49,6 +56,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 			std::cout << "Beginning coarsening, still " << settings.multiLevelRounds << " levels to go." << std::endl;
 		}
 		MultiLevel<IndexType, ValueType>::coarsen(input, nodeWeights, halo, coarseGraph, fineToCoarseMap, settings.coarseningStepsBetweenRefinement);
+
 		scai::dmemo::DistributionPtr oldCoarseDist = input.getRowDistributionPtr();
 		if (comm->getRank() == 0) {
 			std::cout << "Coarse graph has " << coarseGraph.getNumRows() << " nodes." << std::endl;
@@ -62,7 +70,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 			}
 		}
 
-		DenseVector<IndexType> coarsePart = fill<DenseVector<IndexType>>(coarseGraph.getRowDistributionPtr(), comm->getRank());
+		DenseVector<IndexType> coarsePart =  scai::lama::fill<DenseVector<IndexType>>(coarseGraph.getRowDistributionPtr(), comm->getRank());
 
 		DenseVector<ValueType> coarseWeights = sumToCoarse(nodeWeights, fineToCoarseMap);
 
@@ -82,7 +90,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 		settingscopy.multiLevelRounds -= settings.coarseningStepsBetweenRefinement;
 		SCAI_REGION_END( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
 		// recursive call
-		DenseVector<IndexType> coarseOrigin = multiLevelStep(coarseGraph, coarsePart, coarseWeights, coarseCoords, coarseHalo, settingscopy);
+		DenseVector<IndexType> coarseOrigin = multiLevelStep(coarseGraph, coarsePart, coarseWeights, coarseCoords, coarseHalo, settingscopy, metrics);
 		SCAI_ASSERT_DEBUG(coarseOrigin.getDistribution().isEqual(coarseGraph.getRowDistribution()), "Distributions inconsistent.");
 		//SCAI_ASSERT_DEBUG(scai::dmemo::Redistributor(coarseOrigin.getLocalValues(), coarseOrigin.getDistributionPtr()).getTargetDistributionPtr()->isEqual(*oldCoarseDist), "coarseOrigin invalid");
 
@@ -119,12 +127,35 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 	// do local refinement
 	{
 		SCAI_REGION( "MultiLevel.multiLevelStep.localRefinement" )
-		scai::lama::CSRSparseMatrix<ValueType> processGraph = GraphUtils::getPEGraph<IndexType, ValueType>(input);
+		scai::lama::CSRSparseMatrix<ValueType> processGraph = GraphUtils<IndexType, ValueType>::getPEGraph(input);
+		
+		//TODO: remove from final version?
+		// write the PE graph for further experiments
+		if(settings.writePEgraph){//write PE graph for further experiments
+			//TODO: this workos only for 12 rounds
+			PRINT0( "thisRound= " << settings.thisRound << " , multiLevelRounds= " << settings.multiLevelRounds);
+			if( settings.thisRound==0){
+				std::chrono::time_point<std::chrono::system_clock> before =  std::chrono::system_clock::now();
+				std::string filename = settings.fileName+ "_k"+ std::to_string(settings.numBlocks)+ ".PEgraph";
+				if( not FileIO<IndexType,ValueType>::fileExists(filename) ){
+					FileIO<IndexType,ValueType>::writeGraph(processGraph, filename, 1);
+				}
+				std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - before;
+				PRINT0("time to write PE graph: :" << elapTime.count() );
+			}
+		}
 
-		std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(processGraph);
+		std::chrono::time_point<std::chrono::system_clock> before =  std::chrono::system_clock::now();
+		
+		std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(processGraph, settings);
 
-		std::vector<IndexType> nodesWithNonLocalNeighbors = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(input);
+		std::vector<IndexType> nodesWithNonLocalNeighbors = GraphUtils<IndexType, ValueType>::getNodesWithNonLocalNeighbors(input);
 
+		std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - before;
+		ValueType maxTime = comm->max( elapTime.count() );
+		ValueType minTime = comm->min( elapTime.count() );
+		if (settings.verbose) PRINT0("getCommPairs and border nodes: time " << minTime << " -- " << maxTime );
+		
 		std::vector<ValueType> distances;
 		if (settings.useGeometricTieBreaking) {
 			distances = LocalRefinement<IndexType, ValueType>::distancesFromBlockCenter(coordinates);
@@ -135,9 +166,26 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
 		ValueType gain = 0;
 		while (numRefinementRounds == 0 || gain >= settings.minGainForNextRound) {
-			std::vector<IndexType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(input, part, nodesWithNonLocalNeighbors, nodeWeights, coordinates, distances, origin, communicationScheme, settings);
+
+			std::chrono::time_point<std::chrono::system_clock> beforeFMStep =  std::chrono::system_clock::now();
+
+			/* TODO: if getting the graph is fast, maybe doing it in every steo might help
+			// get graph before every step			
+			processGraph = GraphUtils::getPEGraph<IndexType, ValueType>(input);			
+			communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(processGraph, settings);
+			nodesWithNonLocalNeighbors = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(input);
+			elapTime = std::chrono::system_clock::now() - beforeFMStep;
+			maxTime = comm->max( elapTime.count() );
+			minTime = comm->min( elapTime.count() );
+
+			if(settings.verbose){
+				PRINT0("getCommPairs and border nodes: time " << minTime << " -- " << maxTime );
+			}
+			*/
+
+			std::vector<ValueType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(input, part, nodesWithNonLocalNeighbors, nodeWeights, coordinates, distances, origin, communicationScheme, settings);
 			gain = 0;
-			for (IndexType roundGain : gainPerRound) gain += roundGain;
+			for (ValueType roundGain : gainPerRound) gain += roundGain;
 
 			if (settings.skipNoGainColors) {
 				IndexType i = 0;
@@ -152,15 +200,41 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 				}
 			}
 
+			std::chrono::duration<double> elapTimeFMStep = std::chrono::system_clock::now() - beforeFMStep;
+			ValueType FMStepTime = comm->max( elapTimeFMStep.count() );
+			//PRINT0(" one FM step time: " << FMStepTime );
+
+			//int thisRound= settings.multiLevelRounds + settings.coarseningStepsBetweenRefinement;
+			//WARNING: this may case problems... Check also Metrics constructor
+			// Hopefully, numRefinementRound will ALWAYS be less than 50
+			SCAI_ASSERT_LT_ERROR( settings.thisRound, metrics.localRefDetails.size(), "Metrics structure not allocated?" );
+			if(numRefinementRounds>=50){
+				PRINT0("*** WARNING: numRefinementRound more than 50");
+				metrics.localRefDetails[settings.thisRound].push_back( std::make_pair(gain, FMStepTime) );
+			}else{
+				SCAI_ASSERT_LT_ERROR( numRefinementRounds, metrics.localRefDetails[settings.thisRound].size(), "Metrics structure not allocated?" );
+				metrics.localRefDetails[settings.thisRound][numRefinementRounds] = std::make_pair(gain, FMStepTime) ;
+			}
+
 			if (numRefinementRounds > 0) {
 				assert(gain >= 0);
 			}
 			if (comm->getRank() == 0) {
-				std::cout << "Multilevel round "<< settings.multiLevelRounds <<": In refinement round " << numRefinementRounds << ", gain was " << gain << std::endl;
+				std::cout << "Multilevel round "<< settings.multiLevelRounds <<": In refinement round " << numRefinementRounds << ", gain was " << gain << " in time " << FMStepTime << std::endl;
 			}
 			numRefinementRounds++;
+
 		}
+		std::chrono::duration<double> elapTime2 = std::chrono::system_clock::now() - before;
+		ValueType refineTime = comm->max( elapTime2.count() );
+		//PRINT0("local refinement time: " << refineTime );
 	}
+
+	if( settings.debugMode and settings.writeInFile ){
+		std::string filename = "mlRound_"+ std::to_string(settings.thisRound)+".mtx";
+		part.writeToFile( filename );
+	}
+
 	return origin;
 }
 //---------------------------------------------------------------------------------------
@@ -773,7 +847,7 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
     }
     
     // get halo for the non-local coordinates
-    scai::dmemo::HaloExchangePlan coordHalo = GraphUtils::buildNeighborHalo<IndexType, ValueType>(adjM);
+    scai::dmemo::HaloExchangePlan coordHalo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(adjM);
     std::vector<HArray<ValueType>> coordHaloData(dimensions);
     for(int d=0; d<dimensions; d++){        
         coordHalo.updateHalo( coordHaloData[d], coordinates[d].getLocalValues(), *comm );

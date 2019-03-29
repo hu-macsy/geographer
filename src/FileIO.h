@@ -17,11 +17,12 @@
 #include "quadtree/QuadTreeCartesianEuclid.h"
 #include "Settings.h"
 #include "GraphUtils.h"
+#include "CommTree.h"
 
 #include <vector>
 #include <set>
 #include <memory>
-
+#include <sys/stat.h>
 
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
@@ -52,7 +53,7 @@ public:
 	 * @param[in] adjM The graph's adjacency matrix.
 	 * @param[in] filename The file's name to write to
 	 */
-	static void writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
+	static void writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename, const bool edgeWeights = false);
 
 	/** Given an adjacency matrix and a filename writes the local part of matrix in the file using the METIS format.
 	 *  Every proccesor adds his rank in the end of the file name.
@@ -213,19 +214,21 @@ public:
 		return readQuadTree(filename, coords);
 	}
 
-        static std::pair<IndexType, IndexType> getMatrixMarketCoordsInfos(const std::string filename);
-        
-        /** Read a file with numBLocks number of blocks. The file should contain in its first row the number of blocks and
-         *  in each line contains a number that is the size of this block.
-         *  Only PE 0 reads the given file, constructs the std::vector with the block sizes and then broadcasts the vector to
-         *  the rest of the PEs.
-         *  Example of a file with 3 blocks:
-         * 3
-         * 100
-         * 120
-         * 97
-        */
-        static std::vector<IndexType> readBlockSizes(const std::string filename , const IndexType numBlocks);
+	static std::pair<IndexType, IndexType> getMatrixMarketCoordsInfos(const std::string filename);
+
+	/** Read a file with numBLocks number of blocks. The file should contain in its first row the number of blocks and
+	 *  in each line contains a number that is the size of this block.
+	 *  Only PE 0 reads the given file, constructs the std::vector with the block sizes and then broadcasts the vector to
+	 *  the rest of the PEs.
+	 *  Example of a file with 3 blocks:
+	 * 3
+	 * 100
+	 * 120
+	 * 97
+
+	 @return return.size()= number of weights, and return[i].size()= number of blocks
+	*/
+	static std::vector<std::vector<ValueType>> readBlockSizes(const std::string filename , const IndexType numBlocks, const IndexType numWeights = 1);
 
 	static DenseVector<IndexType> readPartition(const std::string filename, IndexType n);
     
@@ -242,7 +245,27 @@ public:
     /** Read graph and coordinates from a dom.geo file of the ALYA tool. Coordinates are (usually) in 3D.
 	*/
     static void readAlyaCentral( scai::lama::CSRSparseMatrix<ValueType>& graph, std::vector<DenseVector<ValueType>>& coords, const IndexType N, const IndexType dimensions, const std::string filename);
+	
 
+	/** Reads a processor tree. Comments are allowed in the beginning with '#' or '%' and the first line
+		after the comments must contain the number of PE in the file. Then, every line contains the 
+		information of one PE: first are number indicating the label of this PE in the tree (for more details
+		see CommTree.h) that ends with a '#'. Then there are two numbers, the first one is the memory of
+		this PE in GB and then the relative speed of the cpu: a positive number x less than 1 indicating that
+		this PE has speed x*maxCPUSpeed. Typically, at least one PE will have speed 1 (the fastest one)
+		although this is not enforced or checked.
+	*/
+	//TODO: move to CommTree as, for example, importFromFile oder so?
+	static CommTree<IndexType,ValueType> readPETree( const std::string& filename);
+
+	
+	// taken from https://stackoverflow.com/questions/4316442/stdofstream-check-if-file-exists-before-writing
+	/** Check if a file exists
+	 @ *param[in] filename - the name of the file to check
+	 @return    true if the file exists, else false
+	 */
+    static bool fileExists(const std::string& filename);
+	
 private:
 	/**
 	 * given the central coordinates of a cell and its level, compute the bounding corners
@@ -250,13 +273,14 @@ private:
 	static std::pair<std::vector<ValueType>, std::vector<ValueType>> getBoundingCoords(std::vector<ValueType> centralCoords, 
         IndexType level);
         
-        /*Reads a graph in Matrix Market format
-        */
-        static scai::lama::CSRSparseMatrix<ValueType> readGraphMatrixMarket(const std::string filename);
-        
-        /** Reads the coordinates for the MatrixMarket file format.
-         */
-        static std::vector<DenseVector<ValueType>> readCoordsMatrixMarket ( const std::string filename);
+	/*Reads a graph in Matrix Market format
+	 */
+	static scai::lama::CSRSparseMatrix<ValueType> readGraphMatrixMarket(const std::string filename);
+	
+	/** Reads the coordinates for the MatrixMarket file format.
+	 */
+	static std::vector<DenseVector<ValueType>> readCoordsMatrixMarket ( const std::string filename);
+	
 };
 
 } /* namespace ITI */
