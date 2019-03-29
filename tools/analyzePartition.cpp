@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
     }
 
     Metrics metrics(settings);
-    metrics.getEasyMetrics( graph, part, nodeWeights[0], settings );//TODO: adapt metrics for multiple node weights
+    metrics.getEasyMetrics( graph, part, nodeWeights, settings );
     
     if (comm->getRank() == 0) {
         metrics.print(std::cout);//TODO: adapt this
