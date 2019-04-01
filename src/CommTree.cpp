@@ -51,6 +51,41 @@ CommTree<IndexType, ValueType>::CommTree( const std::vector<commNode> &leaves, s
 }
 //------------------------------------------------------------------------
 
+template <typename IndexType, typename ValueType>
+CommTree<IndexType, ValueType>::CommTree( const std::vector<IndexType> &levels, const IndexType numWeights ){	
+
+	const IndexType numLevels = levels.size();
+	const IndexType numLeaves = std::accumulate( levels.begin(). levels.end(), 1 , std::multiplies<IndexType>() );
+PRINT("There are " << numLevels << " levels of hierarchy with " << numLevels << " leaves in total." );
+
+	std::vector<IndexType> hierachy( numLevels, 0 );
+	std::vector<ValueType> weights( numWeights, 1.0 );
+
+	std::vector<cNode> leaves(numLeaves);
+
+	for(unsigned int i=0; i<numLeaves; i++){
+		
+		cNode node(hierarchy, weights );
+		leaves[i] = node;
+
+		//fix hierarchy label
+		hierarchy.back()++;
+		
+		for( unsigned int h=numLevels; h>0; h--){
+			if( hierarchy[h]>levels[h] ){
+				SCAI_ASSERT_GT_ERROR( h, 0, "Hierarchy label construction error" );
+				hierarchy[h]--;
+				hierarchy[h-1]++;
+			}else{
+				break;
+			}
+		}		
+	}
+	
+	return CommTree( leaves, std::vector<bool>(numNodeWeights, true) );
+}
+
+//------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
 IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vector<commNode> leaves){
@@ -98,7 +133,7 @@ IndexType CommTree<IndexType, ValueType>::createFlatHomogeneous(
 
 	this->numNodes = createTreeFromLeaves(leaves);
 	this->numWeights = numNodeWeights;
-	this->isProportional = std::vector<bool>(numNodeWeights, true);
+	this->isProportional = std::vector<bool>(numNodeWeights, true); //TODO: check if this is correct
 
 	return leaves.size();
 }//createFlatHomogeneous
@@ -113,6 +148,7 @@ IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneous( const std::ve
 
 	this->numNodes = createTreeFromLeaves(leaves);
 	this->numWeights = leafSizes.size();
+	this->isProportional = std::vector<bool>(numNodeWeights, true); //TODO: check if this is correct
 
 	return leaves.size();
 }//createFlatHeterogeneous

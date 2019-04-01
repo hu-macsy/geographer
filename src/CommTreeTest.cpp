@@ -106,22 +106,10 @@ TEST_F(CommTreeTest, testTreeFromLeaves){
 
 //------------------------------------------------------------------------
 
-TEST_F(CommTreeTest, testTreeforHomogeneous){
+TEST_F(CommTreeTest, testTreeFlatHomogeneous){
 
 	IndexType k= 12;
-/*	IndexType mem = 1;
-	IndexType speed = 1;
-	IndexType cores = 1;
 
-	//re-initialize leaf counter
-	ITI::CommTree<IndexType,ValueType>::commNode::leafCount = 0;
-
-
-	std::vector<cNode> leaves;
-	for(int i=0; i<k; i++){
-	 	leaves.push_back( cNode(std::vector<unsigned int>{0}, cores, mem, speed) );
-	}
-*/	
 	ITI::CommTree<IndexType,ValueType> cTree;
 	cTree.createFlatHomogeneous( k );
 
@@ -129,7 +117,22 @@ TEST_F(CommTreeTest, testTreeforHomogeneous){
 	EXPECT_TRUE( cTree.checkTree(true) );
 	EXPECT_EQ( cTree.numLeaves, k );
 	EXPECT_EQ( cTree.tree[0].size(), 1 ); 
-}//TEST_F(CommTreeTest, testTreeforHomogeneous)
+}//TEST_F(CommTreeTest, testTreeFlatHomogeneous)
+
+//------------------------------------------------------------------------
+
+TEST_F(CommTreeTest, testTreeNonFlatHomogeneous){
+
+	IndexType k= 2*3*4*5;
+
+	ITI::CommTree<IndexType,ValueType> cTree( {2,3,4,5}, 3);
+	
+	//cTree.print();
+	EXPECT_TRUE( cTree.checkTree(true) );
+	EXPECT_EQ( cTree.numLeaves, k );
+	EXPECT_EQ( cTree.tree[0].size(), 1 ); 
+	
+}//TEST_F(CommTreeTest, testTreeNonFlatHomogeneous)
 
 //------------------------------------------------------------------------
 

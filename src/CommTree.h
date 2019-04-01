@@ -216,6 +216,20 @@ CommTree();
 CommTree( const std::vector<commNode> &leaves,
  std::vector<bool> isWeightProp );
 
+/** This crates a homogeneous but not flat tree. The tree has levels.size() number of levels
+	and levels[0]*levels[1]*...*levels.back() number of leaves. Each leaf node has the given
+	number of weights set to 1 and all weights are proportional.
+	Example: leaves = {3,4,5,6}, the first level has 3 children, each node in the next level 
+	has 4 children, each node in the next 5 and the nodes before the leaves has 6 children each.
+	In total, 4 levels and 3*4*5*6 = 360 leaves.
+
+	@param[in] levels The number of children that each node has in each level. If levels[i]=x, then
+	each node of the i-th level has x children.
+	@param[in] numWeights The number of weights that each node has. Node weights are set to 1 and
+	are proportional.
+*/
+CommTree( const std::vector<IndexType> &levels, const IndexType numWeights );
+
 /* @brief Return the root, i.e., hierarchy level 0.
 */
 commNode getRoot() const{ 
@@ -265,7 +279,8 @@ This mainly used when  only block sizes are provided for partitioning.
 IndexType createFlatHeterogeneous( const std::vector<std::vector<ValueType>> &leafSizes );
 
 /** Creates a vector of leaves with only one hierarchy level, i.e., a flat
-tree. There can be multilpe weights for each leaf.
+tree. There can be multilpe weights for each leaf. sizes.size() is the number of different
+weights and sizes[i].size() is the number of leaves.
 **/
 std::vector<commNode> createLeaves( const std::vector<std::vector<ValueType>> &sizes);
 

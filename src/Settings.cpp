@@ -117,7 +117,7 @@ variables_map Settings::parseInput(int argc, char** argv){
 				//used for the competitors main
 				("outDir", value<std::string>(&outDir), "write result partition into file")
 				//("tool", value<std::string>(&tool), "The tool to partition with.")
-				("tools", value<std::vector<std::string>>(&tools)->multitoken(), "The tool to partition with.")
+				("tools", value<std::vector<std::string>>(&tools)->multitoken(), "The tools to partition with.")
 				;
 
     //------------------------------------------------

@@ -211,11 +211,15 @@ int main(int argc, char** argv) {
 
 	//used for printing and creating filenames
 	std::map<ITI::Tool, std::string> toolName = { 
-		{ITI::Tool::zoltanRCB,"zoltanRCB"}, {ITI::Tool::zoltanRIB,"zoltanRIB"}, {ITI::Tool::zoltanMJ,"zoltanMJ"}, {ITI::Tool::zoltanSFC,"zoltanSFC"},
+		{ITI::Tool::zoltanRCB,"zoltanRcb"}, {ITI::Tool::zoltanRIB,"zoltanRib"}, {ITI::Tool::zoltanMJ,"zoltanMJ"}, {ITI::Tool::zoltanSFC,"zoltanHsfc"},
 		{ITI::Tool::parMetisSFC,"parMetisSFC"}, {ITI::Tool::parMetisGeom,"parMetisGeom"}, {ITI::Tool::parMetisGraph,"parMetisGraph"} };
 	
 	std::vector<ITI::Tool> wantedTools;
 	std::vector<std::string> tools = settings.tools; //not really needed
+
+	//if no 'tools' parameter was gives, use all tools
+	if( tools.size()==0 )
+		tools.resize( 1, "all" );
 
 	if( tools[0] == "all"){
 		wantedTools = allTools;
@@ -262,9 +266,10 @@ int main(int argc, char** argv) {
 		}else{
 			settings.repeatTimes = 5;
 		}
-		int parMetisGeom=0	;
+		int parMetisGeom=0;
 
-		
+		std::string outFile = "-";
+
 		if( vm.count("outDir") and vm.count("storeInfo") ){
 			//set the graphName in order to create the outFile name
 			std::string copyName = graphFile;
@@ -274,15 +279,14 @@ int main(int argc, char** argv) {
 			std::string graphName = strs[1]; //[0] is "hparg" (graph reversed)
 			std::reverse( graphName.begin(), graphName.end() );
 			//PRINT0( graphName );		
-			settings.outFile = settings.outDir	+ graphName+ "_k"+ std::to_string(settings.numBlocks)+ "_"+ toolName[thisTool]+ ".info";
-		}else{
-			settings.outFile ="-";
+			//add specific folder for each tool
+			outFile = settings.outDir+ toolName[thisTool]+ "/"+ graphName+ "_k"+ std::to_string(settings.numBlocks)+ "_"+ toolName[thisTool]+ ".info";
 		}
 
-		std::ifstream f(settings.outFile);
+		std::ifstream f(outFile);
 		if( f.good() and settings.storeInfo ){
 			comm->synchronize();	// maybe not needed
-			PRINT0("\n\tWARNING: File " << settings.outFile << " allready exists. Skipping partition with " << toolName[thisTool]);
+			PRINT0("\n\tWARNING: File " << outFile << " allready exists. Skipping partition with " << toolName[thisTool]);
 			continue;
 		}
 		
@@ -329,8 +333,8 @@ if( thisPE==0 ) metrics.printHorizontal2( std::cout );
 			//printMetricsShort( metrics, std::cout);
 
 			// write in a file
-			if( settings.outFile!= "-" ){
-				std::ofstream outF( settings.outFile, std::ios::out);
+			if( outFile!= "-" ){
+				std::ofstream outF( outFile, std::ios::out);
 				if(outF.is_open()){
 					outF << "Running " << __FILE__ << " for tool " << toolName[thisTool] << std::endl;
 					if( vm.count("generate") ){
@@ -341,16 +345,16 @@ if( thisPE==0 ) metrics.printHorizontal2( std::cout );
 
 					metrics.print( outF ); 
 					//printMetricsShort( metrics, outF);
-					std::cout<< "Output information written to file " << settings.outFile << std::endl;
+					std::cout<< "Output information written to file " << outFile << std::endl;
 				}else{
-					std::cout<< "\n\tWARNING: Could not open file " << settings.outFile << " informations not stored.\n"<< std::endl;
+					std::cout<< "\n\tWARNING: Could not open file " << outFile << " informations not stored.\n"<< std::endl;
 				}       
 			}
 		}
 
-	 	if( settings.outFile!="-" and settings.writeInFile ){
+	 	if( outFile!="-" and settings.writeInFile ){
 	        std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
-	        std::string partOutFile = settings.outFile+".part";
+	        std::string partOutFile = outFile+".part";
 			ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
 
 	        std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
