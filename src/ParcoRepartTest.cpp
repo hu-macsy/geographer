@@ -212,12 +212,12 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
 
     scai::lama::DenseVector<IndexType> partition( graph.getRowDistributionPtr(), scai::hmemo::HArray<IndexType>(  localPartition.size(), localPartition.data()) );
 	
-    metrics1.getAllMetrics(graph, partition, nodeWeights[0], settings);
+    metrics1.getAllMetrics(graph, partition, nodeWeights, settings);
     
     scai::lama::DenseVector<IndexType> partition2 = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( graph, coords, nodeWeights, settings, metrics2);
     partition2.redistribute( graph.getRowDistributionPtr() );
 
-    metrics2.getAllMetrics(graph, partition2, nodeWeights[0], settings);
+    metrics2.getAllMetrics(graph, partition2, nodeWeights, settings);
 
     if( comm->getRank()==0){
       std::cout<< "Metrics for first partition:"<< std::endl;

@@ -24,6 +24,17 @@ public:
 	Diffusion() = default;
 	virtual ~Diffusion() = default;
 
+
+     /**
+     * Computes the potential vector of a diffusion flow in a graph. Calls a linear solver to solve Lx=d for x, where L is the graph laplacian and d the demand vector.
+     *
+     * @param laplacian The laplacian of the graph
+     * @param demand The demand at each (non-source) node.
+     * @param eps accuracy
+     *
+     */
+     static scai::lama::DenseVector<ValueType> computeFlow(const scai::lama::CSRSparseMatrix<ValueType>& laplacian, const scai::lama::DenseVector<ValueType>& demand, ValueType eps=1e-6);
+
     /**
      * Computes the potential vector of a diffusion flow in a graph. Calls a linear solver to solve Lx=d for x, where L is the graph laplacian and d the demand vector.
      *
@@ -33,7 +44,7 @@ public:
      * @param eps accuracy
      *
      */
-	static scai::lama::DenseVector<ValueType> potentialsFromSource(scai::lama::CSRSparseMatrix<ValueType> laplacian, scai::lama::DenseVector<ValueType> nodeWeights, IndexType source, ValueType eps=1e-6);
+	static scai::lama::DenseVector<ValueType> potentialsFromSource(const scai::lama::CSRSparseMatrix<ValueType>& laplacian, const scai::lama::DenseVector<ValueType>& nodeWeights, IndexType source, ValueType eps=1e-6);
 
 	/**
 	 * @brief Calls potentialsFromSource several times, once for each source in sources
@@ -45,7 +56,7 @@ public:
 	 *
 	 * @return dense matrix, each row contains one set of potentials, usabel as coordinates
 	 */
-	static scai::lama::DenseMatrix<ValueType> multiplePotentials(scai::lama::CSRSparseMatrix<ValueType> laplacian, scai::lama::DenseVector<ValueType> nodeWeights, std::vector<IndexType> sources, ValueType eps=1e-6);
+	static scai::lama::DenseMatrix<ValueType> multiplePotentials(const scai::lama::CSRSparseMatrix<ValueType>& laplacian, const scai::lama::DenseVector<ValueType>& nodeWeights, const std::vector<IndexType>& sources, ValueType eps=1e-6);
 
 };
 
