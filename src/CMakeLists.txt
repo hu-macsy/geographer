@@ -51,6 +51,13 @@ include_directories(${RBC_DIR})
 link_directories(${SCAI_LIB})
 link_directories(${RBC_DIR}/build/lib)
 
+### add networkit include and link directory ###
+# link_directories has to happen before target definitions
+if (USE_NETWORKIT)
+  include_directories(${NETWORKIT_INCLUDE})
+  link_directories(${NETWORKIT_LIB})
+endif (USE_NETWORKIT)
+
 ### get git commit ###
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
 
@@ -67,8 +74,6 @@ target_link_libraries(heatMap ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_
 
 ### add networkit library ###
 if (USE_NETWORKIT)
-  include_directories(${NETWORKIT_INCLUDE})
-  link_directories(${NETWORKIT_LIB})
   target_link_libraries(Geographer networkit)
 endif (USE_NETWORKIT)
 
