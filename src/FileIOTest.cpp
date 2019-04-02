@@ -655,7 +655,7 @@ TEST_F (FileIOTest, testReadEdgeListDistributed){
 
 TEST_F (FileIOTest, testReadPETree){
 
-	std::string file = graphPath+ "processorTrees/testPEgraph46.txt";
+	std::string file = graphPath+ "processorTrees/testPEgraph28.txt";
 
 	ITI::CommTree<IndexType, ValueType> tree =  FileIO<IndexType, ValueType>::readPETree( file );
 	PRINT("read file " << file );

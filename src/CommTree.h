@@ -213,8 +213,7 @@ CommTree();
 		For example, node weights can be {64, 0.01} and isWeightProp={ false, true}. An interpretation could be that this node has
 		64GB of memory and 1% of the total FLOPS of the system.
 */
-CommTree( const std::vector<commNode> &leaves,
- std::vector<bool> isWeightProp );
+CommTree( const std::vector<commNode> &leaves, const std::vector<bool> isWeightProp );
 
 /** This crates a homogeneous but not flat tree. The tree has levels.size() number of levels
 	and levels[0]*levels[1]*...*levels.back() number of leaves. Each leaf node has the given
@@ -226,7 +225,7 @@ CommTree( const std::vector<commNode> &leaves,
 	@param[in] levels The number of children that each node has in each level. If levels[i]=x, then
 	each node of the i-th level has x children.
 	@param[in] numWeights The number of weights that each node has. Node weights are set to 1 and
-	are proportional.
+	set to proportional.
 */
 CommTree( const std::vector<IndexType> &levels, const IndexType numWeights );
 
