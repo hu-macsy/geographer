@@ -31,7 +31,7 @@ CommTree<IndexType, ValueType>::CommTree(){
 
 //constructor to create tree from a vector of leaves
 template <typename IndexType, typename ValueType>
-CommTree<IndexType, ValueType>::CommTree( const std::vector<commNode> &leaves, std::vector<bool> isWeightProp ){
+CommTree<IndexType, ValueType>::CommTree( const std::vector<commNode> &leaves, const std::vector<bool> isWeightProp ){
 	
 	isProportional = isWeightProp;
 
@@ -55,10 +55,10 @@ template <typename IndexType, typename ValueType>
 CommTree<IndexType, ValueType>::CommTree( const std::vector<IndexType> &levels, const IndexType numWeights ){	
 
 	const IndexType numLevels = levels.size();
-	const IndexType numLeaves = std::accumulate( levels.begin(). levels.end(), 1 , std::multiplies<IndexType>() );
-PRINT("There are " << numLevels << " levels of hierarchy with " << numLevels << " leaves in total." );
+	const IndexType numLeaves = std::accumulate( levels.begin(), levels.end(), 1 , std::multiplies<IndexType>() );
+	//PRINT("There are " << numLevels << " levels of hierarchy with " << numLeaves << " leaves in total." );
 
-	std::vector<IndexType> hierarchy( numLevels, 0 );
+	std::vector<unsigned int> hierarchy( numLevels, 0 );
 	std::vector<ValueType> weights( numWeights, 1.0 );
 
 	std::vector<cNode> leaves(numLeaves);
@@ -81,8 +81,8 @@ PRINT("There are " << numLevels << " levels of hierarchy with " << numLevels << 
 			}
 		}		
 	}
-	
-	return CommTree( leaves, std::vector<bool>(numWeights, true) );
+
+	*this = CommTree( leaves, std::vector<bool>(numWeights, true) );
 }
 
 //------------------------------------------------------------------------
@@ -148,7 +148,7 @@ IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneous( const std::ve
 
 	this->numNodes = createTreeFromLeaves(leaves);
 	this->numWeights = leafSizes.size();
-	this->isProportional = std::vector<bool>(numNodeWeights, true); //TODO: check if this is correct
+	//this->isProportional = std::vector<bool>(numNodeWeights, true); //TODO: check if this is correct
 
 	return leaves.size();
 }//createFlatHeterogeneous
