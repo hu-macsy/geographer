@@ -58,7 +58,7 @@ CommTree<IndexType, ValueType>::CommTree( const std::vector<IndexType> &levels, 
 	const IndexType numLeaves = std::accumulate( levels.begin(). levels.end(), 1 , std::multiplies<IndexType>() );
 PRINT("There are " << numLevels << " levels of hierarchy with " << numLevels << " leaves in total." );
 
-	std::vector<IndexType> hierachy( numLevels, 0 );
+	std::vector<IndexType> hierarchy( numLevels, 0 );
 	std::vector<ValueType> weights( numWeights, 1.0 );
 
 	std::vector<cNode> leaves(numLeaves);
@@ -82,7 +82,7 @@ PRINT("There are " << numLevels << " levels of hierarchy with " << numLevels << 
 		}		
 	}
 	
-	return CommTree( leaves, std::vector<bool>(numNodeWeights, true) );
+	return CommTree( leaves, std::vector<bool>(numWeights, true) );
 }
 
 //------------------------------------------------------------------------
