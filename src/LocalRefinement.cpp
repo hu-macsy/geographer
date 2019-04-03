@@ -93,7 +93,6 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 	//main loop, one iteration for each color of the graph coloring
 	for (IndexType color = 0; color < communicationScheme.size(); color++) {
 		SCAI_REGION( "LocalRefinement.distributedFMStep.loop" )
-		std::chrono::time_point<std::chrono::system_clock> loopStart =  std::chrono::system_clock::now();
 
 		const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 		const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();

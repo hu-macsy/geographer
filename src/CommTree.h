@@ -68,9 +68,10 @@ struct commNode{
 
 	commNode( std::vector<unsigned int> hier, std::vector<ValueType> leafWeights, bool isLeaf=true)
 	:	hierarchy(hier),
+		numChildren(0),
 		weights(leafWeights),
-		isLeaf(isLeaf),
-		numChildren(0)
+		isLeaf(isLeaf)
+		
 	{
 		leafID = leafCount;
 		leafCount++;
