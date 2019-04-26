@@ -466,14 +466,16 @@ int main(int argc, char** argv) {
         partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, commTree, settings, metricsVec[r] );
         assert( partition.size() == N);
         assert( coordinates[0].size() == N);
-        
+
         std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
 		
 		//WARNING: with the noRefinement flag the partition is not distributed
         if (!comm->all(partition.getDistribution().isEqual(graph.getRowDistribution()))) {
             partition.redistribute( graph.getRowDistributionPtr());
         }
-
+		SCAI_ASSERT_EQ_ERROR( nodeWeights[0].getDistributionPtr()->getLocalSize(),\
+						partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");	        
+    
         //---------------------------------------------
         //
         // Get metrics

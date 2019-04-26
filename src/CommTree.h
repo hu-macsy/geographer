@@ -216,7 +216,7 @@ CommTree();
 CommTree( const std::vector<commNode> &leaves, const std::vector<bool> isWeightProp );
 
 /** This crates a homogeneous but not flat tree. The tree has levels.size() number of levels
-	and levels[0]*levels[1]*...*levels.back() number of leaves. Each leaf node has the given
+	and number of leaves=levels[0]*levels[1]*...*levels.back(). Each leaf node has the given
 	number of weights set to 1 and all weights are proportional.
 	Example: leaves = {3,4,5,6}, the first level has 3 children, each node in the next level 
 	has 4 children, each node in the next 5 and the nodes before the leaves has 6 children each.

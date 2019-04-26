@@ -1,7 +1,7 @@
 #include "Settings.h"
 
 //#include <boost/algorithm/string.hpp>
-
+/*
 std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method){
     std::string token;
     in >> token;
@@ -41,8 +41,67 @@ std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method)
     out << token;
     return out;
 }
+*/
 
+std::ostream& ITI::operator<<( std::ostream& out, ITI::Tool tool){
+	std::string token;
+	using ITI::Tool;
 
+	switch( tool ){
+		case Tool::geographer: token = "geographer"; break;
+		case Tool::geoKmeans: token = "geoKmeans"; break;
+		case Tool::geoSFC: token = "geoSFC"; break;
+		case Tool::geoHierKM: token = "geoHierKM"; break;
+		case Tool::geoMS: token = "geoMS"; break;
+		case Tool::parMetisGraph: token = "parMetisGraph"; break;
+		case Tool::parMetisGeom: token = "parMetisGeom"; break;
+		case Tool::parMetisSFC: token = "parMetisSFC"; break;
+		case Tool::zoltanRIB: token = "zoltanRIB"; break;
+		case Tool::zoltanRCB: token = "zoltanRCB"; break;
+		case Tool::zoltanMJ: token = "zoltanMJ"; break;
+		case Tool::zoltanSFC: token = "zoltanSFC"; break;
+		case Tool::none: token = "none"; break;
+	}
+
+	out << token;
+	return out;
+}
+
+std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool){
+    std::string token;
+    in >> token;
+
+    if( token=="Geographer" or token=="geographer" )
+    	tool = ITI::Tool::geographer;
+    else if( token=="geoSFC" or token=="geoSfc" or token=="SFC")
+    	tool = ITI::Tool::geoSFC;
+    else if( token=="geoKmeans" or token=="geoKMeans" or token=="Kmeans")
+		tool = ITI::Tool::geoKmeans; 
+	else if( token=="geoHierKM" or token=="geoHierKmeans" or token=="geoHierKMeans")
+		tool = ITI::Tool::geoHierKM;
+	else if( token=="geoMS" or token=="geoMultiSection" or token=="geoMultisection")
+		tool = ITI::Tool::geoMS;
+	else if( token=="parMetisGraph" or token=="parMetisgraph" or token=="parmetisGraph")
+		tool = ITI::Tool::parMetisGraph;
+	else if( token=="parMetisGeom" or token=="parMetisgeom" or token=="parmetisGeom")
+		tool = ITI::Tool::parMetisGeom;
+	else if( token=="parMetisSFC" or token=="parMetisSfc" or token=="parmetisSFC")
+		tool = ITI::Tool::parMetisSFC;
+	else if( token=="zoltanRIB" or token=="zoltanRib" or token=="zoltanrib")
+		tool = ITI::Tool::zoltanRIB;
+	else if( token=="zoltanRCB" or token=="zoltanRcb" or token=="zoltanrcb")
+		tool = ITI::Tool::zoltanRCB;
+	else if( token=="zoltanMJ" or token=="zoltanMj" or token=="zoltanmj")
+		tool = ITI::Tool::zoltanMJ;
+	else if( token=="zoltanSFC" or token=="zoltanSfc" or token=="zoltansfc")
+		tool = ITI::Tool::zoltanRIB;
+	else if( token=="None" or token=="none")
+		tool = ITI::Tool::none;
+
+    return in;
+}
+
+//-------------------------------------------------------------------------    
 
 using namespace boost::program_options;
 
@@ -77,7 +136,7 @@ variables_map Settings::parseInput(int argc, char** argv){
 				("blockSizesFile", value<std::string>(&blockSizesFile) , " file to read the block sizes for every block")
 				("seed", value<double>()->default_value(time(NULL)), "random seed, default is current time")
 				//multi-level and local refinement
-				("initialPartition", value<InitialPartitioningMethods>(&initialPartition), "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means' or 3) and multisection ('MultiSection' or 4). SFC, Spectral and K-Means are most stable.")
+				("initialPartition", value<ITI::Tool>(&initialPartition), "Choose initial partitioning method between space-filling curves ('geoSFC'), k-means ('geoKMeans') and multisection ('geoMultiSection'). SFC, Spectral and K-Means are most stable.")
 				("noRefinement", "skip local refinement steps")
 				("multiLevelRounds", value<IndexType>(&multiLevelRounds)->default_value(multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
 				("minBorderNodes", value<IndexType>(&minBorderNodes)->default_value(minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
@@ -100,7 +159,10 @@ variables_map Settings::parseInput(int argc, char** argv){
 				("maxKMeansIterations", value<IndexType>(&maxKMeansIterations)->default_value(maxKMeansIterations), "Tuning parameter for K-Means")
 				("tightenBounds", "Tuning parameter for K-Means")
 				("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
-				("initialMigration", value<InitialPartitioningMethods>(&initialMigration)->default_value(initialMigration), "Choose a method to get the first migration, 0: SFCs, 3:k-means, 4:Multisection")
+				("initialMigration", value<ITI::Tool>(&initialMigration)->default_value(initialMigration), "Choose a method to get the first migration: geoSFC, geoKMeans, geoMultiSection")
+				("hierLevels", value<std::vector<IndexType>>(&hierLevels)->multitoken(), "The number of PEs per level. Total number of PEs (=number of leaves) is \
+					the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3 4 10, there are 3 levels. \
+					In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs")
 				//("manhattanDistance", "Tuning parameter for K-Means")
 				//output
 				("outFile", value<std::string>(&outFile), "write result partition into file")
@@ -172,10 +234,10 @@ variables_map Settings::parseInput(int argc, char** argv){
         
 	if( vm.count("initialMigration") ){
 
-		if( !(initialMigration==InitialPartitioningMethods::SFC
-				or initialMigration==InitialPartitioningMethods::KMeans
-				or initialMigration==InitialPartitioningMethods::Multisection
-				or initialMigration==InitialPartitioningMethods::None) ){
+		if( !(initialMigration==ITI::Tool::geoSFC
+				or initialMigration==ITI::Tool::geoKmeans
+				or initialMigration==ITI::Tool::geoMS
+				or initialMigration==ITI::Tool::none) ){
 			PRINT0("Initial migration supported only for 0:SFCs, 3:k-means, 4:MultiSection or 5:None, invalid option " << initialMigration << " was given");
 			isValid = false;
 			//return 126;
@@ -199,7 +261,7 @@ variables_map Settings::parseInput(int argc, char** argv){
 	if (vm.count("previousPartition")) {
 		repartition = true;
 		if (vm.count("initialPartition")) {
-			if (!(initialPartition == InitialPartitioningMethods::KMeans || initialPartition == InitialPartitioningMethods::None)) {
+			if (!(initialPartition == ITI::Tool::geoKmeans || initialPartition == ITI::Tool::none)) {
 				std::cout << "Method " << initialPartition << " not supported for repartitioning, currently only kMeans." << std::endl;
 				isValid = false;
 				//return 126;
@@ -208,7 +270,7 @@ variables_map Settings::parseInput(int argc, char** argv){
 			if (comm->getRank() == 0) {
 				std::cout << "Setting initial partitioning method to kMeans." << std::endl;
 			}
-			initialPartition = InitialPartitioningMethods::KMeans;
+			initialPartition = ITI::Tool::geoKmeans;
 		}
 	}
 	

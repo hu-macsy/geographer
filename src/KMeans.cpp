@@ -1588,8 +1588,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 	const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
 	const IndexType localN = dist->getLocalSize();
 
-	HilbertCurve<IndexType,ValueType>::hilbertRedistribution(
-		coordinates, nodeWeights, settings, metrics);
+	HilbertCurve<IndexType,ValueType>::hilbertRedistribution( coordinates, nodeWeights, settings, metrics );
 
 	if (settings.debugMode) {
 		//added check to verify that the points are indeed distributed 
@@ -1598,7 +1597,11 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		bool hasHilbertDist = HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution( coordinates, nodeWeights[0], settings);//TODO: update if you get multiple node weights
 		SCAI_ASSERT_EQ_ERROR( hasHilbertDist, true, "Input must be distributed according to a hilbert curve distribution");
 	}
-	graph.redistribute( coordinates[0].getDistributionPtr(), graph.getColDistributionPtr() );
+
+//WARNING: this graph redistribution messes up the distributions later... not sure why and where exactly	
+//update 26/04/19: when using hierarchical kmeans, the graph is redistributed (for debugging reasons since actually the graph is not used)
+//so the if condition does not triger but the distributions are inconsistent	
+//graph.redistribute( coordinates[0].getDistributionPtr(), graph.getColDistributionPtr() );
 
 	std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
@@ -1643,7 +1646,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		//numNewBlocksPerOldBlock[i]=k means that, current partition i should be 
 		//partitioned into k new blocks
 
-		std::vector<cNode> thisLevel = commTree.getHierLevel(h);	
+		std::vector<cNode> thisLevel = commTree.getHierLevel(h);
 
 		PRINT0("-- Hierarchy level " << h << " with " << thisLevel.size() << " nodes");
 		if( settings.debugMode ){
@@ -1698,11 +1701,19 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		std::vector<std::vector<ValueType>> targetBlockWeights = commTree.getBalanceVectors(h);
 		SCAI_ASSERT_EQ_ERROR( targetBlockWeights.size(), numNodeWeights, "Wrong number of weights" );
 		SCAI_ASSERT_EQ_ERROR( targetBlockWeights[0].size(), totalNumNewBlocks, "Wrong size of weights" );
-PRINT0( h << ": " << std::accumulate( targetBlockWeights[0].begin(), targetBlockWeights[0].end(), 0.0) );
+		//PRINT0( h << ": " << std::accumulate( targetBlockWeights[0].begin(), targetBlockWeights[0].end(), 0.0) );
 		//TODO: inside computePartition, settings.numBlocks is not
 		//used. We infer the number of new blocks from the groupOfCenters
 		//maybe, set also numBlocks for clarity??
-		partition = computePartition( graph, coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics );
+		
+		//partition = computePartition( graph, coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics );
+		partition = computePartition( coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics );
+
+//SCAI_ASSERT_EQ_ERROR( graph.getRowDistributionPtr()->getLocalSize(),partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
+SCAI_ASSERT_EQ_ERROR( coordinates[0].getDistributionPtr()->getLocalSize(),\
+						partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
+SCAI_ASSERT_EQ_ERROR( nodeWeights[0].getDistributionPtr()->getLocalSize(),\
+						partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
 
 		if (settings.debugMode) {
 			//this check is done before. TODO: remove?

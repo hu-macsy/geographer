@@ -71,10 +71,10 @@ CommTree<IndexType, ValueType>::CommTree( const std::vector<IndexType> &levels, 
 		//fix hierarchy label
 		hierarchy.back()++;
 		
-		for( unsigned int h=numLevels; h>0; h--){
-			if( hierarchy[h]>levels[h] ){
-				SCAI_ASSERT_GT_ERROR( h, 0, "Hierarchy label construction error" );
-				hierarchy[h]--;
+		for( unsigned int h=numLevels-1; h>0; h--){
+			SCAI_ASSERT_GT_ERROR( h, 0, "Hierarchy label construction error" );
+			if( hierarchy[h]>levels[h]-1 ){				
+				hierarchy[h]=0;
 				hierarchy[h-1]++;
 			}else{
 				break;
