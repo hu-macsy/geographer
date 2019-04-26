@@ -1574,10 +1574,8 @@ DenseVector<IndexType> computeHierarchicalPartition(
 	}
 
 	//redistribute points based on their hilbert curve index
-	//warning: this functions redistributes the coordinates and
-	//the node weights. 
-	//TODO: is this supposed to be here? it is also in the
-	// ParcoRepart::partitionGraph
+	//warning: this functions redistributes the coordinates and the node weights. 
+	//TODO: is this supposed to be here? it is also in ParcoRepart::partitionGraph
 	
 	const IndexType numNodeWeights = nodeWeights.size();
 /*	if (numNodeWeights > 1) {
@@ -1586,6 +1584,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 */	
 
 	const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
+	const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
 	const IndexType localN = dist->getLocalSize();
 
 	HilbertCurve<IndexType,ValueType>::hilbertRedistribution( coordinates, nodeWeights, settings, metrics );
@@ -1598,10 +1597,10 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		SCAI_ASSERT_EQ_ERROR( hasHilbertDist, true, "Input must be distributed according to a hilbert curve distribution");
 	}
 
-//WARNING: this graph redistribution messes up the distributions later... not sure why and where exactly	
-//update 26/04/19: when using hierarchical kmeans, the graph is redistributed (for debugging reasons since actually the graph is not used)
-//so the if condition does not triger but the distributions are inconsistent	
-//graph.redistribute( coordinates[0].getDistributionPtr(), graph.getColDistributionPtr() );
+	//WARNING: this graph redistribution messes up the distributions later... not sure why and where exactly	
+	//update 26/04/19: when using hierarchical kmeans, the graph is redistributed (for debugging reasons since actually the graph is not used)
+	//redistribute again to original distribution before exiting the function
+	graph.redistribute( coordinates[0].getDistributionPtr(), graph.getColDistributionPtr() );
 
 	std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
@@ -1691,12 +1690,6 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		//2- main k-means loop
 		//
 
-
-		//TODO: this destroys the const-ness of the tree. Remove code or const
-		//if( not commTree.areWeightsAdapted ){
-		//	commTree.adaptWeights( nodeWeights );
-		//}
-
 		//get the wanted block sizes for this level of the tree
 		std::vector<std::vector<ValueType>> targetBlockWeights = commTree.getBalanceVectors(h);
 		SCAI_ASSERT_EQ_ERROR( targetBlockWeights.size(), numNodeWeights, "Wrong number of weights" );
@@ -1706,14 +1699,15 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		//used. We infer the number of new blocks from the groupOfCenters
 		//maybe, set also numBlocks for clarity??
 		
-		//partition = computePartition( graph, coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics );
-		partition = computePartition( coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics );
+		partition = computePartition( graph, coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics );
+		//partition = computePartition( coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics );
 
-//SCAI_ASSERT_EQ_ERROR( graph.getRowDistributionPtr()->getLocalSize(),partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
-SCAI_ASSERT_EQ_ERROR( coordinates[0].getDistributionPtr()->getLocalSize(),\
-						partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
-SCAI_ASSERT_EQ_ERROR( nodeWeights[0].getDistributionPtr()->getLocalSize(),\
-						partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
+		//TODO: not really needed assertions
+		SCAI_ASSERT_EQ_ERROR( graph.getRowDistributionPtr()->getLocalSize(),partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
+		SCAI_ASSERT_EQ_ERROR( coordinates[0].getDistributionPtr()->getLocalSize(),\
+								partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
+		SCAI_ASSERT_EQ_ERROR( nodeWeights[0].getDistributionPtr()->getLocalSize(),\
+								partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
 
 		if (settings.debugMode) {
 			//this check is done before. TODO: remove?
@@ -1741,6 +1735,9 @@ SCAI_ASSERT_EQ_ERROR( nodeWeights[0].getDistributionPtr()->getLocalSize(),\
 		}
 		
 	}
+
+	//redistribute back to original distribution
+	graph.redistribute( rowDist, graph.getColDistributionPtr() );
 
 	return partition;
 }
