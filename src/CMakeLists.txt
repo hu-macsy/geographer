@@ -21,7 +21,7 @@ set(SCAI_LIB "${SCAI_DIR}/lib/")
 set(NETWORKIT_INCLUDE "${NETWORKIT_DIR}/include/") 
 set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
 
-### set compiler manualy ###
+### set compiler manually ###
 #set(CMAKE_CXX_COMPILER /lrz/sys/compilers/gcc/7.3.0/bin/c++)
 
 ### set files ###
