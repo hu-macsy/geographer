@@ -181,6 +181,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
 			if (interfaceNodes.size() == 0) {
 				if (otherSize != 0) {
+					std::cout<<"this PE: " << comm->getRank() << ", partner: " << partner << std::endl;
 					throw std::runtime_error("Partner PE has a border region, but this PE doesn't. Looks like the block indices were allocated inconsistently.");
 				} else {
 					/*

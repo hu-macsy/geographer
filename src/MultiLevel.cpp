@@ -218,12 +218,12 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 			//update: well... In some case it stucks in a period, like: 
 			//gain 10, gain 30, gain 25, gain 10, gain 30, gain 25, gain 10, ...
 			SCAI_ASSERT_LT_ERROR( settings.thisRound, metrics.localRefDetails.size(), "Metrics structure not allocated?" );
-			if(numRefinementRounds>50){
+			if(numRefinementRounds>=50){
 				metrics.localRefDetails[settings.thisRound].push_back( std::make_pair(gain, FMStepTime) );
-				PRINT0("*** WARNING: numRefinementRound more than 50.\nWill break from !");
+				PRINT0("*** WARNING: numRefinementRound more than 50.\nWill force break from while loop");
 				break;
 			}else{
-				SCAI_ASSERT_LT_ERROR( numRefinementRounds, metrics.localRefDetails[settings.thisRound].size(), "Metrics structure not allocated?" );
+				SCAI_ASSERT_LE_ERROR( numRefinementRounds, metrics.localRefDetails[settings.thisRound].size(), "Metrics structure not allocated?" );
 				metrics.localRefDetails[settings.thisRound][numRefinementRounds] = std::make_pair(gain, FMStepTime) ;
 			}
 

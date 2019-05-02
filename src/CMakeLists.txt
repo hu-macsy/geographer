@@ -54,7 +54,7 @@ link_directories(${RBC_DIR}/build/lib)
 ### get git commit ###
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11 -O3 -DBUILD_COMMIT=${GIT_COMMIT}" )
+set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11 -O3 -fPIC -DBUILD_COMMIT=${GIT_COMMIT}" )
 
 ### define targets ###
 add_executable(Geographer ${FILES_COMMON} main.cpp)
@@ -104,6 +104,15 @@ if( Zoltan2_FOUND )
 	target_include_directories( allCompetitors PUBLIC "/lrz/sys/libraries/parmetis/4.0.3/ibmmpi/i8r8/include" )
 
 	target_link_libraries( allCompetitors ${SCAI_LIBLIST} _rbc ${Boost_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} ${Zoltan2_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )
+
+	### create shared library with the wrappers functionality ###
+	add_library( geographerWrappers SHARED Wrappers.cpp ${FILES_COMMON} )
+
+	target_include_directories( geographerWrappers PUBLIC "/lrz/sys/libraries/metis/5.1.0/i8r8/include" )
+	target_include_directories( geographerWrappers PUBLIC "/lrz/sys/libraries/parmetis/4.0.3/ibmmpi/i8r8/include" )
+	target_include_directories( geographerWrappers PUBLIC ${Zoltan2_INCLUDE_DIRS} ${Zoltan2_TPL_INCLUDE_DIRS} )
+	#target_link_libraries( geographerWrappers ${SCAI_LIBLIST} _rbc ${Boost_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} ${Zoltan2_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )
+
 else()
 	message( "Package Zoltan2 was not found.\nSet it in the CMakeLists.txt file by edditing the line 'FIND_PACKAGE(Zoltan2 ...)'")
 endif()
