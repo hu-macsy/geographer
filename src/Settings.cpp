@@ -229,7 +229,7 @@ variables_map Settings::parseInput(int argc, char** argv){
 
 	if( vm.count("cutsPerDim") ) {
 		SCAI_ASSERT( !cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
-		SCAI_ASSERT_EQ_ERROR(cutsPerDim.size(), dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
+		SCAI_ASSERT_EQ_ERROR(cutsPerDim.size(), dimensions, "cutsPerDim: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
 	}
         
 	if( vm.count("initialMigration") ){
