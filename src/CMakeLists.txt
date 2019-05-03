@@ -1,6 +1,11 @@
 cmake_minimum_required (VERSION 2.6)
 project (Geographer)
 
+# define library version
+set(Geographer_VERSION_MAJOR 0 STRING "major version")
+set(Geographer_VERSION_MINOR 9 STRING "minor version")
+set(Geographer_VERSION ${Geographer_VERSION_MAJOR}.${Geographer_VERSION_MINOR} STRING "version")
+
 if (NOT DEFINED SCAI_DIR)
 	message( FATAL_ERROR "Install Directory of LAMA not defined, specify with -DSCAI_DIR" )
 endif (NOT DEFINED SCAI_DIR)
@@ -25,6 +30,7 @@ set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
 #set(CMAKE_CXX_COMPILER /lrz/sys/compilers/gcc/7.3.0/bin/c++)
 
 ### set files ###
+set(FILES_HEADER ParcoRepart.h MultiLevel.h LocalRefinement.h HilbertCurve.h MeshGenerator.h FileIO.h SpectralPartition.h Diffusion.h GraphUtils.h MultiSection.h KMeans.h CommTree.h AuxiliaryFunctions.h HaloPlanFns.h Metrics.h Mapping.h Settings.h)
 set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp SpectralPartition.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp KMeans.cpp CommTree.cpp AuxiliaryFunctions.cpp HaloPlanFns.cpp Metrics.cpp Mapping.cpp Settings.cpp)
 set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp quadtree/test/QuadTreeTest.cpp SpectralPartitionTest.cpp)
 
@@ -84,6 +90,15 @@ if (GTEST_FOUND)
 	target_link_libraries(GeographerTest ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
 endif (GTEST_FOUND)
 
+### define install targets ###
+set(BIN_DEST "bin")
+set(INCLUDE_DEST "include")
+set(LIB_DEST "lib")
+
+install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable
+install(TARGETS geographer EXPORT geographer DESTINATION "${LIB_DEST}") # library
+install(FILES ${FILES_HEADER} DESTINATION "${INCLUDE_DEST}")
+install(EXPORT geographer DESTINATION "${LIB_DEST}")
 
 ### find zoltan ###
 FIND_PACKAGE( Zoltan2 PATHS "/home/hpc/pr87si/di36qin/Code/Trilinos/build/packages/zoltan2/")
