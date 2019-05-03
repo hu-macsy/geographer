@@ -92,8 +92,18 @@ endif (GTEST_FOUND)
 
 ### define install targets ###
 set(BIN_DEST "bin")
-set(INCLUDE_DEST "include")
-set(LIB_DEST "lib")
+set(INCLUDE_DEST "include/geographer")
+set(LIB_DEST "lib/geographer")
+
+include(CMakePackageConfigHelpers)
+
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfigVersion.cmake
+  VERSION 0.9
+  COMPATIBILITY ExactVersion )
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfigVersion.cmake
+        DESTINATION ${LIB_DEST}/cmake )
 
 install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable
 install(TARGETS geographer EXPORT geographer DESTINATION "${LIB_DEST}") # library
