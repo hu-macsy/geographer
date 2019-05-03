@@ -44,6 +44,7 @@ using point = std::vector<ValueType>;
  * @param[in] nodeWeights
  * @param[in] blockSizes target block sizes, not maximum sizes
  * @param[in] prevPartition This is used for the hierarchical version, it is the partition from the previous hierarchy level.
+ * If settings.repartition=true then this has a different meaning: is the partition to be refined.
  * @param[in] centers initial k-means centers
  * @param[in] settings Settings struct
  *
