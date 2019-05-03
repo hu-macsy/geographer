@@ -1295,6 +1295,8 @@ DenseVector<IndexType> computePartition( \
 	typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
 	std::vector<ValueType> imbalances(numNodeWeights, 1);
 
+	std::vector<std::vector<ValueType>> influence(numNodeWeights, std::vector<ValueType>(totalNumNewBlocks, 1));
+
 	// result[i]=b, means that point i belongs to cluster/block b
 	DenseVector<IndexType> result(coordinates[0].getDistributionPtr(), 0);
 //possible repartition adaptation
@@ -1348,8 +1350,6 @@ if( settings.repartition ){
 				}
 			}
 		}
-
-		std::vector<std::vector<ValueType>> influence(numNodeWeights, std::vector<ValueType>(totalNumNewBlocks, 1));
 
 		//WARNING: this is related with how we store and add the relative speed
 		//see also the ComMTree::createLevelAbove() function
