@@ -21,8 +21,6 @@ if(USE_NETWORKIT)
 endif(USE_NETWORKIT)
 
 #set(NETWORKIT_DIR "/usr/local")
-set(SCAI_INCLUDE "${SCAI_DIR}/include/") 
-set(SCAI_LIB "${SCAI_DIR}/lib/")
 set(NETWORKIT_INCLUDE "${NETWORKIT_DIR}/include/") 
 set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
 
@@ -36,8 +34,6 @@ set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphU
 
 set(RBC_DIR "${PROJECT_SOURCE_DIR}/RBC")
 
-set(SCAI_LIBLIST scai_lama scai_dmemo scai_common scai_hmemo scai_utilskernel scai_tracing scai_sparsekernel scai_solver scai_logging)
-
 ### find MPI ###
 find_package(MPI REQUIRED)
 include_directories(${MPI_CXX_INCLUDE_PATH})
@@ -50,11 +46,16 @@ include_directories(${GTEST_INCLUDE_DIRS})
 find_package(Boost REQUIRED COMPONENTS program_options filesystem system)
 include_directories(${Boost_INCLUDE_DIRS})
 
-### include and link Lama and RBC ###
-include_directories(${SCAI_INCLUDE})
+### find Lama ###
+find_package(SCAI REQUIRED PATHS "${SCAI_DIR}/share/cmake/SCAI")
+include_directories(${SCAI_INCLUDE_DIRS})
+add_definitions(${SCAI_DEFINITIONS})
+set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SCAI_CXX_FLAGS}" )
+link_directories(${SCAI_ROOT}/lib/)
+
+### include and link RBC ###
 include_directories(${RBC_DIR})
 
-link_directories(${SCAI_LIB})
 link_directories(${RBC_DIR}/build/lib)
 
 ### add networkit include and link directory ###
@@ -71,12 +72,12 @@ set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11 -O3 -fPIC -Wall -
 
 ### define targets ###
 add_executable(Geographer ${FILES_COMMON} main.cpp)
-target_link_libraries(Geographer ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
+target_link_libraries(Geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
 add_executable(analyze FileIO.cpp Settings.cpp GraphUtils.cpp CommTree.cpp Metrics.cpp ../tools/analyzePartition.cpp)
-target_link_libraries(analyze ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
+target_link_libraries(analyze ${SCAI_LIBRARIES} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
 
 add_executable(heatMap FileIO.cpp Settings.cpp GraphUtils.cpp CommTree.cpp ../tools/graphToHeatmap.cpp)
-target_link_libraries(heatMap ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
+target_link_libraries(heatMap ${SCAI_LIBRARIES} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
 
 ### add networkit library ###
 if (USE_NETWORKIT)
@@ -87,7 +88,7 @@ add_library(geographer SHARED ${FILES_COMMON})
 
 if (GTEST_FOUND)
 	add_executable(GeographerTest ${FILES_COMMON} ${FILES_TEST})
-	target_link_libraries(GeographerTest ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
+	target_link_libraries(GeographerTest ${SCAI_LIBRARIES} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
 endif (GTEST_FOUND)
 
 ### define install targets ###
@@ -133,7 +134,7 @@ if( Zoltan2_FOUND )
 	target_include_directories( allCompetitors PUBLIC "/lrz/sys/libraries/metis/5.1.0/i8r8/include" )
 	target_include_directories( allCompetitors PUBLIC "/lrz/sys/libraries/parmetis/4.0.3/ibmmpi/i8r8/include" )
 
-	target_link_libraries( allCompetitors ${SCAI_LIBLIST} _rbc ${Boost_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} ${Zoltan2_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )
+	target_link_libraries( allCompetitors ${SCAI_LIBRARIES} _rbc ${Boost_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} ${Zoltan2_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )
 else()
 	message( "Package Zoltan2 was not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
 endif()
