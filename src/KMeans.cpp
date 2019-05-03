@@ -529,18 +529,16 @@ DenseVector<IndexType> assignBlocks(
 	const IndexType localN = dist->getLocalSize();
 	const IndexType currentLocalN = std::distance(firstIndex, lastIndex);
 
-//possible repart adaptation
-//if repartition, numOldBlocks=1
+	//if repartition, numOldBlocks=1
 	//number of blocks from the previous hierarchy
 	const IndexType numOldBlocks= blockSizesPrefixSum.size()-1;
 
-if( settings.repartition )	{
-	assert( numOldBlocks==1 );
-	assert( blockSizesPrefixSum.size()==2 );
-}
+	if( settings.repartition )	{
+		assert( numOldBlocks==1 );
+		assert( blockSizesPrefixSum.size()==2 );
+	}
 	const IndexType numNodeWeights = nodeWeights.size();
 
-//possible repart adaptation	
 	if( settings.debugMode and not settings.repartition){
 		const IndexType maxPart = oldBlock.max(); //global operation
 		SCAI_ASSERT_EQ_ERROR( numOldBlocks-1, maxPart, "The provided old assignment must have equal number of blocks as the length of the vector with the new number of blocks per part");
@@ -548,7 +546,7 @@ if( settings.repartition )	{
 
 	// numNewBlocks is equivalent to 'k' in the classic version
 	IndexType numNewBlocks = centers.size(); 
-//possible repart adaptation
+
 	SCAI_ASSERT_EQ_ERROR( blockSizesPrefixSum.back(), numNewBlocks, "Total number of new blocks mismatch" );
 
 	//centers are given as a 1D vector alongside with a prefix sum vector
@@ -565,7 +563,6 @@ if( settings.repartition )	{
 	std::vector<ValueType> minDistanceAllBlocks( numNewBlocks );
 	std::vector<ValueType> effectMinDistAllBlocks( numNewBlocks );
 
-//possible repart adaptation
 	//for all new blocks
 	for( IndexType newB=0; newB<numNewBlocks; newB++ ){
 		SCAI_REGION( "KMeans.assignBlocks.filterCenters" );
@@ -590,8 +587,8 @@ if( settings.repartition )	{
 	//cluster indices are "global": from 0 to numNewBlocks
 	std::iota( clusterIndicesAllBlocks.begin(), clusterIndicesAllBlocks.end(), 0);
 
-//possible repart adaptation
-//remember, if repartition, numOldBlocks=1 and blockSizesPrefixSum.size()=2
+
+	//remember, if repartition, numOldBlocks=1 and blockSizesPrefixSum.size()=2
 
 	for( IndexType oldB=0; oldB<numOldBlocks; oldB++ ){
 		const unsigned int rangeStart = blockSizesPrefixSum[oldB];
@@ -620,7 +617,6 @@ if( settings.repartition )	{
 	std::vector<ValueType> influenceChangeUpperBound(numNewBlocks, 1+settings.influenceChangeCap);
 	std::vector<ValueType> influenceChangeLowerBound(numNewBlocks, 1-settings.influenceChangeCap);
 
-//if repartition, the previous partition is kept into olbBlock. 
 	//compute assignment and balance
 	DenseVector<IndexType> assignment = previousAssignment;
 	bool allWeightsBalanced = false; //balance over all weights and all blocks
@@ -650,7 +646,7 @@ if( settings.repartition )	{
 				const IndexType oldCluster = wAssignment[i];
 				const IndexType fatherBlock = rOldBlock[i];
 				const IndexType veryLocalI = std::distance(firstIndex, it);
-//possible repart adaptation
+
 				if( not settings.repartition){
 					SCAI_ASSERT_LT_ERROR( fatherBlock, numOldBlocks, "Wrong father block index");
 				}else{
@@ -688,8 +684,8 @@ if( settings.repartition )	{
 						ValueType influenceEffectOfBestBlock = -1;
 						IndexType secondBest = 0;
 						ValueType secondBestValue = std::numeric_limits<ValueType>::max();
-//possible repart adaptation					
-//if repartition, blockSizesPrefixSum only has two elements and the dather index is wrong		
+
+						//if repartition, blockSizesPrefixSum only has two elements and the fatherBlock index is wrong		
 						//where the range of indices starts for the father block
 						const IndexType rangeStart = settings.repartition ? 0 : blockSizesPrefixSum[fatherBlock];
 						const IndexType rangeEnd =  settings.repartition ? blockSizesPrefixSum.back() : blockSizesPrefixSum[fatherBlock+1];
@@ -704,7 +700,7 @@ if( settings.repartition )	{
 							//remember: cluster centers are sorted according to their distance from the bounding box of this PE	
 							//also, the cluster indices go from 0 till numNewBlocks
 							IndexType j = clusterIndicesAllBlocks[c];//maybe it would be useful to sort the whole centers array, aligning memory accesses.
-//possible repart adaptation
+
 							//squared distance from previous assigned center
 							ValueType sqDist = 0;
 							const point& myCenter = centers1DVector[j];
@@ -772,7 +768,7 @@ if( settings.repartition )	{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.blockWeightSum" );
 			comm->sumImpl( blockWeights[j].data(), blockWeights[j].data(), numNewBlocks, scai::common::TypeTraits<ValueType>::stype);
 		}
-//possible repart adaptation		
+
 		//calculate imbalance for every new block and every weight
 		allWeightsBalanced = true;
 		std::vector<std::vector<ValueType>> imbalancesPerBlock( numNodeWeights, std::vector<ValueType>( numNewBlocks ));
@@ -838,10 +834,6 @@ if( settings.repartition )	{
 			}//for numNewBlocks
 		}//for numNodeWeights
 
-//		if (settings.verbose && comm->getRank() == 0) {
-//			std::cout << "Influence ratios: (" << minRatio << ", " << maxRatio << ")." << std::endl;
-//		}
-
 		//update bounds
 		{
 			SCAI_REGION( "KMeans.assignBlocks.balanceLoop.updateBounds" );
@@ -876,7 +868,7 @@ if( settings.repartition )	{
 
 				effectMinDistAllBlocks[newB] = minDistanceAllBlocks[newB]*minDistanceAllBlocks[newB]*influenceMin;
 			}
-//possible repart adaptation			
+
 			//TODO: duplicated code as in the beginning of the assignBlocks, maybe move into lambda?
 			for( IndexType oldB=0; oldB<numOldBlocks; oldB++ ){
 				const unsigned int rangeStart = blockSizesPrefixSum[oldB];
@@ -1028,15 +1020,9 @@ DenseVector<IndexType> computeRepartition(
 	Settings tmpSettings = settings;
 	tmpSettings.repartition = true;
 
-//this compiles but then it tries to partition every block into 1 blocks, so it does not do anything...	
-/*	
-	for(unsigned int i=0; i<transpCenters.size(); i++){
-		groupOfCenters.push_back( transpCenters );
-	}
-*/	
 	Metrics metrics(settings);
 
-	return computePartition(coordinates, nodeWeights, blockSizes, /**/ previous /**/ , groupOfCenters, tmpSettings, metrics);
+	return computePartition(coordinates, nodeWeights, blockSizes, previous , groupOfCenters, tmpSettings, metrics);
 }
 
 //usual call that does not take the graph as input
@@ -1045,7 +1031,7 @@ DenseVector<IndexType> computePartition( \
 	const std::vector<DenseVector<ValueType>> &coordinates, \
 	const std::vector<DenseVector<ValueType>> &nodeWeights, \
 	const std::vector<std::vector<ValueType>> &blockSizes, \
-	const DenseVector<IndexType> &partition, \
+	const DenseVector<IndexType> &partition,  //if repartition, this is the partition to be rebalanced
 	std::vector<std::vector<point>> centers, \
 	const Settings settings, \
 	struct Metrics &metrics ) {
@@ -1060,7 +1046,7 @@ DenseVector<IndexType> computePartition( \
 
 
 //TODO: graph is not needed, this is only for debugging
-//WARNING: if settings.repartition=true then partition has a different meaning: is the partition to be refined,
+//WARNING: if settings.repartition=true then partition has a different meaning: is the partition to be rebalanced,
 // not the partition from the previous hierarchy level.
 //TODO?: add another DenseVector in order not to confuse the two?
 
@@ -1071,7 +1057,7 @@ DenseVector<IndexType> computePartition( \
 	const std::vector<DenseVector<ValueType>> &coordinates, \
 	const std::vector<DenseVector<ValueType>> &nodeWeights, \
 	const std::vector<std::vector<ValueType>> &targetBlockWeights, \
-	const DenseVector<IndexType> &partition, \
+	const DenseVector<IndexType> &partition, //if repartition, this is the partition to be rebalanced
 	std::vector<std::vector<point>> centers, \
 	const Settings settings, \
 	struct Metrics &metrics ) {
@@ -1079,10 +1065,9 @@ DenseVector<IndexType> computePartition( \
 	SCAI_REGION( "KMeans.computePartition" );
 	std::chrono::time_point<std::chrono::high_resolution_clock> KMeansStart = std::chrono::high_resolution_clock::now();
 
-//possible repart adaptation
-//if repartition, by convention, numOldBlocks=1=center.size()
+	//if repartition, by convention, numOldBlocks=1=center.size()
 	//the number of blocks from the previous hierarchy level
-	const IndexType numOldBlocks =  /*settings.repartition ? centers[0].size() :*/ centers.size();
+	const IndexType numOldBlocks = centers.size();
 	if( settings.debugMode and not settings.repartition ){
 		const IndexType maxPart = partition.max(); //global operation
 		SCAI_ASSERT_EQ_ERROR( numOldBlocks-1, maxPart, "The provided partition must have equal number of blocks as the length of the vector with the new number of blocks per part");
@@ -1106,15 +1091,15 @@ DenseVector<IndexType> computePartition( \
 	std::vector<IndexType> blockSizesPrefixSum( numOldBlocks+1, 0 );
 	//in a sense, this is the new k = settings.numBlocks
 	IndexType totalNumNewBlocks = 0;
-//possible repart adaptation
-//if repartition, blockSizesPrefixSum=[ 0, totalNumNewBlocks ]
+
+	//if repartition, blockSizesPrefixSum=[ 0, totalNumNewBlocks ]
 	for( int b=0; b<numOldBlocks; b++ ){
 		blockSizesPrefixSum[b+1] += blockSizesPrefixSum[b]+centers[b].size();
 		totalNumNewBlocks += centers[b].size();
 	}
-//possible repart adaptation
-//if repartition, centers1DVector=centers[0] (remember, centers.size()=1)
-//Basically, one vector with all the centers and the prefix sum vectors is "useless"
+
+	//if repartition, centers1DVector=centers[0] (remember, centers.size()=1)
+	//Basically, one vector with all the centers and the prefix sum vectors is "useless"
 
 	//convert to a 1D vector
 	std::vector<point> centers1DVector;
@@ -1299,15 +1284,13 @@ DenseVector<IndexType> computePartition( \
 
 	// result[i]=b, means that point i belongs to cluster/block b
 	DenseVector<IndexType> result(coordinates[0].getDistributionPtr(), 0);
-//possible repartition adaptation
 
-//
-//if repartition, should it be result = previous???	
-//
-if( settings.repartition ){
-	assert( partition.getDistributionPtr()->isEqual(*coordinates[0].getDistributionPtr()) );
-	result = partition;
-}
+	//TODO, recheck:
+	//if repartition, should it be result = previous???	
+	if( settings.repartition ){
+		assert( partition.getDistributionPtr()->isEqual(*coordinates[0].getDistributionPtr()) );
+		result = partition;
+	}
 
 	do {
 		std::chrono::time_point<std::chrono::high_resolution_clock> iterStart = std::chrono::high_resolution_clock::now();
@@ -1375,8 +1358,7 @@ if( settings.repartition ){
 			}
 		}
 
-//possible repart adaptation
-//TODO: adapt for multiple weights
+		//TODO: adapt for multiple weights
 		std::vector<std::vector<ValueType>> newCenters = findCenters(coordinates, result, totalNumNewBlocks, firstIndex, lastIndex, nodeWeights[0]);
 
 		//newCenters have reversed order of the vectors
@@ -1387,7 +1369,6 @@ if( settings.repartition ){
 		assert( transCenters.size()==totalNumNewBlocks );
 		assert( transCenters[0].size()==dim );
 
-//possible repart adaptation
 		//keep centroids of empty blocks at their last known position
 		for (IndexType j = 0; j <totalNumNewBlocks; j++) {
 			//center for block j is empty
@@ -1418,7 +1399,7 @@ if( settings.repartition ){
 				}
 			}
 		}
-//possible repart adaptation		
+
 		centers1DVector = transCenters;
 
 		delta = *std::max_element(deltas.begin(), deltas.end());

@@ -439,7 +439,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 			commTree.adaptWeights( nodeWeightCopy );
 
 //result = ITI::KMeans::computeHierarchicalPartition<IndexType, ValueType>( input, coordinateCopy, nodeWeightCopy, commTree, settings, metrics);			
-settings.debugMode = true;
+//settings.debugMode = true;
 result = ITI::KMeans::computeHierPlusNormalPartition<IndexType, ValueType>( input, coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
 			SCAI_ASSERT_EQ_ERROR( nodeWeightCopy[0].getDistributionPtr()->getLocalSize(),\
 						result.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");			
