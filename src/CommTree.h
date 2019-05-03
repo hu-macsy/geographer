@@ -362,7 +362,7 @@ is the optimum weight each PE should have. Mainly used to comoute imbalance.
 	If level==-1 it will retunr the the constraints of the leaves.
 */
 
-std::vector<std::vector<ValueType>> getBalanceVectors( const IndexType level) const;
+std::vector<std::vector<ValueType>> getBalanceVectors( const IndexType level=-1) const;
 
 /*@brief Print information for the tree
 */

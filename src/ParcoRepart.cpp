@@ -406,9 +406,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
 		
 		// vector of size k, each element represents the size of one block
-std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors(1);
-SCAI_ASSERT_EQ_ERROR( blockSizes.size(), nodeWeights.size(), "Wrong number of weights");
-SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Wrong size of weights" );
+		std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors(1);
+		SCAI_ASSERT_EQ_ERROR( blockSizes.size(), nodeWeights.size(), "Wrong number of weights");
+		SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Wrong size of weights" );
 		if( blockSizes.empty() ){
 			blockSizes = std::vector<std::vector<ValueType> >(nodeWeights.size());
 			for (int i = 0; i < nodeWeights.size(); i++) {
@@ -438,8 +438,10 @@ SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Wrong size of w
 
 			commTree.adaptWeights( nodeWeightCopy );
 
-			result = ITI::KMeans::computeHierarchicalPartition<IndexType, ValueType>( input, coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
-SCAI_ASSERT_EQ_ERROR( nodeWeightCopy[0].getDistributionPtr()->getLocalSize(),\
+//result = ITI::KMeans::computeHierarchicalPartition<IndexType, ValueType>( input, coordinateCopy, nodeWeightCopy, commTree, settings, metrics);			
+settings.debugMode = true;
+result = ITI::KMeans::computeHierPlusNormalPartition<IndexType, ValueType>( input, coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
+			SCAI_ASSERT_EQ_ERROR( nodeWeightCopy[0].getDistributionPtr()->getLocalSize(),\
 						result.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");			
 		}
 		
@@ -447,7 +449,7 @@ SCAI_ASSERT_EQ_ERROR( nodeWeightCopy[0].getDistributionPtr()->getLocalSize(),\
 		metrics.MM["timeKmeans"] = kMeansTime.count();
 		//timeForKmeans = ValueType ( comm->max(kMeansTime.count() ));
         assert(scai::utilskernel::HArrayUtils::min(result.getLocalValues()) >= 0);
-        assert(scai::utilskernel::HArrayUtils::max(result.getLocalValues()) < k);
+        SCAI_ASSERT_LT_ERROR(scai::utilskernel::HArrayUtils::max(result.getLocalValues()) ,k, "");
 		
 		if (settings.verbose) {
 			ValueType totKMeansTime = ValueType( comm->max(kMeansTime.count()) );
