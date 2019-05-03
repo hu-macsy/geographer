@@ -534,6 +534,10 @@ DenseVector<IndexType> assignBlocks(
 	//number of blocks from the previous hierarchy
 	const IndexType numOldBlocks= blockSizesPrefixSum.size()-1;
 
+if( settings.repartition )	{
+	assert( numOldBlocks==1 );
+	assert( blockSizesPrefixSum.size()==2 );
+}
 	const IndexType numNodeWeights = nodeWeights.size();
 
 //possible repart adaptation	
@@ -587,7 +591,8 @@ DenseVector<IndexType> assignBlocks(
 	std::iota( clusterIndicesAllBlocks.begin(), clusterIndicesAllBlocks.end(), 0);
 
 //possible repart adaptation
-//remember, if repartition, numOldBlocks=1
+//remember, if repartition, numOldBlocks=1 and blockSizesPrefixSum.size()=2
+
 	for( IndexType oldB=0; oldB<numOldBlocks; oldB++ ){
 		const unsigned int rangeStart = blockSizesPrefixSum[oldB];
 		const unsigned int rangeEnd = blockSizesPrefixSum[oldB+1];
