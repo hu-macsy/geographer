@@ -89,7 +89,7 @@ inline std::ostream& operator<<(std::ostream& out, Format method){
 
 //-----------------------------------------------------------------------------------
 
-enum class Tool{ geographer, geoKmeans, geoSFC, geoHierKM, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, none};
+enum class Tool{ geographer, geoKmeans, geoSFC, geoHierKM, geoHierRepart, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, none};
 
 
 std::istream& operator>>(std::istream& in, ITI::Tool& tool);

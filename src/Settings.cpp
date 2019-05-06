@@ -52,6 +52,7 @@ std::ostream& ITI::operator<<( std::ostream& out, ITI::Tool tool){
 		case Tool::geoKmeans: token = "geoKmeans"; break;
 		case Tool::geoSFC: token = "geoSFC"; break;
 		case Tool::geoHierKM: token = "geoHierKM"; break;
+		case Tool::geoHierRepart: token = "geoHierRepart"; break;
 		case Tool::geoMS: token = "geoMS"; break;
 		case Tool::parMetisGraph: token = "parMetisGraph"; break;
 		case Tool::parMetisGeom: token = "parMetisGeom"; break;
@@ -79,6 +80,8 @@ std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool){
 		tool = ITI::Tool::geoKmeans; 
 	else if( token=="geoHierKM" or token=="geoHierKmeans" or token=="geoHierKMeans")
 		tool = ITI::Tool::geoHierKM;
+	else if( token=="geoHierRepart" or token=="geohierrepart" or token=="geoHieRepart")
+		tool = ITI::Tool::geoHierRepart;
 	else if( token=="geoMS" or token=="geoMultiSection" or token=="geoMultisection")
 		tool = ITI::Tool::geoMS;
 	else if( token=="parMetisGraph" or token=="parMetisgraph" or token=="parmetisGraph")

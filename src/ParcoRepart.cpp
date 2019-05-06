@@ -315,7 +315,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 	PRINT0("Initial partition with spectral");
 	result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
 }*/ 
-	else if (settings.initialPartition == ITI::Tool::geoKmeans or settings.initialPartition == ITI::Tool::geoHierKM) {
+	else if (settings.initialPartition == ITI::Tool::geoKmeans or settings.initialPartition == ITI::Tool::geoHierKM \
+		or  settings.initialPartition == ITI::Tool::geoHierRepart){
 	    if (comm->getRank() == 0) {
 	        std::cout << "Initial partition with K-Means" << std::endl;
 	    }
@@ -426,7 +427,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 			result = ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
 		} else if(settings.initialPartition == ITI::Tool::geoKmeans){
 			result = ITI::KMeans::computePartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
-		}else if (settings.initialPartition == ITI::Tool::geoHierKM){
+		}else if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierRepart){
 			const IndexType numWeights = nodeWeightCopy.size();
 			SCAI_ASSERT_GT_ERROR( settings.hierLevels.size(), 0 , "Must provide the tree level sizes in order to call hierarchical KMeans" );
 			//TODO: adapt also for when tree is given in a file
@@ -438,9 +439,13 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
 			commTree.adaptWeights( nodeWeightCopy );
 
-//result = ITI::KMeans::computeHierarchicalPartition<IndexType, ValueType>( input, coordinateCopy, nodeWeightCopy, commTree, settings, metrics);			
-//settings.debugMode = true;
-result = ITI::KMeans::computeHierPlusNormalPartition<IndexType, ValueType>( input, coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
+			if (settings.initialPartition == ITI::Tool::geoHierKM){
+				result = ITI::KMeans::computeHierarchicalPartition<IndexType, ValueType>( input, coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
+			}
+			if (settings.initialPartition == ITI::Tool::geoHierRepart){
+				//settings.debugMode = true;
+				result = ITI::KMeans::computeHierPlusRepart<IndexType, ValueType>( input, coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
+			}
 			SCAI_ASSERT_EQ_ERROR( nodeWeightCopy[0].getDistributionPtr()->getLocalSize(),\
 						result.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");			
 		}

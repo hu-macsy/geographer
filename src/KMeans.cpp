@@ -1766,7 +1766,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 //--------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computeHierPlusNormalPartition(
+DenseVector<IndexType> computeHierPlusRepart(
 	CSRSparseMatrix<ValueType> &graph, //TODO: only for debugging
 	std::vector<DenseVector<ValueType>> &coordinates,
 	std::vector<DenseVector<ValueType>> &nodeWeights,
@@ -1775,29 +1775,30 @@ DenseVector<IndexType> computeHierPlusNormalPartition(
 	struct Metrics& metrics){
 
 	//get a hierarchical partition
-settings.epsilon = 0.07;
 	DenseVector<IndexType> result = ITI::KMeans::computeHierarchicalPartition<IndexType, ValueType>( graph, coordinates, nodeWeights, commTree, settings, metrics);
 
 	std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors(-1);
 
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	PRINT0("finished hierarchical partition");
+	PRINT0("Finished hierarchical partition");
 
-	//this redistribution is needed to calculate the metrics
-	const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
-	graph.redistribute( result.getDistributionPtr(), graph.getColDistributionPtr() );
 
-	metrics.getEasyMetrics( graph, result, nodeWeights, settings );
-	if(comm->getRank()==0){
-		metrics.print( std::cout );
+	if(settings.verbose){
+		//this redistribution is needed to calculate the metrics
+		const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
+		graph.redistribute( result.getDistributionPtr(), graph.getColDistributionPtr() );
+
+		metrics.getEasyMetrics( graph, result, nodeWeights, settings );
+		if(comm->getRank()==0){
+			metrics.print( std::cout );
+		}
+		//redistribute back to original distribution
+		graph.redistribute( rowDist, graph.getColDistributionPtr() );
 	}
-	//redistribute back to original distribution
-	graph.redistribute( rowDist, graph.getColDistributionPtr() );
-settings.epsilon = 0.03;
+
 	//refine using a repartition step
 	return  ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinates, nodeWeights, blockSizes, result, settings);
-
-}//computeHierPlusNormalPartition
+}//computeHierPlusRepart
 
 /**
  * @brief Get local minimum and maximum coordinates
@@ -1870,7 +1871,7 @@ template DenseVector<IndexType> KMeans::computeHierarchicalPartition(
 	const Settings settings,
 	struct Metrics& metrics);
 
-template DenseVector<IndexType> KMeans::computeHierPlusNormalPartition(
+template DenseVector<IndexType> KMeans::computeHierPlusRepart(
 	CSRSparseMatrix<ValueType> &graph, //TODO: only for debugging
 	std::vector<DenseVector<ValueType>> &coordinates,
 	std::vector<DenseVector<ValueType>> &nodeWeights,

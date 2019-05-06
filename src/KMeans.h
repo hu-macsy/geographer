@@ -124,7 +124,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 	struct Metrics& metrics);
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computeHierPlusNormalPartition(
+DenseVector<IndexType> computeHierPlusRepart(
 	CSRSparseMatrix<ValueType> &graph, //TODO: only for debugging
 	std::vector<DenseVector<ValueType>> &coordinates,
 	std::vector<DenseVector<ValueType>> &nodeWeights,
