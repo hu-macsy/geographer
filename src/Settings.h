@@ -94,7 +94,11 @@ enum class Tool{ geographer, geoKmeans, geoSFC, geoHierKM, geoHierRepart, geoMS,
 
 std::istream& operator>>(std::istream& in, ITI::Tool& tool);
 
-std::ostream& operator<<(std::ostream& out, ITI::Tool tool);
+std::ostream& operator<<(std::ostream& out, const ITI::Tool tool);
+
+std::string toString(const ITI::Tool& t);
+
+ITI::Tool toTool(const std::string& s);
 
 }// ITI
 

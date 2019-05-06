@@ -43,7 +43,7 @@ std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method)
 }
 */
 
-std::ostream& ITI::operator<<( std::ostream& out, ITI::Tool tool){
+std::ostream& ITI::operator<<( std::ostream& out, const ITI::Tool tool){
 	std::string token;
 	using ITI::Tool;
 
@@ -66,6 +66,13 @@ std::ostream& ITI::operator<<( std::ostream& out, ITI::Tool tool){
 
 	out << token;
 	return out;
+}
+
+
+std::string ITI::toString(const ITI::Tool& t){
+	std::ostringstream out;
+	out<< t;
+	return out.str();
 }
 
 std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool){
@@ -104,6 +111,13 @@ std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool){
     return in;
 }
 
+ITI::Tool ITI::toTool(const std::string& s){
+	std::stringstream ss;
+	ss << s;
+	ITI::Tool t;
+	ss >> t;
+	return t;
+}
 //-------------------------------------------------------------------------    
 
 using namespace boost::program_options;
