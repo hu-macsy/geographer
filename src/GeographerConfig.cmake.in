@@ -1,0 +1,13 @@
+set ( Geographer_CXX_FLAGS "@CMAKE_CXX_FLAGS@" )
+
+set ( Geographer_ROOT @CMAKE_INSTALL_PREFIX@ )
+
+set ( Boost_ROOT @BOOST_ROOT@ )
+
+set ( Geographer_INCLUDE_DIRS ${Geographer_ROOT}/@INCLUDE_DEST@ @BOOST_INCLUDE_DIRS@ )
+
+set ( Geographer_LIBRARIES geographer)
+
+set ( Geographer_FOUND true )
+
+include(geographer.cmake)
