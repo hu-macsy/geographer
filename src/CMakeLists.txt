@@ -1,5 +1,6 @@
 cmake_minimum_required (VERSION 2.6)
 project (Geographer)
+include(CMakePackageConfigHelpers)
 
 # define library version
 set(Geographer_VERSION_MAJOR 0 STRING "major version")
@@ -79,30 +80,30 @@ target_link_libraries(analyze ${SCAI_LIBRARIES} ${Boost_LIBRARIES} _rbc ${MPI_CX
 add_executable(heatMap FileIO.cpp Settings.cpp GraphUtils.cpp CommTree.cpp ../tools/graphToHeatmap.cpp)
 target_link_libraries(heatMap ${SCAI_LIBRARIES} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
 
-### add networkit library ###
+add_library(geographer SHARED ${FILES_COMMON})
+
+### add networkit library if found ###
 if (USE_NETWORKIT)
   target_link_libraries(Geographer networkit)
 endif (USE_NETWORKIT)
 
-add_library(geographer SHARED ${FILES_COMMON})
-
+### define unit test target if GTest was found ###
 if (GTEST_FOUND)
 	add_executable(GeographerTest ${FILES_COMMON} ${FILES_TEST})
 	target_link_libraries(GeographerTest ${SCAI_LIBRARIES} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
 endif (GTEST_FOUND)
 
-### define install targets ###
+### define install directories ###
 set(BIN_DEST "bin")
 set(INCLUDE_DEST "include/geographer")
 set(LIB_DEST "lib/geographer")
-
-include(CMakePackageConfigHelpers)
 
 write_basic_package_version_file(
   ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfigVersion.cmake
   VERSION 0.9
   COMPATIBILITY ExactVersion )
 
+### install files ###
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfigVersion.cmake
         DESTINATION ${LIB_DEST}/cmake )
 
