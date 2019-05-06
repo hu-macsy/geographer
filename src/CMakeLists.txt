@@ -104,6 +104,7 @@ add_executable(heatMap FileIO.cpp Settings.cpp GraphUtils.cpp CommTree.cpp ../to
 target_link_libraries(heatMap ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 
 add_library(geographer SHARED ${FILES_COMMON})
+target_link_libraries(geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 
 ### add networkit library if found ###
 if (USE_NETWORKIT)
