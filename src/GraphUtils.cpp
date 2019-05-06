@@ -2029,65 +2029,6 @@ std::vector< std::vector<IndexType>> GraphUtils<IndexType, ValueType>::mecGraphC
 //------------------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-std::vector<ValueType> GraphUtils<IndexType, ValueType>::getBetweennessCentrality(const scai::lama::CSRSparseMatrix<ValueType>& graph, bool normalize){
-
-	const IndexType N = graph.getNumRows();
-	const IndexType M = graph.getNumValues()/2;	//WARNING: assumes graph is undirected
-
-	IndexType maxDegree;
-	std::vector<std::tuple<IndexType,IndexType,ValueType>> edgeListTmp = CSR2EdgeList_local( graph, maxDegree );
-	SCAI_ASSERT_EQ_ERROR( edgeListTmp.size(), M, "Wrong edge list size");
-
-	std::vector<std::pair<IndexType,ValueType>> edgeList(M);
-	std::vector<ValueType> edgeWeights(M);
-
-	for(IndexType i=0; i<M; i++){
-		edgeList[i] = std::make_pair( std::get<0>(edgeListTmp[i]), std::get<1>(edgeListTmp[i]) );
-		edgeWeights[i] = std::get<2>(edgeListTmp[i]);
-	}
-
-	using namespace boost;
-	// undirected graph with edge weights
-	typedef property<edge_weight_t, double> EdgeProperty;
-	typedef adjacency_list<	vecS,
-							vecS,
-							undirectedS,	// TODO: option to change to directed
-							no_property,
-							EdgeProperty> Graph;							
-
-	Graph G(N);
-	//add edges manually... TODO: use a constructor
-	for( int e=0; e<M; e++){
-		boost::add_edge( 	edgeList[e].first,
-							edgeList[e].second,
-							EdgeProperty(edgeWeights[e]),
-							//edgeWeights[e],
-							G);
-		//PRINT(e << ": (" << edgeList[e].first << ", " << edgeList[e].second <<") -- "<< edgeWeights[e]);							
-	}
-
-
-
-	boost::shared_array_property_map<double, boost::property_map<Graph, vertex_index_t>::const_type> centrality_map(num_vertices(G), get(boost::vertex_index, G));
-	//WARNING, TODO: relative betweenness returns just 0, do it manually
-	//boost::relative_betweenness_centrality(G, centrality_map);
-	boost::brandes_betweenness_centrality(G, centrality_map);
-
-	// in boost page is 2/(...). I used 4 instead so it gives same results
-	// with the betweenness scores when using Networkit
-	ValueType scaleF = normalize ? 2.0/(N-2)*(N-3) : 1;
-	SCAI_ASSERT_GT_ERROR( scaleF, 0 , "Possible int overflow");
-
-	std::vector<double> centrality(N);
-	for( int i=0; i<N; i++ ){
-		centrality[i] = centrality_map[i]*scaleF;
-	}
-
-	return centrality;
-}
-//-----------------------------------------------------------------------------------
-
-template <typename IndexType, typename ValueType>
 std::vector<IndexType> GraphUtils<IndexType, ValueType>::indexReorderCantor(const IndexType maxIndex){
     IndexType index = 0;
     std::vector<IndexType> ret(maxIndex, -1);
@@ -2148,7 +2089,6 @@ template scai::lama::CSRSparseMatrix<ValueType> constructLaplacian<IndexType, Va
 template scai::lama::CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension);
 template scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d);
 template std::vector< std::vector<IndexType>> mecGraphColoring( const CSRSparseMatrix<ValueType> &graph, IndexType &colors);
-template std::vector<ValueType> getBetweennessCentrality(const scai::lama::CSRSparseMatrix<ValueType>& graph);
 */
 
 //} /*namespace GraphUtils*/
