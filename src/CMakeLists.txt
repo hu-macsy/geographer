@@ -21,7 +21,6 @@ if(USE_NETWORKIT)
   add_definitions(-DUSE_NETWORKIT)
 endif(USE_NETWORKIT)
 
-#set(NETWORKIT_DIR "/usr/local")
 set(NETWORKIT_INCLUDE "${NETWORKIT_DIR}/include/") 
 set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
 
@@ -70,6 +69,14 @@ link_directories(${SCAI_ROOT}/lib/)
 
 ### include and link RBC ###
 find_library( RBC_LIBRARY _rbc "${RBC_DIR}/build/lib" )
+
+if((NOT RBC_LIBRARY) OR (NOT EXISTS ${RBC_LIBRARY}))
+  message("RBC Library not found, cloning and building it now.")
+  execute_process(COMMAND git submodule update --init
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+  execute_process(COMMAND make WORKING_DIRECTORY ${RBC_DIR})
+  find_library( RBC_LIBRARY _rbc "${RBC_DIR}/build/lib" )
+endif()
 
 ### add networkit include and link directory ###
 # link_directories has to happen before target definitions
@@ -161,5 +168,5 @@ if( Zoltan2_FOUND )
 
 	target_link_libraries( allCompetitors ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Boost_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} ${Zoltan2_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )
 else()
-	message( "Package Zoltan2 was not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
+	#message( "Package Zoltan2 was not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
 endif()
