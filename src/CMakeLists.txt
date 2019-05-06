@@ -11,7 +11,7 @@ if (NOT DEFINED SCAI_DIR)
 	message( FATAL_ERROR "Install Directory of LAMA not defined, specify with -DSCAI_DIR" )
 endif (NOT DEFINED SCAI_DIR)
 
-set(CMAKE_VERBOSE_MAKEFILE ON)
+#set(CMAKE_VERBOSE_MAKEFILE ON)
 
 option(USE_NETWORKIT "Use NETWORKIT package." OFF)
 if(USE_NETWORKIT)
@@ -95,16 +95,17 @@ set ( CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 set ( CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE )
 
 ### define targets ###
-add_executable(Geographer ${FILES_COMMON} main.cpp)
-target_link_libraries(Geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+add_library(geographer SHARED ${FILES_COMMON})
+target_link_libraries(geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+
+add_executable(Geographer main.cpp)
+target_link_libraries(Geographer geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+
 add_executable(analyze FileIO.cpp Settings.cpp GraphUtils.cpp CommTree.cpp Metrics.cpp ../tools/analyzePartition.cpp)
 target_link_libraries(analyze ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 
 add_executable(heatMap FileIO.cpp Settings.cpp GraphUtils.cpp CommTree.cpp ../tools/graphToHeatmap.cpp)
 target_link_libraries(heatMap ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
-
-add_library(geographer SHARED ${FILES_COMMON})
-target_link_libraries(geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 
 ### add networkit library if found ###
 if (USE_NETWORKIT)
@@ -113,10 +114,11 @@ endif (USE_NETWORKIT)
 
 ### define unit test target if GTest was found ###
 if (GTEST_FOUND)
-	add_executable(GeographerTest ${FILES_COMMON} ${FILES_TEST})
-	target_link_libraries(GeographerTest ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
+	add_executable(GeographerTest ${FILES_TEST})
+	target_link_libraries(GeographerTest geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
 endif (GTEST_FOUND)
 
+### support for FindPackage ###
 configure_file(GeographerConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfig.cmake @ONLY)
 
 write_basic_package_version_file(
