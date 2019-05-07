@@ -3,6 +3,13 @@ set(FILES_HEADER ParcoRepart.h MultiLevel.h LocalRefinement.h HilbertCurve.h Mes
 set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp SpectralPartition.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp KMeans.cpp CommTree.cpp AuxiliaryFunctions.cpp HaloPlanFns.cpp Metrics.cpp Mapping.cpp Settings.cpp)
 set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp quadtree/test/QuadTreeTest.cpp SpectralPartitionTest.cpp)
 
+### add networkit include and link directory ###
+# link_directories has to happen before target definitions
+if (USE_NETWORKIT)
+  include_directories(${NETWORKIT_INCLUDE})
+  link_directories(${NETWORKIT_LIB})
+endif (USE_NETWORKIT)
+
 ### define targets ###
 add_library(geographer SHARED ${FILES_COMMON})
 target_link_libraries(geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
@@ -24,4 +31,4 @@ endif (GTEST_FOUND)
 install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable
 install(TARGETS geographer EXPORT geographer DESTINATION "${LIB_DEST}") # library
 install(FILES ${FILES_HEADER} DESTINATION "${INCLUDE_DEST}")
-install(EXPORT geographer DESTINATION "${CMAKE_DEST}")
+#install(EXPORT geographer DESTINATION "${CMAKE_DEST}")

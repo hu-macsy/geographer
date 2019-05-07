@@ -18,9 +18,10 @@
 #include <scai/lama/matrix/DIASparseMatrix.hpp>
 
 #include <scai/tracing.hpp>
+#include <JanusSort.hpp>
 
 #include "GraphUtils.h"
-#include "RBC/Sort/SQuick.hpp"
+
 
 
 using std::vector;
@@ -1412,7 +1413,7 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     //typedef std::pair<int,int> int_pair;
 
     int typesize;
-	MPI_Type_size(SortingDatatype<int_pair>::getMPIDatatype(), &typesize);
+	MPI_Type_size(MPI_2INT, &typesize);
 	//SCAI_ASSERT_EQ_ERROR(typesize, sizeof(int_pair), "Wrong size"); //not valid for int_double, presumably due to padding
 
 	//-------------------------------------------------------------------
@@ -1459,7 +1460,7 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
 	//
     std::chrono::time_point<std::chrono::system_clock> beforeSort =  std::chrono::system_clock::now();
     MPI_Comm mpi_comm = MPI_COMM_WORLD;
-	SQuick::sort<int_pair>(mpi_comm, localPairs, -1);
+    JanusSort::sort(mpi_comm, localPairs, MPI_2INT);
 	
 	std::chrono::duration<double> sortTmpTime = std::chrono::system_clock::now() - beforeSort;
 	ValueType sortTime = comm->max( sortTmpTime.count() );

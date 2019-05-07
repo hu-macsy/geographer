@@ -11,7 +11,7 @@ if (NOT DEFINED SCAI_DIR)
 	message( FATAL_ERROR "Install Directory of LAMA not defined, specify with -DSCAI_DIR" )
 endif (NOT DEFINED SCAI_DIR)
 
-#set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_VERBOSE_MAKEFILE ON)
 
 option(USE_NETWORKIT "Use NETWORKIT package." OFF)
 if(USE_NETWORKIT)
@@ -27,12 +27,9 @@ set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
 ### set compiler manually ###
 #set(CMAKE_CXX_COMPILER /lrz/sys/compilers/gcc/7.3.0/bin/c++)
 
-
-set(RBC_DIR "${PROJECT_SOURCE_DIR}/src/RBC")
-
 ### find MPI ###
-find_package(MPI REQUIRED)
-include_directories(${MPI_CXX_INCLUDE_PATH})
+#find_package(MPI REQUIRED)
+#include_directories(${MPI_CXX_INCLUDE_PATH})
 
 ### find GTest ###
 find_package(GTest)
@@ -64,27 +61,21 @@ set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SCAI_CXX_FLAGS}" )
 link_directories(${SCAI_ROOT}/lib/)
 
 ### include and link RBC ###
-find_library( RBC_LIBRARY _rbc "${RBC_DIR}/build/lib" )
+#find_library( RBC_LIBRARY _rbc "${RBC_DIR}/build/lib" )
+#
+#if((NOT RBC_LIBRARY) OR (NOT EXISTS ${RBC_LIBRARY}))
+#  message("RBC Library not found, cloning and building it now.")
+#  execute_process(COMMAND git submodule update --init
+#                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+#  execute_process(COMMAND make WORKING_DIRECTORY ${RBC_DIR})
+#  find_library( RBC_LIBRARY _rbc "${RBC_DIR}/build/lib" )
+#endif()
 
-if((NOT RBC_LIBRARY) OR (NOT EXISTS ${RBC_LIBRARY}))
-  message("RBC Library not found, cloning and building it now.")
-  execute_process(COMMAND git submodule update --init
-                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-  execute_process(COMMAND make WORKING_DIRECTORY ${RBC_DIR})
-  find_library( RBC_LIBRARY _rbc "${RBC_DIR}/build/lib" )
-endif()
-
-### add networkit include and link directory ###
-# link_directories has to happen before target definitions
-if (USE_NETWORKIT)
-  include_directories(${NETWORKIT_INCLUDE})
-  link_directories(${NETWORKIT_LIB})
-endif (USE_NETWORKIT)
 
 ### get git commit ###
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11 -O3 -fPIC -Wall -Wno-sign-compare -Wno-unused-variable -DBUILD_COMMIT=${GIT_COMMIT}" )
+set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp -std=c++14 -O3 -fPIC -Wall -Wno-sign-compare -Wno-unused-variable -DBUILD_COMMIT=${GIT_COMMIT}" )
 
 ### define install directories ###
 set(BIN_DEST "bin")
@@ -96,6 +87,9 @@ set(CMAKE_DEST "share/cmake/geographer")
 set ( CMAKE_SKIP_BUILD_RPATH FALSE )
 set ( CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${LIB_DEST}")
 set ( CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE )
+
+add_subdirectory(external/KaDiS)
+set(RBC_LIBRARY rbcsorting)
 
 add_subdirectory(src)
 

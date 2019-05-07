@@ -26,10 +26,10 @@
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 #include <scai/tracing.hpp>
 
+#include <JanusSort.hpp>
+
 #include "Settings.h"
 #include "Metrics.h"
-
-#include "RBC/Sort/SQuick.hpp"
 
 //#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
