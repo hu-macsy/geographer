@@ -804,8 +804,8 @@ DenseVector<IndexType> assignBlocks(
 
 				ValueType influenceRatio = influence[i][j] / oldInfluence[i][j];
 
-				assert(influenceRatio <= influenceChangeUpperBound[j] + 1e-10);
-				assert(influenceRatio >= influenceChangeLowerBound[j] - 1e-10);
+				assert(influenceRatio <= influenceChangeUpperBound[j] + 1e-6);
+				assert(influenceRatio >= influenceChangeLowerBound[j] - 1e-6);
 				if (influenceRatio < minRatio) minRatio = influenceRatio;
 				if (influenceRatio > maxRatio) maxRatio = influenceRatio;
 
@@ -836,11 +836,11 @@ DenseVector<IndexType> assignBlocks(
 					newInfluenceEffect += influence[j][cluster]*normalizedNodeWeights[j][i];
 				}
 
-				SCAI_ASSERT_LE_ERROR( (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) , maxRatio + 1e12, "Error in calculation of influence effect");
-				SCAI_ASSERT_GE_ERROR( (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) , minRatio - 1e12, "Error in calculation of influence effect");
+				SCAI_ASSERT_LE_ERROR( (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) , maxRatio + 1e6, "Error in calculation of influence effect");
+				SCAI_ASSERT_GE_ERROR( (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) , minRatio - 1e6, "Error in calculation of influence effect");
 
-				upperBoundOwnCenter[i] *= (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) + 1e-12;
-				lowerBoundNextCenter[i] *= minRatio - 1e-12;
+				upperBoundOwnCenter[i] *= (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) + 1e-6;
+				lowerBoundNextCenter[i] *= minRatio - 1e-6;
 
 				//influenceEffectOfOwn[veryLocalI] = newInfluenceEffect;
 			}
