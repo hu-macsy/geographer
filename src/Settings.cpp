@@ -94,8 +94,8 @@ variables_map Settings::parseInput(int argc, char** argv){
 				("pixeledSideLen", value<IndexType>(&pixeledSideLen)->default_value(pixeledSideLen), "The resolution for the pixeled partition or the spectral")
 				// K-Means
 				("minSamplingNodes", value<IndexType>(&minSamplingNodes)->default_value(minSamplingNodes), "Tuning parameter for K-Means")
-				("influenceExponent", value<double>(&influenceExponent)->default_value(influenceExponent), "Tuning parameter for K-Means, default is ")
-				("influenceChangeCap", value<double>(&influenceChangeCap)->default_value(influenceChangeCap), "Tuning parameter for K-Means")
+				("influenceExponent", value<ValueType>(&influenceExponent)->default_value(influenceExponent), "Tuning parameter for K-Means, default is ")
+				("influenceChangeCap", value<ValueType>(&influenceChangeCap)->default_value(influenceChangeCap), "Tuning parameter for K-Means")
 				("balanceIterations", value<IndexType>(&balanceIterations)->default_value(balanceIterations), "Tuning parameter for K-Means")
 				("maxKMeansIterations", value<IndexType>(&maxKMeansIterations)->default_value(maxKMeansIterations), "Tuning parameter for K-Means")
 				("tightenBounds", "Tuning parameter for K-Means")

@@ -776,8 +776,8 @@ DenseVector<IndexType> assignBlocks(
 		}
 
 		// adapt influence values
-		double minRatio = std::numeric_limits<double>::max();
-		double maxRatio = -std::numeric_limits<double>::min();
+		ValueType minRatio = std::numeric_limits<ValueType>::max();
+		ValueType maxRatio = -std::numeric_limits<ValueType>::min();
 		std::vector<std::vector<ValueType>> oldInfluence = influence;//size=numNewBlocks
 		for (IndexType i = 0; i < numNodeWeights; i++) {
 			assert( oldInfluence[i].size()== numNewBlocks );
@@ -785,7 +785,7 @@ DenseVector<IndexType> assignBlocks(
 			for (IndexType j=0; j<numNewBlocks; j++) {
 				SCAI_REGION( "KMeans.assignBlocks.balanceLoop.influence" );
 
-				double ratio = ValueType(blockWeights[i][j])/targetBlockWeights[i][j];
+				ValueType ratio = ValueType(blockWeights[i][j])/targetBlockWeights[i][j];
 				if (std::abs(ratio - 1) < settings.epsilon) {
 					balancedBlocks++; //TODO: update for multiple weights
 					if (settings.freezeBalancedInfluence) {
@@ -802,7 +802,7 @@ DenseVector<IndexType> assignBlocks(
 					);
 				assert(influence[i][j] > 0);
 
-				double influenceRatio = influence[i][j] / oldInfluence[i][j];
+				ValueType influenceRatio = influence[i][j] / oldInfluence[i][j];
 
 				assert(influenceRatio <= influenceChangeUpperBound[j] + 1e-10);
 				assert(influenceRatio >= influenceChangeLowerBound[j] - 1e-10);
@@ -1358,7 +1358,7 @@ DenseVector<IndexType> computePartition( \
 		std::vector<ValueType> squaredDeltas(totalNumNewBlocks,0);
 		std::vector<ValueType> deltas(totalNumNewBlocks,0);
 		std::vector<std::vector<ValueType>> oldInfluence = influence; 
-		ValueType minRatio = std::numeric_limits<double>::max();
+		ValueType minRatio = std::numeric_limits<ValueType>::max();
 
 		for (IndexType j = 0; j < totalNumNewBlocks; j++) {
 			for (int d = 0; d < dim; d++) {
@@ -1382,8 +1382,8 @@ DenseVector<IndexType> computePartition( \
 
 		delta = *std::max_element(deltas.begin(), deltas.end());
 		assert(delta >= 0);
-		const double deltaSq = delta*delta;
-		double maxInfluence = 0;
+		const ValueType deltaSq = delta*delta;
+		ValueType maxInfluence = 0;
 		for (IndexType w = 0; w < numNodeWeights; w++) {
 			maxInfluence = std::max(maxInfluence, *std::max_element(influence[w].begin(), influence[w].end()));
 		}

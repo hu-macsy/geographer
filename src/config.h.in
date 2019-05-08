@@ -1,0 +1,6 @@
+#pragma once
+
+typedef ${Geographer_VALUE_TYPE} ValueType;
+
+//const std::string version = ${GIT_COMMIT};
+

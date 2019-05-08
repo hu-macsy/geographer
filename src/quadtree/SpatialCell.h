@@ -18,7 +18,8 @@
 #include <queue> 
 
 #include "Point.h"
-//#include "../Settings.h"
+
+#include "config.h"
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
@@ -29,7 +30,7 @@ class SpatialCell : public std::enable_shared_from_this<SpatialCell>{
 public:
 	SpatialCell() = default;
 	virtual ~SpatialCell() = default;
-	SpatialCell(const Point<double> &minCoords, const Point<double> &maxCoords, count capacity=1000) : minCoords(minCoords), maxCoords(maxCoords), indexed(false), capacity(capacity) {
+	SpatialCell(const Point<ValueType> &minCoords, const Point<ValueType> &maxCoords, count capacity=1000) : minCoords(minCoords), maxCoords(maxCoords), indexed(false), capacity(capacity) {
 		const count dimension = minCoords.getDimensions();
 		if (maxCoords.getDimensions() != dimension) {
 			throw std::runtime_error("minCoords has dimension " + std::to_string(dimension) + ", maxCoords " + std::to_string(maxCoords.getDimensions()));
@@ -46,8 +47,8 @@ public:
 	}
 
 	virtual void split() = 0;
-	virtual std::pair<double, double> distances(const Point<double> &query) const = 0;
-	virtual double distance(const Point<double> &query, index k) const = 0;
+	virtual std::pair<ValueType, ValueType> distances(const Point<ValueType> &query) const = 0;
+	virtual ValueType distance(const Point<ValueType> &query, index k) const = 0;
 	virtual bool isConsistent() const = 0;
 
 	void addChild(std::shared_ptr<SpatialCell> child) {
@@ -81,7 +82,7 @@ public:
 		assert(positions.size() == 0);
 
 		std::vector<index> allContent;
-		std::vector<Point<double> > allPositions;
+		std::vector<Point<ValueType> > allPositions;
 		for (index i = 0; i < this->children.size(); i++) {
 			allContent.insert(allContent.end(), children[i]->content.begin(), children[i]->content.end());
 			allPositions.insert(allPositions.end(), children[i]->positions.begin(), children[i]->positions.end());
@@ -101,7 +102,7 @@ public:
 	 *
 	 * @return True if content was found and removed, false otherwise
 	 */
-	bool removeContent(index input, const Point<double> &pos) {
+	bool removeContent(index input, const Point<ValueType> &pos) {
 		if (!this->responsible(pos)) return false;
 		if (this->isLeaf) {
 			index i = 0;
@@ -146,11 +147,11 @@ public:
 		}
 	}
 
-	virtual bool outOfReach(Point<double> query, double radius) const {
+	virtual bool outOfReach(Point<ValueType> query, ValueType radius) const {
 		return distances(query).first > radius;
 	}
 
-	virtual void getElementsInCircle(Point<double> center, double radius, std::vector<index> &result) const {
+	virtual void getElementsInCircle(Point<ValueType> center, ValueType radius, std::vector<index> &result) const {
 		if (outOfReach(center, radius)) {
 			return;
 		}
@@ -170,7 +171,7 @@ public:
 		}
 	}
 
-	virtual void addContent(index input, const Point<double> &coords) {
+	virtual void addContent(index input, const Point<ValueType> &coords) {
 		assert(content.size() == positions.size());
 		assert(this->responsible(coords));
 		if (isLeaf) {
@@ -205,7 +206,7 @@ public:
 		}
 	}
 
-	virtual bool responsible(const Point<double> &point) const {
+	virtual bool responsible(const Point<ValueType> &point) const {
 		const index d = minCoords.getDimensions();
 		assert(point.getDimensions() == d);
 		for (index i = 0; i < d; i++) {
@@ -227,10 +228,10 @@ public:
 		}
 	}
 
-	virtual count getElementsProbabilistically(const Point<double> &query, std::function<double(double)> prob, std::vector<index> &result) {
+	virtual count getElementsProbabilistically(const Point<ValueType> &query, std::function<ValueType(ValueType)> prob, std::vector<index> &result) {
 		auto distancePair = distances(query);
-		double probUB = prob(distancePair.first);
-		double probLB = prob(distancePair.second);
+		ValueType probUB = prob(distancePair.first);
+		ValueType probLB = prob(distancePair.second);
 		if (probUB > 1) {
 			throw std::runtime_error("f("+std::to_string(distancePair.first)+")="+std::to_string(probUB)+" is not a probability!");
 		}
@@ -238,7 +239,7 @@ public:
 		if (probUB > 0.5) probUB = 1;//if we are going to take every second element anyway, no use in calculating expensive jumps
 		if (probUB == 0) return 0;
 		//TODO: return whole if probLB == 1
-		double probdenom = std::log(1-probUB);
+		ValueType probdenom = std::log(1-probUB);
 		if (probdenom == 0) {
 			return 0;
 		}
@@ -252,8 +253,8 @@ public:
 			for (index i = 0; i < lsize; i++) {
 				//jump!
 				if (probUB < 1) {
-					double random = double(rand()) / RAND_MAX;
-					double delta = std::log(random) / probdenom;
+					ValueType random = ValueType(rand()) / RAND_MAX;
+					ValueType delta = std::log(random) / probdenom;
 					assert(delta == delta);
 					assert(delta >= 0);
 					i += delta;
@@ -262,11 +263,11 @@ public:
 
 				//see where we've arrived
 				candidatesTested++;
-				double dist = distance(query, i);
+				ValueType dist = distance(query, i);
 				assert(dist >= distancePair.first);
 				assert(dist <= distancePair.second);
 
-				double q = prob(dist);
+				ValueType q = prob(dist);
 				if (q > probUB) {
 					throw std::runtime_error("Probability function is not monotonically decreasing: f(" + std::to_string(dist) + ")="+std::to_string(q)+">"+std::to_string(probUB)+"=f("+std::to_string(distancePair.first)+").");
 				}
@@ -275,7 +276,7 @@ public:
 				assert(q >= 0);
 
 				//accept?
-				double acc = double(rand()) / RAND_MAX;
+				ValueType acc = ValueType(rand()) / RAND_MAX;
 				if (acc < q) {
 					result.push_back(content[i]);
 				}
@@ -285,7 +286,7 @@ public:
 				assert(probUB < 1);
 				const count stsize = size();
 				for (index i = 0; i < stsize; i++) {
-					double delta = std::log(double(rand()) / RAND_MAX) / probdenom;
+					ValueType delta = std::log(ValueType(rand()) / RAND_MAX) / probdenom;
 					assert(delta >= 0);
 					i += delta;
 					if (i < size()) maybeGetKthElement(probUB, query, prob, i, result);//this could be optimized. As of now, the offset is subtracted separately for each point
@@ -301,14 +302,14 @@ public:
 		return candidatesTested;
 	}
 
-	virtual void maybeGetKthElement(double upperBound, Point<double> query, std::function<double(double)> prob, index k, std::vector<index> &circleDenizens) {
+	virtual void maybeGetKthElement(ValueType upperBound, Point<ValueType> query, std::function<ValueType(ValueType)> prob, index k, std::vector<index> &circleDenizens) {
 			assert(k < size());
 			if (isLeaf) {
 				queries++;
-				double dist = distance(query, k);
+				ValueType dist = distance(query, k);
 
-				double acceptance = prob(dist)/upperBound;
-				if (double(rand()) / RAND_MAX < acceptance) circleDenizens.push_back(content[k]);
+				ValueType acceptance = prob(dist)/upperBound;
+				if (ValueType(rand()) / RAND_MAX < acceptance) circleDenizens.push_back(content[k]);
 			} else {
 				index offset = 0;
 				for (index i = 0; i < children.size(); i++) {
@@ -322,30 +323,30 @@ public:
 			}
 		}
 
-	static double euclidDistancePolar(double phi_a, double r_a, double phi_b, double r_b){
+	static ValueType euclidDistancePolar(ValueType phi_a, ValueType r_a, ValueType phi_b, ValueType r_b){
 			return pow(r_a*r_a+r_b*r_b-2*r_a*r_b*cos(phi_a-phi_b), 0.5);
 		}
 
-	std::pair<double, double> EuclideanPolarDistances(Point<double> query) const {
+	std::pair<ValueType, ValueType> EuclideanPolarDistances(Point<ValueType> query) const {
 		assert(query.getDimensions() == 2);
 		assert(minCoords.getDimensions() == 2);
-		const double phi = query[0];
-		const double r = query[1];
-		const double leftAngle = this->minCoords[0];
-		const double rightAngle = this->maxCoords[0];
-		const double minR = this->minCoords[1];
-		const double maxR = this->maxCoords[1];
+		const ValueType phi = query[0];
+		const ValueType r = query[1];
+		const ValueType leftAngle = this->minCoords[0];
+		const ValueType rightAngle = this->maxCoords[0];
+		const ValueType minR = this->minCoords[1];
+		const ValueType maxR = this->maxCoords[1];
 		/**
 		 * If the query point is not within the quadnode, the distance minimum is on the border.
 		 * Need to check whether extremum is between corners.
 		 */
-		double maxDistance = 0;
-		double minDistance = std::numeric_limits<double>::max();
+		ValueType maxDistance = 0;
+		ValueType minDistance = std::numeric_limits<ValueType>::max();
 
 		if (this->responsible(query)) minDistance = 0;
 
-		auto updateMinMax = [&minDistance, &maxDistance, phi, r](double phi_b, double r_b){
-			double extremalValue = euclidDistancePolar(phi, r, phi_b, r_b);
+		auto updateMinMax = [&minDistance, &maxDistance, phi, r](ValueType phi_b, ValueType r_b){
+			ValueType extremalValue = euclidDistancePolar(phi, r, phi_b, r_b);
 			//assert(extremalValue <= r + r_b);
 			maxDistance = std::max(extremalValue, maxDistance);
 			minDistance = std::min(minDistance, extremalValue);
@@ -355,7 +356,7 @@ public:
 		 * angular boundaries
 		 */
 		//left
-		double extremum = r*cos(leftAngle - phi);
+		ValueType extremum = r*cos(leftAngle - phi);
 		if (extremum < maxR && extremum > minR) {
 			updateMinMax(leftAngle, extremum);
 		}
@@ -391,36 +392,36 @@ public:
 		updateMinMax(leftAngle, minR);
 		updateMinMax(rightAngle, minR);
 
-		//double shortCutGainMax = maxR + r - maxDistance;
+		//ValueType shortCutGainMax = maxR + r - maxDistance;
 		//assert(minDistance <= minR + r);
 		//assert(maxDistance <= maxR + r);
 		assert(minDistance < maxDistance);
-		return std::pair<double, double>(minDistance, maxDistance);
+		return std::pair<ValueType, ValueType>(minDistance, maxDistance);
 	}
 
 	/**
 	 * @param query Position of the query point
 	 */
-	std::pair<double, double> EuclideanCartesianDistances(Point<double> query) const {
+	std::pair<ValueType, ValueType> EuclideanCartesianDistances(Point<ValueType> query) const {
 		/**
 		 * If the query point is not within the quadnode, the distance minimum is on the border.
 		 * Need to check whether extremum is between corners.
 		 */
-		double maxDistance = 0;
-		double minDistance = std::numeric_limits<double>::max();
+		ValueType maxDistance = 0;
+		ValueType minDistance = std::numeric_limits<ValueType>::max();
 		const count dimension = this->minCoords.getDimensions();
 		assert(std::isfinite(query.length()));
 
 		if (this->responsible(query)) minDistance = 0;
 
-		auto updateMinMax = [&minDistance, &maxDistance, query](Point<double> pos){
-			double extremalValue = pos.distance(query);
+		auto updateMinMax = [&minDistance, &maxDistance, query](Point<ValueType> pos){
+			ValueType extremalValue = pos.distance(query);
 			maxDistance = std::max(extremalValue, maxDistance);
 			minDistance = std::min(minDistance, extremalValue);
 		};
 
-		std::vector<double> closestValues(dimension);
-		std::vector<double> farthestValues(dimension);
+		std::vector<ValueType> closestValues(dimension);
+		std::vector<ValueType> farthestValues(dimension);
 
 		for (index d = 0; d < dimension; d++) {
 			if (std::abs(query[d] - this->minCoords.at(d)) < std::abs(query[d] - this->maxCoords.at(d))) {
@@ -434,12 +435,12 @@ public:
 				closestValues[d] = query[d];
 			}
 		}
-		updateMinMax(Point<double>(closestValues));
-		updateMinMax(Point<double>(farthestValues));
+		updateMinMax(Point<ValueType>(closestValues));
+		updateMinMax(Point<ValueType>(farthestValues));
 
 		assert(minDistance <= query.length() + this->maxCoords.length());//triangle inequality
 		assert(minDistance < maxDistance);
-		return std::pair<double, double>(minDistance, maxDistance);
+		return std::pair<ValueType, ValueType>(minDistance, maxDistance);
 	}
 
 	/**
@@ -509,7 +510,7 @@ public:
 		return indexed;
 	}
 
-	index getCellID(const Point<double> query) const {
+	index getCellID(const Point<ValueType> query) const {
 		if (!this->responsible(query)) return none;
 		if (this->isLeaf) return getID();
 		else {
@@ -665,7 +666,7 @@ public:
                     for(int d=0; d<dimension; d++){
                         assert(d<coordsTree.size());
                         assert(d< maxCoords.getDimensions());
-                        ValueType thisCoord = thisNode->minCoords[d] + double(thisNode->maxCoords[d] - thisNode->minCoords[d])/ 2;
+                        ValueType thisCoord = thisNode->minCoords[d] + ValueType(thisNode->maxCoords[d] - thisNode->minCoords[d])/ 2;
                         assert( thisNode->getID()< coordsTree[d].size() );
                         coordsTree[d][thisNode->getID()] = thisCoord;
                     }                    
@@ -844,19 +845,19 @@ public:
         
         /* Returns the 2^dim corners of the cell.
          */
-        std::vector<Point<double>> getCorners() const {
+        std::vector<Point<ValueType>> getCorners() const {
         
             int dim = minCoords.getDimensions();
-            std::vector<Point<double>> corners(pow(2,dim));
+            std::vector<Point<ValueType>> corners(pow(2,dim));
             assert(corners.size() % 2 == 0);//if this assert fails, we had some floating point bug in the exponentiation
             for(unsigned int i=0; i<corners.size(); i++){
                 int bitCopy= i;
-                std::vector<double> point(dim, 0.0);
+                std::vector<ValueType> point(dim, 0.0);
                 for(int d=0; d<dim; d++){
                     point[d]= minCoords[d]+ (bitCopy & 1)* maxCoords[d];
                     bitCopy = bitCopy >> 1;
                 }
-                corners[i] = Point<double>(point);
+                corners[i] = Point<ValueType>(point);
             }
             return corners;
         }
@@ -869,10 +870,10 @@ public:
 //-------------------------------------------------------------------------------------
 
 protected:
-	Point<double> minCoords;
-	Point<double> maxCoords;
+	Point<ValueType> minCoords;
+	Point<ValueType> maxCoords;
 	std::vector<index> content;
-	std::vector<Point<double> > positions;
+	std::vector<Point<ValueType> > positions;
 	std::vector<std::shared_ptr<SpatialCell> > children;
 	bool isLeaf;
 	bool indexed;

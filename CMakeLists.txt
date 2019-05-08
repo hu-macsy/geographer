@@ -13,6 +13,8 @@ endif (NOT DEFINED SCAI_DIR)
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
+
+
 option(USE_NETWORKIT "Use NETWORKIT package." OFF)
 if(USE_NETWORKIT)
   if (NOT DEFINED NETWORKIT_DIR)
@@ -85,6 +87,11 @@ endif (USE_NETWORKIT)
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11 -O3 -fPIC -Wall -Wno-sign-compare -Wno-unused-variable -DBUILD_COMMIT=${GIT_COMMIT}" )
+
+### set value type ###
+set(Geographer_VALUE_TYPE "double" CACHE STRING "variable type used for values")
+configure_file("src/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/config.h")
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 ### define install directories ###
 set(BIN_DEST "bin")

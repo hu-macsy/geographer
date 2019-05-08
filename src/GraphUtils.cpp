@@ -2078,7 +2078,7 @@ std::vector<ValueType> GraphUtils<IndexType, ValueType>::getBetweennessCentralit
 	ValueType scaleF = normalize ? 2.0/(N-2)*(N-3) : 1;
 	SCAI_ASSERT_GT_ERROR( scaleF, 0 , "Possible int overflow");
 
-	std::vector<double> centrality(N);
+	std::vector<ValueType> centrality(N);
 	for( int i=0; i<N; i++ ){
 		centrality[i] = centrality_map[i]*scaleF;
 	}
