@@ -1,4 +1,4 @@
-add_definitions(--openmp)
+add_definitions(--openmp -pthread)
 
 ### set files ###
 set(FILES_HEADER ParcoRepart.h MultiLevel.h LocalRefinement.h HilbertCurve.h MeshGenerator.h FileIO.h SpectralPartition.h Diffusion.h GraphUtils.h MultiSection.h KMeans.h CommTree.h AuxiliaryFunctions.h HaloPlanFns.h Metrics.h Mapping.h Settings.h)
@@ -21,6 +21,7 @@ endif (USE_NETWORKIT)
 if (GTEST_FOUND)
 	add_executable(GeographerTest ${FILES_TEST})
 	target_link_libraries(GeographerTest geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
+	target_link_libraries(GeographerTest -pthread)
 endif (GTEST_FOUND)
 
 install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable

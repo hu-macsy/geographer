@@ -98,6 +98,7 @@ set ( CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE )
 
 add_subdirectory(external/KaDiS)
 set(RBC_LIBRARY rbcsorting)
+#add_definitions(--openmp)
 
 ### set value type ###
 set(Geographer_VALUE_TYPE "double" CACHE STRING "variable type used for values")
