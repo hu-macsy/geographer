@@ -61,16 +61,14 @@ add_definitions(${SCAI_DEFINITIONS})
 #set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SCAI_CXX_FLAGS}" )
 link_directories(${SCAI_ROOT}/lib/)
 
-### include and link RBC ###
-#find_library( RBC_LIBRARY _rbc "${RBC_DIR}/build/lib" )
-#
-#if((NOT RBC_LIBRARY) OR (NOT EXISTS ${RBC_LIBRARY}))
-#  message("RBC Library not found, cloning and building it now.")
-#  execute_process(COMMAND git submodule update --init
-#                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-#  execute_process(COMMAND make WORKING_DIRECTORY ${RBC_DIR})
-#  find_library( RBC_LIBRARY _rbc "${RBC_DIR}/build/lib" )
-#endif()
+### download KaDiS if not found. ###
+find_path(KaDiS_CMAKE CMakeLists.txt external/KaDiS NO_DEFAULT_PATH)
+
+if((NOT KaDiS_CMAKE) OR (NOT EXISTS "${KaDiS_CMAKE}/CMakeLists.txt"))
+  message("KaDiS Library not found, cloning it now.")
+  execute_process(COMMAND git submodule update --init --recursive
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
 
 ### add networkit include and link directory ###
 # link_directories has to happen before target definitions
