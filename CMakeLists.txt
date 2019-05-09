@@ -27,9 +27,10 @@ set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
 find_package(MPI REQUIRED)
 include_directories(${MPI_CXX_INCLUDE_PATH})
 link_libraries(${MPI_CXX_LIBRARIES})
-set(CMAKE_REQUIRED_LIBRARIES mpi_cxx mpi)
-set(CMAKE_REQUIRED_INCLUDES /usr/lib/openmpi/include/openmpi/opal/mca/event/libevent2021/libevent /usr/lib/openmpi/include/openmpi/opal/mca/event/libevent2021/libevent/include /usr/lib/openmpi/include /usr/lib/openmpi/include/openmpi)
-set(CMAKE_REQUIRED_FLAGS -pthread -L/usr/lib/openmpi/lib)
+
+set(CMAKE_REQUIRED_LIBRARIES ${MPI_CXX_LIBRARIES})
+set(CMAKE_REQUIRED_INCLUDES ${MPI_CXX_INCLUDE_PATH})
+set(CMAKE_REQUIRED_FLAGS ${MPI_CXX_LINK_FLAGS})
 
 ### find GTest ###
 find_package(GTest)
