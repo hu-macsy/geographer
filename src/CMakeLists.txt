@@ -1,13 +1,17 @@
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 2.8.8)
 project (Geographer)
+include(CMakePackageConfigHelpers)
+
+# define library version
+set(Geographer_VERSION_MAJOR 0 STRING "major version")
+set(Geographer_VERSION_MINOR 9 STRING "minor version")
+set(Geographer_VERSION ${Geographer_VERSION_MAJOR}.${Geographer_VERSION_MINOR} STRING "version")
 
 if (NOT DEFINED SCAI_DIR)
 	message( FATAL_ERROR "Install Directory of LAMA not defined, specify with -DSCAI_DIR" )
 endif (NOT DEFINED SCAI_DIR)
 
-message("SCAI_DIR= " ${SCAI_DIR})
-
-set(CMAKE_VERBOSE_MAKEFILE ON)
+#set(CMAKE_VERBOSE_MAKEFILE ON)
 
 option(USE_NETWORKIT "Use NETWORKIT package." OFF)
 if(USE_NETWORKIT)
@@ -17,22 +21,18 @@ if(USE_NETWORKIT)
   add_definitions(-DUSE_NETWORKIT)
 endif(USE_NETWORKIT)
 
-#set(NETWORKIT_DIR "/usr/local")
-set(SCAI_INCLUDE "${SCAI_DIR}/include/") 
-set(SCAI_LIB "${SCAI_DIR}/lib/")
 set(NETWORKIT_INCLUDE "${NETWORKIT_DIR}/include/") 
 set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
 
-### set compiler manualy ###
+### set compiler manually ###
 #set(CMAKE_CXX_COMPILER /lrz/sys/compilers/gcc/7.3.0/bin/c++)
 
 ### set files ###
+set(FILES_HEADER ParcoRepart.h MultiLevel.h LocalRefinement.h HilbertCurve.h MeshGenerator.h FileIO.h SpectralPartition.h Diffusion.h GraphUtils.h MultiSection.h KMeans.h CommTree.h AuxiliaryFunctions.h HaloPlanFns.h Metrics.h Mapping.h Settings.h)
 set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp SpectralPartition.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp KMeans.cpp CommTree.cpp AuxiliaryFunctions.cpp HaloPlanFns.cpp Metrics.cpp Mapping.cpp Settings.cpp)
-set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp CommTreeTest.cpp quadtree/test/QuadTreeTest.cpp SpectralPartitionTest.cpp)
+set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp quadtree/test/QuadTreeTest.cpp SpectralPartitionTest.cpp)
 
 set(RBC_DIR "${PROJECT_SOURCE_DIR}/RBC")
-
-set(SCAI_LIBLIST scai_lama scai_dmemo scai_common scai_hmemo scai_utilskernel scai_tracing scai_sparsekernel scai_solver scai_logging)
 
 ### find MPI ###
 find_package(MPI REQUIRED)
@@ -56,31 +56,60 @@ link_directories(${RBC_DIR}/build/lib)
 ### get git commit ###
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11 -O3 -fPIC -DBUILD_COMMIT=${GIT_COMMIT}" )
+set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11 -O3 -fPIC -Wall -Wno-sign-compare -Wno-unused-variable -DBUILD_COMMIT=${GIT_COMMIT}" )
+
+### define install directories ###
+set(BIN_DEST "bin")
+set(INCLUDE_DEST "include/geographer")
+set(LIB_DEST "lib/geographer")
+set(CMAKE_DEST "share/cmake/geographer")
+
+### set runtime path ###
+set ( CMAKE_SKIP_BUILD_RPATH FALSE )
+set ( CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+set ( CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE )
 
 ### define targets ###
-add_executable(Geographer ${FILES_COMMON} main.cpp)
-target_link_libraries(Geographer ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
+add_library(geographer SHARED ${FILES_COMMON})
+target_link_libraries(geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+
+add_executable(Geographer main.cpp)
+target_link_libraries(Geographer geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES})
+
 add_executable(analyze FileIO.cpp Settings.cpp GraphUtils.cpp CommTree.cpp Metrics.cpp ../tools/analyzePartition.cpp)
-target_link_libraries(analyze ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
+target_link_libraries(analyze ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 
 add_executable(heatMap FileIO.cpp Settings.cpp GraphUtils.cpp CommTree.cpp ../tools/graphToHeatmap.cpp)
-target_link_libraries(heatMap ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES})
+target_link_libraries(heatMap ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 
-### add networkit library ###
+### add networkit library if found ###
 if (USE_NETWORKIT)
-  include_directories(${NETWORKIT_INCLUDE})
-  link_directories(${NETWORKIT_LIB})
   target_link_libraries(Geographer networkit)
 endif (USE_NETWORKIT)
 
-add_library(geographer SHARED ${FILES_COMMON})
-
+### define unit test target if GTest was found ###
 if (GTEST_FOUND)
-	add_executable(GeographerTest ${FILES_COMMON} ${FILES_TEST})
-	target_link_libraries(GeographerTest ${SCAI_LIBLIST} ${Boost_LIBRARIES} _rbc ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
+	add_executable(GeographerTest ${FILES_TEST})
+	target_link_libraries(GeographerTest geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
 endif (GTEST_FOUND)
 
+### support for FindPackage ###
+configure_file(GeographerConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfig.cmake @ONLY)
+
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfigVersion.cmake
+  VERSION 0.9
+  COMPATIBILITY ExactVersion )
+
+### install files ###
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfigVersion.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfig.cmake
+        DESTINATION "${CMAKE_DEST}" )
+
+install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable
+install(TARGETS geographer EXPORT geographer DESTINATION "${LIB_DEST}") # library
+install(FILES ${FILES_HEADER} DESTINATION "${INCLUDE_DEST}")
+install(EXPORT geographer DESTINATION "${CMAKE_DEST}")
 
 ### find zoltan ###
 FIND_PACKAGE( Zoltan2 PATHS "/home/hpc/pr87si/di36qin/Code/Trilinos/build/packages/zoltan2/")
@@ -105,16 +134,7 @@ if( Zoltan2_FOUND )
 	target_include_directories( allCompetitors PUBLIC "/lrz/sys/libraries/metis/5.1.0/i8r8/include" )
 	target_include_directories( allCompetitors PUBLIC "/lrz/sys/libraries/parmetis/4.0.3/ibmmpi/i8r8/include" )
 
-	target_link_libraries( allCompetitors ${SCAI_LIBLIST} _rbc ${Boost_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} ${Zoltan2_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )
-
-	### create shared library with the wrappers functionality ###
-	add_library( geographerWrappers SHARED Wrappers.cpp ${FILES_COMMON} )
-
-	target_include_directories( geographerWrappers PUBLIC "/lrz/sys/libraries/metis/5.1.0/i8r8/include" )
-	target_include_directories( geographerWrappers PUBLIC "/lrz/sys/libraries/parmetis/4.0.3/ibmmpi/i8r8/include" )
-	target_include_directories( geographerWrappers PUBLIC ${Zoltan2_INCLUDE_DIRS} ${Zoltan2_TPL_INCLUDE_DIRS} )
-	#target_link_libraries( geographerWrappers ${SCAI_LIBLIST} _rbc ${Boost_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} ${Zoltan2_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )
-
+	target_link_libraries( allCompetitors ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Boost_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} ${Zoltan2_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )
 else()
-	message( "Package Zoltan2 was not found.\nSet it in the CMakeLists.txt file by edditing the line 'FIND_PACKAGE(Zoltan2 ...)'")
+	#message( "Package Zoltan2 was not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
 endif()
