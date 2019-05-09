@@ -1836,7 +1836,7 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructFJLTMatrix
     }
 
     const IndexType p = 2;
-    ValueType q = std::min((std::pow(epsilon, p-2)*std::pow(logn,p))/origDimension, 1.0);
+    ValueType q = std::min((std::pow(epsilon, p-2)*std::pow(logn,p))/origDimension, ValueType(1.0));
 
     std::default_random_engine generator;
     std::normal_distribution<ValueType> gauss(0,q);
@@ -2078,7 +2078,7 @@ std::vector<ValueType> GraphUtils<IndexType, ValueType>::getBetweennessCentralit
 	ValueType scaleF = normalize ? 2.0/(N-2)*(N-3) : 1;
 	SCAI_ASSERT_GT_ERROR( scaleF, 0 , "Possible int overflow");
 
-	std::vector<double> centrality(N);
+	std::vector<ValueType> centrality(N);
 	for( int i=0; i<N; i++ ){
 		centrality[i] = centrality_map[i]*scaleF;
 	}

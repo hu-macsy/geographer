@@ -23,7 +23,7 @@ class QuadNodePolarEuclid : public ITI::SpatialCell {
 private:
 	static const long unsigned sanityNodeLimit = 10E15; //just assuming, for debug purposes, that this algorithm never runs on machines with more than 4 Petabyte RAM
 	bool splitTheoretical;
-	double balance;
+	ValueType balance;
 
 public:
 	/**
@@ -31,7 +31,7 @@ public:
 	 *
 	 *
 	 */
-	QuadNodePolarEuclid(Point<double> minCoords = {0,0}, Point<double> maxCoords = {2*M_PI, 1}, unsigned capacity = 1000, bool splitTheoretical = false, double balance = 0.5)
+	QuadNodePolarEuclid(Point<ValueType> minCoords = {0,0}, Point<ValueType> maxCoords = {2*M_PI, 1}, unsigned capacity = 1000, bool splitTheoretical = false, ValueType balance = 0.5)
 	: SpatialCell(minCoords, maxCoords, capacity) {
 		if (balance <= 0 || balance >= 1) throw std::runtime_error("Quadtree balance parameter must be between 0 and 1.");
 		if (minCoords.getDimensions() != 2) throw std::runtime_error("Currently only supported for two dimensions");
@@ -44,12 +44,12 @@ public:
 	void split() {
 		assert(this->isLeaf);
 		assert(this->minCoords.getDimensions() == 2);
-		const double leftAngle = this->minCoords[0];
-		const double rightAngle = this->maxCoords[0];
-		const double minR = this->minCoords[1];
-		const double maxR = this->maxCoords[1];
+		const ValueType leftAngle = this->minCoords[0];
+		const ValueType rightAngle = this->maxCoords[0];
+		const ValueType minR = this->minCoords[1];
+		const ValueType maxR = this->maxCoords[1];
 		//heavy lifting: split up!
-		double middleAngle, middleR;
+		ValueType middleAngle, middleR;
 		if (splitTheoretical) {
 			//Euclidean space is distributed equally
 			middleAngle = (rightAngle - leftAngle) / 2 + leftAngle;
@@ -57,8 +57,8 @@ public:
 		} else {
 			//median of points
 			const index n = this->positions.size();
-			std::vector<double> angles(n);
-			std::vector<double> radii(n);
+			std::vector<ValueType> angles(n);
+			std::vector<ValueType> radii(n);
 			for (index i = 0; i < n; i++) {
 				angles[i] = this->positions[i][0];
 				radii[i] = this->positions[i][1];
@@ -86,11 +86,11 @@ public:
 		return true;
 	}
 
-	virtual std::pair<double, double> distances(const Point<double> &query) const override {
+	virtual std::pair<ValueType, ValueType> distances(const Point<ValueType> &query) const override {
 		return this->EuclideanPolarDistances(query);
 	}
 
-	virtual double distance(const Point<double> &query, index k) const override {
+	virtual ValueType distance(const Point<ValueType> &query, index k) const override {
 		return this->euclidDistancePolar(query[0], query[1], this->positions[k][0], this->positions[k][1]);
 	}
 };

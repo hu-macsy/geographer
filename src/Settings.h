@@ -5,6 +5,8 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 
+#include "config.h"
+
 #define STRINGIZER(arg)     #arg
 #define STR_VALUE(arg)      STRINGIZER(arg)
 #define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
@@ -16,7 +18,7 @@ const std::string version = BUILD_COMMIT_STRING;
 // typedef long int IndexType;
 using scai::IndexType;
 //using scai::ValueType;
-typedef double ValueType;
+//typedef double ValueType;
 
 /*The size of a point/vertex in the application. This is mainly (only)
 used for the mapping using the CommTree. Every node in the tree has a 
@@ -144,15 +146,15 @@ struct Settings{
     bool skipNoGainColors = false;
 
     //tuning parameters for SFC
-    IndexType sfcResolution = 17;
+    IndexType sfcResolution = 7;
 
     //tuning parameters balanced K-Means
 //TODO?: in the heterogenous and hierarchical case, minSamplingNodes
 //makes more sense to be a percentage of the nodes, not a number. Or not?
     IndexType minSamplingNodes = 100;	
 
-    double influenceExponent = 0.5;
-    double influenceChangeCap = 0.1;
+    ValueType influenceExponent = 0.5;
+    ValueType influenceChangeCap = 0.1;
     IndexType balanceIterations = 20;
     IndexType maxKMeansIterations = 50;
     bool tightenBounds = false;

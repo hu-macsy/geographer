@@ -28,15 +28,15 @@ public:
 	 * @param splitTheoretical Whether to split in a theoretically optimal way or in a way to decrease measured running times
 	 *
 	 */
-	QuadTreeCartesianEuclid(Point<double> lower = Point<double>({0.0, 0.0}), Point<double> upper = Point<double>({1.0, 1.0}), bool theoreticalSplit=true, count capacity=1000) {
+	QuadTreeCartesianEuclid(Point<ValueType> lower = Point<ValueType>({0.0, 0.0}), Point<ValueType> upper = Point<ValueType>({1.0, 1.0}), bool theoreticalSplit=true, count capacity=1000) {
 		this->root = std::shared_ptr<QuadNodeCartesianEuclid>(new QuadNodeCartesianEuclid(lower, upper, capacity, theoreticalSplit));
 	}
 
-//	void extractCoordinates(std::vector<Point<double> > &posContainer) const {
+//	void extractCoordinates(std::vector<Point<ValueType> > &posContainer) const {
 //		this->root->getCoordinates(posContainer);
 //	}
 
-	void getElementsInEuclideanCircle(const Point<double> circleCenter, const double radius, std::vector<index> &circleDenizens) const {
+	void getElementsInEuclideanCircle(const Point<ValueType> circleCenter, const ValueType radius, std::vector<index> &circleDenizens) const {
 		this->getElementsInCircle(circleCenter, radius, circleDenizens);
 	}
 

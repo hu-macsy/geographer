@@ -455,7 +455,7 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
     srand(time(NULL));
 
 	auto a = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(n,n);
-	scai::lama::MatrixCreator::fillRandom(a, 0.001);  // not symmetric
+	scai::lama::MatrixCreator::fillRandom(a, 0.01);  // not symmetric
 	CSRSparseMatrix<ValueType> aT = scai::lama::eval<scai::lama::CSRSparseMatrix<ValueType>>(transpose(a));
 
 	a = scai::lama::eval<scai::lama::CSRSparseMatrix<ValueType>>(a+aT);
