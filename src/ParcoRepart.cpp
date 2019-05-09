@@ -308,13 +308,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 				std::cout << "SFC Time:" << totSFCTime << std::endl;
 		}
 	} 
-/*	else if ( settings.initialPartition==ITI::Tool::Pixel) {
-	PRINT0("Initial partition with pixels.");
-	result = ParcoRepart<IndexType, ValueType>::pixelPartition(coordinates, settings);
-} else if ( settings.initialPartition == ITI::Tool::Spectral) {
-	PRINT0("Initial partition with spectral");
-	result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
-}*/ 
+	//09/05/19: these tools are not really used. TODO:remove them?	
+	/*	else if ( settings.initialPartition==ITI::Tool::Pixel) {
+		PRINT0("Initial partition with pixels.");
+		result = ParcoRepart<IndexType, ValueType>::pixelPartition(coordinates, settings);
+	} else if ( settings.initialPartition == ITI::Tool::Spectral) {
+		PRINT0("Initial partition with spectral");
+		result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
+	}*/ 
 	else if (settings.initialPartition == ITI::Tool::geoKmeans or settings.initialPartition == ITI::Tool::geoHierKM \
 		or  settings.initialPartition == ITI::Tool::geoHierRepart){
 	    if (comm->getRank() == 0) {
@@ -491,10 +492,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 	
 	SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
 	
-	// TODO: add another 'debug' parameter to control that?
-	//if( settings.outFile!="-" and settings.writeInFile ){
-	//	FileIO<IndexType, ValueType>::writePartitionParallel( result, settings.outFile+"_initPart.partition" );
-	//}
+	// store partition if in debug mode
+	if( settings.outFile!="-" and settings.writeInFile and settigns.debugMode ){
+		FileIO<IndexType, ValueType>::writePartitionParallel( result, settings.outFile+"_initPart.partition" );
+	}
 	
 	//-----------------------------------------------------------
 	//
@@ -1253,10 +1254,10 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 		//here graph is replicated. PE0 will write it in a file
 		
 		if(settings.mec){
-			//coloring = getGraphMEC_local( adjM, colors );  // using hasan's code
             coloring = GraphUtils<IndexType, ValueType>::mecGraphColoring( adjM, colors); // our implementation
 		}else{
-			coloring = getGraphEdgeColoring_local( adjM, colors );
+			//this uses boost, TODO: remove and leave only the mec function
+			coloring = getGraphEdgeColoring_local( adjM, colors ); 
 		}
 		std::chrono::duration<double> coloringTime = std::chrono::system_clock::now() - beforeColoring;
 		ValueType maxTime = comm->max( coloringTime.count() );

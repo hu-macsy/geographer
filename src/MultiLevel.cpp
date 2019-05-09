@@ -864,9 +864,9 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
         scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
         scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
     
-	const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-	scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+		const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+		scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+		scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
         
         IndexType scaledX, scaledY;
         //the +1 is needed
@@ -938,8 +938,8 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
         scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[2].getLocalValues() );
         
         const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-	scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+		scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+		scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
         
         IndexType scaledX, scaledY, scaledZ;
         
