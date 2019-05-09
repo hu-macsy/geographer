@@ -1,6 +1,6 @@
 #include "Metrics.h"
 
-void Metrics::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
+void Metrics::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ){
 	
 	getEasyMetrics( graph, partition, nodeWeights, settings );
 	
@@ -68,7 +68,7 @@ void Metrics::printKMeansProfiling( std::ostream& out ) const {
 }
 //---------------------------------------------------------------------------
 
-void Metrics::getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
+void Metrics::getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ){
 	
 	getAllMetrics( graph, partition, nodeWeights, settings);
 	
@@ -79,10 +79,14 @@ void Metrics::getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> gra
 	
 }
 //---------------------------------------------------------------------------
-void Metrics::getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings ){
+void Metrics::getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ){
 	
 	MM["finalCut"] = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
-	MM["finalImbalance"] = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights );
+	for( unsigned int w=0; w<nodeWeights.size(); w++ ){
+		imbalances.push_back(  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights[w]) );
+		MM["finalImbalance_w"+std::to_string(w)] = imbalances.back();
+	}
+	MM["finalImbalance"] = *std::max_element( imbalances.begin(), imbalances.end() );
 	
 	//TODO: getting the block graph probably fails for p>5000, removed this metric since we do not use it so much
 	//std::tie(maxBlockGraphDegree, totalBlockGraphEdges) = ITI::GraphUtils::computeBlockGraphComm<IndexType, ValueType>( graph, partition, settings.numBlocks );
@@ -117,8 +121,13 @@ void Metrics::getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph
 	MM["maxBorderNodesPercent"] = *std::max_element( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end() );
 	MM["avgBorderNodesPercent"] = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(settings.numBlocks));
 	
-	//get diameter
-	std::tie( MM["maxBlockDiameter"], MM["harmMeanDiam"], MM["numDisconBlocks"] ) = getDiameter(graph, partition, settings);
+	//get diameter if possible
+	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	if (settings.numBlocks == comm->getSize() && settings.computeDiameter) {
+		std::tie( MM["maxBlockDiameter"], MM["harmMeanDiam"], MM["numDisconBlocks"] ) = getDiameter(graph, partition, settings);
+	}else{
+		PRINT0("\tWARNING: Not computing diameter, not all vertices are in same block everywhere");
+	}
 	
 }
 //---------------------------------------------------------------------------
@@ -182,7 +191,7 @@ std::tuple<IndexType,IndexType,IndexType> Metrics::getDiameter( const scai::lama
 			}
 			*/
 		}else{
-			PRINT0("\tWARNING: Not computing diameter, not all vertices are in same block everywhere");
+			PRINT0("WARNING: Not computing diameter, not all vertices are in same block everywhere");
 		}
 	}
 	std::chrono::duration<ValueType,std::ratio<1>> diameterTime = std::chrono::high_resolution_clock::now() - diameterStart; 

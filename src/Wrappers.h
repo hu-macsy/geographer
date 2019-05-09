@@ -52,7 +52,7 @@ public:
 	static scai::lama::DenseVector<IndexType> partition(
 		const scai::lama::CSRSparseMatrix<ValueType> &graph,
 		const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
-		const scai::lama::DenseVector<ValueType> &nodeWeights, 
+		const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 		bool nodeWeightsFlag,
 		Tool tool,
 		struct Settings &settings,
@@ -74,7 +74,7 @@ public:
 	static scai::lama::DenseVector<IndexType> repartition (
 		const scai::lama::CSRSparseMatrix<ValueType> &graph,
 		const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
-		const scai::lama::DenseVector<ValueType> &nodeWeights, 
+		const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 		bool nodeWeightsFlag,
 		Tool tool,
 		struct Settings &settings,
@@ -103,7 +103,7 @@ private:
 	static scai::lama::DenseVector<IndexType> metisPartition (
 		const scai::lama::CSRSparseMatrix<ValueType> &graph,
 		const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
-		const scai::lama::DenseVector<ValueType> &nodeWeights, 
+		const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 		bool nodeWeightsFlag,
 		int parMetisGeom,
 		struct Settings &settings,
@@ -116,7 +116,7 @@ private:
 	static scai::lama::DenseVector<IndexType> metisRepartition (
 		const scai::lama::CSRSparseMatrix<ValueType> &graph,
 		const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
-		const scai::lama::DenseVector<ValueType> &nodeWeights, 
+		const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 		bool nodeWeightsFlag,
 		struct Settings &settings,
 		struct Metrics &metrics);	
@@ -127,7 +127,7 @@ private:
 	static scai::lama::DenseVector<IndexType> zoltanPartition (
 		const scai::lama::CSRSparseMatrix<ValueType> &graph,
 		const std::vector<scai::lama::DenseVector<ValueType>> &coords, 
-		const scai::lama::DenseVector<ValueType> &nodeWeights, 
+		const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 		bool nodeWeightsFlag,
 		std::string algo,
 		struct Settings &settings,
@@ -136,7 +136,7 @@ private:
 	static scai::lama::DenseVector<IndexType> zoltanRepartition (
 		const scai::lama::CSRSparseMatrix<ValueType> &graph,
 		const std::vector<scai::lama::DenseVector<ValueType>> &coords, 
-		const scai::lama::DenseVector<ValueType> &nodeWeights, 
+		const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 		bool nodeWeightsFlag,
 		std::string algo,
 		struct Settings &settings,
@@ -145,7 +145,7 @@ private:
 	static scai::lama::DenseVector<IndexType> zoltanCore (
 		const scai::lama::CSRSparseMatrix<ValueType> &graph,
 		const std::vector<scai::lama::DenseVector<ValueType>> &coords, 
-		const scai::lama::DenseVector<ValueType> &nodeWeights, 
+		const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 		bool nodeWeightsFlag,
 		std::string algo,
 		bool repart,

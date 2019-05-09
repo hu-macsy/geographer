@@ -21,6 +21,9 @@ struct Metrics{
     
     std::vector< std::vector<std::pair<ValueType,ValueType>> > localRefDetails; //TODO: use or remove
 
+    // with multi nide weights we also have multiple imbalances
+    std::vector<ValueType> imbalances;
+
     //MM, metrics map
 	std::map<std::string,ValueType> MM = {
 		{"timeMigrationAlgo",-1.0} , {"timeFirstDistribution",-1.0}, {"timeTotal",-1.0} , {"timeSpMV",-1.0}, {"timeComm",-1.0} , {"reportTime",-1.0},
@@ -54,13 +57,13 @@ struct Metrics{
 	}
 
 
-	void getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings );
+	void getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings );
 	
-	void getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings );
+	void getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings );
 
 	void getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, struct Settings settings, const IndexType repeatTimes );
 
-	void getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const scai::lama::DenseVector<ValueType> nodeWeights, struct Settings settings );
+	void getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings );
 
 	std::tuple<IndexType,IndexType,IndexType> getDiameter( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, struct Settings settings );
 

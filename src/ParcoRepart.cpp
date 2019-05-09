@@ -228,8 +228,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
 	SCAI_REGION( "ParcoRepart.partitionGraph" )
 
-	std::chrono::time_point<std::chrono::steady_clock> start, afterSFC, round;
-	start = std::chrono::steady_clock::now();
+	std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
 
 	SCAI_REGION_START("ParcoRepart.partitionGraph.inputCheck")
 	/**
@@ -299,7 +298,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 	
 	std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
 	
-	if( settings.initialPartition==InitialPartitioningMethods::SFC) {
+	if( settings.initialPartition==ITI::Tool::geoSFC) {
 		PRINT0("Initial partition with SFCs");
 		result= ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
 		std::chrono::duration<double> sfcTime = std::chrono::system_clock::now() - beforeInitPart;
@@ -308,13 +307,16 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 			if(comm->getRank() == 0)
 				std::cout << "SFC Time:" << totSFCTime << std::endl;
 		}
-	} else if ( settings.initialPartition==InitialPartitioningMethods::Pixel) {
-		PRINT0("Initial partition with pixels.");
-		result = ParcoRepart<IndexType, ValueType>::pixelPartition(coordinates, settings);
-	} else if ( settings.initialPartition == InitialPartitioningMethods::Spectral) {
-		PRINT0("Initial partition with spectral");
-		result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
-	} else if (settings.initialPartition == InitialPartitioningMethods::KMeans) {
+	} 
+/*	else if ( settings.initialPartition==ITI::Tool::Pixel) {
+	PRINT0("Initial partition with pixels.");
+	result = ParcoRepart<IndexType, ValueType>::pixelPartition(coordinates, settings);
+} else if ( settings.initialPartition == ITI::Tool::Spectral) {
+	PRINT0("Initial partition with spectral");
+	result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
+}*/ 
+	else if (settings.initialPartition == ITI::Tool::geoKmeans or settings.initialPartition == ITI::Tool::geoHierKM \
+		or  settings.initialPartition == ITI::Tool::geoHierRepart){
 	    if (comm->getRank() == 0) {
 	        std::cout << "Initial partition with K-Means" << std::endl;
 	    }
@@ -337,17 +339,17 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 				// the distribution for the initial migration   
 				scai::dmemo::DistributionPtr initMigrationPtr;
 				
-				if (settings.initialMigration == InitialPartitioningMethods::SFC) {
+				if (settings.initialMigration == ITI::Tool::geoSFC) {
 					HilbertCurve<IndexType,ValueType>::hilbertRedistribution(coordinateCopy, nodeWeightCopy, settings, metrics);
 				}else {
 					std::vector<DenseVector<ValueType> > convertedWeights(nodeWeights);
 					DenseVector<IndexType> tempResult;				
-					if (settings.initialMigration == InitialPartitioningMethods::Multisection) {
+					if (settings.initialMigration == ITI::Tool::geoMS) {
 						if (convertedWeights.size() > 1) {
 							throw std::logic_error("MultiSection not implemented for multiple weights.");
 						}
 						tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights[0], migrationSettings);
-					} else if (settings.initialMigration == InitialPartitioningMethods::KMeans) {
+					} else if (settings.initialMigration == ITI::Tool::geoKmeans) {
 						std::vector<std::vector<ValueType>> migrationBlockSizes(1, std::vector<ValueType>(migrationSettings.numBlocks, n/migrationSettings.numBlocks ));
                         struct Metrics tmpMetrics(migrationSettings);
 						tempResult = ITI::KMeans::computePartition<IndexType, ValueType>(coordinates, convertedWeights, migrationBlockSizes, migrationSettings, tmpMetrics);
@@ -355,7 +357,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 					
 					initMigrationPtr = scai::dmemo::generalDistributionByNewOwners( tempResult.getDistribution(), tempResult.getLocalValues() );
 					
-					if (settings.initialMigration == InitialPartitioningMethods::None) {
+					if (settings.initialMigration == ITI::Tool::none) {
 						//nothing to do
 						initMigrationPtr = inputDist;
 					} else {
@@ -373,7 +375,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 					std::chrono::time_point<std::chrono::system_clock> afterRedistConstruction =  std::chrono::system_clock::now();
 					
 					std::chrono::duration<double> redist = (afterRedistConstruction - beforeMigration);
-//metrics.MM["timeConstructRedistributor"] = redist.count();
+					//metrics.MM["timeConstructRedistributor"] = redist.count();
 					
 					if (nodesUnweighted) {
 						nodeWeightCopy[0] = DenseVector<ValueType>(initMigrationPtr, nodeWeights[0].getLocalValues()[0]);
@@ -405,9 +407,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
 		
 		// vector of size k, each element represents the size of one block
-std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors(1);
-SCAI_ASSERT_EQ_ERROR( blockSizes.size(), nodeWeights.size(), "Wrong number of weights");
-SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Wrong size of weights" );
+		std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors(1);
+		SCAI_ASSERT_EQ_ERROR( blockSizes.size(), nodeWeights.size(), "Wrong number of weights");
+		SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Wrong size of weights" );
 		if( blockSizes.empty() ){
 			blockSizes = std::vector<std::vector<ValueType> >(nodeWeights.size());
 			for (int i = 0; i < nodeWeights.size(); i++) {
@@ -423,15 +425,36 @@ SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Wrong size of w
 				throw std::logic_error("Not yet implemented for multiple node weights.");
 			}
 			result = ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
-		} else {
+		} else if(settings.initialPartition == ITI::Tool::geoKmeans){
 			result = ITI::KMeans::computePartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
+		}else if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierRepart){
+			const IndexType numWeights = nodeWeightCopy.size();
+			SCAI_ASSERT_GT_ERROR( settings.hierLevels.size(), 0 , "Must provide the tree level sizes in order to call hierarchical KMeans" );
+			//TODO: adapt also for when tree is given in a file
+
+			CommTree<IndexType,ValueType> commTree( settings.hierLevels, numWeights );
+			const IndexType numLeaves = commTree.getNumLeaves();
+			PRINT0("About to call hierarchical kmeans with " << settings.hierLevels.size() << " levels and " << numLeaves << " leaves." );
+			SCAI_ASSERT_EQ_ERROR( numLeaves, settings.numBlocks, "The number of leaves and blocks should agree" );
+
+			commTree.adaptWeights( nodeWeightCopy );
+
+			if (settings.initialPartition == ITI::Tool::geoHierKM){
+				result = ITI::KMeans::computeHierarchicalPartition<IndexType, ValueType>( input, coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
+			}
+			if (settings.initialPartition == ITI::Tool::geoHierRepart){
+				//settings.debugMode = true;
+				result = ITI::KMeans::computeHierPlusRepart<IndexType, ValueType>( input, coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
+			}
+			SCAI_ASSERT_EQ_ERROR( nodeWeightCopy[0].getDistributionPtr()->getLocalSize(),\
+						result.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");			
 		}
 		
 		kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
 		metrics.MM["timeKmeans"] = kMeansTime.count();
 		//timeForKmeans = ValueType ( comm->max(kMeansTime.count() ));
         assert(scai::utilskernel::HArrayUtils::min(result.getLocalValues()) >= 0);
-        assert(scai::utilskernel::HArrayUtils::max(result.getLocalValues()) < k);
+        SCAI_ASSERT_LT_ERROR(scai::utilskernel::HArrayUtils::max(result.getLocalValues()) ,k, "");
 		
 		if (settings.verbose) {
 			ValueType totKMeansTime = ValueType( comm->max(kMeansTime.count()) );
@@ -443,7 +466,7 @@ SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Wrong size of w
         //assert(result.max() == settings.numBlocks -1);
         assert(result.min() == 0);
 		
-	} else if (settings.initialPartition == InitialPartitioningMethods::Multisection) {// multisection
+	} else if (settings.initialPartition == ITI::Tool::geoMS) {// multisection
 		PRINT0("Initial partition with multisection");
 		if (nodeWeights.size() > 1) {
 			throw std::logic_error("MultiSection not implemented for multiple weights.");
@@ -457,7 +480,7 @@ SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Wrong size of w
 			if(comm->getRank() == 0)
 				std::cout << "MS Time:" << totMsTime << std::endl;
 		}
-	} else if (settings.initialPartition == InitialPartitioningMethods::None) {
+	} else if (settings.initialPartition == ITI::Tool::none) {
 		//no need to explicitly check for repartitioning mode or not.
 		assert(comm->getSize() == settings.numBlocks);
 		result = DenseVector<IndexType>(input.getRowDistributionPtr(), comm->getRank());
@@ -484,7 +507,7 @@ SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Wrong size of w
 	
 	if (comm->getSize() == k) {
 		//WARNING: the result  is not redistributed. must redistribute afterwards
-		if(  !settings.noRefinement ) {
+		if( !settings.noRefinement ) {
 
 			//uncomment to store the first, geometric partition into a file that then can be visualized using matlab and GPI's code
 			//std::string filename = "geomPart.mtx";
@@ -547,9 +570,12 @@ SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Wrong size of w
 			std::cout << "Local refinement only implemented for one block per process. Called with " << comm->getSize() << " processes and " << k << " blocks." << std::endl;
 		}
 	}
+
+	std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - startTime;
+	metrics.MM["timeTotal"] = elapTime.count();
 	
 	return result;
-}
+} //partitionGraph
 //--------------------------------------------------------------------------------------- 
 
 //TODO: take node weights into account

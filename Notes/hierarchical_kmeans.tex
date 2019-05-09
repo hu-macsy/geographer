@@ -281,6 +281,22 @@ Here we have 4 PEs and the mesh is partitioned first in 3 parts and then in 3,2 
 \end{figure}
 
 
+\subsection*{Repartition with hierarchical k-means}
+
+The current code (03 May 2019) of the hierarchical k-means accepts as one of the inputs the centers.
+The centers are of type \texttt{vector<vector<point>> centers} and the centers.size() implies
+the number of parts in the previous hierarchy level. In general, the algorithm will receive
+a partitioned mesh, say into $k$ parts, and will partition it again into $k'$ parts with $k'>k$.
+For example, we all ready have 3 parts ($k=3$) and each part will be partitioned into 5 parts
+giving in total 15 parts ($k'=15$). 
+
+In repartition, we want a mesh that is already partitioned into $k$ parts to be repartitioned in $k$
+parts (there are other scenarios but this is the most usual one). With the code as it is, this is not
+possible. 
+
+Started (03/05) adapting the code in k-means to handle some input parameters differently when we
+want to repartition. I am afraid this cannot be avoided...
+
 
 
 \end{document}

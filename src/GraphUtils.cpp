@@ -386,7 +386,7 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
 	ValueType minWeight, maxWeight;
 	if (weighted) {
 		assert(weightsSize == globalN);
-		assert(nodeWeights.getDistributionPtr()->getLocalSize() == localN);
+		SCAI_ASSERT_EQ_ERROR(nodeWeights.getDistributionPtr()->getLocalSize(), localN, "in PE " << comm->getRank() );
 		minWeight = nodeWeights.min();
 		maxWeight = nodeWeights.max();
 	} else {
@@ -1734,7 +1734,7 @@ std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, Val
 //--------------------------------------------------------------------------------------- 
 
 template<typename IndexType, typename ValueType>
-CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(CSRSparseMatrix<ValueType> graph) {
+CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(const CSRSparseMatrix<ValueType>& graph) {
     using scai::lama::CSRStorage;
     using scai::hmemo::HArray;
     using std::vector;
@@ -1807,7 +1807,9 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(
 
     const CSRStorage<ValueType> resultStorage(localN, globalN, newIA, newJA, newValues);
 
-    return CSRSparseMatrix<ValueType>(dist, resultStorage);
+    CSRSparseMatrix<ValueType> result(dist, resultStorage);
+    result.redistribute(dist, dist);
+    return result;
 }
 
 //--------------------------------------------------------------------------------------- 

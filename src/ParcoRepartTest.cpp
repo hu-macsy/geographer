@@ -212,12 +212,12 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
 
     scai::lama::DenseVector<IndexType> partition( graph.getRowDistributionPtr(), scai::hmemo::HArray<IndexType>(  localPartition.size(), localPartition.data()) );
 	
-    metrics1.getAllMetrics(graph, partition, nodeWeights[0], settings);
+    metrics1.getAllMetrics(graph, partition, nodeWeights, settings);
     
     scai::lama::DenseVector<IndexType> partition2 = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( graph, coords, nodeWeights, settings, metrics2);
     partition2.redistribute( graph.getRowDistributionPtr() );
 
-    metrics2.getAllMetrics(graph, partition2, nodeWeights[0], settings);
+    metrics2.getAllMetrics(graph, partition2, nodeWeights, settings);
 
     if( comm->getRank()==0){
       std::cout<< "Metrics for first partition:"<< std::endl;
@@ -474,7 +474,7 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
   struct Settings settings;
   settings.numBlocks= k;
 
-	scai::lama::CSRSparseMatrix<ValueType> blockGraph =  GraphUtils<IndexType, ValueType>::getBlockGraph( a, part, k);
+	scai::lama::CSRSparseMatrix<ValueType> blockGraph =  GraphUtils<IndexType, ValueType>::getBlockGraph_dist( a, part, k);
 	EXPECT_TRUE( blockGraph.isConsistent() );
 	EXPECT_TRUE( blockGraph.checkSymmetry() ); //TODO: this fails occasionally
 	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local(blockGraph, settings);
@@ -555,7 +555,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     settings.dimensions = dimensions;
     settings.multiLevelRounds = 3;
     //settings.initialPartition = InitialPartitioningMethods::Multisection;
-    settings.initialPartition = InitialPartitioningMethods::KMeans;
+    settings.initialPartition = Tool::geoKmeans;
     struct Metrics metrics(settings);
     
     // get partition
@@ -1067,7 +1067,7 @@ TEST_F(ParcoRepartTest, testRedistributeFromPartition){
     settings.dimensions = dimensions;
     settings.multiLevelRounds = 3;
     //settings.initialPartition = InitialPartitioningMethods::Multisection;
-    settings.initialPartition = InitialPartitioningMethods::KMeans;
+    settings.initialPartition = Tool::geoKmeans;
     settings.noRefinement = true;
     struct Metrics metrics(settings);
 

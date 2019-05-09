@@ -101,12 +101,13 @@ def create_input_metis(instance, part, cons, exp):
                             line = create_header_metis(l,cons)
                             tf.write(line + newline)
                             p = read_part_file(part)
-                            assert (max(p) <= nbp )," number of partitions should less than 16!"
+                            nb_part = max(p) + 1
+                            assert (nb_part <= nbp )," number of partitions should less than 16!"
                             assert (len(p) == nbvtxs )," number of vertices in partition is incorrect!"
                             if exp == 'random':
-                                lcons = create_cons_list_random(cons, max(p))
+                                lcons = create_cons_list_random(cons, nb_part)
                             elif exp == 'phase':
-                                lcons = create_cons_list_phase(cons, max(p))
+                                lcons = create_cons_list_phase(cons, nb_part)
                             else:
                                 print("Unknown format: ", format, file=sys.stderr)
                                 sys.exit(1)

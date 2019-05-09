@@ -74,7 +74,7 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
    
     // scale= N^(1/d): this way the scaled max is N^(1/d) and this is also the maximum size of the projection arrays
     ValueType scale = std::pow( globalN /*WARNING*/ -1 , 1.0/dim);
-    PRINT0( scale );
+    //PRINT0( scale );
     {
         SCAI_REGION( "MultiSection.getPartitionNonUniform.minMaxAndScale" )
         
