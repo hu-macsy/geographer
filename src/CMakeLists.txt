@@ -5,6 +5,8 @@ if (NOT DEFINED SCAI_DIR)
 	message( FATAL_ERROR "Install Directory of LAMA not defined, specify with -DSCAI_DIR" )
 endif (NOT DEFINED SCAI_DIR)
 
+message("SCAI_DIR= " ${SCAI_DIR})
+
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
 option(USE_NETWORKIT "Use NETWORKIT package." OFF)

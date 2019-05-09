@@ -555,7 +555,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     settings.dimensions = dimensions;
     settings.multiLevelRounds = 3;
     //settings.initialPartition = InitialPartitioningMethods::Multisection;
-    settings.initialPartition = InitialPartitioningMethods::KMeans;
+    settings.initialPartition = Tool::geoKmeans;
     struct Metrics metrics(settings);
     
     // get partition
@@ -1067,7 +1067,7 @@ TEST_F(ParcoRepartTest, testRedistributeFromPartition){
     settings.dimensions = dimensions;
     settings.multiLevelRounds = 3;
     //settings.initialPartition = InitialPartitioningMethods::Multisection;
-    settings.initialPartition = InitialPartitioningMethods::KMeans;
+    settings.initialPartition = Tool::geoKmeans;
     settings.noRefinement = true;
     struct Metrics metrics(settings);
 

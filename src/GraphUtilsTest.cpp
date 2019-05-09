@@ -603,7 +603,7 @@ TEST_F ( GraphUtilsTest, testGetPEGraph) {
     settings.dimensions = dimensions;
     settings.minGainForNextRound = 100;
     settings.noRefinement = true;
-    settings.initialPartition = InitialPartitioningMethods::SFC;
+    settings.initialPartition = Tool::geoSFC;
     struct Metrics metrics(settings);
     
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
@@ -648,7 +648,7 @@ TEST_F ( GraphUtilsTest, testGetBlockGraph) {
     settings.dimensions = dimensions;
     //settings.minGainForNextRound = 100;
     settings.noRefinement = true;
-    settings.initialPartition = InitialPartitioningMethods::KMeans;
+    settings.initialPartition = Tool::geoKmeans;
     struct Metrics metrics(settings);
     
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
@@ -720,7 +720,7 @@ TEST_F ( GraphUtilsTest, testPEGraphBlockGraph_k_equal_p_Distributed) {
     settings.dimensions = dimensions;
     settings.minGainForNextRound = 100;
     //settings.noRefinement = true;
-    settings.initialPartition = InitialPartitioningMethods::SFC;
+    settings.initialPartition = Tool::geoSFC;
     struct Metrics metrics(settings);
     
     scai::lama::DenseVector<IndexType> partition(dist, -1);
