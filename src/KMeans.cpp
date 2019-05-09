@@ -776,8 +776,8 @@ DenseVector<IndexType> assignBlocks(
 		}
 
 		// adapt influence values
-		double minRatio = std::numeric_limits<double>::max();
-		double maxRatio = -std::numeric_limits<double>::min();
+		ValueType minRatio = std::numeric_limits<ValueType>::max();
+		ValueType maxRatio = -std::numeric_limits<ValueType>::min();
 		std::vector<std::vector<ValueType>> oldInfluence = influence;//size=numNewBlocks
 		for (IndexType i = 0; i < numNodeWeights; i++) {
 			assert( oldInfluence[i].size()== numNewBlocks );
@@ -785,7 +785,7 @@ DenseVector<IndexType> assignBlocks(
 			for (IndexType j=0; j<numNewBlocks; j++) {
 				SCAI_REGION( "KMeans.assignBlocks.balanceLoop.influence" );
 
-				double ratio = ValueType(blockWeights[i][j])/targetBlockWeights[i][j];
+				ValueType ratio = ValueType(blockWeights[i][j])/targetBlockWeights[i][j];
 				if (std::abs(ratio - 1) < settings.epsilon) {
 					balancedBlocks++; //TODO: update for multiple weights
 					if (settings.freezeBalancedInfluence) {
@@ -802,10 +802,10 @@ DenseVector<IndexType> assignBlocks(
 					);
 				assert(influence[i][j] > 0);
 
-				double influenceRatio = influence[i][j] / oldInfluence[i][j];
+				ValueType influenceRatio = influence[i][j] / oldInfluence[i][j];
 
-				assert(influenceRatio <= influenceChangeUpperBound[j] + 1e-10);
-				assert(influenceRatio >= influenceChangeLowerBound[j] - 1e-10);
+				assert(influenceRatio <= influenceChangeUpperBound[j] + 1e-6);
+				assert(influenceRatio >= influenceChangeLowerBound[j] - 1e-6);
 				if (influenceRatio < minRatio) minRatio = influenceRatio;
 				if (influenceRatio > maxRatio) maxRatio = influenceRatio;
 
@@ -836,13 +836,11 @@ DenseVector<IndexType> assignBlocks(
 					newInfluenceEffect += influence[j][cluster]*normalizedNodeWeights[j][i];
 				}
 
-				SCAI_ASSERT_LE_ERROR( (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) , maxRatio + 1e12, "Error in calculation of influence effect");
-				SCAI_ASSERT_GE_ERROR( (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) , minRatio - 1e12, "Error in calculation of influence effect");
+				SCAI_ASSERT_LE_ERROR( (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) , maxRatio + 1e6, "Error in calculation of influence effect");
+				SCAI_ASSERT_GE_ERROR( (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) , minRatio - 1e6, "Error in calculation of influence effect");
 
-				upperBoundOwnCenter[i] *= (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) + 1e-12;
-				lowerBoundNextCenter[i] *= minRatio - 1e-12;
-
-				//influenceEffectOfOwn[veryLocalI] = newInfluenceEffect;
+				upperBoundOwnCenter[i] *= (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) + 1e-6;
+				lowerBoundNextCenter[i] *= minRatio - 1e-6;
 			}
 		}
 
@@ -1358,7 +1356,7 @@ DenseVector<IndexType> computePartition( \
 		std::vector<ValueType> squaredDeltas(totalNumNewBlocks,0);
 		std::vector<ValueType> deltas(totalNumNewBlocks,0);
 		std::vector<std::vector<ValueType>> oldInfluence = influence; 
-		ValueType minRatio = std::numeric_limits<double>::max();
+		ValueType minRatio = std::numeric_limits<ValueType>::max();
 
 		for (IndexType j = 0; j < totalNumNewBlocks; j++) {
 			for (int d = 0; d < dim; d++) {
@@ -1371,7 +1369,7 @@ DenseVector<IndexType> computePartition( \
 			}
 			deltas[j] = std::sqrt(squaredDeltas[j]);
 			if (settings.erodeInfluence) {
-				const ValueType erosionFactor = 2/(1+exp(-std::max(deltas[j]/expectedBlockDiameter-0.1, 0.0))) - 1;
+				const ValueType erosionFactor = 2/(1+exp(-std::max(deltas[j]/expectedBlockDiameter-0.1, ValueType(0.0)))) - 1;
 				for (IndexType i = 0; i < numNodeWeights; i++) {
 					influence[i][j] = exp((1-erosionFactor)*log(influence[i][j]));
 					if (oldInfluence[i][j] / influence[i][j] < minRatio) minRatio = oldInfluence[i][j] / influence[i][j];
@@ -1382,8 +1380,8 @@ DenseVector<IndexType> computePartition( \
 
 		delta = *std::max_element(deltas.begin(), deltas.end());
 		assert(delta >= 0);
-		const double deltaSq = delta*delta;
-		double maxInfluence = 0;
+		const ValueType deltaSq = delta*delta;
+		ValueType maxInfluence = 0;
 		for (IndexType w = 0; w < numNodeWeights; w++) {
 			maxInfluence = std::max(maxInfluence, *std::max_element(influence[w].begin(), influence[w].end()));
 		}

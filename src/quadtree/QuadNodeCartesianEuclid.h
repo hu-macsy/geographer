@@ -41,7 +41,7 @@ public:
 	 * @param splitTheoretical Whether to split in a theoretically optimal way or in a way to decrease measured running times
 	 *
 	 */
-	QuadNodeCartesianEuclid(Point<double> lower = Point<double>({0.0, 0.0}), Point<double> upper = Point<double>({1.0, 1.0}), unsigned capacity = 1000, bool splitTheoretical = false)
+	QuadNodeCartesianEuclid(Point<ValueType> lower = Point<ValueType>({0.0, 0.0}), Point<ValueType> upper = Point<ValueType>({1.0, 1.0}), unsigned capacity = 1000, bool splitTheoretical = false)
 	: SpatialCell(lower, upper, capacity)	{
 		this->splitTheoretical = splitTheoretical;
 	}
@@ -50,7 +50,7 @@ public:
 		assert(this->isLeaf);
 		assert(this->children.size() == 0);
 		const count dimension = this->minCoords.getDimensions();
-		std::vector<double> middle(dimension);
+		std::vector<ValueType> middle(dimension);
 		if (splitTheoretical) {
 			//Euclidean space is distributed equally
 			for (index d = 0; d < dimension; d++) {
@@ -60,7 +60,7 @@ public:
 			//median of points
 			const count numPoints = this->positions.size();
 			assert(numPoints > 0);//otherwise, why split?
-			std::vector<std::vector<double> > sorted(dimension);
+			std::vector<std::vector<ValueType> > sorted(dimension);
 			for (index d = 0; d < dimension; d++) {
 				sorted[d].resize(numPoints);
 				for (index i = 0; i < numPoints; i++) {
@@ -74,8 +74,8 @@ public:
 		}
 		count childCount = pow(2,dimension);
 		for (index i = 0; i < childCount; i++) {
-			std::vector<double> lowerValues(dimension);
-			std::vector<double> upperValues(dimension);
+			std::vector<ValueType> lowerValues(dimension);
+			std::vector<ValueType> upperValues(dimension);
 			index bitCopy = i;
 			for (index d = 0; d < dimension; d++) {
 				if (bitCopy & 1) {
@@ -87,7 +87,7 @@ public:
 				}
 				bitCopy = bitCopy >> 1;
 			}
-			std::shared_ptr<QuadNodeCartesianEuclid> child(new QuadNodeCartesianEuclid(Point<double>(lowerValues), Point<double>(upperValues), this->capacity, splitTheoretical));
+			std::shared_ptr<QuadNodeCartesianEuclid> child(new QuadNodeCartesianEuclid(Point<ValueType>(lowerValues), Point<ValueType>(upperValues), this->capacity, splitTheoretical));
 			assert(child->isLeaf);
 			this->children.push_back(child);
 		}
@@ -111,11 +111,11 @@ public:
 		return true;
 	}
 
-	virtual std::pair<double, double> distances(const Point<double> &query) const override {
+	virtual std::pair<ValueType, ValueType> distances(const Point<ValueType> &query) const override {
 		return this->EuclideanCartesianDistances(query);
 	}
 
-	virtual double distance(const Point<double> &query, index k) const override {
+	virtual ValueType distance(const Point<ValueType> &query, index k) const override {
 		return query.distance(this->positions[k]);
 	}
 };

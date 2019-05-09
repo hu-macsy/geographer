@@ -675,8 +675,8 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
     SCAI_REGION_END("ParcoRepart.hilbertRedistribution.sort")
 
     sort_pair minLocalIndex = localPairs[0];
-    std::vector<ValueType> sendThresholds(comm->getSize(), minLocalIndex.value);
-    std::vector<ValueType> recvThresholds(comm->getSize());
+    std::vector<double> sendThresholds(comm->getSize(), minLocalIndex.value);
+    std::vector<double> recvThresholds(comm->getSize());
 
     MPI_Datatype MPI_ValueType = MPI_DOUBLE; //TODO: properly template this
     MPI_Alltoall(sendThresholds.data(), 1, MPI_ValueType, recvThresholds.data(),

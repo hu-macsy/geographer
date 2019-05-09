@@ -7,11 +7,7 @@ set(Geographer_VERSION_MAJOR 0 STRING "major version")
 set(Geographer_VERSION_MINOR 9 STRING "minor version")
 set(Geographer_VERSION ${Geographer_VERSION_MAJOR}.${Geographer_VERSION_MINOR} STRING "version")
 
-if (NOT DEFINED SCAI_DIR)
-	message( FATAL_ERROR "Install Directory of LAMA not defined, specify with -DSCAI_DIR" )
-endif (NOT DEFINED SCAI_DIR)
-
-set(CMAKE_VERBOSE_MAKEFILE ON)
+add_definitions(--std=c++14)
 
 option(USE_NETWORKIT "Use NETWORKIT package." OFF)
 if(USE_NETWORKIT)
@@ -28,8 +24,8 @@ set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
 #set(CMAKE_CXX_COMPILER /lrz/sys/compilers/gcc/7.3.0/bin/c++)
 
 ### find MPI ###
-#find_package(MPI REQUIRED)
-#include_directories(${MPI_CXX_INCLUDE_PATH})
+find_package(MPI REQUIRED)
+include_directories(${MPI_CXX_INCLUDE_PATH})
 
 ### find GTest ###
 find_package(GTest)
@@ -57,7 +53,7 @@ find_package( SCAI REQUIRED CONFIG
 
 include_directories(${SCAI_INCLUDE_DIRS})
 add_definitions(${SCAI_DEFINITIONS})
-set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SCAI_CXX_FLAGS}" )
+#set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SCAI_CXX_FLAGS}" )
 link_directories(${SCAI_ROOT}/lib/)
 
 ### include and link RBC ###
@@ -71,15 +67,23 @@ link_directories(${SCAI_ROOT}/lib/)
 #  find_library( RBC_LIBRARY _rbc "${RBC_DIR}/build/lib" )
 #endif()
 
+### add networkit include and link directory ###
+# link_directories has to happen before target definitions
+if (USE_NETWORKIT)
+  include_directories(${NETWORKIT_INCLUDE})
+  link_directories(${NETWORKIT_LIB})
+endif (USE_NETWORKIT)
 
 ### get git commit ###
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
+add_definitions("-DBUILD_COMMIT=${GIT_COMMIT}")
 
-set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp -std=c++14 -O3 -fPIC -Wall -Wno-sign-compare -Wno-unused-variable -DBUILD_COMMIT=${GIT_COMMIT}" )
+set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -O3 -fPIC -Wall -Wno-sign-compare -Wno-unused-variable" )
 
 ### define install directories ###
 set(BIN_DEST "bin")
-set(INCLUDE_DEST "include/geographer")
+set(INCLUDE_DEST "include")
+set(HEADER_DEST "${INCLUDE_DEST}/geographer")
 set(LIB_DEST "lib/geographer")
 set(CMAKE_DEST "share/cmake/geographer")
 
@@ -91,6 +95,13 @@ set ( CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE )
 add_subdirectory(external/KaDiS)
 set(RBC_LIBRARY rbcsorting)
 
+### set value type ###
+set(Geographer_VALUE_TYPE "double" CACHE STRING "variable type used for values")
+configure_file("src/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/config.h")
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/config.h" DESTINATION "${HEADER_DEST}")
+
+### include and define targets ###
 add_subdirectory(src)
 
 add_executable(analyze src/FileIO.cpp src/Settings.cpp src/GraphUtils.cpp src/CommTree.cpp src/Metrics.cpp tools/analyzePartition.cpp)
