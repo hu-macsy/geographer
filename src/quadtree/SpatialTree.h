@@ -16,19 +16,19 @@ public:
 	SpatialTree() = default;
 	virtual ~SpatialTree() = default;
 
-	void addContent(index content, const Point<double> &coords) {
+	void addContent(index content, const Point<ValueType> &coords) {
 		root->addContent(content, coords);
 	}
 
-	bool removeContent(index content, const Point<double> &coords) {
+	bool removeContent(index content, const Point<ValueType> &coords) {
 		return root->removeContent(content, coords);
 	}
 
-	void getElementsInCircle(const Point<double> query, const double radius, std::vector<index> &circleDenizens) const {
+	void getElementsInCircle(const Point<ValueType> query, const ValueType radius, std::vector<index> &circleDenizens) const {
 		root->getElementsInCircle(query, radius, circleDenizens);
 	}
 
-	count getElementsProbabilistically(Point<double> query, std::function<double(double)> prob, std::vector<index> &circleDenizens) {
+	count getElementsProbabilistically(Point<ValueType> query, std::function<ValueType(ValueType)> prob, std::vector<index> &circleDenizens) {
 		return root->getElementsProbabilistically(query, prob, circleDenizens);
 	}
 
@@ -56,7 +56,7 @@ public:
 		return this->root->indexSubtree(nextID);
 	}
 
-	index getCellID(Point<double> pos) const {
+	index getCellID(Point<ValueType> pos) const {
 		return this->root->getCellID(pos);
 	}
 

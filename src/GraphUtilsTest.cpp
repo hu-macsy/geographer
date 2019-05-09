@@ -89,7 +89,7 @@ TEST_F(GraphUtilsTest, testConstructLaplacian) {
     ASSERT_TRUE(L.isConsistent());
 
     //test that L*1 = 0
-    DenseVector<ValueType> x( n, 1 );
+    DenseVector<ValueType> x( L.getRowDistributionPtr(), 1 );
     DenseVector<ValueType> y = scai::lama::eval<DenseVector<ValueType>>( L * x );
 
     ValueType norm = y.maxNorm();
@@ -101,9 +101,6 @@ TEST_F(GraphUtilsTest, testConstructLaplacian) {
     LFromReplicated.redistribute(L.getRowDistributionPtr(), L.getColDistributionPtr());
     CSRSparseMatrix<ValueType> diff = scai::lama::eval<CSRSparseMatrix<ValueType>> (LFromReplicated - L);
     EXPECT_EQ(0, diff.l2Norm());
-
-    //sum is zero
-    EXPECT_EQ(0, comm->sum(scai::utilskernel::HArrayUtils::sum(L.getLocalStorage().getValues())) );
 }
 
 TEST_F(GraphUtilsTest, benchConstructLaplacian) {
@@ -281,10 +278,11 @@ TEST_F (GraphUtilsTest,testEdgeList2CSR){
 	std::vector< std::pair<IndexType, IndexType>> localEdgeList( localM );
 
 	srand( std::time(NULL)*thisPE );
+	int x = numPEs==1 ? 1 : thisPE*(N/(numPEs-1));
 	
     for(int i=0; i<localM; i++){
 		//to ensure that there are no isolated vertices
-		IndexType v1 = (i + int(thisPE*2.5))%N; //(rand())%N;
+		IndexType v1 = (i + x)%N; //(rand())%N;
 		IndexType v2 = (v1+rand())%N;
 		localEdgeList[i] = std::make_pair( v1, v2 );
 		//PRINT(thisPE << ": inserting edge " << v1 << " - " << v2 );
