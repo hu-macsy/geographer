@@ -7,13 +7,7 @@ set(Geographer_VERSION_MAJOR 0 STRING "major version")
 set(Geographer_VERSION_MINOR 9 STRING "minor version")
 set(Geographer_VERSION ${Geographer_VERSION_MAJOR}.${Geographer_VERSION_MINOR} STRING "version")
 
-if (NOT DEFINED SCAI_DIR)
-	message( FATAL_ERROR "Install Directory of LAMA not defined, specify with -DSCAI_DIR" )
-endif (NOT DEFINED SCAI_DIR)
-
 #set(CMAKE_VERBOSE_MAKEFILE ON)
-
-
 
 option(USE_NETWORKIT "Use NETWORKIT package." OFF)
 if(USE_NETWORKIT)
@@ -85,17 +79,14 @@ endif (USE_NETWORKIT)
 
 ### get git commit ###
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
+add_definitions("-DBUILD_COMMIT=${GIT_COMMIT}")
 
-set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11 -O3 -fPIC -Wall -Wno-sign-compare -Wno-unused-variable -DBUILD_COMMIT=${GIT_COMMIT}" )
-
-### set value type ###
-set(Geographer_VALUE_TYPE "double" CACHE STRING "variable type used for values")
-configure_file("src/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/config.h")
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11 -O3 -fPIC -Wall -Wno-sign-compare -Wno-unused-variable" )
 
 ### define install directories ###
 set(BIN_DEST "bin")
-set(INCLUDE_DEST "include/geographer")
+set(INCLUDE_DEST "include")
+set(HEADER_DEST "${INCLUDE_DEST}/geographer")
 set(LIB_DEST "lib/geographer")
 set(CMAKE_DEST "share/cmake/geographer")
 
@@ -104,6 +95,13 @@ set ( CMAKE_SKIP_BUILD_RPATH FALSE )
 set ( CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${LIB_DEST}")
 set ( CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE )
 
+### set value type ###
+set(Geographer_VALUE_TYPE "double" CACHE STRING "variable type used for values")
+configure_file("src/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/config.h")
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/config.h" DESTINATION "${HEADER_DEST}")
+
+### include and define targets ###
 add_subdirectory(src)
 
 add_executable(analyze src/FileIO.cpp src/Settings.cpp src/GraphUtils.cpp src/CommTree.cpp src/Metrics.cpp tools/analyzePartition.cpp)

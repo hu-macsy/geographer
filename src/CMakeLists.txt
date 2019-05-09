@@ -23,5 +23,5 @@ endif (GTEST_FOUND)
 
 install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable
 install(TARGETS geographer EXPORT geographer DESTINATION "${LIB_DEST}") # library
-install(FILES ${FILES_HEADER} DESTINATION "${INCLUDE_DEST}")
+install(FILES ${FILES_HEADER} DESTINATION "${HEADER_DEST}")
 install(EXPORT geographer DESTINATION "${CMAKE_DEST}")
