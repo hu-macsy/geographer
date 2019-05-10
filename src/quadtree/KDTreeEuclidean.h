@@ -19,7 +19,7 @@ class KDTreeEuclidean: public ITI::SpatialTree {
 public:
 	KDTreeEuclidean() = default;
 	virtual ~KDTreeEuclidean() = default;
-	KDTreeEuclidean(const Point<double> &minCoords, const Point<double> &maxCoords, count capacity=1000) {
+	KDTreeEuclidean(const Point<ValueType> &minCoords, const Point<ValueType> &maxCoords, count capacity=1000) {
 		this->root = std::shared_ptr<KDNodeEuclidean<cartesian> >(new KDNodeEuclidean<cartesian>(minCoords, maxCoords, capacity));
 	}
 };

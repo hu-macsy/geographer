@@ -17,7 +17,7 @@ public:
 	KDNodeEuclidean() = default;
 	virtual ~KDNodeEuclidean() = default;
 
-	KDNodeEuclidean(const Point<double> &minCoords, const Point<double> &maxCoords, count capacity=1000)
+	KDNodeEuclidean(const Point<ValueType> &minCoords, const Point<ValueType> &maxCoords, count capacity=1000)
 	: SpatialCell(minCoords, maxCoords, capacity) {
 		if (!cartesian) {
 			if (minCoords.getDimensions() != 2) {
@@ -40,18 +40,18 @@ public:
 
 		const count dimension = this->minCoords.getDimensions();
 		index mostSpreadDimension = dimension;
-		double maximumSpread = 0;
+		ValueType maximumSpread = 0;
 
 		//find dimension in which to split
 		for (index d = 0; d < dimension; d++) {
-			double maxElement = this->minCoords[d] - 1;
-			double minElement = this->maxCoords[d] + 1;
+			ValueType maxElement = this->minCoords[d] - 1;
+			ValueType minElement = this->maxCoords[d] + 1;
 			for (index i = 0; i < numPoints; i++) {
-				double pos = this->positions[i][d];
+				ValueType pos = this->positions[i][d];
 				if (pos < minElement) minElement = pos;
 				if (pos > maxElement) maxElement = pos;
 			}
-			double spread = maxElement - minElement;
+			ValueType spread = maxElement - minElement;
 			if (spread > maximumSpread) {
 				maximumSpread = spread;
 				mostSpreadDimension = d;
@@ -59,18 +59,18 @@ public:
 		}
 
 		//find median
-		std::vector<double> sorted(numPoints);
+		std::vector<ValueType> sorted(numPoints);
 		for (index i = 0; i < numPoints; i++) {
 			sorted[i] = this->positions[i][mostSpreadDimension];
 		}
 
 		std::sort(sorted.begin(), sorted.end());
-		double middle = sorted[numPoints/2];
+		ValueType middle = sorted[numPoints/2];
 		assert(middle <= this->maxCoords[mostSpreadDimension]);
 		assert(middle >= this->minCoords[mostSpreadDimension]);
 
-		Point<double> newLower(this->minCoords);
-		Point<double> newUpper(this->maxCoords);
+		Point<ValueType> newLower(this->minCoords);
+		Point<ValueType> newUpper(this->maxCoords);
 		newLower[mostSpreadDimension] = middle;
 		newUpper[mostSpreadDimension] = middle;
 
@@ -90,7 +90,7 @@ public:
 		//TODO: check for region coverage
 	}
 
-	std::pair<double, double> distances(const Point<double> &query) const override {
+	std::pair<ValueType, ValueType> distances(const Point<ValueType> &query) const override {
 		if (cartesian) {
 			return this->EuclideanCartesianDistances(query);
 		} else {
@@ -98,7 +98,7 @@ public:
 		}
 	}
 
-	double distance(const Point<double> &query, index k) const override {
+	ValueType distance(const Point<ValueType> &query, index k) const override {
 		if (cartesian) {
 			return query.distance(this->positions[k]);
 		}	else {

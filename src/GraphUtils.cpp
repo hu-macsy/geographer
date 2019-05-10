@@ -1836,7 +1836,7 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructFJLTMatrix
     }
 
     const IndexType p = 2;
-    ValueType q = std::min((std::pow(epsilon, p-2)*std::pow(logn,p))/origDimension, 1.0);
+    ValueType q = std::min((std::pow(epsilon, p-2)*std::pow(logn,p))/origDimension, ValueType(1.0));
 
     std::default_random_engine generator;
     std::normal_distribution<ValueType> gauss(0,q);

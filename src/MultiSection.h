@@ -15,14 +15,16 @@ namespace ITI {
      * For all i: 0<i<d, it must be bottom[i]<top[i]
      * Also, the rectangle contains the points [bottom, top], so, in a 1D rectangle, [4,8] contains
      * the points 4,5,6,7 and 8.
+     *
+     * Note: This is now using the typedef'd ValueType from config.h
      * */
     struct rectangle{
         
-        double weight;
+        ValueType weight;
         
         // for all i: 0<i<dimension, bottom[i]<top[i]
-        std::vector<double> bottom;
-        std::vector<double> top;
+        std::vector<ValueType> bottom;
+        std::vector<ValueType> top;
         
         void print(std::ostream& out){
             std::cout<< "rectangle bottom: ";

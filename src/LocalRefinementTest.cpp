@@ -146,7 +146,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	std::vector<IndexType> localBorder = GraphUtils<IndexType,ValueType>::getNodesWithNonLocalNeighbors(graph);
 
 	//get distances
-	std::vector<double> distances = LocalRefinement<IndexType,ValueType>::distancesFromBlockCenter(coordinates);
+	std::vector<ValueType> distances = LocalRefinement<IndexType,ValueType>::distancesFromBlockCenter(coordinates);
 
 	ValueType cut = GraphUtils<IndexType,ValueType>::computeCut(graph, part, true);
 	DenseVector<IndexType> origin(graph.getRowDistributionPtr(), comm->getRank());
@@ -192,7 +192,7 @@ TEST_F(LocalRefinementTest, testOriginArray) {
 	DenseVector<IndexType> part(dist, comm->getRank());
 	std::vector<IndexType> localBorder = GraphUtils<IndexType,ValueType>::getNodesWithNonLocalNeighbors(graph);
 	DenseVector<ValueType> weights(dist, 1);
-	std::vector<double> distances = LocalRefinement<IndexType,ValueType>::distancesFromBlockCenter(coordinates);
+	std::vector<ValueType> distances = LocalRefinement<IndexType,ValueType>::distancesFromBlockCenter(coordinates);
 	DenseVector<IndexType> origin(dist, comm->getRank());
 	Settings settings;
 	settings.numBlocks= comm->getSize();
