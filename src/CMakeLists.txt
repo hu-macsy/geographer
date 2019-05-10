@@ -5,9 +5,14 @@ set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphU
 
 ### define targets ###
 add_library(geographer SHARED ${FILES_COMMON})
-target_link_libraries(geographer ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})# TODO: add boost library if USE_BOOST
+target_link_libraries(geographer ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+if (USE_BOOST)
+	target_include_directories(geographer ${Boost_INCLUDE_DIRS})
+	target_link_libraries(geographer ${Boost_LIBRARIES})
+endif(USE_BOOST)
 
 add_executable(Geographer main.cpp parseArgs.cpp)
+target_include_directories(Geographer ${Boost_INCLUDE_DIRS})
 target_link_libraries(Geographer geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES})
 
 ### add networkit library if found ###

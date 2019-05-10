@@ -7,7 +7,7 @@ set(Geographer_VERSION_MAJOR 0 STRING "major version")
 set(Geographer_VERSION_MINOR 9 STRING "minor version")
 set(Geographer_VERSION ${Geographer_VERSION_MAJOR}.${Geographer_VERSION_MINOR} STRING "version")
 
-#set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_VERBOSE_MAKEFILE ON)
 
 option(USE_NETWORKIT "Use NETWORKIT package." OFF)
 if(USE_NETWORKIT)
@@ -34,9 +34,16 @@ include_directories(${MPI_CXX_INCLUDE_PATH})
 find_package(GTest)
 include_directories(${GTEST_INCLUDE_DIRS})
 
+option(USE_BOOST "Use boost library for number parsing" OFF)
+
 ### find Boost ###
-find_package(Boost REQUIRED COMPONENTS program_options filesystem system)
-include_directories(${Boost_INCLUDE_DIRS})
+if (USE_BOOST)
+  find_package(Boost REQUIRED COMPONENTS program_options filesystem system)
+  include_directories(${Boost_INCLUDE_DIRS})
+  add_definitions(-DUSE_BOOST)
+else(USE_BOOST)
+  find_package(Boost COMPONENTS program_options filesystem system)
+endif(USE_BOOST)
 
 ### find SCAI ###
 set ( SCAI_PATH_HINTS "${SCAI_DIR}" "${SCAI_HOME}" "$ENV{SCAI_HOME}" )
