@@ -7,7 +7,7 @@ set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphU
 add_library(geographer SHARED ${FILES_COMMON})
 target_link_libraries(geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 
-add_executable(Geographer main.cpp)
+add_executable(Geographer main.cpp parseArgs.cpp)
 target_link_libraries(Geographer geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES})
 
 ### add networkit library if found ###

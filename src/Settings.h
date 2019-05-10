@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include <scai/lama.hpp>
-#include <boost/program_options.hpp>
+#include <assert.h>
 
 #include "config.h"
 
@@ -256,8 +256,6 @@ struct Settings{
 			 print( out );
 		}
 	}
-
-	boost::program_options::variables_map parseInput(int argc, char** argv);
     
 }; //struct Settings
 
