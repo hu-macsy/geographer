@@ -17,9 +17,11 @@
 #include <scai/lama/storage/MatrixStorage.hpp>
 #include <scai/tracing.hpp>
 
-#include <boost/algorithm/string.hpp>
-#include <boost/tokenizer.hpp>
-#include <boost/lexical_cast.hpp>
+#ifdef USE_BOOST
+    #include <boost/algorithm/string.hpp>
+    #include <boost/tokenizer.hpp>
+    #include <boost/lexical_cast.hpp>
+ #endif
 
 #include <assert.h>
 #include <cmath>
@@ -695,7 +697,9 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         
 		if( !read) PRINT(*comm << ": " <<  i << " __ " << line << " || " << file.tellg() );        
     	//remove leading and trailing whitespace, since these can confuse the string splitter
-    	boost::algorithm::trim(line);
+        #ifdef USE_BOOST
+    	   boost::algorithm::trim(line);
+        #endif
     	assert(read);//if we have read past the end of the file, the node count was incorrect
         std::stringstream ss( line );
         std::string item;
@@ -1386,8 +1390,11 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( st
 				throw std::runtime_error("Unexpected end of line " + line +". Was the number of dimensions correct?");
 			}
 			// WARNING: in supermuc (with the gcc/5) the std::stod returns the int part !!
-			//ValueType coord = std::stod(item);
-			ValueType coord = boost::lexical_cast<ValueType>(item);
+			#ifdef USE_BOOST
+				ValueType coord = boost::lexical_cast<ValueType>(item);
+			#else
+				ValueType coord = std::stod(item);
+			#endif
 			coords[dim][i] = coord;         
 			dim++;
 		}
@@ -1658,9 +1665,12 @@ void  FileIO<IndexType, ValueType>::readOFFTriangularCentral( scai::lama::CSRSpa
 			if (!read) {
 				throw std::runtime_error("Unexpected end of line " + line +". Was the number of dimensions correct?");
 			}
-			// WARNING: in supermuc (with gcc/5) the std::stod returns the int part !!
-			//ValueType coord = std::stod(item);
-			ValueType coord = boost::lexical_cast<ValueType>(item);
+			// WARNING: in supermuc (with the gcc/5) the std::stod returns the int part !!
+            #ifdef USE_BOOST
+             ValueType coord = boost::lexical_cast<ValueType>(item);
+            #else
+             ValueType coord = std::stod(item);
+            #endif
 			coordsLA[dim][i] = coord;         
 			dim++;
 		}
