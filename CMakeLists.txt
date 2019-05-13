@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.8.8)
+cmake_minimum_required (VERSION 3.0.2)
 project (Geographer)
 include(CMakePackageConfigHelpers)
 
@@ -34,9 +34,16 @@ include_directories(${MPI_CXX_INCLUDE_PATH})
 find_package(GTest)
 include_directories(${GTEST_INCLUDE_DIRS})
 
+option(USE_BOOST "Use boost library for number parsing" OFF)
+
 ### find Boost ###
-find_package(Boost REQUIRED COMPONENTS program_options filesystem system)
-include_directories(${Boost_INCLUDE_DIRS})
+if (USE_BOOST)
+  find_package(Boost REQUIRED COMPONENTS program_options filesystem system)
+  include_directories(${Boost_INCLUDE_DIRS})
+  add_definitions(-DUSE_BOOST)
+else(USE_BOOST)
+  find_package(Boost COMPONENTS program_options filesystem system)
+endif(USE_BOOST)
 
 ### find SCAI ###
 set ( SCAI_PATH_HINTS "${SCAI_DIR}" "${SCAI_HOME}" "$ENV{SCAI_HOME}" )
@@ -104,11 +111,13 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/config.h" DESTINATION "${HEADER_DEST}
 ### include and define targets ###
 add_subdirectory(src)
 
-add_executable(analyze src/FileIO.cpp src/Settings.cpp src/GraphUtils.cpp src/CommTree.cpp src/Metrics.cpp tools/analyzePartition.cpp)
-target_link_libraries(analyze ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+if (Boost_FOUND)
+  add_executable(analyze src/FileIO.cpp src/Settings.cpp src/GraphUtils.cpp src/CommTree.cpp src/Metrics.cpp tools/analyzePartition.cpp)
+  target_link_libraries(analyze ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 
-add_executable(heatMap src/FileIO.cpp src/Settings.cpp src/GraphUtils.cpp src/CommTree.cpp tools/graphToHeatmap.cpp)
-target_link_libraries(heatMap ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+  add_executable(heatMap src/FileIO.cpp src/Settings.cpp src/GraphUtils.cpp src/CommTree.cpp tools/graphToHeatmap.cpp)
+  target_link_libraries(heatMap ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+endif (Boost_FOUND)
 
 ### support for FindPackage ###
 configure_file(GeographerConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfig.cmake @ONLY)

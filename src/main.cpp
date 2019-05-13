@@ -29,7 +29,7 @@
 #include "Metrics.h"
 #include "SpectralPartition.h"
 #include "GraphUtils.h"
-
+#include "parseArgs.h"
 
 /**
  *  Examples of use:
@@ -62,7 +62,8 @@ int main(int argc, char** argv) {
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
 	struct Settings settings;
-	variables_map vm = settings.parseInput( argc, argv);
+    variables_map vm;
+	std::tie(vm, settings) = ITI::parseInput( argc, argv);
 	if( !settings.isValid )
 		return -1;
 

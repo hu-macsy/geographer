@@ -1146,61 +1146,6 @@ void ITI::ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRS
 		}
 	}
 }
-//-----------------------------------------------------------------------------------------
-
-template<typename IndexType, typename ValueType>
-std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local(CSRSparseMatrix<ValueType> &adjM, IndexType &colors) {
-    SCAI_REGION("ParcoRepart.coloring");
-    using namespace boost;
-    IndexType N= adjM.getNumRows();
-    assert( N== adjM.getNumColumns() ); // numRows = numColumns
-    
-    if (!adjM.getRowDistributionPtr()->isReplicated()) {
-        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-        //PRINT0("***WARNING: In getGraphEdgeColoring_local: given graph is not replicated; will replicate now");
-        const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
-    	adjM.redistribute(noDist, noDist);
-    	//throw std::runtime_error("Input matrix must be replicated.");
-    }
-
-    // use boost::Graph and boost::edge_coloring()
-    typedef adjacency_list< vecS,
-                            vecS,
-                            undirectedS,
-                            no_property,
-                            size_t,
-                            no_property> Graph;
-    //typedef std::pair<std::size_t, std::size_t> Pair;
-    Graph G(N);
-    
-    // retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge
-    std::vector< std::vector<IndexType>> retG(3);
-    
-	const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-
-    // create graph G from the input adjacency matrix
-    for(IndexType i=0; i<N; i++){
-    	//we replicated the matrix, so global indices are local indices
-    	const IndexType globalI = i;
-    	for (IndexType j = ia[i]; j < ia[i+1]; j++) {
-    		if (globalI < ja[j]) {
-				boost::add_edge(globalI, ja[j], G);
-				retG[0].push_back(globalI);
-				retG[1].push_back(ja[j]);
-    		}
-    	}
-    }
-    
-    colors = boost::edge_coloring(G, boost::get( boost::edge_bundle, G));
-    
-    for (size_t i = 0; i <retG[0].size(); i++) {
-        retG[2].push_back( G[ boost::edge( retG[0][i],  retG[1][i], G).first] );
-    }
-    
-    return retG;
-}
 
 //-----------------------------------------------------------------------------------------
 
@@ -1226,12 +1171,12 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 		}
 		//here graph is replicated. PE0 will write it in a file
 		
-		if(settings.mec){
-			//coloring = getGraphMEC_local( adjM, colors );  // using hasan's code
-            coloring = GraphUtils<IndexType, ValueType>::mecGraphColoring( adjM, colors); // our implementation
-		}else{
-			coloring = getGraphEdgeColoring_local( adjM, colors );
+		if (!settings.mec) {
+			throw std::logic_error("Coloring with Boost no longer implemented.");
 		}
+
+        coloring = GraphUtils<IndexType, ValueType>::mecGraphColoring( adjM, colors); // our implementation
+
 		std::chrono::duration<double> coloringTime = std::chrono::system_clock::now() - beforeColoring;
 		ValueType maxTime = comm->max( coloringTime.count() );
 		ValueType minTime = comm->min( coloringTime.count() );
