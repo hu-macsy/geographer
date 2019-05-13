@@ -708,8 +708,14 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
         for (IndexType j = 0; j < numberNodeWeights; j++) {
         	bool readWeight = !std::getline(ss, item, ' ').fail();
-        	if (readWeight && item.size() > 0) {
-        		nodeWeightStorage[j][i] = std::stoi(item);
+        	if (readWeight) {
+                if (item.size() == 0) {
+                    //some whitespace at beginning of line
+                    j--;
+                    continue;
+                } else {
+                    nodeWeightStorage[j][i] = std::stoi(item);
+                }
         	} else {
         		std::cout << "Could not parse " << item << std::endl;
         	}
