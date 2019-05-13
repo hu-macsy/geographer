@@ -111,11 +111,13 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/config.h" DESTINATION "${HEADER_DEST}
 ### include and define targets ###
 add_subdirectory(src)
 
-add_executable(analyze src/FileIO.cpp src/Settings.cpp src/GraphUtils.cpp src/CommTree.cpp src/Metrics.cpp tools/analyzePartition.cpp)
-target_link_libraries(analyze ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+if (Boost_FOUND)
+  add_executable(analyze src/FileIO.cpp src/Settings.cpp src/GraphUtils.cpp src/CommTree.cpp src/Metrics.cpp tools/analyzePartition.cpp)
+  target_link_libraries(analyze ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 
-add_executable(heatMap src/FileIO.cpp src/Settings.cpp src/GraphUtils.cpp src/CommTree.cpp tools/graphToHeatmap.cpp)
-target_link_libraries(heatMap ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+  add_executable(heatMap src/FileIO.cpp src/Settings.cpp src/GraphUtils.cpp src/CommTree.cpp tools/graphToHeatmap.cpp)
+  target_link_libraries(heatMap ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+endif (Boost_FOUND)
 
 ### support for FindPackage ###
 configure_file(GeographerConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfig.cmake @ONLY)
