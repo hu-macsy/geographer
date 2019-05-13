@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.8.8)
+cmake_minimum_required (VERSION 3.0.2)
 project (Geographer)
 include(CMakePackageConfigHelpers)
 
@@ -36,9 +36,16 @@ set(CMAKE_REQUIRED_FLAGS ${MPI_CXX_LINK_FLAGS})
 find_package(GTest)
 include_directories(${GTEST_INCLUDE_DIRS})
 
+option(USE_BOOST "Use boost library for number parsing" OFF)
+
 ### find Boost ###
-find_package(Boost REQUIRED COMPONENTS program_options filesystem system)
-include_directories(${Boost_INCLUDE_DIRS})
+if (USE_BOOST)
+  find_package(Boost REQUIRED COMPONENTS program_options filesystem system)
+  include_directories(${Boost_INCLUDE_DIRS})
+  add_definitions(-DUSE_BOOST)
+else(USE_BOOST)
+  find_package(Boost COMPONENTS program_options filesystem system)
+endif(USE_BOOST)
 
 ### find SCAI ###
 set ( SCAI_PATH_HINTS "${SCAI_DIR}" "${SCAI_HOME}" "$ENV{SCAI_HOME}" )

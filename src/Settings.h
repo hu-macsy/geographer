@@ -2,8 +2,7 @@
 
 #include <iostream>
 #include <scai/lama.hpp>
-#include <boost/program_options.hpp>
-#include <boost/filesystem.hpp>
+#include <assert.h>
 
 #include "config.h"
 
@@ -15,10 +14,7 @@
 
 const std::string version = BUILD_COMMIT_STRING;
 
-// typedef long int IndexType;
 using scai::IndexType;
-//using scai::ValueType;
-//typedef double ValueType;
 
 /*The size of a point/vertex in the application. This is mainly (only)
 used for the mapping using the CommTree. Every node in the tree has a 
@@ -260,8 +256,6 @@ struct Settings{
 			 print( out );
 		}
 	}
-
-	boost::program_options::variables_map parseInput(int argc, char** argv);
     
 }; //struct Settings
 

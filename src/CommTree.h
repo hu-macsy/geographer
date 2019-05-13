@@ -1,7 +1,9 @@
 #pragma once
 
-#include "Settings.h"
+
 #include <numeric>
+
+#include "Settings.h"
 
 namespace ITI {
 
