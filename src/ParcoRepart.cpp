@@ -472,6 +472,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 		if (nodeWeights.size() > 1) {
 			throw std::logic_error("MultiSection not implemented for multiple weights.");
 		}
+		if( not settings.cutsPerDim.empty() ){ // specific cuts per dimension are provided
+			IndexType k = std::accumulate( settings.cutsPerDim.begin(), settings.cutsPerDim.end(), 1 , std::multiplies<IndexType>() );
+			if( settings.numBlocks!=k ){
+				PRINT0("Input argument numBlocks= " << settings.numBlocks << " but the cutsPerDim provided will partition into "\
+						<< k << " blocks. These values should agree.\nAborting...");
+				throw std::runtime_error("Input argument values do not agree");
+			}
+		}
+
 		DenseVector<ValueType> convertedWeights(nodeWeights[0]);
 		result = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, settings);
 		std::chrono::duration<double> msTime = std::chrono::system_clock::now() - beforeInitPart;
@@ -493,9 +502,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 	SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
 	
 	// store partition if in debug mode
-	if( settings.outFile!="-" and settings.writeInFile and settigns.debugMode ){
-		FileIO<IndexType, ValueType>::writePartitionParallel( result, settings.outFile+"_initPart.partition" );
-	}
+	//comment it out since it will add a dependency to FileIO which is not really needed
+	//if( settings.outFile!="-" and settings.writeInFile and settings.debugMode ){
+	//	FileIO<IndexType, ValueType>::writePartitionParallel( result, settings.outFile+"_initPart.partition" );
+	//}
 	
 	//-----------------------------------------------------------
 	//

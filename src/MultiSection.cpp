@@ -70,10 +70,13 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
     // scale the local coordinates so the projections are not too big and relative to the input size
     // and copy to a std::vector<std::vector>
     //
-    std::vector< std::vector<IndexType> > localPoints( localN, std::vector<IndexType>(dim,0) );
+
+    //TODO: since this stores the scaled coords it can have smaller size (scale?) where each coord has 
+    //a multiplicity, i.e., how many original coords belong to the same scaled coord
+    std::vector<std::vector<IndexType>> localPoints( localN, std::vector<IndexType>(dim,0) );
    
     // scale= N^(1/d): this way the scaled max is N^(1/d) and this is also the maximum size of the projection arrays
-    ValueType scale = std::pow( globalN /*WARNING*/ -1 , 1.0/dim);
+ValueType scale = std::pow( globalN /*WARNING*/ -1 , 1.0/dim) /***TEST-REMOVE****/ *3;
     //PRINT0( scale );
     {
         SCAI_REGION( "MultiSection.getPartitionNonUniform.minMaxAndScale" )
@@ -424,7 +427,7 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
 template<typename IndexType, typename ValueType>
 std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType>::getRectanglesNonUniform( 
     const scai::lama::CSRSparseMatrix<ValueType> &input,
-    const std::vector< std::vector<IndexType> > &coordinates,
+    const std::vector< std::vector<IndexType>> &coordinates,
     const scai::lama::DenseVector<ValueType>& nodeWeights,
     const std::vector<ValueType>& minCoords,
     const std::vector<ValueType>& maxCoords,
@@ -453,7 +456,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     
     //TODO: now for every dimension we have sqrtK cuts. This can be generalized so we have different number of cuts
     //  for each multisection but even more, different cuts for every block.
-    //TODO: maybe if the algorithm dynamically decides in how many parts it will mutlisect each rectangle/block?
+    //TODO: maybe if the algorithm dynamically decides in how many parts it will multisect each rectangle/block?
     
     // number of cuts for each dimensions
     std::vector<IndexType> numCuts;
@@ -500,6 +503,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
 
     bBox.weight = totalWeight;
     
+if(comm->getRank()==0)  bBox.print( std::cout );
     // create the root of the tree that contains the whole grid
     std::shared_ptr<rectCell<IndexType,ValueType>> root( new rectCell<IndexType,ValueType>(bBox) );
     
@@ -517,21 +521,21 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
 
         std::vector<IndexType> chosenDim ( numLeaves, -1);
 
-        // a vector with pointers to all the neave nodes of the tree
+        // a vector with pointers to all the leaf nodes of the tree
         std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> allLeaves = root->getAllLeaves();        
         SCAI_ASSERT( allLeaves.size()==numLeaves, "Wrong number of leaves.");
 
-        /*Two way to find in with dimension to project:
+        /*Two ways to find in with dimension to project:
          * 1) just pick the dimension of the bounding box that has the largest extent and then project: only one projection
          * 2) project in every dimension and pick the one in which the difference between the maximum and minimum value is the smallest: d projections
-         * 3) TODO: maybe we can change (2) and calculate the variance of the projection and pick the one with the biggest
+         * TODO: maybe we can change (2) and calculate the variance of the projection and pick the one with the biggest
          * */
              
         //TODO: since this is done locally, we can also get the 1D partition in every dimension and choose the best one
         //      maybe not the fastest way but probably would give better quality
-        
+PRINT0("about to cut into " << *thisDimCuts);
         //TODO: useExtent is the only option. Add another or remove settings.useExtent
-        // choose the dimension to project for all leaves/rectangles
+        // choose the dimension to project for each leaf/rectangle
         if( settings.useExtent or true){
             SCAI_REGION("MultiSection.getRectanglesNonUniform.forAllRectangles.useExtent");
             // for all leaves/rectangles
@@ -553,7 +557,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projectionNonUniform( coordinates, nodeWeights, root, chosenDim, settings);
 
         SCAI_ASSERT( projections.size()==numLeaves, "Wrong number of projections"); 
- 
+ PRINT0("numLeaves= " << numLeaves);
         for(IndexType l=0; l<numLeaves; l++){        
             SCAI_REGION("MultiSection.getRectanglesNonUniform.forAllRectangles.createRectanglesAndPush");
             //perform 1D partitioning for the chosen dimension
@@ -570,8 +574,8 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             
             //TODO: make sure that projections[l] and allLeaves[l] refer to the same rectangle
             struct rectangle thisRectangle = allLeaves[l]->getRect();
-            //ValueType thisRectWeight = thisRectangle.weight;
-            //ValueType optWeight = thisRectWeight/(*thisDimCuts);
+            
+            ValueType optWeight = thisRectangle.weight/(*thisDimCuts);
             ValueType maxWeight = 0;
             
             // create the new rectangles and add them to the queue
@@ -591,7 +595,8 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
                     maxWeight = newRect.weight;
                 }
 				//dbg_rectW += newRect.weight;                
-                //if(comm->getRank()==0) newRect.print();
+if(comm->getRank()==0) newRect.print(std::cout);
+PRINT0("this rect imbalance= " << (newRect.weight-optWeight)/optWeight << "  (opt= " << optWeight << " , myWeight= "<< newRect.weight << ")" );
             }
             
             //last rectangle
@@ -605,17 +610,18 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
                 maxWeight = newRect.weight;
             }        
 			//dbg_rectW += newRect.weight;    
-            //if(comm->getRank()==0) newRect.print();            
-            //PRINT0("this rect imbalance= " << (maxWeight-optWeight)/optWeight << "  (opt= " << optWeight << " , max= "<< maxWeight << ")" );
+if(comm->getRank()==0) newRect.print(std::cout);
+PRINT0("this rect imbalance= " << (newRect.weight-optWeight)/optWeight << "  (opt= " << optWeight << " , myWeight= "<< newRect.weight << ")" );
 
 			//TODO: only for debuging, remove variable dbg_rectW
 			//SCAI_ASSERT_LE_ERROR( dbg_rectW-thisRectangle.weight, 0.0000001, "Rectangle weights not correct: dbg_rectW-this.weight= " << dbg_rectW - thisRectangle.weight);
 
         }
         numLeaves = root->getNumLeaves();
+PRINT0("numLeaves= " << numLeaves);        
     }
     
-    std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> ret = root->getAllLeaves();
+    const std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> &ret = root->getAllLeaves();
     SCAI_ASSERT( ret.size()==numLeaves , "Number of leaf nodes not correct, ret.size()= "<< ret.size() << " but numLeaves= "<< numLeaves );
 
     return root;
@@ -693,6 +699,7 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
             
             IndexType thisLeafID = thisRectCell->getLeafID();
             
+            //print some info if somethibg went wrong
             if( thisLeafID==-1 and comm->getRank()==0 ){
                 PRINT0( "Owner rectangle for point is ");
                 thisRectCell->getRect().print(std::cout);
@@ -707,7 +714,7 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
 
             SCAI_ASSERT( relativeIndex<=projections[ thisLeafID ].capacity(), "Wrong relative index: "<< relativeIndex << " should be <= "<< projections[ thisLeafID ].capacity() << " (and thisRect.bottom= "<< thisRectCell->getRect().bottom[dim2proj]  << " , thisRect.top= "<< thisRectCell->getRect().top[dim2proj] << ")" );
 
-            projections[ thisLeafID ][relativeIndex] += localWeights[i];
+            projections[thisLeafID][relativeIndex] += localWeights[i];
         }
     }
     //

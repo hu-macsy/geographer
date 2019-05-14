@@ -1324,7 +1324,7 @@ DenseVector<IndexType> computePartition( \
 		scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
 		//TODO: too much info? remove?
-		if(settings.verbose and settings/debugMode){
+		if(settings.verbose and settings.debugMode){
 			comm->sumImpl( timePerPE.data(), timePerPE.data(), comm->getSize(), scai::common::TypeTraits<ValueType>::stype);
 			if(comm->getRank()==0 ){
 				vector<IndexType> indices( timePerPE.size() );
