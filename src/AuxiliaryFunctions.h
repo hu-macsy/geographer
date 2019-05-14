@@ -178,6 +178,21 @@ static void printVector( std::vector<T> v){
 }
 
 //------------------------------------------------------------------------------
+//taken from: https://stackoverflow.com/questions/236129/how-do-i-iterate-over-the-words-of-a-string
+template<typename Out>
+static void split(const std::string &s, char delim, Out result) {
+    std::stringstream ss(s);
+    std::string item;
+    while (std::getline(ss, item, delim)) {
+        *(result++) = item;
+    }
+}
+
+static std::vector<std::string> split(const std::string &s, char delim) {
+    std::vector<std::string> elems;
+    split(s, delim, std::back_inserter(elems));
+    return elems;
+}
 
 /*  From pixel (int) coords, either in 2S or 3D, to a 1D index. 
  * Only for cubes, where every side has the same length, maxLen;

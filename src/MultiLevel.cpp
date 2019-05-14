@@ -169,7 +169,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
 			std::chrono::time_point<std::chrono::system_clock> beforeFMStep =  std::chrono::system_clock::now();
 
-			/* TODO: if getting the graph is fast, maybe doing it in every steo might help
+			/* TODO: if getting the graph is fast, maybe doing it in every step might help
 			// get graph before every step			
 			processGraph = GraphUtils::getPEGraph<IndexType, ValueType>(input);			
 			communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(processGraph, settings);
@@ -204,18 +204,6 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 			ValueType FMStepTime = comm->max( elapTimeFMStep.count() );
 			//PRINT0(" one FM step time: " << FMStepTime );
 
-			//int thisRound= settings.multiLevelRounds + settings.coarseningStepsBetweenRefinement;
-			//WARNING: this may case problems... Check also Metrics constructor
-			// Hopefully, numRefinementRound will ALWAYS be less than 50
-			SCAI_ASSERT_LT_ERROR( settings.thisRound, metrics.localRefDetails.size(), "Metrics structure not allocated?" );
-			if(numRefinementRounds>=50){
-				PRINT0("*** WARNING: numRefinementRound more than 50");
-				metrics.localRefDetails[settings.thisRound].push_back( std::make_pair(gain, FMStepTime) );
-			}else{
-				SCAI_ASSERT_LT_ERROR( numRefinementRounds, metrics.localRefDetails[settings.thisRound].size(), "Metrics structure not allocated?" );
-				metrics.localRefDetails[settings.thisRound][numRefinementRounds] = std::make_pair(gain, FMStepTime) ;
-			}
-
 			if (numRefinementRounds > 0) {
 				assert(gain >= 0);
 			}
@@ -223,6 +211,21 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 				std::cout << "Multilevel round "<< settings.multiLevelRounds <<": In refinement round " << numRefinementRounds << ", gain was " << gain << " in time " << FMStepTime << std::endl;
 			}
 			numRefinementRounds++;
+
+			//int thisRound= settings.multiLevelRounds + settings.coarseningStepsBetweenRefinement;
+			//WARNING: this may case problems... Check also Metrics constructor
+			//Hopefully, numRefinementRound will ALWAYS be less than 50
+			//update: well... In some case it stucks in a period, like: 
+			//gain 10, gain 30, gain 25, gain 10, gain 30, gain 25, gain 10, ...
+			SCAI_ASSERT_LT_ERROR( settings.thisRound, metrics.localRefDetails.size(), "Metrics structure not allocated?" );
+			if(numRefinementRounds>=50){
+				metrics.localRefDetails[settings.thisRound].push_back( std::make_pair(gain, FMStepTime) );
+				PRINT0("*** WARNING: numRefinementRound more than 50.\nWill force break from while loop");
+				break;
+			}else{
+				SCAI_ASSERT_LE_ERROR( numRefinementRounds, metrics.localRefDetails[settings.thisRound].size(), "Metrics structure not allocated?" );
+				metrics.localRefDetails[settings.thisRound][numRefinementRounds] = std::make_pair(gain, FMStepTime) ;
+			}
 
 		}
 		std::chrono::duration<double> elapTime2 = std::chrono::system_clock::now() - before;
@@ -861,9 +864,9 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
         scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
         scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
     
-	const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-	scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+		const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
+		scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+		scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
         
         IndexType scaledX, scaledY;
         //the +1 is needed
@@ -935,8 +938,8 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
         scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[2].getLocalValues() );
         
         const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-	scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-	scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+		scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+		scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
         
         IndexType scaledX, scaledY, scaledZ;
         

@@ -36,7 +36,7 @@ namespace ITI {
 					("blockSizesFile", value<std::string>(&settings.blockSizesFile) , " file to read the block sizes for every block")
 					("seed", value<double>()->default_value(time(NULL)), "random seed, default is current time")
 					//multi-level and local refinement
-					("initialPartition", value<InitialPartitioningMethods>(&settings.initialPartition), "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means' or 3) and multisection ('MultiSection' or 4). SFC, Spectral and K-Means are most stable.")
+					("initialPartition", value<Tool>(&settings.initialPartition), "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means' or 3) and multisection ('MultiSection' or 4). SFC, Spectral and K-Means are most stable.")
 					("noRefinement", "skip local refinement steps")
 					("multiLevelRounds", value<IndexType>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
 					("minBorderNodes", value<IndexType>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
@@ -59,7 +59,10 @@ namespace ITI {
 					("maxKMeansIterations", value<IndexType>(&settings.maxKMeansIterations)->default_value(settings.maxKMeansIterations), "Tuning parameter for K-Means")
 					("tightenBounds", "Tuning parameter for K-Means")
 					("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
-					("initialMigration", value<InitialPartitioningMethods>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration, 0: SFCs, 3:k-means, 4:Multisection")
+					("initialMigration", value<ITI::Tool>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration: geoSFC, geoKMeans, geoMultiSection")
+					("hierLevels", value<std::vector<IndexType>>(&settings.hierLevels)->multitoken(), "The number of PEs per level. Total number of PEs (=number of leaves) is \
+					the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3 4 10, there are 3 levels. \
+					In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs")
 					//("manhattanDistance", "Tuning parameter for K-Means")
 					//output
 					("outFile", value<std::string>(&settings.outFile), "write result partition into file")
@@ -133,15 +136,19 @@ namespace ITI {
 	        
 		if( vm.count("initialMigration") ){
 
-			if( !(settings.initialMigration==InitialPartitioningMethods::SFC
-					or settings.initialMigration==InitialPartitioningMethods::KMeans
-					or settings.initialMigration==InitialPartitioningMethods::Multisection
-					or settings.initialMigration==InitialPartitioningMethods::None) ){
-				PRINT0("Initial migration supported only for 0:SFCs, 3:k-means, 4:MultiSection or 5:None, invalid option " << settings.initialMigration << " was given");
+			if( !(settings.initialMigration==Tool::geoSFC) ){
+				PRINT0("Initial migration supported only for SFCs invalid option " << settings.initialMigration << " was given");
 				settings.isValid = false;
 				//return 126;
 			}
 		}
+
+		/**
+		case Tool::geoKmeans: token = "geoKmeans"; break;
+		case Tool::geoSFC: token = "geoSFC"; break;
+		case Tool::geoHierKM: token = "geoHierKM"; break;
+		case Tool::geoHierRepart: token = "geoHierRepart"; break;
+		*/
 
 		if (vm.count("fileFormat") && settings.fileFormat == ITI::Format::TEEC) {
 			if (!vm.count("numX")) {
@@ -160,14 +167,14 @@ namespace ITI {
 		if (vm.count("previousPartition")) {
 			settings.repartition = true;
 			if (vm.count("initialPartition")) {
-				if (!(settings.initialPartition == InitialPartitioningMethods::KMeans || settings.initialPartition == InitialPartitioningMethods::None)) {
+				if (!(settings.initialPartition == Tool::geoKmeans || settings.initialPartition == Tool::none)) {
 					std::cout << "Method " << settings.initialPartition << " not supported for repartitioning, currently only kMeans." << std::endl;
 					settings.isValid = false;
 					//return 126;
 				}
 			} else {
 				PRINT0("Setting initial partitioning method to kMeans.");
-				settings.initialPartition = InitialPartitioningMethods::KMeans;
+				settings.initialPartition = Tool::geoKmeans;
 			}
 		}
 		
