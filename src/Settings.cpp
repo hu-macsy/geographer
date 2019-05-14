@@ -1,42 +1,79 @@
 #include "Settings.h"
 
-std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method){
+
+std::ostream& ITI::operator<<( std::ostream& out, const ITI::Tool tool){
+	std::string token;
+	using ITI::Tool;
+
+	switch( tool ){
+		case Tool::geographer: token = "geographer"; break;
+		case Tool::geoKmeans: token = "geoKmeans"; break;
+		case Tool::geoSFC: token = "geoSFC"; break;
+		case Tool::geoHierKM: token = "geoHierKM"; break;
+		case Tool::geoHierRepart: token = "geoHierRepart"; break;
+		case Tool::geoMS: token = "geoMS"; break;
+		case Tool::parMetisGraph: token = "parMetisGraph"; break;
+		case Tool::parMetisGeom: token = "parMetisGeom"; break;
+		case Tool::parMetisSFC: token = "parMetisSFC"; break;
+		case Tool::zoltanRIB: token = "zoltanRIB"; break;
+		case Tool::zoltanRCB: token = "zoltanRCB"; break;
+		case Tool::zoltanMJ: token = "zoltanMJ"; break;
+		case Tool::zoltanSFC: token = "zoltanSFC"; break;
+		case Tool::none: token = "none"; break;
+	}
+
+	out << token;
+	return out;
+}
+
+
+std::string ITI::toString(const ITI::Tool& t){
+	std::ostringstream out;
+	out<< t;
+	return out.str();
+}
+
+std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool){
     std::string token;
     in >> token;
-    if (token == "SFC" or token == "0")
-        method = InitialPartitioningMethods::SFC;
-    else if (token == "Pixel" or token == "1")
-        method = InitialPartitioningMethods::Pixel;
-    else if (token == "Spectral" or token == "2")
-    	method = InitialPartitioningMethods::Spectral;
-    else if (token == "KMeans" or token == "Kmeans" or token == "K-Means" or token == "K-means" or token == "3")
-        method = InitialPartitioningMethods::KMeans;
-    else if (token == "Multisection" or token == "MultiSection" or token == "4")
-    	method = InitialPartitioningMethods::Multisection;
-    else if (token == "None" or token == "5")
-        	method = InitialPartitioningMethods::None;
-    else
-        in.setstate(std::ios_base::failbit);
+
+    if( token=="Geographer" or token=="geographer" )
+    	tool = ITI::Tool::geographer;
+    else if( token=="geoSFC" or token=="geoSfc" or token=="SFC")
+    	tool = ITI::Tool::geoSFC;
+    else if( token=="geoKmeans" or token=="geoKMeans" or token=="Kmeans")
+		tool = ITI::Tool::geoKmeans; 
+	else if( token=="geoHierKM" or token=="geoHierKmeans" or token=="geoHierKMeans")
+		tool = ITI::Tool::geoHierKM;
+	else if( token=="geoHierRepart" or token=="geohierrepart" or token=="geoHieRepart")
+		tool = ITI::Tool::geoHierRepart;
+	else if( token=="geoMS" or token=="geoMultiSection" or token=="geoMultisection")
+		tool = ITI::Tool::geoMS;
+	else if( token=="parMetisGraph" or token=="parMetisgraph" or token=="parmetisGraph")
+		tool = ITI::Tool::parMetisGraph;
+	else if( token=="parMetisGeom" or token=="parMetisgeom" or token=="parmetisGeom")
+		tool = ITI::Tool::parMetisGeom;
+	else if( token=="parMetisSFC" or token=="parMetisSfc" or token=="parmetisSFC")
+		tool = ITI::Tool::parMetisSFC;
+	else if( token=="zoltanRIB" or token=="zoltanRib" or token=="zoltanrib")
+		tool = ITI::Tool::zoltanRIB;
+	else if( token=="zoltanRCB" or token=="zoltanRcb" or token=="zoltanrcb")
+		tool = ITI::Tool::zoltanRCB;
+	else if( token=="zoltanMJ" or token=="zoltanMj" or token=="zoltanmj")
+		tool = ITI::Tool::zoltanMJ;
+	else if( token=="zoltanSFC" or token=="zoltanSfc" or token=="zoltansfc")
+		tool = ITI::Tool::zoltanRIB;
+	else if( token=="None" or token=="none")
+		tool = ITI::Tool::none;
+
     return in;
 }
 
-std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method)
-{
-    std::string token;
-
-    if (method == InitialPartitioningMethods::SFC)
-        token = "SFC";
-    else if (method == InitialPartitioningMethods::Pixel)
-    	token = "Pixel";
-    else if (method == InitialPartitioningMethods::Spectral)
-    	token = "Spectral";
-    else if (method == InitialPartitioningMethods::KMeans)
-        token = "KMeans";
-    else if (method == InitialPartitioningMethods::Multisection)
-    	token = "Multisection";
-    else if (method == InitialPartitioningMethods::None)
-        token = "None";
-    out << token;
-    return out;
+ITI::Tool ITI::toTool(const std::string& s){
+	std::stringstream ss;
+	ss << s;
+	ITI::Tool t;
+	ss >> t;
+	return t;
 }
-
+//-------------------------------------------------------------------------    

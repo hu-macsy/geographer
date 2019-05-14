@@ -86,7 +86,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 	std::chrono::duration<double> beforeLoop = std::chrono::system_clock::now() - startTime;
 	ValueType t1 = comm->max(beforeLoop.count());
 	if(settings.verbose){
-		PRINT0("time elapsed before main loop: " << t1 );
+		//PRINT0("time elapsed before main loop: " << t1 );
 		PRINT0("number of rounds/loops: " << communicationScheme.size() );
 	}
 	
@@ -180,6 +180,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
 			if (interfaceNodes.size() == 0) {
 				if (otherSize != 0) {
+					std::cout<<"this PE: " << comm->getRank() << ", partner: " << partner << std::endl;
 					throw std::runtime_error("Partner PE has a border region, but this PE doesn't. Looks like the block indices were allocated inconsistently.");
 				} else {
 					/*

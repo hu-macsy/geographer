@@ -216,8 +216,21 @@ CommTree();
 		For example, node weights can be {64, 0.01} and isWeightProp={ false, true}. An interpretation could be that this node has
 		64GB of memory and 1% of the total FLOPS of the system.
 */
-CommTree( const std::vector<commNode> &leaves,
- std::vector<bool> isWeightProp );
+CommTree( const std::vector<commNode> &leaves, const std::vector<bool> isWeightProp );
+
+/** This crates a homogeneous but not flat tree. The tree has levels.size() number of levels
+	and number of leaves=levels[0]*levels[1]*...*levels.back(). Each leaf node has the given
+	number of weights set to 1 and all weights are proportional.
+	Example: leaves = {3,4,5,6}, the first level has 3 children, each node in the next level 
+	has 4 children, each node in the next 5 and the nodes before the leaves has 6 children each.
+	In total, 4 levels and 3*4*5*6 = 360 leaves.
+
+	@param[in] levels The number of children that each node has in each level. If levels[i]=x, then
+	each node of the i-th level has x children.
+	@param[in] numWeights The number of weights that each node has. Node weights are set to 1 and
+	set to proportional.
+*/
+CommTree( const std::vector<IndexType> &levels, const IndexType numWeights );
 
 /* @brief Return the root, i.e., hierarchy level 0.
 */
@@ -229,7 +242,7 @@ commNode getRoot() const{
 /* @brief Return the requested hierarchy level
 */
 std::vector<commNode> getHierLevel( int level) const {
-	SCAI_ASSERT_LE_ERROR( level, hierarchyLevels, "Tree has less levels than requested" );
+	SCAI_ASSERT_LE_ERROR( level, hierarchyLevels, "Tree has fewer levels than requested" );
 	return tree[level];
 }
 
@@ -263,12 +276,13 @@ IndexType createFlatHomogeneous( const IndexType numLeaves, const IndexType numN
 
 /** @brief Given the desired sizes of the blocks, we construct a flat 
 tree with one level where every leaf node has different weight.
-This mainly used when  only block sizes are provided for partitioning.
+This mainly used when only block sizes are provided for partitioning.
 **/
 IndexType createFlatHeterogeneous( const std::vector<std::vector<ValueType>> &leafSizes );
 
 /** Creates a vector of leaves with only one hierarchy level, i.e., a flat
-tree. There can be multilpe weights for each leaf.
+tree. There can be multiple weights for each leaf. sizes.size() is the number of different
+weights and sizes[i].size() is the number of leaves.
 **/
 std::vector<commNode> createLeaves( const std::vector<std::vector<ValueType>> &sizes);
 
@@ -351,7 +365,7 @@ is the optimum weight each PE should have. Mainly used to comoute imbalance.
 	If level==-1 it will retunr the the constraints of the leaves.
 */
 
-std::vector<std::vector<ValueType>> getBalanceVectors( const IndexType level) const;
+std::vector<std::vector<ValueType>> getBalanceVectors( const IndexType level=-1) const;
 
 /*@brief Print information for the tree
 */

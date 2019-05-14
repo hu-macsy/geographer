@@ -87,17 +87,20 @@ inline std::ostream& operator<<(std::ostream& out, Format method){
 
 //-----------------------------------------------------------------------------------
 
-enum class Tool{ geographer, geoKmeans, geoSFC, parMetisGraph, parMetisGeom, parMetisSFC, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC};
+enum class Tool{ geographer, geoKmeans, geoSFC, geoHierKM, geoHierRepart, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, none};
+
+
+std::istream& operator>>(std::istream& in, ITI::Tool& tool);
+
+std::ostream& operator<<(std::ostream& out, const ITI::Tool tool);
+
+std::string toString(const ITI::Tool& t);
+
+ITI::Tool toTool(const std::string& s);
 
 }// ITI
 
 
-enum class InitialPartitioningMethods {SFC = 0, Pixel = 1, Spectral = 2, KMeans = 3, Multisection = 4, MJ = 5, None = 6};
-
-//-----------------------------------------------------------------------------------
-std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method);
-
-std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method);
 
 struct Settings{
     //partition settings
@@ -125,9 +128,9 @@ struct Settings{
     IndexType numZ = 32;
     
     //general tuning parameters
-    InitialPartitioningMethods initialPartition = InitialPartitioningMethods::KMeans;
-    InitialPartitioningMethods initialMigration = InitialPartitioningMethods::SFC;//TODO: rename
-    
+    ITI::Tool initialPartition = ITI::Tool::geoKmeans;
+    ITI::Tool initialMigration = ITI::Tool::geoSFC;//TODO: rename
+
     //tuning parameters for local refinement
     IndexType minBorderNodes = 1;
     IndexType stopAfterNoGainRounds = 0;
@@ -154,6 +157,7 @@ struct Settings{
     bool freezeBalancedInfluence = false;
     bool erodeInfluence = false;
     bool manhattanDistance = false;
+    std::vector<IndexType> hierLevels; //for hierarchial kMeans
 
     //parameters for multisection
     bool bisect = false;    // 0: works for square k, 1: bisect, for k=power of 2
@@ -225,21 +229,24 @@ struct Settings{
 			out<< "\tskipNoGainColors" << std::endl;
 		}
 		
-		out<< "initial migration: " << static_cast<int>(initialMigration) << std::endl;
+//out<< "initial migration: " << static_cast<int>(initialMigration) << std::endl;
+		out<< "initial migration: " << initialMigration << std::endl;
 		
-		if (initialPartition==InitialPartitioningMethods::SFC) {
+		if (initialPartition==ITI::Tool::geoSFC) {
 			out<< "initial partition: hilbert curve" << std::endl;
 			out<< "\tsfcResolution: " << sfcResolution << std::endl;
-		} else if (initialPartition==InitialPartitioningMethods::Pixel) {
+		}
+		/* else if (initialPartition==ITI::Tool::Pixel) {
 			out<< "initial partition: pixels" << std::endl;
 			out<< "\tpixeledSideLen: "<< pixeledSideLen << std::endl;
 		} else if (initialPartition==InitialPartitioningMethods::Spectral) {
 			out<< "initial partition: spectral" << std::endl;
-		} else if (initialPartition==InitialPartitioningMethods::KMeans) {
+		}*/ 
+		else if (initialPartition==ITI::Tool::geoKmeans) {
 			out<< "initial partition: K-Means" << std::endl;
 			out<< "\tminSamplingNodes: " << minSamplingNodes << std::endl;
 			out<< "\tinfluenceExponent: " << influenceExponent << std::endl;
-		} else if (initialPartition==InitialPartitioningMethods::Multisection) {
+		} else if (initialPartition==ITI::Tool::geoMS) {
 			out<< "initial partition: MultiSection" << std::endl;
 			out<< "\tbisect: " << bisect << std::endl;
 			out<< "\tuseExtent: "<< useExtent << std::endl;

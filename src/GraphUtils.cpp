@@ -387,7 +387,7 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
 	ValueType minWeight, maxWeight;
 	if (weighted) {
 		assert(weightsSize == globalN);
-		assert(nodeWeights.getDistributionPtr()->getLocalSize() == localN);
+		SCAI_ASSERT_EQ_ERROR(nodeWeights.getDistributionPtr()->getLocalSize(), localN, "in PE " << comm->getRank() );
 		minWeight = nodeWeights.min();
 		maxWeight = nodeWeights.max();
 	} else {
