@@ -60,7 +60,7 @@ namespace ITI {
 					("tightenBounds", "Tuning parameter for K-Means")
 					("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
 					("initialMigration", value<ITI::Tool>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration: geoSFC, geoKMeans, geoMultiSection")
-					("hierLevels", value<std::vector<IndexType>>(&settings.hierLevels)->multitoken(), "The number of PEs per level. Total number of PEs (=number of leaves) is \
+					("hierLevels", value<std::vector<IndexType>>(&settings.hierLevels)->multitoken(), "The number of blocks per level. Total number of PEs (=number of leaves) is \
 					the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3 4 10, there are 3 levels. \
 					In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs")
 					//("manhattanDistance", "Tuning parameter for K-Means")
