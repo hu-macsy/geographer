@@ -595,7 +595,7 @@ PRINT0("about to cut into " << *thisDimCuts);
                     maxWeight = newRect.weight;
                 }
 				//dbg_rectW += newRect.weight;                
-if(comm->getRank()==0) newRect.print(std::cout);
+//if(comm->getRank()==0) newRect.print(std::cout);
 PRINT0("this rect imbalance= " << (newRect.weight-optWeight)/optWeight << "  (opt= " << optWeight << " , myWeight= "<< newRect.weight << ")" );
             }
             
@@ -610,7 +610,7 @@ PRINT0("this rect imbalance= " << (newRect.weight-optWeight)/optWeight << "  (op
                 maxWeight = newRect.weight;
             }        
 			//dbg_rectW += newRect.weight;    
-if(comm->getRank()==0) newRect.print(std::cout);
+//if(comm->getRank()==0) newRect.print(std::cout);
 PRINT0("this rect imbalance= " << (newRect.weight-optWeight)/optWeight << "  (opt= " << optWeight << " , myWeight= "<< newRect.weight << ")" );
 
 			//TODO: only for debuging, remove variable dbg_rectW
