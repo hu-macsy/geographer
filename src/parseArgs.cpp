@@ -143,13 +143,6 @@ namespace ITI {
 			}
 		}
 
-		/**
-		case Tool::geoKmeans: token = "geoKmeans"; break;
-		case Tool::geoSFC: token = "geoSFC"; break;
-		case Tool::geoHierKM: token = "geoHierKM"; break;
-		case Tool::geoHierRepart: token = "geoHierRepart"; break;
-		*/
-
 		if (vm.count("fileFormat") && settings.fileFormat == ITI::Format::TEEC) {
 			if (!vm.count("numX")) {
 				std::cout << "TEEC file format does not specify graph size, please set with --numX" << std::endl;
