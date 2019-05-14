@@ -904,7 +904,6 @@ DenseVector<IndexType> assignBlocks(
 				const auto pair = std::minmax_element(blockWeights[i].begin(), blockWeights[i].end());
 				weightSpread[i] = *pair.second / *pair.first;
 			}
-
 			
 			std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
 			totalBalanceTime += balanceTime.count() ;
@@ -1598,10 +1597,6 @@ DenseVector<IndexType> computeHierarchicalPartition(
 	// ParcoRepart::partitionGraph
 	
 	const IndexType numNodeWeights = nodeWeights.size();
-/*	if (numNodeWeights > 1) {
-		throw std::logic_error("Hierarchical k-means not yet implemented for multiple node weights.");
-	}
-*/	
 
 	const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
 	const IndexType localN = dist->getLocalSize();

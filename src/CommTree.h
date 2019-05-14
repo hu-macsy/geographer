@@ -229,7 +229,7 @@ commNode getRoot() const{
 /* @brief Return the requested hierarchy level
 */
 std::vector<commNode> getHierLevel( int level) const {
-	SCAI_ASSERT_LE_ERROR( level, hierarchyLevels, "Tree has less levels than requested" );
+	SCAI_ASSERT_LE_ERROR( level, hierarchyLevels, "Tree has fewer levels than requested" );
 	return tree[level];
 }
 
@@ -263,12 +263,12 @@ IndexType createFlatHomogeneous( const IndexType numLeaves, const IndexType numN
 
 /** @brief Given the desired sizes of the blocks, we construct a flat 
 tree with one level where every leaf node has different weight.
-This mainly used when  only block sizes are provided for partitioning.
+This mainly used when only block sizes are provided for partitioning.
 **/
 IndexType createFlatHeterogeneous( const std::vector<std::vector<ValueType>> &leafSizes );
 
 /** Creates a vector of leaves with only one hierarchy level, i.e., a flat
-tree. There can be multilpe weights for each leaf.
+tree. There can be multiple weights for each leaf.
 **/
 std::vector<commNode> createLeaves( const std::vector<std::vector<ValueType>> &sizes);
 
