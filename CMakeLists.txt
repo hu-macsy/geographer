@@ -11,7 +11,7 @@ if (NOT DEFINED SCAI_DIR)
 	message( FATAL_ERROR "Install Directory of LAMA not defined, specify with -DSCAI_DIR" )
 endif (NOT DEFINED SCAI_DIR)
 
-#set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_VERBOSE_MAKEFILE ON)
 
 
 
@@ -137,11 +137,12 @@ find_library( PARMETIS_LIB parmetis "/lrz/sys/libraries/parmetis/4.0.3/ibmmpi/i8
 
 if( Zoltan2_FOUND )
 	message( "\n\tFound package Zoltan2\n")
-
+	
 	link_directories( ${Zoltan2_LIBRARY_DIRS} ) # not sure if needed, "/home/hpc/pr87si/di36qin/Code/Trilinos/install/lib/"
 	# maybe ${Zoltan2_TPL_LIBRARY_DIRS} is needed but, at least in my installation, it is empty
 
-	add_executable( allCompetitors Wrappers.cpp ${FILES_COMMON} allCompetitorsPart.cpp )
+	#add_executable( allCompetitors src/Wrappers.cpp src/allCompetitorsPart.cpp src/GraphUtils.cpp src/FileIO.cpp src/Settings.cpp src/Metrics.cpp)
+	add_executable( allCompetitors src/Wrappers.cpp src/allCompetitorsPart.cpp ${FILES_COMMON} )
 	target_include_directories( allCompetitors PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} )
 	
 	### include parmetis and metis ###

@@ -19,6 +19,9 @@ endif (USE_NETWORKIT)
 if (GTEST_FOUND)
 	add_executable(GeographerTest ${FILES_TEST})
 	target_link_libraries(GeographerTest geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
+	#install(TARGETS GeographerTest DESTINATION "${BIN_DEST}") # test executable
+else()
+	message("Google test not found")
 endif (GTEST_FOUND)
 
 install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable
