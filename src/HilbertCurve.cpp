@@ -236,7 +236,10 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
 			maxCoords[dim] = coordinates[dim].max();
 			assert(std::isfinite(minCoords[dim]));
 			assert(std::isfinite(maxCoords[dim]));
-			SCAI_ASSERT_GT_ERROR(maxCoords[dim], minCoords[dim], "Wrong coordinates.");
+			SCAI_ASSERT_GE_ERROR(maxCoords[dim], minCoords[dim], "Wrong coordinates for dimension " << dim);
+			if( maxCoords[dim]==minCoords[dim] ){
+				std::cout << "WARNING: min and max coords are equal: all points are collinear" << std::endl;
+			}
 		}
     }
     
