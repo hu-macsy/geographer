@@ -36,7 +36,7 @@ if (GTEST_FOUND AND Boost_FOUND)
 	add_executable(GeographerTest ${FILES_TEST})
 	target_include_directories(Geographer PUBLIC ${Boost_INCLUDE_DIRS})
 	target_link_libraries(GeographerTest geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
-	install(TARGETS GeographerTest DESTINATION "${BIN_DEST}") # test executable
+	#install(TARGETS GeographerTest DESTINATION "${BIN_DEST}") # test executable
 endif (GTEST_FOUND AND Boost_FOUND)
 
 install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable
