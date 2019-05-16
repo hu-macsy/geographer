@@ -12,11 +12,6 @@
 
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 
-#include <boost/config.hpp>
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/edge_coloring.hpp>
-#include <boost/graph/properties.hpp>
-
 #include "Settings.h"
 #include "Metrics.h"
 #include "CommTree.h"
@@ -149,15 +144,6 @@ namespace ITI {
 		 * @param[in] input Adjacency matrix
 		 */
 		static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
-
-		/** Colors the edges of the graph using max_vertex_degree + 1 colors.
-		 * TODO: This method redistributes the graph. Maybe it should not.
-		 *
-		 * @param[in] adjM The graph with N vertices given as an NxN adjacency matrix.
-		 *
-		 * @return A 3xN vector with the edges and the color of each edge: retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge.
-		 */
-		static std::vector< std::vector<IndexType>>  getGraphEdgeColoring_local( CSRSparseMatrix<ValueType> &adjM, IndexType& colors);
 
 		/** Given the block graph, creates an edge coloring of the graph and returns a communication
 		 *  scheme based on the coloring

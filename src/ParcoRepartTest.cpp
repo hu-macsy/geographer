@@ -822,7 +822,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
  *  |   |   |   |
  *  0 - 1 - 14- 15
 */
-TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
+TEST_F (ParcoRepartTest, testGetLocalWeightedGraphColoring_2D) {
     std::string file = graphPath+ "Grid8x8";
     std::ifstream f(file);
     IndexType dimensions= 2, k=16;
@@ -869,7 +869,7 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils<IndexType, ValueType>::getBlockGraph( graph, partition, k);
     
     IndexType colors;
-    std::vector< std::vector<IndexType>>  coloring = ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local(blockGraph, colors);
+    std::vector< std::vector<IndexType>>  coloring = GraphUtils<IndexType, ValueType>::mecGraphColoring( blockGraph, colors); // our implementation
     
     std::vector<DenseVector<IndexType>> communication = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph, settings);
     

@@ -513,6 +513,15 @@ DenseVector<IndexType> assignBlocks(
 	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 	const IndexType localN = dist->getLocalSize();
 	const IndexType currentLocalN = std::distance(firstIndex, lastIndex);
+	
+	if (currentLocalN < 0) {
+		throw std::runtime_error("currentLocalN: " + std::to_string(currentLocalN));
+	}
+
+	if (currentLocalN == 0) {
+		PRINT("Process " + std::to_string(comm->getRank()) + " has no local points!");
+		return previousAssignment;
+	}
 
 	//if repartition, numOldBlocks=1
 	//number of blocks from the previous hierarchy
@@ -885,6 +894,12 @@ DenseVector<IndexType> assignBlocks(
 				const auto pair = std::minmax_element(influence[i].begin(), influence[i].end());
 				influenceSpread[i] = *pair.second / *pair.first;
 			}
+
+			std::vector<ValueType> weightSpread(numNodeWeights);
+			for (IndexType i = 0; i < numNodeWeights; i++) {
+				const auto pair = std::minmax_element(blockWeights[i].begin(), blockWeights[i].end());
+				weightSpread[i] = *pair.second / *pair.first;
+			}
 			
 			std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
 			totalBalanceTime += balanceTime.count() ;
@@ -895,6 +910,10 @@ DenseVector<IndexType> assignBlocks(
 					<< averageComps << ", balanced blocks: " << 100*ValueType(balancedBlocks) / numNewBlocks << "%, influence spread: ";
 				for (IndexType i = 0; i < numNodeWeights; i++) {
 					 std::cout << influenceSpread[i] << " ";
+				}
+				std::cout << ", weight spread : ";
+				for (IndexType i = 0; i < numNodeWeights; i++) {
+					 std::cout << weightSpread[i] << " ";
 				}
 				std::cout << ", imbalance : ";
 				for (IndexType i = 0; i < numNodeWeights; i++) {
