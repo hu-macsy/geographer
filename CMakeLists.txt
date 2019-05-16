@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.8.8)
+cmake_minimum_required (VERSION 3.0.2)
 project (Geographer)
 include(CMakePackageConfigHelpers)
 
@@ -7,13 +7,7 @@ set(Geographer_VERSION_MAJOR 0 STRING "major version")
 set(Geographer_VERSION_MINOR 9 STRING "minor version")
 set(Geographer_VERSION ${Geographer_VERSION_MAJOR}.${Geographer_VERSION_MINOR} STRING "version")
 
-if (NOT DEFINED SCAI_DIR)
-	message( FATAL_ERROR "Install Directory of LAMA not defined, specify with -DSCAI_DIR" )
-endif (NOT DEFINED SCAI_DIR)
-
 #set(CMAKE_VERBOSE_MAKEFILE ON)
-
-
 
 option(USE_NETWORKIT "Use NETWORKIT package." OFF)
 if(USE_NETWORKIT)
@@ -40,9 +34,16 @@ include_directories(${MPI_CXX_INCLUDE_PATH})
 find_package(GTest)
 include_directories(${GTEST_INCLUDE_DIRS})
 
+option(USE_BOOST "Use boost library for number parsing" OFF)
+
 ### find Boost ###
-find_package(Boost REQUIRED COMPONENTS program_options filesystem system)
-include_directories(${Boost_INCLUDE_DIRS})
+if (USE_BOOST)
+  find_package(Boost REQUIRED COMPONENTS program_options filesystem system)
+  include_directories(${Boost_INCLUDE_DIRS})
+  add_definitions(-DUSE_BOOST)
+else(USE_BOOST)
+  find_package(Boost COMPONENTS program_options filesystem system)
+endif(USE_BOOST)
 
 ### find SCAI ###
 set ( SCAI_PATH_HINTS "${SCAI_DIR}" "${SCAI_HOME}" "$ENV{SCAI_HOME}" )
@@ -85,17 +86,14 @@ endif (USE_NETWORKIT)
 
 ### get git commit ###
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
+add_definitions("-DBUILD_COMMIT=${GIT_COMMIT}")
 
-set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11 -O3 -fPIC -Wall -Wno-sign-compare -Wno-unused-variable -DBUILD_COMMIT=${GIT_COMMIT}" )
-
-### set value type ###
-set(Geographer_VALUE_TYPE "double" CACHE STRING "variable type used for values")
-configure_file("src/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/config.h")
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11 -O3 -fPIC -Wall -Wno-sign-compare -Wno-unused-variable" )
 
 ### define install directories ###
 set(BIN_DEST "bin")
-set(INCLUDE_DEST "include/geographer")
+set(INCLUDE_DEST "include")
+set(HEADER_DEST "${INCLUDE_DEST}/geographer")
 set(LIB_DEST "lib/geographer")
 set(CMAKE_DEST "share/cmake/geographer")
 
@@ -104,13 +102,22 @@ set ( CMAKE_SKIP_BUILD_RPATH FALSE )
 set ( CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${LIB_DEST}")
 set ( CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE )
 
+### set value type ###
+set(Geographer_VALUE_TYPE "double" CACHE STRING "variable type used for values")
+configure_file("src/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/config.h")
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/config.h" DESTINATION "${HEADER_DEST}")
+
+### include and define targets ###
 add_subdirectory(src)
 
-add_executable(analyze src/FileIO.cpp src/Settings.cpp src/GraphUtils.cpp src/CommTree.cpp src/Metrics.cpp tools/analyzePartition.cpp)
-target_link_libraries(analyze ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+if (Boost_FOUND)
+  add_executable(analyze src/FileIO.cpp src/Settings.cpp src/GraphUtils.cpp src/CommTree.cpp src/Metrics.cpp tools/analyzePartition.cpp)
+  target_link_libraries(analyze ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 
-add_executable(heatMap src/FileIO.cpp src/Settings.cpp src/GraphUtils.cpp src/CommTree.cpp tools/graphToHeatmap.cpp)
-target_link_libraries(heatMap ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+  add_executable(heatMap src/FileIO.cpp src/Settings.cpp src/GraphUtils.cpp src/CommTree.cpp tools/graphToHeatmap.cpp)
+  target_link_libraries(heatMap ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+endif (Boost_FOUND)
 
 ### support for FindPackage ###
 configure_file(GeographerConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfig.cmake @ONLY)
