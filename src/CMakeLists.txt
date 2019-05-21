@@ -38,8 +38,10 @@ if (GTEST_FOUND AND Boost_FOUND)
 	target_include_directories(Geographer PUBLIC ${Boost_INCLUDE_DIRS})
 	target_link_libraries(GeographerTest geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
 	add_test(NAME GeographerTest COMMAND GeographerTest WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+	#install(TARGETS GeographerTest DESTINATION "${BIN_DEST}") # test executable
 endif (GTEST_FOUND AND Boost_FOUND)
 
+install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable
 install(TARGETS geographer EXPORT geographer DESTINATION "${LIB_DEST}") # library
 install(FILES ${FILES_HEADER} DESTINATION "${HEADER_DEST}")
 install(EXPORT geographer DESTINATION "${CMAKE_DEST}")
