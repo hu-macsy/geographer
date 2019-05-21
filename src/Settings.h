@@ -147,7 +147,7 @@ struct Settings{
     bool tightenBounds = false;
     bool freezeBalancedInfluence = false;
     bool erodeInfluence = false;
-    bool manhattanDistance = false;
+    //bool manhattanDistance = false;
     std::vector<IndexType> hierLevels; //for hierarchial kMeans
 
     //parameters for multisection

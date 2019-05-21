@@ -62,7 +62,6 @@ namespace ITI {
 					("hierLevels", value<std::vector<IndexType>>(&settings.hierLevels)->multitoken(), "The number of blocks per level. Total number of PEs (=number of leaves) is \
 					the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3 4 10, there are 3 levels. \
 					In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs")
-					//("manhattanDistance", "Tuning parameter for K-Means")
 					//output
 					("outFile", value<std::string>(&settings.outFile), "write result partition into file")
 					//debug
@@ -180,10 +179,6 @@ namespace ITI {
 		    settings.influenceExponent = 1.0/settings.dimensions;
 		}
 
-		if (vm.count("manhattanDistance")) {
-			throw std::logic_error("Manhattan distance not yet implemented");
-		}
-
 	    if( vm.count("metricsDetail") ){
 			if( not (settings.metricsDetail=="no" or settings.metricsDetail=="easy" or settings.metricsDetail=="all") ){
 				if(comm->getRank() ==0 ){
@@ -214,7 +209,6 @@ namespace ITI {
 	    settings.storeInfo = vm.count("storeInfo");
 	    settings.erodeInfluence = vm.count("erodeInfluence");
 	    settings.tightenBounds = vm.count("tightenBounds");
-	    settings.manhattanDistance = vm.count("manhattanDistance");
 		settings.noRefinement = vm.count("noRefinement");
 
 	    srand(vm["seed"].as<double>());
