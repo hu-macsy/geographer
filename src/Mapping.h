@@ -13,12 +13,6 @@ template <typename IndexType, typename ValueType>
 class Mapping{
 
 public:
-
-	struct lala{
-		int la;
-		double foo;
-	};
-	typedef struct lala lala;
 	
 	/**Implementation of the Hoefler, Snir mapping algorithm copied from Roland Glantz
 	code as found in TiMEr.

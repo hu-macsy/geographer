@@ -576,4 +576,4 @@ SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
         static std::vector<T> indexTo3D(IndexType ind, IndexType sideLen);
     };
 
-}
+} //namespace ITI

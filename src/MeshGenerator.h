@@ -36,10 +36,8 @@
 #include "AuxiliaryFunctions.h"
 #include "Settings.h"
 
-
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
-
 
 namespace ITI {
 	template <typename IndexType, typename ValueType>

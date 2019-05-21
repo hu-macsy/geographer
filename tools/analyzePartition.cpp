@@ -11,6 +11,12 @@
 #include "../src/GraphUtils.h"
 #include "../src/Settings.h"
 
+using ITI::Settings;
+using ITI::IndexType;
+using ITI::ValueType;
+using ITI::version;
+using ITI::Metrics;
+
 int main(int argc, char** argv) {
 	using namespace boost::program_options;
 	options_description desc("Supported options");

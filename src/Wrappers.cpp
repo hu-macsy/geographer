@@ -287,7 +287,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
 			//PRINT(*comm << ": " << i <<": "<< tpwgts[i]);
 			total += tpwgts[i];
 		}
-		SCAI_ASSERT_LT_ERROR( std::abs(total-ncon), 1e-10, "Wrong tpwgts assignenment");
+		SCAI_ASSERT_LT_ERROR( std::abs(total-ncon), 1e-10, "Wrong tpwgts assignment");
 
 		// the xyz array for coordinates of size dim*localN contains the local coords
 		// convert the vector<DenseVector> to idx_t*

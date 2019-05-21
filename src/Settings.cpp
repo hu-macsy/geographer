@@ -1,3 +1,5 @@
+#include <unistd.h>
+
 #include "Settings.h"
 
 
@@ -76,4 +78,20 @@ ITI::Tool ITI::toTool(const std::string& s){
 	ss >> t;
 	return t;
 }
-//-------------------------------------------------------------------------    
+
+ITI::Settings::Settings() {
+	char machineChar[255];
+	gethostname(machineChar, 255);
+
+	this->machine = std::string(machineChar);
+}
+
+bool ITI::Settings::checkValidity() {
+	if( this->storeInfo && this->outFile=="-" ) {
+		this->isValid = false;
+		return false;
+	}
+
+	return isValid;
+}
+

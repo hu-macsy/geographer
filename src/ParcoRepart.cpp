@@ -1207,10 +1207,6 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 			//throw std::runtime_error("Input matrix must be replicated.");
 		}
 		//here graph is replicated. PE0 will write it in a file
-		
-		if (!settings.mec) {
-			throw std::logic_error("Coloring with Boost no longer implemented.");
-		}
 
         coloring = GraphUtils<IndexType, ValueType>::mecGraphColoring( adjM, colors); // our implementation
 
