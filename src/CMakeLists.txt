@@ -12,6 +12,7 @@ set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphU
 
 ### define targets ###
 add_library(geographer SHARED ${FILES_COMMON})
+target_compile_options(geographer PRIVATE -fPIC)
 target_link_libraries(geographer ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 if (USE_BOOST)
 	target_include_directories(geographer ${Boost_INCLUDE_DIRS})
