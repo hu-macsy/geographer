@@ -1,6 +1,7 @@
 cmake_minimum_required (VERSION 3.0.2)
 project (Geographer)
 include(CMakePackageConfigHelpers)
+include(CTest)
 
 # define library version
 set(Geographer_VERSION_MAJOR 0 STRING "major version")
@@ -8,6 +9,14 @@ set(Geographer_VERSION_MINOR 9 STRING "minor version")
 set(Geographer_VERSION ${Geographer_VERSION_MAJOR}.${Geographer_VERSION_MINOR} STRING "version")
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
+
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+if(NOT CMAKE_BUILD_TYPE) 
+    set(CMAKE_BUILD_TYPE Release)
+endif(NOT CMAKE_BUILD_TYPE)
 
 option(USE_NETWORKIT "Use NETWORKIT package." OFF)
 if(USE_NETWORKIT)
@@ -20,10 +29,6 @@ endif(USE_NETWORKIT)
 set(NETWORKIT_INCLUDE "${NETWORKIT_DIR}/include/") 
 set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
 
-### set compiler manually ###
-#set(CMAKE_CXX_COMPILER /lrz/sys/compilers/gcc/7.3.0/bin/c++)
-
-
 set(RBC_DIR "${PROJECT_SOURCE_DIR}/src/RBC")
 
 ### find MPI ###
@@ -33,6 +38,9 @@ include_directories(${MPI_CXX_INCLUDE_PATH})
 ### find GTest ###
 find_package(GTest)
 include_directories(${GTEST_INCLUDE_DIRS})
+if(GTEST_FOUND)
+  enable_testing()  
+endif(GTEST_FOUND)
 
 option(USE_BOOST "Use boost library for number parsing" OFF)
 
@@ -87,8 +95,8 @@ endif (USE_NETWORKIT)
 ### get git commit ###
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
 add_definitions("-DBUILD_COMMIT=${GIT_COMMIT}")
-
-set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} --openmp --std=c++11 -O3 -fPIC -Wall -Wno-sign-compare -Wno-unused-variable" )
+add_definitions("-Wall -Wno-sign-compare -Wno-unused")
+add_definitions("--openmp")
 
 ### define install directories ###
 set(BIN_DEST "bin")

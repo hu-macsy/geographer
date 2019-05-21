@@ -20,7 +20,6 @@ using scai::lama::CSRSparseMatrix;
 using scai::lama::CSRStorage;
 using scai::lama::DenseVector;
 
-
 namespace ITI {
     
     template <typename IndexType, typename ValueType>

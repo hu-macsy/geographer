@@ -455,7 +455,7 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
     srand(time(NULL));
 
 	auto a = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(n,n);
-	scai::lama::MatrixCreator::fillRandom(a, 0.001);  // not symmetric
+	scai::lama::MatrixCreator::fillRandom(a, 0.01);  // not symmetric
 	CSRSparseMatrix<ValueType> aT = scai::lama::eval<scai::lama::CSRSparseMatrix<ValueType>>(transpose(a));
 
 	a = scai::lama::eval<scai::lama::CSRSparseMatrix<ValueType>>(a+aT);
@@ -474,7 +474,7 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
   struct Settings settings;
   settings.numBlocks= k;
 
-	scai::lama::CSRSparseMatrix<ValueType> blockGraph =  GraphUtils<IndexType, ValueType>::getBlockGraph( a, part, k);
+	scai::lama::CSRSparseMatrix<ValueType> blockGraph =  GraphUtils<IndexType, ValueType>::getBlockGraph_dist( a, part, k);
 	EXPECT_TRUE( blockGraph.isConsistent() );
 	EXPECT_TRUE( blockGraph.checkSymmetry() ); //TODO: this fails occasionally
 	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local(blockGraph, settings);
@@ -555,7 +555,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     settings.dimensions = dimensions;
     settings.multiLevelRounds = 3;
     //settings.initialPartition = InitialPartitioningMethods::Multisection;
-    settings.initialPartition = InitialPartitioningMethods::KMeans;
+    settings.initialPartition = Tool::geoKmeans;
     struct Metrics metrics(settings);
     
     // get partition
@@ -840,7 +840,7 @@ TEST_F (ParcoRepartTest, testGetLocalWeightedGraphColoring_2D) {
     graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
         
 
-    //read the array locally and messed the distribution. Left as a remainder.
+    //read the array locally and messed the distribution. Left as a reminder.
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
     EXPECT_EQ( edges, (graph.getNumValues())/2 );
     
@@ -853,7 +853,6 @@ TEST_F (ParcoRepartTest, testGetLocalWeightedGraphColoring_2D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    settings.mec = false; //use the boost coloring algo
     struct Metrics metrics(settings);
     
     //get the partition
@@ -1067,7 +1066,7 @@ TEST_F(ParcoRepartTest, testRedistributeFromPartition){
     settings.dimensions = dimensions;
     settings.multiLevelRounds = 3;
     //settings.initialPartition = InitialPartitioningMethods::Multisection;
-    settings.initialPartition = InitialPartitioningMethods::KMeans;
+    settings.initialPartition = Tool::geoKmeans;
     settings.noRefinement = true;
     struct Metrics metrics(settings);
 

@@ -299,7 +299,7 @@ PRINT0( "mapped vertex " << blockNode << " to " << peNode);
      		//TODO: possible opt, not need a full Dijkstra, when the first not
      		// used node is found stop
 //WARNING: need shortest paths of longest? we need to map "heavy" nodes of the 
-// blockGraph with "heavy" nodes in the PEGraph (heavy cacording to their weighted
+// blockGraph with "heavy" nodes in the PEGraph (heavy according to their weighted
 // degree).
 // Update: the above is true but irrelevant here: we should find a "heavy" node
 // but also one that is close/near to peNode.
@@ -365,7 +365,108 @@ bool Mapping<IndexType, ValueType>::isValid(
 	return true;
 }
 
+//------------------------------------------------------------------------------------
 
+template <typename IndexType, typename ValueType>
+std::vector<IndexType> Mapping<IndexType, ValueType>::getSfcRenumber( 
+	const std::vector<scai::lama::DenseVector<ValueType>>& coordinates,
+	const std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights, //TODO,check: are these needed?
+	const scai::lama::DenseVector<IndexType>& partition,
+	const Settings settings){
+
+	const IndexType localN = coordinates[0].getLocalValues().size();
+	const IndexType k = settings.numBlocks;
+	const IndexType dim = settings.dimensions;
+
+	//TODO: maybe this can be avoided
+	std::vector<IndexType> localIndices(localN);
+	std::iota(localIndices.begin(), localIndices.end(), 0);
+	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
+	const typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
+
+	//to make it more readable
+	using point = std::vector<ValueType>;
+
+	//the center for each block
+	std::vector<point> blockCenters = KMeans::findCenters(coordinates, partition, k, firstIndex, lastIndex, nodeWeights[0]);
+
+	//remember: blockCenters.size()=dim, blockCenters[i].size()=numBlocks
+	SCAI_ASSERT_EQ_ERROR( blockCenters.size(), dim, "Wrong size of centers vector." );
+	SCAI_ASSERT_EQ_ERROR( blockCenters[0].size(), k, "Wrong size of centers vector." )
+
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	for(IndexType i=0; i<k; i++){
+		PRINT0("center " << i << " in " << blockCenters[0][i] <<", " << blockCenters[1][i]);
+	}
+
+	//
+	//get the sfc index of the centers
+	//
+
+	std::vector<ValueType> centerSFC;
+
+	//convert to vector<DenseVector> in order to call getHilbertIndexVector
+	{
+		std::vector<scai::lama::DenseVector<ValueType>> centersDV(dim);
+
+		for(IndexType d=0; d<dim; d++){
+			//centersDV[d].resize(k);
+			centersDV[d].assign( scai::hmemo::HArray<ValueType>(blockCenters[d]) );
+		}
+
+		//TODO: check if default resolution is OK or set it properly		
+		centerSFC = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector( centersDV, settings.sfcResolution, dim);
+	}
+
+	//the IDs to use for sorting
+	std::vector<IndexType> centerIDs(k);
+	std::iota( centerIDs.begin(), centerIDs.end(), 0);
+
+	//sort center IDs according to their SFC value
+	std::sort( centerIDs.begin(), centerIDs.end(),
+	 	[&](IndexType a, IndexType b){
+	 		return centerSFC[a]<centerSFC[b];
+	 	});
+
+	return centerIDs;
+
+}//sfcMapping
+//------------------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
+std::vector<IndexType> Mapping<IndexType, ValueType>::applySfcRenumber( 
+	const std::vector<scai::lama::DenseVector<ValueType>>& coordinates,
+	const std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights, //TODO,check: are these needed?
+	scai::lama::DenseVector<IndexType>& partition,
+	const Settings settings){
+
+	//get the reunmbering
+	std::vector<IndexType> R = Mapping<IndexType,ValueType>::getSfcRenumber( coordinates, nodeWeights, partition, settings );
+
+	SCAI_ASSERT_EQ_ERROR( R.size(), settings.numBlocks, "Size mismatch" );
+	const IndexType k = settings.numBlocks;
+
+	const IndexType maxR = *std::max_element( R.begin(), R.end() );
+	SCAI_ASSERT_EQ_ERROR( maxR, k-1, "max block id is not k-1 as it should");
+
+	//The implied renumbering is that block R[i] should be renumbered to i. To apply it easier we better reverse it.
+	//Create a vector RR where RR[R[i]]=i, this way, afterwards, we can do part[of point i]= RR[prevPart]
+	std::vector<IndexType> reverseR( k );
+	for( IndexType i=0; i<k; i++){
+		reverseR[R[i]]=i;		
+	}
+
+	//go over the local values and renumber the blocks
+	const IndexType localN = partition.getDistributionPtr()->getLocalSize();
+	scai::hmemo::WriteAccess<IndexType> wPart( partition.getLocalValues() );
+
+	for( IndexType i=0; i<localN; i++){
+		IndexType prevBlock = wPart[i];
+		wPart[i] = reverseR[prevBlock];
+	}
+
+	return reverseR;
+}//applySfcRenumber
 
 //to force instantiation
 template class Mapping<IndexType, ValueType>;

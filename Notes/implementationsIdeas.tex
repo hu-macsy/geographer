@@ -122,7 +122,25 @@ broadcast everything back. This is less centralized but may trigger more complic
 patterns. If the block graph needs to be replicated, the several broadcast at the last step may
 cause congestion.
 
+\paragraph*{In parallel}: The communication graph is used to create the communication schedule
+based on the edge coloring of the graph. The edge coloring can be also computed in parallel
+avoiding the explicit construction of the communication graph. Not computing the communication
+is essential for higher scalability since, for high numbers of PEs, it is a possible bottleneck although
+this should be investigated further. Few new, relevant papers are:
+\begin{enumerate}
+\item \href{https://dl.acm.org/citation.cfm?id=3188906}
+{Deterministic distributed edge-coloring with fewer colors}
 
+\item \href{https://dl.acm.org/citation.cfm?id=3175473}
+{The complexity of distributed edge coloring with small palettes}
+
+\item \href{https://dl.acm.org/citation.cfm?id=2722155}
+{$(2\Delta -1)$-edge-coloring is much easier than maximal matching in the distributed setting}
+
+\item \href{https://dl.acm.org/citation.cfm?id=282804}
+{Near-optimal, distributed edge colouring via the nibble method}
+
+\end{enumerate}
 
 
 \end{document}

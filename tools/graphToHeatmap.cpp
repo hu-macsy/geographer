@@ -10,6 +10,10 @@
 
 using scai::lama::DenseVector;
 using scai::lama::fill;
+using ITI::Settings;
+using ITI::IndexType;
+using ITI::ValueType;
+using ITI::version;
 
 int main(int argc, char** argv) {
 	using namespace boost::program_options;

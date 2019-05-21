@@ -23,8 +23,6 @@
 
 using scai::lama::DenseVector;
 
-
-
 namespace ITI {
 namespace KMeans {
 
@@ -44,6 +42,7 @@ using point = std::vector<ValueType>;
  * @param[in] nodeWeights
  * @param[in] blockSizes target block sizes, not maximum sizes
  * @param[in] prevPartition This is used for the hierarchical version, it is the partition from the previous hierarchy level.
+ * If settings.repartition=true then this has a different meaning: is the partition to be refined.
  * @param[in] centers initial k-means centers
  * @param[in] settings Settings struct
  *
@@ -103,8 +102,27 @@ DenseVector<IndexType> computePartition(
 	const Settings settings,
 	struct Metrics &metrics);
 
+/**
+ * Given a tree of the processors graph, computes a partition into a hierachical fashion.
+ * 
+ * param[in] graph The adjacency matrix. Note: currently, the graph is used mainly for
+ * debugging purposes and is not needed.
+ * @param[in] coordinates first level index specifies dimension, second level index the point id
+ * @param[in] nodeWeights
+ * @param[in] commTree The tree describing the processor network.
+ **/
+
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierarchicalPartition(
+	CSRSparseMatrix<ValueType> &graph, //TODO: only for debugging
+	std::vector<DenseVector<ValueType>> &coordinates,
+	std::vector<DenseVector<ValueType>> &nodeWeights,
+	const CommTree<IndexType,ValueType> &commTree,
+	Settings settings,
+	struct Metrics& metrics);
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computeHierPlusRepart(
 	CSRSparseMatrix<ValueType> &graph, //TODO: only for debugging
 	std::vector<DenseVector<ValueType>> &coordinates,
 	std::vector<DenseVector<ValueType>> &nodeWeights,
@@ -117,7 +135,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
  *
  * @param[in] coordinates first level index specifies dimension, second level index the point id
  * @param[in] nodeWeights
- * @param[in] blockSizes target block sizes, not maximum sizes
+ * @param[in] blockSizes target block sizes, not maximum sizes. blockSizes.size()== number of weights
  * @param[in] previous Previous partition
  * @param[in] settings Settings struct
  *
