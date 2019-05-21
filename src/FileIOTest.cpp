@@ -635,21 +635,21 @@ TEST_F (FileIOTest, testReadEdgeListDistributed){
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	if( comm->getSize() != 4 ){
 		if( comm->getRank() == 0){
-			std::cout << "\n\t\t### WARNING: this test, " << __FUNCTION__ << " reads a distributed file and only works for p=4. You should call again with mpirun -n 4 (maybe also with --gtest_filter=*ReadEdgeListDistributed)." << std::endl<< std::endl;
+			std::cout << "\n\t\t### WARNING: this test reads a distributed file and only works for p=4. You should call again with mpirun -n 4 (maybe also with --gtest_filter=*ReadEdgeListDistributed)." << std::endl<< std::endl;
 		}		
-	}
-	ASSERT_EQ( comm->getSize(), 4) << "Specific number of processors needed for this test: 4";
+	} else {
+	
+        std::string file = graphPath + "tmp4/out";
 
-    std::string file = graphPath + "tmp4/out";
+        scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readEdgeListDistributed( file );
 
-    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readEdgeListDistributed( file );
+        ASSERT_TRUE( graph.isConsistent());
+        EXPECT_TRUE( graph.checkSymmetry() );
+        EXPECT_EQ( graph.getNumRows(), graph.getNumColumns()) << "Matrix is not square";
 
-    ASSERT_TRUE( graph.isConsistent());
-    EXPECT_TRUE( graph.checkSymmetry() );
-    EXPECT_EQ( graph.getNumRows(), graph.getNumColumns()) << "Matrix is not square";
-
-    // only for graph: graphPath + "tmp4/out"
-    EXPECT_EQ( graph.getNumRows(), 16) << "for files tmp4/out N must be 16";
+        // only for graph: graphPath + "tmp4/out"
+        EXPECT_EQ( graph.getNumRows(), 16) << "for files tmp4/out N must be 16";
+    }
 }
 //-------------------------------------------------------------------------------------------------
 

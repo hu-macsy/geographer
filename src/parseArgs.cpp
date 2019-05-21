@@ -46,7 +46,6 @@ namespace ITI {
 					("useDiffusionTieBreaking", value<bool>(&settings.useDiffusionTieBreaking)->default_value(settings.useDiffusionTieBreaking), "Tuning Parameter: Use diffusion to break ties in Fiduccia-Mattheyes algorithm")
 					("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
 					("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
-					("mec", "Use the MEC algorithm for the edge coloring of the PE graphFile instead of the classical boost algorithm" )
 					//multisection
 					("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
 					("cutsPerDim", value<std::vector<IndexType>>(&settings.cutsPerDim)->multitoken(), "If MultiSection is chosen, then provide d values that define the number of cuts per dimension.")
@@ -183,10 +182,6 @@ namespace ITI {
 
 		if (vm.count("manhattanDistance")) {
 			throw std::logic_error("Manhattan distance not yet implemented");
-		}
-
-		if(vm.count("mec")){
-			settings.mec = true;
 		}
 
 	    if( vm.count("metricsDetail") ){

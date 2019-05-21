@@ -34,6 +34,9 @@ include_directories(${MPI_CXX_INCLUDE_PATH})
 ### find GTest ###
 find_package(GTest)
 include_directories(${GTEST_INCLUDE_DIRS})
+if(GTEST_FOUND)
+  enable_testing()  
+endif(GTEST_FOUND)
 
 option(USE_BOOST "Use boost library for number parsing" OFF)
 
