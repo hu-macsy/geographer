@@ -51,6 +51,7 @@
 
 int main(int argc, char** argv) {
 	using namespace boost::program_options;
+    using namespace ITI;
 	
 	//bool writePartition = false;
     

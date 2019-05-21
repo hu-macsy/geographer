@@ -6,27 +6,22 @@
 
 #include "config.h"
 
-#define STRINGIZER(arg)     #arg
-#define STR_VALUE(arg)      STRINGIZER(arg)
-#define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 #define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
-const std::string version = BUILD_COMMIT_STRING;
-
-using scai::IndexType;
-
-/*The size of a point/vertex in the application. This is mainly (only)
-used for the mapping using the CommTree. Every node in the tree has a 
-memory variable that indicated the maximum allowed size of this PE or
-group of PEs. Remember, in the CommTree the leaves are the actual PEs
-and the other nodes are groups consisting of a number of PEs. Then,
-every PEs p, can contain at most p.memory/bytesPerVertex vertices.
-TODO: investigate the best value to use
-*/
-const IndexType bytesPerVertex = 8;
-
 namespace ITI{
+
+	using scai::IndexType;
+
+	/*The size of a point/vertex in the application. This is mainly (only)
+	used for the mapping using the CommTree. Every node in the tree has a 
+	memory variable that indicated the maximum allowed size of this PE or
+	group of PEs. Remember, in the CommTree the leaves are the actual PEs
+	and the other nodes are groups consisting of a number of PEs. Then,
+	every PEs p, can contain at most p.memory/bytesPerVertex vertices.
+	TODO: investigate the best value to use
+	*/
+	const IndexType bytesPerVertex = 8;
 
 enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5, BINARY = 6, EDGELIST = 7, BINARYEDGELIST = 8, EDGELISTDIST = 9};
 
@@ -97,10 +92,6 @@ std::ostream& operator<<(std::ostream& out, const ITI::Tool tool);
 std::string toString(const ITI::Tool& t);
 
 ITI::Tool toTool(const std::string& s);
-
-}// ITI
-
-
 
 struct Settings{
     //partition settings
@@ -266,3 +257,4 @@ struct Settings{
     
 }; //struct Settings
 
+}// namespace ITI

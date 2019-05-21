@@ -1,6 +1,7 @@
 cmake_minimum_required (VERSION 3.0.2)
 project (Geographer)
 include(CMakePackageConfigHelpers)
+include(CTest)
 
 # define library version
 set(Geographer_VERSION_MAJOR 0 STRING "major version")

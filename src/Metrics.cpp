@@ -1,5 +1,7 @@
 #include "Metrics.h"
 
+using namespace ITI;
+
 void Metrics::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ){
 	
 	getEasyMetrics( graph, partition, nodeWeights, settings );

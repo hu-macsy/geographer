@@ -1,6 +1,9 @@
 #pragma once
 
-typedef ${Geographer_VALUE_TYPE} ValueType;
+namespace ITI{
 
-//const std::string version = ${GIT_COMMIT};
+	typedef ${Geographer_VALUE_TYPE} ValueType;
 
+	const std::string version = "${GIT_COMMIT}";
+
+}

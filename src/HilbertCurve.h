@@ -31,8 +31,6 @@
 
 #include "RBC/Sort/SQuick.hpp"
 
-//#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-
 using scai::lama::DenseVector;
 
 namespace ITI {

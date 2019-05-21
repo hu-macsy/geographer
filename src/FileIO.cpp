@@ -39,9 +39,9 @@
 using scai::lama::CSRStorage;
 using scai::hmemo::HArray;
 
-const IndexType fileTypeVersionNumber= 3;
-
 namespace ITI {
+
+    const IndexType fileTypeVersionNumber= 3;
 
 //-------------------------------------------------------------------------------------------------
 /*Given the adjacency matrix it writes it in the file "filename" using the METIS format. In the
