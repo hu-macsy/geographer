@@ -2,7 +2,7 @@
 
 namespace ITI{
 
-	typedef ${Geographer_VALUE_TYPE} ValueType;
+	using ValueType = ${Geographer_VALUE_TYPE};
 
 	const std::string version = "${GIT_COMMIT}";
 
