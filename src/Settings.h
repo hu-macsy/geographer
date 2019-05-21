@@ -1,24 +1,32 @@
 #pragma once
 
-#define STRINGIZER(arg)     #arg
-#define STR_VALUE(arg)      STRINGIZER(arg)
-#define BUILD_COMMIT_STRING STR_VALUE(BUILD_COMMIT)
+#include <iostream>
+#include <scai/lama.hpp>
+#include <assert.h>
+
+#include "config.h"
+
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 #define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
-const std::string version = BUILD_COMMIT_STRING;
-
-// typedef long int IndexType;
-
-using scai::IndexType;
-
-typedef double ValueType;
-
 namespace ITI{
+
+	using scai::IndexType;
+
+	/*The size of a point/vertex in the application. This is mainly (only)
+	used for the mapping using the CommTree. Every node in the tree has a 
+	memory variable that indicated the maximum allowed size of this PE or
+	group of PEs. Remember, in the CommTree the leaves are the actual PEs
+	and the other nodes are groups consisting of a number of PEs. Then,
+	every PEs p, can contain at most p.memory/bytesPerVertex vertices.
+	TODO: investigate the best value to use
+	*/
+	const IndexType bytesPerVertex = 8;
+
 enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5, BINARY = 6, EDGELIST = 7, BINARYEDGELIST = 8, EDGELISTDIST = 9};
 
 inline std::istream& operator>>(std::istream& in, Format& format){
-	std::string token;
+	std::string token;//TODO: There must be a more elegant way to do this with a map!
 	in >> token;
 	if (token == "AUTO" or token == "0")
 		format = ITI::Format::AUTO ;
@@ -74,58 +82,21 @@ inline std::ostream& operator<<(std::ostream& out, Format method){
 
 //-----------------------------------------------------------------------------------
 
-enum class Tool{ geographer, geoKmeans, geoSFC, parMetisGraph, parMetisGeom, parMetisSFC, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC};
-	
-/*	
-static std::string tool2string( Tool t){
-	switch( t){
-		case Tool::geographer:
-			return "geographer";
-			
-		case Tool::geoKmeans:
-			return "geoKmeans";
-			
-		case Tool::geoSFC:
-			return "geoSFC";
-			
-		case Tool::parMetisGraph:
-			return "parMetisGraph";
-			
-		case Tool::parMetisGeom:
-			return "parMetisGeom";
-			
-		case Tool::parMetisSFC:
-			return "parMetisSFC";
-			
-		case Tool::zoltanRIB:
-			return "zoltanRib";
-		
-		case Tool::zoltanRCB:
-			return "zoltanRcb";
-		
-		case Tool::zoltanMJ:
-			return "zoltanMJ";
-			
-		case Tool::zoltanSFC:
-			return "zoltanHsfc";
-			
-		default:
-			throw std::runtime_error("Wrong tool given to convert to string.\nAborting...");
-			return NULL;
-	}
-}
-*/
-
-}// ITI
+enum class Tool{ geographer, geoKmeans, geoSFC, geoHierKM, geoHierRepart, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, none};
 
 
-enum class InitialPartitioningMethods {SFC = 0, Pixel = 1, Spectral = 2, KMeans = 3, Multisection = 4, MJ = 5, None = 6};
+std::istream& operator>>(std::istream& in, ITI::Tool& tool);
 
-//-----------------------------------------------------------------------------------
+std::ostream& operator<<(std::ostream& out, const ITI::Tool tool);
 
+std::string toString(const ITI::Tool& t);
 
+ITI::Tool toTool(const std::string& s);
 
 struct Settings{
+	Settings();
+	bool checkValidity();
+
     //partition settings
     IndexType numBlocks = 2;
     double epsilon = 0.03;
@@ -135,10 +106,14 @@ struct Settings{
     IndexType dimensions= 2;
     std::string fileName = "-";
     std::string outFile = "-";
+    std::string outDir = "-"; //this is used by the competitors main
+    std::string PEGraphFile = "-";
+    std::string blockSizesFile = "-";
     ITI::Format fileFormat = ITI::Format::AUTO;   // 0 for METIS, 4 for MatrixMarket
+    ITI::Format coordFormat = ITI::Format::AUTO; 
     bool useDiffusionCoordinates = false;
     IndexType diffusionRounds = 20;
-    std::vector<IndexType> blockSizes;
+    IndexType numNodeWeights = -1;
     std::string machine;
     
     //mesh generation
@@ -147,9 +122,9 @@ struct Settings{
     IndexType numZ = 32;
     
     //general tuning parameters
-    InitialPartitioningMethods initialPartition = InitialPartitioningMethods::KMeans;
-    InitialPartitioningMethods initialMigration = InitialPartitioningMethods::SFC;//TODO: rename
-    
+    ITI::Tool initialPartition = ITI::Tool::geoKmeans;
+    static const ITI::Tool initialMigration = ITI::Tool::geoSFC;
+
     //tuning parameters for local refinement
     IndexType minBorderNodes = 1;
     IndexType stopAfterNoGainRounds = 0;
@@ -161,18 +136,22 @@ struct Settings{
     bool skipNoGainColors = false;
 
     //tuning parameters for SFC
-    IndexType sfcResolution = 17;
+    IndexType sfcResolution = 7;
 
     //tuning parameters balanced K-Means
-    IndexType minSamplingNodes = 100;
-    double influenceExponent = 0.5;
-    double influenceChangeCap = 0.1;
+//TODO?: in the heterogenous and hierarchical case, minSamplingNodes
+//makes more sense to be a percentage of the nodes, not a number. Or not?
+    IndexType minSamplingNodes = 100;	
+
+    ValueType influenceExponent = 0.5;
+    ValueType influenceChangeCap = 0.1;
     IndexType balanceIterations = 20;
     IndexType maxKMeansIterations = 50;
     bool tightenBounds = false;
     bool freezeBalancedInfluence = false;
     bool erodeInfluence = false;
-    bool manhattanDistance = false;
+    //bool manhattanDistance = false;
+    std::vector<IndexType> hierLevels; //for hierarchial kMeans
 
     //parameters for multisection
     bool bisect = false;    // 0: works for square k, 1: bisect, for k=power of 2
@@ -184,27 +163,39 @@ struct Settings{
     bool noRefinement = false;
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
+    IndexType thisRound=-1;
 
     //debug and profiling parameters
     bool verbose = false;
     bool writeDebugCoordinates = false;
+    bool writePEgraph = false;
     bool writeInFile = false;
     bool storeInfo = false;
-	int repeatTimes = 1;
+    //TODO: turn to false by default
+    bool debugMode = false; //extra checks and prints
+	IndexType repeatTimes = 1;
     
     //calculate expensive performance metrics?
     bool computeDiameter = false;
     IndexType maxDiameterRounds = 2;
+    std::string metricsDetail = "no";
 
+    //this is used by the competitors main to set the tools we are gonna use
+    std::vector<std::string> tools;
+
+    // variable to check if the settings given are valid or not
+    bool isValid = true;
+
+    //struct communicationTree commTree;
     //
     // print settings
     //
     
-	void print(std::ostream& out){
+	void print(std::ostream& out) const {
+		
+		out<< "Git commit: " << version << " and machine: "<< machine << std::endl;
 		
 		IndexType numPoints = numX* numY* numZ;
-		
-		out<< "Code git version: " << version << " and machine: "<< machine << std::endl;
 		out<< "Setting: number of points= " << numPoints<< ", dimensions= "<< dimensions << ", filename: " << fileName << std::endl;
 		if( outFile!="-" ){
 			out<< "outFile: " << outFile << std::endl;
@@ -229,21 +220,17 @@ struct Settings{
 			out<< "\tskipNoGainColors" << std::endl;
 		}
 		
-		out<< "initial migration: " << static_cast<int>(initialMigration) << std::endl;
+		out<< "initial migration: " << initialMigration << std::endl;
 		
-		if (initialPartition==InitialPartitioningMethods::SFC) {
+		if (initialPartition==ITI::Tool::geoSFC) {
 			out<< "initial partition: hilbert curve" << std::endl;
 			out<< "\tsfcResolution: " << sfcResolution << std::endl;
-		} else if (initialPartition==InitialPartitioningMethods::Pixel) {
-			out<< "initial partition: pixels" << std::endl;
-			out<< "\tpixeledSideLen: "<< pixeledSideLen << std::endl;
-		} else if (initialPartition==InitialPartitioningMethods::Spectral) {
-			out<< "initial partition: spectral" << std::endl;
-		} else if (initialPartition==InitialPartitioningMethods::KMeans) {
+		}
+		else if (initialPartition==ITI::Tool::geoKmeans) {
 			out<< "initial partition: K-Means" << std::endl;
 			out<< "\tminSamplingNodes: " << minSamplingNodes << std::endl;
 			out<< "\tinfluenceExponent: " << influenceExponent << std::endl;
-		} else if (initialPartition==InitialPartitioningMethods::Multisection) {
+		} else if (initialPartition==ITI::Tool::geoMS) {
 			out<< "initial partition: MultiSection" << std::endl;
 			out<< "\tbisect: " << bisect << std::endl;
 			out<< "\tuseExtent: "<< useExtent << std::endl;
@@ -252,17 +239,15 @@ struct Settings{
 		}
 		out << "epsilon= "<< epsilon << std::endl;
 		out << "numBlocks= " << numBlocks << std::endl;
-		
 	}
 //--------------------------------------------------------------------------------------------
 
-    void print(std::ostream& out, const scai::dmemo::CommunicatorPtr comm){
+    void print(std::ostream& out, const scai::dmemo::CommunicatorPtr comm) const {
 		if( comm->getRank()==0){
 			 print( out );
 		}
 	}
-
-
     
-};
+}; //struct Settings
 
+}// namespace ITI

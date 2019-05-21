@@ -3,6 +3,7 @@
 *.o
 Geographer
 GeographerTest
+build/
 
 # build system
 Makefile
@@ -53,3 +54,7 @@ local/
 *.map
 octree_timestep_*.dat
 
+# latex notes
+*.aux
+*.log
+*.out

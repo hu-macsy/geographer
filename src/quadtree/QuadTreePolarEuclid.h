@@ -30,23 +30,23 @@ public:
 	 * @param capacity How many points can inhabit a leaf cell before it is split up?
 	 *
 	 */
-	QuadTreePolarEuclid(Point<double> minCoords = {0,0}, Point<double> maxCoords = {2*M_PI, 1}, bool theoreticalSplit=false, count capacity=1000, double balance = 0.5)
+	QuadTreePolarEuclid(Point<ValueType> minCoords = {0,0}, Point<ValueType> maxCoords = {2*M_PI, 1}, bool theoreticalSplit=false, count capacity=1000, ValueType balance = 0.5)
 	{
 		this->root = std::shared_ptr<QuadNodePolarEuclid>(new QuadNodePolarEuclid(minCoords, maxCoords, capacity, theoreticalSplit, balance));
 	}
 
-	QuadTreePolarEuclid(const std::vector<double> &angles, const std::vector<double> &radii, const std::vector<index > &content, bool theoreticalSplit=false, count capacity=1000, double balance = 0.5) {
+	QuadTreePolarEuclid(const std::vector<ValueType> &angles, const std::vector<ValueType> &radii, const std::vector<index > &content, bool theoreticalSplit=false, count capacity=1000, ValueType balance = 0.5) {
 		const count n = angles.size();
 		assert(angles.size() == radii.size());
 		assert(radii.size() == content.size());
-		double minRadius, maxRadius, minAngle, maxAngle;
+		ValueType minRadius, maxRadius, minAngle, maxAngle;
 
 		auto angleMinMax = std::minmax_element(angles.begin(), angles.end());
 		auto radiiMinMax = std::minmax_element(radii.begin(), radii.end());
 		minAngle = *angleMinMax.first;
 		minRadius = *radiiMinMax.first;
-		maxAngle = std::nextafter(*angleMinMax.second, std::numeric_limits<double>::max());
-		maxRadius = std::nextafter(*radiiMinMax.second, std::numeric_limits<double>::max());
+		maxAngle = std::nextafter(*angleMinMax.second, std::numeric_limits<ValueType>::max());
+		maxRadius = std::nextafter(*radiiMinMax.second, std::numeric_limits<ValueType>::max());
 		this->root = std::shared_ptr<QuadNodePolarEuclid>(new QuadNodePolarEuclid({minAngle, minRadius}, {maxAngle, maxRadius}, capacity, theoreticalSplit, balance));
 
 		for (index i = 0; i < n; i++) {
@@ -60,11 +60,11 @@ public:
 	 * @param angle angular coordinate of x
 	 * @param R radial coordinate of x
 	 */
-	bool removeContent(int toRemove, double angle, double r) {
+	bool removeContent(int toRemove, ValueType angle, ValueType r) {
 		return this->root->removeContent(toRemove, {angle, r});
 	}
 
-	void getElementsInEuclideanCircle(const Point<double> circleCenter, const double radius, std::vector<index> &circleDenizens) const {
+	void getElementsInEuclideanCircle(const Point<ValueType> circleCenter, const ValueType radius, std::vector<index> &circleDenizens) const {
 		this->root->getElementsInCircle(circleCenter, radius, circleDenizens);
 	}
 
@@ -72,7 +72,7 @@ public:
 		this->root->recount();
 	}
 
-	index getCellID(double phi, double r) const {
+	index getCellID(ValueType phi, ValueType r) const {
 		return this->root->getCellID({phi, r});
 	}
 };

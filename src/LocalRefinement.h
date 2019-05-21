@@ -20,7 +20,6 @@ using scai::lama::CSRSparseMatrix;
 using scai::lama::CSRStorage;
 using scai::lama::DenseVector;
 
-
 namespace ITI {
     
     template <typename IndexType, typename ValueType>
@@ -39,7 +38,7 @@ namespace ITI {
          * @param[in,out] coordinates Coordinates of input points, only used for tie-breaking
          *
          */
-        static std::vector<IndexType> distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+        static std::vector<ValueType> distributedFMStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
         
         /**
          * Performs a local refinement step using distributed Fiduccia-Mattheyses on the distributed input graph and partition.
@@ -60,7 +59,7 @@ namespace ITI {
          * @param[in] settings Settings struct
          *
          */
-        static std::vector<IndexType> distributedFMStep(
+        static std::vector<ValueType> distributedFMStep(
             CSRSparseMatrix<ValueType> &input, 
             DenseVector<IndexType> &part, 
             std::vector<IndexType>& nodesWithNonLocalNeighbors,

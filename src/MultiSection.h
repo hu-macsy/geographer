@@ -15,14 +15,16 @@ namespace ITI {
      * For all i: 0<i<d, it must be bottom[i]<top[i]
      * Also, the rectangle contains the points [bottom, top], so, in a 1D rectangle, [4,8] contains
      * the points 4,5,6,7 and 8.
+     *
+     * Note: This is now using the typedef'd ValueType from config.h
      * */
     struct rectangle{
         
-        double weight;
+        ValueType weight;
         
         // for all i: 0<i<dimension, bottom[i]<top[i]
-        std::vector<double> bottom;
-        std::vector<double> top;
+        std::vector<ValueType> bottom;
+        std::vector<ValueType> top;
         
         void print(std::ostream& out){
             std::cout<< "rectangle bottom: ";
@@ -125,15 +127,15 @@ namespace ITI {
             return true;
         }
         
-    };
+    };//struct rectangle
         
         
 //---------------------------------------------------------------------------------------
     template <typename IndexType, typename ValueType>
     class rectCell {
         
-        template <typename T, typename U> 
-        friend class MultiSection;
+	template <typename T, typename U> 
+	friend class MultiSection;
         
     public:
         
@@ -200,15 +202,17 @@ namespace ITI {
             
             IndexType dim = point.size();
             SCAI_ASSERT( dim==myRect.top.size(), "Dimensions do not agree");
-            
+    
             // point should be inside this rectangle
             for(int d=0; d<dim; d++){
+SCAI_REGION("rectCell.getContainingLeaf.checkPoint");
                 if(point[d]>myRect.top[d] or  point[d]<myRect.bottom[d]){
                     throw std::logic_error("Point out of bounds");
                 }
             }
-            
+
             if( !this->isLeaf ){
+SCAI_REGION("rectCell.getContainingLeaf.ifNotLeaf");            	
                 for(int c=0; c<this->children.size(); c++){
                     if( children[c]->myRect.owns( point ) ){                    
                         return children[c]->getContainingLeaf( point );
@@ -218,8 +222,9 @@ namespace ITI {
                 //WARNING: in our case this should never happen, but it may happen in a more general
                 // case where the children rectangles do not cover the entire father rectangle
                 //this->getRect().print();
-                throw std::logic_error("Null pointer");
+                throw std::logic_error("Null pointer, the given point in not contained in the tree.");
             }else{
+SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
                 //TODO: possibly a bit expensive and not needed assertion
                 SCAI_ASSERT( myRect.owns(point), "Should not happen")    
                 return  std::make_shared<rectCell>(*this);
@@ -251,7 +256,7 @@ namespace ITI {
                 
         
         /** Returns a vector of size getNumLeaves() with pointers to all the leaf nodes
-         *  The traversal, and thus the order leaves appear in the returned vector, is done in a DFS way.
+         *  The traversal, and thus the order that leaves appear in the returned vector, is done in a DFS way.
          */
         std::vector<std::shared_ptr<rectCell>> getAllLeaves(){
             SCAI_REGION("rectCell.getAllLeaves");
@@ -419,13 +424,36 @@ namespace ITI {
         /** Get a tree of rectangles of a uniform grid with side length sideLen. The rectangles cover the whole grid and 
          * do not overlap.
          * 
-         * @param[in] nodeWeights Optional node weights.
+         * @param[in] nodeWeights The node weights of the points.
          * @param[in] sideLen The length of the side of the whole uniform, square grid. The coordinates are from 0 to sideLen-1. Example: if sideLen=2, the points are (0,0),(0,1),(1,0),(1,1)
          * @param[in] setting Settings struct
          * 
          * @return A pointer to the root of the tree. number of leaves = settings.numBlocks.
          */
         static std::shared_ptr<rectCell<IndexType,ValueType>> getRectangles( const scai::lama::DenseVector<ValueType>& nodeWeights, const IndexType sideLen, Settings settings);
+
+        //TODO: Let coordinates be of ValueType and round inside the function if needed.
+        
+        /** @brief Get a tree of rectangles for a non-uniform grid.
+         * 
+         * @param[in] input The adjacency matrix of the input graph.
+         * @param[in] coordinates The coordinates of each point of the graph. Here they are of type IndexType for the projections need to be in the integers.
+         * @param[in] nodeWeights The weights for each point.
+         * @param[in] minCoords The minimum coordinate on each dimensions. minCoords.size()= dimensions
+         * @param[in] maxCoords The maximum coordinate on each dimensions. maxCoords.size()= dimensions
+         * @param[in] setting Settings struct
+		 * 
+         * @return A pointer to the root of the tree. The leaves of the tree are the rewuested rectangles.
+         */
+        
+        static std::shared_ptr<rectCell<IndexType,ValueType>> getRectanglesNonUniform( 
+            const scai::lama::CSRSparseMatrix<ValueType> &input,
+            const std::vector<std::vector<IndexType>> &coordinates,
+            const scai::lama::DenseVector<ValueType> &nodeWeights,
+            const std::vector<ValueType> &minCoords,
+            const std::vector<ValueType> &maxCoords,
+            Settings settings);
+
         
         /** Calculates the projection of all points in the bounding box (bBox) in the given dimension. Every PE
          *  creates an array of appropriate length, calculates the projection for its local coords and then
@@ -443,35 +471,14 @@ namespace ITI {
          */
         static std::vector<std::vector<ValueType>> projection( const scai::lama::DenseVector<ValueType>& nodeWeights, const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot, const std::vector<IndexType>& dimensionToProject, const IndexType sideLen, Settings settings );
         
-        //TODO: Let coordinates be of ValueType and round inside the function if needed.
-        
-        /** @brief Get a tree of rectangles for a non-uniform grid.
-         * 
-         * @param[in] input The adjacency matrix of the input graph.
-         * @param[in] coordinates The coordinates of each point of the graph. Here they are of type IndexType for the projections need to be in the integers.
-         * @param[in] nodeWeights The weights for each point.
-         * @param[in] minCoords The minimum coordinate on each dimensions. minCoords.size()= dimensions
-         * @param[in] maxCoords The maximum coordinate on each dimensions. maxCoords.size()= dimensions
-         * @param[in] setting Settings struct
-		 * 
-         * @return A pointer to the root of the tree. The leaves of the tree are the rewuested rectangles.
-         */
-        
-        static std::shared_ptr<rectCell<IndexType,ValueType>> getRectanglesNonUniform( 
-            const scai::lama::CSRSparseMatrix<ValueType> &input,
-            const std::vector<std::vector<IndexType> > &coordinates,
-            const scai::lama::DenseVector<ValueType>& nodeWeights,
-            const std::vector<ValueType>& minCoords,
-            const std::vector<ValueType>& maxCoords,
-            Settings settings);
-        
+
         /** @brief Projection for the non-uniform grid case. Coordinates must be Indextype.
          */
         static std::vector<std::vector<ValueType>> projectionNonUniform( 
-            const std::vector<std::vector<IndexType> >& coordinates,
-            const scai::lama::DenseVector<ValueType>& nodeWeights,
+            const std::vector<std::vector<IndexType>> &coordinates,
+            const scai::lama::DenseVector<ValueType> &nodeWeights,
             const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
-            const std::vector<IndexType>& dimensionToProject,
+            const std::vector<IndexType> &dimensionToProject,
             Settings settings);
         
         /** @brief Partitions the given vector into k parts of roughly equal weights using a greedy approach.
@@ -518,8 +525,7 @@ namespace ITI {
 		 */
         static std::pair<bool, std::vector<IndexType>> probeAndGetSplitters(const std::vector<ValueType>& input, const IndexType k, const ValueType target);
         
-        /**Checks if the given index is in the given bounding box. Index corresponds to a uniform matrix given
-         * as a 1D array/vector. 
+        /**Checks if the given point is in the given bounding box.
          * 
          * @param[in] coords The coordinates of the input point.
          * @param[in] bBox The bounding box given as two vectors; one for the bottom point and one for the top point. For all dimensions i, should be: bBox.first(i)< bBox.second(i).
@@ -550,6 +556,7 @@ namespace ITI {
         
         
         static scai::lama::CSRSparseMatrix<ValueType> getBlockGraphFromTree_local( const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot );
+        
         /** Function to transform a 1D index to 2D or 3D given the side length of the cubical grid.
          * For example, in a 4x4 grid, indexTo2D(1)=(0,1), indexTo2D(4)=(1,0) and indexTo2D(13)=(3,1)
          * 
@@ -569,4 +576,4 @@ namespace ITI {
         static std::vector<T> indexTo3D(IndexType ind, IndexType sideLen);
     };
 
-}
+} //namespace ITI

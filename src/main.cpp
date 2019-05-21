@@ -19,7 +19,6 @@
 #include <cstdlib>
 #include <chrono>
 #include <iomanip> 
-#include <unistd.h>
 
 #include "Diffusion.h"
 #include "MeshGenerator.h"
@@ -29,7 +28,7 @@
 #include "Metrics.h"
 #include "SpectralPartition.h"
 #include "GraphUtils.h"
-
+#include "parseArgs.h"
 
 /**
  *  Examples of use:
@@ -46,222 +45,27 @@
 
 //----------------------------------------------------------------------------
 
-
-std::istream& operator>>(std::istream& in, InitialPartitioningMethods& method)
-{
-    std::string token;
-    in >> token;
-    if (token == "SFC" or token == "0")
-        method = InitialPartitioningMethods::SFC;
-    else if (token == "Pixel" or token == "1")
-        method = InitialPartitioningMethods::Pixel;
-    else if (token == "Spectral" or token == "2")
-    	method = InitialPartitioningMethods::Spectral;
-    else if (token == "KMeans" or token == "Kmeans" or token == "K-Means" or token == "K-means" or token == "3")
-        method = InitialPartitioningMethods::KMeans;
-    else if (token == "Multisection" or token == "MultiSection" or token == "4")
-    	method = InitialPartitioningMethods::Multisection;
-    else if (token == "None" or token == "5")
-        	method = InitialPartitioningMethods::None;
-    else
-        in.setstate(std::ios_base::failbit);
-    return in;
-}
-
-std::ostream& operator<<(std::ostream& out, InitialPartitioningMethods method)
-{
-    std::string token;
-
-    if (method == InitialPartitioningMethods::SFC)
-        token = "SFC";
-    else if (method == InitialPartitioningMethods::Pixel)
-    	token = "Pixel";
-    else if (method == InitialPartitioningMethods::Spectral)
-    	token = "Spectral";
-    else if (method == InitialPartitioningMethods::KMeans)
-        token = "KMeans";
-    else if (method == InitialPartitioningMethods::Multisection)
-    	token = "Multisection";
-    else if (method == InitialPartitioningMethods::None)
-        token = "None";
-    out << token;
-    return out;
-}
-
 //void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);	
 
 
 int main(int argc, char** argv) {
 	using namespace boost::program_options;
-	options_description desc("Supported options");
-
-	struct Settings settings;
-        
-    bool writePartition = false;
+    using namespace ITI;
+	
+	//bool writePartition = false;
     
 	std::string metricsDetail = "all";
 	std::string blockSizesFile;
-	ITI::Format coordFormat;
-    IndexType repeatTimes = 1;
+	//ITI::Format coordFormat;
+    
         
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-	desc.add_options()
-				("help", "display options")
-				("version", "show version")
-				//input and coordinates
-				("graphFile", value<std::string>(), "read graph from file")
-				("quadTreeFile", value<std::string>(), "read QuadTree from file")
-				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
-				("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
-				("coordFormat", value<ITI::Format>(&coordFormat), "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ")
-				("nodeWeightIndex", value<int>()->default_value(0), "index of node weight")
-				("useDiffusionCoordinates", value<bool>(&settings.useDiffusionCoordinates)->default_value(settings.useDiffusionCoordinates), "Use coordinates based from diffusive systems instead of loading from file")
-				("dimensions", value<IndexType>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
-				("previousPartition", value<std::string>(), "file of previous partition, used for repartitioning")
-				//output
-				("outFile", value<std::string>(&settings.outFile), "write result partition into file")
-				//mesh generation
-				("generate", "generate random graph. Currently, only uniform meshes are supported.")
-				("numX", value<IndexType>(&settings.numX), "Number of points in x dimension of generated graph")
-				("numY", value<IndexType>(&settings.numY), "Number of points in y dimension of generated graph")
-				("numZ", value<IndexType>(&settings.numZ), "Number of points in z dimension of generated graph")
-				//general partitioning parameters
-				("numBlocks", value<IndexType>(&settings.numBlocks)->default_value(comm->getSize()), "Number of blocks, default is number of processes")
-				("epsilon", value<double>(&settings.epsilon)->default_value(settings.epsilon), "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.")
-				("blockSizesFile", value<std::string>(&blockSizesFile) , " file to read the block sizes for every block")
-				("seed", value<double>()->default_value(time(NULL)), "random seed, default is current time")
-				//multi-level and local refinement
-				("initialPartition", value<InitialPartitioningMethods>(&settings.initialPartition), "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means' or 3) and multisection ('MultiSection' or 4). SFC, Spectral and K-Means are most stable.")
-				("noRefinement", "skip local refinement steps")
-				("multiLevelRounds", value<IndexType>(&settings.multiLevelRounds)->default_value(settings.multiLevelRounds), "Tuning Parameter: How many multi-level rounds with coarsening to perform")
-				("minBorderNodes", value<IndexType>(&settings.minBorderNodes)->default_value(settings.minBorderNodes), "Tuning parameter: Minimum number of border nodes used in each refinement step")
-				("stopAfterNoGainRounds", value<IndexType>(&settings.stopAfterNoGainRounds)->default_value(settings.stopAfterNoGainRounds), "Tuning parameter: Number of rounds without gain after which to abort localFM. A value of 0 means no stopping.")
-				("minGainForNextGlobalRound", value<IndexType>(&settings.minGainForNextRound)->default_value(settings.minGainForNextRound), "Tuning parameter: Minimum Gain above which the next global FM round is started")
-				("gainOverBalance", value<bool>(&settings.gainOverBalance)->default_value(settings.gainOverBalance), "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance")
-				("useDiffusionTieBreaking", value<bool>(&settings.useDiffusionTieBreaking)->default_value(settings.useDiffusionTieBreaking), "Tuning Parameter: Use diffusion to break ties in Fiduccia-Mattheyes algorithm")
-				("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
-				("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
-				//multisection
-				("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
-				("cutsPerDim", value<std::vector<IndexType>>(&settings.cutsPerDim)->multitoken(), "If MultiSection is chosen, then provide d values that define the number of cuts per dimension.")
-				("pixeledSideLen", value<IndexType>(&settings.pixeledSideLen)->default_value(settings.pixeledSideLen), "The resolution for the pixeled partition or the spectral")
-				// K-Means
-				("minSamplingNodes", value<IndexType>(&settings.minSamplingNodes)->default_value(settings.minSamplingNodes), "Tuning parameter for K-Means")
-				("influenceExponent", value<double>(&settings.influenceExponent)->default_value(settings.influenceExponent), "Tuning parameter for K-Means, default is ")
-				("influenceChangeCap", value<double>(&settings.influenceChangeCap)->default_value(settings.influenceChangeCap), "Tuning parameter for K-Means")
-				("balanceIterations", value<IndexType>(&settings.balanceIterations)->default_value(settings.balanceIterations), "Tuning parameter for K-Means")
-				("maxKMeansIterations", value<IndexType>(&settings.maxKMeansIterations)->default_value(settings.maxKMeansIterations), "Tuning parameter for K-Means")
-				("tightenBounds", "Tuning parameter for K-Means")
-				("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
-				("initialMigration", value<InitialPartitioningMethods>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration, 0: SFCs, 3:k-means, 4:Multisection")
-				("manhattanDistance", "Tuning parameter for K-Means")
-				//debug
-				("writeDebugCoordinates", value<bool>(&settings.writeDebugCoordinates)->default_value(settings.writeDebugCoordinates), "Write Coordinates of nodes in each block")
-				("verbose", "Increase output.")
-                ("storeInfo", "Store timing and other metrics in file.")
-                ("writePartition", "Writes the partition in the outFile.partition file")
-                // evaluation
-                ("repeatTimes", value<IndexType>(&repeatTimes), "How many times we repeat the partitioning process.")
-                ("noComputeDiameter", "Compute Diameter of resulting block files.")
-                ("maxDiameterRounds", value<IndexType>(&settings.maxDiameterRounds)->default_value(settings.maxDiameterRounds), "abort diameter algorithm after that many BFS rounds")
-				("metricsDetail", value<std::string>(&metricsDetail)->default_value("no"), "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV")
-				;
-
-        //------------------------------------------------
-        //
-        // checks
-        //
-                                
-        std::string s = "0.12345";
-        ValueType stdDouble = std::stod( s );
-        ValueType boostDouble = boost::lexical_cast<ValueType>(s);
-        if( stdDouble!=boostDouble ){
-            PRINT0( "\033[1;31mWARNING: std::stod and boost::lexical_cast do not agree \033[0m"  );
-            PRINT0( "\033[1;31mWARNING: std::stod and boost::lexical_cast do not agree \033[0m"  );
-        }
-
-	variables_map vm;
-	store(command_line_parser(argc, argv).options(desc).run(), vm);
-	notify(vm);
-
-	if (vm.count("help")) {
-		std::cout << desc << "\n";
-		return 0;
-	}
-
-	if (vm.count("version")) {
-		std::cout << "Git commit " << version << std::endl;
-		return 0;
-	}
-
-	if (vm.count("generate") + vm.count("graphFile") + vm.count("quadTreeFile") != 1) {
-		std::cout << "Pick one of --graphFile, --quadTreeFile or --generate" << std::endl;
-		return 126;
-	}
-
-	if (vm.count("generate") && (vm["dimensions"].as<IndexType>() != 3)) {
-		std::cout << "Mesh generation currently only supported for three dimensions" << std::endl;
-		return 126;
-	}
-
-	if (vm.count("coordFile") && vm.count("useDiffusionCoords")) {
-		std::cout << "Cannot both load coordinates from file with --coordFile or generate them with --useDiffusionCoords." << std::endl;
-		return 126;
-	}
-
-	if( vm.count("cutsPerDim") ) {
-		SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
-		SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
-	}
-        
-	if( vm.count("initialMigration") ){
-
-		if( !(settings.initialMigration==InitialPartitioningMethods::SFC
-				or settings.initialMigration==InitialPartitioningMethods::KMeans
-				or settings.initialMigration==InitialPartitioningMethods::Multisection
-				or settings.initialMigration==InitialPartitioningMethods::None) ){
-			PRINT0("Initial migration supported only for 0:SFCs, 3:k-means, 4:MultiSection or 5:None, invalid option " << settings.initialMigration << " was given");
-			return 126;
-		}
-	}
-
-	if (vm.count("fileFormat") && settings.fileFormat == ITI::Format::TEEC) {
-		if (!vm.count("numX")) {
-			std::cout << "TEEC file format does not specify graph size, please set with --numX" << std::endl;
-			return 126;
-		}
-	}
-
-	if (vm.count("previousPartition")) {
-		settings.repartition = true;
-		if (vm.count("initialPartition")) {
-			if (!(settings.initialPartition == InitialPartitioningMethods::KMeans || settings.initialPartition == InitialPartitioningMethods::None)) {
-				std::cout << "Method " << settings.initialPartition << " not supported for repartitioning, currently only kMeans." << std::endl;
-				return 126;
-			}
-		} else {
-			if (comm->getRank() == 0) {
-				std::cout << "Setting initial partitioning method to kMeans." << std::endl;
-			}
-			settings.initialPartition = InitialPartitioningMethods::KMeans;
-		}
-	}
-	
-	if( settings.storeInfo && settings.outFile=="-" ) {
-		if (comm->getRank() == 0) {
-			std::cout<< "Option to store information used but no output file given to write to. Specify an output file using the option --outFile. Aborting." << std::endl;
-		}
-		return 126;
-	}
-
-	if (!vm.count("influenceExponent")) {
-	    settings.influenceExponent = 1.0/settings.dimensions;
-	}
-
-	if (vm.count("manhattanDistance")) {
-		throw std::logic_error("Manhattan distance not yet implemented");
-	}
+	struct Settings settings;
+    variables_map vm;
+	std::tie(vm, settings) = ITI::parseInput( argc, argv);
+	if( !settings.isValid )
+		return -1;
 
     //--------------------------------------------------------
     //
@@ -276,43 +80,10 @@ int main(int argc, char** argv) {
 	
     IndexType N = -1; 		// total number of points
 
-    char machineChar[255];
-    std::string machine;
-    gethostname(machineChar, 255);
-    
-    machine = std::string(machineChar);
-    settings.machine = machine;
-    
-    settings.verbose = vm.count("verbose");
-    settings.storeInfo = vm.count("storeInfo");
-    settings.erodeInfluence = vm.count("erodeInfluence");
-    settings.tightenBounds = vm.count("tightenBounds");
-    settings.manhattanDistance = vm.count("manhattanDistance");
-	settings.noRefinement = vm.count("noRefinement");
-	if( vm.count("noComputeDiameter") ){
-		settings.computeDiameter = false;
-	}else{
-		settings.computeDiameter = true;
-	}
-	
-    writePartition = vm.count("writePartition");
-    if( writePartition ){
-        settings.writeInFile = true;
-    }
-
-    if( vm.count("metricsDetail") ){
-		if( not (metricsDetail=="no" or metricsDetail=="easy" or metricsDetail=="all") ){
-			if(comm->getRank() ==0 ){
-				std::cout<<"WARNING: wrong value for parameter metricsDetail= " << metricsDetail << ". Setting to all" <<std::endl;
-				metricsDetail="all";
-			}
-		}
-	}
-    
-    srand(vm["seed"].as<double>());
-
+	std::string machine = settings.machine;
     /* timing information
      */
+
     std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
     if (comm->getRank() == 0){
@@ -345,8 +116,8 @@ int main(int argc, char** argv) {
     //
     
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
-    std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
-	scai::lama::DenseVector<ValueType> nodeWeights;		//the weights for each node
+    std::vector<scai::lama::DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
+	std::vector<scai::lama::DenseVector<ValueType>> nodeWeights;		//the weights for each node
 	
 	
     if (vm.count("graphFile")) {
@@ -374,42 +145,55 @@ int main(int argc, char** argv) {
         //
         // read the adjacency matrix and the coordinates from a file
         //
-        std::vector<DenseVector<ValueType> > vectorOfNodeWeights;
+        
         if (vm.count("fileFormat")) {
         	if (settings.fileFormat == ITI::Format::TEEC) {
         		IndexType n = vm["numX"].as<IndexType>();
 				scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(n, comm));
 				scai::dmemo::DistributionPtr noDist( new scai::dmemo::NoDistribution(n));
 				graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDist);
-				ITI::FileIO<IndexType, ValueType>::readCoordsTEEC(graphFile, n, settings.dimensions, vectorOfNodeWeights);
+				ITI::FileIO<IndexType, ValueType>::readCoordsTEEC(graphFile, n, settings.dimensions, nodeWeights);
 				if (settings.verbose) {
-					ValueType minWeight = vectorOfNodeWeights[0].min();
-					ValueType maxWeight = vectorOfNodeWeights[0].max();
+					ValueType minWeight = nodeWeights[0].min();
+					ValueType maxWeight = nodeWeights[0].max();
 					if (comm->getRank() == 0) std::cout << "Min node weight:" << minWeight << ", max weight: " << maxWeight << std::endl;
 				}
 				coordFile = graphFile;
             }else {
-				graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights, settings.fileFormat );
+				graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights, settings.fileFormat );
 			}
         } else{
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfNodeWeights );
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights );
         }
         N = graph.getNumRows();
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
         scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
         assert(graph.getColDistribution().isEqual(*noDistPtr));
 
-        IndexType numNodeWeights = vectorOfNodeWeights.size();
-        if (numNodeWeights == 0) {
-			nodeWeights = fill<DenseVector<ValueType>>(rowDistPtr, 1);
+        IndexType numReadNodeWeights = nodeWeights.size();
+        if (numReadNodeWeights == 0) {
+        	nodeWeights.resize(1);
+			nodeWeights[0] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
 		}
-		else if (numNodeWeights == 1) {
-			nodeWeights = vectorOfNodeWeights[0];
-		} else {
-			IndexType index = vm["nodeWeightIndex"].as<int>();
-			assert(index < numNodeWeights);
-			nodeWeights = vectorOfNodeWeights[index];
-		}
+
+        if (settings.numNodeWeights > 0) {
+            if (settings.numNodeWeights < nodeWeights.size()) {
+                nodeWeights.resize(settings.numNodeWeights);
+                if (comm->getRank() == 0) {
+                    std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, thus discarding "
+                    << numReadNodeWeights - settings.numNodeWeights << std::endl;
+                }
+            } else if (settings.numNodeWeights > nodeWeights.size()) {
+                nodeWeights.resize(settings.numNodeWeights);
+                for (IndexType i = numReadNodeWeights; i < settings.numNodeWeights; i++) {
+                    nodeWeights[i] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
+                }
+                if (comm->getRank() == 0) {
+                    std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, padding with "
+                    << settings.numNodeWeights - numReadNodeWeights << " uniform weights. " << std::endl;
+                }
+            }
+        }
 
         // for 2D we do not know the size of every dimension
         settings.numX = N;
@@ -425,12 +209,12 @@ int main(int argc, char** argv) {
         }
         
         if (settings.useDiffusionCoordinates) {
-        	scai::lama::CSRSparseMatrix<ValueType> L = ITI::GraphUtils::constructLaplacian<IndexType, ValueType>(graph);
+        	scai::lama::CSRSparseMatrix<ValueType> L = ITI::GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
 
         	std::vector<IndexType> nodeIndices(N);
         	std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
 
-        	ITI::GraphUtils::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), settings.dimensions);
+        	ITI::GraphUtils<IndexType, ValueType>::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), settings.dimensions);
 
         	if (comm->getRank() == 0) {
         		std::cout << "Chose diffusion sources";
@@ -443,19 +227,11 @@ int main(int argc, char** argv) {
         	coordinates.resize(settings.dimensions);
 
 			for (IndexType i = 0; i < settings.dimensions; i++) {
-				coordinates[i] = ITI::Diffusion<IndexType, ValueType>::potentialsFromSource(L, nodeWeights, nodeIndices[i]);
+				coordinates[i] = ITI::Diffusion<IndexType, ValueType>::potentialsFromSource(L, nodeWeights[0], nodeIndices[i]);
 			}
 
         } else {
-            if( vm.count("coordFormat") ) { // coordFormat given
-                coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
-            }else if ( !vm.count("coordFormat") and vm.count("fileFormat") ) { 
-                // if no coordFormat was given but was given a fileFormat assume they are the same
-                coordFormat = settings.fileFormat;
-                coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, coordFormat);
-            }else {
-                coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
-            }
+            coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.coordFormat);
         }
         
         std::chrono::duration<double> readCoordsTime = std::chrono::system_clock::now() - startTime;
@@ -514,7 +290,8 @@ int main(int argc, char** argv) {
             std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
         }
         
-        nodeWeights = scai::lama::fill<scai::lama::DenseVector<ValueType>>(graph.getRowDistributionPtr(), 1);
+        nodeWeights.resize(1);
+        nodeWeights[0] = scai::lama::fill<scai::lama::DenseVector<ValueType>>(graph.getRowDistributionPtr(), 1);
         
     } else if (vm.count("quadTreeFile")) {
         //if (comm->getRank() == 0) {
@@ -533,24 +310,64 @@ int main(int argc, char** argv) {
         for (IndexType i = 0; i < settings.dimensions; i++) {
         	coordinates[i].redistribute(rowDistPtr);
         }
-        nodeWeights = scai::lama::fill<scai::lama::DenseVector<ValueType>>(graph.getRowDistributionPtr(), 1);
+
+        nodeWeights.resize(1);
+        nodeWeights[0] = scai::lama::fill<scai::lama::DenseVector<ValueType>>(graph.getRowDistributionPtr(), 1);
 
     } else{
     	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;
     	return 126;
     }
+
+    //
+    // read the communication graph or the block sizes if provided
+    //
+
+    if( vm.count("PEgraphFile") and vm.count("blockSizesFile") ){
+    	throw std::runtime_error("You should provide either a file for a communication graph OR a file for block sizes. Not both.");
+    }
+
+    ITI::CommTree<IndexType,ValueType> commTree;
+
+    if(vm.count("PEgraphFile")){
+        throw std::logic_error("Reading of communication trees not yet implemented here.");
+    	//commTree =  FileIO<IndexType, ValueType>::readPETree( settings.PEGraphFile );
+    }else if( vm.count("blockSizesFile") ){
+    	//blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
+        std::vector<std::vector<ValueType>> blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
+        if (blockSizes.size() < nodeWeights.size()) {
+            throw std::invalid_argument("Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + " weights per block, "
+                + "but nodes have " + std::to_string(nodeWeights.size()) + " weights.");
+        }
+
+        if (blockSizes.size() > nodeWeights.size()) {
+            blockSizes.resize(nodeWeights.size());
+            if (comm->getRank() == 0) {
+                std::cout << "Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + " weights per block, "
+                + "but nodes have " + std::to_string(nodeWeights.size()) + " weights. Discarding surplus block sizes." << std::endl;
+            }
+        }
+
+        for (IndexType i = 0; i < nodeWeights.size(); i++) {
+        	const ValueType blockSizesSum  = std::accumulate( blockSizes[i].begin(), blockSizes[i].end(), 0);
+			const ValueType nodeWeightsSum = nodeWeights[i].sum();
+			SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
+        }
+
+        commTree.createFlatHeterogeneous( blockSizes );
+    }else{
+    	commTree.createFlatHomogeneous( settings.numBlocks, nodeWeights.size() );
+    }
     
+    commTree.adaptWeights( nodeWeights );
+
     //---------------------------------------------------------------------
     //
     //  read block sizes from a file if it is passed as an argument
     //
     
-    if( vm.count("blockSizesFile") ){
-        settings.blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
-        IndexType blockSizesSum  = std::accumulate( settings.blockSizes.begin(), settings.blockSizes.end(), 0);
-        IndexType nodeWeightsSum = nodeWeights.sum();
-        SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
-    }
+    //std::vector<std::vector<ValueType> > blockSizes;
+    
     
     //---------------------------------------------------------------
     //
@@ -591,25 +408,28 @@ int main(int argc, char** argv) {
     		coordinates[d].redistribute(previousRedist);
     	}
 
-    	if (nodeWeights.size() > 0) {
-    		nodeWeights.redistribute(previousRedist);
+    	for (IndexType i = 0; i < nodeWeights.size(); i++) {
+    		nodeWeights[i].redistribute(previousRedist);
     	}
     	previous = fill<DenseVector<IndexType>>(previousRedist.getTargetDistributionPtr(), comm->getRank());
 
     }
-    
+
     std::vector<struct Metrics> metricsVec;
-	
+
     //------------------------------------------------------------
     //
     // partition the graph
     //
-
+    IndexType repeatTimes = settings.repeatTimes;
+    
     if( repeatTimes>0 ){
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
         // SCAI_ASSERT_ERROR(rowDistPtr->isEqual( new scai::dmemo::BlockDistribution(N, comm) ) , "Graph row distribution should (?) be a block distribution." );
-        SCAI_ASSERT_ERROR( coordinates[0].getDistributionPtr()->isEqual( *rowDistPtr ) , "rowDistribution and coordinates distribution must be equal" ); 
-        SCAI_ASSERT_ERROR( nodeWeights.getDistributionPtr()->isEqual( *rowDistPtr ) , "rowDistribution and nodeWeights distribution must be equal" ); 
+        SCAI_ASSERT_ERROR( coordinates[0].getDistributionPtr()->isEqual( *rowDistPtr ) , "rowDistribution and coordinates distribution must be equal" );
+        for (IndexType i = 0; i < nodeWeights.size(); i++) {
+        	SCAI_ASSERT_ERROR( nodeWeights[i].getDistributionPtr()->isEqual( *rowDistPtr ) , "rowDistribution and nodeWeights distribution must be equal" );
+        }
     }
     
     //store distributions to use later
@@ -617,7 +437,7 @@ int main(int argc, char** argv) {
     const scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ) );
     
     scai::lama::DenseVector<IndexType> partition;
-    
+
     for( IndexType r=0; r<repeatTimes; r++){
                 
         // for the next runs the input is redistributed, so we must redistribute to the original distributions
@@ -634,48 +454,33 @@ int main(int argc, char** argv) {
             for(int d=0; d<settings.dimensions; d++){
                 coordinates[d].redistribute( rowDistPtr );
             }
-            nodeWeights.redistribute( rowDistPtr );
+            for (IndexType i = 0; i < nodeWeights.size(); i++) {
+            		nodeWeights[i].redistribute( rowDistPtr );
+            }
         }
-          
-        metricsVec.push_back( Metrics( comm->getSize()) );
+
+        //metricsVec.push_back( Metrics( comm->getSize()) );
+        metricsVec.push_back( Metrics( settings ) );
             
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
-        
-        partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, settings, metricsVec[r] );
+
+        partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, commTree, settings, metricsVec[r] );
         assert( partition.size() == N);
         assert( coordinates[0].size() == N);
-        
+
         std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
 		
 		//WARNING: with the noRefinement flag the partition is not distributed
         if (!comm->all(partition.getDistribution().isEqual(graph.getRowDistribution()))) {
             partition.redistribute( graph.getRowDistributionPtr());
         }
-		
-        metricsVec[r].finalCut = ITI::GraphUtils::computeCut(graph, partition, true);
-        metricsVec[r].finalImbalance = ITI::GraphUtils::computeImbalance<IndexType,ValueType>(partition, settings.numBlocks ,nodeWeights);
-        metricsVec[r].inputTime = ValueType ( comm->max(inputTime.count() ));
-        metricsVec[r].timeFinalPartition = ValueType (comm->max(partitionTime.count()));
-
-        //---------------------------------------------
-        //
-        // Print some output
-        //
-        if (comm->getRank() == 0 ) {
-            std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
-            std::cout << " p:"<< comm->getSize() << " k:"<< settings.numBlocks;
-            auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
-            std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
-            std::cout.precision(oldprecision);
-            std::cout<< std::endl<< "\033[1;36mcut:"<< metricsVec[r].finalCut<< "   imbalance:"<< metricsVec[r].finalImbalance << std::endl;
-            std::cout<<"inputTime:" << metricsVec[r].inputTime << "   partitionTime:" << metricsVec[r].timeFinalPartition << " \033[0m" << std::endl;
-        }
-                
+		SCAI_ASSERT_EQ_ERROR( nodeWeights[0].getDistributionPtr()->getLocalSize(),\
+						partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");	        
+    
         //---------------------------------------------
         //
         // Get metrics
-        //
-        
+        //        
         
         std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
@@ -685,21 +490,51 @@ int main(int argc, char** argv) {
         if( metricsDetail=="easy" ){
 			metricsVec[r].getEasyMetrics( graph, partition, nodeWeights, settings );
 		}
-        std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
-        
-        
+
+        metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
+        metricsVec[r].MM["timeFinalPartition"] = ValueType (comm->max(partitionTime.count()));
+
+		std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
+
+if(comm->getRank() == 0 ) metricsVec[r].printHorizontal2( std::cout );        
+        //---------------------------------------------
+        //
+        // Print some output
+        //
+
+        if (comm->getRank() == 0 ) {
+            std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
+            std::cout << " p:"<< comm->getSize() << " k:"<< settings.numBlocks;
+            auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
+            std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
+            std::cout.precision(oldprecision);
+            metricsVec[r].printHorizontal2( std::cout ); //TODO: remove?
+        }
+       
         //---------------------------------------------------------------
         //
-        // Reporting output to std::cout
+        // Reporting output to std::cout and file for this repeatition
         //
         
-        metricsVec[r].reportTime = ValueType (comm->max(reportTime.count()));
-        
+        metricsVec[r].MM["reportTime"] = ValueType (comm->max(reportTime.count()));
         
         if (comm->getRank() == 0 && metricsDetail != "no") {
             metricsVec[r].print( std::cout );            
         }
-        
+        if( settings.storeInfo && settings.outFile!="-" ) {
+        	//std::vector<std::string> strs;			
+			//boost::split( strs, settings.outFile, boost::is_any_of("./") );
+        	//TODO: create a better tmp name
+        	std::string fileName = settings.outFile+ "_r"+ std::to_string(r);
+	        if( comm->getRank()==0 ){
+	            std::ofstream outF( fileName, std::ios::out);
+	            if(outF.is_open()){
+					settings.print( outF, comm);					
+					metricsVec[r].print( outF ); 
+				}
+			}
+		}
+
         comm->synchronize();
     }// repeat loop
         
@@ -710,16 +545,18 @@ int main(int argc, char** argv) {
     // writing results in a file and std::cout
     //
     
+    //aggregate metrics in one struct
+    const struct Metrics aggrMetrics = aggregateVectorMetrics( metricsVec );
+
     if (repeatTimes > 1) {
         if (comm->getRank() == 0) {
-            std::cout<<  "\033[1;36m";
-        }
-        printVectorMetrics( metricsVec, std::cout );
-        if (comm->getRank() == 0) {
+            std::cout<<  "\033[1;36m";    
+        	aggrMetrics.print( std::cout ); 
             std::cout << " \033[0m";
         }
     }
     
+
     if( settings.storeInfo && settings.outFile!="-" ) {
         if( comm->getRank()==0){
             std::ofstream outF( settings.outFile, std::ios::out);
@@ -727,23 +564,37 @@ int main(int argc, char** argv) {
 				outF << "Running " << __FILE__ << std::endl;
 				settings.print( outF, comm);
 				
-				if( settings.noRefinement)
-					printVectorMetricsShort( metricsVec, outF ); 
-				else
-					printVectorMetrics( metricsVec, outF ); 
-				
+				aggrMetrics.print( outF ); 
+			
+				//	profiling info for k-means
+				if(settings.verbose){
+					outF << "iter | delta | time | imbalance | balanceIter" << std::endl;
+					ValueType totTime = 0.0;
+					SCAI_ASSERT_EQ_ERROR( metricsVec[0].kmeansProfiling.size(), metricsVec[0].numBalanceIter.size() , "mismatch in kmeans profiling metrics vectors");
+
+
+					for( int i=0; i<metricsVec[0].kmeansProfiling.size(); i++){
+						std::tuple<ValueType, ValueType, ValueType> tuple = metricsVec[0].kmeansProfiling[i];
+
+						outF << i << " " << std::get<0>(tuple) << " " << std::get<1>(tuple) << " " << std::get<2>(tuple) << " " <<  metricsVec[0].numBalanceIter[i] << std::endl;
+						totTime += std::get<1>(tuple);
+					}
+					outF << "totTime: " << totTime << std::endl;
+				}	
+				//
+
 				//printVectorMetrics( metricsVec, outF ); 
                 std::cout<< "Output information written to file " << settings.outFile << " in total time " << totalT << std::endl;
-            }else{
+            }	else	{
                 std::cout<< "Could not open file " << settings.outFile << " information not stored"<< std::endl;
             }            
         }
     }    
     
     
-    if( settings.outFile!="-" and writePartition ){
+    if( settings.outFile!="-" and settings.writeInFile ){
         std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
-        std::string partOutFile = settings.outFile;
+        std::string partOutFile = settings.outFile+".part";
 		ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
 
         std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
@@ -797,10 +648,9 @@ int main(int argc, char** argv) {
         }
         */
     }
-      
-        
+      	  
     //this is needed for supermuc
-    //std::exit(0);   
+    std::exit(0);   
     
     return 0;
 }

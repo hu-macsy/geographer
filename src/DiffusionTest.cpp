@@ -36,7 +36,7 @@ TEST_F(DiffusionTest, testPotentials) {
     const IndexType n = graph.getNumRows();
     scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
 
-	CSRSparseMatrix<ValueType> L = GraphUtils::constructLaplacian<IndexType, ValueType>(graph);
+	CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
 
 	DenseVector<ValueType> nodeWeights(L.getRowDistributionPtr(),1);
 	IndexType source = 0;
@@ -56,7 +56,7 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 	const IndexType globalN = inputDist->getGlobalSize();
 	scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
 
-	CSRSparseMatrix<ValueType> L = GraphUtils::constructLaplacian<IndexType, ValueType>(graph);
+	CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
 	EXPECT_EQ(L.getRowDistribution(), graph.getRowDistribution());
 
 
@@ -71,7 +71,7 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 	comm->bcast( seed, 1, 0 );
 	srand(seed[0]);
 
-	GraphUtils::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), numLandmarks);
+	GraphUtils<IndexType, ValueType>::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), numLandmarks);
 
 	std::vector<IndexType> landmarks(numLandmarks);
 	std::copy(nodeIndices.begin(), nodeIndices.begin()+numLandmarks, landmarks.begin());
@@ -98,7 +98,7 @@ TEST_F(DiffusionTest, testConstructFJLTMatrix) {
 	const ValueType epsilon = 0.1;
 	const IndexType n = 10000;
 	const IndexType origDimension = 20;
-	CSRSparseMatrix<ValueType> fjlt = GraphUtils::constructFJLTMatrix<IndexType, ValueType>(epsilon, n, origDimension);
+	CSRSparseMatrix<ValueType> fjlt = GraphUtils<IndexType, ValueType>::constructFJLTMatrix(epsilon, n, origDimension);
 	EXPECT_EQ(origDimension, fjlt.getLocalNumColumns());
 }
 } /* namespace ITI */

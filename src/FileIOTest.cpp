@@ -136,6 +136,29 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile){
         }
     }
 }
+//-----------------------------------------------------------------
+
+TEST_F(FileIOTest, testWriteGraphWithEdgeWeights){
+    const IndexType N = 10;
+    
+    //define distributions
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+
+    //generate random complete matrix
+    auto graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDistPointer);
+    
+	scai::lama::MatrixCreator::fillRandom(graph, 1/9.0);
+	
+	std::string filename = "./meshes/noEdgeWeights.graph";	
+	FileIO<IndexType, ValueType>::writeGraph( graph, filename );
+	
+	filename = "./meshes/dgeWeights.graph";
+	FileIO<IndexType, ValueType>::writeGraph( graph, filename, true );
+	
+}
+
 
 //-----------------------------------------------------------------
 // read a graph from a file in METIS format and its coordinates in 2D and partition that graph
@@ -146,7 +169,8 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     ValueType epsilon= 0.1;
 
     std::string file= "slowrot-00000.graph";
-    std::string grFile= graphPath +file, coordFile= graphPath +file +".xyz";  //graph file and coordinates file
+    std::string grFile= graphPath +file;
+    std::string coordFile= graphPath +file +".xyz";  //graph file and coordinates file
     std::fstream f(grFile);
     IndexType nodes, edges;
     f>> nodes>> edges;
@@ -165,7 +189,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
     SCAI_REGION_START("testPartitionFromFile_local_2D.readGraphFromFile");
         graph = FileIO<IndexType, ValueType>::readGraph( grFile );
         graph.redistribute( distPtr , noDistPtr);
-        //std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
+        std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
     SCAI_REGION_END("testPartitionFromFile_local_2D.readGraphFromFile");
 
     // N is the number of nodes
@@ -198,7 +222,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D){
         settings.epsilon = epsilon;
         settings.dimensions = dim;
         settings.minGainForNextRound = 10;
-        struct Metrics metrics(settings.numBlocks);
+        struct Metrics metrics(settings);
         
         //partition the graph
         scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D, settings, metrics );
@@ -407,10 +431,9 @@ TEST_F(FileIOTest, testReadBlockSizes){
     std::string path = "testing/";
     std::string blocksFile = path + "blockSizes.txt";
 
-    std::vector<IndexType> blockSizes = FileIO<IndexType,ValueType>::readBlockSizes(blocksFile, 16);
+    std::vector<std::vector<ValueType> > blockSizes = FileIO<IndexType,ValueType>::readBlockSizes(blocksFile, 16);
     
-    //aux::printVector( blockSizes );
-    SCAI_ASSERT( blockSizes.size()==16 , "Wrong number of blocks, should be 16 but is " << blockSizes.size() );
+    SCAI_ASSERT( blockSizes[0].size()==16 , "Wrong number of blocks, should be 16 but is " << blockSizes.size() );
 
 }
 //-------------------------------------------------------------------------------------------------
@@ -612,21 +635,34 @@ TEST_F (FileIOTest, testReadEdgeListDistributed){
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	if( comm->getSize() != 4 ){
 		if( comm->getRank() == 0){
-			std::cout << "\n\t\t### WARNING: this test, " << __FUNCTION__ << " reads a distributed file and only works for p=4. You should call again with mpirun -n 4 (maybe also with --gtest_filter=*ReadEdgeListDistributed)." << std::endl<< std::endl;
+			std::cout << "\n\t\t### WARNING: this test reads a distributed file and only works for p=4. You should call again with mpirun -n 4 (maybe also with --gtest_filter=*ReadEdgeListDistributed)." << std::endl<< std::endl;
 		}		
-	}
-	ASSERT_EQ( comm->getSize(), 4) << "Specific number of processors needed for this test: 4";
+	} else {
+	
+        std::string file = graphPath + "tmp4/out";
 
-    std::string file = graphPath + "tmp4/out";
+        scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readEdgeListDistributed( file );
 
-    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readEdgeListDistributed( file );
+        ASSERT_TRUE( graph.isConsistent());
+        EXPECT_TRUE( graph.checkSymmetry() );
+        EXPECT_EQ( graph.getNumRows(), graph.getNumColumns()) << "Matrix is not square";
 
-    ASSERT_TRUE( graph.isConsistent());
-    EXPECT_TRUE( graph.checkSymmetry() );
-    EXPECT_EQ( graph.getNumRows(), graph.getNumColumns()) << "Matrix is not square";
+        // only for graph: graphPath + "tmp4/out"
+        EXPECT_EQ( graph.getNumRows(), 16) << "for files tmp4/out N must be 16";
+    }
+}
+//-------------------------------------------------------------------------------------------------
 
-    // only for graph: graphPath + "tmp4/out"
-    EXPECT_EQ( graph.getNumRows(), 16) << "for files tmp4/out N must be 16";
+TEST_F (FileIOTest, testReadPETree){
+
+	std::string file = graphPath+ "processorTrees/testPEgraph28.txt";
+
+	ITI::CommTree<IndexType, ValueType> tree =  FileIO<IndexType, ValueType>::readPETree( file );
+	PRINT("read file " << file );
+	tree.checkTree();
+
+	tree.getRoot().print();
+
 }
 
 } /* namespace ITI */
