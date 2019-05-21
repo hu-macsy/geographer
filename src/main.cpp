@@ -19,7 +19,6 @@
 #include <cstdlib>
 #include <chrono>
 #include <iomanip> 
-#include <unistd.h>
 
 #include "Diffusion.h"
 #include "MeshGenerator.h"

@@ -94,6 +94,9 @@ std::string toString(const ITI::Tool& t);
 ITI::Tool toTool(const std::string& s);
 
 struct Settings{
+	Settings();
+	bool checkValidity();
+
     //partition settings
     IndexType numBlocks = 2;
     double epsilon = 0.03;
@@ -120,7 +123,7 @@ struct Settings{
     
     //general tuning parameters
     ITI::Tool initialPartition = ITI::Tool::geoKmeans;
-    ITI::Tool initialMigration = ITI::Tool::geoSFC;//TODO: rename
+    static const ITI::Tool initialMigration = ITI::Tool::geoSFC;
 
     //tuning parameters for local refinement
     IndexType minBorderNodes = 1;
@@ -175,7 +178,7 @@ struct Settings{
     //calculate expensive performance metrics?
     bool computeDiameter = false;
     IndexType maxDiameterRounds = 2;
-    std::string metricsDetail;
+    std::string metricsDetail = "no";
 
     //this is used by the competitors main to set the tools we are gonna use
     std::vector<std::string> tools;
@@ -188,9 +191,7 @@ struct Settings{
     // print settings
     //
     
-	void print(std::ostream& out){
-		
-		//TODO: This should not be in settings, since the machine the code runs on is not a part of it.
+	void print(std::ostream& out) const {
 		
 		out<< "Git commit: " << version << " and machine: "<< machine << std::endl;
 		
@@ -219,19 +220,12 @@ struct Settings{
 			out<< "\tskipNoGainColors" << std::endl;
 		}
 		
-//out<< "initial migration: " << static_cast<int>(initialMigration) << std::endl;
 		out<< "initial migration: " << initialMigration << std::endl;
 		
 		if (initialPartition==ITI::Tool::geoSFC) {
 			out<< "initial partition: hilbert curve" << std::endl;
 			out<< "\tsfcResolution: " << sfcResolution << std::endl;
 		}
-		/* else if (initialPartition==ITI::Tool::Pixel) {
-			out<< "initial partition: pixels" << std::endl;
-			out<< "\tpixeledSideLen: "<< pixeledSideLen << std::endl;
-		} else if (initialPartition==InitialPartitioningMethods::Spectral) {
-			out<< "initial partition: spectral" << std::endl;
-		}*/ 
 		else if (initialPartition==ITI::Tool::geoKmeans) {
 			out<< "initial partition: K-Means" << std::endl;
 			out<< "\tminSamplingNodes: " << minSamplingNodes << std::endl;
@@ -248,7 +242,7 @@ struct Settings{
 	}
 //--------------------------------------------------------------------------------------------
 
-    void print(std::ostream& out, const scai::dmemo::CommunicatorPtr comm){
+    void print(std::ostream& out, const scai::dmemo::CommunicatorPtr comm) const {
 		if( comm->getRank()==0){
 			 print( out );
 		}
