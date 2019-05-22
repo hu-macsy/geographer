@@ -15,11 +15,6 @@
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/dmemo/GeneralDistribution.hpp>
 
-#include <boost/config.hpp>
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/betweenness_centrality.hpp>
-#include <boost/graph/properties.hpp>
-
 #include "Settings.h"
 
 
@@ -333,15 +328,6 @@ static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_rand
     }
     return begin;
 }
-
-/**
-	@brief Get the betweenness centality of all nodes of given graph
-	using boost::brandes_betweenness_centrality
-
-*/
-//template<typename IndexType, typename ValueType>
-static std::vector<ValueType> getBetweennessCentrality(const scai::lama::CSRSparseMatrix<ValueType>& graph, bool normalize= false);
-
 
 /**	Reordering a sequence of numbers from 0 to maxIndex.
  * The order is: maxIndex/2, maxIdnex/4, maxIndex*3/4, maxIndex/8, maxIndex*3/8, maxIndex*5/8, ...

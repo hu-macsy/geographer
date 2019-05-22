@@ -455,7 +455,7 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
     srand(time(NULL));
 
 	auto a = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(n,n);
-	scai::lama::MatrixCreator::fillRandom(a, 0.001);  // not symmetric
+	scai::lama::MatrixCreator::fillRandom(a, 0.01);  // not symmetric
 	CSRSparseMatrix<ValueType> aT = scai::lama::eval<scai::lama::CSRSparseMatrix<ValueType>>(transpose(a));
 
 	a = scai::lama::eval<scai::lama::CSRSparseMatrix<ValueType>>(a+aT);
@@ -822,7 +822,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
  *  |   |   |   |
  *  0 - 1 - 14- 15
 */
-TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
+TEST_F (ParcoRepartTest, testGetLocalWeightedGraphColoring_2D) {
     std::string file = graphPath+ "Grid8x8";
     std::ifstream f(file);
     IndexType dimensions= 2, k=16;
@@ -840,7 +840,7 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
         
 
-    //read the array locally and messed the distribution. Left as a remainder.
+    //read the array locally and messed the distribution. Left as a reminder.
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
     EXPECT_EQ( edges, (graph.getNumValues())/2 );
     
@@ -853,7 +853,6 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    settings.mec = false; //use the boost coloring algo
     struct Metrics metrics(settings);
     
     //get the partition
@@ -869,7 +868,7 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils<IndexType, ValueType>::getBlockGraph( graph, partition, k);
     
     IndexType colors;
-    std::vector< std::vector<IndexType>>  coloring = ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local(blockGraph, colors);
+    std::vector< std::vector<IndexType>>  coloring = GraphUtils<IndexType, ValueType>::mecGraphColoring( blockGraph, colors); // our implementation
     
     std::vector<DenseVector<IndexType>> communication = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph, settings);
     

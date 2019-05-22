@@ -308,13 +308,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 				std::cout << "SFC Time:" << totSFCTime << std::endl;
 		}
 	} 
-/*	else if ( settings.initialPartition==ITI::Tool::Pixel) {
-	PRINT0("Initial partition with pixels.");
-	result = ParcoRepart<IndexType, ValueType>::pixelPartition(coordinates, settings);
-} else if ( settings.initialPartition == ITI::Tool::Spectral) {
-	PRINT0("Initial partition with spectral");
-	result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
-}*/ 
+	//09/05/19: these tools are not really used. TODO:remove them?	
+	/*	else if ( settings.initialPartition==ITI::Tool::Pixel) {
+		PRINT0("Initial partition with pixels.");
+		result = ParcoRepart<IndexType, ValueType>::pixelPartition(coordinates, settings);
+	} else if ( settings.initialPartition == ITI::Tool::Spectral) {
+		PRINT0("Initial partition with spectral");
+		result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
+	}*/ 
 	else if (settings.initialPartition == ITI::Tool::geoKmeans or settings.initialPartition == ITI::Tool::geoHierKM \
 		or  settings.initialPartition == ITI::Tool::geoHierRepart){
 	    if (comm->getRank() == 0) {
@@ -471,6 +472,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 		if (nodeWeights.size() > 1) {
 			throw std::logic_error("MultiSection not implemented for multiple weights.");
 		}
+		if( not settings.cutsPerDim.empty() ){ // specific cuts per dimension are provided
+			IndexType k = std::accumulate( settings.cutsPerDim.begin(), settings.cutsPerDim.end(), 1 , std::multiplies<IndexType>() );
+			if( settings.numBlocks!=k ){
+				PRINT0("Input argument numBlocks= " << settings.numBlocks << " but the cutsPerDim provided will partition into "\
+						<< k << " blocks. These values should agree.\nAborting...");
+				throw std::runtime_error("Input argument values do not agree");
+			}
+		}
+
 		DenseVector<ValueType> convertedWeights(nodeWeights[0]);
 		result = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, settings);
 		std::chrono::duration<double> msTime = std::chrono::system_clock::now() - beforeInitPart;
@@ -491,8 +501,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 	
 	SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
 	
-	// TODO: add another 'debug' parameter to control that?
-	//if( settings.outFile!="-" and settings.writeInFile ){
+	// store partition if in debug mode
+	//comment it out since it will add a dependency to FileIO which is not really needed
+	//if( settings.outFile!="-" and settings.writeInFile and settings.debugMode ){
 	//	FileIO<IndexType, ValueType>::writePartitionParallel( result, settings.outFile+"_initPart.partition" );
 	//}
 	
@@ -1172,61 +1183,6 @@ void ITI::ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRS
 		}
 	}
 }
-//-----------------------------------------------------------------------------------------
-
-template<typename IndexType, typename ValueType>
-std::vector< std::vector<IndexType>> ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local(CSRSparseMatrix<ValueType> &adjM, IndexType &colors) {
-    SCAI_REGION("ParcoRepart.coloring");
-    using namespace boost;
-    IndexType N= adjM.getNumRows();
-    assert( N== adjM.getNumColumns() ); // numRows = numColumns
-    
-    if (!adjM.getRowDistributionPtr()->isReplicated()) {
-        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-        //PRINT0("***WARNING: In getGraphEdgeColoring_local: given graph is not replicated; will replicate now");
-        const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
-    	adjM.redistribute(noDist, noDist);
-    	//throw std::runtime_error("Input matrix must be replicated.");
-    }
-
-    // use boost::Graph and boost::edge_coloring()
-    typedef adjacency_list< vecS,
-                            vecS,
-                            undirectedS,
-                            no_property,
-                            size_t,
-                            no_property> Graph;
-    //typedef std::pair<std::size_t, std::size_t> Pair;
-    Graph G(N);
-    
-    // retG[0][i] the first node, retG[1][i] the second node, retG[2][i] the color of the edge
-    std::vector< std::vector<IndexType>> retG(3);
-    
-	const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-
-    // create graph G from the input adjacency matrix
-    for(IndexType i=0; i<N; i++){
-    	//we replicated the matrix, so global indices are local indices
-    	const IndexType globalI = i;
-    	for (IndexType j = ia[i]; j < ia[i+1]; j++) {
-    		if (globalI < ja[j]) {
-				boost::add_edge(globalI, ja[j], G);
-				retG[0].push_back(globalI);
-				retG[1].push_back(ja[j]);
-    		}
-    	}
-    }
-    
-    colors = boost::edge_coloring(G, boost::get( boost::edge_bundle, G));
-    
-    for (size_t i = 0; i <retG[0].size(); i++) {
-        retG[2].push_back( G[ boost::edge( retG[0][i],  retG[1][i], G).first] );
-    }
-    
-    return retG;
-}
 
 //-----------------------------------------------------------------------------------------
 
@@ -1251,13 +1207,9 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 			//throw std::runtime_error("Input matrix must be replicated.");
 		}
 		//here graph is replicated. PE0 will write it in a file
-		
-		if(settings.mec){
-			//coloring = getGraphMEC_local( adjM, colors );  // using hasan's code
-            coloring = GraphUtils<IndexType, ValueType>::mecGraphColoring( adjM, colors); // our implementation
-		}else{
-			coloring = getGraphEdgeColoring_local( adjM, colors );
-		}
+
+        coloring = GraphUtils<IndexType, ValueType>::mecGraphColoring( adjM, colors); // our implementation
+
 		std::chrono::duration<double> coloringTime = std::chrono::system_clock::now() - beforeColoring;
 		ValueType maxTime = comm->max( coloringTime.count() );
 		ValueType minTime = comm->min( coloringTime.count() );

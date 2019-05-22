@@ -23,8 +23,6 @@
 
 using scai::lama::DenseVector;
 
-
-
 namespace ITI {
 namespace KMeans {
 
