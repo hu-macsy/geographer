@@ -21,11 +21,11 @@
 #include "Settings.h"
 #include "Metrics.h" //needed for profiling, remove is not used
 
-using scai::lama::CSRSparseMatrix;
-using scai::lama::DenseVector;
-using scai::dmemo::HaloExchangePlan;
-
 namespace ITI{
+
+    using scai::lama::CSRSparseMatrix;
+    using scai::lama::DenseVector;
+    using scai::dmemo::HaloExchangePlan;
     
     template <typename IndexType, typename ValueType>
     class MultiLevel{

@@ -22,10 +22,10 @@
 #include <memory>
 #include <sys/stat.h>
 
-using scai::lama::CSRSparseMatrix;
-using scai::lama::DenseVector;
-
 namespace ITI {
+
+	using scai::lama::CSRSparseMatrix;
+	using scai::lama::DenseVector;
     
        /** METIS format: for graphs: first line are the nodes, N, and edges, E, of the graph
          *                            the next N lines contain the neighbours for every node. 

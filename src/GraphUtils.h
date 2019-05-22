@@ -17,7 +17,6 @@
 
 #include "Settings.h"
 
-
 namespace ITI {
 
 //namespace GraphUtils {

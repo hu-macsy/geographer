@@ -16,6 +16,7 @@ using ITI::IndexType;
 using ITI::ValueType;
 using ITI::version;
 using ITI::Metrics;
+using scai::lama::DenseVector;
 
 int main(int argc, char** argv) {
 	using namespace boost::program_options;

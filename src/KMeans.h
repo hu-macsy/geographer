@@ -21,9 +21,10 @@
 #include "AuxiliaryFunctions.h"
 #include "CommTree.h"
 
-using scai::lama::DenseVector;
-
 namespace ITI {
+
+		using scai::lama::DenseVector;
+		
 namespace KMeans {
 
 //TODO: any other more proper way to do this?

@@ -31,9 +31,10 @@
 
 #include "RBC/Sort/SQuick.hpp"
 
-using scai::lama::DenseVector;
-
 namespace ITI {
+
+	using scai::lama::DenseVector;
+
 	template <typename IndexType, typename ValueType>
 	class HilbertCurve {
 		public:

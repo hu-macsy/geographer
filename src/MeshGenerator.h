@@ -36,10 +36,10 @@
 #include "AuxiliaryFunctions.h"
 #include "Settings.h"
 
-using scai::lama::CSRSparseMatrix;
-using scai::lama::DenseVector;
-
 namespace ITI {
+    using scai::lama::CSRSparseMatrix;
+    using scai::lama::DenseVector;
+
 	template <typename IndexType, typename ValueType>
 	class MeshGenerator{
             public:
