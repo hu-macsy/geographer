@@ -31,7 +31,6 @@
 #include "Settings.h"
 #include "Metrics.h"
 
-//#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
 using scai::lama::DenseVector;
 

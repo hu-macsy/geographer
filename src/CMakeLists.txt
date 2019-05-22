@@ -14,6 +14,7 @@ set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphU
 
 ### define targets ###
 add_library(geographer SHARED ${FILES_COMMON})
+target_compile_options(geographer PRIVATE -fPIC)
 target_link_libraries(geographer ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 if (USE_BOOST)
 	target_include_directories(geographer ${Boost_INCLUDE_DIRS})
@@ -39,8 +40,11 @@ if (GTEST_FOUND AND Boost_FOUND)
 	target_include_directories(Geographer PUBLIC ${Boost_INCLUDE_DIRS})
 	target_link_libraries(GeographerTest geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
 	target_link_libraries(GeographerTest -pthread)
+	add_test(NAME GeographerTest COMMAND GeographerTest WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+	#install(TARGETS GeographerTest DESTINATION "${BIN_DEST}") # test executable
 endif (GTEST_FOUND AND Boost_FOUND)
 
+install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable
 install(TARGETS geographer EXPORT geographer DESTINATION "${LIB_DEST}") # library
 install(FILES ${FILES_HEADER} DESTINATION "${HEADER_DEST}")
 

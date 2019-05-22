@@ -11,7 +11,7 @@ The following software is needed to compile and use libgeographer:
 - A sufficiently modern compiler, for example [g++ &gt;= 4.9](https://gcc.gnu.org) or [icpc &gt;=17.0](https://en.wikipedia.org/wiki/Intel_C%2B%2B_Compiler)
 - MPI
 - The numerical library [Lama](https://github.com/kit-parco/lama)
-- To build the command line frontend: [Boost](https://www.boost.org/) (&gt;= 1.61.0)
+- For the command line frontend: [Boost](https://www.boost.org/) (&gt;= 1.61.0)
 - For the unit tests: [Google Test](https://github.com/google/googletest)
 
 ## Installation

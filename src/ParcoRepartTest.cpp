@@ -840,7 +840,7 @@ TEST_F (ParcoRepartTest, testGetLocalWeightedGraphColoring_2D) {
     graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
         
 
-    //read the array locally and messed the distribution. Left as a remainder.
+    //read the array locally and messed the distribution. Left as a reminder.
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
     EXPECT_EQ( edges, (graph.getNumValues())/2 );
     
@@ -853,7 +853,6 @@ TEST_F (ParcoRepartTest, testGetLocalWeightedGraphColoring_2D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    settings.mec = false; //use the boost coloring algo
     struct Metrics metrics(settings);
     
     //get the partition

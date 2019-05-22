@@ -9,6 +9,8 @@
 
 #include "GraphUtils.h"
 
+namespace ITI {
+
 struct Metrics{
     
     // timing results
@@ -162,3 +164,5 @@ inline struct Metrics aggregateVectorMetrics( const std::vector<struct Metrics>&
 	return aggregateMetrics;
 }
 //-------------------------------------------------------------------------------------------------------------
+
+} //namespace ITI

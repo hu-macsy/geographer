@@ -46,7 +46,6 @@ namespace ITI {
 					("useDiffusionTieBreaking", value<bool>(&settings.useDiffusionTieBreaking)->default_value(settings.useDiffusionTieBreaking), "Tuning Parameter: Use diffusion to break ties in Fiduccia-Mattheyes algorithm")
 					("useGeometricTieBreaking", value<bool>(&settings.useGeometricTieBreaking)->default_value(settings.useGeometricTieBreaking), "Tuning Parameter: Use distances to block center for tie breaking")
 					("skipNoGainColors", value<bool>(&settings.skipNoGainColors)->default_value(settings.skipNoGainColors), "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round")
-					("mec", "Use the MEC algorithm for the edge coloring of the PE graphFile instead of the classical boost algorithm" )
 					//multisection
 					("bisect", value<bool>(&settings.bisect)->default_value(settings.bisect), "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached")
 					("cutsPerDim", value<std::vector<IndexType>>(&settings.cutsPerDim)->multitoken(), "If MultiSection is chosen, then provide d values that define the number of cuts per dimension.")
@@ -59,11 +58,10 @@ namespace ITI {
 					("maxKMeansIterations", value<IndexType>(&settings.maxKMeansIterations)->default_value(settings.maxKMeansIterations), "Tuning parameter for K-Means")
 					("tightenBounds", "Tuning parameter for K-Means")
 					("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
-					("initialMigration", value<ITI::Tool>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration: geoSFC, geoKMeans, geoMultiSection")
+					//("initialMigration", value<ITI::Tool>(&settings.initialMigration)->default_value(settings.initialMigration), "Choose a method to get the first migration: geoSFC, geoKMeans, geoMultiSection")
 					("hierLevels", value<std::vector<IndexType>>(&settings.hierLevels)->multitoken(), "The number of blocks per level. Total number of PEs (=number of leaves) is \
 					the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3 4 10, there are 3 levels. \
 					In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs")
-					//("manhattanDistance", "Tuning parameter for K-Means")
 					//output
 					("outFile", value<std::string>(&settings.outFile), "write result partition into file")
 					//debug
@@ -75,7 +73,7 @@ namespace ITI {
 	                ("repeatTimes", value<IndexType>(&settings.repeatTimes), "How many times we repeat the partitioning process.")
 	                ("noComputeDiameter", "Compute diameter of resulting block files.")
 	                ("maxDiameterRounds", value<IndexType>(&settings.maxDiameterRounds)->default_value(settings.maxDiameterRounds), "abort diameter algorithm after that many BFS rounds")
-					("metricsDetail", value<std::string>(&settings.metricsDetail)->default_value("no"), "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV")
+					("metricsDetail", value<std::string>(&settings.metricsDetail)->default_value(settings.metricsDetail), "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV")
 					//used for the competitors main
 					("outDir", value<std::string>(&settings.outDir), "write result partition into file")
 					//("tool", value<std::string>(&settings.tool), "The tool to partition with.")
@@ -133,22 +131,6 @@ namespace ITI {
 			SCAI_ASSERT( !settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
 			SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDime: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
 		}
-	        
-		if( vm.count("initialMigration") ){
-
-			if( !(settings.initialMigration==Tool::geoSFC) ){
-				PRINT0("Initial migration supported only for SFCs invalid option " << settings.initialMigration << " was given");
-				settings.isValid = false;
-				//return 126;
-			}
-		}
-
-		/**
-		case Tool::geoKmeans: token = "geoKmeans"; break;
-		case Tool::geoSFC: token = "geoSFC"; break;
-		case Tool::geoHierKM: token = "geoHierKM"; break;
-		case Tool::geoHierRepart: token = "geoHierRepart"; break;
-		*/
 
 		if (vm.count("fileFormat") && settings.fileFormat == ITI::Format::TEEC) {
 			if (!vm.count("numX")) {
@@ -177,7 +159,7 @@ namespace ITI {
 				settings.initialPartition = Tool::geoKmeans;
 			}
 		}
-		
+
 		if( settings.storeInfo && settings.outFile=="-" ) {
 			PRINT0("Option to store information used but no output file given to write to. Specify an output file using the option --outFile. Aborting.");
 			settings.isValid = false;
@@ -188,14 +170,6 @@ namespace ITI {
 		    settings.influenceExponent = 1.0/settings.dimensions;
 		}
 
-		if (vm.count("manhattanDistance")) {
-			throw std::logic_error("Manhattan distance not yet implemented");
-		}
-
-		if(vm.count("mec")){
-			settings.mec = true;
-		}
-
 	    if( vm.count("metricsDetail") ){
 			if( not (settings.metricsDetail=="no" or settings.metricsDetail=="easy" or settings.metricsDetail=="all") ){
 				if(comm->getRank() ==0 ){
@@ -203,8 +177,6 @@ namespace ITI {
 					settings.metricsDetail="all";
 				}
 			}
-		} else {
-			settings.metricsDetail = "easy";
 		}	
 
 		if( vm.count("noComputeDiameter") ){
@@ -216,17 +188,29 @@ namespace ITI {
 	    if( vm.count("writePartition") ){
 	        settings.writeInFile = true;
 	    }
-	   
-	    char machineChar[255];
-	    gethostname(machineChar, 255);
-	    
-	    settings.machine = std::string(machineChar);
+
+	    if ( settings.hierLevels.size() > 0 ) {
+	    	if (!(settings.initialPartition == Tool::geoHierKM 
+	    		|| settings.initialPartition == Tool::geoHierRepart)) {
+		    	if(comm->getRank() ==0 ){
+					std::cout<<" WARNING: Without using hierarchical partitioning,\
+					 the given hierarchy levels will be ignored. " <<std::endl;
+				}
+	    	}
+
+	    	if (!vm.count("numBlocks")) {
+	    		IndexType numBlocks = 1;
+	    		for (IndexType level : settings.hierLevels) {
+	    			numBlocks *= level;
+	    		}
+	    		settings.numBlocks = numBlocks;
+	    	}
+	    }
 	        
 	    settings.verbose = vm.count("verbose");
 	    settings.storeInfo = vm.count("storeInfo");
 	    settings.erodeInfluence = vm.count("erodeInfluence");
 	    settings.tightenBounds = vm.count("tightenBounds");
-	    settings.manhattanDistance = vm.count("manhattanDistance");
 		settings.noRefinement = vm.count("noRefinement");
 
 	    srand(vm["seed"].as<double>());
