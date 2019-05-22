@@ -20,7 +20,7 @@ add_library(geographer SHARED ${FILES_COMMON})
 target_compile_options(geographer PRIVATE -fPIC)
 target_link_libraries(geographer ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 if (USE_BOOST)
-	target_include_directories(geographer ${Boost_INCLUDE_DIRS})
+	target_include_directories(geographer PUBLIC ${Boost_INCLUDE_DIRS})
 	target_link_libraries(geographer ${Boost_LIBRARIES})
 endif(USE_BOOST)
 
@@ -54,3 +54,24 @@ install(EXPORT geographer DESTINATION "${CMAKE_DEST}")
 if (Boost_FOUND)
 	install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable
 endif (Boost_FOUND)
+
+### for more info see the Zoltan2 documentation and https://trilinos.org/oldsite/Finding_Trilinos.txt
+### see also in Trilinos_install_path/install/include/Makefile.export.Zoltan2
+
+if( Zoltan2_FOUND )
+	message( "\n\tFound package Zoltan2\n")
+
+	link_directories( ${Zoltan2_LIBRARY_DIRS} ) # not sure if needed, "/home/hpc/pr87si/di36qin/Code/Trilinos/install/lib/"
+	# maybe ${Zoltan2_TPL_LIBRARY_DIRS} is needed but, at least in my installation, it is empty
+
+	add_executable( allCompetitors Wrappers.cpp ${FILES_COMMON} allCompetitorsPart.cpp )
+	target_include_directories( allCompetitors PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} )
+	
+	### include parmetis and metis ###
+	target_include_directories( allCompetitors PUBLIC "/lrz/sys/libraries/metis/5.1.0/i8r8/include" )
+	target_include_directories( allCompetitors PUBLIC "/lrz/sys/libraries/parmetis/4.0.3/ibmmpi/i8r8/include" )
+
+	target_link_libraries( allCompetitors geographer ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Boost_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} ${Zoltan2_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )
+else()
+	#message( "Package Zoltan2 was not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
+endif()

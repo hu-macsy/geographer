@@ -9,9 +9,9 @@
 #include "Wrappers.h"
 
 
-IndexType HARD_TIME_LIMIT= 600; 	// hard limit in seconds to stop execution if exceeded
-
 namespace ITI {
+
+IndexType HARD_TIME_LIMIT= 600; 	// hard limit in seconds to stop execution if exceeded
 
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(

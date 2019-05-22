@@ -27,7 +27,7 @@
 #include "Metrics.h"
 #include "MeshGenerator.h"
 #include "Wrappers.h"
-
+#include "parseArgs.h"
 
 
 extern "C"{
@@ -41,6 +41,7 @@ extern "C"{
 int main(int argc, char** argv) {
 
 	using namespace boost::program_options;
+	using namespace ITI;
 
 	//int parMetisGeom = 0;			//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
 //	bool storeInfo = true;
@@ -51,8 +52,8 @@ int main(int argc, char** argv) {
 	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
 
 	struct Settings settings;
-	variables_map vm = settings.parseInput( argc, argv);
-
+	variables_map vm;
+	std::tie(vm, settings) = ITI::parseInput( argc, argv);
 	if( !settings.isValid )
 		return -1;
 	
@@ -306,7 +307,7 @@ int main(int argc, char** argv) {
 			metrics.getEasyMetrics( graph, partition, nodeWeights, settings );
 		}
 		
-if( thisPE==0 ) metrics.printHorizontal2( std::cout );
+
 		//---------------------------------------------------------------
 		//
 		// Reporting output to std::cout
