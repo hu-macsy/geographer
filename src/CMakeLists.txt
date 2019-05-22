@@ -10,11 +10,6 @@ set(FILES_HEADER ParcoRepart.h MultiLevel.h LocalRefinement.h HilbertCurve.h Mes
 set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp SpectralPartition.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp KMeans.cpp CommTree.cpp AuxiliaryFunctions.cpp HaloPlanFns.cpp Metrics.cpp Mapping.cpp Settings.cpp)
 set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp quadtree/test/QuadTreeTest.cpp SpectralPartitionTest.cpp)
 
-### add Wrappers to the library if external libraries are found
-if(Zoltan2_FOUND) #TODO: add metis and parmetis
-	set(FILES_COMMON FILES_COMMON Wrappers.com)
-endif()
-
 ### define targets ###
 add_library(geographer SHARED ${FILES_COMMON})
 target_compile_options(geographer PRIVATE -fPIC)
@@ -58,7 +53,7 @@ endif (Boost_FOUND)
 ### for more info see the Zoltan2 documentation and https://trilinos.org/oldsite/Finding_Trilinos.txt
 ### see also in Trilinos_install_path/install/include/Makefile.export.Zoltan2
 
-if( Zoltan2_FOUND )
+if( Zoltan2_FOUND ) #TODO: add metis and parmetis
 	message( "\n\tFound package Zoltan2\n")
 
 	link_directories( ${Zoltan2_LIBRARY_DIRS} ) # not sure if needed, "/home/hpc/pr87si/di36qin/Code/Trilinos/install/lib/"
@@ -72,6 +67,8 @@ if( Zoltan2_FOUND )
 	target_include_directories( allCompetitors PUBLIC "/lrz/sys/libraries/parmetis/4.0.3/ibmmpi/i8r8/include" )
 
 	target_link_libraries( allCompetitors geographer ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Boost_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} ${Zoltan2_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )
+	install(TARGETS allCompetitors DESTINATION "${BIN_DEST}") # executable
+	install(FILES Wrappers.h DESTINATION "${HEADER_DEST}")
 else()
 	#message( "Package Zoltan2 was not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
 endif()
