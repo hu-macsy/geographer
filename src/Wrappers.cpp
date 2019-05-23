@@ -5,6 +5,13 @@
  *      Author: tzovas
  */
 
+#include <parmetis.h>
+
+//for zoltan
+#include <Zoltan2_PartitioningSolution.hpp>
+#include <Zoltan2_PartitioningProblem.hpp>
+#include <Zoltan2_BasicVectorAdapter.hpp>
+#include <Zoltan2_InputTraits.hpp>
 
 #include "Wrappers.h"
 
