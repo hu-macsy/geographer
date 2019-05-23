@@ -61,18 +61,6 @@ using point = std::vector<ValueType>;
  	const Settings settings, \
  	struct Metrics &metrics);
 
-//TODO: graph is not needed, this is only for debugging
- template<typename IndexType, typename ValueType>
- DenseVector<IndexType> computePartition(
- 	const CSRSparseMatrix<ValueType> &graph, \
- 	const std::vector<DenseVector<ValueType>> &coordinates, \
- 	const std::vector<DenseVector<ValueType>> &nodeWeights, \
- 	const std::vector<std::vector<ValueType>> &blockSizes, \
- 	const DenseVector<IndexType>& prevPartition,\
- 	std::vector<std::vector<point>> centers, \
- 	const Settings settings, \
- 	struct Metrics &metrics);
-
 //minimal wrapper
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(
@@ -106,8 +94,6 @@ DenseVector<IndexType> computePartition(
 /**
  * Given a tree of the processors graph, computes a partition into a hierachical fashion.
  * 
- * param[in] graph The adjacency matrix. Note: currently, the graph is used mainly for
- * debugging purposes and is not needed.
  * @param[in] coordinates first level index specifies dimension, second level index the point id
  * @param[in] nodeWeights
  * @param[in] commTree The tree describing the processor network.
@@ -115,7 +101,6 @@ DenseVector<IndexType> computePartition(
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierarchicalPartition(
-	CSRSparseMatrix<ValueType> &graph, //TODO: only for debugging
 	std::vector<DenseVector<ValueType>> &coordinates,
 	std::vector<DenseVector<ValueType>> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,
@@ -124,7 +109,6 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierPlusRepart(
-	CSRSparseMatrix<ValueType> &graph, //TODO: only for debugging
 	std::vector<DenseVector<ValueType>> &coordinates,
 	std::vector<DenseVector<ValueType>> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,

@@ -441,11 +441,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 			commTree.adaptWeights( nodeWeightCopy );
 
 			if (settings.initialPartition == ITI::Tool::geoHierKM){
-				result = ITI::KMeans::computeHierarchicalPartition<IndexType, ValueType>( input, coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
+				result = ITI::KMeans::computeHierarchicalPartition<IndexType, ValueType>( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
 			}
 			if (settings.initialPartition == ITI::Tool::geoHierRepart){
 				//settings.debugMode = true;
-				result = ITI::KMeans::computeHierPlusRepart<IndexType, ValueType>( input, coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
+				result = ITI::KMeans::computeHierPlusRepart<IndexType, ValueType>( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
 			}
 			SCAI_ASSERT_EQ_ERROR( nodeWeightCopy[0].getDistributionPtr()->getLocalSize(),\
 						result.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");			
