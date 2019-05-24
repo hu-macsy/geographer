@@ -10,6 +10,7 @@ set(FILES_HEADER ParcoRepart.h MultiLevel.h LocalRefinement.h HilbertCurve.h Mes
 set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp SpectralPartition.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp KMeans.cpp CommTree.cpp AuxiliaryFunctions.cpp HaloPlanFns.cpp Metrics.cpp Mapping.cpp Settings.cpp)
 set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp quadtree/test/QuadTreeTest.cpp SpectralPartitionTest.cpp)
 
+#set( EXTRA_LIBRARIES "" )
 
 ###
 ### Check if external libraries metis, parmetis and zoltan2 are found. If they are found,
@@ -22,12 +23,17 @@ FIND_PACKAGE( Zoltan2 PATHS "/home/hpc/pr87si/di36qin/Code/Trilinos/build/packag
 
 ### find metis and parmetis
 
-#this are the paths in supermuc
+#this are the paths in supermuc; provide them using -DMETIS_BASE in the cmake call
 #set(METIS_BASE "/lrz/sys/libraries/metis/5.1.0/i8r8")
 #set(PARMETIS_BASE  "/lrz/sys/libraries/parmetis/4.0.3/ibmmpi/i8r8")
 
 find_library( METIS_LIB metis "${METIS_BASE}/lib" )
 find_library( PARMETIS_LIB parmetis "${PARMETIS_BASE}/lib" )
+
+###
+### define libraries and executables
+###
+
 
 ### for more info see the Zoltan2 documentation and https://trilinos.org/oldsite/Finding_Trilinos.txt
 ### see also in Trilinos_install_path/install/include/Makefile.export.Zoltan2
@@ -37,18 +43,31 @@ if( Zoltan2_FOUND AND METIS_LIB AND PARMETIS_LIB )
 	message( "\tFound library metis in " ${METIS_LIB} )
 	message( "\tFound library parmetis in " ${PARMETIS_LIB} )
 	message( "\n" )
+	
+	#WARNING: if we use ${Zoltan2_LIBRARIES}, it tries to link to the .a library and this creates an error. We need the .so library
+	find_library( ZOLTAN2_LIB libzoltan2.so ${Zoltan2_LIBRARY_DIRS} )
+	find_library( ZOLTAN_LIB libzoltan.so ${Zoltan_LIBRARY_DIRS} )
+	message( ${Zoltan_LIBRARY_DIRS} )
+	message( ${ZOLTAN2_LIB} )
+	message( ${ZOLTAN_LIB} )
 
+	#TODO: link_directories is probably not needed; there is a better way to do this; at least, this works for now
 	link_directories( ${Zoltan2_LIBRARY_DIRS} ${METIS_BASE}/lib ${PARMETIS_BASE}/lib )
-	# maybe ${Zoltan2_TPL_LIBRARY_DIRS} is needed but, at least in my installation, it is empty
+	
+	add_library( wrappers SHARED  Wrappers.cpp)
+	target_include_directories( wrappers PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} "${METIS_BASE}/include" "${PARMETIS_BASE}/include")
+	target_link_libraries( wrappers  ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${ZOLTAN2_LIB}  ${ZOLTAN_LIB} ${Zoltan2_LIBRARIES} ) # libzoltan2.so metis parmetis
+	
+	set( EXTRA_LIBRARIES_FOUND "true" )
+	set( EXTRA_LIBRARIES ${METIS_LIB} ${PARMETIS_LIB} ${ZOLTAN2_LIB} ${Zoltan2_LIBRARIES}  PARENT_SCOPE )
 
-	add_executable( allCompetitors Wrappers.cpp allCompetitorsPart.cpp parseArgs.cpp)
+	add_executable( allCompetitors allCompetitorsPart.cpp parseArgs.cpp)
 	target_include_directories( allCompetitors PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} )
+	# include parmetis and metis ###
+	target_include_directories( allCompetitors PUBLIC "${METIS_BASE}/include" "${PARMETIS_BASE}/include" )
+	target_link_libraries( allCompetitors geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Boost_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
 	
-	### include parmetis and metis ###
-	target_include_directories( allCompetitors PUBLIC "${METIS_BASE}/include" )
-	target_include_directories( allCompetitors PUBLIC "${PARMETIS_BASE}/include" )
-	
-	target_link_libraries( allCompetitors geographer ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Boost_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} ${Zoltan2_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} metis parmetis)
+	install(TARGETS wrappers EXPORT wrappers DESTINATION "${LIB_DEST}") 
 	install(TARGETS allCompetitors DESTINATION "${BIN_DEST}") # executable
 	install(FILES Wrappers.h DESTINATION "${HEADER_DEST}")
 else()
@@ -56,25 +75,7 @@ else()
 endif()
 
 
-
-###
-### define libraries and executables
-###
-
-
-# the library; if external libraries (metis, parmetis, zoltan) are found, include Wrappers
-if( Zoltan2_FOUND AND METIS_LIB AND PARMETIS_LIB )
-	#message("with wrappers")
-	add_library(geographer SHARED ${FILES_COMMON} Wrappers.cpp)
-	target_include_directories( geographer PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} "${METIS_BASE}/include" "${PARMETIS_BASE}/include")
-	#WARNING: if we use ${Zoltan2_LIBRARIES}, it tries to link to the .a library and this creates an error. We need the .so library
-	target_link_libraries( geographer  ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} metis parmetis libzoltan2.so)
-else()
-	#message("NO wrappers")
-	add_library(geographer SHARED ${FILES_COMMON})
-endif()
-
-
+add_library(geographer SHARED ${FILES_COMMON})
 target_compile_options(geographer PRIVATE -fPIC)
 target_link_libraries(geographer ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 if (USE_BOOST)
@@ -113,4 +114,3 @@ install(EXPORT geographer DESTINATION "${CMAKE_DEST}")
 if (Boost_FOUND)
 	install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable
 endif (Boost_FOUND)
-

@@ -8,7 +8,7 @@ set(Geographer_VERSION_MAJOR 0 STRING "major version")
 set(Geographer_VERSION_MINOR 9 STRING "minor version")
 set(Geographer_VERSION ${Geographer_VERSION_MAJOR}.${Geographer_VERSION_MINOR} STRING "version")
 
-#set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_VERBOSE_MAKEFILE ON)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -127,6 +127,11 @@ if (Boost_FOUND)
   add_executable(heatMap src/FileIO.cpp src/Settings.cpp src/GraphUtils.cpp src/CommTree.cpp tools/graphToHeatmap.cpp)
   target_link_libraries(heatMap ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 endif (Boost_FOUND)
+
+if( TARGET wrappers )
+	set( WRAPPERS_FOUND TRUE)
+	#set( EXTRA_LIBS "")
+endif()
 
 ### support for FindPackage ###
 configure_file(GeographerConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfig.cmake @ONLY)
