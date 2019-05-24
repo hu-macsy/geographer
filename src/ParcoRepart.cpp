@@ -31,6 +31,7 @@
 #include "AuxiliaryFunctions.h"
 #include "MultiSection.h"
 #include "GraphUtils.h"
+#include "Mapping.h"
 
 
 
@@ -197,7 +198,7 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
 //-------------------------------------------------------------------------------------------------
 
-
+//the core implementation
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 	CSRSparseMatrix<ValueType> &input,
@@ -570,6 +571,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
 	std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - startTime;
 	metrics.MM["timeTotal"] = elapTime.count();
+
+	//possible mapping at the end
+	if( settings.mappingRenumbering ){
+		PRINT0("Applying renumbering of blocks based on the SFC index of their centers.");
+		Mapping<IndexType,ValueType>::applySfcRenumber( coordinates, nodeWeights, result, settings );
+	}
 	
 	return result;
 } //partitionGraph

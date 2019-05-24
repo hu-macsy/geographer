@@ -19,10 +19,10 @@
 #include <scai/dmemo/BlockDistribution.hpp>
 
 #include "Metrics.h"
+#include "Mapping.h"
 
 
 namespace ITI {
-
 
 template <typename IndexType, typename ValueType>
 class Wrappers {

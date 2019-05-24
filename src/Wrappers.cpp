@@ -30,33 +30,40 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
 	struct Settings &settings,
 	struct Metrics &metrics	){
 
-//TODO: for the metis wrappers, nodeWeights[0] is wrong, must adapt the protoypes 
+	scai::lama::DenseVector<IndexType> partition;
 	switch( tool){
 		case Tool::parMetisGraph:
-			return metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 0, settings, metrics);
+			partition = metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 0, settings, metrics);
 		
 		case Tool::parMetisGeom:
-			return metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 1, settings, metrics);
+			partition =  metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 1, settings, metrics);
 			
 		case Tool::parMetisSFC:
-			return metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 2, settings, metrics);
+			partition = metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 2, settings, metrics);
 			
 		case Tool::zoltanRIB:
-			return zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rib", settings, metrics);
+			partition = zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rib", settings, metrics);
 		
 		case Tool::zoltanRCB:
-			return zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rcb", settings, metrics);
+			partition = zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rcb", settings, metrics);
 		
 		case Tool::zoltanMJ:
-			return zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "multijagged", settings, metrics);
+			partition = zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "multijagged", settings, metrics);
 			
 		case Tool::zoltanSFC:
-			return zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "hsfc", settings, metrics);
+			partition = zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "hsfc", settings, metrics);
 			
 		default:
 			throw std::runtime_error("Wrong tool given to partition.\nAborting...");
-			return scai::lama::DenseVector<IndexType>(graph.getLocalNumRows(), -1 );
+			partition = scai::lama::DenseVector<IndexType>(graph.getLocalNumRows(), -1 );
 	}
+
+	if( settings.mappingRenumbering ){
+		PRINT0("Applying renumbering of blocks based on the SFC index of their centers.");
+		Mapping<IndexType,ValueType>::applySfcRenumber( coordinates, nodeWeights, partition, settings );
+	}
+
+	return partition;
 }
 //-----------------------------------------------------------------------------------------	
 
