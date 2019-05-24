@@ -394,9 +394,11 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::getSfcRenumber(
 	SCAI_ASSERT_EQ_ERROR( blockCenters.size(), dim, "Wrong size of centers vector." );
 	SCAI_ASSERT_EQ_ERROR( blockCenters[0].size(), k, "Wrong size of centers vector." )
 
-	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	for(IndexType i=0; i<k; i++){
-		PRINT0("center " << i << " in " << blockCenters[0][i] <<", " << blockCenters[1][i]);
+	if( settings.debugMode ){
+		const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		for(IndexType i=0; i<k; i++){
+			PRINT0("center " << i << " in " << blockCenters[0][i] <<", " << blockCenters[1][i]);
+		}
 	}
 
 	//
