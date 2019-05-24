@@ -14,6 +14,7 @@
 #include <Zoltan2_InputTraits.hpp>
 
 #include "Wrappers.h"
+#include "Mapping.h"
 
 
 namespace ITI {
@@ -59,6 +60,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
 	}
 
 	if( settings.mappingRenumbering ){
+		const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 		PRINT0("Applying renumbering of blocks based on the SFC index of their centers.");
 		Mapping<IndexType,ValueType>::applySfcRenumber( coordinates, nodeWeights, partition, settings );
 	}
