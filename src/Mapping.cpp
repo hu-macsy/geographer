@@ -384,6 +384,9 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::getSfcRenumber(
 	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
 	const typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
 
+	SCAI_ASSERT( partition.getDistribution().isEqual(coordinates[0].getDistribution()), "Partition and coordinates must have the same distribution" );
+	SCAI_ASSERT_EQ_ERROR( partition.getLocalValues().size(), localN, "Size mismatch. partition and coordinates must have the same distribution" );
+	
 	//to make it more readable
 	using point = std::vector<ValueType>;
 

@@ -575,6 +575,13 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 	//possible mapping at the end
 	if( settings.mappingRenumbering ){
 		PRINT0("Applying renumbering of blocks based on the SFC index of their centers.");
+
+		if( not result.getDistribution().isEqual(coordinates[0].getDistribution()) ){
+			PRINT0("WARNING:\nCoordinates and partition do not have the same distribution.\nRedistributing coordinates to match distribution");
+			for( int d=0; d<dimensions; d++){
+				coordinates[d].redistribute( result.getDistributionPtr() );
+			}
+		}
 		Mapping<IndexType,ValueType>::applySfcRenumber( coordinates, nodeWeights, result, settings );
 	}
 	

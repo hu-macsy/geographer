@@ -461,6 +461,7 @@ std::vector<point> findCenters(
 			    result[d][j] = NAN;
 			}
 		}
+
 		comm->sumImpl(result[d].data(), result[d].data(), k, scai::common::TypeTraits<ValueType>::stype);
 	}
 

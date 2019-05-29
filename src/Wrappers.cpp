@@ -35,25 +35,25 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
 	switch( tool){
 		case Tool::parMetisGraph:
 			partition = metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 0, settings, metrics);
-		
+			break;
 		case Tool::parMetisGeom:
 			partition =  metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 1, settings, metrics);
-			
+			break;
 		case Tool::parMetisSFC:
 			partition = metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 2, settings, metrics);
-			
+			break;
 		case Tool::zoltanRIB:
 			partition = zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rib", settings, metrics);
-		
+			break;
 		case Tool::zoltanRCB:
 			partition = zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rcb", settings, metrics);
-		
+			break;
 		case Tool::zoltanMJ:
 			partition = zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "multijagged", settings, metrics);
-			
+			break;
 		case Tool::zoltanSFC:
 			partition = zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "hsfc", settings, metrics);
-			
+			break;
 		default:
 			throw std::runtime_error("Wrong tool given to partition.\nAborting...");
 			partition = scai::lama::DenseVector<IndexType>(graph.getLocalNumRows(), -1 );
