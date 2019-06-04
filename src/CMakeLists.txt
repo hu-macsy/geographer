@@ -41,7 +41,6 @@ if (GTEST_FOUND AND Boost_FOUND)
 	#install(TARGETS GeographerTest DESTINATION "${BIN_DEST}") # test executable
 endif (GTEST_FOUND AND Boost_FOUND)
 
-install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable
 install(TARGETS geographer EXPORT geographer DESTINATION "${LIB_DEST}") # library
 install(FILES ${FILES_HEADER} DESTINATION "${HEADER_DEST}")
 install(EXPORT geographer DESTINATION "${CMAKE_DEST}")
