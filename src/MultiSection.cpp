@@ -134,33 +134,6 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
 }
 
 //--------------------------------------------------------------------------------------- 
-    
-template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr  distPtr, const std::vector<std::vector<IndexType>>& localPoints){
-    SCAI_REGION("MultiSection.setPartition");
-    
-    const IndexType localN = distPtr->getLocalSize();
-    const scai::dmemo::CommunicatorPtr comm = distPtr->getCommunicatorPtr();
-    
-    scai::hmemo::HArray<IndexType> localPartition;
-        
-    scai::hmemo::WriteOnlyAccess<IndexType> wLocalPart(localPartition, localN);
-    
-    for(IndexType i=0; i<localN; i++){
-        try{
-            wLocalPart[i] = root->getContainingLeaf( localPoints[i] )->getLeafID();
-        }catch( const std::logic_error& e ){
-            PRINT0( e.what() );
-            std::terminate();
-        }
-    }
-    wLocalPart.release();
-    
-    scai::lama::DenseVector<IndexType> partition(distPtr, std::move(localPartition));
-
-    return partition;
-}
-//--------------------------------------------------------------------------------------- 
 
 // The non-uniform grid case. Now we take as input the adjacency matrix of a graph and also the coordinates.
    
@@ -224,6 +197,8 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         numCuts = std::vector<IndexType>( log2(k) , 2 );
     }
     
+    SCAI_ASSERT_EQ_ERROR( numCuts.size(), dim, "Wrong dimensions or vector size.");
+
     //
     // initialize the tree
     //
@@ -265,7 +240,7 @@ if(comm->getRank()==0)  bBox.print( std::cout );
         std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> allLeaves = root->getAllLeaves();        
         SCAI_ASSERT( allLeaves.size()==numLeaves, "Wrong number of leaves.");
 
-        /*Two ways to find in with dimension to project:
+        /*Two ways to find in which dimension to project:
          * 1) just pick the dimension of the bounding box that has the largest extent and then project: only one projection
          * 2) project in every dimension and pick the one in which the difference between the maximum and minimum value is the smallest: d projections
          * TODO: maybe we can change (2) and calculate the variance of the projection and pick the one with the biggest
@@ -276,7 +251,7 @@ if(comm->getRank()==0)  bBox.print( std::cout );
 PRINT0("about to cut into " << *thisDimCuts);
         //TODO: useExtent is the only option. Add another or remove settings.useExtent
         // choose the dimension to project for each leaf/rectangle
-        if( settings.useExtent or true){
+        if( settings.useExtent ){
             SCAI_REGION("MultiSection.getRectanglesNonUniform.forAllRectangles.useExtent");
             // for all leaves/rectangles
             for( IndexType l=0; l<allLeaves.size(); l++){
@@ -386,8 +361,6 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
     const IndexType numLeaves = treeRoot->getNumLeaves();
     SCAI_ASSERT( numLeaves>0, "Zero or negative number of leaves.")
     
-    std::vector<std::vector<ValueType>> projections(numLeaves); // 1 projection per rectangle/leaf
-    
     IndexType leafIndex = treeRoot->indexLeaves(0);
     SCAI_ASSERT( numLeaves==leafIndex, "Wrong leaf indexing");
     SCAI_ASSERT( numLeaves==dimensionToProject.size(), "Wrong dimensionToProject vector size.");
@@ -399,7 +372,9 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
     
     //
     // reserve space for every projection
-    //
+	//
+	std::vector<std::vector<ValueType>> projections(numLeaves); // 1 projection per rectangle/leaf
+	
     for(IndexType l=0; l<numLeaves; l++){
         SCAI_REGION("MultiSection.projectionNonUniform.reserveSpace");
         const IndexType dim2proj = dimensionToProject[l];
@@ -660,6 +635,33 @@ std::pair<bool,std::vector<IndexType>> MultiSection<IndexType, ValueType>::probe
     return std::make_pair(ret,spliters);
 }
 //---------------------------------------------------------------------------------------
+    
+template<typename IndexType, typename ValueType>
+scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr  distPtr, const std::vector<std::vector<IndexType>>& localPoints){
+    SCAI_REGION("MultiSection.setPartition");
+    
+    const IndexType localN = distPtr->getLocalSize();
+    const scai::dmemo::CommunicatorPtr comm = distPtr->getCommunicatorPtr();
+    
+    scai::hmemo::HArray<IndexType> localPartition;
+        
+    scai::hmemo::WriteOnlyAccess<IndexType> wLocalPart(localPartition, localN);
+    
+    for(IndexType i=0; i<localN; i++){
+        try{
+            wLocalPart[i] = root->getContainingLeaf( localPoints[i] )->getLeafID();
+        }catch( const std::logic_error& e ){
+            PRINT0( e.what() );
+            std::terminate();
+        }
+    }
+    wLocalPart.release();
+    
+    scai::lama::DenseVector<IndexType> partition(distPtr, std::move(localPartition));
+
+    return partition;
+}
+//--------------------------------------------------------------------------------------- 
 
 // Checks if given index is in the bounding box bBox.
 template<typename IndexType, typename ValueType>
@@ -817,7 +819,7 @@ template<typename T>
 std::vector<T> MultiSection<IndexType, ValueType>::indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dim){
     SCAI_REGION("MultiSection.indexToCoords");
     
-    IndexType gridSize= std::pow(sideLen, dim);
+    const IndexType gridSize= std::pow(sideLen, dim);
     
     if( ind>gridSize){
         PRINT("Index "<< ind <<" too big, should be < gridSize= "<< gridSize);
@@ -838,13 +840,51 @@ std::vector<T> MultiSection<IndexType, ValueType>::indexToCoords(const IndexType
     
 }
 //---------------------------------------------------------------------------------------
+template<typename IndexType, typename ValueType>
+template<typename T>
+std::vector<T> MultiSection<IndexType, ValueType>::indexToCoords(const IndexType ind, const std::vector<IndexType> sideLen){
+    SCAI_REGION("MultiSection.indexToCoords");
+    
+    const IndexType gridSize= std::accumulate( sideLen.begin(), sideLen.end(), 1 , std::multiplies<IndexType>() );
+    const IndexType dim = sideLen.size();
 
+    if( ind>gridSize){
+        PRINT("Index "<< ind <<" too big, should be < gridSize= "<< gridSize);
+        throw std::runtime_error("Wrong index");
+    }
+    
+    if(ind<0){
+        throw std::runtime_error("Wrong index" + std::to_string(ind) + " should be positive or zero.");
+    }
+    
+    if(dim==2){
+        return  MultiSection<IndexType, ValueType>::indexTo2D<T>( ind, sideLen);
+    }else if(dim==3){
+        return MultiSection<IndexType, ValueType>::indexTo3D<T>( ind, sideLen);
+    }else{
+        throw std::runtime_error("function: indexToCoords, line:" +std::to_string(__LINE__) +", supporting only 2 or 3 dimensions");
+    }
+    
+}
+//---------------------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
 template<typename T>
 std::vector<T> MultiSection<IndexType, ValueType>::indexTo2D(IndexType ind, IndexType sideLen){
     SCAI_REGION("MultiSection.indexTo2D");
     T x = ind/sideLen;
     T y = ind%sideLen;
+    
+    return std::vector<T>{x, y};
+}
+//---------------------------------------------------------------------------------------
+template<typename IndexType, typename ValueType>
+template<typename T>
+std::vector<T> MultiSection<IndexType, ValueType>::indexTo2D(IndexType ind, std::vector<IndexType> sideLen){
+    SCAI_REGION("MultiSection.indexTo2D");
+    assert(sideLen.size()==2);
+
+    T x = ind/sideLen[1];
+    T y = ind%sideLen[1];
     
     return std::vector<T>{x, y};
 }
@@ -859,6 +899,21 @@ std::vector<T> MultiSection<IndexType, ValueType>::indexTo3D(IndexType ind, Inde
     T x = ind/planeSize;
     T y = (ind%planeSize)/sideLen;
     T z = (ind%planeSize)%sideLen;
+    
+    return std::vector<T>{ x, y, z };
+}
+//---------------------------------------------------------------------------------------
+template<typename IndexType, typename ValueType>
+template<typename T>
+std::vector<T> MultiSection<IndexType, ValueType>::indexTo3D(IndexType ind, std::vector<IndexType> sideLen){
+    SCAI_REGION("MultiSection.indexTo3D");
+    assert( sideLen.size()==3 );
+
+    IndexType planeSize= sideLen[1]*sideLen[2]; // a YxZ plane
+
+    T x = ind/planeSize;
+    T y = (ind%planeSize)/sideLen[2];
+    T z = (ind%planeSize)%sideLen[2];
     
     return std::vector<T>{ x, y, z };
 }

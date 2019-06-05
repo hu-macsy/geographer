@@ -567,6 +567,11 @@ SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
          */
         template<typename T>
         static std::vector<T> indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dimensions);
+
+        /** @brief Overloaded function for non-cubic grids: every side has different length. sideLen.size()=dimensions
+        **/
+		template<typename T>
+        static std::vector<T> indexToCoords(const IndexType ind, const std::vector<IndexType> sideLen );
         
     private:
         template<typename T>
@@ -574,6 +579,12 @@ SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
         
         template<typename T>
         static std::vector<T> indexTo3D(IndexType ind, IndexType sideLen);
+		
+		template<typename T>
+        static std::vector<T> indexTo2D(IndexType ind, std::vector<IndexType> sideLen);
+        
+        template<typename T>
+        static std::vector<T> indexTo3D(IndexType ind, std::vector<IndexType> sideLen);
     };
 
 }

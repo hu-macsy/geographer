@@ -325,13 +325,6 @@ DenseVector<IndexType> assignBlocks(
 	Settings settings,
 	Metrics &metrics);
 
-/**
- * @brief Get local minimum and maximum coordinates
- * TODO: This isn't used any more! Remove?
- * Update, 27/11/8: start reusing 
- */
-template<typename ValueType>
-std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
 
 /** Reverse the order of the vectors: given a 2D vector of size 
 dimension*numPoints, reverse it and retunr a vector of points

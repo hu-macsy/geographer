@@ -1167,6 +1167,7 @@ DenseVector<IndexType> computePartition( \
 		}
 	}
 
+	//TODO: we can use aux::getGlobalMinMax
 	std::vector<ValueType> globalMinCoords(dim);
 	std::vector<ValueType> globalMaxCoords(dim);
 	comm->minImpl(globalMinCoords.data(), minCoords.data(), dim, scai::common::TypeTraits<ValueType>::stype);
@@ -1535,7 +1536,7 @@ DenseVector<IndexType> computePartition(
 
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
-    std::tie(minCoords, maxCoords) = getLocalMinMaxCoords( coordinates );
+    std::tie(minCoords, maxCoords) = aux<IndexType,ValueType>::getGlobalMinMaxCoords( coordinates );
 
 	std::vector<point> centers = findInitialCentersSFC<IndexType,ValueType>(coordinates, minCoords, maxCoords, settings);
 	SCAI_ASSERT_EQ_ERROR( centers.size(), settings.numBlocks, "Number of centers is not correct" );
@@ -1602,7 +1603,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 	std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
-    std::tie(minCoords, maxCoords) = getLocalMinMaxCoords( coordinates );
+    std::tie(minCoords, maxCoords) = aux<IndexType,ValueType>::getGlobalMinMaxCoords( coordinates );
 
     //used later for debugging and calculating imbalance
     std::vector<ValueType> totalWeightSum(numNodeWeights);
@@ -1777,22 +1778,6 @@ DenseVector<IndexType> computeHierPlusRepart(
 	return  ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinates, nodeWeights, blockSizes, result, settings);
 }//computeHierPlusRepart
 
-/**
- * @brief Get local minimum and maximum coordinates
- * TODO: This isn't used any more! Remove?
- */
-template<typename ValueType>
-std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates) {
-	const int dim = coordinates.size();
-	std::vector<ValueType> minCoords(dim);
-	std::vector<ValueType> maxCoords(dim);
-	for (int d = 0; d < dim; d++) {
-		minCoords[d] = coordinates[d].min();
-        maxCoords[d] = coordinates[d].max();
-		SCAI_ASSERT_NE_ERROR( minCoords[d], maxCoords[d], "min=max for dimension "<< d << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
-	}
-	return {minCoords, maxCoords};
-}
 
 }; // namespace KMeans
 

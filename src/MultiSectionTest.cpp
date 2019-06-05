@@ -1494,5 +1494,14 @@ TEST_F(MultiSectionTest, testIndexTo){
         EXPECT_GE( t[2], 0);
     }
 }
+//---------------------------------------------------------------------------------------
+
+TEST_F(MultiSectionTest, testIndexToNonQubic){
+
+	std::vector<IndexType> sideLen={ 4, 5, 6 };
+
+	//TODO: continue the test
+
+}
 
 }

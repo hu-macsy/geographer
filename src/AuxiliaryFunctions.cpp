@@ -239,7 +239,21 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
     return distFromPartition;
 }                
 
-
-
+/**
+ * @brief Get local minimum and maximum coordinates
+ * TODO: This isn't used any more! Remove?
+ */
+template<typename IndexType, typename ValueType>
+std::pair<std::vector<ValueType>, std::vector<ValueType>> aux<IndexType,ValueType>::getGlobalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates) {
+	const int dim = coordinates.size();
+	std::vector<ValueType> minCoords(dim);
+	std::vector<ValueType> maxCoords(dim);
+	for (int d = 0; d < dim; d++) {
+		minCoords[d] = coordinates[d].min(); //these return the global min and max
+        maxCoords[d] = coordinates[d].max();
+		SCAI_ASSERT_NE_ERROR( minCoords[d], maxCoords[d], "min=max for dimension "<< d << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
+	}
+	return {minCoords, maxCoords};
+}
 
 }//namespace ITI 
