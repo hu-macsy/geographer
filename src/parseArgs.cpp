@@ -83,23 +83,6 @@ namespace ITI {
 
 		return options;
 	}
-	
-
-//	ParseResult parseInput(cxxopts::Options options, int argc, char** argv) {
-//
-//	    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-//	    std::string s = "0.12345";
-//	    ValueType stdDouble = std::stod( s );
-//	    ValueType boostDouble = boost::lexical_cast<ValueType>(s);
-//	    if( stdDouble!=boostDouble ){
-//	        PRINT0( "\033[1;31mWARNING: std::stod and boost::lexical_cast do not agree \033[0m"  );
-//	        PRINT0( "\033[1;31mWARNING: std::stod and boost::lexical_cast do not agree \033[0m"  );
-//	    }
-//
-//	    ParseResult vm = options.parse(argc, argv);
-//
-//		return vm;
-//	}
 
 	Settings interpretSettings(cxxopts::ParseResult vm) {
 

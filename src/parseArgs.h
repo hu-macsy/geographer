@@ -7,7 +7,6 @@
 
 namespace ITI {
 cxxopts::Options populateOptions();
-cxxopts::ParseResult parseInput(cxxopts::Options options, int argc, char** argv);
 Settings interpretSettings(cxxopts::ParseResult result);
 
 }
