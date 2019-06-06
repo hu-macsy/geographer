@@ -20,9 +20,9 @@
 #include "Settings.h"
 
 
-using namespace scai::lama;
-
 namespace ITI{
+
+    using namespace scai::lama;
 
 template <typename IndexType, typename ValueType>
 class aux{

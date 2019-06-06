@@ -8,6 +8,7 @@
 
 #include "../src/FileIO.h"
 
+using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
 using scai::lama::fill;
 using ITI::Settings;

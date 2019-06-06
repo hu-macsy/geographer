@@ -16,10 +16,10 @@
 #include "Metrics.h"
 #include "CommTree.h"
 
-using namespace scai::lama;
-using scai::dmemo::HaloExchangePlan;
-
 namespace ITI {
+
+	using namespace scai::lama;
+	using scai::dmemo::HaloExchangePlan;
 
 	template <typename IndexType, typename ValueType>
 	class ParcoRepart {

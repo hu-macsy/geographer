@@ -10,7 +10,7 @@ The following software is needed to compile and use libgeographer:
 
 - A sufficiently modern compiler, for example [g++ &gt;= 4.9](https://gcc.gnu.org) or [icpc &gt;=17.0](https://en.wikipedia.org/wiki/Intel_C%2B%2B_Compiler)
 - MPI
-- The numerical library [Lama](https://github.com/kit-parco/lama)
+- The numerical library [Lama](https://github.com/kit-parco/lama) (&gt;= 3.0.0)
 - For the command line frontend: [Boost](https://www.boost.org/) (&gt;= 1.61.0)
 - For the unit tests: [Google Test](https://github.com/google/googletest)
 
@@ -24,7 +24,7 @@ after cmake although the Lama website may state otherwise.**
 The *RBC* library for splitting MPI communicators is included as a submodule in this repository.
 If it is not yet cloned when starting the build process, cmake will download it automatically.
 Should this fail, do it manually by calling `git submodule update --init --recursive`.
-RBC is compiled with an external call to make which uses the compiler wrapper mpic++.
+When compiling Geographer, RBC is automatically compiled with an external call to make which uses the compiler wrapper mpic++.
 
 ### Compilation
 Create a build folder in the root directory of this repository, then in it call `cmake ..`.

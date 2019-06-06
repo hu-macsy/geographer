@@ -16,11 +16,11 @@
 #include "Settings.h"
 #include "PrioQueue.h"
 
-using scai::lama::CSRSparseMatrix;
-using scai::lama::CSRStorage;
-using scai::lama::DenseVector;
-
 namespace ITI {
+
+    using scai::lama::CSRSparseMatrix;
+    using scai::lama::CSRStorage;
+    using scai::lama::DenseVector;
     
     template <typename IndexType, typename ValueType>
     class LocalRefinement{
