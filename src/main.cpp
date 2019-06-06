@@ -11,14 +11,14 @@
 
 #include <scai/lama/Vector.hpp>
 
-#include <boost/algorithm/string.hpp>
-#include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 
 #include <memory>
 #include <cstdlib>
 #include <chrono>
-#include <iomanip> 
+#include <iomanip>
+
+#include <cxxopts.hpp>
 
 #include "Diffusion.h"
 #include "MeshGenerator.h"
@@ -49,21 +49,22 @@
 
 
 int main(int argc, char** argv) {
-	using namespace boost::program_options;
     using namespace ITI;
 	
-	//bool writePartition = false;
-    
-	std::string metricsDetail = "all";
 	std::string blockSizesFile;
 	//ITI::Format coordFormat;
-    
-        
+            
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-	struct Settings settings;
-    variables_map vm;
-	std::tie(vm, settings) = ITI::parseInput( argc, argv);
+    cxxopts::Options options = ITI::populateOptions();
+	cxxopts::ParseResult vm = options.parse(argc, argv);
+
+    if (vm.count("help")) {
+        std::cout << options.help() << std::endl;
+        return 0;
+    }
+
+    struct Settings settings = ITI::interpretSettings(vm);
 	if( !settings.isValid )
 		return -1;
 
@@ -484,10 +485,10 @@ int main(int argc, char** argv) {
         
         std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
-		if( metricsDetail=="all" ){
+		if( settings.metricsDetail=="all" ){
 			metricsVec[r].getAllMetrics( graph, partition, nodeWeights, settings );
 		}
-        if( metricsDetail=="easy" ){
+        if( settings.metricsDetail=="easy" ){
 			metricsVec[r].getEasyMetrics( graph, partition, nodeWeights, settings );
 		}
 
@@ -496,7 +497,6 @@ int main(int argc, char** argv) {
 
 		std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
 
-if(comm->getRank() == 0 ) metricsVec[r].printHorizontal2( std::cout );        
         //---------------------------------------------
         //
         // Print some output
@@ -507,7 +507,7 @@ if(comm->getRank() == 0 ) metricsVec[r].printHorizontal2( std::cout );
             std::cout << " p:"<< comm->getSize() << " k:"<< settings.numBlocks;
             auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
             std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
-            std::cout.precision(oldprecision);
+            std::cout.precision(oldprecision);            
             metricsVec[r].printHorizontal2( std::cout ); //TODO: remove?
         }
        
@@ -518,7 +518,7 @@ if(comm->getRank() == 0 ) metricsVec[r].printHorizontal2( std::cout );
         
         metricsVec[r].MM["reportTime"] = ValueType (comm->max(reportTime.count()));
         
-        if (comm->getRank() == 0 && metricsDetail != "no") {
+        if (comm->getRank() == 0 && settings.metricsDetail.compare("no") != 0) {
             metricsVec[r].print( std::cout );            
         }
         if( settings.storeInfo && settings.outFile!="-" ) {

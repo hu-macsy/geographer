@@ -89,7 +89,9 @@ std::istream& operator>>(std::istream& in, ITI::Tool& tool);
 
 std::ostream& operator<<(std::ostream& out, const ITI::Tool tool);
 
-std::string toString(const ITI::Tool& t);
+std::string to_string(const ITI::Tool& t);
+
+std::string to_string(const ITI::Format& f);
 
 ITI::Tool toTool(const std::string& s);
 

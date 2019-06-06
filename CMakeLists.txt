@@ -31,6 +31,8 @@ set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
 
 set(RBC_DIR "${PROJECT_SOURCE_DIR}/src/RBC")
 
+set(CXXOPTS_DIR "${PROJECT_SOURCE_DIR}/external/cxxopts/include")
+
 ### find MPI ###
 find_package(MPI REQUIRED)
 include_directories(${MPI_CXX_INCLUDE_PATH})

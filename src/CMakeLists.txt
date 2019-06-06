@@ -21,6 +21,7 @@ endif(USE_BOOST)
 
 if (Boost_FOUND)
 	add_executable(Geographer main.cpp parseArgs.cpp)
+	target_include_directories(Geographer PUBLIC ${CXXOPTS_DIR})
 	target_include_directories(Geographer PUBLIC ${Boost_INCLUDE_DIRS})
 	target_link_libraries(Geographer geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES})
 else (Boost_FOUND)
