@@ -19,14 +19,9 @@ if (USE_BOOST)
 	target_link_libraries(geographer ${Boost_LIBRARIES})
 endif(USE_BOOST)
 
-if (Boost_FOUND)
-	add_executable(Geographer main.cpp parseArgs.cpp)
-	target_include_directories(Geographer PUBLIC ${CXXOPTS_DIR})
-	target_include_directories(Geographer PUBLIC ${Boost_INCLUDE_DIRS})
-	target_link_libraries(Geographer geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES})
-else (Boost_FOUND)
-	message("Boost not found, cannot build standalone executable.")
-endif (Boost_FOUND)
+add_executable(Geographer main.cpp parseArgs.cpp)
+target_include_directories(Geographer PUBLIC ${CXXOPTS_DIR})
+target_link_libraries(Geographer geographer ${SCAI_LIBRARIES} ${MPI_CXX_LIBRARIES})
 
 ### add networkit library if found ###
 if (USE_NETWORKIT)
@@ -45,7 +40,4 @@ endif (GTEST_FOUND AND Boost_FOUND)
 install(TARGETS geographer EXPORT geographer DESTINATION "${LIB_DEST}") # library
 install(FILES ${FILES_HEADER} DESTINATION "${HEADER_DEST}")
 install(EXPORT geographer DESTINATION "${CMAKE_DEST}")
-
-if (Boost_FOUND)
-	install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable
-endif (Boost_FOUND)
+install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable
