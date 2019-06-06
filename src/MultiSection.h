@@ -399,6 +399,9 @@ SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
     class MultiSection{
     public:
 
+    	//to make it more readable
+    	typedef std::vector<ValueType> point;
+
         /** @brief A partition of non-uniform grid.
 		 * 
 		 * @param[in] input Adjacency matrix of the input graph
@@ -408,7 +411,18 @@ SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
 		 * 
 		 * @return Distributed DenseVector of length n, partition[i] contains the block ID of node i
          */
-        static scai::lama::DenseVector<IndexType> getPartitionNonUniform( const scai::lama::CSRSparseMatrix<ValueType> &input, const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, struct Settings settings );
+        static scai::lama::DenseVector<IndexType> getPartitionNonUniform( 
+        	const scai::lama::CSRSparseMatrix<ValueType> &input,
+        	const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+        	const scai::lama::DenseVector<ValueType>& nodeWeights,
+        	struct Settings settings );
+
+        /** @brief Iterative version to get a partition
+        */
+		static scai::lama::DenseVector<IndexType> getPartitionIter( 
+			const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+			const scai::lama::DenseVector<ValueType>& nodeWeights,
+			struct Settings settings );
         
 		/** @brief Given a tree of rectangles, sets the partition for every point.
 		 * 
@@ -420,7 +434,9 @@ SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
 		 */
         static scai::lama::DenseVector<IndexType> setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr distPtr, const std::vector<std::vector<IndexType>>& localPoints);
         
-        
+        static scai::lama::DenseVector<IndexType> setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr distPtr, const std::vector<scai::lama::DenseVector<ValueType>>& localPoints);
+
+
         /** Get a tree of rectangles of a uniform grid with side length sideLen. The rectangles cover the whole grid and 
          * do not overlap.
          * 
@@ -431,6 +447,17 @@ SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
          * @return A pointer to the root of the tree. number of leaves = settings.numBlocks.
          */
         static std::shared_ptr<rectCell<IndexType,ValueType>> getRectangles( const scai::lama::DenseVector<ValueType>& nodeWeights, const IndexType sideLen, Settings settings);
+
+        /** @brief Iterative version
+        */
+		static std::shared_ptr<rectCell<IndexType,ValueType>> getRectanglesIter( 
+		    //const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+		    const std::vector<std::vector<ValueType>>& coordinates,
+		    const scai::lama::DenseVector<ValueType>& nodeWeights,
+		    const std::vector<ValueType>& minCoords,
+		    const std::vector<ValueType>& maxCoords,
+		    Settings settings);
+
 
         //TODO: Let coordinates be of ValueType and round inside the function if needed.
         
@@ -480,6 +507,18 @@ SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
             const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
             const std::vector<IndexType> &dimensionToProject,
             Settings settings);
+
+        /** @bried Iterative version to get the projection
+        */
+        static std::vector<std::vector<ValueType>> projectionIter( 
+			//const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+			const std::vector<std::vector<ValueType>>& coordinates,
+		    const scai::lama::DenseVector<ValueType>& nodeWeights,
+		    const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
+		    const std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>>& allLeaves,
+		    const std::vector<std::vector<ValueType>>& hyperplanes,
+		    const std::vector<IndexType>& dimensionToProject,
+		    Settings settings);
         
         /** @brief Partitions the given vector into k parts of roughly equal weights using a greedy approach.
          *

@@ -27,7 +27,7 @@ using namespace scai;
 
 namespace ITI {
 
-class MultiSectionTest : public ::testing::Test {
+class MultiSectionTest : public ::testing::TestWithParam<bool> {
 protected:
         // the directory of all the meshes used
         std::string graphPath = "./meshes/";
@@ -1146,8 +1146,8 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
  *  -----------------
  * 
  * */
-TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
-    
+TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D){
+    	
     const IndexType dimensions = 2;
     const std::vector<ValueType> maxCoord= {14, 20};
     const IndexType N = (maxCoord[0]+1)*(maxCoord[1]+1);
@@ -1241,13 +1241,43 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_2D){
 
     ValueType totalGridWeight = N;
     SCAI_ASSERT( totalGridWeight==nodeWeights.sum() , "Wrong sum of node weights: "<< nodeWeights.sum() );
+
+    const bool useIter = true; // GetParam();
+
+    //coordinates of ValueType
+    std::vector<DenseVector<ValueType>> coordinatesVal;
+    {
+	    for( int d=0; d<dimensions; d++){
+	    	for( int i=0; i<localN; i++){
+	    		coordinatesVal[d].getLocalValues()[i] = ValueType (coordinates[d].getLocalValues()[i]);
+	    	}
+	    }
+	}
+    //coordinatesVal[0].redistribute( dist );
+    //coordinatesVal[1].redistribute( dist );
     
     for(int d=0; d<dimensions; d++){
         //dim2proj.size() = number of leaves/rectangles
         std::vector<IndexType> dim2proj = {d, d, d};
-        SCAI_ASSERT( dim2proj.size()==root->getNumLeaves(), "Wrong size of vecctor dim2proj or number of leaves");
-        
-        std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projectionNonUniform( localPoints , nodeWeights, root, dim2proj, settings);
+        SCAI_ASSERT( dim2proj.size()==root->getNumLeaves(), "Wrong size of vector dim2proj or number of leaves");
+
+        std::vector<std::vector<ValueType>> projections;
+
+		if( not useIter ){        
+        	projections = MultiSection<IndexType, ValueType>::projectionNonUniform( localPoints , nodeWeights, root, dim2proj, settings);
+        }else{	
+        	std::vector<std::vector<ValueType>> hyperplanes = {
+        		{0, bBox1.top[d]*0.2, bBox1.top[d]*0.6, bBox1.top[d] },
+        		{0, bBox2.top[d]*0.2, bBox2.top[d]*0.6, bBox2.top[d] },
+        		{0, bBox3.top[d]*0.2, bBox3.top[d]*0.6, bBox3.top[d] }
+        	};
+
+
+        	projections = MultiSection<IndexType, ValueType>::projectionIter( coordinatesVal , nodeWeights, root, root->getAllLeaves(), hyperplanes, dim2proj, settings);
+
+
+        }
+
         
         ValueType projectionsTotalWeight =0 ;
         
@@ -1503,5 +1533,11 @@ TEST_F(MultiSectionTest, testIndexToNonQubic){
 	//TODO: continue the test
 
 }
+//---------------------------------------------------------------------------------------
 
-}
+  
+INSTANTIATE_TEST_CASE_P(InstantiationName,
+                        MultiSectionTest,
+                        testing::Values(true,false));
+
+}//ITI

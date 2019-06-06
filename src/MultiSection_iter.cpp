@@ -6,6 +6,7 @@
 
 #include "MultiSection.h"
 #include "GraphUtils.h"
+#include "AuxiliaryFunctions.h"
 
 #include <numeric>
 
@@ -57,16 +58,29 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
     std::tie(minCoords, maxCoords) = aux<IndexType,ValueType>::getGlobalMinMaxCoords( coordinates );
 
     //
+    //convert coordinates to a vector<vector>
+    //
+
+	std::vector<point> localPoints( localN, point(dim,0.0) );
+
+	for (IndexType d=0; d<dim; d++) {
+    	scai::hmemo::ReadAccess<ValueType> localPartOfCoords( coordinates[d].getLocalValues() );
+    	for (IndexType i=0; i<localN; i++) {
+    		localPoints[i][d] = localPartOfCoords[i];
+    	}
+    }
+
+    //
     // get a partitioning into rectangles
     //
 
-    std::shared_ptr<rectCell<IndexType,ValueType>> root = MultiSection<IndexType, ValueType>::getRectanglesNonUniform( coordinates, nodeWeights, minCoords, maxCoords, settings);
+    std::shared_ptr<rectCell<IndexType,ValueType>> root = MultiSection<IndexType, ValueType>::getRectanglesIter( localPoints, nodeWeights, minCoords, maxCoords, settings);
     
     const IndexType numLeaves = root->getNumLeaves();
     
     SCAI_ASSERT( numLeaves==k , "Returned number of rectangles is not equal k, rectangles.size()= " << numLeaves << " and k= "<< k );
     
-    return MultiSection<IndexType, ValueType>::setPartition( root, inputDistPtr, localPoints);
+    return MultiSection<IndexType, ValueType>::setPartition( root, inputDistPtr, coordinates);
 
 
 }//getPartitionIter
@@ -74,7 +88,8 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
 
 template<typename IndexType, typename ValueType>
 std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType>::getRectanglesIter( 
-    const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+    //const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+    const std::vector<point>& localPoints,
     const scai::lama::DenseVector<ValueType>& nodeWeights,
     const std::vector<ValueType>& minCoords,
     const std::vector<ValueType>& maxCoords,
@@ -88,8 +103,8 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     const IndexType localN = inputDist->getLocalSize();
     //const IndexType globalN = inputDist->getGlobalSize();
     
-    SCAI_ASSERT_EQ_ERROR( coordinates[0].getLocalValues.size(), localN , "Size of coordinates vector is not right" );
-    SCAI_ASSERT_EQ_ERROR( coordinates.size(),dim ,"Dimensions given and size of coordinates do not agree." );
+    SCAI_ASSERT_EQ_ERROR( localPoints.size(), localN , "Size of coordinates vector is not right" );
+    SCAI_ASSERT_EQ_ERROR( localPoints[0].size(),dim ,"Dimensions given and size of coordinates do not agree." );
     SCAI_ASSERT( minCoords.size()==maxCoords.size() and maxCoords.size()==dim , "Wrong size of maxCoords or minCoords." );
     
     for(int d=0; d<dim; d++){
@@ -177,7 +192,7 @@ PRINT0("about to cut into " << *thisDimCuts);
         std::vector<IndexType> chosenDim ( numLeaves, -1); //the chosen dim to project for every leaf
 
         //the hyperplane coordinate for every leaf in the chosen dimension
-		std::vector<std::vector<ValueType>> hyperplanes( numLeaves(std::vector<ValueType> (*thisDimCuts+1,0)) ); 
+		std::vector<std::vector<ValueType>> hyperplanes( numLeaves, (std::vector<ValueType> (*thisDimCuts+1,0)) ); 
         
         // choose the dimension to project for each leaf/rectangle
         for( IndexType l=0; l<numLeaves; l++){
@@ -192,7 +207,7 @@ PRINT0("about to cut into " << *thisDimCuts);
             }
             ValueType meanHyperplaneOffset = maxExtent/ *thisDimCuts;
             for( int c=1; c<*thisDimCuts; c++){
-            	hyperplanes[j][c] = hyperplanes[j][c-1] + meanHyperplaneOffset;
+            	hyperplanes[l][c] = hyperplanes[l][c-1] + meanHyperplaneOffset;
             }
         }
         // in chosenDim we have stored the desired dimension to project for all the leaf nodes
@@ -200,7 +215,7 @@ PRINT0("about to cut into " << *thisDimCuts);
         
         //do{
 			// a vector of size numLeaves. projections[i] is the projection of leaf/rectangle i in the chosen dimension
-    	    std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projectionIter( coordinates, nodeWeights, root, allLeaves, hyperplanes, chosenDim, settings);
+    	    std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projectionIter( localPoints, nodeWeights, root, allLeaves, hyperplanes, chosenDim, settings);
 
         	SCAI_ASSERT( projections.size()==numLeaves, "Wrong number of projections"); 
 
@@ -209,6 +224,8 @@ PRINT0("about to cut into " << *thisDimCuts);
         //while( imbalance<settings.epsilon or numIter==maxIter)
 
 
+	}
+
 }//getRectanglesIter
 
 
@@ -216,11 +233,12 @@ PRINT0("about to cut into " << *thisDimCuts);
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projectionIter( 
-	const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+	//const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+	const std::vector<point> &coordinates,
     const scai::lama::DenseVector<ValueType>& nodeWeights,
     const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
-    const std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> allLeaves,
-    const std::vector<std::vector<ValueType>> hyperplanes,
+    const std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>>& allLeaves,
+    const std::vector<std::vector<ValueType>>& hyperplanes,
     const std::vector<IndexType>& dimensionToProject,
     Settings settings){
 
@@ -260,6 +278,9 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
             // if this point is not contained in any rectangle
             //TODO: in the partition this should not happen. But it may happen in a more general case
             try{
+
+//this expects a point; maybe better convert coordinates from vector<DenseVector> to vector<vector>, as before but without scaling them
+
                 thisRectCell = treeRoot->getContainingLeaf( coordinates[i] );
             }
             catch( const std::logic_error& e){
@@ -287,17 +308,18 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
             const IndexType dim2proj = dimensionToProject[ thisLeafID ];
             
             //IndexType relativeIndex = coordinates[i][dim2proj]-thisRectCell->getRect().bottom[dim2proj];
-            std::vector<ValueType>::iterator upBound = std::upper_bound(hyperplanes[thisLeafID].begin(), hyperplanes[thisLeafID].end(), coordinates[i][dim2proj] );
-            IndexType relativeIndex = (upBound-hyperplanes.begin())-1;
+            typename std::vector<ValueType>::iterator upBound = std::upper_bound(hyperplanes[thisLeafID].begin(), hyperplanes[thisLeafID].end(), coordinates[i][dim2proj] );
+            IndexType relativeIndex = (upBound-hyperplanes[thisLeafID].begin())-1;
 SCAI_ASSERT_LE( coordinates[i][dim2proj], hyperplanes[thisLeafID][relativeIndex], "Wrong relative index" );
-
 
             SCAI_ASSERT( relativeIndex<=projections[thisLeafID].capacity(), "Wrong relative index: "<< relativeIndex << " should be <= "<< projections[ thisLeafID ].capacity() << " (and thisRect.bottom= "<< thisRectCell->getRect().bottom[dim2proj]  << " , thisRect.top= "<< thisRectCell->getRect().top[dim2proj] << ")" );
 
             projections[thisLeafID][relativeIndex] += localWeights[i];
-        }    	
+        }    
+	}	
 
 }//projectionIter
 
+template class MultiSection<IndexType, ValueType>;
 
 }//ITI

@@ -9,7 +9,7 @@ target_link_libraries(geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${RBC_LIBR
 
 add_executable(Geographer main.cpp)
 target_link_libraries(Geographer geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES})
-
+ 
 ### add networkit library if found ###
 if (USE_NETWORKIT)
   target_link_libraries(Geographer networkit)
