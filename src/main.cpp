@@ -11,8 +11,6 @@
 
 #include <scai/lama/Vector.hpp>
 
-#include <boost/filesystem.hpp>
-
 #include <memory>
 #include <cstdlib>
 #include <chrono>
@@ -616,9 +614,7 @@ int main(int argc, char** argv) {
 			coordinateCopy[dim].redistribute( distFromPartition );
         }
         
-        std::string destPath = "partResults/main/blocks_" + std::to_string(settings.numBlocks) ;
-        boost::filesystem::create_directories( destPath );   
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, settings.dimensions, destPath + "/debugResult");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, settings.dimensions, "debugResult");
         comm->synchronize();
         
         //TODO: use something like the code below instead of a NoDistribution
