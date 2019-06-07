@@ -16,8 +16,100 @@ namespace ITI {
 
 template<typename IndexType, typename ValueType>
 template<typename T>
+IndexType MultiSection<IndexType, ValueType>::iterativeProjectionAndPart(
+	std::shared_ptr<rectCell<IndexType,ValueType>> root,
+	const std::vector<std::vector<T>>& coordinates,
+	const scai::lama::DenseVector<ValueType>& nodeWeights,
+	const std::vector<IndexType>& numCuts){
+
+	SCAI_REGION("MultiSection.iterativeProjectionAndPart");
+    const scai::dmemo::DistributionPtr inputDist = nodeWeights.getDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
+	const IndexType dim = coordinates[0].size();
+	IndexType numLeaves = root->getNumLeaves();
+
+    //
+    //multisect in every dimension
+    //
+
+    //if not using bisection, numCuts.size()=dimensions
+    
+    for(typename std::vector<IndexType>::const_iterator thisDimCuts=numCuts.begin(); thisDimCuts!=numCuts.end(); ++thisDimCuts ){
+        SCAI_REGION("MultiSection.iterativeProjectionAndPart.forAllRectangles");
+PRINT0("about to cut into " << *thisDimCuts);
+
+        /*Two ways to find in which dimension to project:
+         * 1) just pick the dimension of the bounding box that has the largest extent and then project: only one projection
+         * 2) project in every dimension and pick the one in which the difference between the maximum and minimum value is the smallest: d projections
+         * TODO: maybe we can change (2) and calculate the variance of the projection and pick the one with the biggest
+         * */
+
+        // a vector with pointers to all the leaf nodes of the tree
+        std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> allLeaves = root->getAllLeaves();        
+        SCAI_ASSERT( allLeaves.size()==numLeaves, "Wrong number of leaves.");
+
+        //TODO: since this is done locally, we can also get the 1D partition in every dimension and choose the best one
+        //      maybe not the fastest way but probably would give better quality
+
+        std::vector<IndexType> chosenDim ( numLeaves, -1); //the chosen dim to project for every leaf
+
+        //the hyperplane coordinate for every leaf in the chosen dimension
+		//this is used only in the iterative approach
+		std::vector<std::vector<ValueType>> hyperplanes( numLeaves, (std::vector<ValueType> (*thisDimCuts+1,0)) ); 
+
+        // choose the dimension to project for each leaf/rectangle
+        for( IndexType l=0; l<allLeaves.size(); l++){
+            struct rectangle thisRectangle = allLeaves[l]->getRect();
+            ValueType maxExtent = 0;
+            for(int d=0; d<dim; d++){
+                ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
+                if( extent>maxExtent ){
+                    maxExtent = extent;
+                    chosenDim[l] = d;
+                }
+            }
+            //determine the hyperplanes for every leaf
+            
+        	ValueType meanHyperplaneOffset = maxExtent/ *thisDimCuts;
+            for( int c=1; c<*thisDimCuts; c++){
+            	hyperplanes[l][c] = hyperplanes[l][c-1] + meanHyperplaneOffset;      	
+            }
+            
+        }
+        
+        // in chosenDim we have stored the desired dimension to project for all the leaf nodes
+
+        // projections[i] is the projection of leaf/rectangle i in the chosen dimension; projections.size()=numLeaves
+
+        std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projectionIter( coordinates, nodeWeights, root, allLeaves, hyperplanes, chosenDim);
+
+        SCAI_ASSERT_EQ_ERROR( projections.size(), numLeaves, "Wrong number of projections"); 
+ 		//PRINT0("numLeaves= " << numLeaves);
+
+ 		//balance the hyperplaned for every leaf
+        for(IndexType l=0; l<numLeaves; l++){        
+            SCAI_REGION("MultiSection.getRectanglesNonUniform.forAllRectangles.forLeaves");
+
+            const IndexType thisChosenDim = chosenDim[l];
+            struct rectangle thisRectangle = allLeaves[l]->getRect();	
+            std::vector<ValueType> thisHyperplanes = hyperplanes[l];	
+            std::vector<ValueType> thisProjection = projections[l];
+
+            ValueType optWeight = thisRectangle.weight/(*thisDimCuts);
+
+        }
+        numLeaves = root->getNumLeaves();
+		//PRINT0("numLeaves= " << numLeaves);        
+    }
+
+    return numLeaves;
+
+}// iterativeProjectionAndPart
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+template<typename T>
 std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projectionIter( 
-	//const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
 	const std::vector<std::vector<T>> &coordinates,
     const scai::lama::DenseVector<ValueType>& nodeWeights,
     const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
@@ -118,98 +210,6 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
 
 }//projectionIter
 //---------------------------------------------------------------------------------------
-
-template<typename IndexType, typename ValueType>
-template<typename T>
-IndexType MultiSection<IndexType, ValueType>::iterativeProjectionAndPart(
-	std::shared_ptr<rectCell<IndexType,ValueType>> root,
-	const std::vector<std::vector<T>>& coordinates,
-	const scai::lama::DenseVector<ValueType>& nodeWeights,
-	const std::vector<IndexType>& numCuts){
-
-	SCAI_REGION("MultiSection.iterativeProjectionAndPart");
-    const scai::dmemo::DistributionPtr inputDist = nodeWeights.getDistributionPtr();
-    const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
-	const IndexType dim = coordinates[0].size();
-	IndexType numLeaves = root->getNumLeaves();
-
-    //
-    //multisect in every dimension
-    //
-
-    //if not using bisection, numCuts.size()=dimensions
-    
-    for(typename std::vector<IndexType>::const_iterator thisDimCuts=numCuts.begin(); thisDimCuts!=numCuts.end(); ++thisDimCuts ){
-        SCAI_REGION("MultiSection.iterativeProjectionAndPart.forAllRectangles");
-PRINT0("about to cut into " << *thisDimCuts);
-
-        /*Two ways to find in which dimension to project:
-         * 1) just pick the dimension of the bounding box that has the largest extent and then project: only one projection
-         * 2) project in every dimension and pick the one in which the difference between the maximum and minimum value is the smallest: d projections
-         * TODO: maybe we can change (2) and calculate the variance of the projection and pick the one with the biggest
-         * */
-
-        // a vector with pointers to all the leaf nodes of the tree
-        std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> allLeaves = root->getAllLeaves();        
-        SCAI_ASSERT( allLeaves.size()==numLeaves, "Wrong number of leaves.");
-
-        //TODO: since this is done locally, we can also get the 1D partition in every dimension and choose the best one
-        //      maybe not the fastest way but probably would give better quality
-
-        std::vector<IndexType> chosenDim ( numLeaves, -1); //the chosen dim to project for every leaf
-
-        //the hyperplane coordinate for every leaf in the chosen dimension
-		//this is used only in the iterative approach
-		std::vector<std::vector<ValueType>> hyperplanes( numLeaves, (std::vector<ValueType> (*thisDimCuts+1,0)) ); 
-
-        // choose the dimension to project for each leaf/rectangle
-        for( IndexType l=0; l<allLeaves.size(); l++){
-            struct rectangle thisRectangle = allLeaves[l]->getRect();
-            ValueType maxExtent = 0;
-            for(int d=0; d<dim; d++){
-                ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
-                if( extent>maxExtent ){
-                    maxExtent = extent;
-                    chosenDim[l] = d;
-                }
-            }
-            //determine the hyperplanes for every leaf
-            
-        	ValueType meanHyperplaneOffset = maxExtent/ *thisDimCuts;
-            for( int c=1; c<*thisDimCuts; c++){
-            	hyperplanes[l][c] = hyperplanes[l][c-1] + meanHyperplaneOffset;      	
-            }
-            
-        }
-        
-        // in chosenDim we have stored the desired dimension to project for all the leaf nodes
-
-        // projections[i] is the projection of leaf/rectangle i in the chosen dimension; projections.size()=numLeaves
-
-        std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projectionIter( coordinates, nodeWeights, root, allLeaves, hyperplanes, chosenDim);
-
-        SCAI_ASSERT_EQ_ERROR( projections.size(), numLeaves, "Wrong number of projections"); 
- 		//PRINT0("numLeaves= " << numLeaves);
-
- 		//balance the hyperplaned for every leaf
-        for(IndexType l=0; l<numLeaves; l++){        
-            SCAI_REGION("MultiSection.getRectanglesNonUniform.forAllRectangles.forLeaves");
-
-            const IndexType thisChosenDim = chosenDim[l];
-            struct rectangle thisRectangle = allLeaves[l]->getRect();	
-            std::vector<ValueType> thisHyperplanes = hyperplanes[l];	
-            std::vector<ValueType> thisProjection = projections[l];
-
-            ValueType optWeight = thisRectangle.weight/(*thisDimCuts);
-
-        }
-        numLeaves = root->getNumLeaves();
-		//PRINT0("numLeaves= " << numLeaves);        
-    }
-
-    return numLeaves;
-
-}// iterativeProjectionAndPart
 
 //
 // instantiations
