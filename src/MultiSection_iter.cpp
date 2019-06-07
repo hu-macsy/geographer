@@ -96,9 +96,6 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
 
             SCAI_ASSERT_LE_ERROR( relativeIndex, projections[thisLeafID].capacity(), "Wrong relative index: "<< relativeIndex << " should be <= "<< projections[ thisLeafID ].capacity() << " (and thisRect.bottom= "<< thisRectCell->getRect().bottom[dim2proj]  << " , thisRect.top= "<< thisRectCell->getRect().top[dim2proj] << ")" );
 
-//aux<IndexType,ValueType>::printVector(coordinates[i]);
-//PRINT0("has relative index " << relativeIndex );
-
             projections[thisLeafID][relativeIndex] += localWeights[i];
         }    
 	}	
@@ -180,8 +177,7 @@ PRINT0("about to cut into " << *thisDimCuts);
             
         	ValueType meanHyperplaneOffset = maxExtent/ *thisDimCuts;
             for( int c=1; c<*thisDimCuts; c++){
-            	hyperplanes[l][c] = hyperplanes[l][c-1] + meanHyperplaneOffset;
-//PRINT0("hyperplane " << c << " for leaf " << l << " is " << hyperplanes[l][c] );	            	
+            	hyperplanes[l][c] = hyperplanes[l][c-1] + meanHyperplaneOffset;      	
             }
             
         }
@@ -232,15 +228,5 @@ template IndexType MultiSection<IndexType, ValueType>::iterativeProjectionAndPar
 	const std::vector<std::vector<ValueType>>& coordinates,
 	const scai::lama::DenseVector<ValueType>& nodeWeights,
 	const std::vector<IndexType>& numCuts);
-
-/*
-template std::vector<std::vector<ValueType>> projectionIter( 
-			const std::vector<std::vector<ValueType>>& coordinates,
-		    const scai::lama::DenseVector<ValueType>& nodeWeights,
-		    const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
-		    const std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>>& allLeaves,
-		    const std::vector<std::vector<ValueType>>& hyperplanes,
-		    const std::vector<IndexType>& dimensionToProject);
-*/
 
 }//ITI
