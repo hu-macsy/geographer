@@ -1246,7 +1246,7 @@ TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D){
     ValueType totalGridWeight = N;
     SCAI_ASSERT( totalGridWeight==nodeWeights.sum() , "Wrong sum of node weights: "<< nodeWeights.sum() );
 
-    const bool useIter = false; // GetParam();
+    const bool useIter = true; // GetParam();
 
     for(int d=0; d<dimensions; d++){
         //dim2proj.size() = number of leaves/rectangles
