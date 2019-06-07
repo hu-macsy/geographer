@@ -335,7 +335,7 @@ TEST_F(MultiSectionTest, test1DPartitionOptimal){
     Settings settings;
     
     //get optimal 1D partitioning
-    std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( nodeWeights, k, settings);
+    std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( nodeWeights, k);
     
     //assertions - prints
 
@@ -398,7 +398,7 @@ TEST_F(MultiSectionTest, test1DPartitionOptimalRandomWeights){
     std::tie( part1DGreedy, weightPerPartGreedy) = MultiSection<IndexType, ValueType>::partition1DGreedy( nodeWeights, k, settings);
 
     //get optimal 1D partitioning
-    std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( nodeWeights, k, settings);
+    std::tie( part1D, weightPerPart) = MultiSection<IndexType, ValueType>::partition1DOptimal( nodeWeights, k);
     
     //
     //assertions - prints
@@ -675,32 +675,32 @@ TEST_F(MultiSectionTest, testGetRectangleWeightNonUniform){
     // all the points
     bBox.bottom = { 0, 0};
     bBox.top = { N, N };
-    ValueType bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, maxCoord, settings);
+    ValueType bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, settings);
     SCAI_ASSERT( bBoxWeight==17*w, "Weight of the bounding box not correct, should be " << 16*w << " but it is "<< bBoxWeight);
     
     bBox.bottom = { 0, 0};
     bBox.top = { N/2, N/2 };
-    bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, maxCoord, settings);
+    bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, settings);
     SCAI_ASSERT( bBoxWeight==9*w, "Weight of the bounding box not correct, should be " << 9*w  << " but it is "<< bBoxWeight);
     
     bBox.bottom = { N/2, N/2 };
     bBox.top = { N, N };
-    bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, maxCoord, settings);
+    bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, settings);
     SCAI_ASSERT( bBoxWeight==9*w, "Weight of the bounding box not correct, should be " << 9*w << " but it is "<< bBoxWeight);
     
     bBox.bottom = { 3, 6 };
     bBox.top = { 7, 11 };
-    bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, maxCoord, settings);
+    bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, settings);
     SCAI_ASSERT( bBoxWeight==2*w, "Weight of the bounding box not correct, should be " <<  2*w << " but it is "<< bBoxWeight);
     
     bBox.bottom = { 3, 1 };
     bBox.top = { 7, 11 };
-    bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, maxCoord, settings);
+    bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, settings);
     SCAI_ASSERT( bBoxWeight==5*w, "Weight of the bounding box not correct, should be "<< 4*w  << " but it is "<< bBoxWeight);
     
     bBox.bottom = { 2, 6 };
     bBox.top = { 5, 11 };
-    bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, maxCoord, settings);
+    bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, bBox, settings);
     SCAI_ASSERT( bBoxWeight==0, "Weight of the bounding box not correct, should be 0 but it is "<< bBoxWeight);
     
 }
@@ -803,8 +803,8 @@ TEST_F(MultiSectionTest, test1DProjection){
 TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
  
     const IndexType dimensions = 3;
-    const std::vector<ValueType> minCoords= {0, 0, 0};    
-    const std::vector<ValueType> maxCoords= {20, 20, 20};
+    const std::vector<IndexType> minCoords= {0, 0, 0};    
+    const std::vector<IndexType> maxCoords= {20, 20, 20};
     const IndexType N = (maxCoords[0]+1)*(maxCoords[1]+1)*(maxCoords[2]+1); 
     const IndexType k = std::pow( 4, dimensions);
     
@@ -899,7 +899,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
         }
         totalVolume += thisVolume;
 
-        ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, thisRectangle, maxCoords, settings);
+        ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( coordinates, nodeWeights, thisRectangle, settings);
         SCAI_ASSERT( thisWeight==thisRectangle.weight, "wrong weight calculation: thisWeight= " << thisWeight << " , thisRectangle.weight= " << thisRectangle.weight);
         SCAI_ASSERT( thisVolume==thisWeight , "This rectangle's area= "<< thisVolume << " and should be equal to its weight that is= "<< thisWeight);   // that is true only when all weights are 1
         
@@ -996,8 +996,8 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
     //
     std::vector<ValueType> minCoords( dimensions, std::numeric_limits<ValueType>::max() );
     std::vector<ValueType> maxCoords( dimensions, std::numeric_limits<ValueType>::lowest() );
-    std::vector<ValueType> scaledMin( dimensions, std::numeric_limits<ValueType>::max());
-    std::vector<ValueType> scaledMax( dimensions, std::numeric_limits<ValueType>::lowest());
+    std::vector<IndexType> scaledMin( dimensions, std::numeric_limits<IndexType>::max());
+    std::vector<IndexType> scaledMax( dimensions, std::numeric_limits<IndexType>::lowest());
     
     std::vector<std::vector<IndexType>> scaledCoords( localN , std::vector<IndexType>(dimensions,0) );
     // scale= N^(1/d): this way the scaled max is N^(1/d) and this is also the maximum size of the projection arrays
@@ -1082,7 +1082,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile){
     for(int r=0; r<settings.numBlocks; r++){
         struct rectangle thisRectangle = rectangles[r]->getRect();
         
-        ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight<IndexType>( scaledCoords, nodeWeights, thisRectangle, scaledMax, settings);
+        ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight<IndexType>( scaledCoords, nodeWeights, thisRectangle, settings);
         /*
         //re-scale rectangle
         for (IndexType d=0; d<dimensions; d++) {
@@ -1221,7 +1221,7 @@ TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D){
     ValueType bBox1Weight = (bBox1.top[0]-bBox1.bottom[0]+1)*(bBox1.top[1]-bBox1.bottom[1]+1);
     bBox1.weight = bBox1Weight;
     root->insert(bBox1);
-    //if(comm->getRank()==0) bBox1.print();    
+    if(comm->getRank()==0) bBox1.print(std::cout);    
     
     rectangle bBox2;        // leafID=0 => projection[0]
     bBox2.bottom = {0, 0};
@@ -1229,15 +1229,15 @@ TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D){
     ValueType bBox2Weight = (bBox2.top[0]-bBox2.bottom[0]+1)*(bBox2.top[1]-bBox2.bottom[1]+1);
     bBox2.weight = bBox2Weight;
     root->insert( bBox2 );
-    //if(comm->getRank()==0)  bBox2.print();        
+    if(comm->getRank()==0)  bBox2.print(std::cout);        
     
     rectangle bBox3;        // leafID=1 => projection[1]
     bBox3.bottom = {0, std::floor(maxCoord[1]*0.75) };
     bBox3.top = { std::floor(maxCoord[0]/2 -1) , maxCoord[1] };
     ValueType bBox3Weight = (bBox3.top[0]-bBox3.bottom[0]+1)*(bBox3.top[1]-bBox3.bottom[1]+1);
-    bBox.weight = bBox3Weight;
+    bBox3.weight = bBox3Weight;
     root->insert( bBox3 );
-    //if(comm->getRank()==0)  bBox3.print();         
+    if(comm->getRank()==0)  bBox3.print(std::cout);         
     
     SCAI_ASSERT( root->getNumLeaves()==3 , "Tree must have 3 leaves but has "<< root->getNumLeaves() );
     
@@ -1246,19 +1246,8 @@ TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D){
     ValueType totalGridWeight = N;
     SCAI_ASSERT( totalGridWeight==nodeWeights.sum() , "Wrong sum of node weights: "<< nodeWeights.sum() );
 
-    const bool useIter = true; // GetParam();
-/*
-    //coordinates of ValueType
-    std::vector<DenseVector<ValueType>> coordinatesVal;
-    {
-	    for( int d=0; d<dimensions; d++){
-	    	for( int i=0; i<localN; i++){
-	    		coordinatesVal[d].getLocalValues()[i] = ValueType (coordinates[d].getLocalValues()[i]);
-	    	}
-	    }
-	}
-*/
-    
+    const bool useIter = false; // GetParam();
+
     for(int d=0; d<dimensions; d++){
         //dim2proj.size() = number of leaves/rectangles
         std::vector<IndexType> dim2proj = {d, d, d};
@@ -1267,19 +1256,24 @@ TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D){
         std::vector<std::vector<ValueType>> projections;
 
 		if( not useIter ){        
-        	projections = MultiSection<IndexType, ValueType>::projectionNonUniform( localPoints , nodeWeights, root, dim2proj, settings);
-        }else{	
+        	projections = MultiSection<IndexType, ValueType>::projectionNonUniform( localPoints , nodeWeights, root, dim2proj);
+        }else{
+        	std::vector<ValueType> extent = {
+        		bBox2.top[d]-bBox2.bottom[d],
+        		bBox3.top[d]-bBox3.bottom[d],
+        		bBox1.top[d]-bBox1.bottom[d]
+        	};
         	std::vector<std::vector<ValueType>> hyperplanes = {
-        		{0, bBox1.top[d]*0.2, bBox1.top[d]*0.6, bBox1.top[d] },
-        		{0, bBox2.top[d]*0.2, bBox2.top[d]*0.6, bBox2.top[d] },
-        		{0, bBox3.top[d]*0.2, bBox3.top[d]*0.6, bBox3.top[d] }
+        		{bBox2.bottom[d], bBox2.bottom[d]+extent[0]*0.2, bBox2.bottom[d]+extent[0]*0.6, bBox2.top[d]},
+        		{bBox3.bottom[d], bBox3.bottom[d]+extent[1]*0.2, bBox3.bottom[d]+extent[1]*0.6, bBox3.top[d]},
+				{bBox1.bottom[d], bBox1.bottom[d]+extent[2]*0.2, bBox1.bottom[d]+extent[2]*0.6, bBox1.top[d]}
         	};
 
-for( int i=0; i<3; i++){
-	aux<IndexType,ValueType>::printVector(hyperplanes[i]);
-}
+//for( int i=0; i<3; i++){
+//	aux<IndexType,ValueType>::printVector(hyperplanes[i]);
+//}
 
-        	projections = MultiSection<IndexType, ValueType>::projectionIter( localPointsVal , nodeWeights, root, root->getAllLeaves(), hyperplanes, dim2proj, settings);
+        	projections = MultiSection<IndexType, ValueType>::projectionIter( localPointsVal , nodeWeights, root, root->getAllLeaves(), hyperplanes, dim2proj);
 
 
         }
@@ -1289,13 +1283,16 @@ for( int i=0; i<3; i++){
         
         for( int i=0; i<projections.size(); i++){
                 projectionsTotalWeight += std::accumulate( projections[i].begin(), projections[i].end(), 0.0 );
+				aux<IndexType,ValueType>::printVector(projections[i]);                
         }
         SCAI_ASSERT( projectionsTotalWeight==totalGridWeight , "Wrong sum of projections weights: projectionsTotalWeight= " << projectionsTotalWeight << " , totalGridWeight= " << totalGridWeight);
     
-        SCAI_ASSERT( projections[0].size()==(bBox2.top[d]-bBox2.bottom[d]+1), "Wrong size for projection 0");
-        SCAI_ASSERT( projections[1].size()==(bBox3.top[d]-bBox3.bottom[d]+1), "Wrong size for projection 1");
-        SCAI_ASSERT( projections[2].size()==(bBox1.top[d]-bBox1.bottom[d]+1), "Wrong size for projection 2");
-        
+    	if(not useIter){
+	        SCAI_ASSERT_EQ_ERROR( projections[0].size(),(bBox2.top[d]-bBox2.bottom[d]+1), "Wrong size for projection 0");
+	        SCAI_ASSERT_EQ_ERROR( projections[1].size(),(bBox3.top[d]-bBox3.bottom[d]+1), "Wrong size for projection 1");
+	        SCAI_ASSERT_EQ_ERROR( projections[2].size(),(bBox1.top[d]-bBox1.bottom[d]+1), "Wrong size for projection 2");
+        }
+
         SCAI_ASSERT( projections.size()==3, "projections size must be 2 but it is "<< projections.size() );
         ValueType proj0Weight = std::accumulate( projections[0].begin(), projections[0].end(), 0.0 );
         ValueType proj1Weight = std::accumulate( projections[1].begin(), projections[1].end(), 0.0 );
@@ -1325,7 +1322,8 @@ for( int i=0; i<3; i++){
 
     IndexType numRows = blockGraph.getNumRows() , numCols = blockGraph.getNumColumns();
     PRINT0( numRows<< " x "<< numCols );
-    SCAI_ASSERT_EQ_ERROR( numRows, numCols, "Number of rows and colums must be equal");        EXPECT_TRUE( blockGraph.isConsistent() );
+    SCAI_ASSERT_EQ_ERROR( numRows, numCols, "Number of rows and colums must be equal");  
+    EXPECT_TRUE( blockGraph.isConsistent() );
     EXPECT_TRUE( blockGraph.checkSymmetry() );
 
     if( comm->getRank()==0 ){
@@ -1445,7 +1443,7 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D){
         std::vector<IndexType> dim2proj = {d, d, d};
         SCAI_ASSERT( dim2proj.size()==root->getNumLeaves(), "Wrong size of vecctor dim2proj or number of leaves");
         
-        std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projectionNonUniform( coordsIndex, nodeWeights, root, dim2proj, settings);
+        std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projectionNonUniform( coordsIndex, nodeWeights, root, dim2proj );
     
         SCAI_ASSERT( projections[0].size()==(bBox2.top[d]-bBox2.bottom[d]+1), "Wrong size for projection 0");
         SCAI_ASSERT( projections[1].size()==(bBox3.top[d]-bBox3.bottom[d]+1), "Wrong size for projection 1");
