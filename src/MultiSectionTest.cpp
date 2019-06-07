@@ -1177,14 +1177,18 @@ TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D){
     coordinates[0].redistribute( dist );
     coordinates[1].redistribute( dist );
     
+    using point = std::vector<ValueType>;
+
     //set local weights + convert local part of coordinates to a vector<vector<IndexType>>
     scai::lama::DenseVector<ValueType> nodeWeights( dist, ValueType(1) );
     std::vector<std::vector<IndexType>> localPoints( localN, std::vector<IndexType>( dimensions, 0) );
+    std::vector<point> localPointsVal( localN, point( dimensions, 0) );
     {
         for(int d=0; d<dimensions; d++){
             scai::hmemo::ReadAccess<IndexType> localCoordR( coordinates[d].getLocalValues() );
             for(int i=0; i<localN; i++){
                 localPoints[i][d] = localCoordR[i];
+                localPointsVal[i][d] = ValueType (localCoordR[i]);
             }
         }
         
@@ -1243,7 +1247,7 @@ TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D){
     SCAI_ASSERT( totalGridWeight==nodeWeights.sum() , "Wrong sum of node weights: "<< nodeWeights.sum() );
 
     const bool useIter = true; // GetParam();
-
+/*
     //coordinates of ValueType
     std::vector<DenseVector<ValueType>> coordinatesVal;
     {
@@ -1253,8 +1257,7 @@ TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D){
 	    	}
 	    }
 	}
-    //coordinatesVal[0].redistribute( dist );
-    //coordinatesVal[1].redistribute( dist );
+*/
     
     for(int d=0; d<dimensions; d++){
         //dim2proj.size() = number of leaves/rectangles
@@ -1272,8 +1275,11 @@ TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D){
         		{0, bBox3.top[d]*0.2, bBox3.top[d]*0.6, bBox3.top[d] }
         	};
 
+for( int i=0; i<3; i++){
+	aux<IndexType,ValueType>::printVector(hyperplanes[i]);
+}
 
-        	projections = MultiSection<IndexType, ValueType>::projectionIter( coordinatesVal , nodeWeights, root, root->getAllLeaves(), hyperplanes, dim2proj, settings);
+        	projections = MultiSection<IndexType, ValueType>::projectionIter( localPointsVal , nodeWeights, root, root->getAllLeaves(), hyperplanes, dim2proj, settings);
 
 
         }

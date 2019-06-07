@@ -6,6 +6,7 @@
 
 #include "MultiSection.h"
 #include "GraphUtils.h"
+#include "AuxiliaryFunctions.h"
 
 #include <numeric>
 
@@ -63,9 +64,15 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
     //
     std::vector<ValueType> minCoords(dim, std::numeric_limits<ValueType>::max());
     std::vector<ValueType> maxCoords(dim, std::numeric_limits<ValueType>::lowest());
-    std::vector<ValueType> scaledMin(dim, std::numeric_limits<ValueType>::max());
-    std::vector<ValueType> scaledMax(dim, std::numeric_limits<ValueType>::lowest());
+    std::tie(minCoords, maxCoords) = aux<IndexType,ValueType>::getGlobalMinMaxCoords( coordinates );
+
+    // scale= N^(1/d): this way the scaled max is N^(1/d) and this is also the maximum size of the projection arrays
+	ValueType scale = std::pow( globalN /*WARNING*/ -1 , 1.0/dim);
+    std::vector<ValueType> scaledMin(dim, 0);
+    std::vector<ValueType> scaledMax(dim, scale);
     
+    PRINT0("max coord= " << *std::max_element(maxCoords.begin(), maxCoords.end() ) << "  and max scaled coord= " << *std::max_element(scaledMax.begin(), scaledMax.end() ) );
+
     //
     // scale the local coordinates so the projections are not too big and relative to the input size
     // and copy to a std::vector<std::vector>
@@ -73,59 +80,49 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
 
     //TODO: since this stores the scaled coords it can have smaller size (scale?) where each coord has 
     //a multiplicity, i.e., how many original coords belong to the same scaled coord
-    std::vector<std::vector<IndexType>> localPoints( localN, std::vector<IndexType>(dim,0) );
-   
-    // scale= N^(1/d): this way the scaled max is N^(1/d) and this is also the maximum size of the projection arrays
-	ValueType scale = std::pow( globalN /*WARNING*/ -1 , 1.0/dim);
+ 	std::vector<point> localPoints( localN, point(dim,0.0) );
+ //TODO: this is bad; find a better solution asap!
+ 	std::vector<intPoint> intLocalPoints( localN, intPoint(dim,0) );
 
     {
-        SCAI_REGION( "MultiSection.getPartitionNonUniform.minMaxAndScale" )
-        
+        SCAI_REGION( "MultiSection.getPartitionNonUniform.scale_copy" )
+       
         for (IndexType d = 0; d < dim; d++) {
-            //get local parts of coordinates
-            scai::hmemo::ReadAccess<ValueType> localPartOfCoords( coordinates[d].getLocalValues() );
-            for (IndexType i = 0; i < localN; i++) {
-                ValueType coord = localPartOfCoords[i];
-                if (coord < minCoords[d]) minCoords[d] = coord;
-                if (coord > maxCoords[d]) maxCoords[d] = coord;
-            }
-        }
-        
-        //  communicate to get global min / max
-        //
-        for (IndexType d = 0; d < dim; d++) {
-            SCAI_REGION( "MultiSection.getPartitionNonUniform.minMaxAndScale.minMax" )
-            minCoords[d] = comm->min(minCoords[d]);
-            maxCoords[d] = comm->max(maxCoords[d]);
-            scaledMax[d] = int(scale) ;
-            scaledMin[d] = 0;
-        }
-        
-        PRINT0("max coord= " << *std::max_element(maxCoords.begin(), maxCoords.end() ) << "  and max scaled coord= " << *std::max_element(scaledMax.begin(), scaledMax.end() ) );
-        
-        for (IndexType d = 0; d < dim; d++) {
-            
-            ValueType thisDimScale = scale/(maxCoords[d]-minCoords[d]);
             scai::hmemo::ReadAccess<ValueType> localPartOfCoords( coordinates[d].getLocalValues() );
             
-            //get local parts of coordinates
             //
-            for (IndexType i = 0; i < localN; i++) {
-                ValueType normalizedCoord = localPartOfCoords[i] - minCoords[d];
-                IndexType scaledCoord =  normalizedCoord * thisDimScale; 
-                //
-                localPoints[i][d] = scaledCoord;
-                //
-                SCAI_ASSERT( scaledCoord >=0 and scaledCoord<=scale, "Wrong scaled coordinate " << scaledCoord << " is either negative or more than "<< scale);
-            }
+            //copy coordinates to a vector<vector> and scale them if we do 
+            //not use the iterative method
+            //
+
+            if( settings.useIter ){ //in this case, do not scale coords
+		    	for (IndexType i=0; i<localN; i++) {
+		    		localPoints[i][d] = localPartOfCoords[i];
+		    	}
+            }else{
+            	ValueType thisDimScale = scale/(maxCoords[d]-minCoords[d]);
+	            for (IndexType i = 0; i < localN; i++) {
+	                ValueType normalizedCoord = localPartOfCoords[i] - minCoords[d];
+	                IndexType scaledCoord =  normalizedCoord * thisDimScale; 
+	                intLocalPoints[i][d] = scaledCoord;
+	                SCAI_ASSERT( scaledCoord >=0 and scaledCoord<=scale, "Wrong scaled coordinate " << scaledCoord << " is either negative or more than "<< scale);
+	            }
+	        }
         }
     }
 
     //
     // get a partitioning into rectangles
     //
-    std::shared_ptr<rectCell<IndexType,ValueType>> root = MultiSection<IndexType, ValueType>::getRectanglesNonUniform( input, localPoints, nodeWeights, scaledMin, scaledMax, settings);
-    
+
+    std::shared_ptr<rectCell<IndexType,ValueType>> root;
+
+    if( settings.useIter ){
+    	root = MultiSection<IndexType, ValueType>::getRectanglesNonUniform( input, localPoints, nodeWeights, scaledMin, scaledMax, settings);
+	}else{
+		 root = MultiSection<IndexType, ValueType>::getRectanglesNonUniform( input, intLocalPoints, nodeWeights, scaledMin, scaledMax, settings);
+	}
+
     const IndexType numLeaves = root->getNumLeaves();
     
     SCAI_ASSERT( numLeaves==k , "Returned number of rectangles is not equal k, rectangles.size()= " << numLeaves << " and k= "<< k );
@@ -138,9 +135,10 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
 // The non-uniform grid case. Now we take as input the adjacency matrix of a graph and also the coordinates.
    
 template<typename IndexType, typename ValueType>
+template<typename T>
 std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType>::getRectanglesNonUniform( 
     const scai::lama::CSRSparseMatrix<ValueType> &input,
-    const std::vector< std::vector<IndexType>> &coordinates,
+    const std::vector< std::vector<T>> &coordinates,
     const scai::lama::DenseVector<ValueType>& nodeWeights,
     const std::vector<ValueType>& minCoords,
     const std::vector<ValueType>& maxCoords,
@@ -160,7 +158,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     SCAI_ASSERT( minCoords.size()==maxCoords.size() and maxCoords.size()==dim , "Wrong size of maxCoords or minCoords." );
     
     for(int d=0; d<dim; d++){
-        SCAI_ASSERT( minCoords[d]<maxCoords[d] , "Minimum coordinates should be less than the maximum coordinates.");
+        SCAI_ASSERT_LT_ERROR( minCoords[d], maxCoords[d] , "Minimum coordinates should be less than the maximum coordinates.");
     }
     
     //
@@ -192,12 +190,13 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         }else{                                  // user-specific number of cuts per dimensions
             numCuts = settings.cutsPerDim;
         }
+        SCAI_ASSERT_EQ_ERROR( numCuts.size(), dim, "Wrong dimensions or vector size.");
     }else{        
         SCAI_ASSERT( k && !(k & (k-1)) , "k is not a power of 2 and this is required for now for bisection");  
         numCuts = std::vector<IndexType>( log2(k) , 2 );
     }
     
-    SCAI_ASSERT_EQ_ERROR( numCuts.size(), dim, "Wrong dimensions or vector size.");
+
 
     //
     // initialize the tree
@@ -230,48 +229,66 @@ if(comm->getRank()==0)  bBox.print( std::cout );
     
     for(typename std::vector<IndexType>::iterator thisDimCuts=numCuts.begin(); thisDimCuts!=numCuts.end(); ++thisDimCuts ){
         SCAI_REGION("MultiSection.getRectanglesNonUniform.forAllRectangles");
-
-        ValueType maxExtent = 0;
-        //std::vector<ValueType> minDifference ( numLeaves, LONG_MAX );        
-
-        std::vector<IndexType> chosenDim ( numLeaves, -1);
-
-        // a vector with pointers to all the leaf nodes of the tree
-        std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> allLeaves = root->getAllLeaves();        
-        SCAI_ASSERT( allLeaves.size()==numLeaves, "Wrong number of leaves.");
+PRINT0("about to cut into " << *thisDimCuts);
 
         /*Two ways to find in which dimension to project:
          * 1) just pick the dimension of the bounding box that has the largest extent and then project: only one projection
          * 2) project in every dimension and pick the one in which the difference between the maximum and minimum value is the smallest: d projections
          * TODO: maybe we can change (2) and calculate the variance of the projection and pick the one with the biggest
          * */
-             
+
+        // a vector with pointers to all the leaf nodes of the tree
+        std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> allLeaves = root->getAllLeaves();        
+        SCAI_ASSERT( allLeaves.size()==numLeaves, "Wrong number of leaves.");
+
         //TODO: since this is done locally, we can also get the 1D partition in every dimension and choose the best one
         //      maybe not the fastest way but probably would give better quality
-PRINT0("about to cut into " << *thisDimCuts);
-        //TODO: useExtent is the only option. Add another or remove settings.useExtent
+
+        std::vector<IndexType> chosenDim ( numLeaves, -1); //the chosen dim to project for every leaf
+
+        //the hyperplane coordinate for every leaf in the chosen dimension
+		//this is used only in the iterative approach
+		std::vector<std::vector<ValueType>> hyperplanes( numLeaves, (std::vector<ValueType> (*thisDimCuts+1,0)) ); 
+
         // choose the dimension to project for each leaf/rectangle
-        if( settings.useExtent ){
-            SCAI_REGION("MultiSection.getRectanglesNonUniform.forAllRectangles.useExtent");
-            // for all leaves/rectangles
-            for( IndexType l=0; l<allLeaves.size(); l++){
-                struct rectangle thisRectangle = allLeaves[l]->getRect();
-                maxExtent = 0;
-                for(int d=0; d<dim; d++){
-                    ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
-                    if( extent>maxExtent ){
-                        maxExtent = extent;
-                        chosenDim[l] = d;
-                    }
+        for( IndexType l=0; l<allLeaves.size(); l++){
+            struct rectangle thisRectangle = allLeaves[l]->getRect();
+            ValueType maxExtent = 0;
+            for(int d=0; d<dim; d++){
+                ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
+                if( extent>maxExtent ){
+                    maxExtent = extent;
+                    chosenDim[l] = d;
                 }
             }
+            //used in the iterative approach
+            if(settings.useIter){
+            	ValueType meanHyperplaneOffset = maxExtent/ *thisDimCuts;
+	            for( int c=1; c<*thisDimCuts; c++){
+	            	hyperplanes[l][c] = hyperplanes[l][c-1] + meanHyperplaneOffset;
+//PRINT0("hyperplane " << c << " for leaf " << l << " is " << hyperplanes[l][c] );	            	
+	            }
+            }
         }
+        
         // in chosenDim we have stored the desired dimension to project for all the leaf nodes
 
         // a vector of size numLeaves. projections[i] is the projection of leaf/rectangle i in the chosen dimension
-        std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projectionNonUniform( coordinates, nodeWeights, root, chosenDim, settings);
 
-        SCAI_ASSERT( projections.size()==numLeaves, "Wrong number of projections"); 
+        std::vector<std::vector<ValueType>> projections;
+
+        if( std::is_same<T,IndexType>::value ){
+        	SCAI_ASSERT( not settings.useIter, "IndexType is for the non-iterative approach" );
+        	projections = MultiSection<IndexType, ValueType>::projectionNonUniform( coordinates, nodeWeights, root, chosenDim, settings);
+        }else if(std::is_same<T,ValueType>::value){
+			SCAI_ASSERT( settings.useIter, "ValueType is for the iterative approach" );
+        	projections = MultiSection<IndexType, ValueType>::projectionIter( coordinates, nodeWeights, root, allLeaves, hyperplanes, chosenDim, settings);
+        }else{
+        	PRINT0("Currently, only supporting IndexType and ValueType for coordinate type.\nAborting");
+        	throw std::runtime_error("Not supported data type");
+        }
+
+        SCAI_ASSERT_EQ_ERROR( projections.size(), numLeaves, "Wrong number of projections"); 
  PRINT0("numLeaves= " << numLeaves);
         for(IndexType l=0; l<numLeaves; l++){        
             SCAI_REGION("MultiSection.getRectanglesNonUniform.forAllRectangles.createRectanglesAndPush");
@@ -637,7 +654,8 @@ std::pair<bool,std::vector<IndexType>> MultiSection<IndexType, ValueType>::probe
 //---------------------------------------------------------------------------------------
     
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr  distPtr, const std::vector<std::vector<IndexType>>& localPoints){
+template<typename T>
+scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr  distPtr, const std::vector<std::vector<T>>& localPoints){
     SCAI_REGION("MultiSection.setPartition");
     
     const IndexType localN = distPtr->getLocalSize();
@@ -921,6 +939,22 @@ std::vector<T> MultiSection<IndexType, ValueType>::indexTo3D(IndexType ind, std:
 
 template class MultiSection<IndexType, ValueType>;
 
+template std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType>::getRectanglesNonUniform( 
+    const scai::lama::CSRSparseMatrix<ValueType> &input,
+    const std::vector< std::vector<IndexType>> &coordinates,
+    const scai::lama::DenseVector<ValueType>& nodeWeights,
+    const std::vector<ValueType>& minCoords,
+    const std::vector<ValueType>& maxCoords,
+    Settings settings);
+
+template std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType>::getRectanglesNonUniform( 
+    const scai::lama::CSRSparseMatrix<ValueType> &input,
+    const std::vector< std::vector<ValueType>> &coordinates,
+    const scai::lama::DenseVector<ValueType>& nodeWeights,
+    const std::vector<ValueType>& minCoords,
+    const std::vector<ValueType>& maxCoords,
+    Settings settings);
+
 template ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vector<scai::lama::DenseVector<IndexType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
 
 template ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vector<std::vector<IndexType>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
@@ -930,5 +964,10 @@ template ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const
 template std::vector<IndexType> MultiSection<IndexType, ValueType>::indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dim);
 
 template std::vector<ValueType> MultiSection<IndexType, ValueType>::indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dim);
+
+//TODO/check: are these instantiations needed? update: probably yes
+template scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr  distPtr, const std::vector<std::vector<IndexType>>& localPoints);
+
+template scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr  distPtr, const std::vector<std::vector<ValueType>>& localPoints);
 
 };

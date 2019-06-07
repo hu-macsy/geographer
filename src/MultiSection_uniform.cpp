@@ -115,18 +115,14 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         //      maybe not the fastest way but probably would give better quality
         
         // choose the dimension to project for all leaves/rectangles
-        if( settings.useExtent or true){
-            SCAI_REGION("MultiSection.getRectangles.forAllRectangles.useExtent");
-            // for all leaves/rectangles
-            for( IndexType l=0; l<allLeaves.size(); l++){
-                struct rectangle thisRectangle = allLeaves[l]->getRect();
-                maxExtent = 0;
-                for(int d=0; d<dim; d++){
-                    ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
-                    if( extent>maxExtent ){
-                        maxExtent = extent;
-                        chosenDim[l] = d;
-                    }
+        for( IndexType l=0; l<allLeaves.size(); l++){
+            struct rectangle thisRectangle = allLeaves[l]->getRect();
+            maxExtent = 0;
+            for(int d=0; d<dim; d++){
+                ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
+                if( extent>maxExtent ){
+                    maxExtent = extent;
+                    chosenDim[l] = d;
                 }
             }
         }

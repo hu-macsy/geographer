@@ -48,17 +48,14 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
         throw std::runtime_error("Creating " + std::to_string(k) + " blocks from " + std::to_string(globalN) + " elements is impossible.");
     }
 
-//
-// difference with previous approach: do not scale coordinates
-//
-
     std::vector<ValueType> minCoords(dim, std::numeric_limits<ValueType>::max());
     std::vector<ValueType> maxCoords(dim, std::numeric_limits<ValueType>::lowest());
 
     std::tie(minCoords, maxCoords) = aux<IndexType,ValueType>::getGlobalMinMaxCoords( coordinates );
 
     //
-    //convert coordinates to a vector<vector>
+    //difference with previous approach: do not scale coordinates, 
+    //just c
     //
 
 	std::vector<point> localPoints( localN, point(dim,0.0) );
@@ -80,7 +77,7 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
     
     SCAI_ASSERT( numLeaves==k , "Returned number of rectangles is not equal k, rectangles.size()= " << numLeaves << " and k= "<< k );
     
-    return MultiSection<IndexType, ValueType>::setPartition( root, inputDistPtr, coordinates);
+    return MultiSection<IndexType, ValueType>::setPartition( root, inputDistPtr, localPoints);
 
 
 }//getPartitionIter
@@ -144,6 +141,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     }
 
 	SCAI_ASSERT_EQ_ERROR( numCuts.size(), dim, "Wrong dimensions or vector size.");
+
 	//
     // initialize the tree
     //
@@ -278,9 +276,6 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
             // if this point is not contained in any rectangle
             //TODO: in the partition this should not happen. But it may happen in a more general case
             try{
-
-//this expects a point; maybe better convert coordinates from vector<DenseVector> to vector<vector>, as before but without scaling them
-
                 thisRectCell = treeRoot->getContainingLeaf( coordinates[i] );
             }
             catch( const std::logic_error& e){
@@ -307,16 +302,36 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
             // the chosen dimension to project for this rectangle
             const IndexType dim2proj = dimensionToProject[ thisLeafID ];
             
-            //IndexType relativeIndex = coordinates[i][dim2proj]-thisRectCell->getRect().bottom[dim2proj];
-            typename std::vector<ValueType>::iterator upBound = std::upper_bound(hyperplanes[thisLeafID].begin(), hyperplanes[thisLeafID].end(), coordinates[i][dim2proj] );
-            IndexType relativeIndex = (upBound-hyperplanes[thisLeafID].begin())-1;
-SCAI_ASSERT_LE( coordinates[i][dim2proj], hyperplanes[thisLeafID][relativeIndex], "Wrong relative index" );
+            //relativeIndex is the index of the hyperplane such that
+            // hyperplane[relativeIndex] < coord <= hyperplane[relativeIndex+1]
+aux<IndexType,ValueType>::printVector(hyperplanes[thisLeafID]);            
+            typename std::vector<ValueType>::const_iterator upBound = std::upper_bound(hyperplanes[thisLeafID].begin(), hyperplanes[thisLeafID].end(), coordinates[i][dim2proj] );
+            IndexType relativeIndex = (upBound-hyperplanes[thisLeafID].begin())/****** -1 ********/ -1;
+			SCAI_ASSERT_GE_ERROR( coordinates[i][dim2proj], hyperplanes[thisLeafID][relativeIndex], "Wrong relative index: " << relativeIndex );            
+			SCAI_ASSERT_LE_ERROR( coordinates[i][dim2proj],
+				hyperplanes[thisLeafID][std::min(numCuts-1,relativeIndex+1)], "Wrong relative index: " << relativeIndex );
 
-            SCAI_ASSERT( relativeIndex<=projections[thisLeafID].capacity(), "Wrong relative index: "<< relativeIndex << " should be <= "<< projections[ thisLeafID ].capacity() << " (and thisRect.bottom= "<< thisRectCell->getRect().bottom[dim2proj]  << " , thisRect.top= "<< thisRectCell->getRect().top[dim2proj] << ")" );
+            SCAI_ASSERT_LE_ERROR( relativeIndex, projections[thisLeafID].capacity(), "Wrong relative index: "<< relativeIndex << " should be <= "<< projections[ thisLeafID ].capacity() << " (and thisRect.bottom= "<< thisRectCell->getRect().bottom[dim2proj]  << " , thisRect.top= "<< thisRectCell->getRect().top[dim2proj] << ")" );
 
             projections[thisLeafID][relativeIndex] += localWeights[i];
         }    
 	}	
+    //
+    // sum all local projections from all PEs
+    //
+    //TODO: sum using one call to comm->sum()
+    // data of vector of vectors are not stored continuously. Maybe copy to a large vector and then add
+    std::vector<std::vector<ValueType>> globalProj(numLeaves);
+    
+    for(IndexType i=0; i<numLeaves; i++){
+        SCAI_REGION("MultiSection.projectionNonUniform.sumImpl");
+        SCAI_ASSERT( i<globalProj.size() and i<projections.size() , "Index too large");
+        
+        globalProj[i].assign( projections[i].size(), 0 );
+        comm->sumImpl( globalProj[i].data(), projections[i].data(), projections[i].size(), scai::common::TypeTraits<ValueType>::stype);
+    }
+    
+    return globalProj;
 
 }//projectionIter
 

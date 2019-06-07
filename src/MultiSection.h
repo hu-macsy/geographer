@@ -11,7 +11,7 @@
 
 namespace ITI {
 
-    /* A d-dimensional rectangle represented by two points: the bottom and the top corner.
+    /** A d-dimensional rectangle represented by two points: the bottom and the top corner.
      * For all i: 0<i<d, it must be bottom[i]<top[i]
      * Also, the rectangle contains the points [bottom, top], so, in a 1D rectangle, [4,8] contains
      * the points 4,5,6,7 and 8.
@@ -20,11 +20,10 @@ namespace ITI {
      * */
     struct rectangle{
         
-        ValueType weight;
-        
+        ValueType weight;        		///< rectangles can have weight
         // for all i: 0<i<dimension, bottom[i]<top[i]
-        std::vector<ValueType> bottom;
-        std::vector<ValueType> top;
+        std::vector<ValueType> bottom; 	///< bottom point
+        std::vector<ValueType> top;		///< top point
         
         void print(std::ostream& out){
             std::cout<< "rectangle bottom: ";
@@ -32,12 +31,11 @@ namespace ITI {
                 out<< bottom[i] << ", ";
             }
             out<< std::endl;
-            
             out<< "             top: ";
+
             for(unsigned int i=0; i<top.size(); i++){
                 out<< top[i] << ", ";
             }
-            
             out<< "          weight: "<< weight << std::endl;
         }
         
@@ -58,7 +56,7 @@ namespace ITI {
             return ret;
         }
         
-        /** Checks if the given point is inside this rectangle.
+        /** \brief Checks if the given point is inside this rectangle.
          */
         template< typename D>
         bool owns( const std::vector<D>& point){
@@ -75,7 +73,7 @@ namespace ITI {
             return true;
         }
         
-        /*  Checks if two rectangles share a common border. In our case if top[d]=10 and bottom[d]=11
+        /**  Checks if two rectangles share a common border. In our case if top[d]=10 and bottom[d]=11
          *  then the rectangles are adjacent: their difference must be more than 1 in order NOT to be
          *  adjacent.
         */
@@ -151,7 +149,7 @@ namespace ITI {
             isLeaf = true;
         }
         
-        /**Insert a rectangle in the tree
+        /** \brief Insert a rectangle in the tree
          */
         //TODO: not handling the case where a rectangle intersects to rectangles allready in the tree
         void insert(rectangle& rect){
@@ -300,7 +298,7 @@ SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
             return  leaves;
         }
         
-        /** Indexes only the leaf nodes of the tree in a DFS way.
+        /** \brief Indexes only the leaf nodes of the tree in a DFS way.
          * */
         IndexType indexLeaves(IndexType currentIndex){
             SCAI_REGION("rectCell.indexLeaves");
@@ -382,13 +380,12 @@ SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
         }
 
     protected:
-        rectangle myRect;
-        //std::shared_ptr<rectangle> myRect;
+        rectangle myRect;		//< the actual rectangle
         std::vector<std::shared_ptr<rectCell>> children;
-        ValueType weight;
+        ValueType weight;		///< the weight of the rectangle
         bool isLeaf;
-        IndexType leafID = -1;   // id value only for leaf nodes
-    };
+        IndexType leafID = -1;  ///< id value only for leaf nodes
+    }; //class rectCell
         
         
         
@@ -401,6 +398,7 @@ SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
 
     	//to make it more readable
     	typedef std::vector<ValueType> point;
+    	typedef std::vector<IndexType> intPoint;
 
         /** @brief A partition of non-uniform grid.
 		 * 
@@ -432,9 +430,10 @@ SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
 		 * 
 		 * @return A distributed DenseVector of length n, partition[i] contains the block ID of node i
 		 */
-        static scai::lama::DenseVector<IndexType> setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr distPtr, const std::vector<std::vector<IndexType>>& localPoints);
+		template <typename T>
+        static scai::lama::DenseVector<IndexType> setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr distPtr, const std::vector<std::vector<T>>& localPoints);
         
-        static scai::lama::DenseVector<IndexType> setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr distPtr, const std::vector<scai::lama::DenseVector<ValueType>>& localPoints);
+        //static scai::lama::DenseVector<IndexType> setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr distPtr, const std::vector<scai::lama::DenseVector<ValueType>>& localPoints);
 
 
         /** Get a tree of rectangles of a uniform grid with side length sideLen. The rectangles cover the whole grid and 
@@ -472,10 +471,10 @@ SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
 		 * 
          * @return A pointer to the root of the tree. The leaves of the tree are the rewuested rectangles.
          */
-        
+        template<typename T>
         static std::shared_ptr<rectCell<IndexType,ValueType>> getRectanglesNonUniform( 
             const scai::lama::CSRSparseMatrix<ValueType> &input,
-            const std::vector<std::vector<IndexType>> &coordinates,
+            const std::vector<std::vector<T>> &coordinates,
             const scai::lama::DenseVector<ValueType> &nodeWeights,
             const std::vector<ValueType> &minCoords,
             const std::vector<ValueType> &maxCoords,
@@ -508,6 +507,14 @@ SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
             const std::vector<IndexType> &dimensionToProject,
             Settings settings);
 
+//TODO: there is not definition of this function; remove it - fix
+static std::vector<std::vector<ValueType>> projectionNonUniform( 
+    const std::vector<std::vector<ValueType>> &coordinates,
+    const scai::lama::DenseVector<ValueType> &nodeWeights,
+    const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
+    const std::vector<IndexType> &dimensionToProject,
+    Settings settings);        
+
         /** @bried Iterative version to get the projection
         */
         static std::vector<std::vector<ValueType>> projectionIter( 
@@ -519,6 +526,17 @@ SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
 		    const std::vector<std::vector<ValueType>>& hyperplanes,
 		    const std::vector<IndexType>& dimensionToProject,
 		    Settings settings);
+
+//TODO: there is not definition of this function; remove it - fix
+static std::vector<std::vector<ValueType>> projectionIter( 
+	//const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+	const std::vector<std::vector<IndexType>>& coordinates,
+    const scai::lama::DenseVector<ValueType>& nodeWeights,
+    const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
+    const std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>>& allLeaves,
+    const std::vector<std::vector<ValueType>>& hyperplanes,
+    const std::vector<IndexType>& dimensionToProject,
+    Settings settings);        
         
         /** @brief Partitions the given vector into k parts of roughly equal weights using a greedy approach.
          *

@@ -165,7 +165,7 @@ struct Settings{
 
     //parameters for multisection
     bool bisect = false;    // 0: works for square k, 1: bisect, for k=power of 2
-    bool useExtent = false;
+    bool useIter = false;  	//use the iterative approach
     std::vector<IndexType> cutsPerDim;
     IndexType pixeledSideLen = 10;
 
@@ -253,7 +253,7 @@ struct Settings{
 		} else if (initialPartition==ITI::Tool::geoMS) {
 			out<< "initial partition: MultiSection" << std::endl;
 			out<< "\tbisect: " << bisect << std::endl;
-			out<< "\tuseExtent: "<< useExtent << std::endl;
+			out<< "\tuseIter "<< useIter << std::endl;
 		} else {
 			out<< "initial partition undefined" << std::endl;
 		}
