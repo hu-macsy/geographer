@@ -332,8 +332,9 @@ int main(int argc, char** argv) {
     if(vm.count("PEgraphFile")){
         throw std::logic_error("Reading of communication trees not yet implemented here.");
     	//commTree =  FileIO<IndexType, ValueType>::readPETree( settings.PEGraphFile );
-    }else if( vm.count("blockSizesFile") ){
+    } else if( vm.count("blockSizesFile") ){
     	//blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
+        blockSizesFile = vm["blockSizesFile"].as<std::string>();
         std::vector<std::vector<ValueType>> blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
         if (blockSizes.size() < nodeWeights.size()) {
             throw std::invalid_argument("Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + " weights per block, "
