@@ -640,6 +640,10 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
     const IndexType globalN = inputDist->getGlobalSize();
     const IndexType rank = comm->getRank();
 
+    if (comm->getSize() == 1) {
+    	return;
+    }
+
     std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
     const IndexType numNodeWeights = nodeWeights.size();
 

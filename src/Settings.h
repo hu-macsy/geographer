@@ -105,10 +105,10 @@ struct Settings{
     //input data and other info
     IndexType dimensions= 2;
     std::string fileName = "-";
-    std::string outFile = "-";
+    std::string outFile = "";
     std::string outDir = "-"; //this is used by the competitors main
-    std::string PEGraphFile = "-";
-    std::string blockSizesFile = "-";
+    std::string PEGraphFile = "-"; //TODO: this should not be in settings 
+    std::string blockSizesFile = "-"; //TODO: this should not be in settings 
     ITI::Format fileFormat = ITI::Format::AUTO;   // 0 for METIS, 4 for MatrixMarket
     ITI::Format coordFormat = ITI::Format::AUTO; 
     bool useDiffusionCoordinates = false;
@@ -171,7 +171,6 @@ struct Settings{
     bool writePEgraph = false;
     bool writeInFile = false;
     bool storeInfo = false;
-    //TODO: turn to false by default
     bool debugMode = false; //extra checks and prints
 	IndexType repeatTimes = 1;
     

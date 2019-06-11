@@ -329,6 +329,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 				if (settings.initialMigration == ITI::Tool::geoSFC) {
 					HilbertCurve<IndexType,ValueType>::hilbertRedistribution(coordinateCopy, nodeWeightCopy, settings, metrics);
 				}else {
+					//This whole block is now unused. Remove?
 					std::vector<DenseVector<ValueType> > convertedWeights(nodeWeights);
 					DenseVector<IndexType> tempResult;				
 					if (settings.initialMigration == ITI::Tool::geoMS) {
@@ -384,7 +385,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 					metrics.MM["timeFirstDistribution"] = migrationTime.count();
 				}
 			}
-			
 		}
 		
 		std::vector<ValueType> weightSum(nodeWeights.size());
@@ -482,7 +482,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 		result = DenseVector<IndexType>(input.getRowDistributionPtr(), comm->getRank());
 	}
 	else {
-		throw std::runtime_error("Initial Partitioning mode undefined.");
+		throw std::runtime_error("Initial Partitioning mode unsupported.");
 	}
 	
 	SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
