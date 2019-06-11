@@ -445,7 +445,7 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::applySfcRenumber(
 	scai::lama::DenseVector<IndexType>& partition,
 	const Settings settings){
 
-	//get the reunmbering
+	//get the renumbering
 	std::vector<IndexType> R = Mapping<IndexType,ValueType>::getSfcRenumber( coordinates, nodeWeights, partition, settings );
 
 	SCAI_ASSERT_EQ_ERROR( R.size(), settings.numBlocks, "Size mismatch" );
@@ -470,6 +470,14 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::applySfcRenumber(
 		wPart[i] = reverseR[prevBlock];
 	}
 
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	if( comm->getRank()==0 and settings.debugMode){
+		for( int i=0; i<k; i++){
+			if( reverseR[i]!=i ){
+				std::cout << "block " << i << " -> " << reverseR[i] << std::endl;
+			}
+		}
+	}
 	return reverseR;
 }//applySfcRenumber
 

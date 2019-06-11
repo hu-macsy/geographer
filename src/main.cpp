@@ -67,8 +67,8 @@ int main(int argc, char** argv) {
 	if( !settings.isValid )
 		return -1;
 
-	
-settings.mappingRenumbering = 1;
+	//update: replace by input parameter "mapping" in parseArgs
+	//settings.mappingRenumbering = 1;
 
 
     //--------------------------------------------------------

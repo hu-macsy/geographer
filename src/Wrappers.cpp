@@ -62,7 +62,12 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
 	if( settings.mappingRenumbering ){
 		const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 		PRINT0("Applying renumbering of blocks based on the SFC index of their centers.");
+		std::chrono::time_point<std::chrono::system_clock> startRnb = std::chrono::system_clock::now();
+
 		Mapping<IndexType,ValueType>::applySfcRenumber( coordinates, nodeWeights, partition, settings );
+
+		std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - startRnb;
+		PRINT0("renumbering time " << elapTime.count() );
 	}
 
 	return partition;
