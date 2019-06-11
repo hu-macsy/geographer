@@ -58,8 +58,10 @@ int main(int argc, char** argv) {
 	std::string blockSizesFile;
 	//ITI::Format coordFormat;
     
-        
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    if (comm->getType() != scai::dmemo::Communicator::CommunicatorKind::MPI) {
+        std::cout << "The linked lama version was compiled without MPI. Only sequential partitioning is supported." << std::endl;
+    }
 
 	struct Settings settings;
     variables_map vm;
@@ -497,7 +499,7 @@ int main(int argc, char** argv) {
 
 		std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
 
-if(comm->getRank() == 0 ) metricsVec[r].printHorizontal2( std::cout );        
+        if(comm->getRank() == 0 ) metricsVec[r].printHorizontal2( std::cout );        
         //---------------------------------------------
         //
         // Print some output
@@ -509,7 +511,6 @@ if(comm->getRank() == 0 ) metricsVec[r].printHorizontal2( std::cout );
             auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
             std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
             std::cout.precision(oldprecision);
-            metricsVec[r].printHorizontal2( std::cout ); //TODO: remove?
         }
        
         //---------------------------------------------------------------
