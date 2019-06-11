@@ -592,7 +592,7 @@ int main(int argc, char** argv) {
     }    
     
     
-    if( settings.outFile!="-" and settings.writeInFile ){
+    if( settings.outFile.size() > 0){
         std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
         std::string partOutFile = settings.outFile+".part";
 		ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );

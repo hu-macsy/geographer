@@ -165,13 +165,12 @@ struct Settings{
     bool noRefinement = false;
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
-    IndexType thisRound=-1;
+    IndexType thisRound=-1; //TODO: what is this? This has nothing to do with the settings.
 
     //debug and profiling parameters
     bool verbose = false;
     bool writeDebugCoordinates = false;
     bool writePEgraph = false;
-    bool writeInFile = false;
     bool storeInfo = false;
     //TODO: turn to false by default
     bool debugMode = false; //extra checks and prints

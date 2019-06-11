@@ -17,27 +17,22 @@ namespace ITI {
 		options.add_options()
 					("help", "display options")
 					("version", "show version")
-					//input and coordinates
+					//main arguments for daily use
 					("graphFile", "read graph from file", value<std::string>())
-					("quadTreeFile", "read QuadTree from file", value<std::string>())
 					("coordFile", "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz", value<std::string>())
-					("fileFormat", "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See Readme.md for more details.", value<ITI::Format>())
-					("coordFormat", "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ", value<ITI::Format>())
-					("PEgraphFile", "read communication graph from file", value<std::string>())
-					("numNodeWeights", "Number of node weights to use. If the input graph contains more node weights, only the first ones are used.", value<IndexType>())
-					("useDiffusionCoordinates", "Use coordinates based from diffusive systems instead of loading from file", value<bool>())
-					("dimensions", "Number of dimensions of generated graph", value<IndexType>())
-					("previousPartition", "file of previous partition, used for repartitioning", value<std::string>())
-					//mesh generation
-					("generate", "generate uniform mesh as input graph")
-					("numX", "Number of points in x dimension of generated graph", value<IndexType>())
-					("numY", "Number of points in y dimension of generated graph", value<IndexType>())
-					("numZ", "Number of points in z dimension of generated graph", value<IndexType>())
-					//general partitioning parameters
+					("dimensions", "Number of dimensions of input graph", value<IndexType>())
 					("numBlocks", "Number of blocks, default is number of processes", value<IndexType>())
 					("epsilon", "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.", value<double>())
-					("blockSizesFile", " file to read the block sizes for every block", value<std::string>() )
+					// other input specification
+					("fileFormat", "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See Readme.md for more details.", value<ITI::Format>())
+					("coordFormat", "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ", value<ITI::Format>())
+					("numNodeWeights", "Number of node weights to use. If the input graph contains more node weights, only the first ones are used.", value<IndexType>())					
 					("seed", "random seed, default is current time", value<double>()->default_value(std::to_string(time(NULL))))
+					//mapping 
+					("PEgraphFile", "read communication graph from file", value<std::string>())
+					("blockSizesFile", " file to read the block sizes for every block", value<std::string>() )
+					//repartitioning
+					("previousPartition", "file of previous partition, used for repartitioning", value<std::string>())
 					//multi-level and local refinement
 					("initialPartition", "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means' or 3) and multisection ('MultiSection' or 4). SFC, Spectral and K-Means are most stable.", value<Tool>())
 					("noRefinement", "skip local refinement steps")
@@ -61,7 +56,6 @@ namespace ITI {
 					("maxKMeansIterations", "Tuning parameter for K-Means", value<IndexType>())
 					("tightenBounds", "Tuning parameter for K-Means")
 					("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
-					//("initialMigration", "Choose a method to get the first migration: geoSFC, geoKMeans, geoMultiSection", value<ITI::Tool>())
 					("hierLevels", "The number of blocks per level. Total number of PEs (=number of leaves) is \
 					the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3 4 10, there are 3 levels. \
 					In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::vector<IndexType>>())
@@ -71,14 +65,21 @@ namespace ITI {
 					("writeDebugCoordinates", "Write Coordinates of nodes in each block", value<bool>())
 					("verbose", "Increase output.")
 	                ("storeInfo", "Store timing and other metrics in file.")
-	                ("writePartition", "Writes the partition in the outFile.partition file")
 	                // evaluation
 	                ("repeatTimes", "How many times we repeat the partitioning process.", value<IndexType>())
 	                ("noComputeDiameter", "Compute diameter of resulting block files.")
 	                ("maxDiameterRounds", "abort diameter algorithm after that many BFS rounds", value<IndexType>())
 					("metricsDetail", "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV", value<std::string>())
 					//used for the competitors main
-					("outDir", "write result partition into file", value<std::string>())
+					// ("outDir", "write result partition into file", value<std::string>())
+					//mesh generation
+					("generate", "generate uniform mesh as input graph")
+					("numX", "Number of points in x dimension of generated graph", value<IndexType>())
+					("numY", "Number of points in y dimension of generated graph", value<IndexType>())
+					("numZ", "Number of points in z dimension of generated graph", value<IndexType>())
+					// exotic test cases
+					("quadTreeFile", "read QuadTree from file", value<std::string>())
+					("useDiffusionCoordinates", "Use coordinates based from diffusive systems instead of loading from file", value<bool>())
 					;
 
 		return options;
@@ -152,10 +153,6 @@ namespace ITI {
 		}else{
 			settings.computeDiameter = true;
 		}
-		
-	    if( vm.count("writePartition") ){
-	        settings.writeInFile = true;
-	    }
 	    
 	    using std::vector;
 	    settings.verbose = vm.count("verbose");
