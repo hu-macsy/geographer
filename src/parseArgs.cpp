@@ -21,7 +21,7 @@ namespace ITI {
 					("graphFile", "read graph from file", value<std::string>())
 					("quadTreeFile", "read QuadTree from file", value<std::string>())
 					("coordFile", "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz", value<std::string>())
-					("fileFormat", "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.", value<ITI::Format>())
+					("fileFormat", "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See Readme.md for more details.", value<ITI::Format>())
 					("coordFormat", "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ", value<ITI::Format>())
 					("PEgraphFile", "read communication graph from file", value<std::string>())
 					("numNodeWeights", "Number of node weights to use. If the input graph contains more node weights, only the first ones are used.", value<IndexType>())
@@ -29,7 +29,7 @@ namespace ITI {
 					("dimensions", "Number of dimensions of generated graph", value<IndexType>())
 					("previousPartition", "file of previous partition, used for repartitioning", value<std::string>())
 					//mesh generation
-					("generate", "generate random graph. Currently, only uniform meshes are supported.")
+					("generate", "generate uniform mesh as input graph")
 					("numX", "Number of points in x dimension of generated graph", value<IndexType>())
 					("numY", "Number of points in y dimension of generated graph", value<IndexType>())
 					("numZ", "Number of points in z dimension of generated graph", value<IndexType>())
@@ -51,7 +51,7 @@ namespace ITI {
 					("skipNoGainColors", "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round", value<bool>())
 					//multisection
 					("bisect", "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached", value<bool>())
-					("cutsPerDim", "If MultiSection is chosen, then provide d values that define the number of cuts per dimension.", value<std::vector<IndexType>>())
+					("cutsPerDim", "If MultiSection is chosen, then provide d values that define the number of cuts per dimension.", value<std::string>())
 					("pixeledSideLen", "The resolution for the pixeled partition or the spectral", value<IndexType>())
 					// K-Means
 					("minSamplingNodes", "Tuning parameter for K-Means", value<IndexType>())
@@ -114,12 +114,7 @@ namespace ITI {
 			//return 126;
 		}
 
-		if( vm.count("cutsPerDim") ) {
-			SCAI_ASSERT(!settings.cutsPerDim.empty(), "options cutsPerDim was given but the vector is empty" );
-			SCAI_ASSERT_EQ_ERROR(settings.cutsPerDim.size(), settings.dimensions, "cutsPerDim: user must specify d values for mutlisection using option --cutsPerDim. e.g.: --cutsPerDim=4,20 for a partition in 80 parts/" );
-		}
-
-		if (vm.count("fileFormat") && settings.fileFormat == ITI::Format::TEEC) {
+		if (vm.count("fileFormat") && vm["fileFormat"].as<ITI::Format>() == ITI::Format::TEEC) {
 			if (!vm.count("numX")) {
 				std::cout << "TEEC file format does not specify graph size, please set with --numX" << std::endl;
 				settings.isValid = false;
@@ -131,20 +126,6 @@ namespace ITI {
 		// if no coordFormat was given but was given a fileFormat assume they are the same
 		if( !vm.count("coordFormat") and vm.count("fileFormat") ){
 			settings.coordFormat = settings.fileFormat;
-		}
-
-		if (vm.count("previousPartition")) {
-			settings.repartition = true;
-			if (vm.count("initialPartition")) {
-				if (!(settings.initialPartition == Tool::geoKmeans || settings.initialPartition == Tool::none)) {
-					std::cout << "Method " << settings.initialPartition << " not supported for repartitioning, currently only kMeans." << std::endl;
-					settings.isValid = false;
-					//return 126;
-				}
-			} else {
-				PRINT0("Setting initial partitioning method to kMeans.");
-				settings.initialPartition = Tool::geoKmeans;
-			}
 		}
 
 		if( settings.storeInfo && settings.outFile=="-" ) {
@@ -174,24 +155,6 @@ namespace ITI {
 		
 	    if( vm.count("writePartition") ){
 	        settings.writeInFile = true;
-	    }
-
-	    if ( settings.hierLevels.size() > 0 ) {
-	    	if (!(settings.initialPartition == Tool::geoHierKM 
-	    		|| settings.initialPartition == Tool::geoHierRepart)) {
-		    	if(comm->getRank() ==0 ){
-					std::cout<<" WARNING: Without using hierarchical partitioning,\
-					 the given hierarchy levels will be ignored. " <<std::endl;
-				}
-	    	}
-
-	    	if (!vm.count("numBlocks")) {
-	    		IndexType numBlocks = 1;
-	    		for (IndexType level : settings.hierLevels) {
-	    			numBlocks *= level;
-	    		}
-	    		settings.numBlocks = numBlocks;
-	    	}
 	    }
 	    
 	    using std::vector;
@@ -257,7 +220,15 @@ namespace ITI {
 			settings.minGainForNextRound = vm["minGainForNextGlobalRound"].as<IndexType>();
 		}
 		if (vm.count("cutsPerDim")) {
-			settings.cutsPerDim = vm["cutsPerDim"].as<vector<IndexType>>();
+			std::stringstream ss( vm["cutsPerDim"].as<std::string>() );
+			std::string item;
+			std::vector<IndexType> cutsPerDim;
+
+			while (!std::getline(ss, item, ' ').fail()) {
+				cutsPerDim.push_back(std::stoi(item));
+			}
+
+			settings.cutsPerDim = cutsPerDim;
 		}
 		if (vm.count("pixeledSideLen")) {
 			settings.pixeledSideLen = vm["pixeledSideLen"].as<IndexType>();
@@ -278,7 +249,15 @@ namespace ITI {
 			settings.maxKMeansIterations = vm["maxKMeansIterations"].as<IndexType>();
 		}
 		if (vm.count("hierLevels")) {
-			settings.hierLevels = vm["hierLevels"].as<vector<IndexType>>();
+			std::stringstream ss( vm["hierLevels"].as<std::string>() );
+			std::string item;
+			std::vector<IndexType> hierLevels;
+
+			while (!std::getline(ss, item, ' ').fail()) {
+				hierLevels.push_back(std::stoi(item));
+			}
+
+			settings.hierLevels = hierLevels;
 		}
 		if (vm.count("outFile")) {
 			settings.outFile = vm["outFile"].as<std::string>();
@@ -295,6 +274,39 @@ namespace ITI {
 		if (vm.count("outDir")) {
 			settings.outDir = vm["outDir"].as<std::string>();
 		}
+
+		/*** consistency checks ***/
+		if (vm.count("previousPartition")) {
+			settings.repartition = true;
+			if (vm.count("initialPartition")) {
+				if (!(settings.initialPartition == Tool::geoKmeans || settings.initialPartition == Tool::none)) {
+					std::cout << "Method " << settings.initialPartition << " not supported for repartitioning, currently only kMeans." << std::endl;
+					settings.isValid = false;
+					//return 126;
+				}
+			} else {
+				PRINT0("Setting initial partitioning method to kMeans.");
+				settings.initialPartition = Tool::geoKmeans;
+			}
+		}
+
+		if ( settings.hierLevels.size() > 0 ) {
+	    	if (!(settings.initialPartition == Tool::geoHierKM 
+	    		|| settings.initialPartition == Tool::geoHierRepart)) {
+		    	if(comm->getRank() ==0 ){
+					std::cout << " WARNING: Without using hierarchical partitioning, ";
+					std::cout << "the given hierarchy levels will be ignored." << std::endl;
+				}
+	    	}
+
+	    	if (!vm.count("numBlocks")) {
+	    		IndexType numBlocks = 1;
+	    		for (IndexType level : settings.hierLevels) {
+	    			numBlocks *= level;
+	    		}
+	    		settings.numBlocks = numBlocks;
+	    	}
+	    }
 
 		return settings;
 
