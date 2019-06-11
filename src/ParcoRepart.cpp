@@ -46,25 +46,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	return partitionGraph(input, coordinates, uniformWeights, settings, metrics);
 }
 
-// no metrics, TODO: remove?
-/*
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
-	CSRSparseMatrix<ValueType> &input,
-	std::vector<DenseVector<ValueType>> &coordinates,
-	std::vector<DenseVector<ValueType>> &nodeWeights,
-	Settings settings) {
-    
-    struct Metrics metrics(settings);
-    
-    assert(settings.storeInfo == false); // Cannot return timing information. Better throw an error than silently drop it.
-    
-    DenseVector<IndexType> previous;
-    assert(!settings.repartition);
-    return partitionGraph(input, coordinates, nodeWeights, previous, settings, metrics);   
-}
-*/
-
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input,
 	std::vector<DenseVector<ValueType>> &coordinates,
@@ -75,7 +56,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
     
     return partitionGraph(input, coordinates, settings, metrics);
 }
-
 
 // overloaded version with metrics
 template<typename IndexType, typename ValueType>
