@@ -40,7 +40,7 @@ find_library( PARMETIS_LIB parmetis "${PARMETIS_BASE}/lib" )
 ### for more info see the Zoltan2 documentation and https://trilinos.org/oldsite/Finding_Trilinos.txt
 ### see also in Trilinos_install_path/install/include/Makefile.export.Zoltan2
 
-if( Zoltan2_FOUND AND METIS_LIB AND PARMETIS_LIB )
+if( Zoltan2_FOUND AND METIS_BASE AND PARMETIS_BASE )
 	message( "\n\tFound package Zoltan2" )
 	message( "\tFound library metis in " ${METIS_LIB} )
 	message( "\tFound library parmetis in " ${PARMETIS_LIB} )
@@ -57,8 +57,8 @@ if( Zoltan2_FOUND AND METIS_LIB AND PARMETIS_LIB )
 	link_directories( ${Zoltan2_LIBRARY_DIRS} ${METIS_BASE}/lib ${PARMETIS_BASE}/lib )
 	
 	add_library( wrappers SHARED  Wrappers.cpp)
-	target_include_directories( wrappers PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} "${METIS_BASE}/include" "${PARMETIS_BASE}/include")
-	target_link_libraries( wrappers  ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${ZOLTAN2_LIB}  ${ZOLTAN_LIB} ${Zoltan2_LIBRARIES} ) # libzoltan2.so metis parmetis
+	target_include_directories( wrappers PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} "${METIS_BASE}/include" "${PARMETIS_BASE}/include" )
+	target_link_libraries( wrappers ${RBC_LIBRARY} ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${ZOLTAN2_LIB}  ${ZOLTAN_LIB} ${Zoltan2_LIBRARIES} ) # libzoltan2.so metis parmetis
 	
 	set( EXTRA_LIBRARIES_FOUND "true" )
 	set( EXTRA_LIBRARIES ${METIS_LIB} ${PARMETIS_LIB} ${ZOLTAN2_LIB} ${Zoltan2_LIBRARIES}  PARENT_SCOPE )
