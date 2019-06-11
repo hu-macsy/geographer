@@ -12,7 +12,6 @@ set(FILES_HEADER ParcoRepart.h MultiLevel.h LocalRefinement.h HilbertCurve.h Mes
 set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp SpectralPartition.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp KMeans.cpp CommTree.cpp AuxiliaryFunctions.cpp HaloPlanFns.cpp Metrics.cpp Mapping.cpp Settings.cpp)
 set(FILES_TEST test_main.cpp auxTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp quadtree/test/QuadTreeTest.cpp SpectralPartitionTest.cpp)
 
-#set( EXTRA_LIBRARIES "" )
 
 ###
 ### Check if external libraries metis, parmetis and zoltan2 are found. If they are found,
@@ -49,9 +48,6 @@ if( Zoltan2_FOUND AND METIS_BASE AND PARMETIS_BASE )
 	#WARNING: if we use ${Zoltan2_LIBRARIES}, it tries to link to the .a library and this creates an error. We need the .so library
 	find_library( ZOLTAN2_LIB libzoltan2.so ${Zoltan2_LIBRARY_DIRS} )
 	find_library( ZOLTAN_LIB libzoltan.so ${Zoltan_LIBRARY_DIRS} )
-	message( ${Zoltan_LIBRARY_DIRS} )
-	message( ${ZOLTAN2_LIB} )
-	message( ${ZOLTAN_LIB} )
 
 	#TODO: link_directories is probably not needed; there is a better way to do this; at least, this works for now
 	link_directories( ${Zoltan2_LIBRARY_DIRS} ${METIS_BASE}/lib ${PARMETIS_BASE}/lib )
@@ -76,6 +72,10 @@ else()
 	#message( "Package Zoltan2 was not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
 endif()
 
+
+###
+### geographer versions
+###
 
 add_library(geographer SHARED ${FILES_COMMON})
 target_compile_options(geographer PRIVATE -fPIC)
@@ -102,7 +102,7 @@ endif (USE_NETWORKIT)
 ### define unit test target if GTest was found ###
 if (GTEST_FOUND AND Boost_FOUND)
 	add_executable(GeographerTest ${FILES_TEST})
-	target_include_directories(Geographer PUBLIC ${Boost_INCLUDE_DIRS})
+	target_include_directories(GeographerTest PUBLIC ${Boost_INCLUDE_DIRS})
 	target_link_libraries(GeographerTest geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
 	target_link_libraries(GeographerTest -pthread)
 	add_test(NAME GeographerTest COMMAND GeographerTest WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
