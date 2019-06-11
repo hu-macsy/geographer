@@ -592,7 +592,7 @@ int main(int argc, char** argv) {
     }    
     
     
-    if( settings.outFile.size() > 0){
+    if( settings.outFile!="-" ){
         std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
         std::string partOutFile = settings.outFile+".part";
 		ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
@@ -600,7 +600,7 @@ int main(int argc, char** argv) {
         std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
         if( comm->getRank()==0 ){
             std::cout << " and last partition of the series in file " << partOutFile << std::endl;
-            std::cout<< " Time needed to write .partition file: " << writePartTime.count() <<  std::endl;
+            std::cout<< " Time needed to write .part file: " << writePartTime.count() <<  std::endl;
         }
     }    
     
@@ -618,33 +618,6 @@ int main(int argc, char** argv) {
         
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, settings.dimensions, "debugResult");
         comm->synchronize();
-        
-        //TODO: use something like the code below instead of a NoDistribution
-        //std::vector<IndexType> gatheredPart;
-        //comm->gatherImpl( gatheredPart.data(), N, 0, partition.getLocalValues(), scai::common::TypeTraits<IndexType>::stype );
-        /*
-        scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
-        graph.redistribute( noDistPtr, noDistPtr );
-        partition.redistribute( noDistPtr );
-        for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-            coordinates[dim].redistribute( noDistPtr );
-        }
-        
-        //scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();     
-        
-        //TODO: change that in later version, where data are gathered in one PE and are not replicated
-        SCAI_ASSERT_ERROR( graph.getRowDistributionPtr()->isReplicated()==1, "Adjacency should be replicated. Aborting...");
-        SCAI_ASSERT_ERROR( partition.getDistributionPtr()->isReplicated()==1, "Partition should be replicated. Aborting...");
-        SCAI_ASSERT_ERROR( coordinates[0].getDistributionPtr()->isReplicated()==1, "Coordinates should be replicated. Aborting...");
-        
-        if( comm->getRank()==0 ){
-            if( settings.outFile != "-" ){
-                ITI::FileIO<IndexType,ValueType>::writeVTKCentral( graph, coordinates, partition, settings.outFile+".vtk" );
-            }else{
-                ITI::FileIO<IndexType,ValueType>::writeVTKCentral( graph, coordinates, partition, destPath + "/debugResult.vtk" );
-            }
-        }
-        */
     }
       	  
     //this is needed for supermuc

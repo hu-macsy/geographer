@@ -20,9 +20,9 @@ namespace ITI {
 					//main arguments for daily use
 					("graphFile", "read graph from file", value<std::string>())
 					("coordFile", "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz", value<std::string>())
-					("dimensions", "Number of dimensions of input graph", value<IndexType>())
+					("dimensions", "Number of dimensions of input graph", value<IndexType>()->default_value(std::to_string(settings.dimensions)))
 					("numBlocks", "Number of blocks, default is number of processes", value<IndexType>())
-					("epsilon", "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.", value<double>())
+					("epsilon", "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.", value<double>()->default_value(std::to_string(settings.epsilon)))
 					// other input specification
 					("fileFormat", "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See Readme.md for more details.", value<ITI::Format>())
 					("coordFormat", "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ", value<ITI::Format>())
@@ -36,7 +36,7 @@ namespace ITI {
 					//multi-level and local refinement
 					("initialPartition", "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means' or 3) and multisection ('MultiSection' or 4). SFC, Spectral and K-Means are most stable.", value<Tool>())
 					("noRefinement", "skip local refinement steps")
-					("multiLevelRounds", "Tuning Parameter: How many multi-level rounds with coarsening to perform", value<IndexType>())
+					("multiLevelRounds", "Tuning Parameter: How many multi-level rounds with coarsening to perform", value<IndexType>()->default_value(std::to_string(settings.multiLevelRounds)))
 					("minBorderNodes", "Tuning parameter: Minimum number of border nodes used in each refinement step", value<IndexType>())
 					("stopAfterNoGainRounds", "Tuning parameter: Number of rounds without gain after which to abort localFM. 0 means no stopping.", value<IndexType>())
 					("minGainForNextGlobalRound", "Tuning parameter: Minimum Gain above which the next global FM round is started", value<IndexType>())
@@ -50,7 +50,7 @@ namespace ITI {
 					("pixeledSideLen", "The resolution for the pixeled partition or the spectral", value<IndexType>())
 					// K-Means
 					("minSamplingNodes", "Tuning parameter for K-Means", value<IndexType>())
-					("influenceExponent", "Tuning parameter for K-Means, default is ", value<ValueType>())
+					("influenceExponent", "Tuning parameter for K-Means, default is ", value<ValueType>()->default_value(std::to_string(settings.influenceExponent)))
 					("influenceChangeCap", "Tuning parameter for K-Means", value<ValueType>())
 					("balanceIterations", "Tuning parameter for K-Means", value<IndexType>())
 					("maxKMeansIterations", "Tuning parameter for K-Means", value<IndexType>())
@@ -58,7 +58,7 @@ namespace ITI {
 					("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
 					("hierLevels", "The number of blocks per level. Total number of PEs (=number of leaves) is \
 					the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3 4 10, there are 3 levels. \
-					In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::vector<IndexType>>())
+					In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
 					//output
 					("outFile", "write result partition into file", value<std::string>())
 					//debug
@@ -194,7 +194,10 @@ namespace ITI {
 		}
 		if (vm.count("numBlocks")) {
 			settings.numBlocks = vm["numBlocks"].as<IndexType>();
+		} else {
+			settings.numBlocks = comm->getSize();
 		}
+
 		if (vm.count("epsilon")) {
 			settings.epsilon = vm["epsilon"].as<double>();
 		}
