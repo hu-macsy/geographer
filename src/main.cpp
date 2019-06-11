@@ -54,6 +54,11 @@ int main(int argc, char** argv) {
             
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
+    std::string callingCommand = "";
+    for (IndexType i = 0; i < argc; i++) {
+        callingCommand += std::string(argv[i]) + " ";
+    }
+
     cxxopts::Options options = ITI::populateOptions();
 	cxxopts::ParseResult vm = options.parse(argc, argv);
 
@@ -102,10 +107,7 @@ int main(int argc, char** argv) {
         std::cout.precision(oldprecision);
 
         std::cout << "Calling command:" << std::endl;
-        for (IndexType i = 0; i < argc; i++) {
-            std::cout << std::string(argv[i]) << " ";
-        }
-        std::cout << std::endl << std::endl;
+        std::cout << callingCommand << std::endl << std::endl;
 
     }
 
