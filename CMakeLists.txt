@@ -125,6 +125,12 @@ add_subdirectory(src)
 
 add_subdirectory(tools)
 
+
+if( TARGET wrappers )
+	set( WRAPPERS_FOUND TRUE)
+	#set( EXTRA_LIBS "")
+endif()
+
 ### support for FindPackage ###
 configure_file(GeographerConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfig.cmake @ONLY)
 
@@ -137,31 +143,3 @@ write_basic_package_version_file(
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfigVersion.cmake
         ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfig.cmake
         DESTINATION "${CMAKE_DEST}" )
-
-### find zoltan ###
-FIND_PACKAGE( Zoltan2 PATHS "/home/hpc/pr87si/di36qin/Code/Trilinos/build/packages/zoltan2/")
-
-#TODO: check if libraries are indeed found?
-find_library( METIS_LIB metis "/lrz/sys/libraries/metis/5.1.0/i8r8/lib" )
-find_library( PARMETIS_LIB parmetis "/lrz/sys/libraries/parmetis/4.0.3/ibmmpi/i8r8/lib" )
-
-### for more info see the Zoltan2 documentation and https://trilinos.org/oldsite/Finding_Trilinos.txt
-### see also in Trilinos_install_path/install/include/Makefile.export.Zoltan2
-
-if( Zoltan2_FOUND )
-	message( "\n\tFound package Zoltan2\n")
-
-	link_directories( ${Zoltan2_LIBRARY_DIRS} ) # not sure if needed, "/home/hpc/pr87si/di36qin/Code/Trilinos/install/lib/"
-	# maybe ${Zoltan2_TPL_LIBRARY_DIRS} is needed but, at least in my installation, it is empty
-
-	add_executable( allCompetitors Wrappers.cpp ${FILES_COMMON} allCompetitorsPart.cpp )
-	target_include_directories( allCompetitors PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} )
-	
-	### include parmetis and metis ###
-	target_include_directories( allCompetitors PUBLIC "/lrz/sys/libraries/metis/5.1.0/i8r8/include" )
-	target_include_directories( allCompetitors PUBLIC "/lrz/sys/libraries/parmetis/4.0.3/ibmmpi/i8r8/include" )
-
-	target_link_libraries( allCompetitors ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Boost_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} ${Zoltan2_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )
-else()
-	#message( "Package Zoltan2 was not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
-endif()

@@ -183,6 +183,9 @@ struct Settings{
     //this is used by the competitors main to set the tools we are gonna use
     std::vector<std::string> tools;
 
+    //for mapping
+    bool mappingRenumbering = false;
+
     // variable to check if the settings given are valid or not
     bool isValid = true;
 
