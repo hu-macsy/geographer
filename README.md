@@ -65,6 +65,7 @@ The methods that should be called by end users are the member functions of the P
 
 An example is this:
 
-	static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings);
+	static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates,
+	 struct Settings settings)
 
-This function takes the input graph as an adjacency matrix in the CSRSparseMatrix format. The edge weights are interpreted as communication volumes. The coordinates are accepted in a vector of DenseVector, one DenseVector for each dimension. The settings struct contains relevant options, for example the target number of blocks. The result is returned as a DenseVector.
+This function takes the input graph as an adjacency matrix in the CSRSparseMatrix format. The edge weights are interpreted as communication volumes. The coordinates are accepted in a vector of DenseVector, one DenseVector for each dimension. The settings struct contains relevant options, for example the target number of blocks. The result is returned as a DenseVector with one entry for each vertex, specifying its block ID in the partition. If the number of blocks is equal to the number of processes, the input data structures are redistributed to reflect the new partition.
