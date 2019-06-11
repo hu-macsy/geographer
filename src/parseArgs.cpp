@@ -223,12 +223,23 @@ namespace ITI {
 			std::stringstream ss( vm["cutsPerDim"].as<std::string>() );
 			std::string item;
 			std::vector<IndexType> cutsPerDim;
+			IndexType product = 1;
 
 			while (!std::getline(ss, item, ' ').fail()) {
-				cutsPerDim.push_back(std::stoi(item));
+				IndexType cutsInDim = std::stoi(item);
+				cutsPerDim.push_back(cutsInDim);
+				product *= cutsInDim;
 			}
 
 			settings.cutsPerDim = cutsPerDim;
+
+			if (!vm.count("numBlocks")) {
+				settings.numBlocks = product;
+			} else {
+				if (vm["numBlocks"].as<IndexType>() != product) {
+					throw std::invalid_argument("When giving --cutsPerDim, either omit --numBlocks or set it to the product of cutsPerDim.");
+				}
+			}
 		}
 		if (vm.count("pixeledSideLen")) {
 			settings.pixeledSideLen = vm["pixeledSideLen"].as<IndexType>();
@@ -252,12 +263,24 @@ namespace ITI {
 			std::stringstream ss( vm["hierLevels"].as<std::string>() );
 			std::string item;
 			std::vector<IndexType> hierLevels;
+			IndexType product = 1;
 
 			while (!std::getline(ss, item, ' ').fail()) {
-				hierLevels.push_back(std::stoi(item));
+				IndexType blocksInLevel = std::stoi(item);
+				hierLevels.push_back(blocksInLevel);
+				product *= blocksInLevel;
+				std::cout << product << std::endl;
 			}
 
 			settings.hierLevels = hierLevels;
+			if (!vm.count("numBlocks")) {
+				settings.numBlocks = product;
+			} else {
+				if (vm["numBlocks"].as<IndexType>() != product) {
+					std::cout << vm["numBlocks"].as<IndexType>() << " " << product << std::endl;
+					throw std::invalid_argument("When giving --hierLevels, either omit --numBlocks or set it to the product of level entries.");
+				}
+			}
 		}
 		if (vm.count("outFile")) {
 			settings.outFile = vm["outFile"].as<std::string>();
