@@ -20,7 +20,8 @@ IndexType MultiSection<IndexType, ValueType>::iterativeProjectionAndPart(
 	std::shared_ptr<rectCell<IndexType,ValueType>> root,
 	const std::vector<std::vector<T>>& coordinates,
 	const scai::lama::DenseVector<ValueType>& nodeWeights,
-	const std::vector<IndexType>& numCuts){
+	const std::vector<IndexType>& numCuts,
+	Settings settings){
 
 	SCAI_REGION("MultiSection.iterativeProjectionAndPart");
     const scai::dmemo::DistributionPtr inputDist = nodeWeights.getDistributionPtr();
@@ -50,7 +51,7 @@ PRINT0("about to cut into " << *thisDimCuts);
 
         //TODO: since this is done locally, we can also get the 1D partition in every dimension and choose the best one
         //      maybe not the fastest way but probably would give better quality
-
+        // in chosenDim we have stored the desired dimension to project for all the leaf nodes
         std::vector<IndexType> chosenDim ( numLeaves, -1); //the chosen dim to project for every leaf
 
         //the hyperplane coordinate for every leaf in the chosen dimension
@@ -76,28 +77,38 @@ PRINT0("about to cut into " << *thisDimCuts);
             }
             
         }
-        
-        // in chosenDim we have stored the desired dimension to project for all the leaf nodes
 
-        // projections[i] is the projection of leaf/rectangle i in the chosen dimension; projections.size()=numLeaves
+        ValueType maxImbalance = 0.0;
+       	IndexType numIterations = 0;
 
-        std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projectionIter( coordinates, nodeWeights, root, allLeaves, hyperplanes, chosenDim);
+        do{
+	        // projections[i] is the projection of leaf/rectangle i in the chosen dimension; projections.size()=numLeaves
 
-        SCAI_ASSERT_EQ_ERROR( projections.size(), numLeaves, "Wrong number of projections"); 
- 		//PRINT0("numLeaves= " << numLeaves);
+	        std::vector<std::vector<ValueType>> projections = MultiSection<IndexType, ValueType>::projectionIter( coordinates, nodeWeights, root, allLeaves, hyperplanes, chosenDim);
 
- 		//balance the hyperplaned for every leaf
-        for(IndexType l=0; l<numLeaves; l++){        
-            SCAI_REGION("MultiSection.getRectanglesNonUniform.forAllRectangles.forLeaves");
+	        SCAI_ASSERT_EQ_ERROR( projections.size(), numLeaves, "Wrong number of projections"); 
+	 		//PRINT0("numLeaves= " << numLeaves);
 
-            const IndexType thisChosenDim = chosenDim[l];
-            struct rectangle thisRectangle = allLeaves[l]->getRect();	
-            std::vector<ValueType> thisHyperplanes = hyperplanes[l];	
-            std::vector<ValueType> thisProjection = projections[l];
+	 		//balance the hyperplaned for every leaf
+	        for(IndexType l=0; l<numLeaves; l++){        
+	            SCAI_REGION("MultiSection.getRectanglesNonUniform.forAllRectangles.forLeaves");
 
-            ValueType optWeight = thisRectangle.weight/(*thisDimCuts);
+	            const IndexType thisChosenDim = chosenDim[l];
+	            struct rectangle thisRectangle = allLeaves[l]->getRect();	
+	            std::vector<ValueType>& thisHyperplanes = hyperplanes[l];	
+	            const std::vector<ValueType>& thisProjection = projections[l];
 
-        }
+	            ValueType optWeight = thisRectangle.weight/(*thisDimCuts);
+
+	            for( unsigned int h=0; h<thisHyperplanes.size(); h++){
+	            	ValueType imbalance = (ValueType (thisHyperplanes[h]-optWeight)/optWeight);
+PRINT0(thisHyperplanes[h] << " -- opt= " << optWeight);            	
+	            }
+
+	        }
+	       	numIterations++;
+	    }while( maxImbalance<settings.epsilon or numIterations<settings.maxIterations );
+
         numLeaves = root->getNumLeaves();
 		//PRINT0("numLeaves= " << numLeaves);        
     }
@@ -217,16 +228,20 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
 
 template class MultiSection<IndexType, ValueType>;
 
+
 template IndexType MultiSection<IndexType, ValueType>::iterativeProjectionAndPart(
 	std::shared_ptr<rectCell<IndexType,ValueType>> root,
 	const std::vector<std::vector<IndexType>>& coordinates,
 	const scai::lama::DenseVector<ValueType>& nodeWeights,
-	const std::vector<IndexType>& numCuts);
+	const std::vector<IndexType>& numCuts,
+	Settings settings);
 
 template IndexType MultiSection<IndexType, ValueType>::iterativeProjectionAndPart(
 	std::shared_ptr<rectCell<IndexType,ValueType>> root,
 	const std::vector<std::vector<ValueType>>& coordinates,
 	const scai::lama::DenseVector<ValueType>& nodeWeights,
-	const std::vector<IndexType>& numCuts);
+	const std::vector<IndexType>& numCuts,
+	Settings settings);
+
 
 }//ITI

@@ -166,6 +166,7 @@ struct Settings{
     //parameters for multisection
     bool bisect = false;    // 0: works for square k, 1: bisect, for k=power of 2
     bool useIter = false;  	//use the iterative approach
+    IndexType maxIterations = 20;
     std::vector<IndexType> cutsPerDim;
     IndexType pixeledSideLen = 10;
 

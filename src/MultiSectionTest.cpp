@@ -862,6 +862,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform){
     Settings settings;
     settings.dimensions = dimensions;
     settings.numBlocks = k;
+    settings.useIter = true;
     
     std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
@@ -1269,21 +1270,16 @@ TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D){
 				{bBox1.bottom[d], bBox1.bottom[d]+extent[2]*0.2, bBox1.bottom[d]+extent[2]*0.6, bBox1.top[d]}
         	};
 
-//for( int i=0; i<3; i++){
-//	aux<IndexType,ValueType>::printVector(hyperplanes[i]);
-//}
-
         	projections = MultiSection<IndexType, ValueType>::projectionIter( localPointsVal , nodeWeights, root, root->getAllLeaves(), hyperplanes, dim2proj);
-
-
         }
 
+        //checks        
         
         ValueType projectionsTotalWeight =0 ;
         
         for( int i=0; i<projections.size(); i++){
                 projectionsTotalWeight += std::accumulate( projections[i].begin(), projections[i].end(), 0.0 );
-				aux<IndexType,ValueType>::printVector(projections[i]);                
+aux<IndexType,ValueType>::printVector(projections[i]);                
         }
         SCAI_ASSERT( projectionsTotalWeight==totalGridWeight , "Wrong sum of projections weights: projectionsTotalWeight= " << projectionsTotalWeight << " , totalGridWeight= " << totalGridWeight);
     
@@ -1293,7 +1289,7 @@ TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D){
 	        SCAI_ASSERT_EQ_ERROR( projections[2].size(),(bBox1.top[d]-bBox1.bottom[d]+1), "Wrong size for projection 2");
         }
 
-        SCAI_ASSERT( projections.size()==3, "projections size must be 2 but it is "<< projections.size() );
+        SCAI_ASSERT( projections.size()==3, "projections size must be 3 but it is "<< projections.size() );
         ValueType proj0Weight = std::accumulate( projections[0].begin(), projections[0].end(), 0.0 );
         ValueType proj1Weight = std::accumulate( projections[1].begin(), projections[1].end(), 0.0 );
         ValueType proj2Weight = std::accumulate( projections[2].begin(), projections[2].end(), 0.0 );

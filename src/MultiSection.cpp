@@ -227,21 +227,20 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     // create the root of the tree that contains the whole grid
     std::shared_ptr<rectCell<IndexType,ValueType>> root( new rectCell<IndexType,ValueType>(bBox) );
     
-    IndexType numLeaves = root->getNumLeaves();
-
     if( not settings.useIter ){
 		SCAI_ASSERT( (std::is_same<T,IndexType>::value), "IndexType is required for the non-iterative approach" );
     	MultiSection<IndexType, ValueType>::projectAnd1Dpartition( root, coordinates, nodeWeights, numCuts, maxCoords );
     }else if (settings.useIter){
     	//TODO: this is not necessary, we can have the iterative approach with IndexType coords
     	//SCAI_ASSERT( std::is_same<T,ValueType>::value, "ValueType is for the non-iterative approach" );
-    	MultiSection<IndexType, ValueType>::iterativeProjectionAndPart( root, coordinates, nodeWeights, numCuts );
+    	MultiSection<IndexType, ValueType>::iterativeProjectionAndPart( root, coordinates, nodeWeights, numCuts, settings );
     }else{
     	PRINT0("Currently, only supporting IndexType and ValueType for coordinate type.\nAborting");
     	throw std::runtime_error("Not supported data type");
     }
 
     const std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> &ret = root->getAllLeaves();
+    IndexType numLeaves = root->getNumLeaves();
     SCAI_ASSERT( ret.size()==numLeaves , "Number of leaf nodes not correct, ret.size()= "<< ret.size() << " but numLeaves= "<< numLeaves );
 
     return root;
@@ -251,7 +250,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
 template<typename IndexType, typename ValueType>
 template<typename T>
 IndexType MultiSection<IndexType, ValueType>::projectAnd1Dpartition(
-	std::shared_ptr<rectCell<IndexType,ValueType>> root,
+	std::shared_ptr<rectCell<IndexType,ValueType>>& root,
 	const std::vector<std::vector<T>>& coordinates,
 	const scai::lama::DenseVector<ValueType>& nodeWeights,
 	const std::vector<IndexType>& numCuts,
@@ -964,7 +963,7 @@ template class MultiSection<IndexType, ValueType>;
 
 
 template IndexType MultiSection<IndexType, ValueType>::projectAnd1Dpartition(
-	std::shared_ptr<rectCell<IndexType,ValueType>> root,
+	std::shared_ptr<rectCell<IndexType,ValueType>>& root,
 	const std::vector<std::vector<IndexType>>& coordinates,
 	const scai::lama::DenseVector<ValueType>& nodeWeights,
 	const std::vector<IndexType>& numCuts,

@@ -494,7 +494,7 @@ SCAI_REGION("rectCell.getContainingLeaf.ifLeaf");
         */
         template<typename T>   	
 		static IndexType projectAnd1Dpartition(
-			std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
+			std::shared_ptr<rectCell<IndexType,ValueType>>& treeRoot,
 			const std::vector<std::vector<T>>& coordinates,
 			const scai::lama::DenseVector<ValueType>& nodeWeights,
 			const std::vector<IndexType>& numCuts,
@@ -569,7 +569,8 @@ static std::vector<std::vector<ValueType>> projectionIter(
 			std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
 			const std::vector<std::vector<T>>& coordinates,
 			const scai::lama::DenseVector<ValueType>& nodeWeights,
-			const std::vector<IndexType>& numCuts);
+			const std::vector<IndexType>& numCuts,
+			Settings settings);
         
         /** @brief Partitions the given vector into k parts of roughly equal weights using a greedy approach.
          *
