@@ -193,8 +193,8 @@ namespace ITI {
 	    	if (!(settings.initialPartition == Tool::geoHierKM 
 	    		|| settings.initialPartition == Tool::geoHierRepart)) {
 		    	if(comm->getRank() ==0 ){
-					std::cout<<" WARNING: Without using hierarchical partitioning,\
-					 the given hierarchy levels will be ignored. " <<std::endl;
+					std::cout<<" WARNING: using "<< settings.initialPartition <<\
+					", without using hierarchical partitioning, the given hierarchy levels will be ignored. " <<std::endl;
 				}
 	    	}
 
