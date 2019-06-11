@@ -65,7 +65,29 @@ The methods that should be called by end users are the member functions of the P
 
 An example is this:
 
-	static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates,
-	 struct Settings settings)
+	static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input,
+		std::vector<DenseVector<ValueType>> &coordinates,
+		struct Settings settings)
 
 This function takes the input graph as an adjacency matrix in the CSRSparseMatrix format. The edge weights are interpreted as communication volumes. The coordinates are accepted in a vector of DenseVector, one DenseVector for each dimension. The settings struct contains relevant options, for example the target number of blocks. The result is returned as a DenseVector with one entry for each vertex, specifying its block ID in the partition. If the number of blocks is equal to the number of processes, the input data structures are redistributed to reflect the new partition.
+
+### Node Weights
+
+Node weights can also be given as an optional parameter. We accept multiple weights per node, for a graph with _n_ nodes and _k_ weights for each node, _nodeWeights_ should be a vector of _k_ DenseVectors with _n_ entries each.
+
+	static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input,
+		std::vector<DenseVector<ValueType>> &coordinates,
+		std::vector<DenseVector<ValueType>> &nodeWeights,
+		struct Settings settings)
+
+### Metis Compatibility Interface
+
+For those used to the common Metis library for graph partitioning, we offer an interface with a similar format:
+
+	static std::vector<IndexType> partitionGraph(
+		IndexType *vtxDist, IndexType *xadj, IndexType *adjncy, IndexType localM,
+		IndexType *vwgt, IndexType ndims, ValueType *xyz,
+		Settings  settings, Metrics& metrics)
+
+### Mapping
+

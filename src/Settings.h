@@ -171,7 +171,6 @@ struct Settings{
     bool writePEgraph = false;
     bool writeInFile = false;
     bool storeInfo = false;
-    //TODO: turn to false by default
     bool debugMode = false; //extra checks and prints
 	IndexType repeatTimes = 1;
     

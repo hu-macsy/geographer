@@ -80,7 +80,6 @@ namespace ITI {
         /**
 		 * Wrapper without metrics.
 		 */
-		//TODO: remove?
 		static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights, struct Settings settings);
 
 		/**
