@@ -38,10 +38,7 @@ struct commNode{
 	unsigned int numChildren;
 
 	unsigned int numCores;
-	//ValueType memMB;
-	//ValueType relatSpeed;
-
-	//replace specific variables, such as memMB, with a vector of weights
+	
 	std::vector<ValueType> weights;
 
 	bool isLeaf;
@@ -218,7 +215,7 @@ CommTree();
 */
 CommTree( const std::vector<commNode> &leaves, const std::vector<bool> isWeightProp );
 
-/** This crates a homogeneous but not flat tree. The tree has levels.size() number of levels
+/** This creates a homogeneous but not flat tree. The tree has levels.size() number of levels
 	and number of leaves=levels[0]*levels[1]*...*levels.back(). Each leaf node has the given
 	number of weights set to 1 and all weights are proportional.
 	Example: leaves = {3,4,5,6}, the first level has 3 children, each node in the next level 
@@ -323,7 +320,6 @@ std::vector<unsigned int> getGrouping(const std::vector<commNode> thisLevel) con
 	distances(1,2)=3, distacne(1,3)=5, distance(2,3)=5
 */
 static ValueType distance( const commNode &node1, const commNode &node2 );
-
 
 /** Export the tree as a weighted graph. The edge weigth between to nodes
 	is the distance of the nodes in the tree as it is calculates by the

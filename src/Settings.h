@@ -107,10 +107,10 @@ struct Settings{
     //input data and other info
     IndexType dimensions= 2;
     std::string fileName = "-";
-    std::string outFile = "-";
+    std::string outFile = "";
     std::string outDir = "-"; //this is used by the competitors main
-    std::string PEGraphFile = "-";
-    std::string blockSizesFile = "-";
+    std::string PEGraphFile = "-"; //TODO: this should not be in settings 
+    std::string blockSizesFile = "-"; //TODO: this should not be in settings 
     ITI::Format fileFormat = ITI::Format::AUTO;   // 0 for METIS, 4 for MatrixMarket
     ITI::Format coordFormat = ITI::Format::AUTO; 
     bool useDiffusionCoordinates = false;
@@ -172,7 +172,6 @@ struct Settings{
     bool writeDebugCoordinates = false;
     bool writePEgraph = false;
     bool storeInfo = false;
-    //TODO: turn to false by default
     bool debugMode = false; //extra checks and prints
 	IndexType repeatTimes = 1;
     
@@ -183,6 +182,9 @@ struct Settings{
 
     //this is used by the competitors main to set the tools we are gonna use
     std::vector<std::string> tools;
+
+    //for mapping
+    bool mappingRenumbering = false;
 
     // variable to check if the settings given are valid or not
     bool isValid = true;
@@ -251,4 +253,21 @@ struct Settings{
     
 }; //struct Settings
 
+struct sort_pair {
+	double value;
+	int32_t index;
+	bool operator<(const sort_pair& rhs ) const {return value < rhs.value || (value == rhs.value && index < rhs.index);}
+	bool operator>(const sort_pair& rhs ) const {return value > rhs.value || (value == rhs.value && index > rhs.index);}
+	bool operator<=(const sort_pair& rhs ) const {return !operator>(rhs);}
+	bool operator>=(const sort_pair& rhs ) const {return !operator<(rhs);}
+};
+
+struct int_pair {
+    int32_t first;
+    int32_t second;
+    bool operator<(const int_pair& rhs ) const {return first < rhs.first || (first == rhs.first && second < rhs.second);}
+    bool operator>(const int_pair& rhs ) const {return first > rhs.first || (first == rhs.first && second > rhs.second);}
+    bool operator<=(const int_pair& rhs ) const {return !operator>(rhs);}
+    bool operator>=(const int_pair& rhs ) const {return !operator<(rhs);}
+};
 }// namespace ITI

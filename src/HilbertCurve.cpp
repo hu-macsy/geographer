@@ -596,14 +596,14 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
         SCAI_REGION( "ParcoRepart.getSortedHilbertIndices.sorting" );
         
         int typesize;
-        MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
+        MPI_Type_size(MPI_DOUBLE_INT, &typesize);
         //assert(typesize == sizeof(sort_pair)); does not have to be true anymore due to padding
         
 		
 		//call distributed sort
         //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
         MPI_Comm mpi_comm = MPI_COMM_WORLD;
-        SQuick::sort<sort_pair>(mpi_comm, localPairs, -1);
+        JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
 
         //copy hilbert indices into array
 
@@ -640,6 +640,10 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
     const IndexType globalN = inputDist->getGlobalSize();
     const IndexType rank = comm->getRank();
 
+    if (comm->getSize() == 1) {
+    	return;
+    }
+
     std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
     const IndexType numNodeWeights = nodeWeights.size();
 
@@ -668,8 +672,8 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
         }
     }
 
-    MPI_Comm mpi_comm = MPI_COMM_WORLD; //maybe cast the communicator ptr to a MPI communicator and get getMPIComm()?
-    SQuick::sort<sort_pair>(mpi_comm, localPairs, -1); //could also do this with just the hilbert index - as a valueType
+    MPI_Comm mpi_comm = MPI_COMM_WORLD; //TODO: cast the communicator ptr to a MPI communicator and get getMPIComm()?
+    JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
     //IndexType newLocalN = localPairs.size();
     migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
     metrics.MM["timeMigrationAlgo"] = migrationCalculation.count();
