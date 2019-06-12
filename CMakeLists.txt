@@ -39,11 +39,14 @@ set(CMAKE_REQUIRED_INCLUDES ${MPI_CXX_INCLUDE_PATH})
 set(CMAKE_REQUIRED_FLAGS ${MPI_CXX_LINK_FLAGS})
 
 ### find GTest ###
-find_package(GTest)
-include_directories(${GTEST_INCLUDE_DIRS})
-if(GTEST_FOUND)
-  enable_testing()  
-endif(GTEST_FOUND)
+#find_package(GTest)
+#if(GTEST_FOUND)
+#  enable_testing()
+#endif(GTEST_FOUND)
+
+add_subdirectory("/usr/src/googletest/googletest" "googletest" EXCLUDE_FROM_ALL)
+set(GTEST_LIBRARIES gtest)
+set(GTEST_FOUND TRUE)
 
 option(USE_BOOST "Use boost library for number parsing" OFF)
 
