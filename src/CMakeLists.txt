@@ -9,8 +9,10 @@ add_definitions(-pthread)
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
 	add_definitions(-qopenmp)
+	link_libraries(-qopenmp)
 else ()
 	add_definitions(--openmp)
+	link_libraries(--openmp)
 endif()
 
 ### set files ###
