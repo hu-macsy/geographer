@@ -66,7 +66,7 @@ if( Zoltan2_FOUND AND METIS_BASE AND PARMETIS_BASE )
 	set( EXTRA_LIBRARIES ${METIS_LIB} ${PARMETIS_LIB} ${ZOLTAN2_LIB} ${Zoltan2_LIBRARIES}  PARENT_SCOPE )
 
 	add_executable( allCompetitors allCompetitorsPart.cpp parseArgs.cpp)
-	target_include_directories( allCompetitors PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} )
+	target_include_directories( allCompetitors PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} )
 	# include parmetis and metis ###
 	target_include_directories( allCompetitors PUBLIC "${METIS_BASE}/include" "${PARMETIS_BASE}/include" )
 	target_link_libraries( allCompetitors geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Boost_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
