@@ -9,8 +9,10 @@ add_definitions(-pthread)
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
 	add_definitions(-qopenmp)
+	link_libraries(-qopenmp)
 else ()
 	add_definitions(--openmp)
+	link_libraries(--openmp)
 endif()
 
 ### set files ###
@@ -66,10 +68,10 @@ if( Zoltan2_FOUND AND METIS_BASE AND PARMETIS_BASE )
 	set( EXTRA_LIBRARIES ${METIS_LIB} ${PARMETIS_LIB} ${ZOLTAN2_LIB} ${Zoltan2_LIBRARIES}  PARENT_SCOPE )
 
 	add_executable( allCompetitors allCompetitorsPart.cpp parseArgs.cpp)
-	target_include_directories( allCompetitors PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} )
+	target_include_directories( allCompetitors PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} )
 	# include parmetis and metis ###
-	target_include_directories( allCompetitors PUBLIC "${METIS_BASE}/include" "${PARMETIS_BASE}/include" )
-	target_link_libraries( allCompetitors geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Boost_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
+	target_include_directories( allCompetitors PUBLIC "${METIS_BASE}/include" "${PARMETIS_BASE}/include" ${CXXOPTS_DIR})
+	target_link_libraries( allCompetitors geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
 	
 	install(TARGETS wrappers EXPORT wrappers DESTINATION "${LIB_DEST}") 
 	install(TARGETS allCompetitors DESTINATION "${BIN_DEST}") # executable
@@ -91,13 +93,9 @@ if (USE_BOOST)
 	target_link_libraries(geographer ${Boost_LIBRARIES})
 endif(USE_BOOST)
 
-if (Boost_FOUND)
-	add_executable(Geographer main.cpp parseArgs.cpp)
-	target_include_directories(Geographer PUBLIC ${Boost_INCLUDE_DIRS})
-	target_link_libraries(Geographer geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES})
-else (Boost_FOUND)
-	message("Boost not found, cannot build standalone executable.")
-endif (Boost_FOUND)
+add_executable(Geographer main.cpp parseArgs.cpp)
+target_include_directories(Geographer PUBLIC ${CXXOPTS_DIR})
+target_link_libraries(Geographer geographer ${SCAI_LIBRARIES} ${MPI_CXX_LIBRARIES})
 
 
 ### add networkit library if found ###
@@ -118,7 +116,4 @@ endif (GTEST_FOUND AND Boost_FOUND)
 
 install(TARGETS geographer EXPORT geographer DESTINATION "${LIB_DEST}") # library
 install(FILES ${FILES_HEADER} DESTINATION "${HEADER_DEST}")
-
-if (Boost_FOUND)
-	install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable
-endif (Boost_FOUND)
+install(TARGETS Geographer DESTINATION "${BIN_DEST}") # executable

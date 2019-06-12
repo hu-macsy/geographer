@@ -29,6 +29,8 @@ set(NETWORKIT_INCLUDE "${NETWORKIT_DIR}/include/")
 set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
 
 
+set(CXXOPTS_DIR "${PROJECT_SOURCE_DIR}/external/cxxopts/include")
+
 ### find MPI ###
 find_package(MPI REQUIRED)
 include_directories(${MPI_CXX_INCLUDE_PATH})
@@ -114,7 +116,7 @@ set ( CMAKE_SKIP_BUILD_RPATH FALSE )
 set ( CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${LIB_DEST}")
 set ( CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE )
 
-add_subdirectory(external/KaDiS)
+add_subdirectory(external/KaDiS EXCLUDE_FROM_ALL)
 set(RBC_LIBRARY rbcsorting)
 
 ### set value type ###

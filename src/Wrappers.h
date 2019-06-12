@@ -12,9 +12,6 @@
 #include <fstream>
 #include <chrono>
 #include <numeric>
- 
-#include <boost/program_options.hpp>
-#include <boost/filesystem.hpp>
 
 #include <scai/dmemo/BlockDistribution.hpp>
 
