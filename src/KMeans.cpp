@@ -461,6 +461,7 @@ std::vector<point> findCenters(
 			    result[d][j] = NAN;
 			}
 		}
+
 		comm->sumImpl(result[d].data(), result[d].data(), k, scai::common::TypeTraits<ValueType>::stype);
 	}
 
@@ -1324,7 +1325,7 @@ DenseVector<IndexType> computePartition( \
 			const ValueType ratio = totalSampledWeightSum / nodeWeightSum[i];
 			adjustedBlockSizes[i].resize(targetBlockWeights[i].size());
 
-			SCAI_ASSERT_LE_ERROR( totalSampledWeightSum, nodeWeightSum[i]+ 1e-10, "Error in sampled weight sum." );
+			SCAI_ASSERT_LE_ERROR( totalSampledWeightSum, nodeWeightSum[i]+ 1e-8, "Error in sampled weight sum." );
 			
 			for (IndexType j = 0; j < targetBlockWeights[i].size(); j++) {
 				adjustedBlockSizes[i][j] = ValueType(targetBlockWeights[i][j]) * ratio;

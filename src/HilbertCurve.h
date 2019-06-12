@@ -26,10 +26,11 @@
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 #include <scai/tracing.hpp>
 
+#include <JanusSort.hpp>
+
 #include "Settings.h"
 #include "Metrics.h"
 
-#include "RBC/Sort/SQuick.hpp"
 
 namespace ITI {
 

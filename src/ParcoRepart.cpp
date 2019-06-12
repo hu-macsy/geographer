@@ -31,12 +31,14 @@
 #include "AuxiliaryFunctions.h"
 #include "MultiSection.h"
 #include "GraphUtils.h"
+#include "Mapping.h"
 
 
 
 namespace ITI {
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input,
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
+	CSRSparseMatrix<ValueType> &input,
 	std::vector<DenseVector<ValueType>> &coordinates,
 	Settings settings,
 	struct Metrics& metrics)
@@ -46,8 +48,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 	return partitionGraph(input, coordinates, uniformWeights, settings, metrics);
 }
 
+
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input,
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
+	CSRSparseMatrix<ValueType> &input,
 	std::vector<DenseVector<ValueType>> &coordinates,
 	struct Settings settings){
     
@@ -57,9 +61,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
     return partitionGraph(input, coordinates, settings, metrics);
 }
 
+
 // overloaded version with metrics
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input,
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
+	CSRSparseMatrix<ValueType> &input,
 	std::vector<DenseVector<ValueType>> &coordinates,
 	std::vector<DenseVector<ValueType>> &nodeWeights,
 	Settings settings,
@@ -191,7 +197,7 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
 //-------------------------------------------------------------------------------------------------
 
-
+//the core implementation
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 	CSRSparseMatrix<ValueType> &input,
@@ -564,6 +570,23 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
 	std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - startTime;
 	metrics.MM["timeTotal"] = elapTime.count();
+
+	//possible mapping at the end
+	if( settings.mappingRenumbering ){
+		PRINT0("Applying renumbering of blocks based on the SFC index of their centers.");
+		std::chrono::time_point<std::chrono::system_clock> startRnb = std::chrono::system_clock::now();
+
+		if( not result.getDistribution().isEqual(coordinates[0].getDistribution()) ){
+			PRINT0("WARNING:\nCoordinates and partition do not have the same distribution.\nRedistributing coordinates to match distribution");
+			for( int d=0; d<dimensions; d++){
+				coordinates[d].redistribute( result.getDistributionPtr() );
+			}
+		}
+		Mapping<IndexType,ValueType>::applySfcRenumber( coordinates, nodeWeights, result, settings );
+
+		std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - startRnb;
+		PRINT0("renumbering time " << elapTime.count() );
+	}
 	
 	return result;
 } //partitionGraph
@@ -651,7 +674,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         SCAI_REGION( "ParcoRepart.hilbertPartition.sorting" );
         //TODO: maybe call getSortedHilbertIndices here?
         int typesize;
-        MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
+        MPI_Type_size(MPI_DOUBLE_INT, &typesize);
         //assert(typesize == sizeof(sort_pair)); //not valid for int_double, presumably due to padding
         
         std::vector<sort_pair> localPairs(localN);
@@ -673,7 +696,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
         //call distributed sort
         //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
         MPI_Comm mpi_comm = MPI_COMM_WORLD;
-        SQuick::sort<sort_pair>(mpi_comm, localPairs, -1);
+        JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
 
         //copy indices into array
         const IndexType newLocalN = localPairs.size();

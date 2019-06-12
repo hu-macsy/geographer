@@ -89,7 +89,9 @@ std::istream& operator>>(std::istream& in, ITI::Tool& tool);
 
 std::ostream& operator<<(std::ostream& out, const ITI::Tool tool);
 
-std::string toString(const ITI::Tool& t);
+std::string to_string(const ITI::Tool& t);
+
+std::string to_string(const ITI::Format& f);
 
 ITI::Tool toTool(const std::string& s);
 
@@ -163,13 +165,12 @@ struct Settings{
     bool noRefinement = false;
     IndexType multiLevelRounds = 0;
     IndexType coarseningStepsBetweenRefinement = 3;
-    IndexType thisRound=-1;
+    IndexType thisRound=-1; //TODO: what is this? This has nothing to do with the settings.
 
     //debug and profiling parameters
     bool verbose = false;
     bool writeDebugCoordinates = false;
     bool writePEgraph = false;
-    bool writeInFile = false;
     bool storeInfo = false;
     bool debugMode = false; //extra checks and prints
 	IndexType repeatTimes = 1;
@@ -181,6 +182,9 @@ struct Settings{
 
     //this is used by the competitors main to set the tools we are gonna use
     std::vector<std::string> tools;
+
+    //for mapping
+    bool mappingRenumbering = false;
 
     // variable to check if the settings given are valid or not
     bool isValid = true;
@@ -249,4 +253,21 @@ struct Settings{
     
 }; //struct Settings
 
+struct sort_pair {
+	double value;
+	int32_t index;
+	bool operator<(const sort_pair& rhs ) const {return value < rhs.value || (value == rhs.value && index < rhs.index);}
+	bool operator>(const sort_pair& rhs ) const {return value > rhs.value || (value == rhs.value && index > rhs.index);}
+	bool operator<=(const sort_pair& rhs ) const {return !operator>(rhs);}
+	bool operator>=(const sort_pair& rhs ) const {return !operator<(rhs);}
+};
+
+struct int_pair {
+    int32_t first;
+    int32_t second;
+    bool operator<(const int_pair& rhs ) const {return first < rhs.first || (first == rhs.first && second < rhs.second);}
+    bool operator>(const int_pair& rhs ) const {return first > rhs.first || (first == rhs.first && second > rhs.second);}
+    bool operator<=(const int_pair& rhs ) const {return !operator>(rhs);}
+    bool operator>=(const int_pair& rhs ) const {return !operator<(rhs);}
+};
 }// namespace ITI

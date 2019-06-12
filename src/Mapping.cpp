@@ -384,6 +384,9 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::getSfcRenumber(
 	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
 	const typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
 
+	SCAI_ASSERT( partition.getDistribution().isEqual(coordinates[0].getDistribution()), "Partition and coordinates must have the same distribution" );
+	SCAI_ASSERT_EQ_ERROR( partition.getLocalValues().size(), localN, "Size mismatch. partition and coordinates must have the same distribution" );
+	
 	//to make it more readable
 	using point = std::vector<ValueType>;
 
@@ -394,9 +397,11 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::getSfcRenumber(
 	SCAI_ASSERT_EQ_ERROR( blockCenters.size(), dim, "Wrong size of centers vector." );
 	SCAI_ASSERT_EQ_ERROR( blockCenters[0].size(), k, "Wrong size of centers vector." )
 
-	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	for(IndexType i=0; i<k; i++){
-		PRINT0("center " << i << " in " << blockCenters[0][i] <<", " << blockCenters[1][i]);
+	if( settings.debugMode ){
+		const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		for(IndexType i=0; i<k; i++){
+			PRINT0("center " << i << " in " << blockCenters[0][i] <<", " << blockCenters[1][i]);
+		}
 	}
 
 	//
@@ -440,7 +445,7 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::applySfcRenumber(
 	scai::lama::DenseVector<IndexType>& partition,
 	const Settings settings){
 
-	//get the reunmbering
+	//get the renumbering
 	std::vector<IndexType> R = Mapping<IndexType,ValueType>::getSfcRenumber( coordinates, nodeWeights, partition, settings );
 
 	SCAI_ASSERT_EQ_ERROR( R.size(), settings.numBlocks, "Size mismatch" );
@@ -465,6 +470,14 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::applySfcRenumber(
 		wPart[i] = reverseR[prevBlock];
 	}
 
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	if( comm->getRank()==0 and settings.debugMode){
+		for( int i=0; i<k; i++){
+			if( reverseR[i]!=i ){
+				std::cout << "block " << i << " -> " << reverseR[i] << std::endl;
+			}
+		}
+	}
 	return reverseR;
 }//applySfcRenumber
 

@@ -1,3 +1,3 @@
-[submodule "src/RBC"]
-	path = src/RBC
-	url = https://github.com/kit-parco/RBC.git/
+[submodule "external/KaDiS"]
+	path = external/KaDiS
+	url = https://github.com/MichaelAxtmann/KaDiS.git

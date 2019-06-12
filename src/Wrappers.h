@@ -12,24 +12,13 @@
 #include <fstream>
 #include <chrono>
 #include <numeric>
- 
-#include <boost/program_options.hpp>
-#include <boost/filesystem.hpp>
 
 #include <scai/dmemo/BlockDistribution.hpp>
 
 #include "Metrics.h"
 
-#include <parmetis.h>
-
-//for zoltan
-#include <Zoltan2_PartitioningSolution.hpp>
-#include <Zoltan2_PartitioningProblem.hpp>
-#include <Zoltan2_BasicVectorAdapter.hpp>
-#include <Zoltan2_InputTraits.hpp>
 
 namespace ITI {
-
 
 template <typename IndexType, typename ValueType>
 class Wrappers {
