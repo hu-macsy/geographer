@@ -1,8 +1,8 @@
 /*
- * GraphUtils.h
+ * @file GraphUtils.h
  *
- *  Created on: 29.06.2017
- *      Authors: Moritz von Looz, Charilaos Tzovas
+ *  @authors: Moritz von Looz, Charilaos Tzovas
+ *  @date 29.06.2017
  */
 
 #pragma once
@@ -19,7 +19,9 @@
 
 namespace ITI {
 
-//namespace GraphUtils {
+/** @brief This class holds all the functionality related to graphs.
+*/
+
 template <typename IndexType, typename ValueType>
 class GraphUtils {
 public:
@@ -29,9 +31,8 @@ public:
  *
  * @param[in,out] the graph
  *
- * @return A block-distributed vector containing the old indices
+ * @return A block-distributed vector containing the old indices.
  */
-//template<typename IndexType, typename ValueType>
 static scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType> &graph);
 
 /**
@@ -42,7 +43,6 @@ static scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<Va
  *
  * @return vector with (local) distance to u for each local node
  */
-//template<typename IndexType, typename ValueType>
 static std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &graph, IndexType u);
 
 /**
@@ -52,15 +52,14 @@ static std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueTy
 	* @param[in] u local index of starting node
 	* @param[out] predecessor A vector with the predecessor of a node in 
 	the shortest path. 
-	Example, predecessor[4] = 5 means that in the shortes path from u to 4,
-	the previous vertex is 5. If also, predeccor[5] = 10 and predecessor[10] = u
+	Example, predecessor[4] = 5 means that in the shortest path from u to 4,
+	the previous vertex is 5. If also, predecessor[5] = 10 and predecessor[10] = u
 	then the shortes path to 4 is: u--10--5--4
 
 	* @return vector with (local) distance to u for each local node
 */
-
-//template<typename IndexType, typename ValueType>
 static std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u, std::vector<IndexType>& predecessor);
+
 /**
  * @brief Computes the diameter of the local subgraph using the iFUB algorithm.
  *
@@ -72,8 +71,6 @@ static std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<Va
  *
  * @return new lower bound
  */
-
-//template<typename IndexType, typename ValueType>
 static IndexType getLocalBlockDiameter(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u, IndexType lowerBound, const IndexType k, IndexType maxRounds);
 
 /**
@@ -83,7 +80,6 @@ static IndexType getLocalBlockDiameter(const scai::lama::CSRSparseMatrix<ValueTy
  * @param[in] part The partition vector for the input graph.
  * @param[in] weighted If edges are weighted or not.
  */
-//template<typename IndexType, typename ValueType>
 static ValueType computeCut(const scai::lama::CSRSparseMatrix<ValueType> &input, const scai::lama::DenseVector<IndexType> &part, bool weighted = false);
 
 /**
@@ -113,7 +109,6 @@ static ValueType computeImbalance(
  *
  * @return HaloExchangePlan
  */
-//template<typename IndexType, typename ValueType>
 static scai::dmemo::HaloExchangePlan buildNeighborHalo(const scai::lama::CSRSparseMatrix<ValueType> &input);
 
 /**
@@ -125,7 +120,6 @@ static scai::dmemo::HaloExchangePlan buildNeighborHalo(const scai::lama::CSRSpar
  * @return True if the vertex has a neighbor that resides in a differetn PE, false if all the neighbors are local.
  * 
  */
-//template<typename IndexType, typename ValueType>
 static bool hasNonLocalNeighbors(const scai::lama::CSRSparseMatrix<ValueType> &input, IndexType globalID);
 
 /**
@@ -134,7 +128,6 @@ static bool hasNonLocalNeighbors(const scai::lama::CSRSparseMatrix<ValueType> &i
  * No communication required, iterates once over the local adjacency matrix
  * @param[in] input Adjacency matrix of the input graph
  */
-//template<typename IndexType, typename ValueType>
 static  std::vector<IndexType> getNodesWithNonLocalNeighbors(const scai::lama::CSRSparseMatrix<ValueType>& input);
 
 /**
@@ -147,7 +140,6 @@ static  std::vector<IndexType> getNodesWithNonLocalNeighbors(const scai::lama::C
  *
  * @return vector of nodes with non-local neighbors
  */
-//template<typename IndexType, typename ValueType>
 static std::vector<IndexType> getNodesWithNonLocalNeighbors(const scai::lama::CSRSparseMatrix<ValueType>& input, const std::set<IndexType>& candidates);
 
 /**
@@ -155,24 +147,20 @@ static std::vector<IndexType> getNodesWithNonLocalNeighbors(const scai::lama::CS
  * @param[in] input Adjacency matrix of the input graph
  * @return The vector with the global IDs 
  */
-//template<typename IndexType, typename ValueType>
 static std::vector<IndexType> nonLocalNeighbors(const scai::lama::CSRSparseMatrix<ValueType>& input);
 
 /** Get the borders nodes of each block. Border node: one that has at least one neighbor in different block.
 */
-//template<typename IndexType, typename ValueType>
 static scai::lama::DenseVector<IndexType> getBorderNodes( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part);
 
 /* Returns two vectors each of size k: the first contains the number of border nodes per block and the second one the number of inner nodes per blocks.
  *
  */
-//template<typename IndexType, typename ValueType>
 static std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, Settings settings);
 
 /* Computes the communication volume for every block. 
  * TODO: Should the result is gathered in the root PE and not be replicated?
  * */
-//template<typename IndexType, typename ValueType>
 static std::vector<IndexType> computeCommVolume( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, Settings settings );
 
 /**Computes the communication volume, boundary and inner nodes in one pass to save time.
@@ -180,7 +168,6 @@ static std::vector<IndexType> computeCommVolume( const scai::lama::CSRSparseMatr
  * @return A tuple with three vectors each od size numBlocks: first vector is the communication volume, second is the number of boundary nodes and third
  * the number of inner nodes pre block.
  */
-//template<typename IndexType, typename ValueType>
 static std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType>> computeCommBndInner( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, Settings settings );
 
 
@@ -196,28 +183,24 @@ static std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<In
  *
  * @return The adjacency matrix of the block graph.
  */
-//template<typename IndexType, typename ValueType>
 static scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 
 static scai::lama::CSRSparseMatrix<ValueType>  getBlockGraph_dist( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 
 
 /** Get the maximum degree of a graph.
- * */
-//template<typename IndexType, typename ValueType>
+*/
 static IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 
 
 /** first = Compute maximum communication = max degree of the block graph.
  *  second = Compute total communication = sum of all edges of the block graph.
  */
-//template<typename IndexType, typename ValueType>
 static std::pair<IndexType, IndexType> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
 
 /** Compute maximum and total communication volume= max and sum of number of border nodes
  * WARNING: this works properly only when k=p and the nodes are redistributed so each PE owns nodes from one block.
  */
-//template<typename IndexType, typename ValueType>
 static std::pair<IndexType,IndexType> computeCommVolume_p_equals_k( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part);
     
 /**Returns the process graph. Every processor traverses its local part of adjM and for every
@@ -227,7 +210,6 @@ static std::pair<IndexType,IndexType> computeCommVolume_p_equals_k( const scai::
  * @param[in] adjM The adjacency matrix of the input graph.
  * @return A [#PE x #PE] adjacency matrix of the process graph, distributed with a Block distribution
  */
-//template<typename IndexType, typename ValueType>
 static scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM);
 
 /**Returns the process graph, as calculated from the local halos.
@@ -238,7 +220,6 @@ static scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::lama::CSRS
  * @param halo HaloExchangePlan objects in which all non-local neighbors are present
  * @return A [#PE x #PE] adjacency matrix of the process graph, distributed with a Block distribution
  */
-//template<typename IndexType, typename ValueType>
 static scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::HaloExchangePlan& halo);
 
 /**
@@ -247,7 +228,6 @@ static scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::Hal
  * @param[in] adjList For each node, a possibly empty set of neighbors
  * @return The distributed adjacency matrix
  */
-//template<typename IndexType, typename ValueType>
 static scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>>& adjList);
 
 /** @brief Get a vector of the local edges, sort the edges and construct the local part of CSR sparse matrix.
@@ -255,7 +235,6 @@ static scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeig
  * @param[in] edgeList The local list of edges for this PE.
  * @return The distributed adjacency matrix.
  */
-//template<typename IndexType, typename ValueType>
 static scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>>& edgeList );
 
 
@@ -267,7 +246,7 @@ static scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pa
 	@return The edge list representation. Size is equal to graph.getNumValues()/2.
 */
 //WARNING,TODO: Assumes the graph is undirected
-//template<typename IndexType, typename ValueType>
+
 static std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local(const scai::lama::CSRSparseMatrix<ValueType>& graph, IndexType& maxDegree=0);
 
 /**
@@ -277,7 +256,6 @@ static std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local
  *
  * @return laplacian with same distribution as input
  */
-//template<typename IndexType, typename ValueType>
 static scai::lama::CSRSparseMatrix<ValueType> constructLaplacian(const scai::lama::CSRSparseMatrix<ValueType>& graph);
 
 /**
@@ -289,7 +267,6 @@ static scai::lama::CSRSparseMatrix<ValueType> constructLaplacian(const scai::lam
  *
  * @return FJLT matrix
  */
-//template<typename IndexType, typename ValueType>
 static scai::lama::CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension);
 
 /**
@@ -299,12 +276,10 @@ static scai::lama::CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsi
  *
  * @return Hadamard matrix
  */
-//template<typename IndexType, typename ValueType>
 static scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d);
 
 //taken from https://stackoverflow.com/a/9345144/494085
 
-//template<typename IndexType, typename ValueType>
 static std::vector< std::vector<IndexType>> mecGraphColoring( const scai::lama::CSRSparseMatrix<ValueType> &graph, IndexType &colors);
 
 /**
@@ -341,6 +316,5 @@ static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex);
 
 
 }; //class GraphUtils
-//} /*namespace GraphUtils*/
 
 } /* namespace ITI */

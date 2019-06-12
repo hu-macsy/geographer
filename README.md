@@ -1,3 +1,6 @@
+@file
+@mainpage User guide
+
 Geographer
 =========
 
@@ -31,7 +34,7 @@ Create a build folder in the root directory of this repository, then in it call 
 Should you have installed Lama in a non-standard location, add `-DSCAI_DIR=<path/to/lama>` where `<path/to/lama>` is your Lama installation directory.
 Afterwards, call `make` or `make Geographer` to create the executable.
 
-## Usage as Standalone Executable
+## Usage
 Geographer can be used as a library or called from the command line.
 When using it from the command line, it expects to read an input graph from some file.
 By default, it is assumed that the input graph is in METIS format and that coordinate files describe one point position per line.
@@ -56,15 +59,4 @@ Geographer supports other parameters and input formats as well. For a full list 
 For example, to partition a graph formatted as METIS and coordinates given in the ADCIRC format into 512 blocks with a maximum imbalance of 0.01 according to the second node weight, use:
 
     mpirun -np 8 Geographer --graphFile fesom_core2.graph --coordFile node2d_core2.out --coordFormat OCEAN --nodeWeightIndex 1 --epsilon 0.01 --dimensions 2 --numBlocks 512
-
-### Partitioning Methods
-
-## Usage as Library
-
-The methods that should be called by end users are the member functions of the ParcoRepart class. They mostly accept and return Lama data structures. The functions are templated to accept different types for indices and values, instantiated with the same types used in the compilation of the used Lama library.
-
-An example is this:
-
-	static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings);
-
-This function takes the input graph as an adjacency matrix in the CSRSparseMatrix format. The edge weights are interpreted as communication volumes. The coordinates are accepted in a vector of DenseVector, one DenseVector for each dimension. The settings struct contains relevant options, for example the target number of blocks. The result is returned as a DenseVector.
+    
