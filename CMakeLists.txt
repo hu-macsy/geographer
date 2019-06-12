@@ -29,6 +29,8 @@ set(NETWORKIT_INCLUDE "${NETWORKIT_DIR}/include/")
 set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
 
 
+set(CXXOPTS_DIR "${PROJECT_SOURCE_DIR}/external/cxxopts/include")
+
 ### find MPI ###
 find_package(MPI REQUIRED)
 include_directories(${MPI_CXX_INCLUDE_PATH})

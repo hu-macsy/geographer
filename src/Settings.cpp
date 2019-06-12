@@ -29,9 +29,15 @@ std::ostream& ITI::operator<<( std::ostream& out, const ITI::Tool tool){
 }
 
 
-std::string ITI::toString(const ITI::Tool& t){
+std::string ITI::to_string(const ITI::Tool& t){
 	std::ostringstream out;
 	out<< t;
+	return out.str();
+}
+
+std::string ITI::to_string(const ITI::Format& f){
+	std::ostringstream out;
+	out<< f;
 	return out.str();
 }
 

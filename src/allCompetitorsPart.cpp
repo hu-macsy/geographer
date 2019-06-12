@@ -15,10 +15,9 @@
 #include <chrono>
 #include <numeric>
 #include <algorithm>
- 
-#include <boost/program_options.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/algorithm/string.hpp>
+#include <sys/stat.h>
+
+#include <cxxopts.hpp>
 
 #include <scai/dmemo/BlockDistribution.hpp>
 
@@ -40,24 +39,32 @@ extern "C"{
 
 int main(int argc, char** argv) {
 
-	using namespace boost::program_options;
 	using namespace ITI;
 
-	//int parMetisGeom = 0;			//0 no geometric info, 1 partGeomKway, 2 PartGeom (only geometry)
-//	bool storeInfo = true;
-//	ITI::Format coordFormat;
-//	std::string outPath;
-//    std::string metricsDetail = "all";
-	
 	std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
 
-	struct Settings settings;
-	variables_map vm;
-	std::tie(vm, settings) = ITI::parseInput( argc, argv);
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    if (comm->getType() != scai::dmemo::Communicator::CommunicatorKind::MPI) {
+        std::cout << "The linked lama version was compiled without MPI. Only sequential partitioning is supported." << std::endl;
+    }
+
+    std::string callingCommand = "";
+    for (IndexType i = 0; i < argc; i++) {
+        callingCommand += std::string(argv[i]) + " ";
+    }
+
+    cxxopts::Options options = ITI::populateOptions();
+	cxxopts::ParseResult vm = options.parse(argc, argv);
+
+    if (vm.count("help")) {
+        std::cout << options.help() << std::endl;
+        return 0;
+    }
+
+    struct Settings settings = ITI::interpretSettings(vm);
 	if( !settings.isValid )
 		return -1;
-	
-	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
 	const IndexType thisPE = comm->getRank();
     IndexType N;
 
@@ -275,9 +282,8 @@ int main(int argc, char** argv) {
 			//set the graphName in order to create the outFile name
 			std::string copyName = graphFile;
 			std::reverse( copyName.begin(), copyName.end() ); 
-			std::vector<std::string> strs;			
-			boost::split( strs, copyName, boost::is_any_of("./") );
-			std::string graphName = strs[1]; //[0] is "hparg" (graph reversed)
+			std::vector<std::string> strs = aux<IndexType,ValueType>::split( copyName, '/' );
+			std::string graphName = aux<IndexType,ValueType>::split(strs.back(), '.')[0];
 			std::reverse( graphName.begin(), graphName.end() );
 			//PRINT0( graphName );		
 			//add specific folder for each tool
@@ -313,13 +319,8 @@ int main(int argc, char** argv) {
 		// Reporting output to std::cout
 		//
 		
-		char machineChar[255];
-		std::string machine;
-		gethostname(machineChar, 255);
-		if (machineChar) {
-			machine = std::string(machineChar);
-		}
-		
+		std::string machine = settings.machine;
+
 		if( thisPE==0 ){
 			if( vm.count("generate") ){
 				std::cout << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon;
@@ -353,7 +354,7 @@ int main(int argc, char** argv) {
 			}
 		}
 
-	 	if( outFile!="-" and settings.writeInFile ){
+	 	if( outFile!="-" ){
 	        std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
 	        std::string partOutFile = outFile+".part";
 			ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
@@ -365,42 +366,31 @@ int main(int argc, char** argv) {
 	        }
 	    } 
 		
-	// the code below writes the output coordinates in one file per processor for visualization purposes.
-    //=================
-    
-    if (settings.writeDebugCoordinates) {
+		// the code below writes the output coordinates in one file per processor for visualization purposes.
+		//=================
 		
-		std::vector<DenseVector<ValueType> > coordinateCopy = coords;
-		
-		//scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );		
-		scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues());
-        for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-            assert( coordinateCopy[dim].size() == N);
-            //coordinates[dim].redistribute(partition.getDistributionPtr());
-			coordinateCopy[dim].redistribute( distFromPartition );			
-        }
-        
-        std::string destPath = "partResults/" +  toolName[thisTool] +"/blocks_" + std::to_string(settings.numBlocks) ;
-        boost::filesystem::create_directories( destPath );   
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, settings.dimensions, destPath + "/debugResult");
-        comm->synchronize();
-        
-        //TODO: use something like the code below instead of a NoDistribution
-        //std::vector<IndexType> gatheredPart;
-        //comm->gatherImpl( gatheredPart.data(), N, 0, partition.getLocalValues(), scai::common::TypeTraits<IndexType>::stype );
-        /*
-        scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
-        graph.redistribute( noDistPtr, noDistPtr );
-        partition.redistribute( noDistPtr );
-        for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-            coords[dim].redistribute( noDistPtr );
-        }
-        */
-    }
-	/*		
-	memusage(&total, &used, &free, &buffers, &cached);	
-	printf("\nMEM: avail: %ld , used: %ld , free: %ld , buffers: %ld , file cache: %ld \n\n",total,used,free,buffers, cached);
-	*/		
+		if (settings.writeDebugCoordinates) {
+			
+			std::vector<DenseVector<ValueType> > coordinateCopy = coords;
+			
+			//scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( partition.getDistribution(), partition.getLocalValues() ) );		
+			scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues());
+			for (IndexType dim = 0; dim < settings.dimensions; dim++) {
+				assert( coordinateCopy[dim].size() == N);
+				//coordinates[dim].redistribute(partition.getDistributionPtr());
+				coordinateCopy[dim].redistribute( distFromPartition );			
+			}
+			
+			std::string destPath = "partResults/" +  toolName[thisTool] +"/blocks_" + std::to_string(settings.numBlocks) ;  
+			struct stat sb;
+			if (stat(destPath.data(), &sb) == 0 && S_ISDIR(sb.st_mode)){
+				ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, settings.dimensions, destPath + "/debugResult");
+				comm->synchronize();
+			}else{
+				std::cout<< "WARNING: directrory " << destPath << " does not exist. De buf coordinates were not stored. Create directory and re-run" << std::endl;
+			}        
+		}
+	
 	} // for wantedTools.size()
      
 	std::chrono::duration<ValueType> totalTimeLocal = std::chrono::system_clock::now() - startTime;

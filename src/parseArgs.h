@@ -1,12 +1,12 @@
 #pragma once
 
 #include <iostream>
-#include <boost/program_options.hpp>
+#include <cxxopts.hpp>
 
 #include "Settings.h"
 
 namespace ITI {
-
-std::pair<boost::program_options::variables_map, Settings> parseInput(int argc, char** argv);
+cxxopts::Options populateOptions();
+Settings interpretSettings(cxxopts::ParseResult result);
 
 }
