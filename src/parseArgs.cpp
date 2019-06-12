@@ -67,6 +67,7 @@ namespace ITI {
 					("verbose", "Increase output.")
 					("debug", "Even more detailed output")
 	                ("storeInfo", "Store timing and other metrics in file.")
+	                ("callExit", "Call std::exit after partitioning to deal with lingering MPI data structures.")
 	                // evaluation
 	                ("repeatTimes", "How many times we repeat the partitioning process.", value<IndexType>())
 	                ("noComputeDiameter", "Compute diameter of resulting block files.")
@@ -271,7 +272,6 @@ namespace ITI {
 				IndexType blocksInLevel = std::stoi(item);
 				hierLevels.push_back(blocksInLevel);
 				product *= blocksInLevel;
-				std::cout << product << std::endl;
 			}
 
 			settings.hierLevels = hierLevels;

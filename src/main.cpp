@@ -627,9 +627,11 @@ int main(int argc, char** argv) {
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, settings.dimensions, "debugResult");
         comm->synchronize();
     }
-      	  
-    //this is needed for supermuc
-    std::exit(0);   
+    
+    if (vm.count("callExit")) {
+        //this is needed for supermuc
+        std::exit(0);
+    }
     
     return 0;
 }
