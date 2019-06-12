@@ -45,7 +45,6 @@
 
 //void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);	
 
-
 int main(int argc, char** argv) {
     using namespace ITI;
 	
@@ -73,10 +72,6 @@ int main(int argc, char** argv) {
     struct Settings settings = ITI::interpretSettings(vm);
 	if( !settings.isValid )
 		return -1;
-
-	//update: replace by input parameter "mapping" in parseArgs
-	//settings.mappingRenumbering = 1;
-
 
     //--------------------------------------------------------
     //
