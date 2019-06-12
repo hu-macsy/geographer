@@ -5,7 +5,13 @@ if(NOT hasParent)
   message(FATAL_ERROR "Do not call this CMakeLists.txt directly. Instead, call the one in the parent directory.")
 endif(NOT hasParent)
 
-add_definitions(--openmp -pthread)
+add_definitions(-pthread)
+
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
+	add_definitions(-qopenmp)
+else ()
+	add_definitions(--openmp)
+endif()
 
 ### set files ###
 set(FILES_HEADER ParcoRepart.h MultiLevel.h LocalRefinement.h HilbertCurve.h MeshGenerator.h FileIO.h SpectralPartition.h Diffusion.h GraphUtils.h MultiSection.h KMeans.h CommTree.h AuxiliaryFunctions.h HaloPlanFns.h Metrics.h Mapping.h Settings.h)
