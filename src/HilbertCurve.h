@@ -1,4 +1,4 @@
-/*
+/* 
  * HilbertCurve.h
  *
  *  Created on: 15.11.2016
@@ -36,6 +36,11 @@ namespace ITI {
 
 	using scai::lama::DenseVector;
 
+	/** The HilbertCurve class provides functionality to calculate the hilbert index (and the inverse)
+	of 2 or 3 dimensional points. The hilbert index is the index of a point in the
+	<a href="https://en.wikipedia.org/wiki/Hilbert_curve"> hilbert curve</a>.
+	*/
+
 	template <typename IndexType, typename ValueType>
 	class HilbertCurve {
 		public:
@@ -50,7 +55,7 @@ namespace ITI {
 		*
  		* @return A value in the unit interval [0,1]
 		*/ 
-		static ValueType getHilbertIndex(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+		static ValueType getHilbertIndex(ValueType const *point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 
 		/** @brief Gets a vector of 2D/3D coordinates and returns a vector with the  hilbert indices for all coordinates.
 		 * 
@@ -119,8 +124,13 @@ namespace ITI {
 		 */
 		static void hilbertRedistribution(std::vector<DenseVector<ValueType> >& coordinates, std::vector<DenseVector<ValueType>>& nodeWeights, Settings settings, struct Metrics& metrics);
 
-		/** @brief Checks if all the input data are distributed to PEs 
-		according to the hilbert index curve of the coordinates
+		/** @brief Checks if all the input data are distributed to PEs according to the hilbert index curve of the coordinates
+
+		 *  @param[in,out] coordinates Coordinates of input points, will be redistributed		
+		 *  @param[in,out] nodeWeights NodeWeights of input points, will be redistributed
+		 *  @param[in] settings Settings struct, effectively only needed for the hilbert curve resolution
+
+		 @return true if the coordinates are distributed among PEs based on their hilbert index, false otherwise.		 
 		*/
 		static bool confirmHilbertDistribution(
 			//const scai::lama::CSRSparseMatrix<ValueType> &graph,
@@ -129,7 +139,7 @@ namespace ITI {
 			Settings settings);			
 			
 		
-//private:
+private:
 		/** @brief Accepts a 2D point and returns is hilbert index.
 		 */
 		static ValueType getHilbertIndex2D(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);

@@ -939,7 +939,7 @@ std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType
 
 //---------------------------------------------------------------------------------------
 
-/** Get the maximum degree of a graph.
+/* Get the maximum degree of a graph.
  * */
 template<typename IndexType, typename ValueType>
 IndexType GraphUtils<IndexType, ValueType>::getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM){
@@ -1218,7 +1218,7 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 	std::vector<ValueType> allEdges(arraySize, -1); //set a dummy value of -1
 	comm->gatherV( allEdges.data(), mySize, rootPE, edgeVec.data(), allSizes.data() );
 	
-	/**
+	/*
 	allEdges is a concatenation of edge lists. Every PE stores its local edgelist.
 	After gathering, the root PE traverses the gathered	edges lists and constructs 
 	the block graph.
