@@ -33,6 +33,7 @@ namespace ITI {
          *                            has edges to nodes 120, 1234, 8 and 2133.
          *                for coordinates (up to 3D): every line has 3 numbers, the real valued
          *                            coordinates. If the coordinates are in 2D the last number is 0.
+
          * MATRIXMARKET format: for graphs: we use the function readFromFile (or readFromSingleFile) 
          *                            provided by LAMA.
          *                for coordinates: first line has two numbers, the number of points N and
@@ -134,25 +135,32 @@ public:
 	 */
 	static CSRSparseMatrix<ValueType> readGraph(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights, Format = Format::METIS);
 
-	/** Reads a graph in parallel that is stored in a binary file. Uses the same format as in ParHiP, the parallel version of KaHiP.
+	/** Reads a graph in parallel that is stored in a binary file. Uses the same format as in ParHiP, the parallel version of KaHiP,
+	see <a href="http://algo2.iti.kit.edu/schulz/software_releases/kahipv2.00.pdf">here</a> for mode details.
 	 * @param[in] filename The file to read from.
-	 * @param[in] fileFormat The type of file to read from.
 	 * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
 	 */
 	static scai::lama::CSRSparseMatrix<ValueType> readGraphBinary(const std::string filename);
         
-	/*Every PE reads its part of the file. The file contains all the edges of the graph: each line has two numbers indicating
+	/**Every PE reads its part of the file. The file contains all the edges of the graph: each line has two numbers indicating
 	 * the vertices of the edge. 
 	 * 0 1
 	 * 0 2				0 - 1 - 3 - 4
 	 * 3 1				  \    /  
 	 * 4 3				    2 
 	 * 3 2
+	 * @param[in] filename The file to read from.
+	 * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
 	 */
 	static scai::lama::CSRSparseMatrix<ValueType> readEdgeList(const std::string filename, const bool binary = false);
 	
 	
-	/** @brief Edge list format but now there are k files, one for each PE
+	/** @brief Edge list format but now there are k files, one for each PE.
+	 * \warning The number of mpi processes k (mpirun -np k), must be the same as the number of existing files. PE X will try
+	 * to read from filenameX.
+	 *
+	 * @param[in] filename The prefix of the file to read from.
+	 * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
 	 * */
 	static scai::lama::CSRSparseMatrix<ValueType> readEdgeListDistributed(const std::string filename);
 	

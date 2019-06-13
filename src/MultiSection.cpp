@@ -259,18 +259,16 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         //      maybe not the fastest way but probably would give better quality
         
         // choose the dimension to project for all leaves/rectangles
-        if( settings.useExtent or true){
-            SCAI_REGION("MultiSection.getRectangles.forAllRectangles.useExtent");
-            // for all leaves/rectangles
-            for( IndexType l=0; l<allLeaves.size(); l++){
-                struct rectangle thisRectangle = allLeaves[l]->getRect();
-                maxExtent = 0;
-                for(int d=0; d<dim; d++){
-                    ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
-                    if( extent>maxExtent ){
-                        maxExtent = extent;
-                        chosenDim[l] = d;
-                    }
+
+        // for all leaves/rectangles
+        for( IndexType l=0; l<allLeaves.size(); l++){
+            struct rectangle thisRectangle = allLeaves[l]->getRect();
+            maxExtent = 0;
+            for(int d=0; d<dim; d++){
+                ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
+                if( extent>maxExtent ){
+                    maxExtent = extent;
+                    chosenDim[l] = d;
                 }
             }
         }
@@ -534,23 +532,21 @@ if(comm->getRank()==0)  bBox.print( std::cout );
         //TODO: since this is done locally, we can also get the 1D partition in every dimension and choose the best one
         //      maybe not the fastest way but probably would give better quality
 PRINT0("about to cut into " << *thisDimCuts);
-        //TODO: useExtent is the only option. Add another or remove settings.useExtent
+
         // choose the dimension to project for each leaf/rectangle
-        if( settings.useExtent or true){
-            SCAI_REGION("MultiSection.getRectanglesNonUniform.forAllRectangles.useExtent");
-            // for all leaves/rectangles
-            for( IndexType l=0; l<allLeaves.size(); l++){
-                struct rectangle thisRectangle = allLeaves[l]->getRect();
-                maxExtent = 0;
-                for(int d=0; d<dim; d++){
-                    ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
-                    if( extent>maxExtent ){
-                        maxExtent = extent;
-                        chosenDim[l] = d;
-                    }
+        // for all leaves/rectangles
+        for( IndexType l=0; l<allLeaves.size(); l++){
+            struct rectangle thisRectangle = allLeaves[l]->getRect();
+            maxExtent = 0;
+            for(int d=0; d<dim; d++){
+                ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
+                if( extent>maxExtent ){
+                    maxExtent = extent;
+                    chosenDim[l] = d;
                 }
             }
         }
+        
         // in chosenDim we have stored the desired dimension to project for all the leaf nodes
 
         // a vector of size numLeaves. projections[i] is the projection of leaf/rectangle i in the chosen dimension
