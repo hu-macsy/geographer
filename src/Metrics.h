@@ -154,13 +154,6 @@ inline struct Metrics aggregateVectorMetrics( const std::vector<struct Metrics>&
 		//thisMetric.print( out );
 	}
 	
-	//this print must be called separetely now, TODO: remove
-	/*
-	if( comm->getRank()==0 ){
-		out << std::setprecision(4) << std::fixed;
-		aggregateMetrics.print( out );
-	}
-	*/
 	return aggregateMetrics;
 }
 //-------------------------------------------------------------------------------------------------------------

@@ -145,12 +145,20 @@ struct Settings{
 	Settings();
 	bool checkValidity();
 
-    //partition settings
+    /** @name General partition settings
+    */
+    //@{
     IndexType numBlocks = 2; 	///< number of blocks to partition to
     double epsilon = 0.03;		///< maximum allowed imbalance of the output partition
     bool repartition = false; 	///< set to true to respect the initial partition
-    
-    //input data and other info
+
+    ITI::Tool initialPartition = ITI::Tool::geoKmeans;			///< the tool to use to get the initial partition, \sa Tool
+    static const ITI::Tool initialMigration = ITI::Tool::geoSFC;///< pre-processing step to redistribute/migrate coordinates
+   	//@}
+
+    /** @name Input data and other info
+    */
+    //@{
     IndexType dimensions= 2;	///< the dimension of the point set
     std::string fileName = "-";	///< the name of the input file to read the graph from
     std::string outFile = "";	///< name of the file to store metrics (if desired)
@@ -162,16 +170,17 @@ struct Settings{
     bool useDiffusionCoordinates = false;		///< if not coordinates are provided, we can use artificial coordinates
     IndexType diffusionRounds = 20;				///< number of rounds to create the diffusion coordinates
     IndexType numNodeWeights = -1;		///< number of vertex weights
-    std::string machine;	
+    std::string machine;
+    //@}	
     
-    //mesh generation
-    IndexType numX = 32;	///< For the mesh generator, the number of points per dimension
+    /** @name Mesh generation settings
+    For the mesh generator, the number of points per dimension
+    */
+    //@{
+    IndexType numX = 32;
     IndexType numY = 32;
     IndexType numZ = 32;
-    
-    //general tuning parameters
-    ITI::Tool initialPartition = ITI::Tool::geoKmeans;			///< the tool to use to get the initial partition, \sa Tool
-    static const ITI::Tool initialMigration = ITI::Tool::geoSFC;
+    //@}
 
     /** @name Tuning parameters for local refinement 
      */
@@ -186,7 +195,11 @@ struct Settings{
     bool skipNoGainColors = false;			///< if we should skip some rounds if there is no gain
     //@}
 
+    /** @name Space filling curve parameters
+    */
+    //@{
     IndexType sfcResolution = 7; 			///<tuning parameters for SFC, the resolution depth for the curve
+    //@}
 
 
     /** @name Tuning parameters balanced K-Means
@@ -218,42 +231,48 @@ struct Settings{
     /** @name Tuning parameters for multiLevel heuristic
     */
     //@{
-    bool noRefinement = false;
-    IndexType multiLevelRounds = 0;
-    IndexType coarseningStepsBetweenRefinement = 3;
-    IndexType thisRound=-1; //TODO: what is this? This has nothing to do with the settings.
+    bool noRefinement = false;				///< if we will do local refinement or not
+    IndexType multiLevelRounds = 0;			///< number of multilevel rounds
+    IndexType coarseningStepsBetweenRefinement = 3; ///< number of rounds every which we do coarsening
     //@}
 
     /** @name Debug and profiling parameters
     */
     //@{
-    bool verbose = false;
-    bool writeDebugCoordinates = false;
-    bool writePEgraph = false;
-    bool storeInfo = false;
-    bool debugMode = false; //extra checks and prints
-	IndexType repeatTimes = 1;
+    bool verbose = false;					///< print more output info
+    bool debugMode = false; 				///< even more checks and prints    
+    bool writeDebugCoordinates = false;		///< store coordinates and block id
+    bool writePEgraph = false;				///< store the processor graph
+    bool storeInfo = false;					///< store metrics info
+	IndexType repeatTimes = 1;				///< for benchmarking, how many times is the partition repeated
+	IndexType thisRound=-1; //TODO: what is this? This has nothing to do with the settings.
 
+	std::string metricsDetail = "no";		///< level of details, possible values are: no, easy, all
     //calculate expensive performance metrics?
-    bool computeDiameter = false;
-    IndexType maxDiameterRounds = 2;
-    std::string metricsDetail = "no";
+    bool computeDiameter = false;			///< if the diameter should be computed (can be expensive)
+    IndexType maxDiameterRounds = 2;		///< max number of rounds to approximate the diameter
     //@}
 
-    //this is used by the competitors main to set the tools we are gonna use
+    /** @name Various parameters
+    */
+    //@{
+    ///this is used by the competitors main to set the tools we are gonna use
     std::vector<std::string> tools;
 
-    //for mapping
+    /// for mapping by renumbering the block centers according to their SFC index
     bool mappingRenumbering = false;
 
-    // variable to check if the settings given are valid or not
+    /// variable to check if the settings given are valid or not
     bool isValid = true;
+    //@}
 
-    //struct communicationTree commTree;
     //
     // print settings
     //
     
+    /** @brief Print the settings.
+    * @param[in] out The stream to print to
+    */
 	void print(std::ostream& out) const {
 		
 		out<< "Git commit: " << version << " and machine: "<< machine << std::endl;
