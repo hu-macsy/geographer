@@ -135,7 +135,7 @@ IndexType CommTree<IndexType, ValueType>::createFlatHomogeneous(
 	this->numWeights = numNodeWeights;
 	this->isProportional = std::vector<bool>(numNodeWeights, true); //TODO: check if this is correct
 
-	return leaves.size();
+	return this->numNodes;
 }//createFlatHomogeneous
 //------------------------------------------------------------------------
 
@@ -150,7 +150,7 @@ IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneous( const std::ve
 	this->numWeights = leafSizes.size();
 	//this->isProportional = std::vector<bool>(numNodeWeights, true); //TODO: check if this is correct
 
-	return leaves.size();
+	return this->numNodes;
 }//createFlatHeterogeneous
 //------------------------------------------------------------------------
 
@@ -162,7 +162,6 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 
 	const IndexType numLeaves = sizes[0].size();
 	SCAI_ASSERT_GT_ERROR( numLeaves, 0, "Provided sizes vector is empty, there are no block size" );
-
 
 	std::vector<cNode> leaves( numLeaves );
 
@@ -422,7 +421,7 @@ scai::lama::CSRSparseMatrix<ValueType> CommTree<IndexType, ValueType>::exportAsG
 template<typename IndexType, typename ValueType>
 std::vector<ValueType> CommTree<IndexType,ValueType>::computeImbalance(
     const scai::lama::DenseVector<IndexType> &part,
-    IndexType k,
+    const IndexType k,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights){
 
     //cNode is typedefed in CommTree.h
@@ -438,9 +437,10 @@ std::vector<ValueType> CommTree<IndexType,ValueType>::computeImbalance(
 
     const IndexType numWeights = getNumWeights();
     SCAI_ASSERT_EQ_ERROR( numWeights, nodeWeights.size(), "Given weights vector size and tree number of weights do not agree" );
-//TODO: is 1 correct?
+
     //get leaf balance vectors
-const std::vector<std::vector<ValueType>> allConstrains = getBalanceVectors( -1 );
+	const std::vector<std::vector<ValueType>> allConstrains = getBalanceVectors( -1 );
+	//an imbalance for every weight
     std::vector<ValueType> imbalances( numWeights );
 
     //compute imbalance for all weights
@@ -449,73 +449,12 @@ const std::vector<std::vector<ValueType>> allConstrains = getBalanceVectors( -1 
 	    std::vector<ValueType> optBlockWeight = allConstrains[i];
 	    SCAI_ASSERT_EQ_ERROR( optBlockWeight.size(), numLeaves, "Size mismatch");
 
-	    ValueType imba = GraphUtils<IndexType, ValueType>::computeImbalance( part, k, nodeWeights[i], optBlockWeight );
-
-    	imbalances[i] = imba;
+	    imbalances[i] = GraphUtils<IndexType, ValueType>::computeImbalance( part, k, nodeWeights[i], optBlockWeight );
 	}
 
     return imbalances;
 }
-//---------------------------------------------------------------------------------------
-/*
-template<typename IndexType, typename ValueType>
-std::vector<ValueType> CommTree<IndexType,ValueType>::getOptBlockWeights(
-	const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights) const {
 
-	const std::vector<commNode> hierLevel = this->getLeaves();
-    const IndexType numBlocks = hierLevel.size();
-    const IndexType numWeights = getNumWeights();
-    SCAI_ASSERT_EQ_ERROR( numWeights, nodeWeights.size(), "Given weights vector size and tree number of weights do not agree" );
-
-	const std::vector<std::vector<ValueType>> allLeafWeights = getBalanceVectors();
-	SCAI_ASSERT_EQ_ERROR( numWeights, allLeafWeights.size, "Number of weigths in tree do not agree" );
-
-    for( unsigned int i=0; i<numWeights; i++){
-
-    	scai::lama::DenseVector<ValueType> &thisNodeWeight = nodeWeights[i];
-    	scai::lama::DenseVector<ValueType> &thisLeafWeight = allLeafWeights[i];
-
-	    //the total node weight of the input graph
-	    ValueType sumNodeWeights = thisWeight.sum();
-	    ValueType sumLeafWeights = std::Accumulate( thisLeafWeight.begin(), thisLeafWeight.end(), 0.0 );
-
-	    if( not isProportional[i] ){
-	    	SCAI_ASSERT_GE_ERROR( sumLeafWeights, sumNodeWeights, "Provided node weights are do not fit in the given tree for weight " << i );
-	    }else{
-
-	    }
-	    
-	    {
-	        scai::hmemo::ReadAccess<ValueType> rW( nodeWeights.getLocalValues() );
-	        ValueType localW = 0;
-	        for(int i=0; i<nodeWeights.getLocalValues().size(); i++ ){
-	            localW += rW[i];
-	        }
-	        const scai::dmemo::CommunicatorPtr comm = nodeWeights.getDistributionPtr()->getCommunicatorPtr();
-	        totalWeightSum = comm->sum(localW);
-	    }
-		
-	    //the sum of the realtive speeds for all nodes
-	    ValueType speedSum = 0;
-	    for( cNode c: hierLevel){
-	        speedSum += c.relatSpeed;
-	    }
-
-	    //the optimum size for every block
-	    std::vector<ValueType> optBlockWeight( numBlocks );
-
-	    //for each PE, we are given its relative speed compare to the fastest
-	    //PE, a number between 0 and 1. The optimum weight it should have 
-	    //is this:
-	    // relative speed*( sum of input node weights / sum of all relative speeds)
-	    for( int i=0; i<numBlocks; i++){
-	        optBlockWeight[i] = totalWeightSum*(hierLevel[i].relatSpeed/speedSum);
-	    }
-	}
-
-    return optBlockWeight;
-}
-*/
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>

@@ -33,9 +33,8 @@ class HilbertCurveTest : public ::testing::TestWithParam<int> {
 	friend class ITI::HilbertCurve<IndexType,ValueType>;	
 protected:
 	// the directory of all the meshes used
-	std::string graphPath = "./meshes/";
-//this directory is not found	
-
+	// projectRoot is defined in config.h.in
+	const std::string graphPath = projectRoot+"/meshes/";
 };
 
 
@@ -105,13 +104,7 @@ TEST_P(HilbertCurveTest, testHilbertIndexUnitSquare_Local) {
   for (IndexType i = 0; i < N; i++) {
     std::vector<ValueType> point(dimensions,0);
     point = HilbertCurve<IndexType, ValueType>::HilbertIndex2Point( indices[i], recursionDepth, dimensions);
-    /*
-    if (dimensions == 2) {
-      point = HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point( indices[i], recursionDepth);
-    } else {
-      point = HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point( indices[i], recursionDepth);
-    }
-	*/
+
     ASSERT_EQ(dimensions, point.size());
     for (IndexType d = 0; d < dimensions; d++) {
       EXPECT_NEAR(point[d]*(maxCoords[d] - minCoords[d])+minCoords[d], convertedCoords[i][d], 0.001);
@@ -130,13 +123,7 @@ TEST_P(HilbertCurveTest, testInverseHilbertIndex_Local) {
   for(int i=0; i<divisor; i++){
     std::vector<ValueType> point(dimensions, 0);
     point = HilbertCurve<IndexType, ValueType>::HilbertIndex2Point( double(i)/divisor, recursionDepth, dimensions);
-    /*
-    if (dimensions == 2) {
-      point = HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point( double(i)/divisor, recursionDepth);
-    } else {
-      point = HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point( double(i)/divisor, recursionDepth);
-    }
-	*/
+
     ASSERT_EQ(dimensions, point.size());
 
     for (IndexType d = 0; d < dimensions; d++) {

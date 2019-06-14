@@ -28,7 +28,6 @@ endif(USE_NETWORKIT)
 set(NETWORKIT_INCLUDE "${NETWORKIT_DIR}/include/") 
 set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
 
-
 set(CXXOPTS_DIR "${PROJECT_SOURCE_DIR}/external/cxxopts/include")
 
 ### find MPI ###

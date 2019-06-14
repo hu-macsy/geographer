@@ -8,7 +8,8 @@ namespace ITI {
 class CommTreeTest : public ::testing::Test {
     protected:
         // the directory of all the meshes used
-        std::string graphPath = "./meshes/";
+        // projectRoot is defined in config.h.in
+		std::string graphPath = projectRoot+"/meshes/";
 };
 
 typedef typename CommTree<IndexType,ValueType>::commNode cNode;
@@ -111,12 +112,14 @@ TEST_F(CommTreeTest, testTreeFlatHomogeneous){
 	IndexType k= 12;
 
 	ITI::CommTree<IndexType,ValueType> cTree;
-	cTree.createFlatHomogeneous( k );
+	IndexType numNodes = cTree.createFlatHomogeneous( k );
 
 	//cTree.print();
 	EXPECT_TRUE( cTree.checkTree(true) );
 	EXPECT_EQ( cTree.numLeaves, k );
 	EXPECT_EQ( cTree.tree[0].size(), 1 ); 
+	EXPECT_EQ( numNodes, cTree.numNodes );
+	EXPECT_EQ( numNodes, k+1);
 }//TEST_F(CommTreeTest, testTreeFlatHomogeneous)
 
 //------------------------------------------------------------------------
