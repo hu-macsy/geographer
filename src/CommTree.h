@@ -242,10 +242,22 @@ IndexType getNumLeaves() const {
 	return tree.back().size();
 }
 
+/** @brief The number of all the nodes of the tree.
+*/
+IndexType getNumNodes() const {
+	return numNodes;
+}
+
 /** @brief The number of weights that its node has.
 */
 IndexType getNumWeights() const{
 	return numWeights;
+}
+
+/**@brief The number of hierarchy levels.
+*/
+IndexType getNumHierLevels() const{
+	return hierarchyLevels;
 }
 
 /* @brief Takes a vector of leaves and creates the tree.

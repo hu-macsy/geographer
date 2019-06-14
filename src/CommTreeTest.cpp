@@ -84,8 +84,8 @@ TEST_F(CommTreeTest, testTreeFromLeaves){
 		//cTree.print();
 
 		EXPECT_TRUE( cTree.checkTree(true) );
-		EXPECT_EQ( cTree.numLeaves, leaves.size() );
-		EXPECT_EQ( cTree.tree[0].size(), 1 ); //top level is just the root
+		EXPECT_EQ( cTree.getNumLeaves(), leaves.size() );
+		EXPECT_EQ( cTree.getHierLevel(0).size(), 1 ); //top level is just the root
 		
 		//accumulate weights for all leaves
 		std::vector<ValueType> sumWeights( 3, 0.0 );
@@ -101,7 +101,7 @@ TEST_F(CommTreeTest, testTreeFromLeaves){
 			EXPECT_FLOAT_EQ( root.weights[i], sumWeights[i] ) << " for weight " << i;
 		}
 		
-		EXPECT_EQ( root.children.size(), cTree.numLeaves );
+		EXPECT_EQ( root.children.size(), cTree.getNumLeaves() );
 	}
 }// TEST_F(CommTreeTest, testTreeFromLeaves)
 
@@ -116,9 +116,9 @@ TEST_F(CommTreeTest, testTreeFlatHomogeneous){
 
 	//cTree.print();
 	EXPECT_TRUE( cTree.checkTree(true) );
-	EXPECT_EQ( cTree.numLeaves, k );
-	EXPECT_EQ( cTree.tree[0].size(), 1 ); 
-	EXPECT_EQ( numNodes, cTree.numNodes );
+	EXPECT_EQ( cTree.getNumLeaves(), k );
+	EXPECT_EQ( cTree.getHierLevel(0).size(), 1 ); 
+	EXPECT_EQ( numNodes, cTree.getNumNodes() );
 	EXPECT_EQ( numNodes, k+1);
 }//TEST_F(CommTreeTest, testTreeFlatHomogeneous)
 
@@ -132,8 +132,8 @@ TEST_F(CommTreeTest, testTreeNonFlatHomogeneous){
 	
 	//cTree.print();
 	EXPECT_TRUE( cTree.checkTree(true) );
-	EXPECT_EQ( cTree.numLeaves, k );
-	EXPECT_EQ( cTree.tree[0].size(), 1 ); 
+	EXPECT_EQ( cTree.getNumLeaves(), k );
+	EXPECT_EQ( cTree.getHierLevel(0).size(), 1 ); 
 	
 }//TEST_F(CommTreeTest, testTreeNonFlatHomogeneous)
 
