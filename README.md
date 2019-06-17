@@ -1,3 +1,6 @@
+@file
+@mainpage User guide
+
 Geographer
 =========
 

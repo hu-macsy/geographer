@@ -90,7 +90,7 @@ CommTree<IndexType, ValueType>::CommTree( const std::vector<IndexType> &levels, 
 template <typename IndexType, typename ValueType>
 IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vector<commNode> leaves){
 
-	hierarchyLevels = leaves.front().hierarchy.size()+1;
+	hierarchyLevels = leaves.front().hierarchy.size()+1; //+1 is for the root
 	numLeaves = leaves.size();
 
 	//bottom level are the leaves
@@ -98,15 +98,15 @@ IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vecto
 	tree.insert( tree.begin(), levelBelow );
 	IndexType size = levelBelow.size();
 
-	IndexType hierarchyLevels = leaves.front().hierarchy.size();//TODO: this declaration shadows the earlier one. Is this intentional?
+	IndexType tmpHierarchyLevels = leaves.front().hierarchy.size();
 	{
 		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 		if( comm->getRank()==0 ){
-			PRINT("There are " << hierarchyLevels << " levels of hierarchy and " << leaves.size() << " leaves");
+			PRINT("There are " << tmpHierarchyLevels << " levels of hierarchy and " << leaves.size() << " leaves");
 		}
 	}
 
-	for(int h = hierarchyLevels-1; h>=0; h--){
+	for(int h = tmpHierarchyLevels-1; h>=0; h--){
 		//PRINT("starting level " << h);
 		std::vector<commNode> levelAbove = createLevelAbove(levelBelow);
 		//add the newly created level to the tree
@@ -135,7 +135,7 @@ IndexType CommTree<IndexType, ValueType>::createFlatHomogeneous(
 	this->numWeights = numNodeWeights;
 	this->isProportional = std::vector<bool>(numNodeWeights, true); //TODO: check if this is correct
 
-	return leaves.size();
+	return this->numNodes;
 }//createFlatHomogeneous
 //------------------------------------------------------------------------
 
@@ -150,7 +150,7 @@ IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneous( const std::ve
 	this->numWeights = leafSizes.size();
 	//this->isProportional = std::vector<bool>(numNodeWeights, true); //TODO: check if this is correct
 
-	return leaves.size();
+	return this->numNodes;
 }//createFlatHeterogeneous
 //------------------------------------------------------------------------
 
@@ -162,7 +162,6 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 
 	const IndexType numLeaves = sizes[0].size();
 	SCAI_ASSERT_GT_ERROR( numLeaves, 0, "Provided sizes vector is empty, there are no block size" );
-
 
 	std::vector<cNode> leaves( numLeaves );
 
@@ -182,8 +181,6 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 template <typename IndexType, typename ValueType>
 void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights ){
 
-	//throw std::logic_error("The method adaptWeights has multiple issues creating segfaults later.");
-
 	if( areWeightsAdapted ){
 		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 		if( comm->getRank()==0 )
@@ -196,8 +193,7 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
 	    const IndexType numWeights = this->getNumWeights();
 	    SCAI_ASSERT_EQ_ERROR( numWeights, nodeWeights.size(), "Given weights vector size and tree number of weights do not agree" );
 
-//TODO: is 1 correct?
-const std::vector<std::vector<ValueType>> &hierWeights = getBalanceVectors( -1 );
+		const std::vector<std::vector<ValueType>> &hierWeights = getBalanceVectors( -1 );
 		SCAI_ASSERT_EQ_ERROR( numWeights, hierWeights.size(), "Number of weights in tree do not agree" );
 		SCAI_ASSERT_EQ_ERROR( numWeights, isProportional.size(), "Number of weights and proportionality information do not agree" );
 
@@ -210,14 +206,15 @@ const std::vector<std::vector<ValueType>> &hierWeights = getBalanceVectors( -1 )
 		    ValueType sumNodeWeights = thisNodeWeight.sum();
 		    ValueType sumHierWeights = std::accumulate( thisHierWeight.begin(), thisHierWeight.end(), 0.0 );
 		    const ValueType scalingFactor = sumNodeWeights / sumHierWeights;
-scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
 		    if( not isProportional[i] ){
 		    	SCAI_ASSERT_GE_ERROR( sumHierWeights, sumNodeWeights, "Provided node weights do not fit in the given tree for weight " << i );
 		    }else{
 		    	//go over the nodes and adapt the weights
-		    	for( commNode &cNode : hierLevel ){//this creates a copy and only adjusts the weights in the copy, which is then discarded.
+		    	for( commNode &cNode : hierLevel ){
 		    		cNode.weights[i] *= scalingFactor;
-//PRINT0( cNode.weights[i] );			    		
+					//scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();		    		
+					//PRINT0( cNode.weights[i] );			    		
 		    	}
 		    }
 		}
@@ -258,7 +255,7 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 
 		commNode thisNode = levelBelow[i];
 		commNode fatherNode = thisNode;
-		fatherNode.numChildren = 1;		//direct children are 0
+		fatherNode.numChildren = 1;		//direct children are 1
 
 		//get the prefix of this node and store it
 		hierPrefix thisPrefix(thisNode.hierarchy.size()-1);
@@ -271,13 +268,13 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 		//PRINT(i << ": thisNode.id is " << thisNode.leafID << " prefix size " << thisPrefix.size() );
 
 		IndexType numWeights=thisNode.getNumWeights();
-		//father.weights.resize( numWeights, 0.0 );
+		
 		SCAI_ASSERT_EQ_ERROR( fatherNode.getNumWeights(), numWeights, "Number of weights mismatch");
-//not really needed
-SCAI_ASSERT_EQ_ERROR( 
-	std::accumulate( fatherNode.weights.begin(), fatherNode.weights.end(), 0.0),
-	std::accumulate( thisNode.weights.begin(), thisNode.weights.end(), 0.0), "Weights are not copied?"
-	);
+		//not really needed
+		SCAI_ASSERT_EQ_ERROR( 
+			std::accumulate( fatherNode.weights.begin(), fatherNode.weights.end(), 0.0),
+			std::accumulate( thisNode.weights.begin(), thisNode.weights.end(), 0.0), "Weights are not copied?"
+			);
 
 		for( unsigned int j=i+1; j<levelBelowsize; j++){
 			commNode otherNode = levelBelow[j];
@@ -288,7 +285,6 @@ SCAI_ASSERT_EQ_ERROR(
 			if( thisPrefix==otherPrefix ){
 				fatherNode += otherNode;		//operator += overloading
 				seen[j] = true;
-				//numChildren++;
 			}
 		}
 
@@ -422,11 +418,11 @@ scai::lama::CSRSparseMatrix<ValueType> CommTree<IndexType, ValueType>::exportAsG
 template<typename IndexType, typename ValueType>
 std::vector<ValueType> CommTree<IndexType,ValueType>::computeImbalance(
     const scai::lama::DenseVector<IndexType> &part,
-    IndexType k,
+    const IndexType k,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights){
 
     //cNode is typedefed in CommTree.h
-    const std::vector<cNode> leaves = this->getLeaves();
+    const std::vector<cNode>& leaves = this->getLeaves();
     const IndexType numLeaves = leaves.size();
     SCAI_ASSERT_EQ_ERROR( numLeaves, k, "Number of blocks of the partition and number of leaves of the tree do not agree" );
 
@@ -438,9 +434,10 @@ std::vector<ValueType> CommTree<IndexType,ValueType>::computeImbalance(
 
     const IndexType numWeights = getNumWeights();
     SCAI_ASSERT_EQ_ERROR( numWeights, nodeWeights.size(), "Given weights vector size and tree number of weights do not agree" );
-//TODO: is 1 correct?
+
     //get leaf balance vectors
-const std::vector<std::vector<ValueType>> allConstrains = getBalanceVectors( -1 );
+	const std::vector<std::vector<ValueType>> allConstrains = getBalanceVectors( -1 );
+	//an imbalance for every weight
     std::vector<ValueType> imbalances( numWeights );
 
     //compute imbalance for all weights
@@ -449,73 +446,12 @@ const std::vector<std::vector<ValueType>> allConstrains = getBalanceVectors( -1 
 	    std::vector<ValueType> optBlockWeight = allConstrains[i];
 	    SCAI_ASSERT_EQ_ERROR( optBlockWeight.size(), numLeaves, "Size mismatch");
 
-	    ValueType imba = GraphUtils<IndexType, ValueType>::computeImbalance( part, k, nodeWeights[i], optBlockWeight );
-
-    	imbalances[i] = imba;
+	    imbalances[i] = GraphUtils<IndexType, ValueType>::computeImbalance( part, k, nodeWeights[i], optBlockWeight );
 	}
 
     return imbalances;
 }
-//---------------------------------------------------------------------------------------
-/*
-template<typename IndexType, typename ValueType>
-std::vector<ValueType> CommTree<IndexType,ValueType>::getOptBlockWeights(
-	const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights) const {
 
-	const std::vector<commNode> hierLevel = this->getLeaves();
-    const IndexType numBlocks = hierLevel.size();
-    const IndexType numWeights = getNumWeights();
-    SCAI_ASSERT_EQ_ERROR( numWeights, nodeWeights.size(), "Given weights vector size and tree number of weights do not agree" );
-
-	const std::vector<std::vector<ValueType>> allLeafWeights = getBalanceVectors();
-	SCAI_ASSERT_EQ_ERROR( numWeights, allLeafWeights.size, "Number of weigths in tree do not agree" );
-
-    for( unsigned int i=0; i<numWeights; i++){
-
-    	scai::lama::DenseVector<ValueType> &thisNodeWeight = nodeWeights[i];
-    	scai::lama::DenseVector<ValueType> &thisLeafWeight = allLeafWeights[i];
-
-	    //the total node weight of the input graph
-	    ValueType sumNodeWeights = thisWeight.sum();
-	    ValueType sumLeafWeights = std::Accumulate( thisLeafWeight.begin(), thisLeafWeight.end(), 0.0 );
-
-	    if( not isProportional[i] ){
-	    	SCAI_ASSERT_GE_ERROR( sumLeafWeights, sumNodeWeights, "Provided node weights are do not fit in the given tree for weight " << i );
-	    }else{
-
-	    }
-	    
-	    {
-	        scai::hmemo::ReadAccess<ValueType> rW( nodeWeights.getLocalValues() );
-	        ValueType localW = 0;
-	        for(int i=0; i<nodeWeights.getLocalValues().size(); i++ ){
-	            localW += rW[i];
-	        }
-	        const scai::dmemo::CommunicatorPtr comm = nodeWeights.getDistributionPtr()->getCommunicatorPtr();
-	        totalWeightSum = comm->sum(localW);
-	    }
-		
-	    //the sum of the realtive speeds for all nodes
-	    ValueType speedSum = 0;
-	    for( cNode c: hierLevel){
-	        speedSum += c.relatSpeed;
-	    }
-
-	    //the optimum size for every block
-	    std::vector<ValueType> optBlockWeight( numBlocks );
-
-	    //for each PE, we are given its relative speed compare to the fastest
-	    //PE, a number between 0 and 1. The optimum weight it should have 
-	    //is this:
-	    // relative speed*( sum of input node weights / sum of all relative speeds)
-	    for( int i=0; i<numBlocks; i++){
-	        optBlockWeight[i] = totalWeightSum*(hierLevel[i].relatSpeed/speedSum);
-	    }
-	}
-
-    return optBlockWeight;
-}
-*/
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
@@ -537,25 +473,22 @@ void CommTree<IndexType, ValueType>::print() const {
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-bool CommTree<IndexType, ValueType>::checkTree( bool all ) const{
+bool CommTree<IndexType, ValueType>::checkTree( bool allTests ) const{
 
 	SCAI_ASSERT_EQ_ERROR( hierarchyLevels, tree.size(), "Mismatch for hierachy levels and tree size");
-	SCAI_ASSERT_EQ_ERROR( numLeaves, tree.back().size(), "Mismatch for number of leaves and the size of the nottom hierechy level");
+	SCAI_ASSERT_EQ_ERROR( numLeaves, tree.back().size(), "Mismatch for number of leaves and the size of the bottom hierechy level");
 	//check sum of sizes for every level
 	SCAI_ASSERT_EQ_ERROR( tree.front().size(), 1 , "Top level of the tree should have size 1, only the root");
 	SCAI_ASSERT_EQ_ERROR( numLeaves, tree.front()[0].children.size(), "The root should contain all leaves as children");
 	//basically, this is the same as the above
 	SCAI_ASSERT_EQ_ERROR( getRoot().children.size(), numLeaves, "The root should contain all leaves as children" );
 
-	//TODO: add more "expensive" checks like, all leaf IDs are unique, or all hierarchy labels are unique
-	//	or check the size of every subtree according to its label...
-
 	//add more "expensive" checks 
 
-	if( all ){
+	if( allTests ){
 		const IndexType numWeights = getNumWeights();
-//TODO: is 1 correct?
-const std::vector<std::vector<ValueType>> balanceVec = getBalanceVectors(-1);
+
+		const std::vector<std::vector<ValueType>> balanceVec = getBalanceVectors(-1);
 		SCAI_ASSERT_EQ_ERROR( balanceVec.size(), numWeights, "Number of weights mismatch" );
 
 		std::vector<ValueType> weightSums(numWeights, 0.0);

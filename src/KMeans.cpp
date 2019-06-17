@@ -1582,7 +1582,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 	struct Metrics& metrics){
 
 	//check although numBlocks is not needed or used
-	SCAI_ASSERT_EQ_ERROR(settings.numBlocks, commTree.numLeaves, "The number of leaves and number of blocks must agree");
+	SCAI_ASSERT_EQ_ERROR(settings.numBlocks, commTree.getNumLeaves(), "The number of leaves and number of blocks must agree");
 
 	//get global communicator
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -1648,7 +1648,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 	//skip root. If we start from the root, we will know the number
 	//of blocks but not the memory and speed per block
-	for(unsigned int h=1; h<commTree.hierarchyLevels; h++ ){
+	for(unsigned int h=1; h<commTree.getNumHierLevels(); h++ ){
 
 		/*
 		There are already as many blocks as the number of leaves

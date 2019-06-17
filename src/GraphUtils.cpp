@@ -682,7 +682,7 @@ DenseVector<IndexType> GraphUtils<IndexType, ValueType>::getBorderNodes( const C
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::pair<std::vector<IndexType>,std::vector<IndexType>> GraphUtils<IndexType, ValueType>::getNumBorderInnerNodes	( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const struct Settings settings) {
+std::pair<std::vector<IndexType>,std::vector<IndexType>> GraphUtils<IndexType, ValueType>::getNumBorderInnerNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const struct Settings settings) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     
@@ -939,7 +939,7 @@ std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType
 
 //---------------------------------------------------------------------------------------
 
-/** Get the maximum degree of a graph.
+/* Get the maximum degree of a graph.
  * */
 template<typename IndexType, typename ValueType>
 IndexType GraphUtils<IndexType, ValueType>::getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM){
@@ -970,16 +970,17 @@ IndexType GraphUtils<IndexType, ValueType>::getGraphMaxDegree( const scai::lama:
 }
 //------------------------------------------------------------------------------
 
-/** Compute maximum communication= max degree of the block graph, and total communication= sum of all edges
+/* Compute maximum communication= max degree of the block graph, and total communication= sum of all edges
  */
 template<typename IndexType, typename ValueType>
-std::pair<IndexType,IndexType> GraphUtils<IndexType, ValueType>::computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k){
+std::pair<IndexType,IndexType> GraphUtils<IndexType, ValueType>::computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part){
 
     scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
     
     if( comm->getRank()==0 ){
         std::cout<<"Computing the block graph communication..." << std::endl;
     }
+    IndexType k = part.max()-1;
     //TODO: getting the block graph probably fails for p>5000, 
     scai::lama::CSRSparseMatrix<ValueType> blockGraph = getBlockGraph( adjM, part, k);
     
@@ -1209,7 +1210,7 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 		//PRINT(*comm <<": array size= " << arraySize );		
 	}
 
-	//every PE has different size to send, this is needed fot the gather
+	//every PE has different size to send, this is needed for the gather
 	std::vector<IndexType> allSizes( comm->getSize(), 0 );
 	allSizes[comm->getRank()] = mySize;
 	comm->sumImpl( allSizes.data(), allSizes.data(), comm->getSize(),  scai::common::TypeTraits<IndexType>::stype );
@@ -1217,7 +1218,7 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 	std::vector<ValueType> allEdges(arraySize, -1); //set a dummy value of -1
 	comm->gatherV( allEdges.data(), mySize, rootPE, edgeVec.data(), allSizes.data() );
 	
-	/**
+	/*
 	allEdges is a concatenation of edge lists. Every PE stores its local edgelist.
 	After gathering, the root PE traverses the gathered	edges lists and constructs 
 	the block graph.
@@ -1262,7 +1263,7 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 		auto edgeIt = allEdgeMap.begin();
 		for(IndexType v=0; v<k; v++ ){ //for every vertex of the block graph			
 			SCAI_ASSERT_EQ_ERROR( edgeIt->first.first, v , "Missing node id " << v );
-			SCAI_ASSERT( edgeIt!=allEdgeMap.end(), "Edge list iterator out of bounds" ); //not very helpfull assertion
+			SCAI_ASSERT( edgeIt!=allEdgeMap.end(), "Edge list iterator out of bounds" ); //not very helpful assertion
 
 			IndexType degree = 0;
 			while( v==edgeIt->first.first ){
@@ -1371,6 +1372,7 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getPEGr
     return PEgraph;
 }
 //-----------------------------------------------------------------------------------
+//TODO: add edge weights
 
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>>& adjList) {
@@ -1535,8 +1537,6 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
 	}
 
 	PRINT0("exchanged edges");
-
-	//const IndexType minLocalVertexBeforeInsertion = localPairs.front().first;
 
 	// insert all the received edges to your local edges
 	{
@@ -2060,39 +2060,6 @@ std::vector<IndexType> GraphUtils<IndexType, ValueType>::indexReorderCantor(cons
     return ret;
 }
 //-----------------------------------------------------------------------------------
-
-/*
-
-template scai::lama::DenseVector<IndexType> reindex(CSRSparseMatrix<ValueType> &graph);
-template std::vector<IndexType> localBFS(const CSRSparseMatrix<ValueType> &graph, IndexType u);
-template std::vector<ValueType> localDijkstra(const scai::lama::CSRSparseMatrix<ValueType> &graph, const IndexType u, std::vector<IndexType>& predecessor);
-template IndexType getLocalBlockDiameter(const CSRSparseMatrix<ValueType> &graph, const IndexType u, IndexType lowerBound, const IndexType k, IndexType maxRounds);
-template ValueType computeCut(const CSRSparseMatrix<ValueType> &input, const DenseVector<IndexType> &part, bool weighted);
-template ValueType computeImbalance(const DenseVector<IndexType> &part, IndexType k, const DenseVector<ValueType> &nodeWeights);
-template scai::dmemo::HaloExchangePlan buildNeighborHalo<IndexType,ValueType>(const CSRSparseMatrix<ValueType> &input);
-template bool hasNonLocalNeighbors(const CSRSparseMatrix<ValueType> &input, IndexType globalID);
-template std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
-template std::vector<IndexType> getNodesWithNonLocalNeighbors(const CSRSparseMatrix<ValueType>& input, const std::set<IndexType>& candidates);
-template std::vector<IndexType> nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input);
-template DenseVector<IndexType> getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part);
-template std::pair<std::vector<IndexType>,std::vector<IndexType>> getNumBorderInnerNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, Settings settings);
-template std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType>> computeCommBndInner( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, Settings settings);
-template std::vector<IndexType> computeCommVolume( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, Settings settings);
-template std::vector<std::vector<IndexType>> getLocalBlockGraphEdges( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part);
-template scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
-template IndexType getGraphMaxDegree( const scai::lama::CSRSparseMatrix<ValueType>& adjM);
-template  std::pair<IndexType,IndexType> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
-template scai::lama::CSRSparseMatrix<ValueType> getPEGraph<IndexType,ValueType>( const scai::lama::CSRSparseMatrix<ValueType> &adjM);
-template scai::lama::CSRSparseMatrix<ValueType> getCSRmatrixFromAdjList_NoEgdeWeights( const std::vector<std::set<IndexType>> &adjList);
-template scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList );
-template std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local(const CSRSparseMatrix<ValueType>& graph, IndexType& maxDegree);
-template scai::lama::CSRSparseMatrix<ValueType> constructLaplacian<IndexType, ValueType>(scai::lama::CSRSparseMatrix<ValueType> graph);
-template scai::lama::CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension);
-template scai::lama::DenseMatrix<ValueType> constructHadamardMatrix(IndexType d);
-template std::vector< std::vector<IndexType>> mecGraphColoring( const CSRSparseMatrix<ValueType> &graph, IndexType &colors);
-*/
-
-//} /*namespace GraphUtils*/
 
 
 //template class GraphUtils<int, double>;

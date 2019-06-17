@@ -11,20 +11,41 @@
 
 namespace ITI{
 
-	using scai::IndexType;
+using scai::IndexType;
 
-	/*The size of a point/vertex in the application. This is mainly (only)
-	used for the mapping using the CommTree. Every node in the tree has a 
-	memory variable that indicated the maximum allowed size of this PE or
-	group of PEs. Remember, in the CommTree the leaves are the actual PEs
-	and the other nodes are groups consisting of a number of PEs. Then,
-	every PEs p, can contain at most p.memory/bytesPerVertex vertices.
-	TODO: investigate the best value to use
-	*/
-	const IndexType bytesPerVertex = 8;
+/*The size of a point/vertex in the application. This is mainly (only)
+used for the mapping using the CommTree. Every node in the tree has a 
+memory variable that indicated the maximum allowed size of this PE or
+group of PEs. Remember, in the CommTree the leaves are the actual PEs
+and the other nodes are groups consisting of a number of PEs. Then,
+every PEs p, can contain at most p.memory/bytesPerVertex vertices.
+TODO: investigate the best value to use
+*/
+//TODO: is this needed?
+const IndexType bytesPerVertex = 8;
+
+/** Different file formats to store a graph. See also FileIO.
+
+0. Auto: it tries to deduce the format automatically
+1. First line has a number that represents the number of vertices of the graph and some flags for vertex and node weights.
+Then, line i has the vertices that are neighbors of vertex i.
+The METIS format is described in detail here <a href="glaros.dtc.umn.edu/gkhome/fetch/sw/metis/manual.pdf">metis manual</a>.
+2. -  //TODO: details
+3. Format to read ocean graphs //TODO: details
+4. The matrixmarket format. Details <a href="https://math.nist.gov/MatrixMarket/formats.html">here</a> and 
+<a href="https://people.sc.fsu.edu/~jburkardt/data/mm/mm.html">here</a>.
+5. Graphs stored in the TEEC file format //TODO: probably not used
+6. Graphs stored in a binary format, see <a href="http://algo2.iti.kit.edu/schulz/software_releases/kahipv2.00.pdf">here</a>.
+7. The graph is stored as sequence of edges.
+8. The graph is stored as sequence of edges but stored in binary format.
+9. An edge list that is stored in several files.
+*/
 
 enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5, BINARY = 6, EDGELIST = 7, BINARYEDGELIST = 8, EDGELISTDIST = 9};
 
+
+/** @brief Operator to convert an enum Format to a stream.
+*/
 inline std::istream& operator>>(std::istream& in, Format& format){
 	std::string token;//TODO: There must be a more elegant way to do this with a map!
 	in >> token;
@@ -52,6 +73,9 @@ inline std::istream& operator>>(std::istream& in, Format& format){
 		in.setstate(std::ios_base::failbit);
 	return in;
 }
+
+/** @brief Operator to convert a stream to an enum Format.
+*/
 
 inline std::ostream& operator<<(std::ostream& out, Format method){
 	std::string token;
@@ -82,7 +106,26 @@ inline std::ostream& operator<<(std::ostream& out, Format method){
 
 //-----------------------------------------------------------------------------------
 
-enum class Tool{ geographer, geoKmeans, geoSFC, geoHierKM, geoHierRepart, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, none};
+/** Different tools, i.e., algorithmic approaches, that can be used to partition a input graph, point set or a mesh, i.e., a graph with coordinates.
+	For geographer, typically these are predetermined combinations of the input settings.
+
+- geographer Both graph and coordinates are required. First, we take an initial partition using only the coordinates and the balanced k-means algorithm
+	and them, the initial partition is improved by using the graph and doing multilevel coarsening and local refinement.
+- geoKmeans Partition a point set (no graph is needed) using the balanced k-means algorithm.
+- geoHierKM Partition a point set (no graph is needed) using the hierarchical balanced k-means algorithm.
+- geoHierRepart First step is same as using geoHierKM but we also do a post-processing repartition step to improve the cut more.
+- geoSFC Partition a point set (no graph is needed) using the hilbert space filling curve.
+- geoMS Partition a point set (no graph is needed) using the MultiSection algorithm.
+### The tools below require the external libraries parmetis and zoltan2.
+- parMetisGraph Partition a graph using parmetis
+- parMetisGeom Partition a mesh using a version of parmetis that also uses coordinates for an initial partition.
+- parMetisSFC Partition a point set (no graph is needed) using the space filling curve algorithm of parmetis.
+- zoltanRIB Partition a point set (no graph is needed) using the Recursive Inertia Bisection of zoltan2.
+- zoltanRCB Partition a point set (no graph is needed) using the Recursive Coordinate Bisection of zoltan2.
+- zoltanMJ Partition a point set (no graph is needed) using the Multijagged algorithm of zoltan2.
+- zoltanMJ Partition a point set (no graph is needed) using the space filling curves algorithm of zoltan2.
+*/
+enum class Tool{ geographer, geoKmeans, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, none};
 
 
 std::istream& operator>>(std::istream& in, ITI::Tool& tool);
@@ -95,105 +138,141 @@ std::string to_string(const ITI::Format& f);
 
 ITI::Tool toTool(const std::string& s);
 
+
+/** @brief A structure that holds several options for partitioning, input, output, metrics e.t.c.
+*/
 struct Settings{
 	Settings();
 	bool checkValidity();
 
-    //partition settings
-    IndexType numBlocks = 2;
-    double epsilon = 0.03;
-    bool repartition = false;
-    
-    //input data and other info
-    IndexType dimensions= 2;
-    std::string fileName = "-";
-    std::string outFile = "";
-    std::string outDir = "-"; //this is used by the competitors main
+    /** @name General partition settings
+    */
+    //@{
+    IndexType numBlocks = 2; 	///< number of blocks to partition to
+    double epsilon = 0.03;		///< maximum allowed imbalance of the output partition
+    bool repartition = false; 	///< set to true to respect the initial partition
+
+    ITI::Tool initialPartition = ITI::Tool::geoKmeans;			///< the tool to use to get the initial partition, \sa Tool
+    static const ITI::Tool initialMigration = ITI::Tool::geoSFC;///< pre-processing step to redistribute/migrate coordinates
+   	//@}
+
+    /** @name Input data and other info
+    */
+    //@{
+    IndexType dimensions= 2;	///< the dimension of the point set
+    std::string fileName = "-";	///< the name of the input file to read the graph from
+    std::string outFile = "";	///< name of the file to store metrics (if desired)
+    std::string outDir = "-"; 	//this is used by the competitors main
     std::string PEGraphFile = "-"; //TODO: this should not be in settings 
     std::string blockSizesFile = "-"; //TODO: this should not be in settings 
-    ITI::Format fileFormat = ITI::Format::AUTO;   // 0 for METIS, 4 for MatrixMarket
-    ITI::Format coordFormat = ITI::Format::AUTO; 
-    bool useDiffusionCoordinates = false;
-    IndexType diffusionRounds = 20;
-    IndexType numNodeWeights = -1;
+    ITI::Format fileFormat = ITI::Format::AUTO;   	///< the format of the input file, \sa Format
+    ITI::Format coordFormat = ITI::Format::AUTO; 	///< the format of the coordinated input file, \sa Format
+    bool useDiffusionCoordinates = false;		///< if not coordinates are provided, we can use artificial coordinates
+    IndexType diffusionRounds = 20;				///< number of rounds to create the diffusion coordinates
+    IndexType numNodeWeights = -1;		///< number of vertex weights
     std::string machine;
+    //@}	
     
-    //mesh generation
+    /** @name Mesh generation settings
+    For the mesh generator, the number of points per dimension
+    */
+    //@{
     IndexType numX = 32;
     IndexType numY = 32;
     IndexType numZ = 32;
-    
-    //general tuning parameters
-    ITI::Tool initialPartition = ITI::Tool::geoKmeans;
-    static const ITI::Tool initialMigration = ITI::Tool::geoSFC;
+    //@}
 
-    //tuning parameters for local refinement
-    IndexType minBorderNodes = 1;
-    IndexType stopAfterNoGainRounds = 0;
-    IndexType minGainForNextRound = 1;
-    IndexType numberOfRestarts = 0;
-    bool useDiffusionTieBreaking = false;
-    bool useGeometricTieBreaking = false;
-    bool gainOverBalance = false;
-    bool skipNoGainColors = false;
+    /** @name Tuning parameters for local refinement 
+     */
+    //@{
+    IndexType minBorderNodes = 1;			///< minimum number of border nodes for the local refinement
+    IndexType stopAfterNoGainRounds = 0; 	///< number of rounds to stop local refinement if no gain is achieved
+    IndexType minGainForNextRound = 1;		///< minimum gain to be achieved so local refinement proceeds to next round
+    IndexType numberOfRestarts = 0;			
+    bool useDiffusionTieBreaking = false;	///< if diffusion should be used for tie breaking
+    bool useGeometricTieBreaking = false;	///< if distance from center should be used for tie braking
+    bool gainOverBalance = false;			
+    bool skipNoGainColors = false;			///< if we should skip some rounds if there is no gain
+    //@}
 
-    //tuning parameters for SFC
-    IndexType sfcResolution = 7;
+    /** @name Space filling curve parameters
+    */
+    //@{
+    IndexType sfcResolution = 7; 			///<tuning parameters for SFC, the resolution depth for the curve
+    //@}
 
-    //tuning parameters balanced K-Means
+
+    /** @name Tuning parameters balanced K-Means
+    */
+    //@{
 //TODO?: in the heterogenous and hierarchical case, minSamplingNodes
 //makes more sense to be a percentage of the nodes, not a number. Or not?
-    IndexType minSamplingNodes = 100;	
+    IndexType minSamplingNodes = 100;		///< the starting number of sampled nodes. If set to -1, all nodes are considered from the start
 
-    ValueType influenceExponent = 0.5;
+    ValueType influenceExponent = 0.5;		
     ValueType influenceChangeCap = 0.1;
-    IndexType balanceIterations = 20;
-    IndexType maxKMeansIterations = 50;
-    bool tightenBounds = false;
-    bool freezeBalancedInfluence = false;
-    bool erodeInfluence = false;
+    IndexType balanceIterations = 20;		///< maximum number of iteration to do in order to achieve balance
+    IndexType maxKMeansIterations = 50;		///< maximum number of global k-means iterations
+    bool tightenBounds = false;				
+    bool freezeBalancedInfluence = false;	
+    bool erodeInfluence = false;			
     //bool manhattanDistance = false;
-    std::vector<IndexType> hierLevels; //for hierarchial kMeans
+    std::vector<IndexType> hierLevels; 		///< for hierarchial kMeans, the number of blocks per level
+    //@}
 
-    //parameters for multisection
-    bool bisect = false;    // 0: works for square k, 1: bisect, for k=power of 2
-    bool useExtent = false;
-    std::vector<IndexType> cutsPerDim;
-    IndexType pixeledSideLen = 10;
+    /** @name Parameters for multisection
+    */
+    //@{
+    bool bisect = false;    				///< if true, we perform a bisection ( false: works for square k, true: for k=power of 2)
+    std::vector<IndexType> cutsPerDim;		///< the cuts we must do per dimensions (size=dimensions)
+    IndexType pixeledSideLen = 10;			///< the side length of a uniform grid
+    //@}
 
-    //tuning parameters for multiLevel heuristic
-    bool noRefinement = false;
-    IndexType multiLevelRounds = 0;
-    IndexType coarseningStepsBetweenRefinement = 3;
-    IndexType thisRound=-1; //TODO: what is this? This has nothing to do with the settings.
+    /** @name Tuning parameters for multiLevel heuristic
+    */
+    //@{
+    bool noRefinement = false;				///< if we will do local refinement or not
+    IndexType multiLevelRounds = 0;			///< number of multilevel rounds
+    IndexType coarseningStepsBetweenRefinement = 3; ///< number of rounds every which we do coarsening
+    //@}
 
-    //debug and profiling parameters
-    bool verbose = false;
-    bool writeDebugCoordinates = false;
-    bool writePEgraph = false;
-    bool storeInfo = false;
-    bool debugMode = false; //extra checks and prints
-	IndexType repeatTimes = 1;
-    
+    /** @name Debug and profiling parameters
+    */
+    //@{
+    bool verbose = false;					///< print more output info
+    bool debugMode = false; 				///< even more checks and prints    
+    bool writeDebugCoordinates = false;		///< store coordinates and block id
+    bool writePEgraph = false;				///< store the processor graph
+    bool storeInfo = false;					///< store metrics info
+	IndexType repeatTimes = 1;				///< for benchmarking, how many times is the partition repeated
+	IndexType thisRound=-1; //TODO: what is this? This has nothing to do with the settings.
+
+	std::string metricsDetail = "no";		///< level of details, possible values are: no, easy, all
     //calculate expensive performance metrics?
-    bool computeDiameter = false;
-    IndexType maxDiameterRounds = 2;
-    std::string metricsDetail = "no";
+    bool computeDiameter = false;			///< if the diameter should be computed (can be expensive)
+    IndexType maxDiameterRounds = 2;		///< max number of rounds to approximate the diameter
+    //@}
 
-    //this is used by the competitors main to set the tools we are gonna use
+    /** @name Various parameters
+    */
+    //@{
+    ///this is used by the competitors main to set the tools we are gonna use
     std::vector<std::string> tools;
 
-    //for mapping
+    /// for mapping by renumbering the block centers according to their SFC index
     bool mappingRenumbering = false;
 
-    // variable to check if the settings given are valid or not
+    /// variable to check if the settings given are valid or not
     bool isValid = true;
+    //@}
 
-    //struct communicationTree commTree;
     //
     // print settings
     //
     
+    /** @brief Print the settings.
+    * @param[in] out The stream to print to
+    */
 	void print(std::ostream& out) const {
 		
 		out<< "Git commit: " << version << " and machine: "<< machine << std::endl;
@@ -236,7 +315,6 @@ struct Settings{
 		} else if (initialPartition==ITI::Tool::geoMS) {
 			out<< "initial partition: MultiSection" << std::endl;
 			out<< "\tbisect: " << bisect << std::endl;
-			out<< "\tuseExtent: "<< useExtent << std::endl;
 		} else {
 			out<< "initial partition undefined" << std::endl;
 		}

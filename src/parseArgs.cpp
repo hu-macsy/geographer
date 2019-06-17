@@ -59,15 +59,12 @@ namespace ITI {
 					("hierLevels", "The number of blocks per level. Total number of PEs (=number of leaves) is \
 					the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3 4 10, there are 3 levels. \
 					In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
-					("mapping", "Use a block renumbering approach to map blocks to PEs" )
 					//output
 					("outFile", "write result partition into file", value<std::string>())
 					//debug
 					("writeDebugCoordinates", "Write Coordinates of nodes in each block", value<bool>())
 					("verbose", "Increase output.")
-					("debug", "Even more detailed output")
 	                ("storeInfo", "Store timing and other metrics in file.")
-	                ("callExit", "Call std::exit after partitioning to deal with lingering MPI data structures.")
 	                // evaluation
 	                ("repeatTimes", "How many times we repeat the partitioning process.", value<IndexType>())
 	                ("noComputeDiameter", "Compute diameter of resulting block files.")
@@ -272,6 +269,7 @@ namespace ITI {
 				IndexType blocksInLevel = std::stoi(item);
 				hierLevels.push_back(blocksInLevel);
 				product *= blocksInLevel;
+				std::cout << product << std::endl;
 			}
 
 			settings.hierLevels = hierLevels;
