@@ -15,16 +15,20 @@ The following software is needed to compile and use Geographer:
 - MPI
 - CMake (&gt;= 3.0.2)
 - The numerical library [Lama](https://github.com/kit-parco/lama) (&gt;= 3.0.0)
-- For Lama, the BLAS linear algebra package
-- For the unit tests: [Google Test](https://github.com/google/googletest)
+- For Lama, an implementation of the BLAS linear algebra standard
 
 On a recent Ubuntu (&gt;= 16.04), most of the dependencies can be installed with the following command:
 
-	sudo apt install cmake g++ git libatlas-base-dev libboost-dev libgtest-dev mpi-default-dev
+	sudo apt install cmake g++ git libatlas-base-dev mpi-default-dev
 
 ### Optional
 
 - For number parsing issues on some platforms: [Boost](https://www.boost.org/) (&gt;= 1.61.0)
+- For the unit tests: [Google Test](https://github.com/google/googletest)
+
+On Ubuntu (&gt;= 16.04), install them using:
+
+	sudo apt install libboost-dev libgtest-dev
 
 ## Installation
 
@@ -33,8 +37,10 @@ Compile and install the Lama library.
 If its dependencies are installed, this can be done with the following commands:
 
     git clone https://github.com/kit-parco/lama.git
-    cd lama && mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../install ../scai && cd ../..
-    cd lama/build && make -j8 && make install && cd ../..
+    cd lama && mkdir build && cd build && cmake ../scai && cd ../..
+    cd lama/build && make && sudo make install && cd ../..
+
+If root access is not available or not preferred, you can pass the argument `-DCMAKE_INSTALL_PREFIX=<path>`to cmake to specify an alternative install location.
 
 The *RBC* library for splitting MPI communicators is included as a submodule in this repository.
 If it is not yet cloned when starting the build process, cmake will download it automatically.
@@ -42,9 +48,12 @@ Should this fail, do it manually by calling `git submodule update --init --recur
 When compiling Geographer, RBC is automatically compiled with an external call to make which uses the compiler wrapper mpic++.
 
 ### Compilation
-Create a build folder in the root directory of this repository, then in it call `cmake ..`.
-Should you have installed Lama in a non-standard location, add `-DSCAI_DIR=<path/to/lama>` where `<path/to/lama>` is your Lama installation directory.
-Afterwards, call `make` or `make Geographer` to create the executable.
+Use CMake to configure the project and make to build it:
+
+	mkdir build && cd build && cmake .. && make && sudo make install
+
+If you have installed Lama in a non-standard location, add `-DSCAI_DIR=<path/to/lama>` where `<path/to/lama>` is your Lama installation directory.
+To install Geographer in an alternative location, pass the argument `-DCMAKE_INSTALL_PREFIX=<path>` to cmake. After successful compilation, the library `libgeographer` and the standalone executable `Geographer` are installed into the installation target. If the Google Test library was found, the unit tests can be found in the executable `GeographerTest`.
 
 ## Usage as Standalone Executable
 Geographer can be used as a library or called from the command line.
