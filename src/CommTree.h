@@ -216,14 +216,16 @@ CommTree( const std::vector<commNode> &leaves, const std::vector<bool> isWeightP
 */
 CommTree( const std::vector<IndexType> &levels, const IndexType numWeights );
 
-/* @brief Return the root, i.e., hierarchy level 0.
+/** @brief Return the root, i.e., hierarchy level 0.
 */
 commNode getRoot() const{ 
 	//TODO: check if tree is not initialized
 	return tree[0][0]; 
 }
 
-/* @brief Return the requested hierarchy level
+/** @brief Return the requested hierarchy level
+@param[in] level The requested hierarchy level
+@return A vector with the nodes of level.
 */
 std::vector<commNode> getHierLevel( int level) const {
 	SCAI_ASSERT_LE_ERROR( level, hierarchyLevels, "Tree has fewer levels than requested" );
@@ -260,9 +262,10 @@ IndexType getNumHierLevels() const{
 	return hierarchyLevels;
 }
 
-/* @brief Takes a vector of leaves and creates the tree.
+/** Takes a vector of leaves and creates the tree. The hierarchy vector in every node is used
+to construct the level above until we reach the root.
 
-@param[in] leaves A vector with all the leaves
+@param[in] leaves A vector with all the leaf nodes.
 @return The size of the tree, i.e., numNodes.
 */
 IndexType createTreeFromLeaves( const std::vector<commNode> leaves);
@@ -376,7 +379,7 @@ part[i]=x then node i belongs to block x.
 @param[in] k The number of blocks,  numLeaves=k, part.max()=k+1
 @param[in] nodeWeight The weights for every node.
 
-return The maximum imbalance for every weight. ret.size()=nodeWeight.size()
+@return The maximum imbalance for every weight. ret.size()=nodeWeight.size()=numWeights
 */
 
 //TODO: turn to static? move to other class?
@@ -400,18 +403,20 @@ std::vector<ValueType> computeImbalance(
 std::vector<std::vector<ValueType>> getBalanceVectors( const IndexType level=-1) const;
 
 
-/*@brief Print information for the tree
+/** @brief Print information for the tree
 */
 void print() const;
 
-/* @brief Basic sanity checks for the tree.
+/** @brief Basic sanity checks for the tree.
+@param[in] allTests If true, do additional, more expensive tests
 */
-bool checkTree( bool all=false ) const;
+bool checkTree( bool allTests=false ) const;
+
+
 
 private:
 
 scai::lama::CSRSparseMatrix<ValueType> exportAsGraph_local(const std::vector<commNode> leaves) const;
-
 
 
 /**The root of the communication tree; used for hierarchical partitioning
@@ -431,8 +436,6 @@ IndexType numWeights;				///< how many weights each node has
 bool areWeightsAdapted = false;		///< if relative weights are adapted, \sa adaptWeights
 /// if isProportional[i] is true, then weight i is proportional and if false, weight i is absolute; isProportional.size()=numWeights
 std::vector<bool> isProportional;	
-
-
 
 
 //------------------------------------------------------------------------

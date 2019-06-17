@@ -38,8 +38,8 @@ TEST_F(CommTreeTest, testTreeFromLeaves){
 
 	//with one more level
 	std::vector<cNode> leaves2 = {
-		// 				{hierachy ids}, numCores, mem, speed
-		cNode( std::vector<unsigned int>{0,0,0}, {4, 8, 50} ),//0
+		// 				{hierachy ids}, numCores, mem, speed  	//leafID
+		cNode( std::vector<unsigned int>{0,0,0}, {4, 8, 50} ),	//0
 		cNode( std::vector<unsigned int>{0,0,1}, {4, 0.8, 90} ),
 		cNode( std::vector<unsigned int>{0,0,2}, {4, 0.8, 60} ),
 
@@ -64,7 +64,6 @@ TEST_F(CommTreeTest, testTreeFromLeaves){
 		cNode( std::vector<unsigned int>{2,1,0}, {8, 0.12, 90} ),//16
 		cNode( std::vector<unsigned int>{2,1,1}, {8, 0.12, 90} ),	
 	};
-	//std::vector<bool> isProp2 = { false, true, false };
 
 
 	for( std::vector<cNode> leaves: {leaves1, leaves2} ){
@@ -260,6 +259,7 @@ TEST_F(CommTreeTest, testAdaptWeights){
 	for( int i=0; i<3; i++ ){
 		nodeWeights[i].setRandom( N, 1 );
 	}
+PRINT( nodeWeights[2].getValue(10) );
 
 	cTree.adaptWeights( nodeWeights );
 

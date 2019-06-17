@@ -90,7 +90,7 @@ CommTree<IndexType, ValueType>::CommTree( const std::vector<IndexType> &levels, 
 template <typename IndexType, typename ValueType>
 IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vector<commNode> leaves){
 
-	hierarchyLevels = leaves.front().hierarchy.size()+1;
+	hierarchyLevels = leaves.front().hierarchy.size()+1; //+1 is for the root
 	numLeaves = leaves.size();
 
 	//bottom level are the leaves
@@ -98,15 +98,15 @@ IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vecto
 	tree.insert( tree.begin(), levelBelow );
 	IndexType size = levelBelow.size();
 
-	IndexType hierarchyLevels = leaves.front().hierarchy.size();//TODO: this declaration shadows the earlier one. Is this intentional?
+	IndexType tmpHierarchyLevels = leaves.front().hierarchy.size();
 	{
 		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 		if( comm->getRank()==0 ){
-			PRINT("There are " << hierarchyLevels << " levels of hierarchy and " << leaves.size() << " leaves");
+			PRINT("There are " << tmpHierarchyLevels << " levels of hierarchy and " << leaves.size() << " leaves");
 		}
 	}
 
-	for(int h = hierarchyLevels-1; h>=0; h--){
+	for(int h = tmpHierarchyLevels-1; h>=0; h--){
 		//PRINT("starting level " << h);
 		std::vector<commNode> levelAbove = createLevelAbove(levelBelow);
 		//add the newly created level to the tree
@@ -195,8 +195,7 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
 	    const IndexType numWeights = this->getNumWeights();
 	    SCAI_ASSERT_EQ_ERROR( numWeights, nodeWeights.size(), "Given weights vector size and tree number of weights do not agree" );
 
-//TODO: is 1 correct?
-const std::vector<std::vector<ValueType>> &hierWeights = getBalanceVectors( -1 );
+		const std::vector<std::vector<ValueType>> &hierWeights = getBalanceVectors( -1 );
 		SCAI_ASSERT_EQ_ERROR( numWeights, hierWeights.size(), "Number of weights in tree do not agree" );
 		SCAI_ASSERT_EQ_ERROR( numWeights, isProportional.size(), "Number of weights and proportionality information do not agree" );
 
@@ -209,14 +208,15 @@ const std::vector<std::vector<ValueType>> &hierWeights = getBalanceVectors( -1 )
 		    ValueType sumNodeWeights = thisNodeWeight.sum();
 		    ValueType sumHierWeights = std::accumulate( thisHierWeight.begin(), thisHierWeight.end(), 0.0 );
 		    const ValueType scalingFactor = sumNodeWeights / sumHierWeights;
-scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
 		    if( not isProportional[i] ){
 		    	SCAI_ASSERT_GE_ERROR( sumHierWeights, sumNodeWeights, "Provided node weights do not fit in the given tree for weight " << i );
 		    }else{
 		    	//go over the nodes and adapt the weights
 		    	for( commNode &cNode : hierLevel ){//this creates a copy and only adjusts the weights in the copy, which is then discarded.
 		    		cNode.weights[i] *= scalingFactor;
-//PRINT0( cNode.weights[i] );			    		
+					//scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();		    		
+					//PRINT0( cNode.weights[i] );			    		
 		    	}
 		    }
 		}
@@ -476,25 +476,22 @@ void CommTree<IndexType, ValueType>::print() const {
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-bool CommTree<IndexType, ValueType>::checkTree( bool all ) const{
+bool CommTree<IndexType, ValueType>::checkTree( bool allTests ) const{
 
 	SCAI_ASSERT_EQ_ERROR( hierarchyLevels, tree.size(), "Mismatch for hierachy levels and tree size");
-	SCAI_ASSERT_EQ_ERROR( numLeaves, tree.back().size(), "Mismatch for number of leaves and the size of the nottom hierechy level");
+	SCAI_ASSERT_EQ_ERROR( numLeaves, tree.back().size(), "Mismatch for number of leaves and the size of the bottom hierechy level");
 	//check sum of sizes for every level
 	SCAI_ASSERT_EQ_ERROR( tree.front().size(), 1 , "Top level of the tree should have size 1, only the root");
 	SCAI_ASSERT_EQ_ERROR( numLeaves, tree.front()[0].children.size(), "The root should contain all leaves as children");
 	//basically, this is the same as the above
 	SCAI_ASSERT_EQ_ERROR( getRoot().children.size(), numLeaves, "The root should contain all leaves as children" );
 
-	//TODO: add more "expensive" checks like, all leaf IDs are unique, or all hierarchy labels are unique
-	//	or check the size of every subtree according to its label...
-
 	//add more "expensive" checks 
 
-	if( all ){
+	if( allTests ){
 		const IndexType numWeights = getNumWeights();
-//TODO: is 1 correct?
-const std::vector<std::vector<ValueType>> balanceVec = getBalanceVectors(-1);
+
+		const std::vector<std::vector<ValueType>> balanceVec = getBalanceVectors(-1);
 		SCAI_ASSERT_EQ_ERROR( balanceVec.size(), numWeights, "Number of weights mismatch" );
 
 		std::vector<ValueType> weightSums(numWeights, 0.0);
