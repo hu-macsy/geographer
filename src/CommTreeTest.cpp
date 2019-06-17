@@ -251,15 +251,15 @@ TEST_F(CommTreeTest, testAdaptWeights){
 		cNode( std::vector<unsigned int>{2,4}, {53, 0.23, 90} )
 	};
 
+	//1st and 3rd weights are proportional
 	ITI::CommTree<IndexType,ValueType> cTree( leaves,{ false, true, false } );
 
-	IndexType N = 500; //the nodes of the supposed graphPath
+	IndexType N = 500; //the nodes of the supposed graph
 	std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(3);
 
 	for( int i=0; i<3; i++ ){
 		nodeWeights[i].setRandom( N, 1 );
 	}
-PRINT( nodeWeights[2].getValue(10) );
 
 	cTree.adaptWeights( nodeWeights );
 

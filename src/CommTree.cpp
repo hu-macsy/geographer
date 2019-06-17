@@ -181,8 +181,6 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 template <typename IndexType, typename ValueType>
 void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights ){
 
-	//throw std::logic_error("The method adaptWeights has multiple issues creating segfaults later.");
-
 	if( areWeightsAdapted ){
 		scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 		if( comm->getRank()==0 )
@@ -213,7 +211,7 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
 		    	SCAI_ASSERT_GE_ERROR( sumHierWeights, sumNodeWeights, "Provided node weights do not fit in the given tree for weight " << i );
 		    }else{
 		    	//go over the nodes and adapt the weights
-		    	for( commNode &cNode : hierLevel ){//this creates a copy and only adjusts the weights in the copy, which is then discarded.
+		    	for( commNode &cNode : hierLevel ){
 		    		cNode.weights[i] *= scalingFactor;
 					//scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();		    		
 					//PRINT0( cNode.weights[i] );			    		
@@ -257,7 +255,7 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 
 		commNode thisNode = levelBelow[i];
 		commNode fatherNode = thisNode;
-		fatherNode.numChildren = 1;		//direct children are 0
+		fatherNode.numChildren = 1;		//direct children are 1
 
 		//get the prefix of this node and store it
 		hierPrefix thisPrefix(thisNode.hierarchy.size()-1);
@@ -270,13 +268,13 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 		//PRINT(i << ": thisNode.id is " << thisNode.leafID << " prefix size " << thisPrefix.size() );
 
 		IndexType numWeights=thisNode.getNumWeights();
-		//father.weights.resize( numWeights, 0.0 );
+		
 		SCAI_ASSERT_EQ_ERROR( fatherNode.getNumWeights(), numWeights, "Number of weights mismatch");
-//not really needed
-SCAI_ASSERT_EQ_ERROR( 
-	std::accumulate( fatherNode.weights.begin(), fatherNode.weights.end(), 0.0),
-	std::accumulate( thisNode.weights.begin(), thisNode.weights.end(), 0.0), "Weights are not copied?"
-	);
+		//not really needed
+		SCAI_ASSERT_EQ_ERROR( 
+			std::accumulate( fatherNode.weights.begin(), fatherNode.weights.end(), 0.0),
+			std::accumulate( thisNode.weights.begin(), thisNode.weights.end(), 0.0), "Weights are not copied?"
+			);
 
 		for( unsigned int j=i+1; j<levelBelowsize; j++){
 			commNode otherNode = levelBelow[j];
@@ -287,7 +285,6 @@ SCAI_ASSERT_EQ_ERROR(
 			if( thisPrefix==otherPrefix ){
 				fatherNode += otherNode;		//operator += overloading
 				seen[j] = true;
-				//numChildren++;
 			}
 		}
 
@@ -425,7 +422,7 @@ std::vector<ValueType> CommTree<IndexType,ValueType>::computeImbalance(
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights){
 
     //cNode is typedefed in CommTree.h
-    const std::vector<cNode> leaves = this->getLeaves();
+    const std::vector<cNode>& leaves = this->getLeaves();
     const IndexType numLeaves = leaves.size();
     SCAI_ASSERT_EQ_ERROR( numLeaves, k, "Number of blocks of the partition and number of leaves of the tree do not agree" );
 
