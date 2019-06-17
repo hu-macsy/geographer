@@ -6,20 +6,32 @@ Geographer is a mesh partitioner for large-scale simulation meshes in distribute
 It is implemented in C++ and uses the LAMA framework for distributed graph datastructures. 
 
 ## Requirements
-The following software is needed to compile and use libgeographer:
+The following software is needed to compile and use Geographer:
 
 - A sufficiently modern compiler, for example [g++ &gt;= 4.9](https://gcc.gnu.org) or [icpc &gt;=17.0](https://en.wikipedia.org/wiki/Intel_C%2B%2B_Compiler)
 - MPI
+- CMake (&gt;= 3.0.2)
 - The numerical library [Lama](https://github.com/kit-parco/lama) (&gt;= 3.0.0)
-- For the command line frontend: [Boost](https://www.boost.org/) (&gt;= 1.61.0)
+- For Lama, the BLAS linear algebra package
 - For the unit tests: [Google Test](https://github.com/google/googletest)
+
+On a recent Ubuntu (&gt;= 16.04), most of the dependencies can be installed with the following command:
+
+	sudo apt install cmake g++ git libatlas-base-dev libboost-dev libgtest-dev mpi-default-dev
+
+### Optional
+
+- For number parsing issues on some platforms: [Boost](https://www.boost.org/) (&gt;= 1.61.0)
 
 ## Installation
 
 ### Libraries
 Compile and install the Lama library.
-**You may need to do a `make install`
-after cmake although the Lama website may state otherwise.**
+If its dependencies are installed, this can be done with the following commands:
+
+    git clone https://github.com/kit-parco/lama.git
+    cd lama && mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../install ../scai && cd ../..
+    cd lama/build && make -j8 && make install && cd ../..
 
 The *RBC* library for splitting MPI communicators is included as a submodule in this repository.
 If it is not yet cloned when starting the build process, cmake will download it automatically.
@@ -33,8 +45,8 @@ Afterwards, call `make` or `make Geographer` to create the executable.
 
 ## Usage as Standalone Executable
 Geographer can be used as a library or called from the command line.
-When using it from the command line, it expects to read an input graph from some file.
-By default, it is assumed that the input graph is in METIS format and that coordinate files describe one point position per line.
+When using it from the command line, it expects to read an input graph from a file.
+By default, it is assumed that the input graph is in the METIS format and that coordinate files describe one point position per line.
 If no coordinate file is given, it is assumed that the coordinates are in foo.metis.xyz for an input file foo.metis.
 For an input graph embedded in 2 dimensions, a graph file input.graph and a coordinate file input.graph.xyz, call the program like this:
 
