@@ -183,24 +183,6 @@ void Repartition<IndexType,ValueType>::getImbalancedDistribution(
 		
 
 		scai::dmemo::DistributionPtr firstDist = ITI::aux<IndexType,ValueType>::redistributeFromPartition( firstPartition, graph, coords, nodeWeights, settings, metrics );
-		/*
-		//get the distribution from the partition
-		scai::dmemo::DistributionPtr firstDist = scai::dmemo::DistributionPtr(new scai::dmemo::GeneralDistribution( firstPartition.getDistribution(), firstPartition.getLocalValues() ) );
-
-		scai::dmemo::DistributionPtr defaultDist = imbaNodeWeights.getDistributionPtr();
-		scai::dmemo::Redistributor prepareRedist( firstDist, defaultDist );
-		
-		//distribute graph, node weights and coordinates to mimic an imbalanced simulation
-		scai::dmemo::DistributionPtr columnDist = graph.getColDistributionPtr();
-		graph.redistribute( prepareRedist, columnDist );
-		
-		for(IndexType i=0; i<dimensions; i++){
-			coords[i].redistribute( prepareRedist );
-		}
-		
-		nodeWeights.redistribute( prepareRedist );
-		firstPartition.redistribute( prepareRedist);	//needed to get metrics
-		*/
 	}
 	metrics.getAllMetrics( graph, firstPartition, nodeWeights, settings );	
 	

@@ -22,7 +22,9 @@
 
 namespace ITI{
 
-    using namespace scai::lama;
+using namespace scai::lama;
+
+
 
 template <typename IndexType, typename ValueType>
 class aux{
@@ -77,7 +79,6 @@ static void timeMeasurement(std::chrono::time_point<std::chrono::high_resolution
     }
 
 }
-
 
 //------------------------------------------------------------------------------   
 
@@ -194,11 +195,6 @@ static std::vector<std::string> split(const std::string &s, char delim) {
     return elems;
 }
 
-/*  From pixel (int) coords, either in 2S or 3D, to a 1D index. 
- * Only for cubes, where every side has the same length, maxLen;
- */
-//static IndexType pixel2Index(IndexType pixel1, IndexType maxLen, IndexType dimension){
-//}
  
  /** The l1 distance of two pixels in 2D if their given as a 1D distance.
   * @param[in] pixel1 The index of the first pixel.

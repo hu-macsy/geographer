@@ -36,8 +36,10 @@ namespace ITI {
 
 	using scai::lama::DenseVector;
 
-	/** The HilbertCurve class provides functionality to calculate the hilbert index (and the inverse)
-	of 2 or 3 dimensional points. The hilbert index is the index of a point in the
+	/** @brief Class providing functionality to calculate the hilbert index (and the inverse)
+	of 2 or 3 dimensional points.
+
+	 The hilbert index is the index of a point in the
 	<a href="https://en.wikipedia.org/wiki/Hilbert_curve"> hilbert curve</a>.
 	*/
 

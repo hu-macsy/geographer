@@ -22,12 +22,10 @@
 #include "Wrappers.h"
 
 
-//using namespace scai::lama;
-//using scai::dmemo::Halo;
-//using scai::dmemo::Halo;
-
 namespace ITI {
 
+	/** @brief Class for testing/benchmarking repartition
+	*/
 	template <typename IndexType, typename ValueType>
 	class Repartition {
 	public:
@@ -38,6 +36,7 @@ namespace ITI {
 		 * @param[in] diverg Divergence, how different are the node weigths. For 0 all weights are 1, the larger
 		 * the value more diverse the node weights.
 		 * @param[in] dimensions The dimension of the coordinates.
+		 * @return The weights of the nodes. This has the same distribution as the coordinates.
 		 */
 		static scai::lama::DenseVector<ValueType> setNodeWeights(  const std::vector<scai::lama::DenseVector<ValueType> >& coordinates, const IndexType seed, const ValueType diverg, const IndexType dimensions);
 		
@@ -46,7 +45,7 @@ namespace ITI {
 		 * until it gets an imbalanced partition. After that, all input data are redistributed based on that
 		 * imbalanced partition.
 		 * 
-		 * @param[in,out] graph The adjecency matrix of the graph.
+		 * @param[in,out] graph The adjacency matrix of the graph.
 		 * @param[in,out] coordinates The input coordinates.
 		 * @param[in,out] nodeWeights The weights for each point/vertex.
 		 * @param[in] tool The tool to partition with.

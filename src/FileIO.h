@@ -27,7 +27,7 @@ namespace ITI {
 	using scai::lama::CSRSparseMatrix;
 	using scai::lama::DenseVector;
     
-       /** All the function to read and write in files.
+       /** @brief All the function to read and write in files.
          *
        	 * METIS format: for graphs: first line are the nodes, N, and edges, E, of the graph
          *                            the next N lines contain the neighbours for every node. 
