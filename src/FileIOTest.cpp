@@ -624,7 +624,7 @@ TEST_F (FileIOTest, testreadOFFCentral){
     }
     SCAI_ASSERT_EQ_ERROR( true, graph.isConsistent(), "Matrix not consistent");
     
-    PRINT( graph.getNumValues() << " _ " << graph.getNumRows() << " @ " << graph.getNumColumns() );
+    //PRINT( graph.getNumValues() << " _ " << graph.getNumRows() << " @ " << graph.getNumColumns() );
 }
 //-------------------------------------------------------------------------------------------------
 
