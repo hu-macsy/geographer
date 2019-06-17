@@ -42,10 +42,10 @@ If its dependencies are installed, this can be done with the following commands:
 
 If root access is not available or not preferred, you can pass the argument `-DCMAKE_INSTALL_PREFIX=<path>`to cmake to specify an alternative install location.
 
-The *RBC* library for splitting MPI communicators is included as a submodule in this repository.
+The *KaDIS* library for distributed sorting is included as a submodule in this repository.
 If it is not yet cloned when starting the build process, cmake will download it automatically.
 Should this fail, do it manually by calling `git submodule update --init --recursive`.
-When compiling Geographer, RBC is automatically compiled with an external call to make which uses the compiler wrapper mpic++.
+When compiling Geographer, KaDIS is automatically compiled as a CMake subproject.
 
 ### Compilation
 Use CMake to configure the project and make to build it:
