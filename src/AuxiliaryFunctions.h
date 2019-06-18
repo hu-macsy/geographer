@@ -49,9 +49,7 @@ static void timeMeasurement(std::chrono::time_point<std::chrono::high_resolution
     //set local time in your position
     allTimes[thisPE] = elapTime;
 
-    //gather all times in root (=0) PE
-    //std::vector<ValueType> allTimesLocal(numPEs);
-    //comm->gatherImpl(allTimesLocal.data(), numPEs, 0 , allTimes.data(), scai::common::TypeTraits<ValueType>::stype);
+    //replicate all times in all PEs, TODO: gather to root PE instead
     comm->sumImpl(allTimes.data(), allTimes.data(), numPEs, scai::common::TypeTraits<ValueType>::stype);
 
     if( thisPE==0 ){
@@ -207,6 +205,8 @@ static void split(const std::string &s, char delim, Out result) {
         *(result++) = item;
     }
 }
+//------------------------------------------------------------------------------
+
 /** Splits a string according to some delimiter.
 @param[in] s The string to be slitted.
 @param[in] delim The delimiters according to which we gonna split the string.

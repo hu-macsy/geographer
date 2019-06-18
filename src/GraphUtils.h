@@ -213,7 +213,9 @@ static scai::lama::CSRSparseMatrix<ValueType> getBlockGraph( const scai::lama::C
 
 /** Constructs the block (aka, communication)  graph of the partition (@sa getBlockGraph()).
 The difference with getBlockGraph() is that now, every PE sends its local adjacent list to a root PE, the block is constructed
-there and then it is broadcast back to all PEs. This avoids the k*k spaces needed in getBlockGraph().
+there and then it is broadcast back to all PEs. This avoids the k*k space needed in getBlockGraph().
+
+Input parameter and return value are the same as for getBlockGraph().
 */
 
 static scai::lama::CSRSparseMatrix<ValueType>  getBlockGraph_dist( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k);
@@ -228,7 +230,7 @@ of the block graph.
 
   @return first: maximum communication = max degree of the block graph.
 
- *  second: total communication = sum of all edges of the block graph.
+   second: total communication = sum of all edges of the block graph.
  */
 static std::pair<IndexType, IndexType> computeBlockGraphComm( const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType> &part);
 
@@ -258,8 +260,7 @@ static scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::lama::CSRS
  */
 static scai::lama::CSRSparseMatrix<ValueType> getPEGraph( const scai::dmemo::HaloExchangePlan& halo);
 
-/**
- * @Convert a set of unweighted adjacency lists into a CSR matrix
+/** Convert a set of unweighted adjacency lists into a CSR matrix
  *
  * @param[in] adjList For each node, a possibly empty set of neighbors
  * @return The distributed adjacency matrix
@@ -285,8 +286,7 @@ static scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pa
 */
 static std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local(const scai::lama::CSRSparseMatrix<ValueType>& adjM, IndexType& maxDegree=0);
 
-/**
- * @brief Construct the Laplacian of the input matrix. May contain parallel communication.
+/** @brief Construct the Laplacian of the input matrix. May contain parallel communication.
  *
  * @param adjM Input matrix, must have a (general) block distribution or be replicated.
  *
@@ -294,8 +294,7 @@ static std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local
  */
 static scai::lama::CSRSparseMatrix<ValueType> constructLaplacian(const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 
-/**
- * @brief Construct a replicated projection matrix for a fast Johnson-Lindenstrauß-Transform
+/** @brief Construct a replicated projection matrix for a fast Johnson-Lindenstrauß-Transform
  *
  * @param epsilon Desired accuracy of transform
  * @param n
@@ -305,8 +304,7 @@ static scai::lama::CSRSparseMatrix<ValueType> constructLaplacian(const scai::lam
  */
 static scai::lama::CSRSparseMatrix<ValueType> constructFJLTMatrix(ValueType epsilon, IndexType n, IndexType origDimension);
 
-/**
- * @brief Construct a replicated Hadamard matrix
+/** @brief Construct a replicated Hadamard matrix
  *
  * @param d Dimension
  *
@@ -325,12 +323,11 @@ The edges of the graph are grouped in colors so that heavier edge are group toge
 */
 static std::vector< std::vector<IndexType>> mecGraphColoring( const scai::lama::CSRSparseMatrix<ValueType> &adjM, IndexType &colors);
 
-/** @brief Randomly select elements and move them to the front.
+/** A random permutation of the elements in the given range. Randomly select elements and move them to the front.
  *
  * @param begin Begin of range
  * @param end End of range
  * @param num_random Number of selected elements
- *
  */
 //taken from https://stackoverflow.com/a/9345144/494085
 template<class BidiIter >
@@ -352,7 +349,6 @@ static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_rand
  * @return The permuted numbers. return.size()=maxIdnex and 0< return[i]< maxIndex.
  */
 static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex);
-
 
 
 }; //class GraphUtils

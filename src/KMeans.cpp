@@ -106,7 +106,7 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		//gather all block sizes to root
 		IndexType arraySize=1;
 		if( comm->getRank()==rootPE ){
-			//a possible bottleneck: in the last stepm arraySize=k*p
+			//a possible bottleneck: in the last step arraySize=k*p
 			//TODO?: cut to smaller chunks and do it in rounds?
 			arraySize = numPEs*numOldBlocks; 
 		}
@@ -329,7 +329,10 @@ std::vector<std::vector<ValueType>>  findInitialCentersSFC(
 
 
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(const std::vector<ValueType> &maxCoords, Settings settings){
+std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(
+	const std::vector<ValueType> &minCoords,
+	const std::vector<ValueType> &maxCoords,
+	Settings settings){
 	//This assumes that minCoords is 0!
     //TODO: change or remove
 	const IndexType dimensions = settings.dimensions;
@@ -348,8 +351,9 @@ std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(const std::ve
 		centerCoords = HilbertCurve<IndexType,ValueType>::HilbertIndex2Point( centerHilbInd, settings.sfcResolution, settings.dimensions);
 		SCAI_ASSERT_EQ_ERROR( centerCoords.size(), dimensions, "Wrong dimensions for center.");
 		
+		//centerCoords are points in the unit square; project back to input space
 		for (IndexType d = 0; d < dimensions; d++) {
-			result[d][i] = centerCoords[d]*maxCoords[d];
+			result[d][i] = (centerCoords[d]*(maxCoords[d]-minCoords[d]))+minCoords[d];
 		}
 	}
 	return result;
@@ -1797,8 +1801,7 @@ DenseVector<IndexType> computeHierPlusRepart(
 	return  ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinates, nodeWeights, blockSizes, result, settings);
 }//computeHierPlusRepart
 
-/**
- * @brief Get local minimum and maximum coordinates
+/* Get local minimum and maximum coordinates
  * TODO: This isn't used any more! Remove?
  */
 template<typename ValueType>
@@ -1816,7 +1819,10 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 
 }; // namespace KMeans
 
-template std::vector<std::vector<ValueType> > KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>(const std::vector<ValueType> &maxCoords, Settings settings);
+template std::vector<std::vector<ValueType> > KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>(
+	const std::vector<ValueType> &minCoords,
+	const std::vector<ValueType> &maxCoords,
+	Settings settings);
 
 //instantiations needed otherwise there is a undefined reference 
 template DenseVector<IndexType> KMeans::computePartition(

@@ -46,8 +46,7 @@ namespace ITI {
 	template <typename IndexType, typename ValueType>
 	class HilbertCurve {
 		public:
-		/**
-		* @brief Accepts a 2D/3D point and calculates its hilbert index.
+		/** @brief Accepts a 2D/3D point and calculates its hilbert index.
 		*
 		* @param[in] point Node positions. In d dimensions, coordinates of node v are at v*d ... v*d+(d-1).
  		* @param[in] dimensions Number of dimensions of coordinates.
@@ -110,8 +109,7 @@ namespace ITI {
 		 */			
 		static std::vector<sort_pair> getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);			
 
-		/**
-		 * Redistribute coordinates and weights according to an implicit hilberPartition.
+		/** Redistribute coordinates and weights according to an implicit hilberPartition.
 		 * Equivalent to (but faster):
 		 *  partition = hilbertPartition(coordinates, settings)
 		 *  for (IndexType d = 0; d < settings.dimensions; d++) {
@@ -202,7 +200,9 @@ private:
 		* @return A point in the unit cube [0,1]^3
 		*/
 		static std::vector<ValueType> Hilbert3DIndex2Point(const ValueType index, const IndexType recursionDepth);
-		
+
+		/** Similar, but for 3D, as Hilbert2DIndex2PointVec()
+		*/		
 		static std::vector<std::vector<ValueType>> Hilbert3DIndex2PointVec(const std::vector<ValueType> indices, IndexType recursionDepth);
 
 	};
