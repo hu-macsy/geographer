@@ -31,7 +31,7 @@ namespace ITI {
          * When changing the partition during the refinement step, the graph, partition and coordinates are redistributed to match.
          * Internally calls twoWayLocalFM.
          *
-         * Note: This method is not in use any longer.
+         * @deprecated This method is not in use any longer.
          *
          * @param[in,out] input Adjacency matrix of the input graph
          * @param[in,out] part Partition

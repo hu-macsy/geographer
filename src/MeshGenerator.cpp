@@ -243,7 +243,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured2D3DMesh_dist(CSRSpars
     }
     
     IndexType localSize = dist->getLocalSize(); // the size of the local part
-PRINT(*comm<< ": " << localSize) ;
+
     IndexType planeSize= numPoints[1]*numPoints[2]; // a YxZ plane
     
     // find which should be the first local coordinate in this processor
@@ -351,7 +351,7 @@ PRINT(*comm<< ": " << localSize) ;
             
             ia[i+1] = ia[i] + numRowElems;
         }
-PRINT(*comm<< nnzCounter ) ;
+
         SCAI_ASSERT_EQUAL_ERROR(numEdges*2 , comm->sum(nnzCounter));
         ja.resize(nnzCounter);
         values.resize(nnzCounter);
@@ -491,7 +491,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
 
     // an upper bound to how many neighbours a vertex can have, 
     // at most as many neighbours as we have
-    IndexType ngbUpperBound = std::min( IndexType(12), (IndexType) neighbourGlobalIndices.size() ); // I do not know, just trying 12
+    IndexType ngbUpperBound = std::min( IndexType(12), (IndexType) neighbourGlobalIndices.size() ); // TODO: I do not know, just trying 12
     // TODO:  maybe treat nodes in the faces differently
     IndexType ngbLowerBound = 3;
                                 
@@ -501,8 +501,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
      *  Also we separate those edges with non-local neighbours so we can set the non-local edge
      *  later.
      */
-    
-                
+
     // a set for every local node. localNgbs[i] keeps the neighbours of node i that are also local. We use set in order to prevent the insertion of an index multiple times
     std::vector< std::set<IndexType> > localNgbs(localSize);
         
@@ -547,7 +546,6 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
             bool setInsertion = false;
             
             do{
-                //int randInd = (int) (rand()%(neighbourGlobalIndices.size()-1) +1 ) ;
                 // pick a random index (of those allowed) to greate edge
                 unsigned long randInd= (unsigned long) rand()%neighbourGlobalIndices.size() ;
 
@@ -596,8 +594,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
             }while(setInsertion==false);
             //finally, we inserted a valid (>0 && <N && close enough) neighbour
 
-        } // for(IndexType j=0; j<numOfNeighbours; j++)
-        
+        } // for(IndexType j=0; j<numOfNeighbours; j++)        
 
         //
         // from here, ngbGloblaIndSet has all the valid global neighbours
@@ -622,7 +619,6 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
     } // for(IndexType i=0; i<localSize; i++)
     //PRINT(*comm << ",  num of non-local ngbs= " << nonLocalNodeInd.size() );   
     
-
     /* 
      * communicate the non-local edges that we must set.
      * idea:
@@ -688,11 +684,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
     }
     
     scai::hmemo::ReadAccess<IndexType> readRcvSize( recvSize);
-    /*
-    for(IndexType ii=0; ii<recvSize.size(); ii++){
-        PRINT(*comm<<"| "<< readRcvSize[ii]);
-    }
-    */
+
     
     for(IndexType round=1; round<comm->getSize(); round++){
         SCAI_REGION("MeshGenerator.createRandomStructured3DMesh_dist.commNonLocalEdges");
@@ -707,7 +699,6 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
         // send your local part, receive other PE's part
         comm->shiftArray( recvPart, sendPart, 1);
         
-
         // check if recvPart[2*i+1] is local, if it is must add edge [2*i+1]-[2*i]
         // the symmetric edge [2*i]-[2*i+1] is already been set to the PE that send the part
         // Note that send and recv parts should contain global indices
@@ -799,7 +790,6 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
         adjM.assignDistribute(localMatrix , adjM.getRowDistributionPtr() , adjM.getColDistributionPtr() );
     }
     
-    //SCAI_REGION_END("MeshGenerator.createRandomStructured3DMesh_dist.setAdjacencyMatrix");
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -808,12 +798,9 @@ template<typename IndexType, typename ValueType>
     void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const int dimension, const IndexType numberOfAreas, const IndexType pointsPerArea, const ValueType maxVal, const IndexType seed) {
     SCAI_REGION("MeshGenerator.createQuadMesh")
     
-    Point<ValueType> minCoord(dimension);
-    Point<ValueType> maxCoord(dimension);
-    for(int i=0; i< dimension; i++){
-        minCoord[i]= 0;
-        maxCoord[i]= maxVal;
-    }
+    Point<ValueType> minCoord(dimension, 0);
+    Point<ValueType> maxCoord(dimension, maxVal);
+    
     IndexType capacity = 1;
     
     // the quad tree 
