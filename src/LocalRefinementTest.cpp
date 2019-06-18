@@ -67,8 +67,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	  coordinates[i] = static_cast<ValueType>( 0 );
 	}
 
-	MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(graph, coordinates, maxCoord, numPoints);
-	//MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(graph, coordinates, maxCoord, numPoints);
+	MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(graph, coordinates, maxCoord, numPoints, dimensions);
 
 /*
 	//try reading from file instead of generating the mesh
@@ -384,7 +383,7 @@ TEST_F(LocalRefinementTest, testDistancesFromBlockCenter) {
 	  coordinates[i] = static_cast<ValueType>( 0 );
 	}
 
-	MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(a, coordinates, maxCoord, numPoints);
+	MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(a, coordinates, maxCoord, numPoints, dimensions);
 
 	const IndexType localN = dist->getLocalSize();
 

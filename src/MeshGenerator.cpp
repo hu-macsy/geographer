@@ -111,12 +111,12 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_seq(CSRSparseMa
                     // we need to check distance for the nodes at the outer borders of the grid: eg:
                     // in a 4x4 grid with 16 nodes {0, 1, 2, ...} , for p1= node 3 there is an edge with
                     // p2= node 4 that we should not add (node 3 has coords (0,3) and node 4 has coords (1,0)).
-                    // A way to avoid that is check if thery are close enough.
+                    // A way to avoid that is check if they are close enough.
                     // TODO: maybe find another, faster way to avoid adding that kind of edges
                     
                     if(dist3DSquared( thisPoint, ngbPoint) <= 1)
                     {
-                        ja[nnzCounter]= ngb_node;       // -1 for the METIS format
+                        ja[nnzCounter]= ngb_node;       
                         values[nnzCounter] = 1;         // unweighted edges
                         ++nnzCounter;
                         ++numRowElems;
@@ -151,60 +151,58 @@ void MeshGenerator<IndexType, ValueType>::writeGraphStructured3DMesh_seq( std::v
 	
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
+    //not distributed
 	SCAI_ASSERT_EQ_ERROR( comm->getSize(), 0 , "Function " << __FUNCTION__ <<  " is not distributed, it works only for p=1.");
 
-	//TODO: leave the assertion or the if, not both are needed
-    if (comm->getRank() == 0) {//not distributed
+    IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
+    IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
+                                -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
 
-        IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
-        IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
-                                    -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
+    // write number of vertices and edges
+    f<< N << " " << numEdges << std::endl;
 
-        // write number of vertices and edges
-        f<< N << " " << numEdges << std::endl;
+    {
+        IndexType nnzCounter = 0; // count non-zero elements
+        // for every node= for every line of adjM
+        for(IndexType i=0; i<N; i++){
+            IndexType ngbIndex = 0;
 
-        {
-            IndexType nnzCounter = 0; // count non-zero elements
-            // for every node= for every line of adjM
-            for(IndexType i=0; i<N; i++){
-                IndexType ngbIndex = 0;
-
-                std::tuple<IndexType, IndexType, IndexType> thisPoint = aux<IndexType,ValueType>::index2_3DPoint( i, numPoints);
+            std::tuple<IndexType, IndexType, IndexType> thisPoint = aux<IndexType,ValueType>::index2_3DPoint( i, numPoints);
+            
+            {
+            SCAI_REGION("writeStructured3DMesh.setAdjacencyMatrix");
+            // for all 6 possible neighbours
+            for(IndexType m=0; m<6; m++){
+                switch(m){
+                    case 0: ngbIndex= i+1; break;
+                    case 1: ngbIndex= i-1; break;
+                    case 2: ngbIndex = i + numPoints[2]; break;
+                    case 3: ngbIndex = i - numPoints[2]; break;
+                    case 4: ngbIndex = i + numPoints[2]*numPoints[1]; break;
+                    case 5: ngbIndex = i - numPoints[2]*numPoints[1]; break;
+                }
                 
-                {
-                SCAI_REGION("writeStructured3DMesh.setAdjacencyMatrix");
-                // for all 6 possible neighbours
-                for(IndexType m=0; m<6; m++){
-                    switch(m){
-                        case 0: ngbIndex= i+1; break;
-                        case 1: ngbIndex= i-1; break;
-                        case 2: ngbIndex = i + numPoints[2]; break;
-                        case 3: ngbIndex = i - numPoints[2]; break;
-                        case 4: ngbIndex = i + numPoints[2]*numPoints[1]; break;
-                        case 5: ngbIndex = i - numPoints[2]*numPoints[1]; break;
-                    }
-                    
-                    if(ngbIndex>=0 && ngbIndex<N){
-                        std::tuple<IndexType, IndexType, IndexType> ngbPoint = aux<IndexType,ValueType>::index2_3DPoint( ngbIndex, numPoints);
+                if(ngbIndex>=0 && ngbIndex<N){
+                    std::tuple<IndexType, IndexType, IndexType> ngbPoint = aux<IndexType,ValueType>::index2_3DPoint( ngbIndex, numPoints);
 
-                        // we need to check distance for the nodes at the outer borders of the grid: eg:
-                        // in a 4x4 grid with 16 nodes {0, 1, 2, ...} , for p1= node 3 there is an edge with
-                        // p2= node 4 that we should not add (node 3 has coords (0,3) and node 4 has coords (1,0)).
-                        // A way to avoid that is check if thery are close enough.
-                        // TODO: maybe find another, faster way to avoid adding that kind of edges
+                    // we need to check distance for the nodes at the outer borders of the grid: eg:
+                    // in a 4x4 grid with 16 nodes {0, 1, 2, ...} , for p1= node 3 there is an edge with
+                    // p2= node 4 that we should not add (node 3 has coords (0,3) and node 4 has coords (1,0)).
+                    // A way to avoid that is check if thery are close enough.
+                    // TODO: maybe find another, faster way to avoid adding that kind of edges
 
-                        if(dist3DSquared( thisPoint, ngbPoint) <= 1)
-                        {
-                            f << ngbIndex +1<< " ";
-                            ++nnzCounter;
-                        }
+                    if(dist3DSquared( thisPoint, ngbPoint) <= 1)
+                    {
+                        f << ngbIndex +1<< " ";
+                        ++nnzCounter;
                     }
                 }
-                }
-                f << std::endl;
             }
+            }
+            f << std::endl;
         }
     }
+    
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -214,8 +212,8 @@ void MeshGenerator<IndexType, ValueType>::writeGraphStructured3DMesh_seq( std::v
 //TODO: code duplication as in its sequential counterpart
 
 template<typename IndexType, typename ValueType>
-void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
-    SCAI_REGION( "MeshGenerator.createStructured3DMesh_dist" )
+void MeshGenerator<IndexType, ValueType>::createStructured2D3DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints) {
+    SCAI_REGION( "MeshGenerator.createStructured2D3DMesh_dist" )
     
     if (coords.size() != 3) {
         throw std::runtime_error("Needs three coordinate vectors, one for each dimension");
@@ -245,7 +243,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseM
     }
     
     IndexType localSize = dist->getLocalSize(); // the size of the local part
-    
+PRINT(*comm<< ": " << localSize) ;
     IndexType planeSize= numPoints[1]*numPoints[2]; // a YxZ plane
     
     // find which should be the first local coordinate in this processor
@@ -257,7 +255,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseM
     //PRINT( *comm<< ": " << indX << " ,"<< indY << ", "<< indZ << ", startingIndex= "<< startingIndex);
     
     for(IndexType i=0; i<localSize; i++){
-        SCAI_REGION("MeshGenerator.createStructured3DMesh_dist.setCoordinates");
+        SCAI_REGION("MeshGenerator.createStructured2D3DMesh_dist.setCoordinates");
         
         (*localCoords[0])[i] = indX*offset[0];
         (*localCoords[1])[i] = indY*offset[1];
@@ -291,48 +289,57 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseM
     HArray<ValueType> csrValues;
     // ja and values have size= edges of the graph
     // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
+	// for 2D, thus C=1, this results to 2AB-A-B
     IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
                                 -numPoints[0]*numPoints[2] - numPoints[1]*numPoints[2];
                                 
     {
-        SCAI_REGION("MeshGenerator.createStructured3DMesh_dist.setCSRSparseMatrix");
+        SCAI_REGION("MeshGenerator.createStructured2D3DMesh_dist.setCSRSparseMatrix");
         IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
+
+        IndexType numNeighbors;
+
+		if(numPoints[2]==1){	//2D case
+			numNeighbors=4;
+		}else{					//3D case
+			numNeighbors=6;
+		}
         
         WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
         // we do not know the sizes of ja and values. 6*numOfLocalNodes is safe upper bound for a structured 3D mesh
         // after all the values are written the arrays get resized
-        WriteOnlyAccess<IndexType> ja( csrJA , 6*adjM.getLocalNumRows() );
-        WriteOnlyAccess<ValueType> values( csrValues, 6*adjM.getLocalNumRows() );
+        WriteOnlyAccess<IndexType> ja( csrJA , numNeighbors*adjM.getLocalNumRows() );
+        WriteOnlyAccess<ValueType> values( csrValues, numNeighbors*adjM.getLocalNumRows() );
         ia[0] = 0;
         IndexType nnzCounter = 0; // count non-zero elements
          
         for(IndexType i=0; i<localSize; i++){   // for all local nodes
             IndexType globalInd = dist->local2Global(i);    // get the corresponding global index
-            // the global id of the neighbouring nodes
+            // the global id of the neighboring nodes
             IndexType ngb_node = globalInd;
-            IndexType numRowElems= 0;     // the number of neighbours for each node. Can be less than 6.
+            IndexType numRowElems= 0;     // the number of neighbors for each node. Can be less than 6.
             // the position of this node in 3D
             std::tuple<IndexType, IndexType, IndexType> thisPoint = aux<IndexType,ValueType>::index2_3DPoint( globalInd, numPoints);
             
-            // for all 6 possible neighbours
-            for(IndexType m=0; m<6; m++){
+            // for all possible neighbors
+			for(IndexType m=0; m<numNeighbors; m++){
                 switch(m){
                     case 0: ngb_node= globalInd+1; break;
                     case 1: ngb_node= globalInd-1; break;
-                    case 2: ngb_node = globalInd +numPoints[2]; break;
-                    case 3: ngb_node = globalInd -numPoints[2]; break;
-                    case 4: ngb_node = globalInd +numPoints[2]*numPoints[1]; break;
-                    case 5: ngb_node = globalInd -numPoints[2]*numPoints[1]; break;
+                    case 2: ngb_node = globalInd +numPoints[2]*numPoints[1]; break;
+                    case 3: ngb_node = globalInd -numPoints[2]*numPoints[1]; break;
+                    //two last cases are equivalent to the two first for 2D since numPoints[2]=1
+                    case 4: ngb_node = globalInd +numPoints[2]; break;
+                    case 5: ngb_node = globalInd -numPoints[2]; break;
                 }
        
                 if(ngb_node>=0 && ngb_node<N){
-                    // get the position in the 3D of the neighbouring node
+                    // get the position in the 3D of the neighboring node
                 	std::tuple<IndexType, IndexType, IndexType> ngbPoint = aux<IndexType,ValueType>::index2_3DPoint( ngb_node, numPoints);
                 	ValueType distanceSquared = dist3DSquared( thisPoint, ngbPoint);
                 	assert(distanceSquared <= numPoints[0]*numPoints[0]+numPoints[1]*numPoints[1]+numPoints[2]*numPoints[2]);
                     
-                    if(distanceSquared <= 1)
-                    {
+                    if(distanceSquared <= 1){
                         ja[nnzCounter]= ngb_node;       
                         values[nnzCounter] = 1;         // unweighted edges
                         ++nnzCounter;
@@ -344,6 +351,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseM
             
             ia[i+1] = ia[i] + numRowElems;
         }
+PRINT(*comm<< nnzCounter ) ;
         SCAI_ASSERT_EQUAL_ERROR(numEdges*2 , comm->sum(nnzCounter));
         ja.resize(nnzCounter);
         values.resize(nnzCounter);
@@ -356,140 +364,27 @@ void MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(CSRSparseM
     }
 }
 //-------------------------------------------------------------------------------------------------
-// coords.size()= 3 , coords[i].size()= N
-// here, N= numPoints[0]*numPoints[1]*numPoints[2]
-
-//TODO: not used, deprecate?
-//TODO: some code duplication with its 3D counterpart, create a core function and 2D/3D wrappers?
 
 template<typename IndexType, typename ValueType>
-void MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, std::vector<ValueType> maxCoord, std::vector<IndexType> numPoints) {
-    SCAI_REGION( "MeshGenerator.createStructured3DMesh_dist" )
-    
-    if (coords.size() != 2) {
-        throw std::runtime_error("Needs two coordinate vectors, one for each dimension");
-    }
-    
-    if (numPoints.size() != 2) {
-        throw std::runtime_error("Needs two point counts, one for each dimension");
-    }
-        
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
-    
-    if( !dist->isEqual( coords[0].getDistribution() ) ){
-        std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and coordinates dist: "<< coords[0].getDistribution() << std::endl;
-        throw std::runtime_error( "Distributions: should (?) be equal.");
-    }
-    
-    std::vector<ValueType> offset={maxCoord[0]/numPoints[0], maxCoord[1]/numPoints[1]};
+void MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const std::vector<ValueType> maxCoord, const std::vector<IndexType> numPoints, const IndexType dimensions){
 
-    // create the coordinates
-       
-    // get the local part of the coordinates vectors
-    std::vector<HArray<ValueType>* > localCoords(2);
-    
-    for(IndexType i=0; i<2; i++){
-        localCoords[i] = &coords[i].getLocalValues();
-    }
-    
-    IndexType localSize = dist->getLocalSize(); // the size of the local part
-    
-    // find which should be the first local coordinate in this processor
-    IndexType startingIndex = dist->local2Global(0);
-    
-    IndexType indX = (IndexType) (startingIndex/numPoints[1]) ;
-    IndexType indY = (IndexType) (startingIndex%numPoints[1]);
-    //PRINT( *comm<< ": " << indX << " ,"<< indY << ", "<< indZ << ", startingIndex= "<< startingIndex);
-    
-    for(IndexType i=0; i<localSize; i++){
-        SCAI_REGION("MeshGenerator.createStructured3DMesh_dist.setCoordinates");
-        
-        (*localCoords[0])[i] = indX*offset[0];
-        (*localCoords[1])[i] = indY*offset[1];
-        //PRINT( *comm << ": "<< (*localCoords[0])[i] << "_ "<< (*localCoords[1])[i] );
+	if(dimensions==3){
+		createStructured2D3DMesh_dist( adjM, coords, maxCoord, numPoints);
+	}else if( dimensions==2){
+		std::vector<ValueType> copyMaxCoord(maxCoord);
+		copyMaxCoord.push_back(1);
+		std::vector<IndexType> copyNumPoints(numPoints);
+		copyNumPoints.push_back(1);
+		std::vector<DenseVector<ValueType>> copyCoords(coords);
+		copyCoords.push_back( scai::lama::DenseVector<ValueType>(coords[0].size(),0) );
 
-        ++indY;
-        
-        if(indY >= numPoints[1]){   // if y coord reaches maximum, set it to 0 and increase x
-            indY = 0;
-            ++indX;
-        }
-
-        if(indX >= numPoints[0]){   // reached end of grid
-            assert(i == localSize - 1);
-        }
-    }
-    // finish setting the coordinates
-    
-    
-    // start making the local part of the adjacency matrix
-    scai::lama::CSRStorage<ValueType> localMatrix;
-    localMatrix.allocate( adjM.getLocalNumRows() , adjM.getLocalNumColumns() );
-    
-    HArray<IndexType> csrIA;
-    HArray<IndexType> csrJA;
-    HArray<ValueType> csrValues;
-    // ja and values have size= edges of the graph
-    // for a 3D structured grid with dimensions AxBxC the number of edges is 3ABC-AB-AC-BC
-    IndexType numEdges= (numPoints[0]-1)*numPoints[1] + numPoints[0]*(numPoints[1]-1);
-                                
-    {
-        SCAI_REGION("MeshGenerator.createStructured3DMesh_dist.setCSRSparseMatrix");
-        IndexType N= numPoints[0]* numPoints[1];
-        
-        WriteOnlyAccess<IndexType> ia( csrIA, adjM.getLocalNumRows() +1 );
-        // we do not know the sizes of ja and values. 6*numOfLocalNodes is safe upper bound for a structured 3D mesh
-        // after all the values are written the arrays get resized
-        WriteOnlyAccess<IndexType> ja( csrJA , 4*adjM.getLocalNumRows() );
-        WriteOnlyAccess<ValueType> values( csrValues, 4*adjM.getLocalNumRows() );
-        ia[0] = 0;
-        IndexType nnzCounter = 0; // count non-zero elements
-         
-        for(IndexType i=0; i<localSize; i++){   // for all local nodes
-            IndexType globalInd = dist->local2Global(i);    // get the corresponding global index
-            // the global id of the neighbouring nodes
-            IndexType ngb_node = globalInd;
-            IndexType numRowElems= 0;     // the number of neighbours for each node. Can be less than 6.
-            // the position of this node in 3D
-            std::tuple<IndexType, IndexType> thisPoint = aux<IndexType,ValueType>::index2_2DPoint( globalInd, numPoints);
-            
-            // for all 6 possible neighbours
-            for(IndexType m=0; m<4; m++){
-                switch(m){
-                    case 0: ngb_node= globalInd+1; break;
-                    case 1: ngb_node= globalInd-1; break;
-                    case 2: ngb_node = globalInd +numPoints[1]; break;
-                    case 3: ngb_node = globalInd -numPoints[1]; break;
-                }
-       
-                if(ngb_node>=0 && ngb_node<N){
-					//if(distanceSquared <= 1)
-                    std::tuple<IndexType, IndexType> ngbPoint = aux<IndexType,ValueType>::index2_2DPoint( ngb_node, numPoints);
-                    
-                    if( std::abs( std::get<0>(ngbPoint)-std::get<0>(thisPoint) )<=1 and std::abs( std::get<1>(ngbPoint)-std::get<1>(thisPoint) )<=1 ){
-                        ja[nnzCounter]= ngb_node;       
-                        values[nnzCounter] = 1;         // unweighted edges
-                        ++nnzCounter;
-                        ++numRowElems;
-                    }   
-                }
-            }
-            assert(numRowElems >= 2);
-            
-            ia[i+1] = ia[i] + numRowElems;
-        }
-        SCAI_ASSERT_EQUAL_ERROR(numEdges*2 , comm->sum(nnzCounter));
-        ja.resize(nnzCounter);
-        values.resize(nnzCounter);
-    } //read/write block
-    
-    {
-        SCAI_REGION( "MeshGenerator.createStructured3DMesh_dist.swap_assign" )
-        localMatrix.swap( csrIA, csrJA, csrValues );
-        adjM.assignDistribute(localMatrix , adjM.getRowDistributionPtr() , adjM.getColDistributionPtr() );
-    }
+		createStructured2D3DMesh_dist( adjM, copyCoords, copyMaxCoord, copyNumPoints);
+	}else{
+		throw std::runtime_error("Function createStructuredMesh_dist only supports 2 or 3 dimension grids but dimension given is "+ std::to_string(dimensions)\
+			+ ".\nAborting...");
+	}	
 }
+
 //-------------------------------------------------------------------------------------------------
 // coords.size()= 3 , coords[i].size()= N
 // here, N= numPoints[0]*numPoints[1]*numPoints[2]
@@ -573,13 +468,13 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
      * start making the local part of the adjacency matrix
     */
     
-    // first find the indices of possible neighbours
+    // first find the indices of possible neighbors
     
     // the diameter of the box in which we gonna pick indices.
     // we set it as: 1 + 2% of the minimum side length. this is >2 for sides >50
     IndexType boxRadius = 1 + (IndexType) (0.02 * (ValueType) *std::min_element(std::begin(numPoints), std::end(numPoints)));
     
-    // radius^3 is the number of possible neighbours, here keep their indices as an array
+    // radius^3 is the number of possible neighbors, here keep their indices as an array
     std::vector<IndexType> neighbourGlobalIndices;
 
     //PRINT(*comm << " , boxRadius= "<< boxRadius<< " , and num of possible neighbours ="<< pow(2*boxRadius+1, 3) );
@@ -979,7 +874,7 @@ template<typename IndexType, typename ValueType>
 
 template<typename IndexType, typename ValueType>
 void MeshGenerator<IndexType, ValueType>::graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid &quad) {
-	//const IndexType numLeaves= quad.countLeaves();
+
 	const IndexType treeSize = quad.countNodes();
 	const IndexType dimension = quad.getDimensions();
 
@@ -1022,23 +917,6 @@ std::vector<DenseVector<ValueType>> MeshGenerator<IndexType, ValueType>::randomP
 }
 
 //-------------------------------------------------------------------------------------------------
-/* Calculates the distance in 3D.
-*/
-template<typename IndexType, typename ValueType>
-ValueType MeshGenerator<IndexType, ValueType>::dist3D(DenseVector<ValueType> p1, DenseVector<ValueType> p2){
-  SCAI_REGION( "MeshGenerator.dist3D" )
-  ValueType res0, res1, res2, res;
-  res0= p1.getValue(0)-p2.getValue(0);
-  res0= res0*res0;
-  res1= p1.getValue(1)-p2.getValue(1);
-  res1= res1*res1;
-  res2= p1.getValue(2)-p2.getValue(2);
-  res2= res2*res2;
-  res = res0+ res1+ res2;
-  return scai::common::Math::sqrt( res );
-}
-
-//-------------------------------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
 ValueType MeshGenerator<IndexType, ValueType>::dist3DSquared(std::tuple<IndexType, IndexType, IndexType> p1, std::tuple<IndexType, IndexType, IndexType> p2){
   SCAI_REGION( "MeshGenerator.dist3DSquared" )
@@ -1051,9 +929,29 @@ ValueType MeshGenerator<IndexType, ValueType>::dist3DSquared(std::tuple<IndexTyp
   ValueType distanceSquared = distX*distX+distY*distY+distZ*distZ;
   return distanceSquared;
 }
+//-------------------------------------------------------------------------------------------------
+template<typename IndexType, typename ValueType>
+template<typename T>
+ValueType MeshGenerator<IndexType, ValueType>::distSquared( const std::vector<T> p1, const std::vector<T> p2){
+  SCAI_REGION( "MeshGenerator.distSquared" )
 
+	const IndexType dimensions=p1.size();
+	SCAI_ASSERT_EQ_ERROR( p2.size(), dimensions, "The two points must have the same dimension" );
+
+	ValueType distanceSquared=0;
+
+	for( int d=0; d<dimensions; d++){
+		ValueType distThisDim = p1[d]-p2[d];
+		distanceSquared += distThisDim*distThisDim;
+	}
+
+	return distanceSquared;
+}
 //-------------------------------------------------------------------------------------------------
 
 template class MeshGenerator<IndexType, ValueType>;
+
+template ValueType MeshGenerator<IndexType, ValueType>::distSquared( const std::vector<IndexType> p1, const std::vector<IndexType> p2);
+template ValueType MeshGenerator<IndexType, ValueType>::distSquared( const std::vector<ValueType> p1, const std::vector<ValueType> p2);
 
 } //namespace ITI

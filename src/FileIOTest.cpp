@@ -64,7 +64,7 @@ TEST_F(FileIOTest, testWriteMetis_Dist_3D){
     auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
 
     // create the adjacency matrix and the coordinates
-    MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
+    MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(adjM, coords, maxCoord, numPoints, 3);
 
     // write the mesh in p(=number of PEs) files
     FileIO<IndexType, ValueType>::writeGraphDistributed( adjM, graphPath+"dist3D_");
