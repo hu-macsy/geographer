@@ -99,7 +99,7 @@ public:
 		return root->getSubTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coords );
 	}
 	
-	/** Given several tree (thus, a forest) we create the corresponding graph. \sa SpatialCell::getSubTreeAsGraph()
+	/* Given several tree (thus, a forest) we create the corresponding graph. \sa SpatialCell::getSubTreeAsGraph()
 	*/
    
     template<typename IndexType, typename ValueType>

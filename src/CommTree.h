@@ -356,7 +356,7 @@ std::vector<unsigned int> getGrouping(const std::vector<commNode> thisLevel) con
 */
 static ValueType distance( const commNode &node1, const commNode &node2 );
 
-/** Export the tree as a weighted graph. The edge weight between to nodes
+/** Export the tree as a weighted graph. The edge weight between two nodes
 	is the distance of the nodes in the tree as it is calculates by the function distance.
 	Remember: only leaves are nodes in the graph. This means that the
 	number of nodes in the graph is equal the number of leaves of the tree and the

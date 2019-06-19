@@ -40,7 +40,7 @@ public:
 		}
 		for (index i = 0; i < dimension; i++) {
 			if (!(minCoords[i] < maxCoords[i])) {
-				throw std::runtime_error("minCoords["+std::to_string(i)+("]="+std::to_string(minCoords[i])+" not < "+std::to_string(maxCoords[i])+"=maxCoords["+std::to_string(i)+"]"));
+				throw std::runtime_error("minCoords["+std::to_string(i)+"]="+std::to_string(minCoords[i])+" not < "+std::to_string(maxCoords[i])+"=maxCoords["+std::to_string(i)+"] for cell with id " +std::to_string(ID) );
 			}
 		}
 		isLeaf = true;

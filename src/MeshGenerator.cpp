@@ -542,7 +542,7 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
             SCAI_REGION("MeshGenerator.createRandomStructured3DMesh_dist.findNgbrs.findRelativeIndices");
             
             IndexType relativeIndex=0;
-            std::tuple<IndexType, IndexType, IndexType>  ngbPoint;
+            std::tuple<IndexType, IndexType, IndexType> ngbPoint;
             bool setInsertion = false;
             
             do{
@@ -798,8 +798,14 @@ template<typename IndexType, typename ValueType>
     void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const int dimension, const IndexType numberOfAreas, const IndexType pointsPerArea, const ValueType maxVal, const IndexType seed) {
     SCAI_REGION("MeshGenerator.createQuadMesh")
     
-    Point<ValueType> minCoord(dimension, 0);
-    Point<ValueType> maxCoord(dimension, maxVal);
+    //Point<ValueType> minCoord(dimension, 0); //something like that does not work, look at quad/Point.h
+ 	
+    Point<ValueType> minCoord(dimension);
+    Point<ValueType> maxCoord(dimension);
+    for(int i=0; i< dimension; i++){
+        minCoord[i]= 0;
+        maxCoord[i]= maxVal;
+    }
     
     IndexType capacity = 1;
     

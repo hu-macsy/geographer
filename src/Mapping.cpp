@@ -9,13 +9,14 @@
 
 namespace ITI {
 
-//Tranferring code from the implementation of Roland in TiMEr/src/mapping/algorithms.cpp
+//Transferring code from the implementation of Roland in TiMEr/src/mapping/algorithms.cpp
 
-//Edge weigths in the block graph represent the amount of information that needs to
+//Edge weights in the block graph represent the amount of information that needs to
 //be communicated, aka the communication volume.
 //Edge weights in the the processor graph represent the bandwidth/capacity of the
 //edge. Higher values indicate faster connection.
 
+/*
 template <typename IndexType, typename ValueType>
 std::vector<IndexType> Mapping<IndexType, ValueType>::rolandMapping_local( 
 	scai::lama::CSRSparseMatrix<ValueType>& blockGraph,
@@ -36,7 +37,7 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::rolandMapping_local(
 
 	//total communication involving node i in communication graph
   	std::vector<ValueType> comFrom(N, 0);
-/*	
+// 
 	//compute weighted node degrees in block graph and store them in comFrom
 	{
 	    const scai::lama::CSRStorage<ValueType> localStorage = blockGraph.getLocalStorage();
@@ -116,14 +117,15 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::rolandMapping_local(
 		//find next blockNode
 		//blockNode
   	}//for i<N
-*/
+// 
 
   	return mapping;
 
 }
+*/
 //------------------------------------------------------------------------------------
 
-// copy and convert/reimplement code from libTopoMap,
+// copy and convert/re-implement code from libTopoMap,
 // http://htor.inf.ethz.ch/research/mpitopo/libtopomap/,
 // function TPM_Map_greedy found in file libtopomap.cpp around line 580
 
@@ -142,8 +144,7 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::torstenMapping_local(
 	// PEGraph is const so make local copy
 	scai::lama::CSRSparseMatrix<ValueType> copyPEGraph;// = PEGraph;
 
-	//TODO: why is the thing below needed? we ignore the edges of the original
-	// PEGraph?
+	//TODO: why is the thing below needed? we ignore the edges of the original PEGraph?
 	//change the edge weights in the copyPEGraph
 	{
 		//find max weight in block graph
@@ -214,7 +215,7 @@ for( int i=0; i<N; i++){
 	const scai::hmemo::ReadAccess<IndexType> ja(blockStorage.getJA());
 	const scai::hmemo::ReadAccess<ValueType> blockValues(blockStorage.getValues());
 	//actually, the weights of the edges of the PE graph. We will update them
-	//after wvery time we map a vertex
+	//after every time we map a vertex
 	scai::lama::CSRStorage<ValueType> PEStorage = copyPEGraph.getLocalStorage();
 	scai::hmemo::ReadAccess<ValueType> PEValues( PEStorage.getValues() );
 	const scai::hmemo::ReadAccess<IndexType> PEia( PEStorage.getIA() );
@@ -298,7 +299,7 @@ PRINT0( "mapped vertex " << blockNode << " to " << peNode);
 
      		//TODO: possible opt, not need a full Dijkstra, when the first not
      		// used node is found stop
-//WARNING: need shortest paths of longest? we need to map "heavy" nodes of the 
+//WARNING: need shortest paths or longest? we need to map "heavy" nodes of the 
 // blockGraph with "heavy" nodes in the PEGraph (heavy according to their weighted
 // degree).
 // Update: the above is true but irrelevant here: we should find a "heavy" node
