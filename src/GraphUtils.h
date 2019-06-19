@@ -323,6 +323,17 @@ The edges of the graph are grouped in colors so that heavier edge are group toge
 */
 static std::vector< std::vector<IndexType>> mecGraphColoring( const scai::lama::CSRSparseMatrix<ValueType> &adjM, IndexType &colors);
 
+
+/**
+* @brief Sum of weights of local outgoing edges. An edge (u,v) is an outgoing if u is
+local to this PE but v belongs to some other PE.
+
+* @param[in] input The adjacency matrix of the graph. Possibly distributed among PEs.
+* @param[in] weighted If the edges have weights or not.
+* @return The total weight of the edges that have an endpoint to another PE.
+*/
+static ValueType localSumOutgoingEdges(const scai::lama::CSRSparseMatrix<ValueType> &input, const bool weighted);
+
 /** A random permutation of the elements in the given range. Randomly select elements and move them to the front.
  *
  * @param begin Begin of range

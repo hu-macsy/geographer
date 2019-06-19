@@ -2027,6 +2027,22 @@ std::vector< std::vector<IndexType>> GraphUtils<IndexType, ValueType>::mecGraphC
 
     return retCol;
 }
+//--------------------------------------------------------------------------------------- 
+
+template<typename IndexType, typename ValueType>
+ValueType GraphUtils<IndexType, ValueType>::localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input, const bool weighted) {
+	SCAI_REGION( "ParcoRepart.localSumOutgoingEdges" )
+	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
+	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+    const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+
+	ValueType sumOutgoingEdgeWeights = 0;
+	for (IndexType j = 0; j < ja.size(); j++) {
+		if (!input.getRowDistributionPtr()->isLocal(ja[j])) sumOutgoingEdgeWeights += weighted ? values[j] : 1;
+	}
+
+	return sumOutgoingEdgeWeights;
+}
 //------------------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>

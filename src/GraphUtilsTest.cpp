@@ -56,12 +56,12 @@ TEST_F(GraphUtilsTest, testReindexCut){
     //get first cut
     ValueType initialCut = GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
     ASSERT_GE(initialCut, 0);
-    ValueType sumNonLocalInitial = ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(graph, true);
+    ValueType sumNonLocalInitial = GraphUtils<IndexType, ValueType>::localSumOutgoingEdges(graph, true);
 
 	PRINT("about to reindex the graph");
     //now reindex and get second cut
     GraphUtils<IndexType, ValueType>::reindex(graph);
-    ValueType sumNonLocalAfterReindexing = ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(graph, true);
+    ValueType sumNonLocalAfterReindexing = GraphUtils<IndexType, ValueType>::localSumOutgoingEdges(graph, true);
     EXPECT_EQ(sumNonLocalInitial, sumNonLocalAfterReindexing);
 
     DenseVector<IndexType> reIndexedPartition = DenseVector<IndexType>(graph.getRowDistributionPtr(), partition.getLocalValues());
@@ -129,19 +129,14 @@ TEST_F (GraphUtilsTest, testLocalDijkstra){
     std::string file = graphPath + "Grid4x4";
     IndexType dimensions = 2;
     IndexType N;
-    
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    
-	if( comm->getSize() != 1 ){
-		if( comm->getRank() == 0){
-			std::cout << "\n\t\t### WARNING: this test, " << __FUNCTION__ << " will fail if run with multiple PES" << std::endl<< std::endl;
-		}		
-	}
-	ASSERT_EQ( comm->getSize(), 1) << "Specific number of processors needed for this test: 1";
-
+  
     // read graph
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     N= graph.getNumRows();
+
+    //replicate graph to all PEs
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+    graph.redistribute( noDistPointer, noDistPointer );
 
     std::vector<IndexType> predecessor;
     std::vector<ValueType> shortDist = GraphUtils<IndexType, ValueType>::localDijkstra( graph, 0, predecessor);

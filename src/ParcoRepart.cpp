@@ -522,7 +522,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 			
 			partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
 			//ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
-			ValueType cut = comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;//TODO: this assumes that the graph is unweighted
+			//ValueType cut = comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;//TODO: this assumes that the graph is unweighted
+			ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( input, result, true);
 			ValueType imbalance = GraphUtils<IndexType, ValueType>::computeImbalance(result, k, nodeWeights[0]);
 			
 			
@@ -1095,22 +1096,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
     
     return result;
 }
-//--------------------------------------------------------------------------------------- 
 
-template<typename IndexType, typename ValueType>
-ValueType ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input, const bool weighted) {
-	SCAI_REGION( "ParcoRepart.localSumOutgoingEdges" )
-	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
-	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-    const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
-
-	ValueType sumOutgoingEdgeWeights = 0;
-	for (IndexType j = 0; j < ja.size(); j++) {
-		if (!input.getRowDistributionPtr()->isLocal(ja[j])) sumOutgoingEdgeWeights += weighted ? values[j] : 1;
-	}
-
-	return sumOutgoingEdgeWeights;
-}
 //--------------------------------------------------------------------------------------- 
  
 template<typename IndexType, typename ValueType>

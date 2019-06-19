@@ -171,16 +171,13 @@ namespace ITI {
 		/**
 		 * @brief Counts the number of local nodes in block blockID
 		 *
-		 * @param blockID
+		 * @param[in] part A partition of the graph, 
+		 * @param blockID The wanted block ID to count. \p blockID<part.max()
 		 *
-		 * @return Number of local nodes in blockID
+		 * @return Number of local nodes in \p blockID
 		 */
 		static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
 
-		/**
-		 * @brief Sum of weights of local outgoing edges.
-		 */
-		static ValueType localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input, const bool weighted);
 
 		static std::vector<IndexType> neighbourPixels(const IndexType thisPixel,const IndexType sideLen, const IndexType dimensions);
 
