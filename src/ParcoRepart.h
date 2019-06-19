@@ -167,45 +167,14 @@ namespace ITI {
 		static std::vector<DenseVector<IndexType>> getCommunicationPairs_local( CSRSparseMatrix<ValueType> &adjM, Settings settings);
 
 	//private:
-		
-		/**
-		 * @brief Counts the number of local nodes in block blockID
-		 *
-		 * @param[in] part A partition of the graph, 
-		 * @param blockID The wanted block ID to count. \p blockID<part.max()
-		 *
-		 * @return Number of local nodes in \p blockID
-		 */
-		static IndexType localBlockSize(const DenseVector<IndexType> &part, IndexType blockID);
 
-
+		/** Finds the IDs of all the neighbors of this pixel.
+		@param[in] thisPixel The pixel ID to find its neighbors.
+		@param[in] sideLen The side length of a uniform, homogeneous grid.
+		@param[in] dimensions The dimensions of the grid
+		@return The IDs of \p thisPixel neighboring pixels in the grid.
+		*/
 		static std::vector<IndexType> neighbourPixels(const IndexType thisPixel,const IndexType sideLen, const IndexType dimensions);
 
-		//WARNING: moved function to AuxiliaryFuncions.h
-		/**
-		Given a partition as input, redistribute the graph, coordinates and node weights. 
-		The partition vector must be a permutation of the indices from 0 to comm->getSize()-1.
-		For the partition to ne valid: 0<= partition[i]<= rank,
-		every entry must appear only once, i.e. there exist no i, j 
-		such that partition[i]=partition[j].
-
-		The partition vector is also redistributed so in the end, partition, graph
-		coordinated and nodeWeights all ahve the same distribution.
-
-		@param[in] partition The partition according to which we will redistribute data.
-		@param[out] graph The graph to be redistributed
-		@param[out} nodeWeights The coordinates of the points/vertices.
-		@param[out] The weights for every vertex.
-		*/
-		/*
-		static scai::dmemo::DistributionPtr redistributeFromPartition( 
-			DenseVector<IndexType>& partition,
-			CSRSparseMatrix<ValueType>& graph,
-			std::vector<DenseVector<ValueType>>& coordinates,
-			DenseVector<ValueType>& nodeWeights,
-			Settings settings, 
-			struct Metrics& metrics,
-			bool useRedistributor = false );
-		*/
 	};
 }

@@ -217,7 +217,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 	std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
 
 	SCAI_REGION_START("ParcoRepart.partitionGraph.inputCheck")
-	/**
+	/*
 	* check input arguments for sanity
 	*/
 	IndexType n = input.getNumRows();
@@ -514,7 +514,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 			if (nodeWeights.size() > 1) {
 				throw std::logic_error("Local refinement not yet implemented for multiple weights.");
 			}
-			/**
+			/*
 			 * redistribute to prepare for local refinement
 			 */
             bool useRedistributor = true;
@@ -648,13 +648,13 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
 
 */    
 
-    /**
+    /*
      * Several possibilities exist for choosing the recursion depth.
      * Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
      */
     const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(globalN), double(21));
     
-    /**
+    /*
      *	create space filling curve indices.
      */
     
@@ -665,7 +665,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     //TODO: use the blockSizes vector
     //TODO: take into account node weights: just sorting will create imbalanced blocks, not so much in number of node but in the total weight of each block
     
-    /**
+    /*
      * now sort the global indices by where they are on the space-filling curve.
      */
 
@@ -777,7 +777,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
     //TODO: probably minimum is not needed
     //TODO: if we know maximum from the input we could save that although is not too costly
     
-    /**
+    /*
      * get minimum / maximum of local coordinates
      */
     for (IndexType dim = 0; dim < dimensions; dim++) {
@@ -790,7 +790,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
         }
     }
     
-    /**
+    /*
      * communicate to get global min / max
      */
     for (IndexType dim = 0; dim < dimensions; dim++) {
@@ -1040,10 +1040,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
     }   
     //PRINT0("##### final blockSize for block "<< k-1 << ": "<< thisBlockSize);
 
-    // here all pixels should have a partition 
-    
-    //=========
-    
+    /*
+     * here all pixels should have a partition 
+    */
+
     // set your local part of the partition/result
     scai::hmemo::WriteOnlyAccess<IndexType> wLocalPart ( result.getLocalValues() );
     
@@ -1095,24 +1095,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
     wLocalPart.release();
     
     return result;
-}
-
-//--------------------------------------------------------------------------------------- 
- 
-template<typename IndexType, typename ValueType>
-IndexType ParcoRepart<IndexType, ValueType>::localBlockSize(const DenseVector<IndexType> &part, IndexType blockID) {
-	SCAI_REGION( "ParcoRepart.localBlockSize" )
-	IndexType result = 0;
-	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
-	//possibly shorten with std::count(localPart.get(), localPart.get()+localPart.size(), blockID);
-
-	for (IndexType i = 0; i < localPart.size(); i++) {
-		if (localPart[i] == blockID) {
-			result++;
-		}
-	}
-
-	return result;
 }
 
 //-----------------------------------------------------------------------------------------
@@ -1179,8 +1161,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 }
 //---------------------------------------------------------------------------------------
 
-/* A 2D or 3D matrix given as a 1D array of size sideLen^dimesion
- * */
+
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const IndexType thisPixel, const IndexType sideLen, const IndexType dimension){
     SCAI_REGION("ParcoRepart.neighbourPixels");

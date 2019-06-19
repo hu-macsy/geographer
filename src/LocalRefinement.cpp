@@ -1261,6 +1261,7 @@ IndexType LocalRefinement<IndexType, ValueType>::localBlockSize(const DenseVecto
 	IndexType result = 0;
 	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
 
+	//possibly shorten with std::count(localPart.get(), localPart.get()+localPart.size(), blockID);
 	for (IndexType i = 0; i < localPart.size(); i++) {
 		if (localPart[i] == blockID) {
 			result++;
