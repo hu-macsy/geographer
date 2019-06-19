@@ -63,7 +63,7 @@ TEST_F(MeshGeneratorTest, testCreateStructured3DMeshLocalDegreeSymmetry) {
 		}
 
 		MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(a, coordinates, maxCoord, numPoints, dimensions);
-		ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(a);
+		aux<IndexType, ValueType>::checkLocalDegreeSymmetry(a);
 	} else {
 		std::cout << "Not tested, since called with <= 16 processes, this implies you don't have enough memory for " << n << " nodes."<< std::endl;
 	}
@@ -300,7 +300,7 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
     EXPECT_EQ( true , adjM.getRowDistribution().isEqual(coords[0].getDistribution()) );
     
     // check symmetry in every PE
-    ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
+    aux<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
     if (!adjM.isConsistent()) {
 	throw std::runtime_error("Input matrix inconsistent");
     }
@@ -312,7 +312,7 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
         // gather/replicate locally and test whole matrix
         adjM.redistribute(noDistPointer, noDistPointer);
         
-        ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
+        aux<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
         PRINT(*comm<<": "<< adjM.getNumValues() );
         if (!adjM.isConsistent()) {
             throw std::runtime_error("Input matrix inconsistent");
@@ -325,7 +325,7 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
         scai::dmemo::DistributionPtr distCyc ( scai::dmemo::Distribution::getDistributionPtr( "CYCLIC", comm, N) );
         adjM.redistribute( distCyc, noDistPointer);
         
-        ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
+        aux<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
         if (!adjM.isConsistent()) {
             throw std::runtime_error("Input matrix inconsistent");
         }

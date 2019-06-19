@@ -21,6 +21,9 @@ namespace ITI {
 	using namespace scai::lama;
 	using scai::dmemo::HaloExchangePlan;
 
+	/** @brief Main class to partition a graph.
+	*/
+
 	template <typename IndexType, typename ValueType>
 	class ParcoRepart {
 		public:
@@ -29,13 +32,13 @@ namespace ITI {
          * Partitions the given input graph
          * If the number of blocks is equal to the number of processes, graph, coordinates and weights are redistributed according to the partition.
          *
-         * @param[in,out] input Adjacency matrix of the input graph
-         * @param[in,out] coordinates Coordinates of input points
-         * @param[in,out] nodeWeights Optional node weights.
+         * @param[in,out] input Adjacency matrix of the input graph with n vertices. numRows=numColumns=n
+         * @param[in,out] coordinates Coordinates of input points, coordinates.size()=n
+         * @param[in,out] nodeWeights Optional node weights. nodeWeights.size()=n
          * @param[in] settings Settings struct
          * @param[out] metrics struct into which time measurements are written
          *
-         * @return partition Distributed DenseVector of length n, partition[i] contains the block ID of node i
+         * @return partition Distributed DenseVector of length n, partition[i] contains the block ID of node i.  partition[i]<\p settings.numBlocks
          */
 		static DenseVector<IndexType> partitionGraph(
 			CSRSparseMatrix<ValueType> &input,
@@ -84,6 +87,10 @@ namespace ITI {
 
 		/**
 		*	Wrapper with block sizes.
+
+		@param[in] blockSizes \p blockSizes[i][j] is the wanted target weight of the i-th weight for the j-th block.
+		blockSizes.size() = number of weights (remember: vertices can have multiple weights),
+		blockSizes[i].size() = number of blocks (=\p settings.numBlocks)
 		*/
 		static DenseVector<IndexType> partitionGraph(
 			CSRSparseMatrix<ValueType> &input,
@@ -95,19 +102,30 @@ namespace ITI {
 
 
 		/**
-		* Wrapper for metis-like input.
+		* Wrapper for metis-like input. \p numPEs is the number of processors (comm->getSize()), 
+		\p localN  is the number of local points
 		
 		* vtxDist, size=numPEs,  is a replicated array, it is the prefix sum of the number of nodes per PE
-    			eg: [0, 15, 25, 50], PE0 has 15 vertices, PE1 10 and PE2 25
+    			e.g.: [0, 15, 25, 50], PE0 has 15 vertices, PE1 10 and PE2 25
+
 		* xadj, size=localN+1, (= IA array of the CSR sparse matrix format), is the prefix sum of the degrees
-    			of the local nodes, ie, how many non-zero values the row has.
+    			of the local nodes, i.e., how many non-zero values the row has.
+
 		* adjncy, size=localM (number of local edges = the JA array), contains numbers >0 and < N, each
     			number is the global id of the neighboring vertex
-    	* localM, the number of local edges
-    	* vwgt, size=localN, array for the node weights
+
+    	* localM, the number of local edges 
+
+    	* vwgt, size=localN, array for the node weights 
+
     	* ndims, the dimensions of the coordinates
+
     	* xyz, size=ndims*locaN, the coordinates for every vertex. For vertex/point i, its coordinates are
     			in xyz[ndims*i], xyz[ndims*i+1], ... , xyz[ndims*i+ndims]
+
+    	\sa <a href="glaros.dtc.umn.edu/gkhome/fetch/sw/metis/manual.pdf">metis manual</a>.
+
+    	\sa <a href="https://en.wikipedia.org/wiki/Sparse_matrix">CSR matrix</a>
 		*/
 		static std::vector<IndexType> partitionGraph(
 			IndexType *vtxDist, IndexType *xadj, IndexType *adjncy, IndexType localM,
@@ -120,7 +138,7 @@ namespace ITI {
          */
         static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings);
 
-		/*
+		/**
          * @brief Partition a point set using the Hilbert curve, only implemented for equal number of blocks and processes.
          *
          * @param coordinates Coordinates of the input points
@@ -130,19 +148,10 @@ namespace ITI {
          */
 		static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
 
-		/*
+		/**
 		 * Get an initial partition using the morton curve and measuring density per square.
 		 */
 		static DenseVector<IndexType> pixelPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
-
-		/**
-		 * Iterates over the local part of the adjacency matrix and counts local edges.
-		 * If an inconsistency in the graph is detected, it tries to find the inconsistent edge and throw a runtime error.
-		 * Not guaranteed to find inconsistencies. Iterates once over the edge list.
-		 *
-		 * @param[in] input Adjacency matrix
-		 */
-		static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
 
 		/** Given the block graph, creates an edge coloring of the graph and returns a communication
 		 *  scheme based on the coloring

@@ -332,6 +332,16 @@ static scai::dmemo::DistributionPtr redistributeFromPartition(
                 bool useRedistributor = true,
                 bool renumberPEs = true );
 
+
+/**
+ * Iterates over the local part of the adjacency matrix and counts local edges.
+ * If an inconsistency in the graph is detected, it tries to find the inconsistent edge and throw a runtime error.
+ * Not guaranteed to find inconsistencies. Iterates once over the edge list.
+ *
+ * @param[in] input Adjacency matrix
+ */
+static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
+
 }; //class aux
 
 template class aux<IndexType, ValueType>;
