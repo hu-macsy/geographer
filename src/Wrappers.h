@@ -20,23 +20,26 @@
 
 namespace ITI {
 
+/*@brief Class for external tools like zoltan and metis.
+*/
+
 template <typename IndexType, typename ValueType>
 class Wrappers {
 
 public:
-	//TODO: different interface for methods that do not require coordinates
+	//TODO: different interface for methods that do not require coordinates or a graph.
 	
 	/** Returns a partition with one of the supported tools
 	 * 
-	 * @param[in] graph The adjacency matrix of the graph of size NxN
-	 * @param[in] coordinates The coordinates of the mesh. Not always needed by all tools
-	 * @param[in] nodeWeights Weights for every node, used only is nodeWeightFlag is true
-	 * @param[in] nodeWeightsFlag If true the node weigts are used, if false they are ignored
+	 * @param[in] graph The adjacency matrix of the graph of size NxN, where N is the number of vertices of the graph.
+	 * @param[in] coordinates The coordinates of the mesh. Not always needed by all tools.
+	 * @param[in] nodeWeights Weights for every node, used only is nodeWeightFlag is true.
+	 * @param[in] nodeWeightsFlag If true the node weights are used, if false they are ignored.
 	 * @param[in] tool One of the supported tools.
-	 * @param[in] settings A Settings structure to pass various settings
-	 * @param[out] metrics Structure to store/return timing info
+	 * @param[in] settings A Settings structure to pass various settings.
+	 * @param[out] metrics Structure to store/return timing info.
 	 * 
-	 * @return A DenseVector of size N with the partition calcualted: 0<= return[i] < k with the block that point i belongs to
+	 * @return A DenseVector of size N with the partition calculated: 0<= return[i] < k with the block that point i belongs to
 	 */
 	static scai::lama::DenseVector<IndexType> partition(
 		const scai::lama::CSRSparseMatrix<ValueType> &graph,

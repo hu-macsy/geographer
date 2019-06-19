@@ -73,6 +73,46 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
 	return partition;
 }
 //-----------------------------------------------------------------------------------------	
+template<typename IndexType, typename ValueType>
+scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
+	//const scai::lama::CSRSparseMatrix<ValueType> &graph,
+	const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
+	const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
+	bool nodeWeightsFlag,
+	Tool tool,
+	struct Settings &settings,
+	struct Metrics &metrics	){
+
+	scai::lama::DenseVector<IndexType> partition;
+	switch( tool ){
+		case Tool::parMetisGraph:
+		case Tool::parMetisGeom:
+			PRINT("Tool "<< tool <<" requires the graph to compute a partition but no graph was given.")
+			throw std::runtime_error("Missing graph.\nAborting...");
+			break;
+		case Tool::parMetisSFC: 
+		case Tool::zoltanRIB:
+		case Tool::zoltanRCB:
+		case Tool::zoltanMJ:
+		case Tool::zoltanSFC:
+			//create dummy graph as the these tools do not use it.
+
+			const scai::dmemo::DistributionPtr dist = coords[0].getDistributionPtr();
+			const scai::dmemo::DistributionPtr noDistPointer( new scai::dmemo::NoDistribution(dist.getNumValues()) );
+
+			scai::lama::CSRSparseMatrix<ValueType> graph( dist, noDistPointer );
+
+			//call partition function
+			partition =  metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 1, tool, settings, metrics);
+			break;
+		default:
+			throw std::runtime_error("Wrong tool given to partition.\nAborting...");
+			partition = scai::lama::DenseVector<IndexType>(graph.getLocalNumRows(), -1 );			
+	}//switch
+
+	return partition;
+}
+//-----------------------------------------------------------------------------------------	
 
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::repartition (
@@ -582,7 +622,8 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 	typedef Zoltan2::BasicVectorAdapter<myTypes> inputAdapter_t;
 	
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+//const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+const scai::dmemo::DistributionPtr dist = coords[0].getDistributionPtr();
 	const IndexType thisPE = comm->getRank();
 	const IndexType numBlocks = settings.numBlocks;
 	 
