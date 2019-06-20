@@ -75,7 +75,6 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
 //-----------------------------------------------------------------------------------------	
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
-	//const scai::lama::CSRSparseMatrix<ValueType> &graph,
 	const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
 	const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 	bool nodeWeightsFlag,
@@ -83,11 +82,16 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
 	struct Settings &settings,
 	struct Metrics &metrics	){
 
-	scai::lama::DenseVector<IndexType> partition;
+	//create dummy graph as the these tools do not use it.
+	const scai::dmemo::DistributionPtr distPtr = coordinates[0].getDistributionPtr();
+	const scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution(distPtr->getGlobalSize()) );
+	const scai::lama::CSRSparseMatrix<ValueType> graph = scai::lama::zero<CSRSparseMatrix<ValueType>>( distPtr, noDistPtr );
+
+	scai::lama::DenseVector<IndexType> retPart;
 	switch( tool ){
 		case Tool::parMetisGraph:
 		case Tool::parMetisGeom:
-			PRINT("Tool "<< tool <<" requires the graph to compute a partition but no graph was given.")
+			PRINT("Tool "<< tool <<" requires the graph to compute a partition but no graph was given.");
 			throw std::runtime_error("Missing graph.\nAborting...");
 			break;
 		case Tool::parMetisSFC: 
@@ -95,22 +99,15 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
 		case Tool::zoltanRCB:
 		case Tool::zoltanMJ:
 		case Tool::zoltanSFC:
-			//create dummy graph as the these tools do not use it.
-
-			const scai::dmemo::DistributionPtr dist = coords[0].getDistributionPtr();
-			const scai::dmemo::DistributionPtr noDistPointer( new scai::dmemo::NoDistribution(dist.getNumValues()) );
-
-			scai::lama::CSRSparseMatrix<ValueType> graph( dist, noDistPointer );
-
 			//call partition function
-			partition =  metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 1, tool, settings, metrics);
+			retPart =  partition( graph, coordinates, nodeWeights, nodeWeightsFlag, tool, settings, metrics);
 			break;
 		default:
 			throw std::runtime_error("Wrong tool given to partition.\nAborting...");
-			partition = scai::lama::DenseVector<IndexType>(graph.getLocalNumRows(), -1 );			
+			retPart = scai::lama::DenseVector<IndexType>(graph.getLocalNumRows(), -1 );			
 	}//switch
 
-	return partition;
+	return retPart;
 }
 //-----------------------------------------------------------------------------------------	
 
@@ -129,6 +126,8 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::repartition (
 		case Tool::parMetisGraph:		
 		case Tool::parMetisGeom:			
 		case Tool::parMetisSFC:
+			throw std::runtime_error("Unfortunatelly, Current version does not support repartitioning with parmetis.\nAborting...");
+			//TODO: parmetis needs consective indices for the vertices; must reindex vertices
 			//return metisRepartition( graph, coordinates, nodeWeights, nodeWeightsFlag, settings, metrics);
 			
 		case Tool::zoltanRIB:
@@ -408,7 +407,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
             metisRet = ParMETIS_V3_PartGeomKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ndims, xyzLocal, &ncon, &nparts, tpwgts, ubvec, options, &edgecut, partKway, &metisComm );  
         }else if( parMetisGeom==2 ){
 			metisRet = ParMETIS_V3_PartGeom( vtxDist, &ndims, xyzLocal, partKway, &metisComm ); 
-		}else { // parMetisGeom==3 
+		}else { 
 			//repartition
 			
 			//TODO: check if vsize is correct 
@@ -582,7 +581,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanPartiti
 	
 	bool repart = false;
 	
-	return Wrappers<IndexType, ValueType>::zoltanCore(graph, coords, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);
+	return Wrappers<IndexType, ValueType>::zoltanCore( coords, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);
 }
 //---------------------------------------------------------------------------------------	
 		
@@ -601,7 +600,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanReparti
 	
 	bool repart = true;
 	
-	return Wrappers<IndexType, ValueType>::zoltanCore(graph, coords, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);	
+	return Wrappers<IndexType, ValueType>::zoltanCore( coords, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);	
 	}
 //---------------------------------------------------------------------------------------	
 
@@ -609,7 +608,6 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanReparti
 
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
-	const scai::lama::CSRSparseMatrix<ValueType> &graph,
 	const std::vector<scai::lama::DenseVector<ValueType>> &coords, 
 	const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 	bool nodeWeightsFlag,
@@ -622,8 +620,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 	typedef Zoltan2::BasicVectorAdapter<myTypes> inputAdapter_t;
 	
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-//const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-const scai::dmemo::DistributionPtr dist = coords[0].getDistributionPtr();
+	const scai::dmemo::DistributionPtr dist = coords[0].getDistributionPtr();
 	const IndexType thisPE = comm->getRank();
 	const IndexType numBlocks = settings.numBlocks;
 	 
@@ -711,7 +708,7 @@ const scai::dmemo::DistributionPtr dist = coords[0].getDistributionPtr();
 			}
 		}
 	}else{
-		//all weights are initiallized weigth unit weight
+		//all weights are initiallized with unit weight
 	}
 
 	std::vector<const ValueType *>weightVec( numWeights );
@@ -791,6 +788,6 @@ const scai::dmemo::DistributionPtr dist = coords[0].getDistributionPtr();
 
 //---------------------------------------------------------------------------------------	
 		
-	template class Wrappers<IndexType, ValueType>;
+template class Wrappers<IndexType, ValueType>;
 	
 }//namespace

@@ -20,14 +20,13 @@
 
 namespace ITI {
 
-/*@brief Class for external tools like zoltan and metis.
+/*@brief Class for external partitioning tools like zoltan and metis.
 */
 
 template <typename IndexType, typename ValueType>
 class Wrappers {
 
 public:
-	//TODO: different interface for methods that do not require coordinates or a graph.
 	
 	/** Returns a partition with one of the supported tools
 	 * 
@@ -50,6 +49,18 @@ public:
 		struct Settings &settings,
 		struct Metrics &metrics
 	);
+	
+	
+	/** @brief Version for tools that do not need the graph as input.
+	 */
+	static scai::lama::DenseVector<IndexType> partition(
+		const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
+		const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
+		bool nodeWeightsFlag,
+		Tool tool,
+		struct Settings &settings,
+		struct Metrics &metrics
+	);	
 	
 	/** Returns a partition with one of the supported tools based on the current distribution of the data.
 	 * 
@@ -134,8 +145,8 @@ private:
 		struct Settings &settings,
 		struct Metrics &metrics);
 		
+	//the core implementation for zoltan
 	static scai::lama::DenseVector<IndexType> zoltanCore (
-		const scai::lama::CSRSparseMatrix<ValueType> &graph,
 		const std::vector<scai::lama::DenseVector<ValueType>> &coords, 
 		const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 		bool nodeWeightsFlag,
