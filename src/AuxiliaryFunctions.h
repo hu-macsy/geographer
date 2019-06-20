@@ -24,7 +24,7 @@ namespace ITI{
 
 using namespace scai::lama;
 
-/**  A collection of several for output and mesh helper functions (mainly).
+/** @brief A collection of several for output and mesh helper functions (mainly).
 */
 
 template <typename IndexType, typename ValueType>

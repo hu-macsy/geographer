@@ -331,6 +331,8 @@ struct Settings{
     
 }; //struct Settings
 
+/** @cond INTERNAL 
+*/
 struct sort_pair {
 	double value;
 	int32_t index;
@@ -348,4 +350,7 @@ struct int_pair {
     bool operator<=(const int_pair& rhs ) const {return !operator>(rhs);}
     bool operator>=(const int_pair& rhs ) const {return !operator<(rhs);}
 };
+
+/** @endcond INTERNAL 
+*/
 }// namespace ITI

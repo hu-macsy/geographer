@@ -6,7 +6,9 @@
 
 namespace ITI {
 
-/** A communication tree for storing information about the physical network if this can represented
+/** @brief A tree structure to store the physical network in the form of a tree.
+
+ A communication tree for storing information about the physical network if this can represented
 in a hierarchical fashion. The actual compute nodes, the PEs, are only the leaves and they contain
 a vector of weights to model different properties like CPU speed, memory, number of cores etc.
 Intermediate node model some aggregation of PEs, like racks, chips, islands etc, and the weights
@@ -18,7 +20,9 @@ class CommTree{
 
 public:
 
-/** Hierarchy is a vector of size equal to the levels of the tree. Every position
+/** @brief A node of the communication tree.
+
+ 	Hierarchy is a vector of size equal to the levels of the tree. Every position
 	indicates the tree-node this leaf belongs to.
 	For example, if hierarchy={1, 0, 2}, it means that this PE belongs to tree-node 1
 	in the first level; then, within tree-node 1, it belongs to tree-node 0 and inside 0,

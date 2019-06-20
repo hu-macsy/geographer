@@ -29,8 +29,8 @@
 
 namespace ITI {
 
-	/** @brief Partition a graph using the spectral partitiong method.
-	@warning This class is heavily unstable and underdeveloped.
+	/** @brief Partition a graph using the spectral partitioning method.
+	@warning This class is heavily unstable and not further developed.
 	*/
 
     template <typename IndexType, typename ValueType>

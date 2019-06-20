@@ -20,7 +20,7 @@
 
 namespace ITI {
 
-/*@brief Class for external tools like zoltan and metis.
+/** @brief Class for external tools like zoltan and metis.
 */
 
 template <typename IndexType, typename ValueType>

@@ -21,6 +21,9 @@ namespace ITI {
     using scai::lama::CSRSparseMatrix;
     using scai::lama::CSRStorage;
     using scai::lama::DenseVector;
+
+    /** @brief Improve the cut of a partition by doing local refinement.
+    */
     
     template <typename IndexType, typename ValueType>
     class LocalRefinement{
