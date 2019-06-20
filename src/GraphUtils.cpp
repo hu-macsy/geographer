@@ -79,8 +79,7 @@ scai::lama::DenseVector<IndexType> GraphUtils<IndexType,ValueType>::reindex(scai
 
     CSRStorage<ValueType> newStorage(localN, globalN, localStorage.getIA(), newJA, localStorage.getValues());
     graph = CSRSparseMatrix<ValueType>(blockDist, std::move(newStorage));
-    //graph.setDistributionPtr(blockDist);//TODO no longer allowed, change
-
+    
     return result;
 }
 
@@ -1268,7 +1267,7 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 			IndexType degree = 0;
 			while( v==edgeIt->first.first ){
 				IndexType u = edgeIt->first.second;
-				ValueType w = edgeIt->second;
+				ValueType w = edgeIt->second;	//edge weight
 				ja.push_back( u );
 				values.push_back( w );
 				degree++;

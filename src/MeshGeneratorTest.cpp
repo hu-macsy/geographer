@@ -302,10 +302,10 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
     // check symmetry in every PE
     aux<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
     if (!adjM.isConsistent()) {
-	throw std::runtime_error("Input matrix inconsistent");
+		throw std::runtime_error("Input matrix inconsistent");
     }
-    PRINT(*comm<< ": "<< adjM.getLocalNumValues() );
-    PRINT(*comm<< ": "<< comm->sum(adjM.getLocalNumValues()) );
+    //PRINT(*comm<< ": "<< adjM.getLocalNumValues() );
+    //PRINT(*comm<< ": "<< comm->sum(adjM.getLocalNumValues()) );
     
     {
         SCAI_REGION("testCreateRandomStructuredMesh_Distributed_3D.noDist")
@@ -313,7 +313,7 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
         adjM.redistribute(noDistPointer, noDistPointer);
         
         aux<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
-        PRINT(*comm<<": "<< adjM.getNumValues() );
+        //PRINT(*comm<<": "<< adjM.getNumValues() );
         if (!adjM.isConsistent()) {
             throw std::runtime_error("Input matrix inconsistent");
         }

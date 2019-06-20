@@ -56,11 +56,13 @@ TEST_F(GraphUtilsTest, testReindexCut){
     //get first cut
     ValueType initialCut = GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
     ASSERT_GE(initialCut, 0);
+    std::pair<std::vector<IndexType>,std::vector<IndexType>> initialBorderInnerNodes = GraphUtils<IndexType, ValueType>::getNumBorderInnerNodes( graph, partition, settings );
     ValueType sumNonLocalInitial = GraphUtils<IndexType, ValueType>::localSumOutgoingEdges(graph, true);
 
-	PRINT("about to reindex the graph");
-    //now reindex and get second cut
+	PRINT0("about to reindex the graph");
+    //now reindex and get second metrics
     GraphUtils<IndexType, ValueType>::reindex(graph);
+
     ValueType sumNonLocalAfterReindexing = GraphUtils<IndexType, ValueType>::localSumOutgoingEdges(graph, true);
     EXPECT_EQ(sumNonLocalInitial, sumNonLocalAfterReindexing);
 
@@ -68,8 +70,11 @@ TEST_F(GraphUtilsTest, testReindexCut){
     ASSERT_TRUE(reIndexedPartition.getDistributionPtr()->isEqual(*graph.getRowDistributionPtr()));
 
     ValueType secondCut = GraphUtils<IndexType, ValueType>::computeCut(graph, reIndexedPartition, true);
-
     EXPECT_EQ(initialCut, secondCut);
+
+	std::pair<std::vector<IndexType>,std::vector<IndexType>> secondBorderInnerNodes = GraphUtils<IndexType, ValueType>::getNumBorderInnerNodes( graph, reIndexedPartition, settings );
+	EXPECT_EQ( initialBorderInnerNodes.first ,secondBorderInnerNodes.first );
+	EXPECT_EQ( initialBorderInnerNodes.second ,secondBorderInnerNodes.second );
 }
 //-----------------------------------------------------------------
 
@@ -129,60 +134,72 @@ TEST_F (GraphUtilsTest, testLocalDijkstra){
     std::string file = graphPath + "Grid4x4";
     IndexType dimensions = 2;
     IndexType N;
-  
-    // read graph
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
-    N= graph.getNumRows();
+    bool executed = true;
+ 
+    //TODO:probably there is a better way to do that: exit tests as failed if p>7. Regular googletest tests
+    // do not exit the test. Maybe by using death test, but I could not figure it out.
 
-    //replicate graph to all PEs
-    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    graph.redistribute( noDistPointer, noDistPointer );
+   	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+   	if( comm->getSize()>6 ){
+   		PRINT0("\n\tWARNING:File too small to read. If p>6 this test is not executed\n" );
+   		executed=false;
+   	}else{
+	  	//EXPECT_EXIT( /*CSRSparseMatrix<ValueType> graph = */FileIO<IndexType, ValueType>::readGraph( file ), ::testing::ExitedWithCode(1), "too few PEs" );
+	    // read graph
+	    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+	    N= graph.getNumRows();
 
-    std::vector<IndexType> predecessor;
-    std::vector<ValueType> shortDist = GraphUtils<IndexType, ValueType>::localDijkstra( graph, 0, predecessor);
+	    //replicate graph to all PEs
+	    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+	    graph.redistribute( noDistPointer, noDistPointer );
 
-    EXPECT_EQ( shortDist.size(), N );
+	    std::vector<IndexType> predecessor;
+	    std::vector<ValueType> shortDist = GraphUtils<IndexType, ValueType>::localDijkstra( graph, 0, predecessor);
 
-    //check specific distances for Grid4x4
-    EXPECT_EQ( shortDist[15], 6);
-    EXPECT_EQ( shortDist[7], 4);
+	    EXPECT_EQ( shortDist.size(), N );
 
-    //PRINT0("set edge (14, 15) to 1.5");
-    graph.setValue(5, 6, 1.5);
-    graph.setValue(8, 12, 1.1);
-    shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 0, predecessor);
-    EXPECT_EQ( shortDist[15], 6);
+	    //check specific distances for Grid4x4
+	    EXPECT_EQ( shortDist[15], 6);
+	    EXPECT_EQ( shortDist[7], 4);
 
-    //PRINT0("set edge (11, 15) to 0.5");
-    graph.setValue(11, 15, 0.5);
-    shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 0, predecessor);
-    EXPECT_EQ( shortDist[15], 5.5);
-    EXPECT_EQ( predecessor[15], 11);
+	    //PRINT0("set edge (14, 15) to 1.5");
+	    graph.setValue(5, 6, 1.5);
+	    graph.setValue(8, 12, 1.1);
+	    shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 0, predecessor);
+	    EXPECT_EQ( shortDist[15], 6);
 
-    //PRINT0("set edge (9, 10) to 0.3");
-    graph.setValue(9, 10, 0.3);
-    shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 0, predecessor);
-    EXPECT_EQ( shortDist[15], 4.8);
-    EXPECT_EQ( shortDist[11], 4.3);
-    EXPECT_EQ( predecessor[10], 9);
-    EXPECT_EQ( predecessor[11], 10);
-    EXPECT_EQ( predecessor[14], 10);
+	    //PRINT0("set edge (11, 15) to 0.5");
+	    graph.setValue(11, 15, 0.5);
+	    shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 0, predecessor);
+	    EXPECT_EQ( shortDist[15], 5.5);
+	    EXPECT_EQ( predecessor[15], 11);
 
-    graph.setValue(5, 9, 1.3);
-    graph.setValue(7, 11, 1.3);
-    shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 0, predecessor);
-    EXPECT_EQ( shortDist[15], 4.8);
-    EXPECT_EQ( shortDist[11], 4.3);
-    EXPECT_EQ( predecessor[9], 8);
+	    //PRINT0("set edge (9, 10) to 0.3");
+	    graph.setValue(9, 10, 0.3);
+	    shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 0, predecessor);
+	    EXPECT_EQ( shortDist[15], 4.8);
+	    EXPECT_EQ( shortDist[11], 4.3);
+	    EXPECT_EQ( predecessor[10], 9);
+	    EXPECT_EQ( predecessor[11], 10);
+	    EXPECT_EQ( predecessor[14], 10);
 
-    shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 13, predecessor);
-    EXPECT_EQ( shortDist[0], 4);
-    EXPECT_EQ( shortDist[15], 2);
-    EXPECT_EQ( shortDist[7], 3.3);
+	    graph.setValue(5, 9, 1.3);
+	    graph.setValue(7, 11, 1.3);
+	    shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 0, predecessor);
+	    EXPECT_EQ( shortDist[15], 4.8);
+	    EXPECT_EQ( shortDist[11], 4.3);
+	    EXPECT_EQ( predecessor[9], 8);
 
-    //for( int i=0; i<N; i++){
-    //    PRINT0("dist to vertex " << i << "= " << shortDist[i]);
-    //}
+	    shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 13, predecessor);
+	    EXPECT_EQ( shortDist[0], 4);
+	    EXPECT_EQ( shortDist[15], 2);
+	    EXPECT_EQ( shortDist[7], 3.3);
+
+	    //for( int i=0; i<N; i++){
+	    //    PRINT0("dist to vertex " << i << "= " << shortDist[i]);
+	    //}
+	}
+	EXPECT_TRUE(executed ) << "too many PEs, must be <7 for this test" ;
 }
 
 //--------------------------------------------------------------------------------------- 

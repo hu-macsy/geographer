@@ -128,7 +128,7 @@ public:
                     maxHeight = thisNode->height();
                 }
             }
-            PRINT("numTrees= "<< numTrees);            
+            //PRINT("numTrees= "<< numTrees);            
             std::shared_ptr<const SpatialCell> dummyRoot= onlyChild;
 
             // convert the tree vector to a queue for the starting frontier

@@ -460,7 +460,17 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
 
 	a = scai::lama::eval<scai::lama::CSRSparseMatrix<ValueType>>(a+aT);
 
-	PRINT("num of edges= " << a.getNumValues()/2 );
+	//go over elements and turn them to integers.
+	//this way a.checkSymmetry does not fail due to floating point errors
+	for(int i=0; i<n; i++ ){
+		for(int j=0; j<n;  j++ ){
+			ValueType val = a.getLocalStorage().getValue(i,j);
+			if(val!=0)//if [i,j] is a non-zero value
+				a.setValue( i, j, int (100*val) );
+		}
+	}
+
+	//PRINT("num of edges= " << a.getNumValues()/2 );
 	EXPECT_TRUE( a.isConsistent() );
 	EXPECT_TRUE( a.checkSymmetry() );
 
@@ -471,12 +481,13 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
 		part.setValue(i, blockId);
 	}
   
-  struct Settings settings;
-  settings.numBlocks= k;
+	struct Settings settings;
+	settings.numBlocks= k;
 
 	scai::lama::CSRSparseMatrix<ValueType> blockGraph =  GraphUtils<IndexType, ValueType>::getBlockGraph_dist( a, part, k);
 	EXPECT_TRUE( blockGraph.isConsistent() );
-	EXPECT_TRUE( blockGraph.checkSymmetry() ); //TODO: this fails occasionally
+	EXPECT_TRUE( blockGraph.checkSymmetry() ); 
+
 	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local(blockGraph, settings);
 
 	IndexType rounds = scheme.size();
@@ -698,8 +709,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     //distrubute graph
-    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
-        
+    //graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
 
     //read the array locally and messed the distribution. Left as a remainder.
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());

@@ -263,7 +263,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 		comm->synchronize();
 	}
 	
-	SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition")
+//SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition")
 	// get an initial partition
 	DenseVector<IndexType> result;
 	
@@ -485,7 +485,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 		throw std::runtime_error("Initial Partitioning mode unsupported.");
 	}
 	
-	SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
+//SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
 	
 	// store partition if in debug mode
 	//comment it out since it will add a dependency to FileIO which is not really needed
