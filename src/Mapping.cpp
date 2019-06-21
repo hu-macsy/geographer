@@ -9,13 +9,14 @@
 
 namespace ITI {
 
-//Tranferring code from the implementation of Roland in TiMEr/src/mapping/algorithms.cpp
+//Transferring code from the implementation of Roland in TiMEr/src/mapping/algorithms.cpp
 
-//Edge weigths in the block graph represent the amount of information that needs to
+//Edge weights in the block graph represent the amount of information that needs to
 //be communicated, aka the communication volume.
 //Edge weights in the the processor graph represent the bandwidth/capacity of the
 //edge. Higher values indicate faster connection.
 
+/*
 template <typename IndexType, typename ValueType>
 std::vector<IndexType> Mapping<IndexType, ValueType>::rolandMapping_local( 
 	scai::lama::CSRSparseMatrix<ValueType>& blockGraph,
@@ -36,7 +37,7 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::rolandMapping_local(
 
 	//total communication involving node i in communication graph
   	std::vector<ValueType> comFrom(N, 0);
-/*	
+// 
 	//compute weighted node degrees in block graph and store them in comFrom
 	{
 	    const scai::lama::CSRStorage<ValueType> localStorage = blockGraph.getLocalStorage();
@@ -116,14 +117,15 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::rolandMapping_local(
 		//find next blockNode
 		//blockNode
   	}//for i<N
-*/
+// 
 
   	return mapping;
 
 }
+*/
 //------------------------------------------------------------------------------------
 
-// copy and convert/reimplement code from libTopoMap,
+// copy and convert/re-implement code from libTopoMap,
 // http://htor.inf.ethz.ch/research/mpitopo/libtopomap/,
 // function TPM_Map_greedy found in file libtopomap.cpp around line 580
 
@@ -142,8 +144,7 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::torstenMapping_local(
 	// PEGraph is const so make local copy
 	scai::lama::CSRSparseMatrix<ValueType> copyPEGraph;// = PEGraph;
 
-	//TODO: why is the thing below needed? we ignore the edges of the original
-	// PEGraph?
+	//TODO: why is the thing below needed? we ignore the edges of the original PEGraph?
 	//change the edge weights in the copyPEGraph
 	{
 		//find max weight in block graph
@@ -214,7 +215,7 @@ for( int i=0; i<N; i++){
 	const scai::hmemo::ReadAccess<IndexType> ja(blockStorage.getJA());
 	const scai::hmemo::ReadAccess<ValueType> blockValues(blockStorage.getValues());
 	//actually, the weights of the edges of the PE graph. We will update them
-	//after wvery time we map a vertex
+	//after every time we map a vertex
 	scai::lama::CSRStorage<ValueType> PEStorage = copyPEGraph.getLocalStorage();
 	scai::hmemo::ReadAccess<ValueType> PEValues( PEStorage.getValues() );
 	const scai::hmemo::ReadAccess<IndexType> PEia( PEStorage.getIA() );
@@ -298,8 +299,8 @@ PRINT0( "mapped vertex " << blockNode << " to " << peNode);
 
      		//TODO: possible opt, not need a full Dijkstra, when the first not
      		// used node is found stop
-//WARNING: need shortest paths of longest? we need to map "heavy" nodes of the 
-// blockGraph with "heavy" nodes in the PEGraph (heavy cacording to their weighted
+//WARNING: need shortest paths or longest? we need to map "heavy" nodes of the 
+// blockGraph with "heavy" nodes in the PEGraph (heavy according to their weighted
 // degree).
 // Update: the above is true but irrelevant here: we should find a "heavy" node
 // but also one that is close/near to peNode.
@@ -365,7 +366,121 @@ bool Mapping<IndexType, ValueType>::isValid(
 	return true;
 }
 
+//------------------------------------------------------------------------------------
 
+template <typename IndexType, typename ValueType>
+std::vector<IndexType> Mapping<IndexType, ValueType>::getSfcRenumber( 
+	const std::vector<scai::lama::DenseVector<ValueType>>& coordinates,
+	const std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights, //TODO,check: are these needed?
+	const scai::lama::DenseVector<IndexType>& partition,
+	const Settings settings){
+
+	const IndexType localN = coordinates[0].getLocalValues().size();
+	const IndexType k = settings.numBlocks;
+	const IndexType dim = settings.dimensions;
+
+	//TODO: maybe this can be avoided
+	std::vector<IndexType> localIndices(localN);
+	std::iota(localIndices.begin(), localIndices.end(), 0);
+	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
+	const typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
+
+	SCAI_ASSERT( partition.getDistribution().isEqual(coordinates[0].getDistribution()), "Partition and coordinates must have the same distribution" );
+	SCAI_ASSERT_EQ_ERROR( partition.getLocalValues().size(), localN, "Size mismatch. partition and coordinates must have the same distribution" );
+	
+	//to make it more readable
+	using point = std::vector<ValueType>;
+
+	//the center for each block
+	std::vector<point> blockCenters = KMeans::findCenters(coordinates, partition, k, firstIndex, lastIndex, nodeWeights[0]);
+
+	//remember: blockCenters.size()=dim, blockCenters[i].size()=numBlocks
+	SCAI_ASSERT_EQ_ERROR( blockCenters.size(), dim, "Wrong size of centers vector." );
+	SCAI_ASSERT_EQ_ERROR( blockCenters[0].size(), k, "Wrong size of centers vector." )
+
+	if( settings.debugMode ){
+		const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		for(IndexType i=0; i<k; i++){
+			PRINT0("center " << i << " in " << blockCenters[0][i] <<", " << blockCenters[1][i]);
+		}
+	}
+
+	//
+	//get the sfc index of the centers
+	//
+
+	std::vector<ValueType> centerSFC;
+
+	//convert to vector<DenseVector> in order to call getHilbertIndexVector
+	{
+		std::vector<scai::lama::DenseVector<ValueType>> centersDV(dim);
+
+		for(IndexType d=0; d<dim; d++){
+			//centersDV[d].resize(k);
+			centersDV[d].assign( scai::hmemo::HArray<ValueType>(blockCenters[d]) );
+		}
+
+		//TODO: check if default resolution is OK or set it properly		
+		centerSFC = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector( centersDV, settings.sfcResolution, dim);
+	}
+
+	//the IDs to use for sorting
+	std::vector<IndexType> centerIDs(k);
+	std::iota( centerIDs.begin(), centerIDs.end(), 0);
+
+	//sort center IDs according to their SFC value
+	std::sort( centerIDs.begin(), centerIDs.end(),
+	 	[&](IndexType a, IndexType b){
+	 		return centerSFC[a]<centerSFC[b];
+	 	});
+
+	return centerIDs;
+
+}//sfcMapping
+//------------------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
+std::vector<IndexType> Mapping<IndexType, ValueType>::applySfcRenumber( 
+	const std::vector<scai::lama::DenseVector<ValueType>>& coordinates,
+	const std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights, //TODO,check: are these needed?
+	scai::lama::DenseVector<IndexType>& partition,
+	const Settings settings){
+
+	//get the renumbering
+	std::vector<IndexType> R = Mapping<IndexType,ValueType>::getSfcRenumber( coordinates, nodeWeights, partition, settings );
+
+	SCAI_ASSERT_EQ_ERROR( R.size(), settings.numBlocks, "Size mismatch" );
+	const IndexType k = settings.numBlocks;
+
+	const IndexType maxR = *std::max_element( R.begin(), R.end() );
+	SCAI_ASSERT_EQ_ERROR( maxR, k-1, "max block id is not k-1 as it should");
+
+	//The implied renumbering is that block R[i] should be renumbered to i. To apply it easier we better reverse it.
+	//Create a vector RR where RR[R[i]]=i, this way, afterwards, we can do part[of point i]= RR[prevPart]
+	std::vector<IndexType> reverseR( k );
+	for( IndexType i=0; i<k; i++){
+		reverseR[R[i]]=i;		
+	}
+
+	//go over the local values and renumber the blocks
+	const IndexType localN = partition.getDistributionPtr()->getLocalSize();
+	scai::hmemo::WriteAccess<IndexType> wPart( partition.getLocalValues() );
+
+	for( IndexType i=0; i<localN; i++){
+		IndexType prevBlock = wPart[i];
+		wPart[i] = reverseR[prevBlock];
+	}
+
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	if( comm->getRank()==0 and settings.debugMode){
+		for( int i=0; i<k; i++){
+			if( reverseR[i]!=i ){
+				std::cout << "block " << i << " -> " << reverseR[i] << std::endl;
+			}
+		}
+	}
+	return reverseR;
+}//applySfcRenumber
 
 //to force instantiation
 template class Mapping<IndexType, ValueType>;

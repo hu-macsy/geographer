@@ -2,13 +2,18 @@ set ( Geographer_CXX_FLAGS "@CMAKE_CXX_FLAGS@" )
 
 set ( Geographer_ROOT @CMAKE_INSTALL_PREFIX@ )
 
-set ( Boost_ROOT @Boost_ROOT@ )
-
 set ( Geographer_INCLUDE_DIRS ${Geographer_ROOT}/@INCLUDE_DEST@ @Boost_INCLUDE_DIRS@ )
 
-set ( Geographer_LIBRARIES geographer)
+find_library ( Geographer_LIB
+               NAMES geographer
+               PATHS ${Geographer_ROOT}/@LIB_DEST@ )
+
+if( @WRAPPERS_FOUND@ )	
+	find_library ( wrapper_LIB
+				NAMES wrappers
+				PATHS ${Geographer_ROOT}/@LIB_DEST@ )
+endif()               
+
+set ( Geographer_LIBRARIES ${Geographer_LIB} @Boost_LIBRARIES@ ${wrapper_LIB} @EXTRA_LIBRARIES@ )
 
 set ( Geographer_FOUND true )
-
-get_filename_component(SELF_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
-include(${SELF_DIR}/geographer.cmake)

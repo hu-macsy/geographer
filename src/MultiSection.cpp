@@ -671,7 +671,10 @@ std::pair<bool,std::vector<IndexType>> MultiSection<IndexType, ValueType>::probe
     
 template<typename IndexType, typename ValueType>
 template<typename T>
-scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr  distPtr, const std::vector<std::vector<T>>& localPoints){
+scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::setPartition( 
+	std::shared_ptr<rectCell<IndexType,ValueType>> root,
+	const scai::dmemo::DistributionPtr distPtr,
+	const std::vector<std::vector<T>>& localPoints){
     SCAI_REGION("MultiSection.setPartition");
     
     const IndexType localN = distPtr->getLocalSize();

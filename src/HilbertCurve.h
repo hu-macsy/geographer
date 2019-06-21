@@ -1,4 +1,4 @@
-/*
+/* 
  * HilbertCurve.h
  *
  *  Created on: 15.11.2016
@@ -26,21 +26,27 @@
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 #include <scai/tracing.hpp>
 
+#include <JanusSort.hpp>
+
 #include "Settings.h"
 #include "Metrics.h"
 
-#include "RBC/Sort/SQuick.hpp"
-
-//#define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-
-using scai::lama::DenseVector;
 
 namespace ITI {
+
+	using scai::lama::DenseVector;
+
+	/** @brief Class providing functionality to calculate the hilbert index (and the inverse)
+	of 2 or 3 dimensional points.
+
+	 The hilbert index is the index of a point in the
+	<a href="https://en.wikipedia.org/wiki/Hilbert_curve"> hilbert curve</a>.
+	*/
+
 	template <typename IndexType, typename ValueType>
 	class HilbertCurve {
 		public:
-		/**
-		* @brief Accepts a 2D/3D point and calculates its hilbert index.
+		/** @brief Accepts a 2D/3D point and calculates its hilbert index.
 		*
 		* @param[in] point Node positions. In d dimensions, coordinates of node v are at v*d ... v*d+(d-1).
  		* @param[in] dimensions Number of dimensions of coordinates.
@@ -50,7 +56,7 @@ namespace ITI {
 		*
  		* @return A value in the unit interval [0,1]
 		*/ 
-		static ValueType getHilbertIndex(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+		static ValueType getHilbertIndex(ValueType const *point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 
 		/** @brief Gets a vector of 2D/3D coordinates and returns a vector with the  hilbert indices for all coordinates.
 		 * 
@@ -103,8 +109,7 @@ namespace ITI {
 		 */			
 		static std::vector<sort_pair> getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);			
 
-		/**
-		 * Redistribute coordinates and weights according to an implicit hilberPartition.
+		/** Redistribute coordinates and weights according to an implicit hilberPartition.
 		 * Equivalent to (but faster):
 		 *  partition = hilbertPartition(coordinates, settings)
 		 *  for (IndexType d = 0; d < settings.dimensions; d++) {
@@ -119,8 +124,13 @@ namespace ITI {
 		 */
 		static void hilbertRedistribution(std::vector<DenseVector<ValueType> >& coordinates, std::vector<DenseVector<ValueType>>& nodeWeights, Settings settings, struct Metrics& metrics);
 
-		/** @brief Checks if all the input data are distributed to PEs 
-		according to the hilbert index curve of the coordinates
+		/** @brief Checks if all the input data are distributed to PEs according to the hilbert index curve of the coordinates
+
+		 *  @param[in,out] coordinates Coordinates of input points, will be redistributed		
+		 *  @param[in,out] nodeWeights NodeWeights of input points, will be redistributed
+		 *  @param[in] settings Settings struct, effectively only needed for the hilbert curve resolution
+
+		 @return true if the coordinates are distributed among PEs based on their hilbert index, false otherwise.		 
 		*/
 		static bool confirmHilbertDistribution(
 			//const scai::lama::CSRSparseMatrix<ValueType> &graph,
@@ -129,7 +139,7 @@ namespace ITI {
 			Settings settings);			
 			
 		
-//private:
+private:
 		/** @brief Accepts a 2D point and returns is hilbert index.
 		 */
 		static ValueType getHilbertIndex2D(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
@@ -190,7 +200,9 @@ namespace ITI {
 		* @return A point in the unit cube [0,1]^3
 		*/
 		static std::vector<ValueType> Hilbert3DIndex2Point(const ValueType index, const IndexType recursionDepth);
-		
+
+		/** Similar, but for 3D, as Hilbert2DIndex2PointVec()
+		*/		
 		static std::vector<std::vector<ValueType>> Hilbert3DIndex2PointVec(const std::vector<ValueType> indices, IndexType recursionDepth);
 
 	};

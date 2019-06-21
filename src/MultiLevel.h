@@ -21,11 +21,14 @@
 #include "Settings.h"
 #include "Metrics.h" //needed for profiling, remove is not used
 
-using scai::lama::CSRSparseMatrix;
-using scai::lama::DenseVector;
-using scai::dmemo::HaloExchangePlan;
-
 namespace ITI{
+
+    using scai::lama::CSRSparseMatrix;
+    using scai::lama::DenseVector;
+    using scai::dmemo::HaloExchangePlan;
+
+    /** @brief Multilevel scheme for coarsening and refining a graph, used (mainly) for local refinement
+    */
     
     template <typename IndexType, typename ValueType>
     class MultiLevel{
@@ -78,7 +81,7 @@ namespace ITI{
          * @param[in] graph Adjacency matrix of input graph
          * @param[in] nodeWeights
          *
-         * @return vector of edges in maximum matching
+         * @return vector of edges in maximum matching. ret[i].first is a vertex that is matched to ret[i].second
          */
         static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& graph, const DenseVector<ValueType> &nodeWeights);
         
@@ -113,25 +116,26 @@ namespace ITI{
         
         /**
          * @brief Compute a global prefix sum of a block-distributed input
+         @attention This works only if \p input is distributed using a block distribution.
          */
         template<typename T>
         static DenseVector<T> computeGlobalPrefixSum(const DenseVector<T> &input, T offset = 0);
         
         /**
          * Creates a coarsened graph using geometric information. Rounds every point according to settings.pixeledDetailLevel
-         * creating a grid of size 2^detailLevel x 2^detailLevel (for 2D). Every coarse node/pixel of the
+         * creating a grid of size 2^k x 2^k (for 2D) where k=\p settings.detailLevel. Every coarse node/pixel of the
          * grid has weight equal the number of points it contains. The edge between two coarse nodes/pixels is the
          * number of edges of the input graph that their endpoints belong to different pixels.
          * 
-         * WARNING: can happen that pixels are empty, this would create isolated vertices in the pixeled graph 
+         * @warning: can happen that pixels are empty, this would create isolated vertices in the pixeled graph 
          *          which is not so good for spectral partitioning. To avoid that, we add every edge in the isolated
          *          vertices with a small weight of 0.001. This might cause other problems though, so have it in mind.
          * 
          * @param[in] adjM The adjacency matrix of the input graph
          * @param[in] coordinates The coordinates of the input points.
          * @param[out] nodeWeights The weights for the coarse nodes/pixels of the returned graph.
-         * @param[in] settings Descibe different setting for the coarsening. Here we need settings.pixeledDetailLevel.
-         * @return The adjacency matric of the coarsened/pixeled graph. This has side length 2^detailLevel and the whole size is dimension^sideLength.
+         * @param[in] settings Describe different setting for the coarsening. Here we need settings.pixeledDetailLevel.
+         * @return The adjacency matrix of the coarsened/pixeled graph. This has side length 2^detailLevel and the whole size is dimension^sideLength.
          */
         static scai::lama::CSRSparseMatrix<ValueType> pixeledCoarsen (const CSRSparseMatrix<ValueType>& adjM, const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings);
     

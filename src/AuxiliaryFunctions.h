@@ -1,4 +1,4 @@
-/**
+/*
  * A collection of several output and mesh functions.
  * TODO: maybe split, move the mesh-related functions to MeshGenerator?
  */
@@ -20,15 +20,20 @@
 #include "Settings.h"
 
 
+namespace ITI{
+
 using namespace scai::lama;
 
-namespace ITI{
+/** @brief A collection of several for output and mesh helper functions (mainly).
+*/
 
 template <typename IndexType, typename ValueType>
 class aux{
 public:
 
-//------------------------------------------------------------------------------   
+/** Print to std::cout some timing information.
+@param[in] The starting point from which is calculated how much time has passed.
+*/
 
 static void timeMeasurement(std::chrono::time_point<std::chrono::high_resolution_clock> timeStart){
 
@@ -44,12 +49,8 @@ static void timeMeasurement(std::chrono::time_point<std::chrono::high_resolution
     //set local time in your position
     allTimes[thisPE] = elapTime;
 
-    //gather all times in root (=0) PE
-    //std::vector<ValueType> allTimesLocal(numPEs);
-    //comm->gatherImpl(allTimesLocal.data(), numPEs, 0 , allTimes.data(), scai::common::TypeTraits<ValueType>::stype);
+    //replicate all times in all PEs, TODO: gather to root PE instead
     comm->sumImpl(allTimes.data(), allTimes.data(), numPEs, scai::common::TypeTraits<ValueType>::stype);
-
-    //PRINT0(allTimes.size() << " : " << allTimesLocal.size() );
 
     if( thisPE==0 ){
         if( numPEs <33 ){
@@ -78,21 +79,30 @@ static void timeMeasurement(std::chrono::time_point<std::chrono::high_resolution
 
 }
 
-
 //------------------------------------------------------------------------------   
 
-static void writeHeatLike_local_2D(std::vector<IndexType> input,IndexType sideLen, IndexType dim, const std::string filename){
+/** Given the node weights of a square grid as a vector, write them in a file that can be 
+viewed as a hear map using gnuplots.
+
+@warning Only works for square grids, i.e., sideLen*sideLen=input.size()
+@param[in] input The node weights as a 1D vector.
+@param[in] sideLen The side length of the square grid.
+@param[in] filename The name of the file to store the data.
+*/
+static void writeHeatLike_local_2D(std::vector<IndexType> input, IndexType sideLen, const std::string filename){
     std::ofstream f(filename);
     if(f.fail())
         throw std::runtime_error("File "+ filename+ " failed.");
+
+    if( sideLen*sideLen!=input.size() ){
+    	throw std::logic_error(" Function writeHeatLike_local_2D only works for square grids/\nAborting...");
+    }
     
     f<< "$map2 << EOD" << std::endl;
     
     for(IndexType i=0; i<sideLen; i++){
         for(IndexType j=0; j<sideLen; j++){
-            //for(IndexType d=0; d<dim; d++){
             f<< j << " " << i << " " << input[i*sideLen+j] << std::endl;
-            //PRINT( i/dim<< " " << i%dim << " " << input[i*dim +dim] );
         }
         f<< std::endl;
     }
@@ -102,8 +112,10 @@ static void writeHeatLike_local_2D(std::vector<IndexType> input,IndexType sideLe
 }    
 //------------------------------------------------------------------------------
 
+/** Overloaded version where node weights are an HArray.
+*/
 
-static void writeHeatLike_local_2D(scai::hmemo::HArray<IndexType> input,IndexType sideLen, IndexType dim, const std::string filename){
+static void writeHeatLike_local_2D(scai::hmemo::HArray<IndexType> input, IndexType sideLen, const std::string filename){
     std::ofstream f(filename);
     if(f.fail())
         throw std::runtime_error("File "+ filename+ " failed.");
@@ -124,7 +136,11 @@ static void writeHeatLike_local_2D(scai::hmemo::HArray<IndexType> input,IndexTyp
 }    
 //------------------------------------------------------------------------------
 
-
+/** Prints a square grid and also marks the borders between the blocks.
+@warning Only works for square grids, i.e., adjM.getNumRows() is an square number.
+@param[in] adjM The graph,
+@param[in] partition The partition of the graph.
+*/
 static void print2DGrid(const scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama::DenseVector<IndexType>& partition  ){
     
     IndexType N= adjM.getNumRows();
@@ -169,6 +185,8 @@ static void print2DGrid(const scai::lama::CSRSparseMatrix<ValueType>& adjM, scai
 }
 //------------------------------------------------------------------------------
 
+/** Prints a vector
+*/
 template<typename T>
 static void printVector( std::vector<T> v){
     for(int i=0; i<v.size(); i++){
@@ -187,18 +205,19 @@ static void split(const std::string &s, char delim, Out result) {
         *(result++) = item;
     }
 }
+//------------------------------------------------------------------------------
 
+/** Splits a string according to some delimiter.
+@param[in] s The string to be slitted.
+@param[in] delim The delimiters according to which we gonna split the string.
+@return A vector of the string separated by delim.
+*/
 static std::vector<std::string> split(const std::string &s, char delim) {
     std::vector<std::string> elems;
     split(s, delim, std::back_inserter(elems));
     return elems;
 }
 
-/*  From pixel (int) coords, either in 2S or 3D, to a 1D index. 
- * Only for cubes, where every side has the same length, maxLen;
- */
-//static IndexType pixel2Index(IndexType pixel1, IndexType maxLen, IndexType dimension){
-//}
  
  /** The l1 distance of two pixels in 2D if their given as a 1D distance.
   * @param[in] pixel1 The index of the first pixel.
@@ -245,11 +264,11 @@ static ValueType pointDistanceL2( std::vector<ValueType> p1, std::vector<ValueTy
 
 //------------------------------------------------------------------------------
 
-/* Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
+/** Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
  * of the index in 3D. The return value is not the coordinates of the point!
  * */
 
-static std::tuple<IndexType, IndexType, IndexType> index2_3DPoint(IndexType index,  std::vector<IndexType> numPoints){
+static std::tuple<IndexType, IndexType, IndexType> index2_3DPoint( const IndexType index, const  std::vector<IndexType> numPoints){
     // a YxZ plane
     SCAI_ASSERT( numPoints.size()==3 , "Wrong dimensions, should be 3");
     
@@ -267,7 +286,7 @@ static std::tuple<IndexType, IndexType, IndexType> index2_3DPoint(IndexType inde
 }
 
 
-static std::tuple<IndexType, IndexType> index2_2DPoint(IndexType index,  std::vector<IndexType> numPoints){
+static std::tuple<IndexType, IndexType> index2_2DPoint( const IndexType index, const std::vector<IndexType> numPoints){
     SCAI_ASSERT( numPoints.size()==2 , "Wrong dimensions, should be 2");
     
     IndexType xIndex = index/numPoints[1];
@@ -281,23 +300,26 @@ static std::tuple<IndexType, IndexType> index2_2DPoint(IndexType index,  std::ve
 
     return std::make_tuple(xIndex, yIndex);
 } 
+
+
 //------------------------------------------------------------------------------
 
 /** Redistribute all data according to the given a partition.
-	This basically equivallen to:
+	This basically equivalent to:
 	scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues());
 	graph.redistribute( distFromPartition, noDist );
 	...
 
-	The partititon itself is redistributed.
-
+	The partition itself is redistributed.
 	Afterwards, partition[i]=comm->getRank(), i.e., every PE gets its owned data.
-
 	It can also be done using a redistributor object.
 
 	@param[in,out] partition The partition according to which we redistribute.
-	@param[out] graph 
-
+	@param[out] graph The graph to be redistributed.
+	@param[out] coordinates The coordinates of the graoh to be redistributed.
+	@param[out] nodeWeights The node weights to be redistributed.
+	@param[in] useRedistributor Flag if we should use or not a redistributor object.
+	@param[in] renumberPEs Flag if we should renumber some PE if this reduces the communication volume.
 	@return The distribution pointer of the created distribution.
 **/
 
@@ -308,7 +330,17 @@ static scai::dmemo::DistributionPtr redistributeFromPartition(
                 DenseVector<ValueType>& nodeWeights,
                 Settings settings, 
                 bool useRedistributor = true,
-                bool renumberPEs = false );
+                bool renumberPEs = true );
+
+
+/**
+ * Iterates over the local part of the adjacency matrix and counts local edges.
+ * If an inconsistency in the graph is detected, it tries to find the inconsistent edge and throw a runtime error.
+ * Not guaranteed to find inconsistencies. Iterates once over the edge list.
+ *
+ * @param[in] input Adjacency matrix
+ */
+static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
 
 
 /** @brief Return the minimum and maximum global coordinates

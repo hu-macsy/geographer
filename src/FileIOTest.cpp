@@ -39,8 +39,8 @@ class FileIOTest : public ::testing::Test {
   
 protected:
         // the directory of all the meshes used
-        const std::string graphPath = "./meshes/";
-
+        // projectRoot is defined in config.h.in
+		const std::string graphPath = projectRoot+"/meshes/";
 };
 
 //-----------------------------------------------------------------
@@ -64,10 +64,10 @@ TEST_F(FileIOTest, testWriteMetis_Dist_3D){
     auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
 
     // create the adjacency matrix and the coordinates
-    MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
+    MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(adjM, coords, maxCoord, numPoints, 3);
 
     // write the mesh in p(=number of PEs) files
-    FileIO<IndexType, ValueType>::writeGraphDistributed( adjM, "meshes/dist3D_");
+    FileIO<IndexType, ValueType>::writeGraphDistributed( adjM, graphPath+"dist3D_");
 
 }
 
@@ -332,20 +332,18 @@ TEST_F(FileIOTest, testReadBinaryEdgeList) {
 TEST_F(FileIOTest, testReadGraphBinary){
     std::string file = "trace-00008.bgf";   // trace-08: n=8993, m=13370
     //std::string file = "Grid16x16.bgf";   // Grid16x16: n= 256, m=480
-    //std::string file = "Grid8x8.bgf";   // Grid16x16: n= 64, m=224
+    //std::string file = "Grid8x8.bgf";   // Grid8x8: n= 64, m=224
     std::string filename= graphPath + file;
         
     scai::lama::CSRSparseMatrix<ValueType> graph;
     
-    //std::vector<DenseVector<ValueType>> dummyWeightContainer;
     graph =  FileIO<IndexType, ValueType>::readGraphBinary(filename);
     
     //assertions
     
     //TODO: read same graph with the original reader. Matrices must be identical
     
-    //std::string txtFile= file.substr(0, file.length()-4);
-    std::string txtFile= "./meshes/trace-00008.graph";
+    std::string txtFile= graphPath+"/trace-00008.graph";
     std::fstream f(txtFile);
     if (f.fail()) {
         throw std::runtime_error("Reading graph from " + txtFile + " failed.");
@@ -428,10 +426,10 @@ TEST_F(FileIOTest, testReadMatrixMarketFormat){
 
 TEST_F(FileIOTest, testReadBlockSizes){
     
-    std::string path = "testing/";
+    std::string path = projectRoot+"/testing/";
     std::string blocksFile = path + "blockSizes.txt";
 
-    std::vector<std::vector<ValueType> > blockSizes = FileIO<IndexType,ValueType>::readBlockSizes(blocksFile, 16);
+    std::vector<std::vector<ValueType>> blockSizes = FileIO<IndexType,ValueType>::readBlockSizes(blocksFile, 16);
     
     SCAI_ASSERT( blockSizes[0].size()==16 , "Wrong number of blocks, should be 16 but is " << blockSizes.size() );
 
@@ -626,7 +624,7 @@ TEST_F (FileIOTest, testreadOFFCentral){
     }
     SCAI_ASSERT_EQ_ERROR( true, graph.isConsistent(), "Matrix not consistent");
     
-    PRINT( graph.getNumValues() << " _ " << graph.getNumRows() << " @ " << graph.getNumColumns() );
+    //PRINT( graph.getNumValues() << " _ " << graph.getNumRows() << " @ " << graph.getNumColumns() );
 }
 //-------------------------------------------------------------------------------------------------
 
@@ -635,21 +633,21 @@ TEST_F (FileIOTest, testReadEdgeListDistributed){
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	if( comm->getSize() != 4 ){
 		if( comm->getRank() == 0){
-			std::cout << "\n\t\t### WARNING: this test, " << __FUNCTION__ << " reads a distributed file and only works for p=4. You should call again with mpirun -n 4 (maybe also with --gtest_filter=*ReadEdgeListDistributed)." << std::endl<< std::endl;
+			std::cout << "\n\t\t### WARNING: this test reads a distributed file and only works for p=4. You should call again with mpirun -n 4 (maybe also with --gtest_filter=*ReadEdgeListDistributed)." << std::endl<< std::endl;
 		}		
-	}
-	ASSERT_EQ( comm->getSize(), 4) << "Specific number of processors needed for this test: 4";
+	} else {
+	
+        std::string file = graphPath + "tmp4/out";
 
-    std::string file = graphPath + "tmp4/out";
+        scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readEdgeListDistributed( file );
 
-    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readEdgeListDistributed( file );
+        ASSERT_TRUE( graph.isConsistent());
+        EXPECT_TRUE( graph.checkSymmetry() );
+        EXPECT_EQ( graph.getNumRows(), graph.getNumColumns()) << "Matrix is not square";
 
-    ASSERT_TRUE( graph.isConsistent());
-    EXPECT_TRUE( graph.checkSymmetry() );
-    EXPECT_EQ( graph.getNumRows(), graph.getNumColumns()) << "Matrix is not square";
-
-    // only for graph: graphPath + "tmp4/out"
-    EXPECT_EQ( graph.getNumRows(), 16) << "for files tmp4/out N must be 16";
+        // only for graph: graphPath + "tmp4/out"
+        EXPECT_EQ( graph.getNumRows(), 16) << "for files tmp4/out N must be 16";
+    }
 }
 //-------------------------------------------------------------------------------------------------
 

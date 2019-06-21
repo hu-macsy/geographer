@@ -32,8 +32,8 @@ namespace ITI {
 class ParcoRepartTest : public ::testing::Test {
     protected:
         // the directory of all the meshes used
-        std::string graphPath = "./meshes/";
-
+		// projectRoot is defined in config.h.in
+		const std::string graphPath = projectRoot+"/meshes/";
 };
 
 
@@ -255,7 +255,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
 	  coordinates[i] = DenseVector<ValueType>(dist, 0);
   }
   
-  MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(a, coordinates, maxCoord, numPoints);
+  MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(a, coordinates, maxCoord, numPoints, dimensions);
 
   const ValueType epsilon = 0.05;
   
@@ -460,7 +460,17 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
 
 	a = scai::lama::eval<scai::lama::CSRSparseMatrix<ValueType>>(a+aT);
 
-	PRINT("num of edges= " << a.getNumValues()/2 );
+	//go over elements and turn them to integers.
+	//this way a.checkSymmetry does not fail due to floating point errors
+	for(int i=0; i<n; i++ ){
+		for(int j=0; j<n;  j++ ){
+			ValueType val = a.getLocalStorage().getValue(i,j);
+			if(val!=0)//if [i,j] is a non-zero value
+				a.setValue( i, j, int (100*val) );
+		}
+	}
+
+	//PRINT("num of edges= " << a.getNumValues()/2 );
 	EXPECT_TRUE( a.isConsistent() );
 	EXPECT_TRUE( a.checkSymmetry() );
 
@@ -471,12 +481,13 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
 		part.setValue(i, blockId);
 	}
   
-  struct Settings settings;
-  settings.numBlocks= k;
+	struct Settings settings;
+	settings.numBlocks= k;
 
 	scai::lama::CSRSparseMatrix<ValueType> blockGraph =  GraphUtils<IndexType, ValueType>::getBlockGraph_dist( a, part, k);
 	EXPECT_TRUE( blockGraph.isConsistent() );
-	EXPECT_TRUE( blockGraph.checkSymmetry() ); //TODO: this fails occasionally
+	EXPECT_TRUE( blockGraph.checkSymmetry() ); 
+
 	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local(blockGraph, settings);
 
 	IndexType rounds = scheme.size();
@@ -698,8 +709,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     //distrubute graph
-    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
-        
+    //graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
 
     //read the array locally and messed the distribution. Left as a remainder.
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
@@ -765,7 +775,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
     auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
     
     // create the adjacency matrix and the coordinates
-    MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
+    MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(adjM, coords, maxCoord, numPoints, 3);
     
     struct Settings settings;
     settings.numBlocks= k;
@@ -822,7 +832,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
  *  |   |   |   |
  *  0 - 1 - 14- 15
 */
-TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
+TEST_F (ParcoRepartTest, testGetLocalWeightedGraphColoring_2D) {
     std::string file = graphPath+ "Grid8x8";
     std::ifstream f(file);
     IndexType dimensions= 2, k=16;
@@ -840,7 +850,7 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
         
 
-    //read the array locally and messed the distribution. Left as a remainder.
+    //read the array locally and messed the distribution. Left as a reminder.
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
     EXPECT_EQ( edges, (graph.getNumValues())/2 );
     
@@ -853,7 +863,6 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    settings.mec = false; //use the boost coloring algo
     struct Metrics metrics(settings);
     
     //get the partition
@@ -869,7 +878,7 @@ TEST_F (ParcoRepartTest, testGetLocalGraphColoring_2D) {
     scai::lama::CSRSparseMatrix<ValueType> blockGraph = GraphUtils<IndexType, ValueType>::getBlockGraph( graph, partition, k);
     
     IndexType colors;
-    std::vector< std::vector<IndexType>>  coloring = ParcoRepart<IndexType, ValueType>::getGraphEdgeColoring_local(blockGraph, colors);
+    std::vector< std::vector<IndexType>>  coloring = GraphUtils<IndexType, ValueType>::mecGraphColoring( blockGraph, colors); // our implementation
     
     std::vector<DenseVector<IndexType>> communication = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(blockGraph, settings);
     

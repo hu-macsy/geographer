@@ -8,7 +8,8 @@ namespace ITI {
 class CommTreeTest : public ::testing::Test {
     protected:
         // the directory of all the meshes used
-        std::string graphPath = "./meshes/";
+        // projectRoot is defined in config.h.in
+		std::string graphPath = projectRoot+"/meshes/";
 };
 
 typedef typename CommTree<IndexType,ValueType>::commNode cNode;
@@ -37,8 +38,8 @@ TEST_F(CommTreeTest, testTreeFromLeaves){
 
 	//with one more level
 	std::vector<cNode> leaves2 = {
-		// 				{hierachy ids}, numCores, mem, speed
-		cNode( std::vector<unsigned int>{0,0,0}, {4, 8, 50} ),//0
+		// 				{hierachy ids}, numCores, mem, speed  	//leafID
+		cNode( std::vector<unsigned int>{0,0,0}, {4, 8, 50} ),	//0
 		cNode( std::vector<unsigned int>{0,0,1}, {4, 0.8, 90} ),
 		cNode( std::vector<unsigned int>{0,0,2}, {4, 0.8, 60} ),
 
@@ -63,7 +64,6 @@ TEST_F(CommTreeTest, testTreeFromLeaves){
 		cNode( std::vector<unsigned int>{2,1,0}, {8, 0.12, 90} ),//16
 		cNode( std::vector<unsigned int>{2,1,1}, {8, 0.12, 90} ),	
 	};
-	//std::vector<bool> isProp2 = { false, true, false };
 
 
 	for( std::vector<cNode> leaves: {leaves1, leaves2} ){
@@ -83,8 +83,8 @@ TEST_F(CommTreeTest, testTreeFromLeaves){
 		//cTree.print();
 
 		EXPECT_TRUE( cTree.checkTree(true) );
-		EXPECT_EQ( cTree.numLeaves, leaves.size() );
-		EXPECT_EQ( cTree.tree[0].size(), 1 ); //top level is just the root
+		EXPECT_EQ( cTree.getNumLeaves(), leaves.size() );
+		EXPECT_EQ( cTree.getHierLevel(0).size(), 1 ); //top level is just the root
 		
 		//accumulate weights for all leaves
 		std::vector<ValueType> sumWeights( 3, 0.0 );
@@ -100,7 +100,7 @@ TEST_F(CommTreeTest, testTreeFromLeaves){
 			EXPECT_FLOAT_EQ( root.weights[i], sumWeights[i] ) << " for weight " << i;
 		}
 		
-		EXPECT_EQ( root.children.size(), cTree.numLeaves );
+		EXPECT_EQ( root.children.size(), cTree.getNumLeaves() );
 	}
 }// TEST_F(CommTreeTest, testTreeFromLeaves)
 
@@ -111,12 +111,14 @@ TEST_F(CommTreeTest, testTreeFlatHomogeneous){
 	IndexType k= 12;
 
 	ITI::CommTree<IndexType,ValueType> cTree;
-	cTree.createFlatHomogeneous( k );
+	IndexType numNodes = cTree.createFlatHomogeneous( k );
 
 	//cTree.print();
 	EXPECT_TRUE( cTree.checkTree(true) );
-	EXPECT_EQ( cTree.numLeaves, k );
-	EXPECT_EQ( cTree.tree[0].size(), 1 ); 
+	EXPECT_EQ( cTree.getNumLeaves(), k );
+	EXPECT_EQ( cTree.getHierLevel(0).size(), 1 ); 
+	EXPECT_EQ( numNodes, cTree.getNumNodes() );
+	EXPECT_EQ( numNodes, k+1);
 }//TEST_F(CommTreeTest, testTreeFlatHomogeneous)
 
 //------------------------------------------------------------------------
@@ -129,8 +131,8 @@ TEST_F(CommTreeTest, testTreeNonFlatHomogeneous){
 	
 	//cTree.print();
 	EXPECT_TRUE( cTree.checkTree(true) );
-	EXPECT_EQ( cTree.numLeaves, k );
-	EXPECT_EQ( cTree.tree[0].size(), 1 ); 
+	EXPECT_EQ( cTree.getNumLeaves(), k );
+	EXPECT_EQ( cTree.getHierLevel(0).size(), 1 ); 
 	
 }//TEST_F(CommTreeTest, testTreeNonFlatHomogeneous)
 
@@ -249,9 +251,10 @@ TEST_F(CommTreeTest, testAdaptWeights){
 		cNode( std::vector<unsigned int>{2,4}, {53, 0.23, 90} )
 	};
 
+	//1st and 3rd weights are proportional
 	ITI::CommTree<IndexType,ValueType> cTree( leaves,{ false, true, false } );
 
-	IndexType N = 500; //the nodes of the supposed graphPath
+	IndexType N = 500; //the nodes of the supposed graph
 	std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(3);
 
 	for( int i=0; i<3; i++ ){

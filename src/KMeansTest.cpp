@@ -13,8 +13,8 @@ using scai::lama::DenseVector;
 class KMeansTest : public ::testing::Test {
 protected:
         // the directory of all the meshes used
-        std::string graphPath = "./meshes/";
-
+        // projectRoot is defined in config.h.in
+		const std::string graphPath = projectRoot+"/meshes/";
 };
 
 TEST_F(KMeansTest, testFindInitialCentersSFC) {
@@ -149,7 +149,7 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 	EXPECT_EQ( centers1[0].size(), dimensions );
 
 	settings.sfcResolution = std::log2(k);
-	std::vector<std::vector<ValueType>> centers2 = KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>( maxCoords, settings);
+	std::vector<std::vector<ValueType>> centers2 = KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>( minCoords, maxCoords, settings);
 	EXPECT_EQ( centers2.size(), dimensions );
 
 //WARNING: quick fix for tests to pass
@@ -165,13 +165,15 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 	centers1 = reversedCenters;
 }
 
-
-
 	EXPECT_EQ( centers1.size(), centers2.size() );
 	EXPECT_EQ( centers1[0].size(), centers2[0].size() );
 	EXPECT_EQ( centers1[0].size(), k);
 	
 	if(comm->getRank()==0){
+		std::cout<<"minCoords= ";
+		for(int d=0; d<dimensions; d++){
+			std::cout<< minCoords[d] <<", ";
+		}		
 		std::cout<<"maxCoords= ";
 		for(int d=0; d<dimensions; d++){
 			std::cout<< maxCoords[d] <<", ";
@@ -179,7 +181,6 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 		std::cout<< std::endl;
 		std::cout<<"center1" << std::endl;
 		for( int c=0; c<k; c++){
-			//std::cout<<"center1["<< c << "]= ";
 			std::cout<<"( ";
 			for(int d=0; d<dimensions; d++){
 				std::cout<< centers1[d][c]<< ", ";
@@ -190,10 +191,9 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 		
 		std::cout<<"center2" << std::endl;
 		for( int c=0; c<k; c++){
-			//std::cout<<"center2["<< c << "]= ";
 			std::cout<<"( ";
 			for(int d=0; d<dimensions; d++){
-				std::cout<<  centers2[d][c]*maxCoords[d]<< ", ";
+				std::cout<<  centers2[d][c]<< ", ";
 			}
 			std::cout<< "\b\b )" << std::endl;
 		}

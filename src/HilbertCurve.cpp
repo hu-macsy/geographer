@@ -223,7 +223,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
 		throw std::runtime_error("Wrong dimensions given");
 	}
 	
-	/**
+	/*
      * get minimum / maximum of coordinates
      */
 	ValueType minCoords[2];
@@ -236,7 +236,10 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
 			maxCoords[dim] = coordinates[dim].max();
 			assert(std::isfinite(minCoords[dim]));
 			assert(std::isfinite(maxCoords[dim]));
-			SCAI_ASSERT_GT_ERROR(maxCoords[dim], minCoords[dim], "Wrong coordinates.");
+			SCAI_ASSERT_GE_ERROR(maxCoords[dim], minCoords[dim], "Wrong coordinates for dimension " << dim);
+			if( maxCoords[dim]==minCoords[dim] ){
+				std::cout << "WARNING: min and max coords are equal: all points are collinear" << std::endl;
+			}
 		}
     }
     
@@ -320,7 +323,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
 		throw std::runtime_error("Wrong dimensions given");
 	}
 	
-	/**
+	/*
      * get minimum / maximum of coordinates
      */
 	ValueType minCoords[3];
@@ -566,7 +569,7 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
     const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(globalN), double(21));
     //const IndexType recursionDepth = std::min(std::log2(globalN), double(21));
 	
-	 /**
+	 /*
      *	create space filling curve indices.
      */
     
@@ -585,7 +588,7 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
         }
     }
     
-     /**
+     /*
      * now sort the global indices by where they are on the space-filling curve.
      */
 	 
@@ -593,14 +596,14 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
         SCAI_REGION( "ParcoRepart.getSortedHilbertIndices.sorting" );
         
         int typesize;
-        MPI_Type_size(SortingDatatype<sort_pair>::getMPIDatatype(), &typesize);
+        MPI_Type_size(MPI_DOUBLE_INT, &typesize);
         //assert(typesize == sizeof(sort_pair)); does not have to be true anymore due to padding
         
 		
 		//call distributed sort
         //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
         MPI_Comm mpi_comm = MPI_COMM_WORLD;
-        SQuick::sort<sort_pair>(mpi_comm, localPairs, -1);
+        JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
 
         //copy hilbert indices into array
 
@@ -637,6 +640,10 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
     const IndexType globalN = inputDist->getGlobalSize();
     const IndexType rank = comm->getRank();
 
+    if (comm->getSize() == 1) {
+    	return;
+    }
+
     std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
     const IndexType numNodeWeights = nodeWeights.size();
 
@@ -650,7 +657,7 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
     std::vector<ValueType> hilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
     SCAI_REGION_END("ParcoRepart.hilbertRedistribution.sfc")
     SCAI_REGION_START("ParcoRepart.hilbertRedistribution.sort")
-    /**
+    /*
      * fill sort pair
      */
 
@@ -665,8 +672,8 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
         }
     }
 
-    MPI_Comm mpi_comm = MPI_COMM_WORLD; //maybe cast the communicator ptr to a MPI communicator and get getMPIComm()?
-    SQuick::sort<sort_pair>(mpi_comm, localPairs, -1); //could also do this with just the hilbert index - as a valueType
+    MPI_Comm mpi_comm = MPI_COMM_WORLD; //TODO: cast the communicator ptr to a MPI communicator and get getMPIComm()?
+    JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
     //IndexType newLocalN = localPairs.size();
     migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
     metrics.MM["timeMigrationAlgo"] = migrationCalculation.count();

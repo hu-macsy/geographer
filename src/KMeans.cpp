@@ -106,7 +106,7 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		//gather all block sizes to root
 		IndexType arraySize=1;
 		if( comm->getRank()==rootPE ){
-			//a possible bottleneck: in the last stepm arraySize=k*p
+			//a possible bottleneck: in the last step arraySize=k*p
 			//TODO?: cut to smaller chunks and do it in rounds?
 			arraySize = numPEs*numOldBlocks; 
 		}
@@ -329,7 +329,10 @@ std::vector<std::vector<ValueType>>  findInitialCentersSFC(
 
 
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(const std::vector<ValueType> &maxCoords, Settings settings){
+std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(
+	const std::vector<ValueType> &minCoords,
+	const std::vector<ValueType> &maxCoords,
+	Settings settings){
 	//This assumes that minCoords is 0!
     //TODO: change or remove
 	const IndexType dimensions = settings.dimensions;
@@ -348,8 +351,9 @@ std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(const std::ve
 		centerCoords = HilbertCurve<IndexType,ValueType>::HilbertIndex2Point( centerHilbInd, settings.sfcResolution, settings.dimensions);
 		SCAI_ASSERT_EQ_ERROR( centerCoords.size(), dimensions, "Wrong dimensions for center.");
 		
+		//centerCoords are points in the unit square; project back to input space
 		for (IndexType d = 0; d < dimensions; d++) {
-			result[d][i] = centerCoords[d]*maxCoords[d];
+			result[d][i] = (centerCoords[d]*(maxCoords[d]-minCoords[d]))+minCoords[d];
 		}
 	}
 	return result;
@@ -513,6 +517,15 @@ DenseVector<IndexType> assignBlocks(
 	const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 	const IndexType localN = dist->getLocalSize();
 	const IndexType currentLocalN = std::distance(firstIndex, lastIndex);
+	
+	if (currentLocalN < 0) {
+		throw std::runtime_error("currentLocalN: " + std::to_string(currentLocalN));
+	}
+
+	if (currentLocalN == 0) {
+		PRINT("Process " + std::to_string(comm->getRank()) + " has no local points!");
+		return previousAssignment;
+	}
 
 	//if repartition, numOldBlocks=1
 	//number of blocks from the previous hierarchy
@@ -885,6 +898,12 @@ DenseVector<IndexType> assignBlocks(
 				const auto pair = std::minmax_element(influence[i].begin(), influence[i].end());
 				influenceSpread[i] = *pair.second / *pair.first;
 			}
+
+			std::vector<ValueType> weightSpread(numNodeWeights);
+			for (IndexType i = 0; i < numNodeWeights; i++) {
+				const auto pair = std::minmax_element(blockWeights[i].begin(), blockWeights[i].end());
+				weightSpread[i] = *pair.second / *pair.first;
+			}
 			
 			std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
 			totalBalanceTime += balanceTime.count() ;
@@ -895,6 +914,10 @@ DenseVector<IndexType> assignBlocks(
 					<< averageComps << ", balanced blocks: " << 100*ValueType(balancedBlocks) / numNewBlocks << "%, influence spread: ";
 				for (IndexType i = 0; i < numNodeWeights; i++) {
 					 std::cout << influenceSpread[i] << " ";
+				}
+				std::cout << ", weight spread : ";
+				for (IndexType i = 0; i < numNodeWeights; i++) {
+					 std::cout << weightSpread[i] << " ";
 				}
 				std::cout << ", imbalance : ";
 				for (IndexType i = 0; i < numNodeWeights; i++) {
@@ -1167,7 +1190,6 @@ DenseVector<IndexType> computePartition( \
 		}
 	}
 
-	//TODO: we can use aux::getGlobalMinMax
 	std::vector<ValueType> globalMinCoords(dim);
 	std::vector<ValueType> globalMaxCoords(dim);
 	comm->minImpl(globalMinCoords.data(), minCoords.data(), dim, scai::common::TypeTraits<ValueType>::stype);
@@ -1306,7 +1328,7 @@ DenseVector<IndexType> computePartition( \
 			const ValueType ratio = totalSampledWeightSum / nodeWeightSum[i];
 			adjustedBlockSizes[i].resize(targetBlockWeights[i].size());
 
-			SCAI_ASSERT_LE_ERROR( totalSampledWeightSum, nodeWeightSum[i]+ 1e-10, "Error in sampled weight sum." );
+			SCAI_ASSERT_LE_ERROR( totalSampledWeightSum, nodeWeightSum[i]+ 1e-8, "Error in sampled weight sum." );
 			
 			for (IndexType j = 0; j < targetBlockWeights[i].size(); j++) {
 				adjustedBlockSizes[i][j] = ValueType(targetBlockWeights[i][j]) * ratio;
@@ -1536,7 +1558,7 @@ DenseVector<IndexType> computePartition(
 
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
-    std::tie(minCoords, maxCoords) = aux<IndexType,ValueType>::getGlobalMinMaxCoords( coordinates );
+    std::tie(minCoords, maxCoords) = getLocalMinMaxCoords( coordinates );
 
 	std::vector<point> centers = findInitialCentersSFC<IndexType,ValueType>(coordinates, minCoords, maxCoords, settings);
 	SCAI_ASSERT_EQ_ERROR( centers.size(), settings.numBlocks, "Number of centers is not correct" );
@@ -1563,7 +1585,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 	struct Metrics& metrics){
 
 	//check although numBlocks is not needed or used
-	SCAI_ASSERT_EQ_ERROR(settings.numBlocks, commTree.numLeaves, "The number of leaves and number of blocks must agree");
+	SCAI_ASSERT_EQ_ERROR(settings.numBlocks, commTree.getNumLeaves(), "The number of leaves and number of blocks must agree");
 
 	//get global communicator
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -1603,7 +1625,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 	std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
-    std::tie(minCoords, maxCoords) = aux<IndexType,ValueType>::getGlobalMinMaxCoords( coordinates );
+    std::tie(minCoords, maxCoords) = getLocalMinMaxCoords( coordinates );
 
     //used later for debugging and calculating imbalance
     std::vector<ValueType> totalWeightSum(numNodeWeights);
@@ -1629,7 +1651,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 	//skip root. If we start from the root, we will know the number
 	//of blocks but not the memory and speed per block
-	for(unsigned int h=1; h<commTree.hierarchyLevels; h++ ){
+	for(unsigned int h=1; h<commTree.getNumHierLevels(); h++ ){
 
 		/*
 		There are already as many blocks as the number of leaves
@@ -1778,10 +1800,28 @@ DenseVector<IndexType> computeHierPlusRepart(
 	return  ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinates, nodeWeights, blockSizes, result, settings);
 }//computeHierPlusRepart
 
+/** Get local minimum and maximum coordinates
+ * TODO: This isn't used any more! Remove?
+ */
+template<typename ValueType>
+std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates) {
+	const int dim = coordinates.size();
+	std::vector<ValueType> minCoords(dim);
+	std::vector<ValueType> maxCoords(dim);
+	for (int d = 0; d < dim; d++) {
+		minCoords[d] = coordinates[d].min();
+        maxCoords[d] = coordinates[d].max();
+		SCAI_ASSERT_NE_ERROR( minCoords[d], maxCoords[d], "min=max for dimension "<< d << ", this will cause problems to the hilbert index. local= " << coordinates[0].getLocalValues().size() );
+	}
+	return {minCoords, maxCoords};
+}
 
 }; // namespace KMeans
 
-template std::vector<std::vector<ValueType> > KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>(const std::vector<ValueType> &maxCoords, Settings settings);
+template std::vector<std::vector<ValueType> > KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>(
+	const std::vector<ValueType> &minCoords,
+	const std::vector<ValueType> &maxCoords,
+	Settings settings);
 
 //instantiations needed otherwise there is a undefined reference 
 template DenseVector<IndexType> KMeans::computePartition(

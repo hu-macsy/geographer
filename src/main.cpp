@@ -11,15 +11,12 @@
 
 #include <scai/lama/Vector.hpp>
 
-#include <boost/algorithm/string.hpp>
-#include <boost/program_options.hpp>
-#include <boost/filesystem.hpp>
-
 #include <memory>
 #include <cstdlib>
 #include <chrono>
-#include <iomanip> 
-#include <unistd.h>
+#include <iomanip>
+
+#include <cxxopts.hpp>
 
 #include "Diffusion.h"
 #include "MeshGenerator.h"
@@ -29,7 +26,7 @@
 #include "Metrics.h"
 #include "SpectralPartition.h"
 #include "GraphUtils.h"
-
+#include "parseArgs.h"
 
 /**
  *  Examples of use:
@@ -48,21 +45,31 @@
 
 //void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);	
 
-
 int main(int argc, char** argv) {
-	using namespace boost::program_options;
+    using namespace ITI;
 	
-	//bool writePartition = false;
-    
-	std::string metricsDetail = "all";
 	std::string blockSizesFile;
 	//ITI::Format coordFormat;
     
-        
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    if (comm->getType() != scai::dmemo::Communicator::CommunicatorKind::MPI) {
+        std::cout << "The linked lama version was compiled without MPI. Only sequential partitioning is supported." << std::endl;
+    }
 
-	struct Settings settings;
-	variables_map vm = settings.parseInput( argc, argv);
+    std::string callingCommand = "";
+    for (IndexType i = 0; i < argc; i++) {
+        callingCommand += std::string(argv[i]) + " ";
+    }
+
+    cxxopts::Options options = ITI::populateOptions();
+	cxxopts::ParseResult vm = options.parse(argc, argv);
+
+    if (vm.count("help")) {
+        std::cout << options.help() << std::endl;
+        return 0;
+    }
+
+    struct Settings settings = ITI::interpretSettings(vm);
 	if( !settings.isValid )
 		return -1;
 
@@ -102,10 +109,7 @@ int main(int argc, char** argv) {
         std::cout.precision(oldprecision);
 
         std::cout << "Calling command:" << std::endl;
-        for (IndexType i = 0; i < argc; i++) {
-            std::cout << std::string(argv[i]) << " ";
-        }
-        std::cout << std::endl << std::endl;
+        std::cout << callingCommand << std::endl << std::endl;
 
     }
 
@@ -281,7 +285,7 @@ int main(int argc, char** argv) {
         }
        
         // create the adjacency matrix and the coordinates
-        ITI::MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist( graph, coordinates, maxCoord, numPoints);
+        ITI::MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist( graph, coordinates, maxCoord, numPoints, settings.dimensions );
         
         IndexType nodes= graph.getNumRows();
         IndexType edges= graph.getNumValues()/2;
@@ -331,8 +335,9 @@ int main(int argc, char** argv) {
     if(vm.count("PEgraphFile")){
         throw std::logic_error("Reading of communication trees not yet implemented here.");
     	//commTree =  FileIO<IndexType, ValueType>::readPETree( settings.PEGraphFile );
-    }else if( vm.count("blockSizesFile") ){
+    } else if( vm.count("blockSizesFile") ){
     	//blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
+        blockSizesFile = vm["blockSizesFile"].as<std::string>();
         std::vector<std::vector<ValueType>> blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
         if (blockSizes.size() < nodeWeights.size()) {
             throw std::invalid_argument("Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + " weights per block, "
@@ -483,10 +488,10 @@ int main(int argc, char** argv) {
         
         std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
     
-		if( metricsDetail=="all" ){
+		if( settings.metricsDetail=="all" ){
 			metricsVec[r].getAllMetrics( graph, partition, nodeWeights, settings );
 		}
-        if( metricsDetail=="easy" ){
+        if( settings.metricsDetail=="easy" ){
 			metricsVec[r].getEasyMetrics( graph, partition, nodeWeights, settings );
 		}
 
@@ -495,7 +500,6 @@ int main(int argc, char** argv) {
 
 		std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
 
-if(comm->getRank() == 0 ) metricsVec[r].printHorizontal2( std::cout );        
         //---------------------------------------------
         //
         // Print some output
@@ -506,7 +510,7 @@ if(comm->getRank() == 0 ) metricsVec[r].printHorizontal2( std::cout );
             std::cout << " p:"<< comm->getSize() << " k:"<< settings.numBlocks;
             auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
             std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
-            std::cout.precision(oldprecision);
+            std::cout.precision(oldprecision);            
             metricsVec[r].printHorizontal2( std::cout ); //TODO: remove?
         }
        
@@ -517,7 +521,7 @@ if(comm->getRank() == 0 ) metricsVec[r].printHorizontal2( std::cout );
         
         metricsVec[r].MM["reportTime"] = ValueType (comm->max(reportTime.count()));
         
-        if (comm->getRank() == 0 && metricsDetail != "no") {
+        if (comm->getRank() == 0 && settings.metricsDetail.compare("no") != 0) {
             metricsVec[r].print( std::cout );            
         }
         if( settings.storeInfo && settings.outFile!="-" ) {
@@ -591,7 +595,7 @@ if(comm->getRank() == 0 ) metricsVec[r].printHorizontal2( std::cout );
     }    
     
     
-    if( settings.outFile!="-" and settings.writeInFile ){
+    if( settings.outFile!="-" ){
         std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
         std::string partOutFile = settings.outFile+".part";
 		ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
@@ -599,7 +603,7 @@ if(comm->getRank() == 0 ) metricsVec[r].printHorizontal2( std::cout );
         std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
         if( comm->getRank()==0 ){
             std::cout << " and last partition of the series in file " << partOutFile << std::endl;
-            std::cout<< " Time needed to write .partition file: " << writePartTime.count() <<  std::endl;
+            std::cout<< " Time needed to write .part file: " << writePartTime.count() <<  std::endl;
         }
     }    
     
@@ -615,41 +619,14 @@ if(comm->getRank() == 0 ) metricsVec[r].printHorizontal2( std::cout );
 			coordinateCopy[dim].redistribute( distFromPartition );
         }
         
-        std::string destPath = "partResults/main/blocks_" + std::to_string(settings.numBlocks) ;
-        boost::filesystem::create_directories( destPath );   
-        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, settings.dimensions, destPath + "/debugResult");
+        ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, settings.dimensions, "debugResult");
         comm->synchronize();
-        
-        //TODO: use something like the code below instead of a NoDistribution
-        //std::vector<IndexType> gatheredPart;
-        //comm->gatherImpl( gatheredPart.data(), N, 0, partition.getLocalValues(), scai::common::TypeTraits<IndexType>::stype );
-        /*
-        scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
-        graph.redistribute( noDistPtr, noDistPtr );
-        partition.redistribute( noDistPtr );
-        for (IndexType dim = 0; dim < settings.dimensions; dim++) {
-            coordinates[dim].redistribute( noDistPtr );
-        }
-        
-        //scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();     
-        
-        //TODO: change that in later version, where data are gathered in one PE and are not replicated
-        SCAI_ASSERT_ERROR( graph.getRowDistributionPtr()->isReplicated()==1, "Adjacency should be replicated. Aborting...");
-        SCAI_ASSERT_ERROR( partition.getDistributionPtr()->isReplicated()==1, "Partition should be replicated. Aborting...");
-        SCAI_ASSERT_ERROR( coordinates[0].getDistributionPtr()->isReplicated()==1, "Coordinates should be replicated. Aborting...");
-        
-        if( comm->getRank()==0 ){
-            if( settings.outFile != "-" ){
-                ITI::FileIO<IndexType,ValueType>::writeVTKCentral( graph, coordinates, partition, settings.outFile+".vtk" );
-            }else{
-                ITI::FileIO<IndexType,ValueType>::writeVTKCentral( graph, coordinates, partition, destPath + "/debugResult.vtk" );
-            }
-        }
-        */
     }
-      	  
-    //this is needed for supermuc
-    std::exit(0);   
+    
+    if (vm.count("callExit")) {
+        //this is needed for supermuc
+        std::exit(0);
+    }
     
     return 0;
 }

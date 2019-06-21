@@ -12,42 +12,33 @@
 #include <fstream>
 #include <chrono>
 #include <numeric>
- 
-#include <boost/program_options.hpp>
-#include <boost/filesystem.hpp>
 
 #include <scai/dmemo/BlockDistribution.hpp>
 
 #include "Metrics.h"
 
-#include <parmetis.h>
-
-//for zoltan
-#include <Zoltan2_PartitioningSolution.hpp>
-#include <Zoltan2_PartitioningProblem.hpp>
-#include <Zoltan2_BasicVectorAdapter.hpp>
-#include <Zoltan2_InputTraits.hpp>
 
 namespace ITI {
 
+/*@brief Class for external partitioning tools like zoltan and metis.
+*/
 
 template <typename IndexType, typename ValueType>
 class Wrappers {
 
 public:
-	//TODO: different interface for methods that do not require coordinates
 	
 	/** Returns a partition with one of the supported tools
 	 * 
-	 * @param[in] graph The adjacency matrix of the graph of size NxN
-	 * @param[in] coordinates The coordinates of the mesh. Not always needed by all tools
-	 * @param[in] nodeWeights Weights for every node, used only is nodeWeightFlag is true
-	 * @param[in] nodeWeightsFlag If true the node weigts are used, if false they are ignored
+	 * @param[in] graph The adjacency matrix of the graph of size NxN, where N is the number of vertices of the graph.
+	 * @param[in] coordinates The coordinates of the mesh. Not always needed by all tools.
+	 * @param[in] nodeWeights Weights for every node, used only is nodeWeightFlag is true.
+	 * @param[in] nodeWeightsFlag If true the node weights are used, if false they are ignored.
 	 * @param[in] tool One of the supported tools.
-	 * @param[in] settings A Settings structure to pass various settings
-	 * @param[out] metrics Structure to store/return timing info
+	 * @param[in] settings A Settings structure to pass various settings.
+	 * @param[out] metrics Structure to store/return timing info.
 	 * 
-	 * @return A DenseVector of size N with the partition calcualted: 0<= return[i] < k with the block that point i belongs to
+	 * @return A DenseVector of size N with the partition calculated: 0<= return[i] < k with the block that point i belongs to
 	 */
 	static scai::lama::DenseVector<IndexType> partition(
 		const scai::lama::CSRSparseMatrix<ValueType> &graph,
@@ -58,6 +49,18 @@ public:
 		struct Settings &settings,
 		struct Metrics &metrics
 	);
+	
+	
+	/** @brief Version for tools that do not need the graph as input.
+	 */
+	static scai::lama::DenseVector<IndexType> partition(
+		const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
+		const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
+		bool nodeWeightsFlag,
+		Tool tool,
+		struct Settings &settings,
+		struct Metrics &metrics
+	);	
 	
 	/** Returns a partition with one of the supported tools based on the current distribution of the data.
 	 * 
@@ -143,7 +146,6 @@ private:
 		struct Metrics &metrics);
 		
 	static scai::lama::DenseVector<IndexType> zoltanCore (
-		const scai::lama::CSRSparseMatrix<ValueType> &graph,
 		const std::vector<scai::lama::DenseVector<ValueType>> &coords, 
 		const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 		bool nodeWeightsFlag,

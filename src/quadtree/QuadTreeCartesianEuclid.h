@@ -18,6 +18,10 @@
 
 namespace ITI {
 
+/** A cartesian, euclidean tree.
+
+*/
+
 class QuadTreeCartesianEuclid : public ITI::SpatialTree {
 	friend class QuadTreeCartesianEuclidTest;
 public:
