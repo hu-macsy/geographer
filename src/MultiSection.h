@@ -424,7 +424,23 @@ public:
     	const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
     	const scai::lama::DenseVector<ValueType>& nodeWeights,
     	struct Settings settings );
+
+	template<typename T>
+	static scai::lama::DenseVector<IndexType> getPartitionNonUniform(
+		const scai::lama::CSRSparseMatrix<ValueType>& input,
+		const std::vector<std::vector<T>>& coordinates,
+		const scai::lama::DenseVector<ValueType>& nodeWeights,
+		const std::vector<T>& minCoords,
+		const std::vector<T>& maxCoords,
+		struct Settings settings );    
     
+    /** @brief Iterative version to get a partition
+    */
+	static scai::lama::DenseVector<IndexType> getPartitionIter( 
+		const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+		const scai::lama::DenseVector<ValueType>& nodeWeights,
+		struct Settings settings );
+
 	/** @brief Given a tree of rectangles, sets the partition for every point.
 	 * 
 	 * @param[in] root The root of the rectTree, a tree of non-overlapping rectangles
@@ -433,10 +449,11 @@ public:
 	 * 
 	 * @return A distributed DenseVector of length n, partition[i] contains the block ID of node i
 	 */
+	template <typename T>
     static scai::lama::DenseVector<IndexType> setPartition( 
     	std::shared_ptr<rectCell<IndexType,ValueType>> root,
     	const scai::dmemo::DistributionPtr distPtr,
-    	const std::vector<std::vector<IndexType>>& localPoints);
+    	const std::vector<std::vector<T>>& localPoints);
     
     
     /** Get a tree of rectangles of a uniform grid with side length sideLen. The rectangles cover the whole grid and 
@@ -453,6 +470,16 @@ public:
     	const IndexType sideLen,
     	Settings settings);
 
+    /** @brief Iterative version
+    */
+	static std::shared_ptr<rectCell<IndexType,ValueType>> getRectanglesIter( 
+	    //const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+	    const std::vector<std::vector<ValueType>>& coordinates,
+	    const scai::lama::DenseVector<ValueType>& nodeWeights,
+	    const std::vector<ValueType>& minCoords,
+	    const std::vector<ValueType>& maxCoords,
+	    Settings settings);    
+
     //TODO: Let coordinates be of ValueType and round inside the function if needed.
     
     /** @brief Get a tree of rectangles for a non-uniform grid.
@@ -466,15 +493,24 @@ public:
 	 * 
      * @return A pointer to the root of the tree. The leaves of the tree are the rewuested rectangles.
      */
-    
+    template<typename T>
     static std::shared_ptr<rectCell<IndexType,ValueType>> getRectanglesNonUniform( 
-        const scai::lama::CSRSparseMatrix<ValueType> &input,
-        const std::vector<std::vector<IndexType>> &coordinates,
-        const scai::lama::DenseVector<ValueType> &nodeWeights,
-        const std::vector<ValueType> &minCoords,
-        const std::vector<ValueType> &maxCoords,
+        const scai::lama::CSRSparseMatrix<ValueType>& input,
+        const std::vector<std::vector<T>>& coordinates,
+        const scai::lama::DenseVector<ValueType>& nodeWeights,
+        const std::vector<T>& minCoords,
+        const std::vector<T>& maxCoords,
         Settings settings);
 
+    /** @brief Project and partition using a optimal 1D partition algo
+    */
+    template<typename T>   	
+	static IndexType projectAnd1Dpartition(
+		std::shared_ptr<rectCell<IndexType,ValueType>>& treeRoot,
+		const std::vector<std::vector<T>>& coordinates,
+		const scai::lama::DenseVector<ValueType>& nodeWeights,
+		const std::vector<IndexType>& numCuts,
+		const std::vector<T>& maxCoords);
     
     /** Calculates the projection of all points in the bounding box (bBox) in the given dimension. Every PE
      *  creates an array of appropriate length, calculates the projection for its local coords and then
@@ -494,19 +530,55 @@ public:
      return[i][0] is the sum of the coordinates in the bBox which have their 0-coordinate equal to 5,
      return[i][1] for he points with 0-coordinate equal to 6 etc. If dimensionToProject=1 then return_vector[i] has size |10-15|=5 .
      */
-    static std::vector<std::vector<ValueType>> projection( const scai::lama::DenseVector<ValueType>& nodeWeights, const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot, const std::vector<IndexType>& dimensionToProject, const IndexType sideLen, Settings settings );
+    static std::vector<std::vector<ValueType>> projection(
+    	const scai::lama::DenseVector<ValueType>& nodeWeights,
+    	const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
+    	const std::vector<IndexType>& dimensionToProject,
+    	const IndexType sideLen,
+    	Settings settings );
     
 
     /** @brief Projection for the non-uniform grid case. Coordinates must be Indextype.  \sa projection
         @param[in] coordinates The coordinates of the points.\p coordinates[i][d] the d-th coordinate of the i-th point.
      */
+    template<typename T>
     static std::vector<std::vector<ValueType>> projectionNonUniform( 
-        const std::vector<std::vector<IndexType>> &coordinates,
-        const scai::lama::DenseVector<ValueType> &nodeWeights,
+        const std::vector<std::vector<T>>& coordinates,
+        const scai::lama::DenseVector<ValueType>& nodeWeights,
         const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
-        const std::vector<IndexType> &dimensionToProject,
-        Settings settings);
+        const std::vector<IndexType>& dimensionToProject);
     
+
+    /** @bried Iterative version to get the projection
+    */
+	template<typename T>
+    static std::vector<std::vector<ValueType>> projectionIter( 
+		const std::vector<std::vector<T>>& coordinates,
+	    const scai::lama::DenseVector<ValueType>& nodeWeights,
+	    const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
+	    const std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>>& allLeaves,
+	    const std::vector<std::vector<ValueType>>& hyperplanes,
+	    const std::vector<IndexType>& dimensionToProject);
+
+/*
+//TODO: there is not definition of this function; remove it - fix
+static std::vector<std::vector<ValueType>> projectionIter( 
+//const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+const std::vector<std::vector<IndexType>>& coordinates,
+const scai::lama::DenseVector<ValueType>& nodeWeights,
+const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
+const std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>>& allLeaves,
+const std::vector<std::vector<ValueType>>& hyperplanes,
+const std::vector<IndexType>& dimensionToProject);        
+*/
+	template<typename T>
+	static IndexType iterativeProjectionAndPart(
+		std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
+		const std::vector<std::vector<T>>& coordinates,
+		const scai::lama::DenseVector<ValueType>& nodeWeights,
+		const std::vector<IndexType>& numCuts,
+		Settings settings);
+
     /** @brief Partitions the given vector into k parts of roughly equal weights using a greedy approach.
      *
      * @param[in] array The 1 dimensional array of positive numbers to be partitioned.
@@ -529,7 +601,9 @@ public:
 	 * @return The first returned value is a vector of size k and holds the indices of each part/block: first part is from [return.first[0], return.first[1]) ( not inluding the weight of the last element), second from [return.first[1], return.first[2]) ets. Last part if from return.first[k-1] till return.first.size().
      * The second vector is of size k and holds the weights of each part.
 	 */
-    static std::pair<std::vector<IndexType>,std::vector<ValueType>> partition1DOptimal( const std::vector<ValueType>& array, const IndexType k, Settings settings);   
+    static std::pair<std::vector<IndexType>,std::vector<ValueType>> partition1DOptimal(
+    	const std::vector<ValueType>& array,
+    	const IndexType k);   
 
 	/** @brief Searches if there is a partition of the input vector into k parts where the maximum weight of a part is <=target.
 	 * @param[in] input A vector of numbers.
@@ -568,17 +642,29 @@ public:
      *
      * @return The weight of the given rectangle.
      */
-    static ValueType getRectangleWeight( const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const IndexType sideLen, Settings settings);
+    static ValueType getRectangleWeight(
+    	const scai::lama::DenseVector<ValueType>& nodeWeights, 
+    	const struct rectangle& bBox,
+    	const IndexType sideLen,
+    	Settings settings);
     
     /* Overloaded version for the non-uniform grid that also takes as input the coordinates.
      */
     template<typename T>
-    static ValueType getRectangleWeight( const std::vector<scai::lama::DenseVector<T>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
+    static ValueType getRectangleWeight(
+    	const std::vector<scai::lama::DenseVector<T>> &coordinates,
+    	const scai::lama::DenseVector<ValueType>& nodeWeights,
+    	const struct rectangle& bBox,
+    	Settings settings);
     
 	/* Overloaded version for the non-uniform grid with different type for coordinates.
      */
     template<typename T>
-    static ValueType getRectangleWeight( const std::vector<std::vector<T>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const std::vector<ValueType> maxCoords, Settings settings);
+    static ValueType getRectangleWeight(
+    	const std::vector<std::vector<T>> &coordinates,
+    	const scai::lama::DenseVector<ValueType>& nodeWeights,
+    	const struct rectangle& bBox,
+    	Settings settings);
     
     
     static scai::lama::CSRSparseMatrix<ValueType> getBlockGraphFromTree_local( const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot );
@@ -593,6 +679,11 @@ public:
      */
     template<typename T>
     static std::vector<T> indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dimensions);
+
+    /** @brief Overloaded function for non-cubic grids: every side has different length. sideLen.size()=dimensions
+    **/
+	template<typename T>
+    static std::vector<T> indexToCoords(const IndexType ind, const std::vector<IndexType> sideLen );
     
 private:
     template<typename T>
@@ -600,6 +691,12 @@ private:
     
     template<typename T>
     static std::vector<T> indexTo3D(IndexType ind, IndexType sideLen);
+	
+	template<typename T>
+    static std::vector<T> indexTo2D(IndexType ind, std::vector<IndexType> sideLen);
+    
+    template<typename T>
+    static std::vector<T> indexTo3D(IndexType ind, std::vector<IndexType> sideLen);
 };
 
 } //namespace ITI

@@ -342,11 +342,6 @@ static scai::dmemo::DistributionPtr redistributeFromPartition(
  */
 static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
 
-
-/** @brief Return the minimum and maximum global coordinates
-**/
-static std::pair<std::vector<ValueType>, std::vector<ValueType>> getGlobalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
-
 }; //class aux
 
 template class aux<IndexType, ValueType>;

@@ -141,7 +141,7 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 	
 	//get min and max
 	std::vector<ValueType> minCoords, maxCoords;
-	std::tie(minCoords, maxCoords) = aux<IndexType,ValueType>::getGlobalMinMaxCoords(coords);
+	std::tie(minCoords, maxCoords) = KMeans::getLocalMinMaxCoords(coords);
 	
 	// get centers
 	std::vector<std::vector<ValueType>> centers1 = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords, minCoords, maxCoords, settings);

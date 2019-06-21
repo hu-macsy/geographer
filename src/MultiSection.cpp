@@ -59,9 +59,18 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
     //
     // get minimum and maximum of the coordinates
     //
+    /*
     std::vector<ValueType> minCoords(dim, std::numeric_limits<ValueType>::max());
     std::vector<ValueType> maxCoords(dim, std::numeric_limits<ValueType>::lowest());
     std::tie(minCoords, maxCoords) = aux<IndexType,ValueType>::getGlobalMinMaxCoords( coordinates );    
+    */
+    //get global min and max
+    std::vector<ValueType> minCoords(dim);
+	std::vector<ValueType> maxCoords(dim);
+    for (int d=0; d<dim; d++) {
+    	minCoords[d] = coordinates[d].min();
+    	maxCoords[d] = coordinates[d].max();
+    }
 
 	if( settings.useIter ){ //in this case, do not scale coords
 		std::vector<point> localPoints( localN, point(dim,0.0) );
@@ -146,8 +155,8 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
 template<typename IndexType, typename ValueType>
 template<typename T>
 std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType>::getRectanglesNonUniform( 
-    const scai::lama::CSRSparseMatrix<ValueType> &input,
-    const std::vector<std::vector<T>> &coordinates,
+    const scai::lama::CSRSparseMatrix<ValueType>& input,
+    const std::vector<std::vector<T>>& coordinates,
     const scai::lama::DenseVector<ValueType>& nodeWeights,
     const std::vector<T>& minCoords,
     const std::vector<T>& maxCoords,
@@ -378,8 +387,9 @@ PRINT0("numLeaves= " << numLeaves);
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
+template<typename T>
 std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projectionNonUniform( 
-    const std::vector<std::vector<IndexType>>& coordinates,
+    const std::vector<std::vector<T>>& coordinates,
     const scai::lama::DenseVector<ValueType>& nodeWeights,
     const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
     const std::vector<IndexType>& dimensionToProject){
@@ -540,7 +550,9 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
 //TODO: In the same paper thers is a better, but more complicated, algorithm called Nicol+
 
 template<typename IndexType, typename ValueType>
-std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1DOptimal( const std::vector<ValueType>& nodeWeights, const IndexType k){
+std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1DOptimal(
+	const std::vector<ValueType>& nodeWeights,
+	const IndexType k){
     
     const IndexType N = nodeWeights.size();
 
@@ -760,7 +772,11 @@ ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const scai::la
 
 template<typename IndexType, typename ValueType>
 template<typename T>
-ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vector<scai::lama::DenseVector<T>> &coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, Settings settings){
+ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( 
+	const std::vector<scai::lama::DenseVector<T>> &coordinates,
+	const scai::lama::DenseVector<ValueType>& nodeWeights,
+	const struct rectangle& bBox,
+	Settings settings){
     SCAI_REGION("MultiSection.getRectangleWeight");
     
     const scai::dmemo::DistributionPtr inputDist = nodeWeights.getDistributionPtr();
