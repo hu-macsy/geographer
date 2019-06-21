@@ -1497,7 +1497,7 @@ DenseVector<IndexType> computePartition( \
 			maxTime = comm->max( balanceTime.count() );
 		}
 
-		ValueType cut=-1;
+		ValueType cut = -1;
 		if( settings.debugMode && iter >= samplingRounds){
 			cut = ITI::GraphUtils<IndexType, ValueType>::computeCut( graph, result, false );			
 		}
