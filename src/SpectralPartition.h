@@ -5,6 +5,8 @@
  *      Author: tzovas
  */
 
+#pragma once
+
 #include <scai/dmemo/Distribution.hpp>
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/dmemo/GenBlockDistribution.hpp>
