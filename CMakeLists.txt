@@ -50,11 +50,11 @@ option(USE_BOOST "Use boost library for number parsing" OFF)
 
 ### find Boost ###
 if (USE_BOOST)
-  find_package(Boost REQUIRED COMPONENTS program_options filesystem system)
+  find_package(Boost REQUIRED COMPONENTS filesystem system)
   include_directories(${Boost_INCLUDE_DIRS})
   add_definitions(-DUSE_BOOST)
 else(USE_BOOST)
-  find_package(Boost COMPONENTS program_options filesystem system)
+  find_package(Boost COMPONENTS filesystem system)
 endif(USE_BOOST)
 
 ### find SCAI ###
