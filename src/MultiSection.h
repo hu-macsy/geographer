@@ -473,14 +473,19 @@ public:
      * @param[in] dimensiontoProject A vector of size treeRoot.getNumLeaves(). dimensionsToProject[i]= the dimension in which we wish to project the weights for rectangle/leaf i. Should be more or equal to 0 and less than d (where d are the total dimensions).
      * @param[in] sideLen The length of the side of the whole uniform, square grid.
      * @param[in] setting A settings struct passing various arguments.
-     * @return Return a vector where in each position is the sum of the weights of the corresponding coordinate (not the same).
+     * @return Return a vector where in each position is the sum of the weights of the corresponding coordinate for every leaf.
+     * \p ret[i][j] is the the weight of the j-th coordinate of the i-th leaf/rectangle.
 
-     * Example: bBox={(5,10),(8,15)} and dimensionToProject=0 (=x). Then the return vector has size |8-5|=3. return[0] is the sum of the coordinates in the bBox which have their 0-coordinate equal to 5, return[1] fot he points with 0-coordinate equal to 3 etc. If dimensionToProject=1 then return vector has size |10-15|=5.
+     * Example, for a rectangle i with i.Bbox={(5,10),(8,15)} and dimensionToProject=0 (=x). Then the return vector in position i has size |8-5|=3. 
+     The total size of the return vector is equal the number of leaves.
+     return[i][0] is the sum of the coordinates in the bBox which have their 0-coordinate equal to 5,
+     return[i][1] for he points with 0-coordinate equal to 6 etc. If dimensionToProject=1 then return_vector[i] has size |10-15|=5 .
      */
     static std::vector<std::vector<ValueType>> projection( const scai::lama::DenseVector<ValueType>& nodeWeights, const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot, const std::vector<IndexType>& dimensionToProject, const IndexType sideLen, Settings settings );
     
 
-    /** @brief Projection for the non-uniform grid case. Coordinates must be Indextype.
+    /** @brief Projection for the non-uniform grid case. Coordinates must be Indextype.  \sa projection
+        @param[in] coordinates The coordinates of the points.\p coordinates[i][d] the d-th coordinate of the i-th point.
      */
     static std::vector<std::vector<ValueType>> projectionNonUniform( 
         const std::vector<std::vector<IndexType>> &coordinates,

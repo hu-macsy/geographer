@@ -423,7 +423,7 @@ TEST_F(HilbertCurveTest, testHilbertRedistribution) {
 
     const IndexType newLocalN = nodeWeights.getDistributionPtr()->getLocalSize();
 
-    /**
+    /*
      *  check that a redistribution happened, i.e. that the hilbert indices of local points are grouped together.
      */
     std::vector<ValueType> minCoords(settings.dimensions);
