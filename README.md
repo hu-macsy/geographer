@@ -11,7 +11,7 @@ It is implemented in C++ and uses the LAMA framework for distributed graph datas
 ## Requirements
 The following software is needed to compile and use Geographer:
 
-- A sufficiently modern compiler, for example [g++ &gt;= 4.9](https://gcc.gnu.org) or [icpc &gt;=17.0](https://en.wikipedia.org/wiki/Intel_C%2B%2B_Compiler)
+- A sufficiently modern compiler, for example [g++ &gt;= 4.9](https://gcc.gnu.org) or [icpc &gt;=17.0](https://en.wikipedia.org/wiki/Intel_C%2B%2B_Compiler). LLVM / Clang is currently not supported.
 - MPI
 - OpenMP
 - CMake (&gt;= 3.0.2)
@@ -49,12 +49,18 @@ Should this fail, do it manually by calling `git submodule update --init --recur
 When compiling Geographer, KaDIS is automatically compiled as a CMake subproject.
 
 ### Compilation
-Use CMake to configure the project and make to build it:
+Use CMake to configure the project and make to build it, followed by make install:
 
 	mkdir build && cd build && cmake .. && make && sudo make install
 
 If you have installed Lama in a non-standard location, add `-DSCAI_DIR=<path/to/lama>` where `<path/to/lama>` is your Lama installation directory.
 To install Geographer in an alternative location, pass the argument `-DCMAKE_INSTALL_PREFIX=<path>` to cmake. After successful compilation, the library `libgeographer` and the standalone executable `Geographer` are installed into the installation target. If the Google Test library was found, the unit tests can be found in the executable `GeographerTest`.
+
+### Mac OS
+On Mac OS, the default compiler is LLVM, which is not supported by the Lama library on which we depend.
+One possibility to install the Gnu Compiler Collection GCC is with the [homebrew](https://brew.sh/) package manager.
+You need to specify the compiler explicitly when calling CMake;
+ as on Mac OS the command `g++` is often an alias for clang, you might need to set the full path, for example as `-DCMAKE_CXX_Compiler=/usr/local/bin/g++-7 -DCMAKE_C_COMPILER=/usr/local/bin/gcc-7`.
 
 ## Usage as Standalone Executable
 Geographer can be used as a library or called from the command line.
