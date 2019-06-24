@@ -47,6 +47,11 @@ namespace ITI {
 	class MeshGenerator{
     public:          
         
+        /** Creates a uniform 3D mesh and writes it to a file (as a graph) using the METIS format.
+
+		@param[in] numPoints The number of points in every dimension
+		@param[in] filename The name of the file to store the graph.
+        */
         static void writeGraphStructured3DMesh_seq( std::vector<IndexType> numPoints, const std::string filename);
 
         /** Creates a structured 3D mesh sequentially, both the adjacency matrix and the coordinates vectors.

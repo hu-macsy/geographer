@@ -122,6 +122,11 @@ namespace ITI {
         template<typename T>
         static void redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, const scai::dmemo::HaloExchangePlan& halo, const scai::hmemo::HArray<T>& haloData);
         
+        /** First, it calculates the centroid of the local coordinates and then the distance of every local point to the centroid.
+
+        @param[in] coordinates The coordinates of the points.
+        @return The distance of all local points from the centroid.
+        */
 		static std::vector<ValueType> distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates);
 
     private:
