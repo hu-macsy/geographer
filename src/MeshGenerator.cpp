@@ -149,10 +149,10 @@ void MeshGenerator<IndexType, ValueType>::writeGraphStructured3DMesh_seq( std::v
 	if(f.fail())
 		throw std::runtime_error("File "+ filename+ " failed.");	
 	
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-
-    //not distributed
-	SCAI_ASSERT_EQ_ERROR( comm->getSize(), 0 , "Function " << __FUNCTION__ <<  " is not distributed, it works only for p=1.");
+	{   //not distributed
+	    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		SCAI_ASSERT_EQ_ERROR( comm->getSize(), 0 , "Function " << __FUNCTION__ <<  " is not distributed, it works only for p=1.");
+	}
 
     IndexType N= numPoints[0]* numPoints[1]* numPoints[2];
     IndexType numEdges= 3*numPoints[0]*numPoints[1]*numPoints[2] - numPoints[0]*numPoints[1]\
@@ -161,47 +161,46 @@ void MeshGenerator<IndexType, ValueType>::writeGraphStructured3DMesh_seq( std::v
     // write number of vertices and edges
     f<< N << " " << numEdges << std::endl;
 
-    {
-        IndexType nnzCounter = 0; // count non-zero elements
-        // for every node= for every line of adjM
-        for(IndexType i=0; i<N; i++){
-            IndexType ngbIndex = 0;
+    IndexType nnzCounter = 0; // count non-zero elements
+    // for every node= for every line of adjM
+    for(IndexType i=0; i<N; i++){
+        IndexType ngbIndex = 0;
 
-            std::tuple<IndexType, IndexType, IndexType> thisPoint = aux<IndexType,ValueType>::index2_3DPoint( i, numPoints);
+        std::tuple<IndexType, IndexType, IndexType> thisPoint = aux<IndexType,ValueType>::index2_3DPoint( i, numPoints);
+        
+        {
+        SCAI_REGION("writeStructured3DMesh.setAdjacencyMatrix");
+        // for all 6 possible neighbours
+        for(IndexType m=0; m<6; m++){
+            switch(m){
+                case 0: ngbIndex= i+1; break;
+                case 1: ngbIndex= i-1; break;
+                case 2: ngbIndex = i + numPoints[2]; break;
+                case 3: ngbIndex = i - numPoints[2]; break;
+                case 4: ngbIndex = i + numPoints[2]*numPoints[1]; break;
+                case 5: ngbIndex = i - numPoints[2]*numPoints[1]; break;
+            }
             
-            {
-            SCAI_REGION("writeStructured3DMesh.setAdjacencyMatrix");
-            // for all 6 possible neighbours
-            for(IndexType m=0; m<6; m++){
-                switch(m){
-                    case 0: ngbIndex= i+1; break;
-                    case 1: ngbIndex= i-1; break;
-                    case 2: ngbIndex = i + numPoints[2]; break;
-                    case 3: ngbIndex = i - numPoints[2]; break;
-                    case 4: ngbIndex = i + numPoints[2]*numPoints[1]; break;
-                    case 5: ngbIndex = i - numPoints[2]*numPoints[1]; break;
-                }
-                
-                if(ngbIndex>=0 && ngbIndex<N){
-                    std::tuple<IndexType, IndexType, IndexType> ngbPoint = aux<IndexType,ValueType>::index2_3DPoint( ngbIndex, numPoints);
+            if(ngbIndex>=0 && ngbIndex<N){
+                std::tuple<IndexType, IndexType, IndexType> ngbPoint = aux<IndexType,ValueType>::index2_3DPoint( ngbIndex, numPoints);
 
-                    // we need to check distance for the nodes at the outer borders of the grid: eg:
-                    // in a 4x4 grid with 16 nodes {0, 1, 2, ...} , for p1= node 3 there is an edge with
-                    // p2= node 4 that we should not add (node 3 has coords (0,3) and node 4 has coords (1,0)).
-                    // A way to avoid that is check if thery are close enough.
-                    // TODO: maybe find another, faster way to avoid adding that kind of edges
+                // we need to check distance for the nodes at the outer borders of the grid: eg:
+                // in a 4x4 grid with 16 nodes {0, 1, 2, ...} , for p1= node 3 there is an edge with
+                // p2= node 4 that we should not add (node 3 has coords (0,3) and node 4 has coords (1,0)).
+                // A way to avoid that is check if thery are close enough.
+                // TODO: maybe find another, faster way to avoid adding that kind of edges
 
-                    if(dist3DSquared( thisPoint, ngbPoint) <= 1)
-                    {
-                        f << ngbIndex +1<< " ";
-                        ++nnzCounter;
-                    }
+                if(dist3DSquared( thisPoint, ngbPoint) <= 1)
+                {
+                    f << ngbIndex +1<< " ";
+                    ++nnzCounter;
                 }
             }
-            }
-            f << std::endl;
         }
+        }
+        f << std::endl;
     }
+
     
 }
 

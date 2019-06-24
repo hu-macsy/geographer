@@ -46,6 +46,8 @@ namespace ITI {
 	template <typename IndexType, typename ValueType>
 	class MeshGenerator{
     public:          
+
+    	
         
         static void writeGraphStructured3DMesh_seq( std::vector<IndexType> numPoints, const std::string filename);
 
