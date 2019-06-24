@@ -99,7 +99,7 @@ namespace ITI {
 		}
 
 		if (vm.count("generate") + vm.count("graphFile") + vm.count("quadTreeFile") != 1) {
-			std::cout << "Pick one of --graphFile, --quadTreeFile or --generate. Use --help for more parameters" << std::endl;
+			std::cout << "Call with --graphFile <input>. Use --help for more parameters." << std::endl;
 			settings.isValid = false;
 			//return 126;
 		}

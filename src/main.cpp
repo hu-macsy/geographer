@@ -318,7 +318,7 @@ int main(int argc, char** argv) {
         nodeWeights[0] = scai::lama::fill<scai::lama::DenseVector<ValueType>>(graph.getRowDistributionPtr(), 1);
 
     } else{
-    	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;
+    	std::cout << "Call with --graphFile <input>" << std::endl;
     	return 126;
     }
 
