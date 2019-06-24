@@ -23,24 +23,26 @@
 
 namespace ITI {
 
-		using scai::lama::DenseVector;
-		
+using scai::lama::DenseVector;
+
+/** K-means related algorithms for partitioning a point set
+*/
+
 namespace KMeans {
 
-//TODO: any other more proper way to do this?
-//typedef typename CommTree<IndexType,ValueType>::commNode cNode;
 
 //to make it more readable
 using point = std::vector<ValueType>;
-
 
 /**
  * @brief Partition a point set using balanced k-means.
  *
  * This is the main function, others with the same name are wrappers for this one.
  *
- * @param[in] coordinates first level index specifies dimension, second level index the point id
- * @param[in] nodeWeights
+ * @param[in] coordinates first level index specifies dimension, second level index the point id:
+ coordinates[i][p] is the i-th coordinate of point p
+ * @param[in] nodeWeights The weights of the points. Each point can have multiple weights but all points
+ must have the same number of weights.
  * @param[in] blockSizes target block sizes, not maximum sizes
  * @param[in] prevPartition This is used for the hierarchical version, it is the partition from the previous hierarchy level.
  * If settings.repartition=true then this has a different meaning: is the partition to be refined.
@@ -61,7 +63,8 @@ using point = std::vector<ValueType>;
  	const Settings settings, \
  	struct Metrics &metrics);
 
-//minimal wrapper
+/** @brief Minimal wrapper with only the coordinates. Unit weights are assumed and uniform block sizes.
+*/
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,
@@ -70,20 +73,21 @@ DenseVector<IndexType> computePartition(
 /**
  * @brief Partition a point set using balanced k-means
  *
- * Wrapper without initial centers. Calls computePartition with centers derived from a Hilbert Curve
+ * Wrapper without initial centers. Calls computePartition with centers derived from a Hilbert Curve.
  *
- * @param[in] coordinates first level index specifies dimension, second level index the point id
- * @param[in] nodeWeights
- * @param[in] blockSizes target block sizes, not maximum sizes
+ * @param[in] coordinates first level index specifies dimension, second level index the point id: 
+ coordinates[i][p] is the i-th coordinate of point p
+ * @param[in] nodeWeights The weights of the points. Each point can have multiple weights but all points
+ must have the same number of weights.
+ * @param[in] blockSizes Target, i.e., wanted, block sizes, not maximum sizes.
  * @param[in] settings Settings struct
  * @param[in] metrics Metrics struct
  *
- * @return partition
+ * @return A partition of the points into \p settings.numBlocks number of blocks.
  */
 
 //wrapper 1- no centers
-//template<typename IndexType, typename ValueType>
- template<typename IndexType, typename ValueType>
+template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(
 	const std::vector<DenseVector<ValueType>> &coordinates,
 	const std::vector<DenseVector<ValueType>> &nodeWeights,
@@ -92,11 +96,12 @@ DenseVector<IndexType> computePartition(
 	struct Metrics &metrics);
 
 /**
- * Given a tree of the processors graph, computes a partition into a hierachical fashion.
+ * Given a tree of the processors graph, computes a partition into a hierarchical fashion.
  * 
- * @param[in] coordinates first level index specifies dimension, second level index the point id
- * @param[in] nodeWeights
- * @param[in] commTree The tree describing the processor network.
+ * @param[in] coordinates First level index specifies dimension, second level index the point id
+ * @param[in] nodeWeights The weights of the points. Each point can have multiple weights but all
+ the same number of weights.
+ * @param[in] commTree The tree describing the processor network. \sa CommTree
  **/
 
 template<typename IndexType, typename ValueType>
@@ -107,6 +112,11 @@ DenseVector<IndexType> computeHierarchicalPartition(
 	Settings settings,
 	struct Metrics& metrics);
 
+/** Calls computeHierarchicalPartition() with an additional step of repartitioning in order to
+provide a better global cut.
+
+Parameters and return are same as in computeHierarchicalPartition()
+*/
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierPlusRepart(
 	std::vector<DenseVector<ValueType>> &coordinates,
@@ -119,7 +129,8 @@ DenseVector<IndexType> computeHierPlusRepart(
  * @brief Repartition a point set using balanced k-means.
  *
  * @param[in] coordinates first level index specifies dimension, second level index the point id
- * @param[in] nodeWeights
+ * @param[in] nodeWeights The weights of the points. Each point can have multiple weights but all points
+ must have the same number of weights.
  * @param[in] blockSizes target block sizes, not maximum sizes. blockSizes.size()== number of weights
  * @param[in] previous Previous partition
  * @param[in] settings Settings struct
@@ -142,22 +153,15 @@ DenseVector<IndexType> computeRepartition(
 	struct Metrics& metrics);
 
 
+/** @brief Version for hierarchical version. The returned centers now are a vector of vectors,
+	a vector of centers for every block/center in the previous hierarchy level.
+	For every known block (given through \p partition), a number of centers is calculated independently
+	of the rest of the blocks. How many centers we find for each block is determined by \p hierLevel.
 
-/**
-	@brief Version for hierarchical version. The centers now are a vector of vectors,
-	a set o centers for every block/center in the previous hierarchy level.
-	We need two hierarchy levels to partition. If we only use the top one,
-	e.g., start from the root, we know the number of children but we do not
-	know the memory ans speeds. If we use the one below, e.g., start from
-	level 1, we know the number of blocks and the properties for each block
-	but we do not know where block belong to.
-
-	@param [in] prevHierarLevel The previous hierarch level. 
-	//@param[in] centers Centers from previous partition: centers[i] are the centers 
-	for block i in the previous hierarchy level.
+	@param [in] hierLevel The previous hierarch level. 
 	@param[in] partition The block id of every point in the previous hierarchy.
-	partition[i]=b means that point i was in block b in the previous hierarchy
-	level. 
+	partition[i]=b means that point i was in block b in the previous hierarchy level. 
+	@return A vector of vectors of points.
 */
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<point>> findInitialCentersSFC(
@@ -167,7 +171,6 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		const scai::lama::DenseVector<IndexType> &partition,
 		const std::vector<cNode> hierLevel,	
 		Settings settings);
-
 
 /**
  * Find initial centers for k-means by sorting the local points along a space-filling curve.
@@ -189,28 +192,35 @@ std::vector<std::vector<ValueType>>  findInitialCentersSFC(
 		Settings settings);
 
 /**
- * @brief Compute initial centers from space-filling curve without considering point positions
- * TODO: Currently assumes that minCoords = vector<ValueType>(settings.dimensions, 0). This is not always true! Fix or remove.
- *
+ * @brief Compute initial centers from space-filling curve without considering point positions.
+ 
+ * @param[in] minCoords Minimum coordinate in each dimension 
  * @param[in] maxCoords Maximum coordinate in each dimension
  * @param[in] settings
  *
  * @return coordinates of centers
  */
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(const std::vector<ValueType> &maxCoords, Settings settings);
+std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(
+	const std::vector<ValueType> &minCoords,
+	const std::vector<ValueType> &maxCoords,
+	Settings settings);
 
 /**
  * Compute centers based on the assumption that the partition is equal to the distribution.
  * Each process then picks the average of mass of its local points.
  *
- * @param[in] coordinates
- * @param[in] nodeWeights
+ * @param[in] coordinates First level index specifies dimension, second level index the point id:
+ coordinates[i][p] is the i-th coordinate of point p
+ * @param[in] nodeWeights The weights of the points. Each point can have multiple weights but all points
+ must have the same number of weights.
  *
  * @return coordinates of centers
  */
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType>> findLocalCenters(const std::vector<DenseVector<ValueType> >& coordinates, const DenseVector<ValueType> &nodeWeights);
+std::vector<std::vector<ValueType>> findLocalCenters(
+	const std::vector<DenseVector<ValueType> >& coordinates,
+	const DenseVector<ValueType> &nodeWeights);
 
 /**
  * Find centers of current partition.
@@ -234,6 +244,13 @@ std::vector<point> findCenters(
 	const Iterator lastIndex,
 	const DenseVector<ValueType> &nodeWeights);
 
+
+/** @brief Get minimum and maximum of the local coordinates.
+ */
+template<typename ValueType>
+std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
+ 
+
 /**
  * Computes the weighted distance between a vertex and a cluster, given the geometric distance and the weights and influence values.
  *
@@ -253,14 +270,14 @@ ValueType computeEffectiveDistance(
 
 /**
  * Assign points to block with smallest effective distance, adjusted for influence values.
- * Repeatedly adjusts influence values to adhere to the balance constraint given by settings.epsilon
+ * Repeatedly adjusts influence values to adhere to the balance constraint given by \p settings.epsilon
  * To enable random initialization with a subset of the points, this function accepts iterators for the first and last local index that should be considered.
  *
- * The parameters upperBoundOwnCenter, lowerBoundNextCenter and influence are updated during point assignment.
+ * The parameters \p upperBoundOwnCenter,\p lowerBoundNextCenter and \p influence are updated during point assignment.
  *
  * In contrast to the paper, the influence value is multiplied with the plain distance to compute the effective distance.
  * Thus, blocks with higher influence values have larger distances to all points and will receive less points in the next iteration.
- * Blocks which too few points get a lower influence value to attract more points in the next iteration.
+ * Blocks with too few points get a lower influence value to attract more points in the next iteration.
  *
  * The returned vector has always as many entries as local points, even if only some of them are non-zero.
  *
@@ -308,16 +325,9 @@ DenseVector<IndexType> assignBlocks(
 	Settings settings,
 	Metrics &metrics);
 
-/**
- * @brief Get local minimum and maximum coordinates
- * TODO: This isn't used any more! Remove?
- * Update, 27/11/8: start reusing 
- */
-template<typename ValueType>
-std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
 
 /** Reverse the order of the vectors: given a 2D vector of size 
-dimension*numPoints, reverse it and retunr a vector of points
+dimension*numPoints, reverse it and return a vector of points
 of size numPoints; in other words, the returned vector has size
 numPoints*dimensions. In general, if the given 2D vector has size
 A*B, the returned vector has size B*A.

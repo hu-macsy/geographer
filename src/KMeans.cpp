@@ -106,7 +106,7 @@ std::vector<std::vector<point>> findInitialCentersSFC(
 		//gather all block sizes to root
 		IndexType arraySize=1;
 		if( comm->getRank()==rootPE ){
-			//a possible bottleneck: in the last stepm arraySize=k*p
+			//a possible bottleneck: in the last step arraySize=k*p
 			//TODO?: cut to smaller chunks and do it in rounds?
 			arraySize = numPEs*numOldBlocks; 
 		}
@@ -329,7 +329,10 @@ std::vector<std::vector<ValueType>>  findInitialCentersSFC(
 
 
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(const std::vector<ValueType> &maxCoords, Settings settings){
+std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(
+	const std::vector<ValueType> &minCoords,
+	const std::vector<ValueType> &maxCoords,
+	Settings settings){
 	//This assumes that minCoords is 0!
     //TODO: change or remove
 	const IndexType dimensions = settings.dimensions;
@@ -348,8 +351,9 @@ std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(const std::ve
 		centerCoords = HilbertCurve<IndexType,ValueType>::HilbertIndex2Point( centerHilbInd, settings.sfcResolution, settings.dimensions);
 		SCAI_ASSERT_EQ_ERROR( centerCoords.size(), dimensions, "Wrong dimensions for center.");
 		
+		//centerCoords are points in the unit square; project back to input space
 		for (IndexType d = 0; d < dimensions; d++) {
-			result[d][i] = centerCoords[d]*maxCoords[d];
+			result[d][i] = (centerCoords[d]*(maxCoords[d]-minCoords[d]))+minCoords[d];
 		}
 	}
 	return result;
@@ -461,6 +465,7 @@ std::vector<point> findCenters(
 			    result[d][j] = NAN;
 			}
 		}
+
 		comm->sumImpl(result[d].data(), result[d].data(), k, scai::common::TypeTraits<ValueType>::stype);
 	}
 
@@ -1302,7 +1307,7 @@ DenseVector<IndexType> computePartition(
 			const ValueType ratio = totalSampledWeightSum / nodeWeightSum[i];
 			adjustedBlockSizes[i].resize(targetBlockWeights[i].size());
 
-			SCAI_ASSERT_LE_ERROR( totalSampledWeightSum, nodeWeightSum[i]+ 1e-10, "Error in sampled weight sum." );
+			SCAI_ASSERT_LE_ERROR( totalSampledWeightSum, nodeWeightSum[i]+ 1e-8, "Error in sampled weight sum." );
 			
 			for (IndexType j = 0; j < targetBlockWeights[i].size(); j++) {
 				adjustedBlockSizes[i][j] = ValueType(targetBlockWeights[i][j]) * ratio;
@@ -1550,7 +1555,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 	struct Metrics& metrics){
 
 	//check although numBlocks is not needed or used
-	SCAI_ASSERT_EQ_ERROR(settings.numBlocks, commTree.numLeaves, "The number of leaves and number of blocks must agree");
+	SCAI_ASSERT_EQ_ERROR(settings.numBlocks, commTree.getNumLeaves(), "The number of leaves and number of blocks must agree");
 
 	//get global communicator
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -1610,7 +1615,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 	//skip root. If we start from the root, we will know the number
 	//of blocks but not the memory and speed per block
-	for(unsigned int h=1; h<commTree.hierarchyLevels; h++ ){
+	for(unsigned int h=1; h<commTree.getNumHierLevels(); h++ ){
 
 		/*
 		There are already as many blocks as the number of leaves
@@ -1737,8 +1742,7 @@ DenseVector<IndexType> computeHierPlusRepart(
 	return  ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinates, nodeWeights, blockSizes, result, settings);
 }//computeHierPlusRepart
 
-/**
- * @brief Get local minimum and maximum coordinates
+/* Get local minimum and maximum coordinates
  * TODO: This isn't used any more! Remove?
  */
 template<typename ValueType>
@@ -1756,7 +1760,10 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
 
 }; // namespace KMeans
 
-template std::vector<std::vector<ValueType> > KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>(const std::vector<ValueType> &maxCoords, Settings settings);
+template std::vector<std::vector<ValueType> > KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>(
+	const std::vector<ValueType> &minCoords,
+	const std::vector<ValueType> &maxCoords,
+	Settings settings);
 
 //instantiations needed otherwise there is a undefined reference 
 template DenseVector<IndexType> KMeans::computePartition(

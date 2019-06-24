@@ -202,10 +202,10 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
 	scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( n ));
 	scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 
-    /**
-	 * If the input is replicated, we can write it directly from the root processor.
+    /* If the input is replicated, we can write it directly from the root processor.
 	 * If it is not, we need to create a replicated copy.
 	 */
+	//TODO: instead of replicate, gather to root PE
 
     std::vector<DenseVector<ValueType>> maybeCopy;
     const std::vector<DenseVector<ValueType>> &targetReference = dist->isReplicated() ? coords : maybeCopy;
@@ -431,18 +431,12 @@ void FileIO<IndexType, ValueType>::writePartitionParallel(const DenseVector<Inde
             if( outfile.fail() ){
                 throw std::runtime_error("Could not write to file " + filename);
             }
-                        
+
+            //write local part
             for( IndexType i=0; i<localN; i++){                    
                 outfile << localPart[i] << std::endl;
             }
-			/* TODO: resolve commented code         
-            // the last PE maybe has less local values
-            if( p==numPEs-1 ){
-                SCAI_ASSERT_EQ_ERROR( outfile.tellp(), globalN , "While writing coordinates in parallel: Position in file " << filename << " is not correct." );
-            }else{
-                SCAI_ASSERT_EQ_ERROR( outfile.tellp(), localN*(comm->getRank()+1) , "While writing coordinates in parallel: Position in file " << filename << " is not correct for processor " << comm->getRank() );
-            }
-            */
+
 			outfile.close();
             //PRINT("PE " << p << " wrote its part");
         }
@@ -463,7 +457,7 @@ void FileIO<IndexType, ValueType>::writeDenseVectorParallel(const DenseVector<T>
     
     const scai::dmemo::Distribution blockDist( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, globalN) );
     
-    // create a copy of the input and distribute with a block distribution
+    // create a copy of the input and distribute with a block distribution 
     const scai::lama::DenseVector<T> dvBlock( dv, blockDist);
 
     const IndexType localN = blockDist.getLocalSize();
@@ -491,14 +485,14 @@ void FileIO<IndexType, ValueType>::writeDenseVectorParallel(const DenseVector<T>
                 outfile << localPart[i] << std::endl;
             }
             
-            // the last PE maybe has less local values
+            // because of the block distribution, the last PE maybe has less local values
             if( p==numPEs-1 ){
                 SCAI_ASSERT_EQ_ERROR( outfile.tellp(), globalN , "While writing DenseVector in parallel: Position in file " << filename << " is not correct." );
             }else{
                 SCAI_ASSERT_EQ_ERROR( outfile.tellp(), localN*(comm->getRank()+1) , "While writing DenseVector in parallel: Position in file " << filename << " is not correct for processor " << comm->getRank() );
             }
 
-            PRINT("PE " << p << " wrote its part");
+            //PRINT("PE " << p << " wrote its part");
             outfile.close();
         }
         comm->synchronize();    //TODO: takes huge time here
@@ -514,14 +508,14 @@ void FileIO<IndexType, ValueType>::writeDenseVectorCentral(DenseVector<IndexType
 
     const IndexType globalN = dist->getGlobalSize();
     
-    //TODO: change to gather as this way part is replicated in all PEs
+    //TODO: change to gather as this way, part is replicated in all PEs
     //comm->gatherImpl( localPart.get(), 
     
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
     part.redistribute( noDist );
     SCAI_ASSERT_EQ_ERROR( part.getLocalValues().size(), globalN, "Partition must be replicated");
     
-    if( comm->getRank() ){
+    if( comm->getRank()==0 ){
     
         std::ofstream f( filename );  
 
@@ -577,9 +571,10 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 		throw std::logic_error("Format not yet implemented.");
 	}
 
-	/**
+	/*
 	 * Now assuming METIS format
 	 */
+
 	std::ifstream file(filename);
 
 	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -1206,7 +1201,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 
 
 template<typename IndexType, typename ValueType>
-std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOcean(std::string filename, IndexType dimension) {
+std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOcean(const std::string filename, const IndexType dimension) {
 	SCAI_REGION( "FileIO.readCoords" );
 	std::ifstream file(filename);
 
@@ -1320,7 +1315,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsTEEC
 /*File "filename" contains the coordinates of a graph. The function reads these coordinates and returns a vector of DenseVectors, one for each dimension
  */
 template<typename IndexType, typename ValueType>
-std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( std::string filename, IndexType numberOfPoints, const IndexType dimension, Format format){
+std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( const std::string filename, const IndexType numberOfPoints, const IndexType dimension, Format format){
     SCAI_REGION( "FileIO.readCoords" );
 
     IndexType globalN= numberOfPoints;
@@ -1459,6 +1454,11 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
     //WARNING: for the binary format files, in 2D cases the 3rd coordinate is 0 but we must always read
     //         3 coordinates from the file and just not copy the 3rd
     IndexType maxDimension = 3;
+
+    if( dimension>maxDimension ){
+    	PRINT0("Function readCoordsBinary can only read coordinates up to 3 dimensions.\nAborting...");
+    	throw std::runtime_error("Number of dimensions not supported.");
+    }
     
     const UINT beginLocalCoords = beginLocalRange*maxDimension;
     //const UINT endLocalCoords = endLocalRange*maxDimension;
@@ -1615,7 +1615,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsMatr
 }
 //-------------------------------------------------------------------------------------------------
 
-/** Read graph and coordinates from a OFF file. Coordinates are (usually) in 3D.
+/* Read graph and coordinates from a OFF file. Coordinates are (usually) in 3D.
  */
 
 template<typename IndexType, typename ValueType>
@@ -1745,7 +1745,7 @@ void  FileIO<IndexType, ValueType>::readOFFTriangularCentral( scai::lama::CSRSpa
 }
 //-------------------------------------------------------------------------------------------------
 
-/** Read graph and coordinates from a dom.geo file of the ALYA tool. Coordinates are (usually) in 3D.
+/* Read graph and coordinates from a dom.geo file of the ALYA tool. Coordinates are (usually) in 3D.
  * The mesh is composed out of elements (eg. hexagons, tetrahedra etc) and each elements is composed out of nodes.
  */
 
@@ -1880,12 +1880,12 @@ void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix
         coords[i] = DenseVector<ValueType>( coordsLA[i] );
     }    
 
-}
+}//readAlyaCentral
 
 
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::string filename, IndexType globalN) {
+DenseVector<IndexType> FileIO<IndexType, ValueType>::readPartition(const std::string filename, const IndexType globalN) {
 	std::ifstream file(filename);
 
 	if(file.fail())
@@ -2162,7 +2162,7 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
     assert(nodeMap.size() == i++);
     std::cout << "Read " << totalEdges << " confirmed edges, among them " << leafEdges << " edges between " << numLeaves << " leaves." << std::endl;
 
-    /**
+    /*
      * now convert into CSRSparseMatrix
      */
 

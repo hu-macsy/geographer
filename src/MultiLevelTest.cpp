@@ -30,8 +30,8 @@ namespace ITI {
 class MultiLevelTest : public ::testing::Test {
 protected:
         // the directory of all the meshes used
-        std::string graphPath = "./meshes/";
-
+	    // projectRoot is defined in config.h.in
+		const std::string graphPath = projectRoot+"/meshes/";
 };
 
 
@@ -286,27 +286,38 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 //--------------------------------------------------------------------------------------- 
 
 TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
-    std::string file = graphPath + "trace-00008.bgf";
-    std::string coordFile = graphPath + "trace-00008.graph.xyz";
-    
-    // kept for further checking
-    std::string txtFile = graphPath+ "trace-00008.graph";
-    std::ifstream f(txtFile);
-    IndexType dimensions= 2, k=8;
-    IndexType N, edges;
-    f >> N >> edges; 
-    f.close();
-    
+
+	for( int dim : {2,3} ){
+
+	
+    std::string file; // = graphPath + "trace-00008.bgf";
+    std::string coordFile; // = graphPath + "trace-00008.graph.xyz";
+    IndexType dimensions= dim;
+    IndexType k=8;
+
+    if( dim==2 ){
+    	file = graphPath + "trace-00008.graph";
+    	coordFile = graphPath + "trace-00008.graph.xyz";
+    }else if( dim==3 ){
+    	file = graphPath + "quadTreeGraph3D_4.graph";
+    	//coordFile = graphPath + "353off.graph.xyz";
+    	coordFile = file + ".xyz";
+    }
+
+	IndexType N, edges;
+	std::ifstream f(file);
+	f >> N >> edges; 
+	f.close();
+
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
     // for now local refinement requires k = P
     k = comm->getSize();
     //
+
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file, ITI::Format::BINARY );
-    //distrubute graph
-    //graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
-        
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file, ITI::Format::METIS );        
 
     //read the array locally and messed the distribution. Left as a remainder.
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
@@ -321,10 +332,8 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
 
-    //check distributions
-    //assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
 
-    // coarsen the graph
+    // coarsen the graph with different coarsening resolution
     for(IndexType i=2; i<7; i++){
         std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
         
@@ -332,11 +341,12 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
         IndexType sideLen = settings.pixeledSideLen;
         IndexType pixeledGraphSize =  std::pow( sideLen, dimensions);
         IndexType pixeledGraphAdjecencyMatrixSize = pixeledGraphSize*pixeledGraphSize;
-        
                 
         PRINT0("sideLen= "<< settings.pixeledSideLen << " ,pixeledGraphSize= "<< pixeledGraphSize << " , pixeledGraphAdjecencyMatrixSize= " << pixeledGraphAdjecencyMatrixSize );
         if( pixeledGraphSize > N ){
-            std::cout<< " size of pixeledGraph (number of pixels)= "<< pixeledGraphSize << "  > input grap " << N <<" .Hmm, not really a coarsening... Breaking..." << std::endl;
+        	if( comm->getRank()==0 ){
+            	std::cout<< " size of pixeledGraph (number of pixels)= "<< pixeledGraphSize << "  > input graph " << N <<". Hmm, not really a coarsening... Breaking..." << std::endl;
+            }
             break;
         }
         
@@ -362,7 +372,9 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
         
         EXPECT_EQ( nnzValues , pixelGraph.getNumValues() );
         EXPECT_GE( pixelGraph.l1Norm(), 1 );
-    }
+    }// for i=2:7
+
+	}//for dim
 }
 
 //---------------------------------------------------------------------------------------

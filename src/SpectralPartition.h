@@ -5,6 +5,8 @@
  *      Author: tzovas
  */
 
+#pragma once
+
 #include <scai/dmemo/Distribution.hpp>
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/dmemo/GenBlockDistribution.hpp>
@@ -28,6 +30,10 @@
 #include "Settings.h"
 
 namespace ITI {
+
+	/** @brief Partition a graph using the spectral partitioning method.
+	@warning This class is heavily unstable and not further developed.
+	*/
 
     template <typename IndexType, typename ValueType>
     class SpectralPartition {

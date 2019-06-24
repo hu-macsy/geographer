@@ -4,7 +4,7 @@
  * A standalone executable to analyze an existing partition stored in a file.
  */
 
-#include <boost/program_options.hpp>
+#include <cxxopts.hpp>
 
 #include "../src/FileIO.h"
 #include "../src/Metrics.h"
@@ -19,40 +19,36 @@ using ITI::Metrics;
 using scai::lama::DenseVector;
 
 int main(int argc, char** argv) {
-	using namespace boost::program_options;
-	options_description desc("Supported options");
+	using namespace cxxopts;
+	cxxopts::Options options("analyze", "Analyzing existing partitions");
 
 	struct Settings settings;
 
 	std::string blockSizesFile;
 
-	desc.add_options()
+	options.add_options()
 				("help", "display options")
 				("version", "show version")
 				//input and coordinates
-				("graphFile", value<std::string>(), "read graph from file")
-				//("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
-				("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
-				//("coordFormat", value<ITI::Format>(&coordFormat), "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ")
-				("dimensions", value<IndexType>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions of generated graph")
-				("partition", value<std::string>(), "file of partition")
-				("blockSizesFile", value<std::string>(&blockSizesFile) , " file to read the block sizes for every block")
+				("graphFile", "read graph from file", value<std::string>())
+				("fileFormat", "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.", value<ITI::Format>())
+				("dimensions", "Number of dimensions of generated graph", value<IndexType>()->default_value(std::to_string(settings.dimensions)))
+				("partition", "file of partition", value<std::string>())
+				("blockSizesFile", " file to read the block sizes for every block", value<std::string>() )
 				("computeDiameter", "Compute Diameter of resulting block files.")
-                ("maxDiameterRounds", value<IndexType>(&settings.maxDiameterRounds)->default_value(settings.maxDiameterRounds), "abort diameter algorithm after that many BFS rounds")
+                ("maxDiameterRounds", "abort diameter algorithm after that many BFS rounds", value<IndexType>()->default_value(std::to_string(settings.maxDiameterRounds)))
 				;
 
 
-	variables_map vm;
-	store(command_line_parser(argc, argv).options(desc).run(), vm);
-	notify(vm);
+	cxxopts::ParseResult vm = options.parse(argc, argv);
 
 	if (vm.count("help")) {
-		std::cout << desc << "\n";
+		std::cout << options.help() << "\n";
 		return 0;
 	}
 
 	if (vm.count("version")) {
-		std::cout << "Git commit " << version << std::endl;
+		std::cout << "Git commit " << ITI::version << std::endl;
 		return 0;
 	}
 
@@ -77,6 +73,18 @@ int main(int argc, char** argv) {
         coordFile = graphFile + ".xyz";
     }
 
+    if (vm.count("fileFormat")) {
+        settings.fileFormat = vm["fileFormat"].as<ITI::Format>();
+    }
+
+    if (vm.count("maxDiameterRounds")) {
+        settings.maxDiameterRounds = vm["maxDiameterRounds"].as<IndexType>();
+    }
+
+    if (vm.count("dimensions")) {
+        settings.dimensions = vm["dimensions"].as<IndexType>();
+    }
+
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     //std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
     
@@ -90,6 +98,7 @@ int main(int argc, char** argv) {
     std::vector<std::vector<ValueType>> blockSizes;
 
     if( vm.count("blockSizesFile") ){
+        std::string blockSizesFile = vm["blockSizesFile"].as<std::string>();
         blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
         for (IndexType i = 0; i < nodeWeights.size(); i++) {
             const ValueType blockSizesSum  = std::accumulate( blockSizes[i].begin(), blockSizes[i].end(), 0);

@@ -9,13 +9,14 @@
 
 namespace ITI {
 
-//Tranferring code from the implementation of Roland in TiMEr/src/mapping/algorithms.cpp
+//Transferring code from the implementation of Roland in TiMEr/src/mapping/algorithms.cpp
 
-//Edge weigths in the block graph represent the amount of information that needs to
+//Edge weights in the block graph represent the amount of information that needs to
 //be communicated, aka the communication volume.
 //Edge weights in the the processor graph represent the bandwidth/capacity of the
 //edge. Higher values indicate faster connection.
 
+/*
 template <typename IndexType, typename ValueType>
 std::vector<IndexType> Mapping<IndexType, ValueType>::rolandMapping_local( 
 	scai::lama::CSRSparseMatrix<ValueType>& blockGraph,
@@ -36,7 +37,7 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::rolandMapping_local(
 
 	//total communication involving node i in communication graph
   	std::vector<ValueType> comFrom(N, 0);
-/*	
+// 
 	//compute weighted node degrees in block graph and store them in comFrom
 	{
 	    const scai::lama::CSRStorage<ValueType> localStorage = blockGraph.getLocalStorage();
@@ -116,14 +117,15 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::rolandMapping_local(
 		//find next blockNode
 		//blockNode
   	}//for i<N
-*/
+// 
 
   	return mapping;
 
 }
+*/
 //------------------------------------------------------------------------------------
 
-// copy and convert/reimplement code from libTopoMap,
+// copy and convert/re-implement code from libTopoMap,
 // http://htor.inf.ethz.ch/research/mpitopo/libtopomap/,
 // function TPM_Map_greedy found in file libtopomap.cpp around line 580
 
@@ -142,8 +144,7 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::torstenMapping_local(
 	// PEGraph is const so make local copy
 	scai::lama::CSRSparseMatrix<ValueType> copyPEGraph;// = PEGraph;
 
-	//TODO: why is the thing below needed? we ignore the edges of the original
-	// PEGraph?
+	//TODO: why is the thing below needed? we ignore the edges of the original PEGraph?
 	//change the edge weights in the copyPEGraph
 	{
 		//find max weight in block graph
@@ -214,7 +215,7 @@ for( int i=0; i<N; i++){
 	const scai::hmemo::ReadAccess<IndexType> ja(blockStorage.getJA());
 	const scai::hmemo::ReadAccess<ValueType> blockValues(blockStorage.getValues());
 	//actually, the weights of the edges of the PE graph. We will update them
-	//after wvery time we map a vertex
+	//after every time we map a vertex
 	scai::lama::CSRStorage<ValueType> PEStorage = copyPEGraph.getLocalStorage();
 	scai::hmemo::ReadAccess<ValueType> PEValues( PEStorage.getValues() );
 	const scai::hmemo::ReadAccess<IndexType> PEia( PEStorage.getIA() );
@@ -298,7 +299,7 @@ PRINT0( "mapped vertex " << blockNode << " to " << peNode);
 
      		//TODO: possible opt, not need a full Dijkstra, when the first not
      		// used node is found stop
-//WARNING: need shortest paths of longest? we need to map "heavy" nodes of the 
+//WARNING: need shortest paths or longest? we need to map "heavy" nodes of the 
 // blockGraph with "heavy" nodes in the PEGraph (heavy according to their weighted
 // degree).
 // Update: the above is true but irrelevant here: we should find a "heavy" node
@@ -384,6 +385,9 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::getSfcRenumber(
 	const typename std::vector<IndexType>::iterator firstIndex = localIndices.begin();
 	const typename std::vector<IndexType>::iterator lastIndex = localIndices.end();
 
+	SCAI_ASSERT( partition.getDistribution().isEqual(coordinates[0].getDistribution()), "Partition and coordinates must have the same distribution" );
+	SCAI_ASSERT_EQ_ERROR( partition.getLocalValues().size(), localN, "Size mismatch. partition and coordinates must have the same distribution" );
+	
 	//to make it more readable
 	using point = std::vector<ValueType>;
 
@@ -394,9 +398,11 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::getSfcRenumber(
 	SCAI_ASSERT_EQ_ERROR( blockCenters.size(), dim, "Wrong size of centers vector." );
 	SCAI_ASSERT_EQ_ERROR( blockCenters[0].size(), k, "Wrong size of centers vector." )
 
-	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	for(IndexType i=0; i<k; i++){
-		PRINT0("center " << i << " in " << blockCenters[0][i] <<", " << blockCenters[1][i]);
+	if( settings.debugMode ){
+		const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		for(IndexType i=0; i<k; i++){
+			PRINT0("center " << i << " in " << blockCenters[0][i] <<", " << blockCenters[1][i]);
+		}
 	}
 
 	//
@@ -440,7 +446,7 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::applySfcRenumber(
 	scai::lama::DenseVector<IndexType>& partition,
 	const Settings settings){
 
-	//get the reunmbering
+	//get the renumbering
 	std::vector<IndexType> R = Mapping<IndexType,ValueType>::getSfcRenumber( coordinates, nodeWeights, partition, settings );
 
 	SCAI_ASSERT_EQ_ERROR( R.size(), settings.numBlocks, "Size mismatch" );
@@ -465,6 +471,14 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::applySfcRenumber(
 		wPart[i] = reverseR[prevBlock];
 	}
 
+	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+	if( comm->getRank()==0 and settings.debugMode){
+		for( int i=0; i<k; i++){
+			if( reverseR[i]!=i ){
+				std::cout << "block " << i << " -> " << reverseR[i] << std::endl;
+			}
+		}
+	}
 	return reverseR;
 }//applySfcRenumber
 

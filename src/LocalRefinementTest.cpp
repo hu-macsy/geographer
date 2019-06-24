@@ -31,8 +31,8 @@ namespace ITI {
 class LocalRefinementTest : public ::testing::Test {
 protected:
         // the directory of all the meshes used
-        std::string graphPath = "./meshes/";
-
+        // projectRoot is defined in config.h.in
+		const std::string graphPath = projectRoot+"/meshes/";
 };
 
 //--------------------------------------------------------------------------------------- 
@@ -40,7 +40,7 @@ protected:
 TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	const IndexType k = comm->getSize();
-	const ValueType epsilon = 0.1;
+	ValueType epsilon = 0.1;
 
 	//srand(2); //WARNING/TODO 04/03: hangs for p=4
 	//srand(3); //WARNING/TODO 04/03: hangs for p=6
@@ -67,8 +67,8 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	  coordinates[i] = static_cast<ValueType>( 0 );
 	}
 
-	MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(graph, coordinates, maxCoord, numPoints);
-	//MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(graph, coordinates, maxCoord, numPoints);
+	//MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(graph, coordinates, maxCoord, numPoints, dimensions);
+	MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(graph, coordinates, maxCoord, numPoints);
 
 /*
 	//try reading from file instead of generating the mesh
@@ -101,7 +101,8 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
         
 	if(initialImbalance > epsilon){
 		PRINT0("Warning, initial random partition too imbalanced: "<< initialImbalance);
-		//epsilon = initialImbalance;
+		PRINT0("Setting as epsilon the initial imbalance " << initialImbalance);
+		epsilon = initialImbalance;
 	}
         
 	//redistribute according to partition
@@ -116,7 +117,6 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 
 	Settings settings;
 	settings.numBlocks= k;
-	//settings.epsilon = initialImbalance;
 	settings.epsilon = epsilon;
         
 	//get block graph
@@ -151,8 +151,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	ValueType cut = GraphUtils<IndexType,ValueType>::computeCut(graph, part, true);
 	DenseVector<IndexType> origin(graph.getRowDistributionPtr(), comm->getRank());
 	ASSERT_GE(cut, 0);
-	const IndexType iterations = 1;
-
+	const IndexType iterations = 10;
 
 
 	for (IndexType i = 0; i < iterations; i++) {
@@ -175,7 +174,7 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 	// TODO: I do not know, both assertion fail from time to time...
 	// at least return a solution less imbalanced than the initial one
 	EXPECT_LE(imbalance, initialImbalance);
-	//EXPECT_LE( imbalance , settings.epsilon);
+	EXPECT_LE( imbalance , settings.epsilon);
 }
 
 //---------------------------------------------------------------------------------------
@@ -384,7 +383,7 @@ TEST_F(LocalRefinementTest, testDistancesFromBlockCenter) {
 	  coordinates[i] = static_cast<ValueType>( 0 );
 	}
 
-	MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(a, coordinates, maxCoord, numPoints);
+	MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(a, coordinates, maxCoord, numPoints, dimensions);
 
 	const IndexType localN = dist->getLocalSize();
 

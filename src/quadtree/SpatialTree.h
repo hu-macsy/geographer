@@ -99,9 +99,14 @@ public:
 		return root->getSubTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coords );
 	}
 	
+	/* Given several tree (thus, a forest) we create the corresponding graph. \sa SpatialCell::getSubTreeAsGraph()
+	*/
    
     template<typename IndexType, typename ValueType>
-	static scai::lama::CSRSparseMatrix<ValueType>  getGraphFromForest( std::vector< std::set<std::shared_ptr< const SpatialCell>>>& graphNgbrsCells, const std::vector<std::shared_ptr< const SpatialCell>>& treePtrVector,  std::vector<std::vector<ValueType>>& coords){
+	static scai::lama::CSRSparseMatrix<ValueType>  getGraphFromForest( 
+		std::vector< std::set<std::shared_ptr< const SpatialCell>>>& graphNgbrsCells,
+		const std::vector<std::shared_ptr< const SpatialCell>>& treePtrVector,
+		std::vector<std::vector<ValueType>>& coords){
             IndexType numTrees = treePtrVector.size();
             //  both vectors must have the same size = forestSize
             IndexType forestSize = treePtrVector[numTrees-1]->getID()+1;
@@ -123,7 +128,7 @@ public:
                     maxHeight = thisNode->height();
                 }
             }
-            PRINT("numTrees= "<< numTrees);            
+            //PRINT("numTrees= "<< numTrees);            
             std::shared_ptr<const SpatialCell> dummyRoot= onlyChild;
 
             // convert the tree vector to a queue for the starting frontier
@@ -134,7 +139,7 @@ public:
             /* since we use a frontier as an input, dummy node should not be needed at all
              * maybe only to call getSubTreeAsGraph.
              * TODO: turn getSubTreeAsGraph to static ??
-             * */
+             */
             
             return dummyRoot->getSubTreeAsGraph<IndexType, ValueType>( graphNgbrsCells , coords, frontier);
 	}

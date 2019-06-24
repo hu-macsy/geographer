@@ -5,13 +5,21 @@
  *      Author: tzovas
  */
 
+#include <parmetis.h>
+
+//for zoltan
+#include <Zoltan2_PartitioningSolution.hpp>
+#include <Zoltan2_PartitioningProblem.hpp>
+#include <Zoltan2_BasicVectorAdapter.hpp>
+#include <Zoltan2_InputTraits.hpp>
 
 #include "Wrappers.h"
+#include "Mapping.h"
 
-
-IndexType HARD_TIME_LIMIT= 600; 	// hard limit in seconds to stop execution if exceeded
 
 namespace ITI {
+
+IndexType HARD_TIME_LIMIT= 600; 	// hard limit in seconds to stop execution if exceeded
 
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
@@ -23,33 +31,83 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
 	struct Settings &settings,
 	struct Metrics &metrics	){
 
-//TODO: for the metis wrappers, nodeWeights[0] is wrong, must adapt the protoypes 
+	scai::lama::DenseVector<IndexType> partition;
 	switch( tool){
 		case Tool::parMetisGraph:
-			return metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 0, settings, metrics);
-		
+			partition = metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 0, settings, metrics);
+			break;
 		case Tool::parMetisGeom:
-			return metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 1, settings, metrics);
-			
+			partition =  metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 1, settings, metrics);
+			break;
 		case Tool::parMetisSFC:
-			return metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 2, settings, metrics);
-			
+			partition = metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 2, settings, metrics);
+			break;
 		case Tool::zoltanRIB:
-			return zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rib", settings, metrics);
-		
+			partition = zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rib", settings, metrics);
+			break;
 		case Tool::zoltanRCB:
-			return zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rcb", settings, metrics);
-		
+			partition = zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rcb", settings, metrics);
+			break;
 		case Tool::zoltanMJ:
-			return zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "multijagged", settings, metrics);
-			
+			partition = zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "multijagged", settings, metrics);
+			break;
 		case Tool::zoltanSFC:
-			return zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "hsfc", settings, metrics);
-			
+			partition = zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "hsfc", settings, metrics);
+			break;
 		default:
 			throw std::runtime_error("Wrong tool given to partition.\nAborting...");
-			return scai::lama::DenseVector<IndexType>(graph.getLocalNumRows(), -1 );
+			partition = scai::lama::DenseVector<IndexType>(graph.getLocalNumRows(), -1 );
 	}
+
+	if( settings.mappingRenumbering ){
+		const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+		PRINT0("Applying renumbering of blocks based on the SFC index of their centers.");
+		std::chrono::time_point<std::chrono::system_clock> startRnb = std::chrono::system_clock::now();
+
+		Mapping<IndexType,ValueType>::applySfcRenumber( coordinates, nodeWeights, partition, settings );
+
+		std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - startRnb;
+		PRINT0("renumbering time " << elapTime.count() );
+	}
+
+	return partition;
+}
+//-----------------------------------------------------------------------------------------	
+template<typename IndexType, typename ValueType>
+scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
+	const std::vector<scai::lama::DenseVector<ValueType>> &coordinates, 
+	const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
+	bool nodeWeightsFlag,
+	Tool tool,
+	struct Settings &settings,
+	struct Metrics &metrics	){
+
+	//create dummy graph as the these tools do not use it.
+	const scai::dmemo::DistributionPtr distPtr = coordinates[0].getDistributionPtr();
+	const scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution(distPtr->getGlobalSize()) );
+	const scai::lama::CSRSparseMatrix<ValueType> graph = scai::lama::zero<CSRSparseMatrix<ValueType>>( distPtr, noDistPtr );
+
+	scai::lama::DenseVector<IndexType> retPart;
+	switch( tool ){
+		case Tool::parMetisGraph:
+		case Tool::parMetisGeom:
+			PRINT("Tool "<< tool <<" requires the graph to compute a partition but no graph was given.");
+			throw std::runtime_error("Missing graph.\nAborting...");
+			break;
+		case Tool::parMetisSFC: 
+		case Tool::zoltanRIB:
+		case Tool::zoltanRCB:
+		case Tool::zoltanMJ:
+		case Tool::zoltanSFC:
+			//call partition function
+			retPart =  partition( graph, coordinates, nodeWeights, nodeWeightsFlag, tool, settings, metrics);
+			break;
+		default:
+			throw std::runtime_error("Wrong tool given to partition.\nAborting...");
+			retPart = scai::lama::DenseVector<IndexType>(graph.getLocalNumRows(), -1 );			
+	}//switch
+
+	return retPart;
 }
 //-----------------------------------------------------------------------------------------	
 
@@ -68,6 +126,8 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::repartition (
 		case Tool::parMetisGraph:		
 		case Tool::parMetisGeom:			
 		case Tool::parMetisSFC:
+			throw std::runtime_error("Unfortunatelly, Current version does not support repartitioning with parmetis.\nAborting...");
+			//TODO: parmetis needs consective indices for the vertices; must reindex vertices
 			//return metisRepartition( graph, coordinates, nodeWeights, nodeWeightsFlag, settings, metrics);
 			
 		case Tool::zoltanRIB:
@@ -347,7 +407,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
             metisRet = ParMETIS_V3_PartGeomKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ndims, xyzLocal, &ncon, &nparts, tpwgts, ubvec, options, &edgecut, partKway, &metisComm );  
         }else if( parMetisGeom==2 ){
 			metisRet = ParMETIS_V3_PartGeom( vtxDist, &ndims, xyzLocal, partKway, &metisComm ); 
-		}else { // parMetisGeom==3 
+		}else { 
 			//repartition
 			
 			//TODO: check if vsize is correct 
@@ -521,7 +581,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanPartiti
 	
 	bool repart = false;
 	
-	return Wrappers<IndexType, ValueType>::zoltanCore(graph, coords, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);
+	return Wrappers<IndexType, ValueType>::zoltanCore( coords, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);
 }
 //---------------------------------------------------------------------------------------	
 		
@@ -540,7 +600,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanReparti
 	
 	bool repart = true;
 	
-	return Wrappers<IndexType, ValueType>::zoltanCore(graph, coords, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);	
+	return Wrappers<IndexType, ValueType>::zoltanCore( coords, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);	
 	}
 //---------------------------------------------------------------------------------------	
 
@@ -548,7 +608,6 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanReparti
 
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
-	const scai::lama::CSRSparseMatrix<ValueType> &graph,
 	const std::vector<scai::lama::DenseVector<ValueType>> &coords, 
 	const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
 	bool nodeWeightsFlag,
@@ -561,7 +620,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 	typedef Zoltan2::BasicVectorAdapter<myTypes> inputAdapter_t;
 	
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+	const scai::dmemo::DistributionPtr dist = coords[0].getDistributionPtr();
 	const IndexType thisPE = comm->getRank();
 	const IndexType numBlocks = settings.numBlocks;
 	 
@@ -649,7 +708,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 			}
 		}
 	}else{
-		//all weights are initiallized weigth unit weight
+		//all weights are initiallized with unit weight
 	}
 
 	std::vector<const ValueType *>weightVec( numWeights );
@@ -729,6 +788,6 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
 
 //---------------------------------------------------------------------------------------	
 		
-	template class Wrappers<IndexType, ValueType>;
+template class Wrappers<IndexType, ValueType>;
 	
 }//namespace
