@@ -358,7 +358,7 @@ TEST_F(MeshGeneratorTest, testWriteMetis_Dist_3D){
     MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(adjM, coords, maxCoord, numPoints, 3);
     
     // write the mesh in p(=number of PEs) files
-    FileIO<IndexType, ValueType>::writeGraphDistributed( adjM, "meshes/dist3D_");
+    FileIO<IndexType, ValueType>::writeGraphDistributed( adjM, graphPath+"/dist3D_");
     
 }
 
