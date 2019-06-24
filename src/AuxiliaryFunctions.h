@@ -344,6 +344,5 @@ static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
 
 }; //class aux
 
-template class aux<IndexType, ValueType>;
 }// namespace ITI
 

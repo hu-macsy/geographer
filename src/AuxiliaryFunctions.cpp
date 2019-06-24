@@ -294,6 +294,6 @@ void ITI::aux<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRSparseMat
 	}
 }//checkLocalDegreeSymmetry
 
-
+template class aux<IndexType, ValueType>;
 
 }//namespace ITI 
