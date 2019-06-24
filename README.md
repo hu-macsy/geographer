@@ -63,18 +63,18 @@ By default, it is assumed that the input graph is in the METIS format and that c
 If no coordinate file is given, it is assumed that the coordinates are in foo.metis.xyz for an input file foo.metis.
 For an input graph embedded in 2 dimensions, a graph file input.graph and a coordinate file input.graph.xyz, call the program like this:
 
-    ./Geographer --graphFile input.graph  --numBlocks 8 --dimensions 2 --writePartition --outFile output.part
+    ./Geographer --graphFile input.graph  --numBlocks 8 --dimensions 2 --outFile output.part
 
 This will partition the graph into 8 blocks and write the result to output.part.
 
 ### Parallelization
 Geographer can run in parallel using MPI. An example call with 8 processes :
 
-    mpirun -np 8 Geographer --graphFile input.graph  --numBlocks 8 --dimensions 2 --writePartition --outFile  output.part
+    mpirun -np 8 Geographer --graphFile input.graph  --numBlocks 8 --dimensions 2 --outFile  output.part
 
 The number of blocks can be different from the number of processes, but this will disable the local refinement. If the number of blocks is not given, it is set to the number of processes. Thus, the last command could also be phrased like this:
 
-    mpirun -np 8 Geographer --graphFile input.graph --dimensions 2 --writePartition --outFile output.part
+    mpirun -np 8 Geographer --graphFile input.graph --dimensions 2 --outFile output.part
 
 ### Other parameters
 Geographer supports other parameters and input formats as well. For a full list call `./Geographer --help`.
