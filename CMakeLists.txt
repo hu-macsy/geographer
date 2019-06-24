@@ -108,6 +108,7 @@ set(LIB_DEST "lib/geographer")
 set(CMAKE_DEST "share/cmake/geographer")
 
 ### set runtime path ###
+cmake_policy(SET CMP0042 NEW) # using rpath also on Macos
 set ( CMAKE_SKIP_BUILD_RPATH FALSE )
 set ( CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${LIB_DEST} ${SCAI_ROOT}/lib/)
 set ( CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE )
