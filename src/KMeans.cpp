@@ -907,7 +907,7 @@ DenseVector<IndexType> assignBlocks(
 			}
 			
 			std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;			
-			totalBalanceTime += balanceTime.count() ;
+			totalBalanceTime += balanceTime.count();
 
 			auto oldprecision = std::cout.precision(3);
 			if (comm->getRank() == 0) {
@@ -1032,35 +1032,13 @@ DenseVector<IndexType> computeRepartition(
 	return computePartition(coordinates, nodeWeights, blockSizes, previous , groupOfCenters, tmpSettings, metrics);
 }
 
-//usual call that does not take the graph as input
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition( \
-	const std::vector<DenseVector<ValueType>> &coordinates, \
-	const std::vector<DenseVector<ValueType>> &nodeWeights, \
-	const std::vector<std::vector<ValueType>> &blockSizes, \
-	const DenseVector<IndexType> &partition,  //if repartition, this is the partition to be rebalanced
-	std::vector<std::vector<point>> centers, \
-	const Settings settings, \
-	struct Metrics &metrics ) {
-
-	scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
-	scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(dist->getGlobalSize()));
-	auto graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDistPtr);
-
-	return computePartition( graph, coordinates, nodeWeights, blockSizes,
-		partition, centers, settings, metrics );
-}
-
-
-//TODO: graph is not needed, this is only for debugging
 //WARNING: if settings.repartition=true then partition has a different meaning: is the partition to be rebalanced,
 // not the partition from the previous hierarchy level.
 //TODO?: add another DenseVector in order not to confuse the two?
 
 //core implementation 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> computePartition( \
-	const CSRSparseMatrix<ValueType> &graph, \
+DenseVector<IndexType> computePartition(
 	const std::vector<DenseVector<ValueType>> &coordinates, \
 	const std::vector<DenseVector<ValueType>> &nodeWeights, \
 	const std::vector<std::vector<ValueType>> &targetBlockWeights, \
@@ -1250,7 +1228,7 @@ DenseVector<IndexType> computePartition( \
 	{
 		if (randomInitialization) {
 			ITI::GraphUtils<IndexType, ValueType>::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
-			//TODO: the cantor shuffle is more stable; random suffling can yield better
+			//TODO: the cantor shuffle is more stable; random shuffling can yield better
 			// results occasionally but has higher fluctuation/variance
 			//localIndices = GraphUtils<IndexType,ValueType>::indexReorderCantor( localN );
 
@@ -1497,11 +1475,6 @@ DenseVector<IndexType> computePartition( \
 			maxTime = comm->max( balanceTime.count() );
 		}
 
-		ValueType cut = -1;
-		if( settings.debugMode && iter >= samplingRounds){
-			cut = ITI::GraphUtils<IndexType, ValueType>::computeCut( graph, result, false );			
-		}
-
 		if (comm->getRank() == 0) {
 			std::cout << "i: " << iter<< ", delta: " << delta << ", imbalance=";
 			for (IndexType i = 0; i < numNodeWeights; i++) {
@@ -1509,9 +1482,6 @@ DenseVector<IndexType> computePartition( \
 			}
 			if (settings.verbose) {
 				std::cout << ", time : "<< maxTime;
-			}
-			if (settings.debugMode  && iter >= samplingRounds) {
-				std::cout << ", cut= " << cut;
 			}
 			std::cout << std::endl;
 		}
@@ -1578,7 +1548,6 @@ DenseVector<IndexType> computePartition(
 //---------------------------------------
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierarchicalPartition(
-	CSRSparseMatrix<ValueType> &graph,	//TODO: graph is not needed
 	std::vector<DenseVector<ValueType>> &coordinates,
 	std::vector<DenseVector<ValueType>> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,
@@ -1600,7 +1569,6 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
 	const IndexType numNodeWeights = nodeWeights.size();
 	const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
-	const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
 	const IndexType localN = dist->getLocalSize();
 
 	//redistribute points based on their hilbert curve index
@@ -1618,11 +1586,6 @@ DenseVector<IndexType> computeHierarchicalPartition(
 			SCAI_ASSERT_EQ_ERROR( hasHilbertDist, true, "Input must be distributed according to a hilbert curve distribution");
 		}
 	}
-
-	//WARNING: this graph redistribution messes up the distributions later... not sure why and where exactly	
-	//update 26/04/19: when using hierarchical kmeans, the graph is redistributed (for debugging reasons since actually the graph is not used)
-	//redistribute again to original distribution before exiting the function
-	graph.redistribute( coordinates[0].getDistributionPtr(), graph.getColDistributionPtr() );
 
 	std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
@@ -1722,11 +1685,9 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		//used. We infer the number of new blocks from the groupOfCenters
 		//maybe, set also numBlocks for clarity??
 		
-		partition = computePartition( graph, coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics );
-		//partition = computePartition( coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics );
+		partition = computePartition( coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics );
 
 		//TODO: not really needed assertions
-		SCAI_ASSERT_EQ_ERROR( graph.getRowDistributionPtr()->getLocalSize(),partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
 		SCAI_ASSERT_EQ_ERROR( coordinates[0].getDistributionPtr()->getLocalSize(),\
 								partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
 		SCAI_ASSERT_EQ_ERROR( nodeWeights[0].getDistributionPtr()->getLocalSize(),\
@@ -1740,7 +1701,6 @@ DenseVector<IndexType> computeHierarchicalPartition(
 				//FileIO<IndexType,ValueType>::writePartitionParallel( partition, "./partResults/partHKM"+std::to_string(settings.numBlocks)+"_h"+std::to_string(h)+".out");
 				FileIO<IndexType,ValueType>::writeDenseVectorCentral( partition, "./partResults/partHKM"+std::to_string(settings.numBlocks)+"_h"+std::to_string(h)+".out");
 			}
-			//aux<IndexType,ValueType>::print2DGrid( graph, partition );
 		}
 
 		//TODO?: remove?
@@ -1748,7 +1708,6 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		for (IndexType i = 0; i < numNodeWeights; i++) {
 			imbalances[i] = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, totalNumNewBlocks, nodeWeights[i], targetBlockWeights[i] );
 		}
-		//IndexType cut = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
 
 		PRINT0("\nFinished hierarchy level " << h <<", partitioned into " << totalNumNewBlocks << " blocks and imbalance is:" );
 		if( comm->getRank()==0 ){
@@ -1759,16 +1718,12 @@ DenseVector<IndexType> computeHierarchicalPartition(
 		
 	} //for( h=1; h<commTree.hierarchyLevels; h++ ){
 
-	//redistribute graph back to original distribution
-	graph.redistribute( rowDist, graph.getColDistributionPtr() );
-
 	return partition;
 }//computeHierarchicalPartition
 
 //--------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierPlusRepart(
-	CSRSparseMatrix<ValueType> &graph, //TODO: only for debugging
 	std::vector<DenseVector<ValueType>> &coordinates,
 	std::vector<DenseVector<ValueType>> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,
@@ -1776,26 +1731,12 @@ DenseVector<IndexType> computeHierPlusRepart(
 	struct Metrics& metrics){
 
 	//get a hierarchical partition
-	DenseVector<IndexType> result = ITI::KMeans::computeHierarchicalPartition<IndexType, ValueType>( graph, coordinates, nodeWeights, commTree, settings, metrics);
+	DenseVector<IndexType> result = ITI::KMeans::computeHierarchicalPartition<IndexType, ValueType>( coordinates, nodeWeights, commTree, settings, metrics);
 
 	std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors(-1);
 
 	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 	PRINT0("Finished hierarchical partition");
-
-
-	if(settings.verbose){
-		//this redistribution is needed to calculate the metrics
-		const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
-		graph.redistribute( result.getDistributionPtr(), graph.getColDistributionPtr() );
-
-		metrics.getEasyMetrics( graph, result, nodeWeights, settings );
-		if(comm->getRank()==0){
-			metrics.print( std::cout );
-		}
-		//redistribute back to original distribution
-		graph.redistribute( rowDist, graph.getColDistributionPtr() );
-	}
 
 	//refine using a repartition step
 	return  ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinates, nodeWeights, blockSizes, result, settings);
@@ -1832,30 +1773,6 @@ template DenseVector<IndexType> KMeans::computePartition(
 	const Settings settings,
 	struct Metrics& metrics);
 
-/*
-using point = std::vector<ValueType>;
-//TODO: graph is not needed, this is only for debugging
- template DenseVector<IndexType> KMeans::computePartition(
- 	const CSRSparseMatrix<ValueType> &graph, \
- 	const std::vector<DenseVector<ValueType>> &coordinates, \
- 	const DenseVector<ValueType> &nodeWeights, \
- 	const std::vector<ValueType> &blockSizes, \
- 	const DenseVector<IndexType>& prevPartition,\
- 	std::vector<std::vector<point>> centers, \
- 	const Settings settings, \
- 	struct Metrics &metrics);
-*/
-
-/*
-//instantiations needed or there is a undefined reference otherwise
-template DenseVector<IndexType> KMeans::computePartition(
-	const CSRSparseMatrix<ValueType> &graph,
-	const std::vector<DenseVector<ValueType>> &coordinates,
-	const scai::lama::DenseVector<ValueType> &nodeWeights,
-	const std::vector<IndexType> &blockSizes,
-	const Settings settings,
-	struct Metrics& metrics);
-*/
 template DenseVector<IndexType> KMeans::computeRepartition(
 	const std::vector<DenseVector<ValueType>>& coordinates,
 	const std::vector<DenseVector<ValueType>>& nodeWeights,
@@ -1863,9 +1780,7 @@ template DenseVector<IndexType> KMeans::computeRepartition(
 	const DenseVector<IndexType>& previous,
 	const Settings settings);
 
-
 template DenseVector<IndexType> KMeans::computeHierarchicalPartition(
-	CSRSparseMatrix<ValueType> &graph,
 	std::vector<DenseVector<ValueType>> &coordinates,
 	std::vector<DenseVector<ValueType>> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,
@@ -1873,7 +1788,6 @@ template DenseVector<IndexType> KMeans::computeHierarchicalPartition(
 	struct Metrics& metrics);
 
 template DenseVector<IndexType> KMeans::computeHierPlusRepart(
-	CSRSparseMatrix<ValueType> &graph, //TODO: only for debugging
 	std::vector<DenseVector<ValueType>> &coordinates,
 	std::vector<DenseVector<ValueType>> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,

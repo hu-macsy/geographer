@@ -63,18 +63,6 @@ using point = std::vector<ValueType>;
  	const Settings settings, \
  	struct Metrics &metrics);
 
-//TODO: graph is not needed, this is only for debugging
- template<typename IndexType, typename ValueType>
- DenseVector<IndexType> computePartition(
- 	const CSRSparseMatrix<ValueType> &graph, \
- 	const std::vector<DenseVector<ValueType>> &coordinates, \
- 	const std::vector<DenseVector<ValueType>> &nodeWeights, \
- 	const std::vector<std::vector<ValueType>> &blockSizes, \
- 	const DenseVector<IndexType>& prevPartition,\
- 	std::vector<std::vector<point>> centers, \
- 	const Settings settings, \
- 	struct Metrics &metrics);
-
 /** @brief Minimal wrapper with only the coordinates. Unit weights are assumed and uniform block sizes.
 */
 template<typename IndexType, typename ValueType>
@@ -110,8 +98,6 @@ DenseVector<IndexType> computePartition(
 /**
  * Given a tree of the processors graph, computes a partition into a hierarchical fashion.
  * 
- * param[in] graph The adjacency matrix. Note: currently, the graph is used mainly for
- * debugging purposes and is not needed.
  * @param[in] coordinates First level index specifies dimension, second level index the point id
  * @param[in] nodeWeights The weights of the points. Each point can have multiple weights but all
  the same number of weights.
@@ -120,7 +106,6 @@ DenseVector<IndexType> computePartition(
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierarchicalPartition(
-	CSRSparseMatrix<ValueType> &graph, //TODO: only for debugging
 	std::vector<DenseVector<ValueType>> &coordinates,
 	std::vector<DenseVector<ValueType>> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,
@@ -134,7 +119,6 @@ Parameters and return are same as in computeHierarchicalPartition()
 */
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierPlusRepart(
-	CSRSparseMatrix<ValueType> &graph, //TODO: only for debugging
 	std::vector<DenseVector<ValueType>> &coordinates,
 	std::vector<DenseVector<ValueType>> &nodeWeights,
 	const CommTree<IndexType,ValueType> &commTree,
