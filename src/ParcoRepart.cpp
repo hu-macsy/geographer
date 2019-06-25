@@ -250,8 +250,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 	const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
 	const IndexType rank = comm->getRank();
 
-
-	if( !coordDist->isEqual( *inputDist) ){
+	if (!coordDist->isEqual( *inputDist) ) {
 		throw std::runtime_error( "Distributions should be equal.");
 	}
 
@@ -262,15 +261,21 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 		SCAI_REGION("ParcoRepart.synchronize")
 		comm->synchronize();
 	}
+
+	if (settings.repartition && nodeWeights.size() > 1) {
+		throw std::logic_error("Repartitioning not implemented for multiple node weights.");
+	}
+
+	if (settings.initialPartition == ITI::Tool::geoMS && nodeWeights.size() > 1) {
+		throw std::logic_error("MultiSection not implemented for multiple weights.");
+	}
 	
-//SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition")
 	// get an initial partition
 	DenseVector<IndexType> result;
 	
 	for (IndexType i = 0; i < nodeWeights.size(); i++) {
 		assert(nodeWeights[i].getDistribution().isEqual(*inputDist));
 	}
-
 	
 	//-------------------------
 	//
@@ -293,17 +298,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 			if(comm->getRank() == 0)
 				std::cout << "SFC Time:" << totSFCTime << std::endl;
 		}
-	} 
-	//09/05/19: these tools are not really used. TODO:remove them?	
-	/*	else if ( settings.initialPartition==ITI::Tool::Pixel) {
-		PRINT0("Initial partition with pixels.");
-		result = ParcoRepart<IndexType, ValueType>::pixelPartition(coordinates, settings);
-	} else if ( settings.initialPartition == ITI::Tool::Spectral) {
-		PRINT0("Initial partition with spectral");
-		result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
-	}*/ 
+	}  
 	else if (settings.initialPartition == ITI::Tool::geoKmeans or settings.initialPartition == ITI::Tool::geoHierKM \
-		or  settings.initialPartition == ITI::Tool::geoHierRepart){
+		or  settings.initialPartition == ITI::Tool::geoHierRepart) {
 	    if (comm->getRank() == 0) {
 	        std::cout << "Initial partition with K-Means" << std::endl;
 	    }
@@ -313,77 +310,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 		std::vector<DenseVector<ValueType> > nodeWeightCopy = nodeWeights;
 		if (comm->getSize() > 1 && (settings.dimensions == 2 || settings.dimensions == 3)) {
 			SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans")
-			Settings migrationSettings = settings;
-			migrationSettings.numBlocks = comm->getSize();
-			migrationSettings.epsilon = settings.epsilon;
-			//migrationSettings.bisect = true;
-			
-			// the distribution for the initial migration   
-			scai::dmemo::DistributionPtr initMigrationPtr;
 			
 			if (!settings.repartition || comm->getSize() != settings.numBlocks) {
 				
-				// the distribution for the initial migration   
-				scai::dmemo::DistributionPtr initMigrationPtr;
-				
-				if (settings.initialMigration == ITI::Tool::geoSFC) {
-					HilbertCurve<IndexType,ValueType>::hilbertRedistribution(coordinateCopy, nodeWeightCopy, settings, metrics);
-				}else {
-					//This whole block is now unused. Remove?
-					std::vector<DenseVector<ValueType> > convertedWeights(nodeWeights);
-					DenseVector<IndexType> tempResult;				
-					if (settings.initialMigration == ITI::Tool::geoMS) {
-						if (convertedWeights.size() > 1) {
-							throw std::logic_error("MultiSection not implemented for multiple weights.");
-						}
-						tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights[0], migrationSettings);
-					} else if (settings.initialMigration == ITI::Tool::geoKmeans) {
-						std::vector<std::vector<ValueType>> migrationBlockSizes(1, std::vector<ValueType>(migrationSettings.numBlocks, n/migrationSettings.numBlocks ));
-                        struct Metrics tmpMetrics(migrationSettings);
-						tempResult = ITI::KMeans::computePartition<IndexType, ValueType>(coordinates, convertedWeights, migrationBlockSizes, migrationSettings, tmpMetrics);
-					}
-					
-					initMigrationPtr = scai::dmemo::generalDistributionByNewOwners( tempResult.getDistribution(), tempResult.getLocalValues() );
-					
-					if (settings.initialMigration == ITI::Tool::none) {
-						//nothing to do
-						initMigrationPtr = inputDist;
-					} else {
-						throw std::logic_error("Method not yet supported for preparing for K-Means");
-					}
-					
-					//every PE sets its oen time
-					migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
-					metrics.MM["timeMigrationAlgo"] = migrationCalculation.count(); 
-					
-					std::chrono::time_point<std::chrono::system_clock> beforeMigration =  std::chrono::system_clock::now();
-					
-					auto prepareRedist = scai::dmemo::redistributePlanByNewDistribution(initMigrationPtr, nodeWeights[0].getDistributionPtr());
-					
-					std::chrono::time_point<std::chrono::system_clock> afterRedistConstruction =  std::chrono::system_clock::now();
-					
-					std::chrono::duration<double> redist = (afterRedistConstruction - beforeMigration);
-					//metrics.MM["timeConstructRedistributor"] = redist.count();
-					
-					if (nodesUnweighted) {
-						nodeWeightCopy[0] = DenseVector<ValueType>(initMigrationPtr, nodeWeights[0].getLocalValues()[0]);
-					} else {
-						for (IndexType i = 0; i < nodeWeightCopy.size(); i++) {
-							nodeWeightCopy[i].redistribute(prepareRedist);
-						}
-					}
-					
-					for (IndexType d = 0; d < dimensions; d++) {
-						coordinateCopy[d].redistribute(prepareRedist);
-					}
-					
-					if (settings.repartition) {
-						previous.redistribute(prepareRedist);
-					}
-					//Each PE sets its own time
-					migrationTime = std::chrono::system_clock::now() - beforeMigration;
-					metrics.MM["timeFirstDistribution"] = migrationTime.count();
+				if (settings.initialMigration != ITI::Tool::geoSFC) {
+					throw std::logic_error("KMeans depends on pre-sorting with space filling curves.");
 				}
+
+				HilbertCurve<IndexType,ValueType>::hilbertRedistribution(coordinateCopy, nodeWeightCopy, settings, metrics);
 			}
 		}
 		
@@ -391,7 +325,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 		for (int i = 0; i < nodeWeights.size(); i++) {
 			weightSum[i] = nodeWeights[i].sum();
 		}
-
 		
 		// vector of size k, each element represents the size of one block
 		std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors(1);
@@ -402,19 +335,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 			for (int i = 0; i < nodeWeights.size(); i++) {
 				blockSizes[i].assign( settings.numBlocks, std::ceil(weightSum[i]/settings.numBlocks) );
 			}
-		} 
-		SCAI_ASSERT( blockSizes[0].size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
+		}
 		
 		std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
 		
 		if (settings.repartition) {
-			if (nodeWeightCopy.size() > 1) {
-				throw std::logic_error("Not yet implemented for multiple node weights.");
-			}
 			result = ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
-		} else if(settings.initialPartition == ITI::Tool::geoKmeans){
+		} else if (settings.initialPartition == ITI::Tool::geoKmeans){
 			result = ITI::KMeans::computePartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
-		}else if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierRepart){
+		} else if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierRepart){
 			const IndexType numWeights = nodeWeightCopy.size();
 			SCAI_ASSERT_GT_ERROR( settings.hierLevels.size(), 0 , "Must provide the tree level sizes in order to call hierarchical KMeans" );
 			//TODO: adapt also for when tree is given in a file
@@ -455,9 +384,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 		
 	} else if (settings.initialPartition == ITI::Tool::geoMS) {// multisection
 		PRINT0("Initial partition with multisection");
-		if (nodeWeights.size() > 1) {
-			throw std::logic_error("MultiSection not implemented for multiple weights.");
-		}
 		if( not settings.cutsPerDim.empty() ){ // specific cuts per dimension are provided
 			IndexType k = std::accumulate( settings.cutsPerDim.begin(), settings.cutsPerDim.end(), 1 , std::multiplies<IndexType>() );
 			if( settings.numBlocks!=k ){
@@ -485,14 +411,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 		throw std::runtime_error("Initial Partitioning mode unsupported.");
 	}
 	
-//SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
-	
-	// store partition if in debug mode
-	//comment it out since it will add a dependency to FileIO which is not really needed
-	//if( settings.outFile!="-" and settings.writeInFile and settings.debugMode ){
-	//	FileIO<IndexType, ValueType>::writePartitionParallel( result, settings.outFile+"_initPart.partition" );
-	//}
-	
 	//-----------------------------------------------------------
 	//
 	// At this point we have the initial, geometric partition.
@@ -508,7 +426,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
 			//uncomment to store the first, geometric partition into a file that then can be visualized using matlab and GPI's code
 			//std::string filename = "geomPart.mtx";
-			//result.writeToFile( filename );		
+			//result.writeToFile( filename );
 
 			SCAI_REGION("ParcoRepart.partitionGraph.initialRedistribution");
 			if (nodeWeights.size() > 1) {
@@ -521,8 +439,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
             aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights[0], settings, useRedistributor);
 			
 			partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
-			//ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
-			//ValueType cut = comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;//TODO: this assumes that the graph is unweighted
 			ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( input, result, true);
 			ValueType imbalance = GraphUtils<IndexType, ValueType>::computeImbalance(result, k, nodeWeights[0]);
 			
