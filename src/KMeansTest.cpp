@@ -282,7 +282,7 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
 
 	Metrics metrics(settings);
 
-	scai::lama::DenseVector<IndexType> partition = KMeans::computeHierarchicalPartition( graph, coords, nodeWeights, cTree, settings, metrics);
+	scai::lama::DenseVector<IndexType> partition = KMeans::computeHierarchicalPartition( coords, nodeWeights, cTree, settings, metrics);
 
 	//checks - prints
 

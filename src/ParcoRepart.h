@@ -16,6 +16,9 @@
 #include "Metrics.h"
 #include "CommTree.h"
 
+/** @brief Global namespace that includes all classes.
+*/
+
 namespace ITI {
 
 	using namespace scai::lama;
@@ -132,12 +135,6 @@ namespace ITI {
 			IndexType *vwgt, IndexType ndims, ValueType *xyz,
 			Settings  settings, Metrics& metrics);
 
-        /*
-         * Get an initial partition using the Hilbert curve.
-         * TODO: This currently does nothing and isn't used. Remove?
-         */
-        static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings);
-
 		/**
          * @brief Partition a point set using the Hilbert curve, only implemented for equal number of blocks and processes.
          *
@@ -147,6 +144,16 @@ namespace ITI {
          * @return partition DenseVector, redistributed according to the partition
          */
 		static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+
+		/** \overload 
+		@param[in] nodeWeights Weights for the points
+		*/
+         /*
+         * Get an initial partition using the Hilbert curve.
+         * TODO: This currently does nothing and isn't used. Remove?
+         */
+        static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings);
+
 
 		/**
 		 * Get an initial partition using the morton curve and measuring density per square.

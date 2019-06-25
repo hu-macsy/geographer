@@ -52,7 +52,9 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
 	  		
   		//for profiling/debugging, count the non-zero values, i.e., number of blocks owned by this PE
   		const IndexType numBlocksOwned = std::count_if( blockSizes.begin(), blockSizes.end(), [&](IndexType bSize){ return bSize>0;} );
-  		PRINT(*comm<<": owns "<< numBlocksOwned << " blocks");
+  		if( settings.debugMode ){
+  			PRINT(*comm<<": owns "<< numBlocksOwned << " blocks");
+  		}
 
   		//the claimed PE id and size for the claimed block  		
   		std::vector<IndexType> allClaimedIDs( numPEs, 0 );
@@ -151,7 +153,7 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
 		  		availableIDs[ allClaimedIDs[lastIndex] ] = false;  //ID becomes unavailable
 	  		}
 
-	  		PRINT0("there are " << std::accumulate(mappedPEs.begin(), mappedPEs.end(), 0) << " mapped PEs");
+	  		//PRINT0("there are " << std::accumulate(mappedPEs.begin(), mappedPEs.end(), 0) << " mapped PEs");
 
 	  	}//while //TODO/WARNING:not sure at all that this will always finish
 
@@ -294,6 +296,6 @@ void ITI::aux<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRSparseMat
 	}
 }//checkLocalDegreeSymmetry
 
-
+template class aux<IndexType, ValueType>;
 
 }//namespace ITI 

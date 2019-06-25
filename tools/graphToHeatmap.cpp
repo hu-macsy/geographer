@@ -4,7 +4,7 @@
  * A standalone executable to convert the coordinates of a graph into a heatmap.
  */
 
-#include <boost/program_options.hpp>
+#include <cxxopts.hpp>
 
 #include "../src/FileIO.h"
 
@@ -17,41 +17,39 @@ using ITI::ValueType;
 using ITI::version;
 
 int main(int argc, char** argv) {
-	using namespace boost::program_options;
-	options_description desc("Supported options");
+	using namespace cxxopts;
+	cxxopts::Options options("graphToHeatmap", "Converting graph to grid, suitable for heat map plotting");
 
 	struct Settings settings;
 
 	IndexType numGridCells = 100;
 	IndexType globalN = -1;
 
-	desc.add_options()
+	options.add_options()
 				("help", "display options")
 				("version", "show version")
 				//input and coordinates
-				("graphFile", value<std::string>(), "read graph from file")
-				("coordFile", value<std::string>(), "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz")
-				("fileFormat", value<ITI::Format>(&settings.fileFormat)->default_value(settings.fileFormat), "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.")
-				("coordFormat", value<ITI::Format>(&settings.coordFormat)->default_value(settings.coordFormat), "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ")
-				("nodeWeightIndex", value<IndexType>()->default_value(0), "index of node weight")
-				("numVertices", value<IndexType>(&globalN), "Number of vertices, in case no graph file is given")
-				("dimensions", value<IndexType>(&settings.dimensions)->default_value(settings.dimensions), "Number of dimensions")
-				("gridCells", value<IndexType>(&numGridCells)->default_value(numGridCells), "Number of grid cells in each dimension to use for the visualization.")
+				("graphFile", "read graph from file", value<std::string>())
+				("coordFile", "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz", value<std::string>())
+				("fileFormat", "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.", value<ITI::Format>())
+				("coordFormat", "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ", value<ITI::Format>())
+				("nodeWeightIndex", "index of node weight", value<IndexType>()->default_value(0))
+				("numVertices", "Number of vertices, in case no graph file is given", value<IndexType>())
+				("dimensions", "Number of dimensions", value<IndexType>())
+				("gridCells", "Number of grid cells in each dimension to use for the visualization.", value<IndexType>()->default_value(std::to_string(numGridCells)))
 				;
 
-	variables_map vm;
-	store(command_line_parser(argc, argv).options(desc).run(), vm);
-	notify(vm);
+	cxxopts::ParseResult vm = options.parse(argc, argv);
 
 	bool validOptions = true;
 
 	if (vm.count("help")) {
-		std::cout << desc << "\n";
+		std::cout << options.help() << "\n";
 		return 0;
 	}
 
 	if (vm.count("version")) {
-		std::cout << "Git commit " << version << std::endl;
+		std::cout << "Git commit " << ITI::version << std::endl;
 		return 0;
 	}
 
@@ -89,8 +87,24 @@ int main(int argc, char** argv) {
 		coordFile = graphFile + ".xyz";
 	}
 
+	if (vm.count("dimensions")) {
+        settings.dimensions = vm["dimensions"].as<IndexType>();
+    }
+
 	if (settings.dimensions != 2) {
 		throw std::logic_error("Only implemented for 2 dimensions.");
+	}
+
+	if (vm.count("fileFormat")) {
+		settings.fileFormat = vm["fileFormat"].as<ITI::Format>();
+	}
+
+	if (vm.count("coordFormat")) {
+		settings.coordFormat = vm["coordFormat"].as<ITI::Format>();
+	}
+
+	if (vm.count("gridCells")) {
+		numGridCells = vm["gridCells"].as<IndexType>();
 	}
 	
 	DenseVector<ValueType> nodeWeights;
@@ -99,10 +113,10 @@ int main(int argc, char** argv) {
 		std::vector<DenseVector<ValueType> > vectorOfnodeWeights;
 		CSRSparseMatrix<ValueType> graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfnodeWeights, settings.fileFormat );
 		const IndexType numReadVertices = graph.getNumRows();
-		if (globalN == -1) {
+		if (!vm.count("numVertices")) {
 			globalN = numReadVertices;
 		} else {
-			assert(globalN == numReadVertices);
+			assert(vm["numVertices"].as<IndexType>() == numReadVertices);
 		}
 
 		if (vectorOfnodeWeights.size() > 0) {
