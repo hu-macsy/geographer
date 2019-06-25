@@ -64,6 +64,7 @@ namespace ITI {
 					("writeDebugCoordinates", "Write Coordinates of nodes in each block", value<bool>())
 					("verbose", "Increase output.")
 	                ("storeInfo", "Store timing and other metrics in file.")
+	                ("callExit", "Call std::exit after finishing partitioning, useful in case of lingering MPI data structures.")
 	                // evaluation
 	                ("repeatTimes", "How many times we repeat the partitioning process.", value<IndexType>())
 	                ("noComputeDiameter", "Compute diameter of resulting block files.")
