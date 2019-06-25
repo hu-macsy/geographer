@@ -41,7 +41,8 @@ namespace ITI {
 class auxTest : public ::testing::TestWithParam<int> {
 protected:
         // the directory of all the meshes used
-        std::string graphPath = "./meshes/";
+        // projectRoot is defined in config.h.in
+		std::string graphPath = projectRoot+"/meshes/";
 };
 
 TEST_F (auxTest, testInitialPartitions){

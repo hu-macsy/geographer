@@ -210,14 +210,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 {
 	IndexType k = settings.numBlocks;
 	ValueType epsilon = settings.epsilon;
-    const IndexType dimensions = coordinates.size();
+     const IndexType dimensions = coordinates.size();
 
 	SCAI_REGION( "ParcoRepart.partitionGraph" )
 
 	std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
 
 	SCAI_REGION_START("ParcoRepart.partitionGraph.inputCheck")
-	/**
+	/*
 	* check input arguments for sanity
 	*/
 	IndexType n = input.getNumRows();
@@ -250,8 +250,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 	const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
 	const IndexType rank = comm->getRank();
 
-
-	if( !coordDist->isEqual( *inputDist) ){
+	if (!coordDist->isEqual( *inputDist) ) {
 		throw std::runtime_error( "Distributions should be equal.");
 	}
 
@@ -262,15 +261,21 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 		SCAI_REGION("ParcoRepart.synchronize")
 		comm->synchronize();
 	}
+
+	if (settings.repartition && nodeWeights.size() > 1) {
+		throw std::logic_error("Repartitioning not implemented for multiple node weights.");
+	}
+
+	if (settings.initialPartition == ITI::Tool::geoMS && nodeWeights.size() > 1) {
+		throw std::logic_error("MultiSection not implemented for multiple weights.");
+	}
 	
-	SCAI_REGION_START("ParcoRepart.partitionGraph.initialPartition")
 	// get an initial partition
 	DenseVector<IndexType> result;
 	
 	for (IndexType i = 0; i < nodeWeights.size(); i++) {
 		assert(nodeWeights[i].getDistribution().isEqual(*inputDist));
 	}
-
 	
 	//-------------------------
 	//
@@ -293,17 +298,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 			if(comm->getRank() == 0)
 				std::cout << "SFC Time:" << totSFCTime << std::endl;
 		}
-	} 
-	//09/05/19: these tools are not really used. TODO:remove them?	
-	/*	else if ( settings.initialPartition==ITI::Tool::Pixel) {
-		PRINT0("Initial partition with pixels.");
-		result = ParcoRepart<IndexType, ValueType>::pixelPartition(coordinates, settings);
-	} else if ( settings.initialPartition == ITI::Tool::Spectral) {
-		PRINT0("Initial partition with spectral");
-		result = ITI::SpectralPartition<IndexType, ValueType>::getPartition(input, coordinates, settings);
-	}*/ 
+	}  
 	else if (settings.initialPartition == ITI::Tool::geoKmeans or settings.initialPartition == ITI::Tool::geoHierKM \
-		or  settings.initialPartition == ITI::Tool::geoHierRepart){
+		or  settings.initialPartition == ITI::Tool::geoHierRepart) {
 	    if (comm->getRank() == 0) {
 	        std::cout << "Initial partition with K-Means" << std::endl;
 	    }
@@ -313,77 +310,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 		std::vector<DenseVector<ValueType> > nodeWeightCopy = nodeWeights;
 		if (comm->getSize() > 1 && (settings.dimensions == 2 || settings.dimensions == 3)) {
 			SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans")
-			Settings migrationSettings = settings;
-			migrationSettings.numBlocks = comm->getSize();
-			migrationSettings.epsilon = settings.epsilon;
-			//migrationSettings.bisect = true;
-			
-			// the distribution for the initial migration   
-			scai::dmemo::DistributionPtr initMigrationPtr;
 			
 			if (!settings.repartition || comm->getSize() != settings.numBlocks) {
 				
-				// the distribution for the initial migration   
-				scai::dmemo::DistributionPtr initMigrationPtr;
-				
-				if (settings.initialMigration == ITI::Tool::geoSFC) {
-					HilbertCurve<IndexType,ValueType>::hilbertRedistribution(coordinateCopy, nodeWeightCopy, settings, metrics);
-				}else {
-					//This whole block is now unused. Remove?
-					std::vector<DenseVector<ValueType> > convertedWeights(nodeWeights);
-					DenseVector<IndexType> tempResult;				
-					if (settings.initialMigration == ITI::Tool::geoMS) {
-						if (convertedWeights.size() > 1) {
-							throw std::logic_error("MultiSection not implemented for multiple weights.");
-						}
-						tempResult  = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights[0], migrationSettings);
-					} else if (settings.initialMigration == ITI::Tool::geoKmeans) {
-						std::vector<std::vector<ValueType>> migrationBlockSizes(1, std::vector<ValueType>(migrationSettings.numBlocks, n/migrationSettings.numBlocks ));
-                        struct Metrics tmpMetrics(migrationSettings);
-						tempResult = ITI::KMeans::computePartition<IndexType, ValueType>(coordinates, convertedWeights, migrationBlockSizes, migrationSettings, tmpMetrics);
-					}
-					
-					initMigrationPtr = scai::dmemo::generalDistributionByNewOwners( tempResult.getDistribution(), tempResult.getLocalValues() );
-					
-					if (settings.initialMigration == ITI::Tool::none) {
-						//nothing to do
-						initMigrationPtr = inputDist;
-					} else {
-						throw std::logic_error("Method not yet supported for preparing for K-Means");
-					}
-					
-					//every PE sets its oen time
-					migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
-					metrics.MM["timeMigrationAlgo"] = migrationCalculation.count(); 
-					
-					std::chrono::time_point<std::chrono::system_clock> beforeMigration =  std::chrono::system_clock::now();
-					
-					auto prepareRedist = scai::dmemo::redistributePlanByNewDistribution(initMigrationPtr, nodeWeights[0].getDistributionPtr());
-					
-					std::chrono::time_point<std::chrono::system_clock> afterRedistConstruction =  std::chrono::system_clock::now();
-					
-					std::chrono::duration<double> redist = (afterRedistConstruction - beforeMigration);
-					//metrics.MM["timeConstructRedistributor"] = redist.count();
-					
-					if (nodesUnweighted) {
-						nodeWeightCopy[0] = DenseVector<ValueType>(initMigrationPtr, nodeWeights[0].getLocalValues()[0]);
-					} else {
-						for (IndexType i = 0; i < nodeWeightCopy.size(); i++) {
-							nodeWeightCopy[i].redistribute(prepareRedist);
-						}
-					}
-					
-					for (IndexType d = 0; d < dimensions; d++) {
-						coordinateCopy[d].redistribute(prepareRedist);
-					}
-					
-					if (settings.repartition) {
-						previous.redistribute(prepareRedist);
-					}
-					//Each PE sets its own time
-					migrationTime = std::chrono::system_clock::now() - beforeMigration;
-					metrics.MM["timeFirstDistribution"] = migrationTime.count();
+				if (settings.initialMigration != ITI::Tool::geoSFC) {
+					throw std::logic_error("KMeans depends on pre-sorting with space filling curves.");
 				}
+
+				HilbertCurve<IndexType,ValueType>::hilbertRedistribution(coordinateCopy, nodeWeightCopy, settings, metrics);
 			}
 		}
 		
@@ -391,7 +325,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 		for (int i = 0; i < nodeWeights.size(); i++) {
 			weightSum[i] = nodeWeights[i].sum();
 		}
-
 		
 		// vector of size k, each element represents the size of one block
 		std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors(1);
@@ -402,19 +335,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 			for (int i = 0; i < nodeWeights.size(); i++) {
 				blockSizes[i].assign( settings.numBlocks, std::ceil(weightSum[i]/settings.numBlocks) );
 			}
-		} 
-		SCAI_ASSERT( blockSizes[0].size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
+		}
 		
 		std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
 		
 		if (settings.repartition) {
-			if (nodeWeightCopy.size() > 1) {
-				throw std::logic_error("Not yet implemented for multiple node weights.");
-			}
 			result = ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
-		} else if(settings.initialPartition == ITI::Tool::geoKmeans){
+		} else if (settings.initialPartition == ITI::Tool::geoKmeans){
 			result = ITI::KMeans::computePartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
-		}else if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierRepart){
+		} else if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierRepart){
 			const IndexType numWeights = nodeWeightCopy.size();
 			SCAI_ASSERT_GT_ERROR( settings.hierLevels.size(), 0 , "Must provide the tree level sizes in order to call hierarchical KMeans" );
 			//TODO: adapt also for when tree is given in a file
@@ -427,11 +356,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 			commTree.adaptWeights( nodeWeightCopy );
 
 			if (settings.initialPartition == ITI::Tool::geoHierKM){
-				result = ITI::KMeans::computeHierarchicalPartition<IndexType, ValueType>( input, coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
+				result = ITI::KMeans::computeHierarchicalPartition<IndexType, ValueType>( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
 			}
 			if (settings.initialPartition == ITI::Tool::geoHierRepart){
 				//settings.debugMode = true;
-				result = ITI::KMeans::computeHierPlusRepart<IndexType, ValueType>( input, coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
+				result = ITI::KMeans::computeHierPlusRepart<IndexType, ValueType>( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
 			}
 			SCAI_ASSERT_EQ_ERROR( nodeWeightCopy[0].getDistributionPtr()->getLocalSize(),\
 						result.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");			
@@ -455,9 +384,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 		
 	} else if (settings.initialPartition == ITI::Tool::geoMS) {// multisection
 		PRINT0("Initial partition with multisection");
-		if (nodeWeights.size() > 1) {
-			throw std::logic_error("MultiSection not implemented for multiple weights.");
-		}
 		if( not settings.cutsPerDim.empty() ){ // specific cuts per dimension are provided
 			IndexType k = std::accumulate( settings.cutsPerDim.begin(), settings.cutsPerDim.end(), 1 , std::multiplies<IndexType>() );
 			if( settings.numBlocks!=k ){
@@ -485,14 +411,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 		throw std::runtime_error("Initial Partitioning mode unsupported.");
 	}
 	
-	SCAI_REGION_END("ParcoRepart.partitionGraph.initialPartition")
-	
-	// store partition if in debug mode
-	//comment it out since it will add a dependency to FileIO which is not really needed
-	//if( settings.outFile!="-" and settings.writeInFile and settings.debugMode ){
-	//	FileIO<IndexType, ValueType>::writePartitionParallel( result, settings.outFile+"_initPart.partition" );
-	//}
-	
 	//-----------------------------------------------------------
 	//
 	// At this point we have the initial, geometric partition.
@@ -508,21 +426,20 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
 			//uncomment to store the first, geometric partition into a file that then can be visualized using matlab and GPI's code
 			//std::string filename = "geomPart.mtx";
-			//result.writeToFile( filename );		
+			//result.writeToFile( filename );
 
 			SCAI_REGION("ParcoRepart.partitionGraph.initialRedistribution");
 			if (nodeWeights.size() > 1) {
 				throw std::logic_error("Local refinement not yet implemented for multiple weights.");
 			}
-			/**
+			/*
 			 * redistribute to prepare for local refinement
 			 */
             bool useRedistributor = true;
             aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights[0], settings, useRedistributor);
 			
 			partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
-			//ValueType timeForInitPart = ValueType ( comm->max(partitionTime.count() ));
-			ValueType cut = comm->sum(ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(input, true)) / 2;//TODO: this assumes that the graph is unweighted
+			ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( input, result, true);
 			ValueType imbalance = GraphUtils<IndexType, ValueType>::computeImbalance(result, k, nodeWeights[0]);
 			
 			
@@ -647,13 +564,13 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
 
 */    
 
-    /**
+    /*
      * Several possibilities exist for choosing the recursion depth.
      * Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
      */
     const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(globalN), double(21));
     
-    /**
+    /*
      *	create space filling curve indices.
      */
     
@@ -664,7 +581,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     //TODO: use the blockSizes vector
     //TODO: take into account node weights: just sorting will create imbalanced blocks, not so much in number of node but in the total weight of each block
     
-    /**
+    /*
      * now sort the global indices by where they are on the space-filling curve.
      */
 
@@ -776,7 +693,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
     //TODO: probably minimum is not needed
     //TODO: if we know maximum from the input we could save that although is not too costly
     
-    /**
+    /*
      * get minimum / maximum of local coordinates
      */
     for (IndexType dim = 0; dim < dimensions; dim++) {
@@ -789,7 +706,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
         }
     }
     
-    /**
+    /*
      * communicate to get global min / max
      */
     for (IndexType dim = 0; dim < dimensions; dim++) {
@@ -866,11 +783,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
     //TODO: is that needed? we just can overwrite density array.
     // use the summed density as a Dense vector
     scai::lama::DenseVector<IndexType> sumDensity( density );
-    /*
-    if(comm->getRank()==0){
-        ITI::aux::writeHeatLike_local_2D(density, sideLen, dimensions, "heat_"+settings.fileName+".plt");
-    }
-    */
+
     //
     //using the summed density get an initial pixeled partition
     
@@ -1043,10 +956,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
     }   
     //PRINT0("##### final blockSize for block "<< k-1 << ": "<< thisBlockSize);
 
-    // here all pixels should have a partition 
-    
-    //=========
-    
+    /*
+     * here all pixels should have a partition 
+    */
+
     // set your local part of the partition/result
     scai::hmemo::WriteOnlyAccess<IndexType> wLocalPart ( result.getLocalValues() );
     
@@ -1098,93 +1011,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
     wLocalPart.release();
     
     return result;
-}
-//--------------------------------------------------------------------------------------- 
-
-template<typename IndexType, typename ValueType>
-ValueType ParcoRepart<IndexType, ValueType>::localSumOutgoingEdges(const CSRSparseMatrix<ValueType> &input, const bool weighted) {
-	SCAI_REGION( "ParcoRepart.localSumOutgoingEdges" )
-	const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
-	const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-    const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
-
-	ValueType sumOutgoingEdgeWeights = 0;
-	for (IndexType j = 0; j < ja.size(); j++) {
-		if (!input.getRowDistributionPtr()->isLocal(ja[j])) sumOutgoingEdgeWeights += weighted ? values[j] : 1;
-	}
-
-	return sumOutgoingEdgeWeights;
-}
-//--------------------------------------------------------------------------------------- 
- 
-template<typename IndexType, typename ValueType>
-IndexType ParcoRepart<IndexType, ValueType>::localBlockSize(const DenseVector<IndexType> &part, IndexType blockID) {
-	SCAI_REGION( "ParcoRepart.localBlockSize" )
-	IndexType result = 0;
-	scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
-	//possibly shorten with std::count(localPart.get(), localPart.get()+localPart.size(), blockID);
-
-	for (IndexType i = 0; i < localPart.size(); i++) {
-		if (localPart[i] == blockID) {
-			result++;
-		}
-	}
-
-	return result;
-}
-//--------------------------------------------------------------------------------------- 
-
-template<typename IndexType, typename ValueType>
-void ITI::ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input) {
-	SCAI_REGION( "ParcoRepart.checkLocalDegreeSymmetry" )
-
-	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
-	const IndexType localN = inputDist->getLocalSize();
-
-	const CSRStorage<ValueType>& storage = input.getLocalStorage();
-	const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
-	const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());
-
-	std::vector<IndexType> inDegree(localN, 0);
-	std::vector<IndexType> outDegree(localN, 0);
-	for (IndexType i = 0; i < localN; i++) {
-		IndexType globalI = inputDist->local2Global(i);
-		const IndexType beginCols = localIa[i];
-		const IndexType endCols = localIa[i+1];
-
-		for (IndexType j = beginCols; j < endCols; j++) {
-			IndexType globalNeighbor = localJa[j];
-
-			if (globalNeighbor != globalI && inputDist->isLocal(globalNeighbor)) {
-				IndexType localNeighbor = inputDist->global2Local(globalNeighbor);
-				outDegree[i]++;
-				inDegree[localNeighbor]++;
-			}
-		}
-	}
-
-	for (IndexType i = 0; i < localN; i++) {
-		if (inDegree[i] != outDegree[i]) {
-			//now check in detail:
-			IndexType globalI = inputDist->local2Global(i);
-			for (IndexType j = localIa[i]; j < localIa[i+1]; j++) {
-				IndexType globalNeighbor = localJa[j];
-				if (inputDist->isLocal(globalNeighbor)) {
-					IndexType localNeighbor = inputDist->global2Local(globalNeighbor);
-					bool foundBackEdge = false;
-					for (IndexType y = localIa[localNeighbor]; y < localIa[localNeighbor+1]; y++) {
-						if (localJa[y] == globalI) {
-							foundBackEdge = true;
-						}
-					}
-					if (!foundBackEdge) {
-						throw std::runtime_error("Local node " + std::to_string(globalI) + " has edge to local node " + std::to_string(globalNeighbor)
-											+ " but no back edge found.");
-					}
-				}
-			}
-		}
-	}
 }
 
 //-----------------------------------------------------------------------------------------
@@ -1251,8 +1077,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 }
 //---------------------------------------------------------------------------------------
 
-/* A 2D or 3D matrix given as a 1D array of size sideLen^dimesion
- * */
+
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const IndexType thisPixel, const IndexType sideLen, const IndexType dimension){
     SCAI_REGION("ParcoRepart.neighbourPixels");

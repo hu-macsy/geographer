@@ -28,7 +28,6 @@ endif(USE_NETWORKIT)
 set(NETWORKIT_INCLUDE "${NETWORKIT_DIR}/include/") 
 set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
 
-
 set(CXXOPTS_DIR "${PROJECT_SOURCE_DIR}/external/cxxopts/include")
 
 ### find MPI ###
@@ -54,11 +53,11 @@ option(USE_BOOST "Use boost library for number parsing" OFF)
 
 ### find Boost ###
 if (USE_BOOST)
-  find_package(Boost REQUIRED COMPONENTS program_options filesystem system)
+  find_package(Boost REQUIRED COMPONENTS filesystem system)
   include_directories(${Boost_INCLUDE_DIRS})
   add_definitions(-DUSE_BOOST)
 else(USE_BOOST)
-  find_package(Boost COMPONENTS program_options filesystem system)
+  find_package(Boost COMPONENTS filesystem system)
 endif(USE_BOOST)
 
 ### find SCAI ###
@@ -112,8 +111,9 @@ set(LIB_DEST "lib/geographer")
 set(CMAKE_DEST "share/cmake/geographer")
 
 ### set runtime path ###
+cmake_policy(SET CMP0042 NEW) # using rpath also on Mac OS
 set ( CMAKE_SKIP_BUILD_RPATH FALSE )
-set ( CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${LIB_DEST}")
+set ( CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${LIB_DEST} ${SCAI_ROOT}/lib/)
 set ( CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE )
 
 add_subdirectory(external/KaDiS EXCLUDE_FROM_ALL)

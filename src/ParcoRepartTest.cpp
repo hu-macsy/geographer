@@ -32,8 +32,8 @@ namespace ITI {
 class ParcoRepartTest : public ::testing::Test {
     protected:
         // the directory of all the meshes used
-        std::string graphPath = "./meshes/";
-
+		// projectRoot is defined in config.h.in
+		const std::string graphPath = projectRoot+"/meshes/";
 };
 
 
@@ -153,9 +153,9 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
     scai::hmemo::ReadAccess<IndexType> ia( localMatrix.getIA() );
     scai::hmemo::ReadAccess<IndexType> ja( localMatrix.getJA() );
     IndexType iaSize= ia.size();
-    
-    IndexType xadj[ iaSize ];
-    IndexType adjncy[ja.size()];
+  
+	IndexType xadj[ iaSize ];
+	IndexType adjncy[ja.size()];
 
     for(int i=0; i<iaSize ; i++){
       xadj[i]= ia[i];
@@ -169,12 +169,12 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
     }
     ia.release();
     ja.release();
-
+ 
     //
     // convert the coordinates
     //
 
-    ValueType xyzLocal[localN*dimensions];
+	ValueType* xyzLocal = new ValueType[localN*dimensions];
 
     for(int d=0; d<dimensions; d++){
         scai::hmemo::ReadAccess<ValueType> localCoords( coords[d].getLocalValues() );
@@ -188,7 +188,8 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
     //
 
     // this required from parmetis but why int node weights and not double?
-    IndexType vwgt[localN];
+
+	IndexType* vwgt = new IndexType[localN];
     {
         scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights[0].getLocalValues() );
         SCAI_ASSERT_EQ_ERROR( localN, localWeights.size(), "Local weights size mismatch. Are node weights distributed correctly?");
@@ -196,7 +197,6 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
             vwgt[i] = IndexType (localWeights[i]);
         }
     }
-
 
     Settings settings;
     settings.numBlocks = k;
@@ -208,8 +208,7 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
 
     //scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );
     std::vector<IndexType> localPartition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );
-    //partition.redistribute( graph.getRowDistributionPtr() );
-
+    
     scai::lama::DenseVector<IndexType> partition( graph.getRowDistributionPtr(), scai::hmemo::HArray<IndexType>(  localPartition.size(), localPartition.data()) );
 	
     metrics1.getAllMetrics(graph, partition, nodeWeights, settings);
@@ -225,11 +224,12 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
       std::cout<< std::endl <<"Metrics for second partition:"<< std::endl;
       metrics2.print( std::cout );
     }
+    
+    EXPECT_NEAR( metrics1.MM["finalImbalance"], metrics2.MM["finalImbalance"], 0.0001 );
+    EXPECT_EQ( metrics1.MM["finalCut"], metrics2.MM["finalCut"] );
+    EXPECT_EQ( metrics1.MM["maxCommVolume"], metrics2.MM["maxCommVolume"] );
+    EXPECT_EQ( metrics1.MM["totalCommVolume"], metrics2.MM["totalCommVolume"] );
 
-    EXPECT_LE( std::abs(metrics1.MM["finalCut"]-metrics2.MM["finalCut"])/std::max(metrics1.MM["finalCut"], metrics2.MM["finalCut"]), 0.02) ;
-    EXPECT_LE( std::abs(metrics1.MM["finalImbalance"]-metrics2.MM["finalImbalance"])/std::max(metrics1.MM["finalImbalance"], metrics2.MM["finalImbalance"]), 0.02) ;
-    EXPECT_LE( std::abs(metrics1.MM["maxCommVolume"]-metrics2.MM["maxCommVolume"])/std::max(metrics1.MM["maxCommVolume"], metrics2.MM["maxCommVolume"]), 0.02) ;
-    EXPECT_LE( std::abs(metrics1.MM["totalCommVolume"]-metrics2.MM["totalCommVolume"])/std::max(metrics1.MM["totalCommVolume"], metrics2.MM["totalCommVolume"]), 0.02) ;
   }
 
 //--------------------------------------------------------------------------------------- 
@@ -255,7 +255,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
 	  coordinates[i] = DenseVector<ValueType>(dist, 0);
   }
   
-  MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(a, coordinates, maxCoord, numPoints);
+  MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(a, coordinates, maxCoord, numPoints, dimensions);
 
   const ValueType epsilon = 0.05;
   
@@ -460,7 +460,17 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
 
 	a = scai::lama::eval<scai::lama::CSRSparseMatrix<ValueType>>(a+aT);
 
-	PRINT("num of edges= " << a.getNumValues()/2 );
+	//go over elements and turn them to integers.
+	//this way a.checkSymmetry does not fail due to floating point errors
+	for(int i=0; i<n; i++ ){
+		for(int j=0; j<n;  j++ ){
+			ValueType val = a.getLocalStorage().getValue(i,j);
+			if(val!=0)//if [i,j] is a non-zero value
+				a.setValue( i, j, int (100*val) );
+		}
+	}
+
+	//PRINT("num of edges= " << a.getNumValues()/2 );
 	EXPECT_TRUE( a.isConsistent() );
 	EXPECT_TRUE( a.checkSymmetry() );
 
@@ -471,12 +481,13 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
 		part.setValue(i, blockId);
 	}
   
-  struct Settings settings;
-  settings.numBlocks= k;
+	struct Settings settings;
+	settings.numBlocks= k;
 
 	scai::lama::CSRSparseMatrix<ValueType> blockGraph =  GraphUtils<IndexType, ValueType>::getBlockGraph_dist( a, part, k);
 	EXPECT_TRUE( blockGraph.isConsistent() );
-	EXPECT_TRUE( blockGraph.checkSymmetry() ); //TODO: this fails occasionally
+	EXPECT_TRUE( blockGraph.checkSymmetry() ); 
+
 	std::vector<DenseVector<IndexType>> scheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local(blockGraph, settings);
 
 	IndexType rounds = scheme.size();
@@ -698,8 +709,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     //distrubute graph
-    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
-        
+    //graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
 
     //read the array locally and messed the distribution. Left as a remainder.
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
@@ -765,7 +775,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
     auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
     
     // create the adjacency matrix and the coordinates
-    MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
+    MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(adjM, coords, maxCoord, numPoints, 3);
     
     struct Settings settings;
     settings.numBlocks= k;

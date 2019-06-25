@@ -21,6 +21,9 @@ namespace ITI {
     using scai::lama::CSRSparseMatrix;
     using scai::lama::CSRStorage;
     using scai::lama::DenseVector;
+
+    /** @brief Improve the cut of a partition by doing local refinement.
+    */
     
     template <typename IndexType, typename ValueType>
     class LocalRefinement{
@@ -31,7 +34,7 @@ namespace ITI {
          * When changing the partition during the refinement step, the graph, partition and coordinates are redistributed to match.
          * Internally calls twoWayLocalFM.
          *
-         * Note: This method is not in use any longer.
+         * @deprecated This method is not in use any longer.
          *
          * @param[in,out] input Adjacency matrix of the input graph
          * @param[in,out] part Partition
@@ -119,6 +122,11 @@ namespace ITI {
         template<typename T>
         static void redistributeFromHalo(DenseVector<T>& input, scai::dmemo::DistributionPtr newDist, const scai::dmemo::HaloExchangePlan& halo, const scai::hmemo::HArray<T>& haloData);
         
+        /** First, it calculates the centroid of the local coordinates and then the distance of every local point to the centroid.
+
+        @param[in] coordinates The coordinates of the points.
+        @return The distance of all local points from the centroid.
+        */
 		static std::vector<ValueType> distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates);
 
     private:

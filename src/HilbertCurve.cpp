@@ -223,7 +223,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
 		throw std::runtime_error("Wrong dimensions given");
 	}
 	
-	/**
+	/*
      * get minimum / maximum of coordinates
      */
 	ValueType minCoords[2];
@@ -323,7 +323,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
 		throw std::runtime_error("Wrong dimensions given");
 	}
 	
-	/**
+	/*
      * get minimum / maximum of coordinates
      */
 	ValueType minCoords[3];
@@ -569,7 +569,7 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
     const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(globalN), double(21));
     //const IndexType recursionDepth = std::min(std::log2(globalN), double(21));
 	
-	 /**
+	 /*
      *	create space filling curve indices.
      */
     
@@ -588,7 +588,7 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
         }
     }
     
-     /**
+     /*
      * now sort the global indices by where they are on the space-filling curve.
      */
 	 
@@ -657,7 +657,7 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
     std::vector<ValueType> hilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
     SCAI_REGION_END("ParcoRepart.hilbertRedistribution.sfc")
     SCAI_REGION_START("ParcoRepart.hilbertRedistribution.sort")
-    /**
+    /*
      * fill sort pair
      */
 

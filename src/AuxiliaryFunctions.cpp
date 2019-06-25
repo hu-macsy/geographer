@@ -52,7 +52,9 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
 	  		
   		//for profiling/debugging, count the non-zero values, i.e., number of blocks owned by this PE
   		const IndexType numBlocksOwned = std::count_if( blockSizes.begin(), blockSizes.end(), [&](IndexType bSize){ return bSize>0;} );
-  		PRINT(*comm<<": owns "<< numBlocksOwned << " blocks");
+  		if( settings.debugMode ){
+  			PRINT(*comm<<": owns "<< numBlocksOwned << " blocks");
+  		}
 
   		//the claimed PE id and size for the claimed block  		
   		std::vector<IndexType> allClaimedIDs( numPEs, 0 );
@@ -151,7 +153,7 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
 		  		availableIDs[ allClaimedIDs[lastIndex] ] = false;  //ID becomes unavailable
 	  		}
 
-	  		PRINT0("there are " << std::accumulate(mappedPEs.begin(), mappedPEs.end(), 0) << " mapped PEs");
+	  		//PRINT0("there are " << std::accumulate(mappedPEs.begin(), mappedPEs.end(), 0) << " mapped PEs");
 
 	  	}//while //TODO/WARNING:not sure at all that this will always finish
 
@@ -237,9 +239,63 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
     SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*inputDist), "Distribution mismatch" );
 
     return distFromPartition;
-}                
+}//redistributeFromPartition                
 
+//--------------------------------------------------------------------------------------- 
 
+template<typename IndexType, typename ValueType>
+void ITI::aux<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input) {
+	SCAI_REGION( "ParcoRepart.checkLocalDegreeSymmetry" )
 
+	const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+	const IndexType localN = inputDist->getLocalSize();
+
+	const CSRStorage<ValueType>& storage = input.getLocalStorage();
+	const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
+	const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());
+
+	std::vector<IndexType> inDegree(localN, 0);
+	std::vector<IndexType> outDegree(localN, 0);
+	for (IndexType i = 0; i < localN; i++) {
+		IndexType globalI = inputDist->local2Global(i);
+		const IndexType beginCols = localIa[i];
+		const IndexType endCols = localIa[i+1];
+
+		for (IndexType j = beginCols; j < endCols; j++) {
+			IndexType globalNeighbor = localJa[j];
+
+			if (globalNeighbor != globalI && inputDist->isLocal(globalNeighbor)) {
+				IndexType localNeighbor = inputDist->global2Local(globalNeighbor);
+				outDegree[i]++;
+				inDegree[localNeighbor]++;
+			}
+		}
+	}
+
+	for (IndexType i = 0; i < localN; i++) {
+		if (inDegree[i] != outDegree[i]) {
+			//now check in detail:
+			IndexType globalI = inputDist->local2Global(i);
+			for (IndexType j = localIa[i]; j < localIa[i+1]; j++) {
+				IndexType globalNeighbor = localJa[j];
+				if (inputDist->isLocal(globalNeighbor)) {
+					IndexType localNeighbor = inputDist->global2Local(globalNeighbor);
+					bool foundBackEdge = false;
+					for (IndexType y = localIa[localNeighbor]; y < localIa[localNeighbor+1]; y++) {
+						if (localJa[y] == globalI) {
+							foundBackEdge = true;
+						}
+					}
+					if (!foundBackEdge) {
+						throw std::runtime_error("Local node " + std::to_string(globalI) + " has edge to local node " + std::to_string(globalNeighbor)
+											+ " but no back edge found.");
+					}
+				}
+			}
+		}
+	}
+}//checkLocalDegreeSymmetry
+
+template class aux<IndexType, ValueType>;
 
 }//namespace ITI 

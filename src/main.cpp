@@ -285,7 +285,7 @@ int main(int argc, char** argv) {
         }
        
         // create the adjacency matrix and the coordinates
-        ITI::MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist( graph, coordinates, maxCoord, numPoints);
+        ITI::MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist( graph, coordinates, maxCoord, numPoints, settings.dimensions );
         
         IndexType nodes= graph.getNumRows();
         IndexType edges= graph.getNumValues()/2;
@@ -318,7 +318,7 @@ int main(int argc, char** argv) {
         nodeWeights[0] = scai::lama::fill<scai::lama::DenseVector<ValueType>>(graph.getRowDistributionPtr(), 1);
 
     } else{
-    	std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;
+    	std::cout << "Call with --graphFile <input>" << std::endl;
     	return 126;
     }
 

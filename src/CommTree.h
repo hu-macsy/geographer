@@ -1,74 +1,75 @@
 #pragma once
 
-
 #include <numeric>
 
 #include "Settings.h"
 
 namespace ITI {
 
+/** @brief A tree structure to store the physical network in the form of a tree.
+
+ A communication tree for storing information about the physical network if this can represented
+in a hierarchical fashion. The actual compute nodes, the PEs, are only the leaves and they contain
+a vector of weights to model different properties like CPU speed, memory, number of cores etc.
+Intermediate node model some aggregation of PEs, like racks, chips, islands etc, and the weights
+are added as we move up. So, the root node holds the sum for every weight.
+*/
 
 template <typename IndexType, typename ValueType>
 class CommTree{
 
 public:
 
-/** Hierarchy is a vector of size equal to the levels of the tree. Every position
+/** @brief A node of the communication tree.
+
+ 	Hierarchy is a vector of size equal to the levels of the tree. Every position
 	indicates the tree-node this leaf belongs to.
 	For example, if hierarchy={1, 0, 2}, it means that this PE belongs to tree-node 1
 	in the first level; then, within tree-node 1, it belongs to tree-node 0 and inside 0,
 	it is leaf-node 2.
-	implicit level 0    o
-                       /|\
-	level 1           o o o .... in 1
-                       /|\
-	level 2           o o o ....   in 0
-                      ... | ...
-    level 3               o        in 2, leaves
 
+	\verbatim
+	implicit level 0    o
+                       /|\ 
+	level 1           o o o ....   in child 0 (there is only the root)
+                   ... /|\ ...
+	level 2           o o o ....   in child 1
+                      ... | ...
+    level 3               o        in child 2. These are the leaves
+	\endverbatim
 **/    
 
 
 struct commNode{
+	/** A hierarchy label for this node; size=number of levels. For example, if hierarchy={1,0,1,4} means that
+	this node belongs to the 2nd node in level 0, to the 1st in level 1 , to the 2nd in level 2 and to the 5th
+	in level 3. In general, if hierarchy[i]=x means that this node belong to  node i in level x.
+	*/
 	std::vector<unsigned int> hierarchy;
 	//TODO: probably, keeping all children is not necessary and uses a lot of space
 	// replace by keeping only the number of children
-	std::vector<unsigned int> children;
-	//this is the number of direct children this node has
-	unsigned int numChildren;
-
-	unsigned int numCores;
+	std::vector<unsigned int> children;	
 	
-	std::vector<ValueType> weights;
+	unsigned int numChildren; 		///< this is the number of direct children this node has
 
-	bool isLeaf;
-	static unsigned int leafCount;
+	unsigned int numCores;			///< number of cores this processor has
+	std::vector<ValueType> weights;	///< each node can have multiple weights
+	bool isLeaf;					///< if this is leaf node or not
+	static unsigned int leafCount;	///< number of leafs; 
+	/// a unique id only for leaf nodes
 	unsigned int leafID = std::numeric_limits<unsigned int>::max();
 
-/*
-	commNode( std::vector<unsigned int> hier,
-		unsigned int c, ValueType m, ValueType rSp, bool isLeaf=true)
+
+	/** Constructor.
+	@param[in] hier The hierarchy label for this node.
+	@param[in] allWeights Each node can have several weights. These can represent, for example, computational speed
+	of the node, memory capacity, number of cores e.t.c.
+	@param[in] isLeaf If this node is a leaf or not
+	*/
+	commNode( std::vector<unsigned int> hier, std::vector<ValueType> allWeights, bool isLeaf=true)
 	:	hierarchy(hier),
 		numChildren(0),
-		numCores(c),
-		//memMB(m),
-		//relatSpeed(rSp),
-		isLeaf(isLeaf)
-	{
-		leafID = leafCount;
-		leafCount++;
-		//convention: leaf node have their ID as their only child
-		// this will speed up the += operator
-		children.resize(1,leafID);
-
-		weights.assign(1,0); //one weight of value 0
-	}
-*/
-
-	commNode( std::vector<unsigned int> hier, std::vector<ValueType> leafWeights, bool isLeaf=true)
-	:	hierarchy(hier),
-		numChildren(0),
-		weights(leafWeights),
+		weights(allWeights),
 		isLeaf(isLeaf)
 		
 	{
@@ -82,12 +83,12 @@ struct commNode{
 
 	//this constructor is supposed to be used for non-leaf nodes
 	//TODO: how to enforce that?
+	/** Default constructor for non-leaf nodes.
+	*/
 	commNode()
 	:	hierarchy( std::vector<unsigned int>(1,1)), //TODO: is this right?
 		numChildren(0), //TODO: check
 		numCores(0),
-		//memMB(0.0),
-		//relatSpeed(0.0),
 		isLeaf(false)
 	{
 		weights.assign(1,0); //one weight of value 0
@@ -96,7 +97,9 @@ struct commNode{
 		//leafCount++;
 	}
 
-	//used to construct the father node from the children
+	/** Used to construct the father node from the children. The weights of the two nodes are added
+	and their children are merged
+	*/
 	commNode& operator+=( const commNode& c ){
 		this->numCores += c.numCores;
 
@@ -115,8 +118,7 @@ struct commNode{
 		return *this;
 	}
 
-	/** @brief Check if two nodes are the same, i.e., if all their values
-	are the same except their leaf ID
+	/** @brief Check if two nodes are the same, i.e., if all their values are the same except their leaf ID
 	*/
 	bool operator==( const commNode& c ) const{
 		if( this->hierarchy != c.hierarchy ){
@@ -140,10 +142,11 @@ struct commNode{
 		return not (*this==c);
 	}
 
-	/* @brief Return the number of children this node has
+//TODO: these are only leaf nodes or all the nodes of the subtree?
+	/* @brief Return the number of all ancestors this node has.
 	*/
 	//TODO: probably children should be removed but this function is needed
-	//to know in how many new blocks each block will be partitioned.
+	//to know how many new blocks each block will be partitioned.
 	IndexType numAncestors() const{
 		return children.size();
 	}
@@ -160,6 +163,8 @@ struct commNode{
 		return weights.size();
 	}
 
+	/**@brief Print a node.
+	*/
 	void print() const{
 		std::cout << "hierarchy vector: ";
 		for(unsigned int i=0; i<hierarchy.size(); i++){
@@ -185,27 +190,14 @@ struct commNode{
 }; //struct commNode
 
 
-//structure used to store the communication tree. used for hierarchical
-// partitioning
-// tree.size==hierarchyLevels
-// tree[i] is the vector of nodes for hierarchy level i
-// tree.back() is the vector of all the leaves
-std::vector<std::vector<commNode>> tree;
 
-//must be known how many levels the tree has
-//(well, it can infered but it is just easier)
-IndexType hierarchyLevels; //hierarchyLevels = tree.size()
-IndexType numNodes;
-IndexType numLeaves;
-IndexType numWeights;
-bool areWeightsAdapted = false;
-std::vector<bool> isProportional;
 
-/*@brief Default constructor.
+/** @brief Default constructor.
 */
+//TODO: remove?
 CommTree();
 
-/*	@brief Constructor to create tree from a vector of leaves.
+/**	@brief Constructor to create tree from a vector of leaves.
 	@param[in] leaves The leaf nodes of the tree
 	@param[in] isWeightProp A vector of size equal the number of weights
 		that each tree node has. It is used to indicate if the
@@ -229,14 +221,16 @@ CommTree( const std::vector<commNode> &leaves, const std::vector<bool> isWeightP
 */
 CommTree( const std::vector<IndexType> &levels, const IndexType numWeights );
 
-/* @brief Return the root, i.e., hierarchy level 0.
+/** @brief Return the root, i.e., hierarchy level 0.
 */
 commNode getRoot() const{ 
 	//TODO: check if tree is not initialized
 	return tree[0][0]; 
 }
 
-/* @brief Return the requested hierarchy level
+/** @brief Return the requested hierarchy level
+@param[in] level The requested hierarchy level
+@return A vector with the nodes of level.
 */
 std::vector<commNode> getHierLevel( int level) const {
 	SCAI_ASSERT_LE_ERROR( level, hierarchyLevels, "Tree has fewer levels than requested" );
@@ -255,42 +249,81 @@ IndexType getNumLeaves() const {
 	return tree.back().size();
 }
 
+/** @brief The number of all the nodes of the tree.
+*/
+IndexType getNumNodes() const {
+	return numNodes;
+}
+
 /** @brief The number of weights that its node has.
 */
 IndexType getNumWeights() const{
 	return numWeights;
 }
 
-/* @brief Takes a vector of leaves and creates the tree
+/**@brief The number of hierarchy levels.
+*/
+IndexType getNumHierLevels() const{
+	return hierarchyLevels;
+}
+
+/** Takes a vector of leaves and creates the tree. The hierarchy vector in every node is used
+to construct the level above until we reach the root.
+
+@param[in] leaves A vector with all the leaf nodes.
+@return The size of the tree, i.e., numNodes.
 */
 IndexType createTreeFromLeaves( const std::vector<commNode> leaves);
 
-/** @brief Creates an artificial flat tree with only one hierarchy level.
-This mainly used when no communication is provided. All leaf nodes have
-the same weight.
+/** Creates an artificial flat tree with only one hierarchy level.
+This mainly used when no communication is provided. All leaf nodes have the same weight.
+
+@param[in] numLeaves The number of the leaves.
+@param[in] numNodeWeights Number of weights that each node has.
+@return The size of the tree, i.e., numNodes. Since this is a flat tree with one hierarchy level,
+numNodes=numLeanes+1, where +1 is for the root node.
 */
 IndexType createFlatHomogeneous( const IndexType numLeaves, const IndexType numNodeWeights = 1 );
 
-/** @brief Given the desired sizes of the blocks, we construct a flat 
+/** Given the desired sizes of the blocks, we construct a flat 
 tree with one level where every leaf node has different weight.
 This mainly used when only block sizes are provided for partitioning.
+
+@param[in] leafSizes The size of leaves: leafSizes.size()= numWeights, leafSizes[i].size()=numLeaves
+leafSizes[i][j] holds the i-th weight for the j-th leaf.
+@return The size of the tree, i.e., numNodes. Since this is a flat tree with one hierarchy level,
+numNodes=numLeanes+1, where +1 is for the root node.
 **/
 IndexType createFlatHeterogeneous( const std::vector<std::vector<ValueType>> &leafSizes );
 
 /** Creates a vector of leaves with only one hierarchy level, i.e., a flat
-tree. There can be multiple weights for each leaf. sizes.size() is the number of different
+tree. There can be multiple weights for each leaf. 
+
+@param[in] sizes The sizes of the leaves. sizes.size() is the number of different
 weights and sizes[i].size() is the number of leaves.
+@return A vector with all the leaves.
 **/
 std::vector<commNode> createLeaves( const std::vector<std::vector<ValueType>> &sizes);
 
-/* @brief Takes a level of the tree and creates the level above it by 
-grouping together nodes that have the same last hierarchy index
+/* Takes a level of the tree and creates the level above it by grouping together nodes that
+ have the same last hierarchy index.
+
+ @param[in] levelBelow A vector of leaves
+ @return A vector of leaves. ret.size()<=levelBelow.size() as the upper level cannot have
+ more nodes from the level below.
 */
 static std::vector<commNode> createLevelAbove( const std::vector<commNode> &levelBelow);
 
 /** Weights of leaf nodes can be given as relative values. Given specific
 node weights, adapt them so now, leaf weights are calculated according 
-to the provided node weights.
+to the provided node weights. Weights of the tree that are not proportional are
+not affected; only proportional weights are converted to absolute values.
+If the i-th weight is proportional, then the adapted weight for a node x is 
+x.weight[i] = e*(sum(leafSizes[i])/sum(allNodes.weight[i]))
+
+@param[in] leafSizes This contains the absolute weights for the leaves.
+leafSizes.size()=numWeights, leafSizes[i].size()=numLeaves
+leafSizes[i][j]: the i-th weight for node j
 */
 
 void adaptWeights( const std::vector<scai::lama::DenseVector<ValueType>> &leafSizes );
@@ -304,77 +337,113 @@ void adaptWeights( const std::vector<scai::lama::DenseVector<ValueType>> &leafSi
  belonged  to the same node in the previous level, i.e., have the same father,
  thisLevel[3,4] belonged to the same node, the same for thisLevel[5,6,7]  etc.
 
-@param[in] thisLevel The input hierarchy level of the the tree.
+@param[in] thisLevel The input hierarchy level of the tree.
 @return A vector with the number of nodes for each group.
 */
 std::vector<unsigned int> getGrouping(const std::vector<commNode> thisLevel) const;
 
-/** @brief Calculates the distance of two nodes using their hierarchy labels.
+/** Calculates the distance of two nodes using their hierarchy labels.
 	We assume that leaves with the same father have distance 1. 
 	Comparing two hierarchy labels, the distance is their first mismatch.
 	In other words, the height of their least common ancestor.
+
 	For example:
-	hierarchy1 = { 3, 3, 1, 4, 2}
-	hierarchy2 = { 3, 3, 0, 0, 1}
-	hierarchy3 = { 0, 3, 1, 4, 2}
+	@verbatim
+	1.hierarchy = { 3, 3, 1, 4, 2}
+	2.hierarchy = { 3, 3, 0, 0, 1}
+	3.hierarchy = { 0, 3, 1, 4, 2}
 	distances(1,2)=3, distacne(1,3)=5, distance(2,3)=5
+	@endverbatim
+
+	@param[in] node1 The first node
+	@param[in] node2 The second node
+	@return Their distance in the tree.
 */
 static ValueType distance( const commNode &node1, const commNode &node2 );
 
-/** Export the tree as a weighted graph. The edge weigth between to nodes
-	is the distance of the nodes in the tree as it is calculates by the
-	function distance.
+/** Export the tree as a weighted graph. The edge weight between two nodes
+	is the distance of the nodes in the tree as it is calculates by the function distance.
 	Remember: only leaves are nodes in the graph. This means that the
-	number of nodes in the graph is equal the number of leaves and the
-	graph is complete: it inludes all possible edges.
+	number of nodes in the graph is equal the number of leaves of the tree and the
+	graph is complete: it includes all possible edges.
 
-	This is not distributed, it works only localy in every PE.
+	This is not distributed, it works only locally in every PE.
+
+	@return A (not distributed) graph.
 */
 //TODO: since this a complete matrix, the CSRSparsematrix is not very efficient
-
-scai::lama::CSRSparseMatrix<ValueType> exportAsGraph_local(const std::vector<commNode> leaves) const;
-
 scai::lama::CSRSparseMatrix<ValueType> exportAsGraph_local() const;
 
-/** Overloaded version that takes as input the communication tree
+
+/** Compute the imbalance of a partition (of k blocks) where the leaves of the tree provide the
+balance constrain for every weight. Note that the actual graph is not needed to calculate the
+imbalance.
+
+@param[in] part A partition of the nodes of a graph. part.size() is the number of nodes,
+part[i]=x then node i belongs to block x.
+@param[in] k The number of blocks,  numLeaves=k, part.max()=k+1
+@param[in] nodeWeight The weights for every node.
+
+@return The maximum imbalance for every weight. ret.size()=nodeWeight.size()=numWeights
 */
 
 //TODO: turn to static? move to other class?
 std::vector<ValueType> computeImbalance(
     const scai::lama::DenseVector<IndexType> &part,
-    IndexType k,
+    const IndexType k,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeight);
 
 
-/** @brief Given a hierarchy level, it extracts the relative speed
-of every PE (remember: every node in a hierarchy level is either a single
-PE, if the level is the leaves, or a group of PEs) and calculates what
-is the optimum weight each PE should have. Mainly used to comoute imbalance.
-*/
-//TODO: leave as static?
-//std::vector<ValueType> getOptBlockWeights(
-//    const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights) const;
-
-/** Returns a vector for every balance constrain.
+/** Returns a vector for every balance constrain, i.e., the weights of the nodes, for the specific hierarchy level.
 	return.size()==the number of constrains
 	return[i].size()==number of leaves, for all i
-	If level==-1 it will retunr the the constraints of the leaves.
+	If level==-1 it will return the the constraints of the leaves.
+
+	@param[in] level The hierarchy level. If level=-1 then calculate for the leaves.
+	@return A vector of size numWeight that holds the balance/weight for all node of the level.
+	ret.size()=numWeight, ret[i].size()=hierarch[level].size()
+	ret[i][j] is the i-th weight for the j-th node in given hierarchy level.
 */
 
 std::vector<std::vector<ValueType>> getBalanceVectors( const IndexType level=-1) const;
 
-/*@brief Print information for the tree
+
+/** @brief Print information for the tree
 */
 void print() const;
 
-/* @brief Basic sanity checks for the tree.
+/** @brief Basic sanity checks for the tree.
+@param[in] allTests If true, do additional, more expensive tests
 */
-bool checkTree( bool all=false ) const;
+bool checkTree( bool allTests=false ) const;
 
+
+
+private:
+
+scai::lama::CSRSparseMatrix<ValueType> exportAsGraph_local(const std::vector<commNode> leaves) const;
+
+
+/**The root of the communication tree; used for hierarchical partitioning
+
+- tree.size==hierarchyLevels
+- tree[i] is the vector of nodes for hierarchy level i
+- tree.back() is the vector of all the leaves
+*/
+std::vector<std::vector<commNode>> tree;
+
+//must be known how many levels the tree has
+//(well, it can inferred but it is just easier)
+IndexType hierarchyLevels; 			///< how many hierarchy levels exist, hierarchyLevels = tree.size()
+IndexType numNodes;					///< all the nodes of the tree
+IndexType numLeaves;				///< the leafs of the tree
+IndexType numWeights;				///< how many weights each node has
+bool areWeightsAdapted = false;		///< if relative weights are adapted, \sa adaptWeights
+/// if isProportional[i] is true, then weight i is proportional and if false, weight i is absolute; isProportional.size()=numWeights
+std::vector<bool> isProportional;	
 
 
 //------------------------------------------------------------------------
-
 
 };//class CommTree
 

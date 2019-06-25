@@ -15,7 +15,7 @@
 
 namespace ITI {
 
-/**
+/** @cond INTERNAL
  * Priority queue with extract-min and decrease-key.
  * The type Val takes on integer values between 0 and n-1.
  * O(n log n) for construction, O(log n) for typical operations.
@@ -228,3 +228,6 @@ inline void ITI::PrioQueue<Key, Val>::clear() {
 	pqset.clear();
 	mapValToKey.clear();
 }
+
+/** @endcond INTERNAL
+*/

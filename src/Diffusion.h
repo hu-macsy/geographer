@@ -17,13 +17,15 @@
 
 namespace ITI {
 
+/** @brief Calculate coordinates for the vertices a a graph using a diffusion approach.	
+*/	
+
 template<typename IndexType, typename ValueType>
 class Diffusion {
 
 public:
 	Diffusion() = default;
 	virtual ~Diffusion() = default;
-
 
      /**
      * Computes the potential vector of a diffusion flow in a graph. Calls a linear solver to solve Lx=d for x, where L is the graph laplacian and d the demand vector.

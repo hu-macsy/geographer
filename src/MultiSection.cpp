@@ -76,7 +76,7 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
     std::vector<std::vector<IndexType>> localPoints( localN, std::vector<IndexType>(dim,0) );
    
     // scale= N^(1/d): this way the scaled max is N^(1/d) and this is also the maximum size of the projection arrays
-ValueType scale = std::pow( globalN /*WARNING*/ -1 , 1.0/dim) /***TEST-REMOVE****/ *3;
+ValueType scale = std::pow( globalN /*WARNING*/ -1 , 1.0/dim);
     //PRINT0( scale );
     {
         SCAI_REGION( "MultiSection.getPartitionNonUniform.minMaxAndScale" )
@@ -259,18 +259,16 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
         //      maybe not the fastest way but probably would give better quality
         
         // choose the dimension to project for all leaves/rectangles
-        if( settings.useExtent or true){
-            SCAI_REGION("MultiSection.getRectangles.forAllRectangles.useExtent");
-            // for all leaves/rectangles
-            for( IndexType l=0; l<allLeaves.size(); l++){
-                struct rectangle thisRectangle = allLeaves[l]->getRect();
-                maxExtent = 0;
-                for(int d=0; d<dim; d++){
-                    ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
-                    if( extent>maxExtent ){
-                        maxExtent = extent;
-                        chosenDim[l] = d;
-                    }
+
+        // for all leaves/rectangles
+        for( IndexType l=0; l<allLeaves.size(); l++){
+            struct rectangle thisRectangle = allLeaves[l]->getRect();
+            maxExtent = 0;
+            for(int d=0; d<dim; d++){
+                ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
+                if( extent>maxExtent ){
+                    maxExtent = extent;
+                    chosenDim[l] = d;
                 }
             }
         }
@@ -534,23 +532,21 @@ if(comm->getRank()==0)  bBox.print( std::cout );
         //TODO: since this is done locally, we can also get the 1D partition in every dimension and choose the best one
         //      maybe not the fastest way but probably would give better quality
 PRINT0("about to cut into " << *thisDimCuts);
-        //TODO: useExtent is the only option. Add another or remove settings.useExtent
+
         // choose the dimension to project for each leaf/rectangle
-        if( settings.useExtent or true){
-            SCAI_REGION("MultiSection.getRectanglesNonUniform.forAllRectangles.useExtent");
-            // for all leaves/rectangles
-            for( IndexType l=0; l<allLeaves.size(); l++){
-                struct rectangle thisRectangle = allLeaves[l]->getRect();
-                maxExtent = 0;
-                for(int d=0; d<dim; d++){
-                    ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
-                    if( extent>maxExtent ){
-                        maxExtent = extent;
-                        chosenDim[l] = d;
-                    }
+        // for all leaves/rectangles
+        for( IndexType l=0; l<allLeaves.size(); l++){
+            struct rectangle thisRectangle = allLeaves[l]->getRect();
+            maxExtent = 0;
+            for(int d=0; d<dim; d++){
+                ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
+                if( extent>maxExtent ){
+                    maxExtent = extent;
+                    chosenDim[l] = d;
                 }
             }
         }
+        
         // in chosenDim we have stored the desired dimension to project for all the leaf nodes
 
         // a vector of size numLeaves. projections[i] is the projection of leaf/rectangle i in the chosen dimension
@@ -595,8 +591,8 @@ PRINT0("about to cut into " << *thisDimCuts);
                     maxWeight = newRect.weight;
                 }
 				//dbg_rectW += newRect.weight;                
-//if(comm->getRank()==0) newRect.print(std::cout);
-PRINT0("this rect imbalance= " << (newRect.weight-optWeight)/optWeight << "  (opt= " << optWeight << " , myWeight= "<< newRect.weight << ")" );
+				if(settings.debugMode)
+					PRINT0("this rect imbalance= " << (newRect.weight-optWeight)/optWeight << "  (opt= " << optWeight << " , myWeight= "<< newRect.weight << ")" );
             }
             
             //last rectangle
@@ -610,15 +606,14 @@ PRINT0("this rect imbalance= " << (newRect.weight-optWeight)/optWeight << "  (op
                 maxWeight = newRect.weight;
             }        
 			//dbg_rectW += newRect.weight;    
-//if(comm->getRank()==0) newRect.print(std::cout);
-PRINT0("this rect imbalance= " << (newRect.weight-optWeight)/optWeight << "  (opt= " << optWeight << " , myWeight= "<< newRect.weight << ")" );
+			if(settings.debugMode)
+				PRINT0("this rect imbalance= " << (newRect.weight-optWeight)/optWeight << "  (opt= " << optWeight << " , myWeight= "<< newRect.weight << ")" );
 
 			//TODO: only for debuging, remove variable dbg_rectW
 			//SCAI_ASSERT_LE_ERROR( dbg_rectW-thisRectangle.weight, 0.0000001, "Rectangle weights not correct: dbg_rectW-this.weight= " << dbg_rectW - thisRectangle.weight);
-
         }
         numLeaves = root->getNumLeaves();
-PRINT0("numLeaves= " << numLeaves);        
+
     }
     
     const std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> &ret = root->getAllLeaves();

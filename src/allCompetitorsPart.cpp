@@ -186,7 +186,7 @@ int main(int argc, char** argv) {
         }
         
         // create the adjacency matrix and the coordinates
-        ITI::MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist( graph, coords, maxCoord, numPoints);
+        ITI::MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist( graph, coords, maxCoord, numPoints, settings.dimensions);
         
         IndexType nodes= graph.getNumRows();
         IndexType edges= graph.getNumValues()/2;

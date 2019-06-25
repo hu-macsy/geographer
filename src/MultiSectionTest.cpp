@@ -30,8 +30,8 @@ namespace ITI {
 class MultiSectionTest : public ::testing::Test {
 protected:
         // the directory of all the meshes used
-        std::string graphPath = "./meshes/";
-
+  		// projectRoot is defined in config.h.in
+		const std::string graphPath = projectRoot+"/meshes/";
 };
 
 

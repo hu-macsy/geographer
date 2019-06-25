@@ -25,6 +25,9 @@
 
 namespace ITI {
 
+/** Spatial cell class used by spatial tree to create a tree that stores point for faster search.
+*/
+
 class SpatialCell : public std::enable_shared_from_this<SpatialCell>{
 	friend class QuadTreeTest;
 public:
@@ -37,7 +40,7 @@ public:
 		}
 		for (index i = 0; i < dimension; i++) {
 			if (!(minCoords[i] < maxCoords[i])) {
-				throw std::runtime_error("minCoords["+std::to_string(i)+("]="+std::to_string(minCoords[i])+" not < "+std::to_string(maxCoords[i])+"=maxCoords["+std::to_string(i)+"]"));
+				throw std::runtime_error("minCoords["+std::to_string(i)+"]="+std::to_string(minCoords[i])+" not < "+std::to_string(maxCoords[i])+"=maxCoords["+std::to_string(i)+"] for cell with id " +std::to_string(ID) );
 			}
 		}
 		isLeaf = true;
@@ -553,22 +556,22 @@ public:
 //-------------------------------------------------------------------------------------------
     
 	/** Returns the sub tree starting from this node as the adjacency list/matrix of a graph.
-         * Whenever I use "graph" I mean in the final graph, not the tree.
-         * 
-         * @param[in] graphNgbrsCells Keeps pointers to neighbours of every node in the graph.
-         *  graphNgbrsPtrs[i]= a set with pointers to the neighbours of -i- in the CSR matrix/graph.
-         *  graphNgbrsPtrs.size() == size of the forest or tree = all nodes on every tree, the global sum of nodes
-         * @param[out] coords The coordinates of the output graph.
-         * @param[in] frontier Used in the case we have a forest and is initialised inside SpatialTree.h while called
-         *  in SpatialTree::getGraphFromForest(...).
-         */
-        //TODO: graphNgbrsCells, is initialised only in case of forest. If we have a tree is empty. right???
+     * (Whenever we use "graph" it means the final/output graph, not the tree.)
+     * 
+     * @param[in] graphNgbrsCells Keeps pointers to neighbors of every node in the graph.
+     *  graphNgbrsPtrs[i]= a set with pointers to the neighbors of -i- in the CSR matrix/graph.
+     *  graphNgbrsPtrs.size() == size of the forest or tree, i.e., all nodes on every tree, the global sum of nodes
+     * @param[out] coords The coordinates of the output graph.
+     * @param[in] frontier Used in the case we have a forest and is initialised inside SpatialTree.h while called
+     *  in SpatialTree::getGraphFromForest(...).
+     */
+    //TODO: graphNgbrsCells, is initialised only in case of forest. If we have a tree is empty, right???
 	template<typename IndexType, typename ValueType>
 	scai::lama::CSRSparseMatrix<ValueType> getSubTreeAsGraph(
-                        std::vector< std::set<std::shared_ptr<const SpatialCell>>>& graphNgbrsCells,
+			std::vector< std::set<std::shared_ptr<const SpatialCell>>>& graphNgbrsCells,
 			std::vector<std::vector<ValueType>>& coords,
 			std::queue<std::shared_ptr<const SpatialCell>> frontier = std::queue<std::shared_ptr<const SpatialCell>>()) const {
-            SCAI_REGION("SpatialCell.getSubTreeAsGraph");
+			SCAI_REGION("SpatialCell.getSubTreeAsGraph");
             unsigned int treeSize= graphNgbrsCells.size();
             
             // graphNeighbours[i]: the indices of the neighbours of node i in the final graph, not of the tree
@@ -677,7 +680,7 @@ public:
             /*
              * Before making the CSR sparse matrix must reindex because leaves do not have
              * sequential indices.
-             * Also set the coordinates so they correspond only to leaves.
+             * Also, set the coordinates so they correspond only to leaves.
              * REMEMBER: graphNgbrsCells.size()== treeSize, not leafSize
              */
             
@@ -743,12 +746,12 @@ public:
                     if(leafIndexMapping[i]==-1){    // is not a leaf
                         continue;
                     }else{
-                        // leaf indices are sequenrial
+                        // leaf indices are sequential
                         SCAI_ASSERT_EQUAL_ERROR(leafIndex , leafIndexMapping[i]-1);
                         leafIndex = leafIndexMapping[i];
                     }
                     
-                    // graphNgb is a neighbouring cell of this node as a shared_ptr
+                    // graphNgb is a neighboring cell of this node as a shared_ptr
                     for(std::shared_ptr<const SpatialCell> graphNgb : graphNgbrsCells[i]){
                         // all nodes must be leaves                
                         assert( graphNgb->isLeaf );
@@ -801,10 +804,9 @@ public:
         
         /* Checks if two cells are adjacent and share an area. If they have an edge or a corner in common
          * then the test is false.
-         * TODO: it does not test if on cell is inside another (well, this cannot happen in a quadTree).
-         * TODO: remove the dimension warning if there nothing to warn about.
-         * */
-        
+        */
+        // TODO: it does not test if on cell is inside another (well, this cannot happen in a quadTree).
+		//TODO: remove the dimension warning if there nothing to warn about.
         bool isAdjacent(const SpatialCell& other) const {
             int dim = minCoords.getDimensions();
             if(dim!=3){

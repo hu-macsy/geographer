@@ -774,6 +774,7 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
     const IndexType globalN = inputDist->getGlobalSize();
     
     std::vector<ValueType> maxCoords(dimensions, std::numeric_limits<ValueType>::lowest());
+    std::vector<ValueType> minCoords(dimensions, std::numeric_limits<ValueType>::max());
     DenseVector<IndexType> result(inputDist, 0);
     
     //TODO: if we know maximum from the input we could save that although is not too costly
@@ -786,7 +787,8 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
         const HArray<ValueType>& localPartOfCoords = coordinates[dim].getLocalValues();
         for (IndexType i = 0; i < localN; i++) {
             ValueType coord = localPartOfCoords[i];
-            if (coord > maxCoords[dim]) maxCoords[dim] = coord;
+            if(coord > maxCoords[dim]) maxCoords[dim] = coord;
+            if(coord < minCoords[dim]) minCoords[dim] = coord;
         }
     }
     
@@ -795,6 +797,7 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
      */
     for (IndexType dim = 0; dim < dimensions; dim++) {
         maxCoords[dim] = comm->max(maxCoords[dim]);
+        minCoords[dim] = comm->min(minCoords[dim]);
     }
    
     // measure density with rounding
@@ -808,8 +811,8 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
         std::cout<< "Warning, in pixeledCoarsen, pixeled graph size bigger than input size. Not actually a coarsening" << std::endl;
     }
     
-    //TODO: generalise this to arbitrary dimensions, do not handle 2D and 3D differently
-    // a 2D or 3D arrays as a one dimensional vector
+    //TODO: generalize this to arbitrary dimensions, do not handle 2D and 3D differently
+    // maybe a 2D or 3D arrays as a one dimensional vector?
     // [i][j] is in position: i*sideLen + j
     // [i][j][k] is in: i*sideLen*sideLen + j*sideLen + k
     
@@ -821,7 +824,8 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
     scai::hmemo::HArray<ValueType> pixelValues;
     
     // here we assume that all edges exist in the pixeled graph. That might not be true. After we add the edges that
-    // do exist, we add all mising edges with a small weight.
+    // do exist, we add all missing edges with a small weight.
+    // the number of edges in a 3D grid is 3ABC-AB-AC-BC. if A=B=C we get the next formula for 3D and this is generalized for higher dimensions
     IndexType nnzValues= 2*dimensions*(std::pow(sideLen, dimensions) - std::pow(sideLen, dimensions-1) );
     {
         scai::hmemo::WriteOnlyAccess<IndexType> wPixelIA( pixelIA, cubeSize+1 );
@@ -856,27 +860,53 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
         coordHalo.updateHalo( coordHaloData[d], coordinates[d].getLocalValues(), *comm );
     }
   
-    IndexType notCountedPixelEdges = 0; //edges between diagonal pixels are not counted
+  	//TODO?: if we also count diagonal edges, in 2D, every pixel will have 8 neighbors.
+    IndexType notCountedPixelEdges = 0; //edges between diagonal pixels are not counted on purpose
   
-    if(dimensions==2){
+
+    if( dimensions==2 or dimensions==3 ){
         SCAI_REGION( "MultiLevel.pixeledCoarsen.localDensity" )
         scai::hmemo::WriteAccess<IndexType> wDensity(density);
         scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
         scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
     
+    	//in case of dimensions==3, the third coord is correct;
+    	//	 in case dimensions==2, is the second coordinate, so it the wrong one, but is never used
+		const HArray<ValueType>* thirdCoord = &coordinates[1].getLocalValues();
+		if(dimensions==3)
+			thirdCoord = &coordinates[2].getLocalValues();
+
+		scai::hmemo::ReadAccess<ValueType> coordAccess2( (*thirdCoord) );
+
 		const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
 		scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
 		scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+
+		ValueType denomX = maxCoords[0]-minCoords[0]+1;
+		ValueType denomY = maxCoords[1]-minCoords[1]+1;
+		ValueType denomZ = 1;
+
+		if(dimensions==3){
+			denomZ = maxCoords[2]-minCoords[2]+1;
+		}
         
         IndexType scaledX, scaledY;
-        //the +1 is needed
-        IndexType maxX = maxCoords[0]+1;
-        IndexType maxY = maxCoords[1]+1;
+		IndexType scaledZ=0; //this will not be further used in case of 2 dimensions		
 
         for(IndexType i=0; i<localN; i++){
-            scaledX = coordAccess0[i]/maxX * sideLen;
-            scaledY = coordAccess1[i]/maxY * sideLen;
-            IndexType thisPixel = scaledX*sideLen + scaledY;      
+
+        	//scale each point to get a pixeled coord between [0,cubeSize-1]
+			scaledX = (ValueType(coordAccess0[i]-minCoords[0])/denomX)*sideLen;        
+			scaledY = (ValueType(coordAccess1[i]-minCoords[1])/denomY)*sideLen;
+			if(dimensions==3){
+				scaledZ = (ValueType(coordAccess2[i]-minCoords[2])/denomZ)*sideLen;
+			}
+
+			IndexType thisPixel = 	scaledX*std::pow(sideLen, dimensions-1) +
+									scaledY*std::pow(sideLen, dimensions-2) +
+									scaledZ; //this is 0 if dimensions==2
+
+			//wDensity.size()=cubeSize
             SCAI_ASSERT( thisPixel < wDensity.size(), "Index too big: "<< std::to_string(thisPixel) );
             
             ++wDensity[thisPixel];
@@ -895,16 +925,25 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
                 
                 // find the neighbor's pixel
                 ValueType ngbrX, ngbrY;
+                ValueType ngbrZ = minCoords[2]; // in case dimensions=3
                 if( coordDist->isLocal(neighbor) ){
                     ngbrX = coordAccess0[ coordDist->global2Local(neighbor) ];
                     ngbrY = coordAccess1[ coordDist->global2Local(neighbor) ];
+					if(dimensions==3)
+						ngbrZ = coordAccess2[ coordDist->global2Local(neighbor) ];
                 }else{
                     ngbrX = coordHaloData[0][ coordHalo.global2Halo(neighbor) ];
                     ngbrY = coordHaloData[1][ coordHalo.global2Halo(neighbor) ];
-                }
+					if(dimensions==3)        
+						ngbrZ = coordHaloData[2][ coordHalo.global2Halo(neighbor) ];
+				}
 
-                IndexType ngbrPixelIndex = sideLen*(IndexType (sideLen*ngbrX/maxX))  + sideLen*ngbrY/maxY;
-           
+				//the pixel the our neighbor resides
+				IndexType ngbrPixelIndex = 
+					std::pow(sideLen, dimensions-1)*(IndexType (sideLen*(ValueType(ngbrX-minCoords[0])/denomX) )) +
+					std::pow(sideLen, dimensions-2)*(IndexType (sideLen*(ValueType(ngbrY-minCoords[1])/denomY) )) +
+					IndexType ( sideLen*(ValueType (ngbrZ-minCoords[2])/denomZ) ); // this is 0 if dimensions=3
+
                 SCAI_ASSERT( ngbrPixelIndex < cubeSize, "Index too big: "<< ngbrPixelIndex <<". Should be less than: "<< cubeSize);
 
                 if( ngbrPixelIndex != thisPixel ){ // neighbor not in the same pixel, find the correct pixel
@@ -914,14 +953,14 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
                     
                     for(IndexType p= pixelBeginCols; p<pixelEndCols; p++){
                         IndexType thisPixelOtherNeighbor = wPixelJA[p];
+                        SCAI_ASSERT(thisPixelOtherNeighbor < cubeSize, "Index too big." << ngbrPixelIndex );
                         if( thisPixelOtherNeighbor == ngbrPixelIndex ){   // add in edge weights
-                            SCAI_ASSERT(ngbrPixelIndex < cubeSize, "Index too big." << ngbrPixelIndex );
-                            ++wPixelValues[ p ];
+							++wPixelValues[ p ];                            
                             ngbrNotFound = false;
                             break;
                         }
                     }
-                    // somehow got a pixel as neighbour that is either far (not a mesh?) or share only
+                    // somehow got a pixel as neighbour that is either far (maybe graph is not a mesh?) or share only
                     // a corner with thisPixel, not a cube facet
                     if( ngbrNotFound ){ 
                         ++notCountedPixelEdges;
@@ -929,82 +968,6 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
                 }
             }          
         } 
-    }else if(dimensions==3){
-        SCAI_REGION( "MultiLevel.pixeledCoarsen.localDensity" )
-        
-        scai::hmemo::WriteAccess<IndexType> wDensity(density);
-        scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
-        scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
-        scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[2].getLocalValues() );
-        
-        const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-		scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
-		scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
-        
-        IndexType scaledX, scaledY, scaledZ;
-        
-        IndexType maxX = maxCoords[0]+1;
-        IndexType maxY = maxCoords[1]+1;
-        IndexType maxZ = maxCoords[2]+1;
-        
-        for(IndexType i=0; i<localN; i++){
-            scaledX = coordAccess0[i]/maxX * sideLen;
-            scaledY = coordAccess1[i]/maxY * sideLen;
-            scaledZ = coordAccess2[i]/maxZ * sideLen;
-            IndexType thisPixel = scaledX*sideLen*sideLen + scaledY*sideLen + scaledZ;
-            SCAI_ASSERT( thisPixel < wDensity.size(), "Index too big: "<< thisPixel );
-             
-            ++wDensity[thisPixel];
-            
-            // check the neighbours to fix the pixeledEdge weights
-            const IndexType beginCols = ia[i];
-            const IndexType endCols = ia[i+1];
-            assert(ja.size() >= endCols);
-            
-            scai::hmemo::WriteAccess<IndexType> wPixelIA( pixelIA );
-            scai::hmemo::WriteAccess<IndexType> wPixelJA( pixelJA );
-            scai::hmemo::WriteAccess<ValueType> wPixelValues( pixelValues );
-            
-            for (IndexType j = beginCols; j < endCols; j++) {
-                IndexType neighbor = ja[j];
-                
-                // find the neighbor's pixel
-                IndexType ngbrX, ngbrY, ngbrZ;
-                if( coordDist->isLocal(neighbor) ){
-                    ngbrX = coordAccess0[ coordDist->global2Local(neighbor) ];
-                    ngbrY = coordAccess1[ coordDist->global2Local(neighbor) ];
-                    ngbrZ = coordAccess2[ coordDist->global2Local(neighbor) ];
-                }else{
-                    ngbrX = coordHaloData[0][ coordHalo.global2Halo(neighbor) ];
-                    ngbrY = coordHaloData[1][ coordHalo.global2Halo(neighbor) ];
-                    ngbrZ = coordHaloData[2][ coordHalo.global2Halo(neighbor) ];
-                }
-
-                IndexType ngbrPixelIndex = sideLen*sideLen*(int (sideLen*ngbrX/maxX))  + sideLen*(int(sideLen*ngbrY/maxY)) + sideLen*ngbrZ/maxZ;
-                SCAI_ASSERT( ngbrPixelIndex < cubeSize, "Index too big: "<< ngbrPixelIndex <<". Should be less than: "<< cubeSize);
-                
-                if( ngbrPixelIndex != thisPixel ){ // neighbor not in the same pixel
-                    const IndexType pixelBeginCols = wPixelIA[thisPixel];
-                    const IndexType pixelEndCols = wPixelIA[thisPixel+1];
-                    bool ngbrNotFound = true;
-                    
-                    for(IndexType p= pixelBeginCols; p<pixelEndCols; p++){
-                        IndexType thisPixelOtherNeighbor = wPixelJA[p];
-                        if( thisPixelOtherNeighbor == ngbrPixelIndex ){   // add in edge weights
-                            SCAI_ASSERT(ngbrPixelIndex < wPixelValues.size(), "Index too big." << ngbrPixelIndex );
-                            ++wPixelValues[ngbrPixelIndex];
-                            ngbrNotFound = false;
-                            //break;
-                        }
-                    }
-                    // somehow got a pixel as neighbour that is either far (not a mesh?) or share only
-                    // a corner with thisPixel, not a cube facet
-                    if( ngbrNotFound ){ 
-                        ++notCountedPixelEdges;
-                    }
-                }
-            }
-        }
     }else{
         throw std::runtime_error("Available only for 2D and 3D. Data given have dimension:" + std::to_string(dimensions) );
     } 
@@ -1042,7 +1005,7 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
         scai::hmemo::WriteAccess<ValueType> wPixelValues( pixelValues );    
         if(wPixelValues[i]==0){
             //PRINT(*comm<< ": " << i );
-            wPixelValues[i]=0.01;
+            wPixelValues[i]=1e-10;
         }
     }
     

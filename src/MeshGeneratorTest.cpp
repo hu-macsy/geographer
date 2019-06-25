@@ -34,8 +34,8 @@ namespace ITI {
 class MeshGeneratorTest : public ::testing::Test {
 protected:
         // the directory of all the meshes used
-        std::string graphPath = "./meshes/";
-
+        // projectRoot is defined in config.h.in
+		const std::string graphPath = projectRoot+"/meshes/";
 };
 
 //-----------------------------------------------------------------
@@ -62,8 +62,8 @@ TEST_F(MeshGeneratorTest, testCreateStructured3DMeshLocalDegreeSymmetry) {
 		  coordinates[i] = static_cast<ValueType>( 0 );
 		}
 
-		MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(a, coordinates, maxCoord, numPoints);
-		ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry(a);
+		MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(a, coordinates, maxCoord, numPoints, dimensions);
+		aux<IndexType, ValueType>::checkLocalDegreeSymmetry(a);
 	} else {
 		std::cout << "Not tested, since called with <= 16 processes, this implies you don't have enough memory for " << n << " nodes."<< std::endl;
 	}
@@ -92,7 +92,7 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_3D) {
     auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
     
     // create the adjacency matrix and the coordinates
-    MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
+    MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(adjM, coords, maxCoord, numPoints, 3);
     
     // print local values 
     /*
@@ -115,7 +115,7 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_3D) {
     {
         SCAI_REGION("testCreateStructuredMesh_Distributed_3D.check_adjM_2")
         const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
-	const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+		const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
         
         for(IndexType i=0; i<ia.size()-1; i++){
             // this checks that the number of non-zero elements in each row is less than 6 
@@ -192,7 +192,8 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_2D) {
     auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
     
     // create the adjacency matrix and the coordinates
-    MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(adjM, coords, maxCoord, numPoints);
+    //MeshGenerator<IndexType, ValueType>::createStructured2DMesh_dist(adjM, coords, maxCoord, numPoints);
+    MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(adjM, coords, maxCoord, numPoints, 2);
     
     // print local values 
     /*
@@ -218,7 +219,7 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_2D) {
         
         for(IndexType i=0; i<ia.size()-1; i++){
             // this checks that the number of non-zero elements in each row is less than 4 
-            // (6 is the maximum number of neighbours a node can have in a structured grid)
+            // (4 is the maximum number of neighbours a node can have in a structured grid)
             EXPECT_LE( ia[i+1]-ia[i], 4 );
             // and also more than 2 which is the minimum
             EXPECT_GE( ia[i+1]-ia[i], 2 );
@@ -299,20 +300,20 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
     EXPECT_EQ( true , adjM.getRowDistribution().isEqual(coords[0].getDistribution()) );
     
     // check symmetry in every PE
-    ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
+    aux<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
     if (!adjM.isConsistent()) {
-	throw std::runtime_error("Input matrix inconsistent");
+		throw std::runtime_error("Input matrix inconsistent");
     }
-    PRINT(*comm<< ": "<< adjM.getLocalNumValues() );
-    PRINT(*comm<< ": "<< comm->sum(adjM.getLocalNumValues()) );
+    //PRINT(*comm<< ": "<< adjM.getLocalNumValues() );
+    //PRINT(*comm<< ": "<< comm->sum(adjM.getLocalNumValues()) );
     
     {
         SCAI_REGION("testCreateRandomStructuredMesh_Distributed_3D.noDist")
         // gather/replicate locally and test whole matrix
         adjM.redistribute(noDistPointer, noDistPointer);
         
-        ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
-        PRINT(*comm<<": "<< adjM.getNumValues() );
+        aux<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
+        //PRINT(*comm<<": "<< adjM.getNumValues() );
         if (!adjM.isConsistent()) {
             throw std::runtime_error("Input matrix inconsistent");
         }
@@ -324,7 +325,7 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
         scai::dmemo::DistributionPtr distCyc ( scai::dmemo::Distribution::getDistributionPtr( "CYCLIC", comm, N) );
         adjM.redistribute( distCyc, noDistPointer);
         
-        ParcoRepart<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
+        aux<IndexType, ValueType>::checkLocalDegreeSymmetry( adjM );
         if (!adjM.isConsistent()) {
             throw std::runtime_error("Input matrix inconsistent");
         }
@@ -354,10 +355,10 @@ TEST_F(MeshGeneratorTest, testWriteMetis_Dist_3D){
     auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
     
     // create the adjacency matrix and the coordinates
-    MeshGenerator<IndexType, ValueType>::createStructured3DMesh_dist(adjM, coords, maxCoord, numPoints);
+    MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(adjM, coords, maxCoord, numPoints, 3);
     
     // write the mesh in p(=number of PEs) files
-    FileIO<IndexType, ValueType>::writeGraphDistributed( adjM, "meshes/dist3D_");
+    FileIO<IndexType, ValueType>::writeGraphDistributed( adjM, graphPath+"/dist3D_");
     
 }
 
@@ -474,7 +475,18 @@ TEST_F(MeshGeneratorTest, testSimpleMeshFromQuadTree_2D){
         ITI::FileIO<IndexType, ValueType>::writeCoords(coords, outCoords);
     }
 }
+//-----------------------------------------------------------------
 
+TEST_F(MeshGeneratorTest, testDistSquared){
+
+	EXPECT_EQ( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<IndexType>({1,1}),std::vector<IndexType>({2,2}) )), 2 );
+	EXPECT_NEAR( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<ValueType>({0.5,1.2}),std::vector<ValueType>({1.1,2.1}) )), 1.17, 1e-10);
+	EXPECT_EQ( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<IndexType>({1,1,1}),std::vector<IndexType>({2,2,2}) )), 3 );
+	EXPECT_EQ( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<IndexType>({1,2,3}),std::vector<IndexType>({4,5,6}) )), 3*3*3 );
+	EXPECT_EQ( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<IndexType>({1,1,1,1}),std::vector<IndexType>({2,2,2,2}) )), 4 );
+	EXPECT_EQ( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<IndexType>({1,1,2,2}),std::vector<IndexType>({1,1,2,5}) )), 3*3 );
+	EXPECT_NEAR( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<ValueType>({1.2,3,3.2,4.1}),std::vector<ValueType>({2.1,0.5,0.2,4.1}) )), 16.06, 1e-10 );
+}
 //-----------------------------------------------------------------
     
 }//namespace ITI

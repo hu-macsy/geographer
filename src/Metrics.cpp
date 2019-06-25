@@ -183,15 +183,6 @@ std::tuple<IndexType,IndexType,IndexType> Metrics::getDiameter( const scai::lama
 			//PRINT(*comm << ": "<< localDiameter);
 			maxBlockDiameter = comm->max(localDiameter);
 			
-			// in case all blocks are disconnected
-			//TODO: remove ang diameter, use harmMean diameter
-			/*
-			if( numPEs-numDisconBlocks==0 ){
-				avgBlockDiameter = 0;
-			}else{
-				avgBlockDiameter = comm->sum(localDiameter) / (numPEs-numDisconBlocks);
-			}
-			*/
 		}else{
 			PRINT0("WARNING: Not computing diameter, not all vertices are in same block everywhere");
 		}
@@ -334,69 +325,6 @@ std::pair<IndexType,IndexType> Metrics::getRedistributionVol( const scai::dmemo:
 	//PRINT0("maxSourceSize= " << maxSourceSize);
 	
 	return std::make_pair( std::max(maxTargetSize,maxSourceSize), globSourceSize);
-}
-//---------------------------------------------------------------------------------------
-
-//TODO: deprecated version, remove
-ValueType Metrics::getCommScheduleTime( scai::lama::CSRSparseMatrix<ValueType> graph, scai::lama::DenseVector<IndexType> partition, const IndexType repeatTimes){
-		
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	const IndexType N = graph.getNumRows();
-	
-	PRINT0("starting comm shcedule...");
-	
-	// the original row and  column distributions
-	const scai::dmemo::DistributionPtr initRowDistPtr = graph.getRowDistributionPtr();
-	const scai::dmemo::DistributionPtr initColDistPtr = graph.getColDistributionPtr();
-	
-	//get the distribution from the partition
-	scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues() );
-	
-	std::chrono::time_point<std::chrono::system_clock> beforeRedistribution = std::chrono::system_clock::now();
-	// redistribute graph according to partition distribution
-	//graph.redistribute( distFromPartition, initColDistPtr);
-	graph.redistribute( distFromPartition, distFromPartition);
-	std::chrono::duration<ValueType> redistributionTime =  std::chrono::system_clock::now() - beforeRedistribution;
-	
-	ValueType time = 0;
-	time = comm->max( redistributionTime.count() );
-	PRINT0("time to redistribute: " << time);
-
-	const IndexType localN = distFromPartition->getLocalSize();
-	SCAI_ASSERT_EQ_ERROR( localN, graph.getLocalNumRows(), "Distribution mismatch")
-	
-	const IndexType maxLocalN = comm->max(localN);
-	const IndexType minLocalN = comm->min(localN);
-	const ValueType optSize = ValueType(N)/comm->getSize();
-	
-	ValueType imbalance = ValueType( maxLocalN - optSize)/optSize;
-	PRINT0("minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", imbalance= " << imbalance);
-	
-	const scai::dmemo::HaloExchangePlan& matrixHaloPlan = graph.getHaloExchangePlan();
-	const scai::dmemo::CommunicationPlan& sendPlan  = matrixHaloPlan.getLocalCommunicationPlan();
-	const scai::dmemo::CommunicationPlan& recvPlan  = matrixHaloPlan.getHaloCommunicationPlan();
-	
-	scai::hmemo::HArray<ValueType> sendData( sendPlan.totalQuantity(), 1.0 );
-	scai::hmemo::HArray<ValueType> recvData;
-	
-	comm->synchronize();
-	std::chrono::time_point<std::chrono::system_clock> beforeCommTime = std::chrono::system_clock::now();
-	for ( IndexType i = 0; i < repeatTimes; ++i ){
-		comm->exchangeByPlan( recvData, recvPlan, sendData, sendPlan );
-	}
-	//comm->synchronize();
-	std::chrono::duration<ValueType> commTime = std::chrono::system_clock::now() - beforeCommTime;
-	
-	//PRINT(*comm << ": "<< sendPlan );		
-	time = comm->max(commTime.count());
-	
-	ValueType minTime = comm->min( commTime.count() );
-	PRINT0("max time for " << repeatTimes <<" communications: " << time << " , min time " << minTime);
-
-	//redistibute back to initial distributions
-	graph.redistribute( initRowDistPtr, initColDistPtr );
-	
-	return time;
 }
 //---------------------------------------------------------------------------------------
 
