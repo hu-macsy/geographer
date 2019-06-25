@@ -196,16 +196,6 @@ static void printVector( std::vector<T> v){
 }
 
 //------------------------------------------------------------------------------
-//taken from: https://stackoverflow.com/questions/236129/how-do-i-iterate-over-the-words-of-a-string
-template<typename Out>
-static void split(const std::string &s, char delim, Out result) {
-    std::stringstream ss(s);
-    std::string item;
-    while (std::getline(ss, item, delim)) {
-        *(result++) = item;
-    }
-}
-//------------------------------------------------------------------------------
 
 /** Splits a string according to some delimiter.
 @param[in] s The string to be slitted.
@@ -239,6 +229,7 @@ static IndexType pixelL1Distance2D(IndexType pixel1, IndexType pixel2, IndexType
 }
 
 
+
 static ValueType pixelL2Distance2D(IndexType pixel1, IndexType pixel2, IndexType sideLen){
      
      IndexType col1 = pixel1/sideLen;
@@ -263,6 +254,15 @@ static ValueType pointDistanceL2( std::vector<ValueType> p1, std::vector<ValueTy
 }
 
 //------------------------------------------------------------------------------
+/* TODO: implement or remove
+static std::tuple<IndexType, IndexType, IndexType> index2Point( const IndexType index, const  std::vector<IndexType> numPoints, const dimension){
+
+	if( dimension==2 )
+		return index2_2DPoint()
+	else if( dimension==3 )
+		return index2_3DPoint()
+}
+*/
 
 /** Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
  * of the index in 3D. The return value is not the coordinates of the point!
@@ -332,7 +332,6 @@ static scai::dmemo::DistributionPtr redistributeFromPartition(
                 bool useRedistributor = true,
                 bool renumberPEs = true );
 
-
 /**
  * Iterates over the local part of the adjacency matrix and counts local edges.
  * If an inconsistency in the graph is detected, it tries to find the inconsistent edge and throw a runtime error.
@@ -341,6 +340,19 @@ static scai::dmemo::DistributionPtr redistributeFromPartition(
  * @param[in] input Adjacency matrix
  */
 static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
+
+private:
+
+//------------------------------------------------------------------------------
+//taken from: https://stackoverflow.com/questions/236129/how-do-i-iterate-over-the-words-of-a-string
+template<typename Out>
+static void split(const std::string &s, char delim, Out result) {
+    std::stringstream ss(s);
+    std::string item;
+    while (std::getline(ss, item, delim)) {
+        *(result++) = item;
+    }
+}
 
 }; //class aux
 
