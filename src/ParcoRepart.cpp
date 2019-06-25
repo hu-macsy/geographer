@@ -210,7 +210,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 {
 	IndexType k = settings.numBlocks;
 	ValueType epsilon = settings.epsilon;
-    const IndexType dimensions = coordinates.size();
+     const IndexType dimensions = coordinates.size();
 
 	SCAI_REGION( "ParcoRepart.partitionGraph" )
 
