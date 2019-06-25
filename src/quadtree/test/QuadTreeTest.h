@@ -18,13 +18,13 @@ namespace ITI {
 
 class QuadTreeTest: public testing::Test {
 public:
-	QuadTreeTest() = default;
-	virtual ~QuadTreeTest() = default;
+    QuadTreeTest() = default;
+    virtual ~QuadTreeTest() = default;
 
 protected:
-	std::vector<std::shared_ptr<SpatialCell > > getChildren(std::shared_ptr<SpatialCell> node) {
-		return node->children;
-	}
+    std::vector<std::shared_ptr<SpatialCell > > getChildren(std::shared_ptr<SpatialCell> node) {
+        return node->children;
+    }
 };
 
 } /* namespace ITI */
