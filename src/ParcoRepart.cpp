@@ -5,7 +5,7 @@
  *      Author: moritzl
  */
 
-#include <scai/tracing.hpp>
+#include "ParcoRepart.h"
 
 #include <assert.h>
 #include <cmath>
@@ -22,8 +22,9 @@
 #include <iostream>
 #include <iomanip>
 
+#include <scai/tracing.hpp>
+
 #include "PrioQueue.h"
-#include "ParcoRepart.h"
 #include "HilbertCurve.h"
 #include "MultiLevel.h"
 #include "SpectralPartition.h"

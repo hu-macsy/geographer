@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>
 #include <scai/lama/Vector.hpp>
@@ -184,4 +186,4 @@ public:
     static std::vector<IndexType> neighbourPixels(const IndexType thisPixel,const IndexType sideLen, const IndexType dimensions);
 
 };
-}
+} //namespace ITI
