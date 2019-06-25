@@ -153,9 +153,9 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
     scai::hmemo::ReadAccess<IndexType> ia( localMatrix.getIA() );
     scai::hmemo::ReadAccess<IndexType> ja( localMatrix.getJA() );
     IndexType iaSize= ia.size();
-    
-    IndexType xadj[ iaSize ];
-    IndexType adjncy[ja.size()];
+  
+	IndexType xadj[ iaSize ];
+	IndexType adjncy[ja.size()];
 
     for(int i=0; i<iaSize ; i++){
       xadj[i]= ia[i];
@@ -169,12 +169,12 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
     }
     ia.release();
     ja.release();
-
+ 
     //
     // convert the coordinates
     //
 
-    ValueType xyzLocal[localN*dimensions];
+	ValueType* xyzLocal = new ValueType[localN*dimensions];
 
     for(int d=0; d<dimensions; d++){
         scai::hmemo::ReadAccess<ValueType> localCoords( coords[d].getLocalValues() );
@@ -188,7 +188,8 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
     //
 
     // this required from parmetis but why int node weights and not double?
-    IndexType vwgt[localN];
+
+	IndexType* vwgt = new IndexType[localN];
     {
         scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights[0].getLocalValues() );
         SCAI_ASSERT_EQ_ERROR( localN, localWeights.size(), "Local weights size mismatch. Are node weights distributed correctly?");
@@ -196,7 +197,6 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
             vwgt[i] = IndexType (localWeights[i]);
         }
     }
-
 
     Settings settings;
     settings.numBlocks = k;
@@ -208,8 +208,7 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
 
     //scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );
     std::vector<IndexType> localPartition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );
-    //partition.redistribute( graph.getRowDistributionPtr() );
-
+    
     scai::lama::DenseVector<IndexType> partition( graph.getRowDistributionPtr(), scai::hmemo::HArray<IndexType>(  localPartition.size(), localPartition.data()) );
 	
     metrics1.getAllMetrics(graph, partition, nodeWeights, settings);
@@ -225,11 +224,12 @@ TEST_F(ParcoRepartTest, testMetisWrapper){
       std::cout<< std::endl <<"Metrics for second partition:"<< std::endl;
       metrics2.print( std::cout );
     }
+    
+    EXPECT_NEAR( metrics1.MM["finalImbalance"], metrics2.MM["finalImbalance"], 0.0001 );
+    EXPECT_EQ( metrics1.MM["finalCut"], metrics2.MM["finalCut"] );
+    EXPECT_EQ( metrics1.MM["maxCommVolume"], metrics2.MM["maxCommVolume"] );
+    EXPECT_EQ( metrics1.MM["totalCommVolume"], metrics2.MM["totalCommVolume"] );
 
-    EXPECT_LE( std::abs(metrics1.MM["finalCut"]-metrics2.MM["finalCut"])/std::max(metrics1.MM["finalCut"], metrics2.MM["finalCut"]), 0.02) ;
-    EXPECT_LE( std::abs(metrics1.MM["finalImbalance"]-metrics2.MM["finalImbalance"])/std::max(metrics1.MM["finalImbalance"], metrics2.MM["finalImbalance"]), 0.02) ;
-    EXPECT_LE( std::abs(metrics1.MM["maxCommVolume"]-metrics2.MM["maxCommVolume"])/std::max(metrics1.MM["maxCommVolume"], metrics2.MM["maxCommVolume"]), 0.02) ;
-    EXPECT_LE( std::abs(metrics1.MM["totalCommVolume"]-metrics2.MM["totalCommVolume"])/std::max(metrics1.MM["totalCommVolume"], metrics2.MM["totalCommVolume"]), 0.02) ;
   }
 
 //--------------------------------------------------------------------------------------- 

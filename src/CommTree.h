@@ -192,11 +192,12 @@ struct commNode{
 
 
 
-/*@brief Default constructor.
+/** @brief Default constructor.
 */
+//TODO: remove?
 CommTree();
 
-/*	@brief Constructor to create tree from a vector of leaves.
+/**	@brief Constructor to create tree from a vector of leaves.
 	@param[in] leaves The leaf nodes of the tree
 	@param[in] isWeightProp A vector of size equal the number of weights
 		that each tree node has. It is used to indicate if the
