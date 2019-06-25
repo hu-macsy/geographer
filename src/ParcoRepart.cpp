@@ -545,8 +545,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const
     //
     // vector of size k, each element represents the size of each block
     //
-//TODO: either adapt hilbert partition to consider node weights and block
-// sizes or add checks when used with nodeweights outside the function
+	//TODO: either adapt hilbert partition to consider node weights and block
+	// sizes or add checks when used with nodeweights outside the function
 
     /*
         std::vector<ValueType> blockSizes;
@@ -916,12 +916,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
                 geomSpread = 1;
                 //
 
-                if( localSumDens[ neighbours[j]] == -1) { // this pixel is already picked by a block (maybe this)
+                if (localSumDens[ neighbours[j]] == -1) { // this pixel is already picked by a block (maybe this)
                     continue;
                 } else {
                     bool inBorder = false;
 
-                    for(IndexType l=0; l<border.size(); l++) {
+                    for (IndexType l=0; l<border.size(); l++) {
                         if( border[l].first == neighbours[j]) { // its already in border, update value
                             //border[l].second = 1.3*border[l].second + geomSpread * (spreadFactor*(std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5) );
                             pixelDistance = aux<IndexType, ValueType>::pixelL2Distance2D( maxDensityPixel, neighbours[j], sideLen);
@@ -929,7 +929,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
                             inBorder= true;
                         }
                     }
-                    if(!inBorder) {
+                    if (!inBorder) {
                         std::pair<IndexType, ValueType> toInsert;
                         toInsert.first = neighbours[j];
                         //toInsert.second = geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[bestIndex], 0.5));
@@ -1136,4 +1136,4 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const 
 //to force instantiation
 template class ParcoRepart<IndexType, ValueType>;
 
-}
+} //namespace ITI
