@@ -9,9 +9,11 @@
 
 #include <vector>
 #include <numeric>
+#include <chrono>
+#include <utility>
+
 #include <scai/lama/DenseVector.hpp>
 #include <scai/tracing.hpp>
-#include <chrono>
 
 #include "quadtree/QuadNodeCartesianEuclid.h"
 #include "Settings.h"
@@ -53,29 +55,29 @@ using point = std::vector<ValueType>;
  */
 
 //core implementation
- template<typename IndexType, typename ValueType>
- DenseVector<IndexType> computePartition(
- 	const std::vector<DenseVector<ValueType>> &coordinates, \
- 	const std::vector<DenseVector<ValueType>> &nodeWeights, \
- 	const std::vector<std::vector<ValueType>> &blockSizes, \
- 	const DenseVector<IndexType>& prevPartition,\
- 	std::vector<std::vector<point>> centers, \
- 	const Settings settings, \
- 	struct Metrics &metrics);
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> computePartition(
+    const std::vector<DenseVector<ValueType>> &coordinates, \
+    const std::vector<DenseVector<ValueType>> &nodeWeights, \
+    const std::vector<std::vector<ValueType>> &blockSizes, \
+    const DenseVector<IndexType>& prevPartition,\
+    std::vector<std::vector<point>> centers, \
+    const Settings settings, \
+    struct Metrics &metrics);
 
 /** @brief Minimal wrapper with only the coordinates. Unit weights are assumed and uniform block sizes.
 */
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(
-	const std::vector<DenseVector<ValueType>> &coordinates,
-	const Settings settings);
+    const std::vector<DenseVector<ValueType>> &coordinates,
+    const Settings settings);
 
 /**
  * @brief Partition a point set using balanced k-means
  *
  * Wrapper without initial centers. Calls computePartition with centers derived from a Hilbert Curve.
  *
- * @param[in] coordinates first level index specifies dimension, second level index the point id: 
+ * @param[in] coordinates first level index specifies dimension, second level index the point id:
  coordinates[i][p] is the i-th coordinate of point p
  * @param[in] nodeWeights The weights of the points. Each point can have multiple weights but all points
  must have the same number of weights.
@@ -89,15 +91,15 @@ DenseVector<IndexType> computePartition(
 //wrapper 1- no centers
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computePartition(
-	const std::vector<DenseVector<ValueType>> &coordinates,
-	const std::vector<DenseVector<ValueType>> &nodeWeights,
-	const std::vector<std::vector<ValueType>> &blockSizes,
-	const Settings settings,
-	struct Metrics &metrics);
+    const std::vector<DenseVector<ValueType>> &coordinates,
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const std::vector<std::vector<ValueType>> &blockSizes,
+    const Settings settings,
+    struct Metrics &metrics);
 
 /**
  * Given a tree of the processors graph, computes a partition into a hierarchical fashion.
- * 
+ *
  * @param[in] coordinates First level index specifies dimension, second level index the point id
  * @param[in] nodeWeights The weights of the points. Each point can have multiple weights but all
  the same number of weights.
@@ -106,11 +108,11 @@ DenseVector<IndexType> computePartition(
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierarchicalPartition(
-	std::vector<DenseVector<ValueType>> &coordinates,
-	std::vector<DenseVector<ValueType>> &nodeWeights,
-	const CommTree<IndexType,ValueType> &commTree,
-	Settings settings,
-	struct Metrics& metrics);
+    std::vector<DenseVector<ValueType>> &coordinates,
+    std::vector<DenseVector<ValueType>> &nodeWeights,
+    const CommTree<IndexType,ValueType> &commTree,
+    Settings settings,
+    struct Metrics& metrics);
 
 /** Calls computeHierarchicalPartition() with an additional step of repartitioning in order to
 provide a better global cut.
@@ -119,11 +121,11 @@ Parameters and return are same as in computeHierarchicalPartition()
 */
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeHierPlusRepart(
-	std::vector<DenseVector<ValueType>> &coordinates,
-	std::vector<DenseVector<ValueType>> &nodeWeights,
-	const CommTree<IndexType,ValueType> &commTree,
-	Settings settings,
-	struct Metrics& metrics);
+    std::vector<DenseVector<ValueType>> &coordinates,
+    std::vector<DenseVector<ValueType>> &nodeWeights,
+    const CommTree<IndexType,ValueType> &commTree,
+    Settings settings,
+    struct Metrics& metrics);
 
 /**
  * @brief Repartition a point set using balanced k-means.
@@ -139,18 +141,18 @@ DenseVector<IndexType> computeHierPlusRepart(
  */
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeRepartition(
-	const std::vector<DenseVector<ValueType>> &coordinates,
-	const std::vector<DenseVector<ValueType>> &nodeWeights,
-	const std::vector<std::vector<ValueType>> &blockSizes,
-	const DenseVector<IndexType> &previous,
-	const Settings settings);
+    const std::vector<DenseVector<ValueType>> &coordinates,
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const std::vector<std::vector<ValueType>> &blockSizes,
+    const DenseVector<IndexType> &previous,
+    const Settings settings);
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> computeRepartition(
-	const std::vector<DenseVector<ValueType>> &coordinates,
-	const std::vector<DenseVector<ValueType>> &nodeWeights,
-	const Settings settings,
-	struct Metrics& metrics);
+    const std::vector<DenseVector<ValueType>> &coordinates,
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const Settings settings,
+    struct Metrics& metrics);
 
 
 /** @brief Version for hierarchical version. The returned centers now are a vector of vectors,
@@ -158,19 +160,19 @@ DenseVector<IndexType> computeRepartition(
 	For every known block (given through \p partition), a number of centers is calculated independently
 	of the rest of the blocks. How many centers we find for each block is determined by \p hierLevel.
 
-	@param [in] hierLevel The previous hierarch level. 
+	@param [in] hierLevel The previous hierarch level.
 	@param[in] partition The block id of every point in the previous hierarchy.
-	partition[i]=b means that point i was in block b in the previous hierarchy level. 
+	partition[i]=b means that point i was in block b in the previous hierarchy level.
 	@return A vector of vectors of points.
 */
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<point>> findInitialCentersSFC(
-		const std::vector<DenseVector<ValueType> >& coordinates, 
-		const std::vector<ValueType> &minCoords,
-		const std::vector<ValueType> &maxCoords,
-		const scai::lama::DenseVector<IndexType> &partition,
-		const std::vector<cNode> hierLevel,	
-		Settings settings);
+                                 const std::vector<DenseVector<ValueType> >& coordinates,
+                                 const std::vector<ValueType> &minCoords,
+                                 const std::vector<ValueType> &maxCoords,
+                                 const scai::lama::DenseVector<IndexType> &partition,
+                                 const std::vector<cNode> hierLevel,
+                                 Settings settings);
 
 /**
  * Find initial centers for k-means by sorting the local points along a space-filling curve.
@@ -186,15 +188,15 @@ std::vector<std::vector<point>> findInitialCentersSFC(
  */
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType>>  findInitialCentersSFC(
-		const std::vector<DenseVector<ValueType> >& coordinates,
-		const std::vector<ValueType> &minCoords,
-		const std::vector<ValueType> &maxCoords,
-		Settings settings);
+                                     const std::vector<DenseVector<ValueType> >& coordinates,
+                                     const std::vector<ValueType> &minCoords,
+                                     const std::vector<ValueType> &maxCoords,
+                                     Settings settings);
 
 /**
  * @brief Compute initial centers from space-filling curve without considering point positions.
- 
- * @param[in] minCoords Minimum coordinate in each dimension 
+
+ * @param[in] minCoords Minimum coordinate in each dimension
  * @param[in] maxCoords Maximum coordinate in each dimension
  * @param[in] settings
  *
@@ -202,9 +204,9 @@ std::vector<std::vector<ValueType>>  findInitialCentersSFC(
  */
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(
-	const std::vector<ValueType> &minCoords,
-	const std::vector<ValueType> &maxCoords,
-	Settings settings);
+    const std::vector<ValueType> &minCoords,
+    const std::vector<ValueType> &maxCoords,
+    Settings settings);
 
 /**
  * Compute centers based on the assumption that the partition is equal to the distribution.
@@ -219,8 +221,8 @@ std::vector<std::vector<ValueType> > findInitialCentersFromSFCOnly(
  */
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType>> findLocalCenters(
-	const std::vector<DenseVector<ValueType> >& coordinates,
-	const DenseVector<ValueType> &nodeWeights);
+                                     const std::vector<DenseVector<ValueType> >& coordinates,
+                                     const DenseVector<ValueType> &nodeWeights);
 
 /**
  * Find centers of current partition.
@@ -237,19 +239,19 @@ std::vector<std::vector<ValueType>> findLocalCenters(
  */
 template<typename IndexType, typename ValueType, typename Iterator>
 std::vector<point> findCenters(
-	const std::vector<DenseVector<ValueType>> &coordinates, 
-	const DenseVector<IndexType> &partition, 
-	const IndexType k,
-	const Iterator firstIndex,
-	const Iterator lastIndex,
-	const DenseVector<ValueType> &nodeWeights);
+    const std::vector<DenseVector<ValueType>> &coordinates,
+    const DenseVector<IndexType> &partition,
+    const IndexType k,
+    const Iterator firstIndex,
+    const Iterator lastIndex,
+    const DenseVector<ValueType> &nodeWeights);
 
 
 /** @brief Get minimum and maximum of the local coordinates.
  */
 template<typename ValueType>
 std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
- 
+
 
 /**
  * Computes the weighted distance between a vertex and a cluster, given the geometric distance and the weights and influence values.
@@ -262,11 +264,11 @@ std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(
  */
 template<typename IndexType, typename ValueType>
 ValueType computeEffectiveDistance(
-	const ValueType distance,
-	const std::vector<DenseVector<ValueType>> &nodeWeights,
-	const std::vector<std::vector<ValueType>> &influence,
-	const IndexType vertex,
-	const IndexType cluster);
+    const ValueType distance,
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const std::vector<std::vector<ValueType>> &influence,
+    const IndexType vertex,
+    const IndexType cluster);
 
 /**
  * Assign points to block with smallest effective distance, adjusted for influence values.
@@ -288,7 +290,7 @@ ValueType computeEffectiveDistance(
  * @param[in] nodeWeights node weights
  * @param[in] previousAssignment previous assignment of points
  * @param[in] oldBlock The block from the previous hierarchy that every point
- belongs to. In case of the non-hierarchical version, this is 0 for all points. This is different from previousAssignment 
+ belongs to. In case of the non-hierarchical version, this is 0 for all points. This is different from previousAssignment
  because it does not chacge inbetween kmeans iteration while
  previousAssignement changes until it converges and the
  algorithm stops.
@@ -306,27 +308,27 @@ ValueType computeEffectiveDistance(
  */
 template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(
-	const std::vector<std::vector<ValueType>> &coordinates,
-	//const std::vector<std::vector<point>> &centers,
-	const std::vector<point>& centers,
-	const std::vector<IndexType>& blockSizesPrefixSum,
-	const Iterator firstIndex,
-	const Iterator lastIndex,
-	const std::vector<std::vector<ValueType>> &nodeWeights,
-	const std::vector<std::vector<ValueType>> &normalizedNodeWeights, 
-	const DenseVector<IndexType> &previousAssignment,
-	const DenseVector<IndexType> &oldBlocks,
-	const std::vector<std::vector<ValueType>> &targetBlockWeights,
-	const SpatialCell &boundingBox,
-	std::vector<ValueType> &upperBoundOwnCenter,
-	std::vector<ValueType> &lowerBoundNextCenter,
-	std::vector<std::vector<ValueType>> &influence,
-	std::vector<ValueType> &imbalance,
-	Settings settings,
-	Metrics &metrics);
+    const std::vector<std::vector<ValueType>> &coordinates,
+    //const std::vector<std::vector<point>> &centers,
+    const std::vector<point>& centers,
+    const std::vector<IndexType>& blockSizesPrefixSum,
+    const Iterator firstIndex,
+    const Iterator lastIndex,
+    const std::vector<std::vector<ValueType>> &nodeWeights,
+    const std::vector<std::vector<ValueType>> &normalizedNodeWeights,
+    const DenseVector<IndexType> &previousAssignment,
+    const DenseVector<IndexType> &oldBlocks,
+    const std::vector<std::vector<ValueType>> &targetBlockWeights,
+    const SpatialCell &boundingBox,
+    std::vector<ValueType> &upperBoundOwnCenter,
+    std::vector<ValueType> &lowerBoundNextCenter,
+    std::vector<std::vector<ValueType>> &influence,
+    std::vector<ValueType> &imbalance,
+    Settings settings,
+    Metrics &metrics);
 
 
-/** Reverse the order of the vectors: given a 2D vector of size 
+/** Reverse the order of the vectors: given a 2D vector of size
 dimension*numPoints, reverse it and return a vector of points
 of size numPoints; in other words, the returned vector has size
 numPoints*dimensions. In general, if the given 2D vector has size

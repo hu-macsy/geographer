@@ -33,13 +33,13 @@ scai::dmemo::HaloExchangePlan coarsenHalo(
     {
         ReadAccess<IndexType> rFineToCoarse(localFineToCoarse);
 
-        //construct new send plan 
+        //construct new send plan
         for (IndexType i = 0; i < sendPlan.size(); i++)
         {
             scai::dmemo::CommunicationPlan::Entry entry = sendPlan[i];
 
             if (IndexType(sendQuantities.size()) <= entry.partitionId)
-            {   
+            {
                 sendQuantities.resize(entry.partitionId+1);
             }
 

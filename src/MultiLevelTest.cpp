@@ -29,39 +29,39 @@ namespace ITI {
 
 class MultiLevelTest : public ::testing::Test {
 protected:
-        // the directory of all the meshes used
-	    // projectRoot is defined in config.h.in
-		const std::string graphPath = projectRoot+"/meshes/";
+    // the directory of all the meshes used
+    // projectRoot is defined in config.h.in
+    const std::string graphPath = projectRoot+"/meshes/";
 };
 
 
 TEST_F (MultiLevelTest, testCoarseningGrid_2D) {
-     std::string file = graphPath + "Grid8x8";
+    std::string file = graphPath + "Grid8x8";
     std::ifstream f(file);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;
-    f >> N >> edges; 
-    
+    f >> N >> edges;
+
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     // for now local refinement requires k = P
     k = comm->getSize();
     //
-    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     //distrubute graph
-    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
-        
+    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed
+
 
     //read the array locally and messed the distribution. Left as a remainder.
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
-    EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
-    
+    EXPECT_EQ( edges, (graph.getNumValues())/2 );
+
     //distribution should be the same
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
-    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
-    
+    EXPECT_EQ(coords[0].getLocalValues().size(), coords[1].getLocalValues().size() );
+
     struct Settings Settings;
     Settings.numBlocks= k;
     Settings.epsilon = 0.2;
@@ -76,7 +76,7 @@ TEST_F (MultiLevelTest, testCoarseningGrid_2D) {
     scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
 
     MultiLevel<IndexType, ValueType>::coarsen(graph, uniformWeights, halo, coarseGraph, fineToCoarseMap);
-    
+
     EXPECT_TRUE(coarseGraph.isConsistent());
     EXPECT_TRUE(coarseGraph.checkSymmetry());
     DenseVector<IndexType> sortedMap(fineToCoarseMap);
@@ -96,28 +96,28 @@ TEST_F (MultiLevelTest, testGetMatchingGrid_2D) {
     std::ifstream f(file);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;
-    f >> N >> edges; 
-    
+    f >> N >> edges;
+
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     // for now local refinement requires k = P
     k = comm->getSize();
     //
-    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     //distrubute graph
-    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed 
-        
+    graph.redistribute(dist, noDistPointer); // needed because readFromFile2AdjMatrix is not distributed
+
 
     //read the array locally and messed the distribution. Left as a remainder.
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
-    EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
-    
+    EXPECT_EQ( edges, (graph.getNumValues())/2 );
+
     //distribution should be the same
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
-    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
-    
+    EXPECT_EQ(coords[0].getLocalValues().size(), coords[1].getLocalValues().size() );
+
     struct Settings Settings;
     Settings.numBlocks= k;
     Settings.epsilon = 0.2;
@@ -128,18 +128,18 @@ TEST_F (MultiLevelTest, testGetMatchingGrid_2D) {
 
     std::vector<std::pair<IndexType,IndexType>> matching = MultiLevel<IndexType, ValueType>::maxLocalMatching( graph, uniformWeights );
     //assert( matching[0].size() == matching[1].size() );
-    
+
     // check matching to see if a node appears twice somewhere
     // for an matching as std::vector<std::vector<IndexType>> (2)
-    for(int i=0; i<matching.size(); i++){
+    for(int i=0; i<matching.size(); i++) {
         IndexType thisNodeGlob = matching[0].first;
         EXPECT_NE( thisNodeGlob, matching[0].second );
-            for(int j=i+1; j<matching.size(); j++){
-                EXPECT_NE( thisNodeGlob, matching[j].first);
-                EXPECT_NE( thisNodeGlob, matching[j].second);
-            }
+        for(int j=i+1; j<matching.size(); j++) {
+            EXPECT_NE( thisNodeGlob, matching[j].first);
+            EXPECT_NE( thisNodeGlob, matching[j].second);
+        }
     }
-    
+
     /*
     { // print
         std::cout<<"matched edges for "<< *comm << " (local indices) :" << std::endl;
@@ -153,58 +153,58 @@ TEST_F (MultiLevelTest, testGetMatchingGrid_2D) {
 //------------------------------------------------------------------------------
 
 TEST_F (MultiLevelTest, testComputeGlobalPrefixSum) {
-	const IndexType globalN = 14764;
-	scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const IndexType globalN = 14764;
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-	//test for a DenseVector consisting of only 1s
-	scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, globalN) );
-	const IndexType localN = dist->getLocalSize();
+    //test for a DenseVector consisting of only 1s
+    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, globalN) );
+    const IndexType localN = dist->getLocalSize();
 
-	DenseVector<IndexType> vector(dist, 1);
-	DenseVector<IndexType> prefixSum = MultiLevel<IndexType, ValueType>::computeGlobalPrefixSum<IndexType>(vector);
+    DenseVector<IndexType> vector(dist, 1);
+    DenseVector<IndexType> prefixSum = MultiLevel<IndexType, ValueType>::computeGlobalPrefixSum<IndexType>(vector);
 
-	ASSERT_EQ(localN, prefixSum.getDistributionPtr()->getLocalSize());
-	if (comm->getRank() == 0) {
-		ASSERT_EQ(1, prefixSum.getLocalValues()[0]);
-	}
+    ASSERT_EQ(localN, prefixSum.getDistributionPtr()->getLocalSize());
+    if (comm->getRank() == 0) {
+        ASSERT_EQ(1, prefixSum.getLocalValues()[0]);
+    }
 
-	{
-		scai::hmemo::ReadAccess<IndexType> rPrefixSum(prefixSum.getLocalValues());
-		for (IndexType i = 0; i < localN; i++) {
-			EXPECT_EQ(dist->local2Global(i)+1, rPrefixSum[i]);
-		}
-	}
+    {
+        scai::hmemo::ReadAccess<IndexType> rPrefixSum(prefixSum.getLocalValues());
+        for (IndexType i = 0; i < localN; i++) {
+            EXPECT_EQ(dist->local2Global(i)+1, rPrefixSum[i]);
+        }
+    }
 
-	//test for a DenseVector consisting of zeros and ones
-	DenseVector<IndexType> mixedVector(dist,0);
-	{
-		scai::hmemo::WriteOnlyAccess<IndexType> wMixed(mixedVector.getLocalValues(), localN);
-		for (IndexType i = 0; i < localN; i++) {
-			wMixed[i] = i % 2;
-		}
-	}
+    //test for a DenseVector consisting of zeros and ones
+    DenseVector<IndexType> mixedVector(dist,0);
+    {
+        scai::hmemo::WriteOnlyAccess<IndexType> wMixed(mixedVector.getLocalValues(), localN);
+        for (IndexType i = 0; i < localN; i++) {
+            wMixed[i] = i % 2;
+        }
+    }
 
-	prefixSum = MultiLevel<IndexType, ValueType>::computeGlobalPrefixSum<IndexType>(mixedVector);
+    prefixSum = MultiLevel<IndexType, ValueType>::computeGlobalPrefixSum<IndexType>(mixedVector);
 
-	//test for equality with std::partial_sum
-	scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(globalN));
-	mixedVector.redistribute(noDistPointer);
-	prefixSum.redistribute(noDistPointer);
+    //test for equality with std::partial_sum
+    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(globalN));
+    mixedVector.redistribute(noDistPointer);
+    prefixSum.redistribute(noDistPointer);
 
-	scai::hmemo::ReadAccess<IndexType> rMixed(mixedVector.getLocalValues());
-	scai::hmemo::ReadAccess<IndexType> rPrefixSum(prefixSum.getLocalValues());
-	ASSERT_EQ(globalN, rMixed.size());
-	ASSERT_EQ(globalN, rPrefixSum.size());
+    scai::hmemo::ReadAccess<IndexType> rMixed(mixedVector.getLocalValues());
+    scai::hmemo::ReadAccess<IndexType> rPrefixSum(prefixSum.getLocalValues());
+    ASSERT_EQ(globalN, rMixed.size());
+    ASSERT_EQ(globalN, rPrefixSum.size());
 
-	std::vector<IndexType> comparison(globalN);
-	std::partial_sum(rMixed.get(), rMixed.get()+globalN, comparison.begin());
+    std::vector<IndexType> comparison(globalN);
+    std::partial_sum(rMixed.get(), rMixed.get()+globalN, comparison.begin());
 
-	for (IndexType i = 0; i < globalN; i++) {
-		EXPECT_EQ(comparison[i], rPrefixSum[i]);
-	}
-	EXPECT_TRUE(std::equal(comparison.begin(), comparison.end(), rPrefixSum.get()));
+    for (IndexType i = 0; i < globalN; i++) {
+        EXPECT_EQ(comparison[i], rPrefixSum[i]);
+    }
+    EXPECT_TRUE(std::equal(comparison.begin(), comparison.end(), rPrefixSum.get()));
 }
-//--------------------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------------------
 
 TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 
@@ -218,7 +218,7 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr distPtr ( graph.getRowDistributionPtr() );
     scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( globalN ));
-    
+
     const IndexType localN = distPtr->getLocalSize();
 
     struct Settings settings;
@@ -228,40 +228,40 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     EXPECT_TRUE( graph.isConsistent() );
     ValueType beforel1Norm = graph.l1Norm();
     IndexType beforeNumValues = graph.getNumValues();
-    
+
     //broadcast seed value from root to ensure equal pseudorandom numbers.
     ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
     comm->bcast( seed, 1, 0 );
     srand(seed[0]);
 
     //random partition
-	DenseVector<IndexType> partition( distPtr , 0);
-	{
-	    scai::hmemo::WriteAccess<IndexType> wPart(partition.getLocalValues());
-	    for(IndexType i=0; i<localN; i++){
-	        wPart[i] = rand()%settings.numBlocks;
+    DenseVector<IndexType> partition( distPtr, 0);
+    {
+        scai::hmemo::WriteAccess<IndexType> wPart(partition.getLocalValues());
+        for(IndexType i=0; i<localN; i++) {
+            wPart[i] = rand()%settings.numBlocks;
         }
-	}
+    }
 
-	//changes due to new lama version
-	scai::dmemo::RedistributePlan redist = scai::dmemo::redistributePlanByNewOwners(partition.getLocalValues(), partition.getDistributionPtr());
-	scai::dmemo::DistributionPtr newDist = redist.getTargetDistributionPtr();
+    //changes due to new lama version
+    scai::dmemo::RedistributePlan redist = scai::dmemo::redistributePlanByNewOwners(partition.getLocalValues(), partition.getDistributionPtr());
+    scai::dmemo::DistributionPtr newDist = redist.getTargetDistributionPtr();
 
-	partition.redistribute( newDist );
+    partition.redistribute( newDist );
 
-    graph.redistribute( newDist , noDistPtr);
+    graph.redistribute( newDist, noDistPtr);
 
-    EXPECT_EQ( graph.l1Norm() , beforel1Norm);
-    EXPECT_EQ( graph.getNumValues() , beforeNumValues);
+    EXPECT_EQ( graph.l1Norm(), beforel1Norm);
+    EXPECT_EQ( graph.getNumValues(), beforeNumValues);
 
     // node weights = 1
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1.0);
     //ValueType beforeSumWeigths = uniformWeights.l1Norm();
     IndexType beforeSumWeights = globalN;
-    
+
     //coordinates at random and redistribute
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType,ValueType>::readCoords(coordFile, globalN, settings.dimensions);
-    for(IndexType i=0; i<settings.dimensions; i++){
+    for(IndexType i=0; i<settings.dimensions; i++) {
         coords[i].redistribute( newDist );
     }
 
@@ -272,109 +272,111 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     settings.dimensions= 2;
     settings.minGainForNextRound = 100;
     settings.minBorderNodes=100;
-	Metrics metrics(settings);
-    
+    Metrics metrics(settings);
+
     scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, halo, settings, metrics);
-    
-    EXPECT_EQ( graph.l1Norm() , beforel1Norm);
-    EXPECT_EQ( graph.getNumValues() , beforeNumValues);
+
+    EXPECT_EQ( graph.l1Norm(), beforel1Norm);
+    EXPECT_EQ( graph.getNumValues(), beforeNumValues);
     // l1Norm not supported for IndexType
-    EXPECT_EQ( static_cast <DenseVector<ValueType>> (uniformWeights).l1Norm() , beforeSumWeights );
-    
+    EXPECT_EQ( static_cast <DenseVector<ValueType>> (uniformWeights).l1Norm(), beforeSumWeights );
+
 }
-//--------------------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------------------
 
 TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
 
-	for( int dim : {2,3} ){
-
-	
-    std::string file; // = graphPath + "trace-00008.bgf";
-    std::string coordFile; // = graphPath + "trace-00008.graph.xyz";
-    IndexType dimensions= dim;
-    IndexType k=8;
-
-    if( dim==2 ){
-    	file = graphPath + "trace-00008.graph";
-    	coordFile = graphPath + "trace-00008.graph.xyz";
-    }else if( dim==3 ){
-    	file = graphPath + "quadTreeGraph3D_4.graph";
-    	//coordFile = graphPath + "353off.graph.xyz";
-    	coordFile = file + ".xyz";
-    }
-
-	IndexType N, edges;
-	std::ifstream f(file);
-	f >> N >> edges; 
-	f.close();
-
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-
-    // for now local refinement requires k = P
-    k = comm->getSize();
-    //
-
-    scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );  
-    scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file, ITI::Format::METIS );        
-
-    //read the array locally and messed the distribution. Left as a remainder.
-    EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
-    EXPECT_EQ( edges, (graph.getNumValues())/2 ); 
-    
-    //distribution should be the same
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions);
-    EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
-    EXPECT_EQ(coords[0].getLocalValues().size() , coords[1].getLocalValues().size() );
-    
-    struct Settings settings;
-    settings.numBlocks= k;
-    settings.epsilon = 0.2;
+    for( int dim : {
+                2,3
+            } ) {
 
 
-    // coarsen the graph with different coarsening resolution
-    for(IndexType i=2; i<7; i++){
-        std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
-        
-        settings.pixeledSideLen = std::pow(i,2);
-        IndexType sideLen = settings.pixeledSideLen;
-        IndexType pixeledGraphSize =  std::pow( sideLen, dimensions);
-        IndexType pixeledGraphAdjecencyMatrixSize = pixeledGraphSize*pixeledGraphSize;
-                
-        PRINT0("sideLen= "<< settings.pixeledSideLen << " ,pixeledGraphSize= "<< pixeledGraphSize << " , pixeledGraphAdjecencyMatrixSize= " << pixeledGraphAdjecencyMatrixSize );
-        if( pixeledGraphSize > N ){
-        	if( comm->getRank()==0 ){
-            	std::cout<< " size of pixeledGraph (number of pixels)= "<< pixeledGraphSize << "  > input graph " << N <<". Hmm, not really a coarsening... Breaking..." << std::endl;
+        std::string file; // = graphPath + "trace-00008.bgf";
+        std::string coordFile; // = graphPath + "trace-00008.graph.xyz";
+        IndexType dimensions= dim;
+        IndexType k=8;
+
+        if( dim==2 ) {
+            file = graphPath + "trace-00008.graph";
+            coordFile = graphPath + "trace-00008.graph.xyz";
+        } else if( dim==3 ) {
+            file = graphPath + "quadTreeGraph3D_4.graph";
+            //coordFile = graphPath + "353off.graph.xyz";
+            coordFile = file + ".xyz";
+        }
+
+        IndexType N, edges;
+        std::ifstream f(file);
+        f >> N >> edges;
+        f.close();
+
+        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+        // for now local refinement requires k = P
+        k = comm->getSize();
+        //
+
+        scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
+        scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+        CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file, ITI::Format::METIS );
+
+        //read the array locally and messed the distribution. Left as a remainder.
+        EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
+        EXPECT_EQ( edges, (graph.getNumValues())/2 );
+
+        //distribution should be the same
+        std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions);
+        EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
+        EXPECT_EQ(coords[0].getLocalValues().size(), coords[1].getLocalValues().size() );
+
+        struct Settings settings;
+        settings.numBlocks= k;
+        settings.epsilon = 0.2;
+
+
+        // coarsen the graph with different coarsening resolution
+        for(IndexType i=2; i<7; i++) {
+            std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
+
+            settings.pixeledSideLen = std::pow(i,2);
+            IndexType sideLen = settings.pixeledSideLen;
+            IndexType pixeledGraphSize =  std::pow( sideLen, dimensions);
+            IndexType pixeledGraphAdjecencyMatrixSize = pixeledGraphSize*pixeledGraphSize;
+
+            PRINT0("sideLen= "<< settings.pixeledSideLen << " ,pixeledGraphSize= "<< pixeledGraphSize << " , pixeledGraphAdjecencyMatrixSize= " << pixeledGraphAdjecencyMatrixSize );
+            if( pixeledGraphSize > N ) {
+                if( comm->getRank()==0 ) {
+                    std::cout<< " size of pixeledGraph (number of pixels)= "<< pixeledGraphSize << "  > input graph " << N <<". Hmm, not really a coarsening... Breaking..." << std::endl;
+                }
+                break;
             }
-            break;
-        }
-        
-        DenseVector<ValueType> pixelWeights;
-        
-        scai::lama::CSRSparseMatrix<ValueType> pixelGraph = MultiLevel<IndexType, ValueType>::pixeledCoarsen(graph, coords, pixelWeights, settings);
-        
-        std::chrono::duration<double> elapsedSeconds = std::chrono::steady_clock::now() - start;
-        double maxElapsedTime = comm->max( elapsedSeconds.count() );
-        
-        if(comm->getRank()==0 ){
-            std::cout<< "sideLen= "<< sideLen << " , max time: "<< maxElapsedTime << std::endl;
-        }
-        
-        EXPECT_TRUE(pixelGraph.isConsistent());
-        if(pixeledGraphSize < 4000){
-            EXPECT_TRUE(pixelGraph.checkSymmetry());
-        }
-        SCAI_ASSERT_EQ_ERROR( pixelWeights.sum(), N , "should ne equal");
-        EXPECT_LE( pixelGraph.l1Norm(), edges);
-        
-        IndexType nnzValues= 2*dimensions*(std::pow(sideLen, dimensions) - std::pow(sideLen, dimensions-1) );
-        
-        EXPECT_EQ( nnzValues , pixelGraph.getNumValues() );
-        EXPECT_GE( pixelGraph.l1Norm(), 1 );
-    }// for i=2:7
 
-	}//for dim
+            DenseVector<ValueType> pixelWeights;
+
+            scai::lama::CSRSparseMatrix<ValueType> pixelGraph = MultiLevel<IndexType, ValueType>::pixeledCoarsen(graph, coords, pixelWeights, settings);
+
+            std::chrono::duration<double> elapsedSeconds = std::chrono::steady_clock::now() - start;
+            double maxElapsedTime = comm->max( elapsedSeconds.count() );
+
+            if(comm->getRank()==0 ) {
+                std::cout<< "sideLen= "<< sideLen << " , max time: "<< maxElapsedTime << std::endl;
+            }
+
+            EXPECT_TRUE(pixelGraph.isConsistent());
+            if(pixeledGraphSize < 4000) {
+                EXPECT_TRUE(pixelGraph.checkSymmetry());
+            }
+            SCAI_ASSERT_EQ_ERROR( pixelWeights.sum(), N, "should ne equal");
+            EXPECT_LE( pixelGraph.l1Norm(), edges);
+
+            IndexType nnzValues= 2*dimensions*(std::pow(sideLen, dimensions) - std::pow(sideLen, dimensions-1) );
+
+            EXPECT_EQ( nnzValues, pixelGraph.getNumValues() );
+            EXPECT_GE( pixelGraph.l1Norm(), 1 );
+        }// for i=2:7
+
+    }//for dim
 }
 
 //---------------------------------------------------------------------------------------
