@@ -118,8 +118,6 @@ TEST_F(KMeansTest, testFindCenters) {
     centers = KMeans::findCenters(coords, part, k, nodeIndices.begin(), nodeIndices.end(), uniformWeights);
 }
 
-//TODO: got undefined reference for getLocalMinMaxCoords and findInitialCentersFromSFCOnly
-//update: instantiation is needed
 
 
 TEST_F(KMeansTest, testCentersOnlySfc) {
