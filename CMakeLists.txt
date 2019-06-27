@@ -14,8 +14,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(NOT CMAKE_BUILD_TYPE) 
-    set(CMAKE_BUILD_TYPE Release)
+    #set(CMAKE_BUILD_TYPE Release)
+    set(CMAKE_BUILD_TYPE Debug)
 endif(NOT CMAKE_BUILD_TYPE)
+
+### add code coverage
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/CmakeModules)
+if(CMAKE_COMPILER_IS_GNUCXX)
+    include(CodeCoverage)
+    APPEND_COVERAGE_COMPILER_FLAGS()
+    #setup_target_for_coverage(${PROJECT_NAME}_coverage ${PROJECT_TEST_NAME} coverage)
+    setup_target_for_coverage_gcovr_html( 
+        NAME ${PROJECT_NAME}_coverage 
+        EXECUTABLE GeographerTest
+        DEPANDENCIES GeographerTest)
+    #setup_target_for_coverage(${PROJECT_NAME}_coverage GeographerTest coverage)
+endif()
 
 option(USE_NETWORKIT "Use NETWORKIT package." OFF)
 if(USE_NETWORKIT)
