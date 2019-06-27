@@ -340,7 +340,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured2D3DMesh_dist(CSRSpars
             IndexType globalInd = dist->local2Global(i);    // get the corresponding global index
             // the global id of the neighboring nodes
             IndexType ngb_node = globalInd;
-            IndexType numRowElems= 0;     // the number of neighbors for each node. Can be less than 6.
+            IndexType numRowElems= 0;     // the number of neighbors for each node. In 2D, corner nodes have only 2 neighbors
             // the position of this node in 3D
             std::tuple<IndexType, IndexType, IndexType> thisPoint = aux<IndexType,ValueType>::index2_3DPoint( globalInd, numPoints);
 
@@ -382,7 +382,7 @@ void MeshGenerator<IndexType, ValueType>::createStructured2D3DMesh_dist(CSRSpars
                     }
                 }
             }
-            assert(numRowElems >= 3);
+            assert(numRowElems >= 2);
 
             ia[i+1] = ia[i] + numRowElems;
         }
