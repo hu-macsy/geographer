@@ -35,7 +35,7 @@ protected:
 };
 
 
-TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
+TEST_F(MultiSectionTest, testComputePartitionNonUniformFromFile){
 
     const IndexType dimensions = 2;
     const IndexType k = std::pow( 4, dimensions);
@@ -81,14 +81,14 @@ TEST_F(MultiSectionTest, testGetPartitionNonUniformFromFile){
     //
     std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
     
-    scai::lama::DenseVector<IndexType> partitionMS =  MultiSection<IndexType, ValueType>::getPartitionNonUniform( adjM, coordinates, nodeWeights, settings);
+    scai::lama::DenseVector<IndexType> partitionMS =  MultiSection<IndexType, ValueType>::computePartition( adjM, coordinates, nodeWeights, settings);
 
     std::chrono::duration<double> partitionMSTime = std::chrono::system_clock::now() - startTime;
 
     startTime = std::chrono::system_clock::now();
     
     settings.bisect = 1;
-    scai::lama::DenseVector<IndexType> partitionBS =  MultiSection<IndexType, ValueType>::getPartitionNonUniform( adjM, coordinates, nodeWeights, settings);
+    scai::lama::DenseVector<IndexType> partitionBS =  MultiSection<IndexType, ValueType>::computePartition( adjM, coordinates, nodeWeights, settings);
     
     std::chrono::duration<double> partitionBSTime = std::chrono::system_clock::now() - startTime;
     
