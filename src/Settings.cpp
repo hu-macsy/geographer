@@ -47,6 +47,9 @@ std::ostream& ITI::operator<<( std::ostream& out, const ITI::Tool tool) {
     case Tool::zoltanSFC:
         token = "zoltanSFC";
         break;
+	case Tool::myAlgo:
+		token = "myAlgo";
+		break;
     case Tool::none:
         token = "none";
         break;
@@ -99,6 +102,8 @@ std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool) {
         tool = ITI::Tool::zoltanMJ;
     else if( token=="zoltanSFC" or token=="zoltanSfc" or token=="zoltansfc")
         tool = ITI::Tool::zoltanRIB;
+	else if( token=="myAlgo")
+		tool = ITI::Tool::myAlgo;
     else if( token=="None" or token=="none")
         tool = ITI::Tool::none;
 
