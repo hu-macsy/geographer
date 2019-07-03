@@ -45,7 +45,29 @@ of 2 or 3 dimensional points.
 
 template <typename IndexType, typename ValueType>
 class HilbertCurve {
+	
 public:
+
+    /**
+     * @brief Partition a point set using the Hilbert curve, only implemented for equal number of blocks and processes.
+     *
+     * @param coordinates Coordinates of the input points
+     * @param settings Settings struct
+     *
+     * @return partition DenseVector, redistributed according to the partition
+     */
+    static scai::lama::DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+
+    /** \overload
+    @param[in] nodeWeights Weights for the points
+    */
+    /*
+    * Get an initial partition using the Hilbert curve.
+    * TODO: This currently does nothing and isn't used. Remove?
+    */
+    static scai::lama::DenseVector<IndexType> computePartition(const std::vector<DenseVector<ValueType>> &coordinates, const DenseVector<ValueType> &nodeWeights, Settings settings);
+
+	
     /** @brief Accepts a 2D/3D point and calculates its hilbert index.
     *
     * @param[in] point Node positions. In d dimensions, coordinates of node v are at v*d ... v*d+(d-1).

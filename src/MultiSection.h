@@ -649,6 +649,7 @@ const std::vector<IndexType>& dimensionToProject);
     	Settings settings);
     
     /* Overloaded version for the non-uniform grid that also takes as input the coordinates.
+	 * \overload
      */
     template<typename T>
     static ValueType getRectangleWeight(
@@ -658,6 +659,7 @@ const std::vector<IndexType>& dimensionToProject);
     	Settings settings);
     
 	/* Overloaded version for the non-uniform grid with different type for coordinates.
+	 * \overload
      */
     template<typename T>
     static ValueType getRectangleWeight(
