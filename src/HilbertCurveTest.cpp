@@ -402,7 +402,7 @@ TEST_F(HilbertCurveTest, testHilbertRedistribution) {
         coordSum[d] = coords[d].sum();
     }
 
-    HilbertCurve<IndexType, ValueType>::hilbertRedistribution(coords, nodeWeightsContainer, settings, metrics);
+    HilbertCurve<IndexType, ValueType>::redistribute(coords, nodeWeightsContainer, settings, metrics);
     nodeWeights = nodeWeightsContainer[0];
 
     //redistribute also graph

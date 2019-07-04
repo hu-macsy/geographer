@@ -353,7 +353,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
                     throw std::logic_error("KMeans depends on pre-sorting with space filling curves.");
                 }
 
-                HilbertCurve<IndexType,ValueType>::hilbertRedistribution(coordinateCopy, nodeWeightCopy, settings, metrics);
+                HilbertCurve<IndexType,ValueType>::redistribute(coordinateCopy, nodeWeightCopy, settings, metrics);
             }
         }
 

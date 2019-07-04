@@ -144,7 +144,7 @@ public:
      *  @param[in] settings Settings struct, effectively only needed for the hilbert curve resolution
      *  @param[out] metrics
      */
-    static void hilbertRedistribution(std::vector<DenseVector<ValueType> >& coordinates, std::vector<DenseVector<ValueType>>& nodeWeights, Settings settings, struct Metrics& metrics);
+    static void redistribute(std::vector<DenseVector<ValueType> >& coordinates, std::vector<DenseVector<ValueType>>& nodeWeights, Settings settings, struct Metrics& metrics);
 
     /** @brief Checks if all the input data are distributed to PEs according to the hilbert index curve of the coordinates
 

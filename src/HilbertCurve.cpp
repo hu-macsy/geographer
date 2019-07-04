@@ -815,8 +815,8 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
 
 
 template<typename IndexType, typename ValueType>
-void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<DenseVector<ValueType> >& coordinates, std::vector<DenseVector<ValueType>>& nodeWeights, Settings settings, struct Metrics& metrics) {
-    SCAI_REGION_START("HilbertCurve.hilbertRedistribution.sfc")
+void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<ValueType> >& coordinates, std::vector<DenseVector<ValueType>>& nodeWeights, Settings settings, struct Metrics& metrics) {
+    SCAI_REGION_START("HilbertCurve.redistribute.sfc")
     scai::dmemo::DistributionPtr inputDist = coordinates[0].getDistributionPtr();
     scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
     const IndexType localN = inputDist->getLocalSize();
@@ -838,8 +838,8 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
     std::chrono::duration<double> migrationCalculation, migrationTime;
 
     std::vector<ValueType> hilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
-    SCAI_REGION_END("HilbertCurve.hilbertRedistribution.sfc")
-    SCAI_REGION_START("HilbertCurve.hilbertRedistribution.sort")
+    SCAI_REGION_END("HilbertCurve.redistribute.sfc")
+    SCAI_REGION_START("HilbertCurve.redistribute.sort")
     /*
      * fill sort pair
      */
@@ -862,7 +862,7 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
     metrics.MM["timeMigrationAlgo"] = migrationCalculation.count();
     std::chrono::time_point < std::chrono::system_clock > beforeMigration = std::chrono::system_clock::now();
     assert(localPairs.size() > 0);
-    SCAI_REGION_END("HilbertCurve.hilbertRedistribution.sort")
+    SCAI_REGION_END("HilbertCurve.redistribute.sort")
 
     sort_pair minLocalIndex = localPairs[0];
     std::vector<double> sendThresholds(comm->getSize(), minLocalIndex.value);
@@ -899,7 +899,7 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
         }
     }
 
-    SCAI_REGION_START("HilbertCurve.hilbertRedistribution.communicationPlan")
+    SCAI_REGION_START("HilbertCurve.redistribute.communicationPlan")
 
     // allocate sendPlan
     scai::dmemo::CommunicationPlan sendPlan(quantities.data(), comm->getSize());
@@ -908,7 +908,7 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
     // allocate recvPlan - either with allocateTranspose, or directly
     scai::dmemo::CommunicationPlan recvPlan = comm->transpose( sendPlan );
     IndexType newLocalN = recvPlan.totalQuantity();
-    SCAI_REGION_END("HilbertCurve.hilbertRedistribution.communicationPlan")
+    SCAI_REGION_END("HilbertCurve.redistribute.communicationPlan")
 
     if (settings.verbose) {
         PRINT0(std::to_string(localN) + " old local values "
@@ -917,7 +917,7 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
     //transmit indices, allowing for resorting of the received values
     std::vector<IndexType> sendIndices(localN);
     {
-        SCAI_REGION("HilbertCurve.hilbertRedistribution.permute");
+        SCAI_REGION("HilbertCurve.redistribute.permute");
         scai::hmemo::ReadAccess<IndexType> rIndices(myGlobalIndices);
         for (IndexType i = 0; i < localN; i++) {
             assert(permutation[i] < localN);
@@ -939,14 +939,14 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
     }
 
     {
-        SCAI_REGION("HilbertCurve.hilbertRedistribution.redistribute");
+        SCAI_REGION("HilbertCurve.redistribute.redistribute");
         // for each dimension: define DenseVector with new distribution, get write access to local values, call exchangeByPlan
         std::vector<ValueType> sendBuffer(localN);
         std::vector<ValueType> recvBuffer(newLocalN);
 
         for (IndexType d = 0; d < settings.dimensions; d++) {
             {
-                SCAI_REGION("HilbertCurve.hilbertRedistribution.redistribute.permute");
+                SCAI_REGION("HilbertCurve.redistribute.redistribute.permute");
                 scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
                 for (IndexType i = 0; i < localN; i++) { //TODO:maybe extract into lambda?
                     sendBuffer[i] = rCoords[permutation[i]]; //TODO: how to make this more cache-friendly? (Probably by using pairs and sorting them.)
@@ -956,7 +956,7 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
             comm->exchangeByPlan(recvBuffer.data(), recvPlan, sendBuffer.data(), sendPlan);
             coordinates[d] = DenseVector<ValueType>(newDist, 0);
             {
-                SCAI_REGION("HilbertCurve.hilbertRedistribution.redistribute.permute");
+                SCAI_REGION("HilbertCurve.redistribute.redistribute.permute");
                 scai::hmemo::WriteAccess<ValueType> wCoords(coordinates[d].getLocalValues());
                 assert(wCoords.size() == newLocalN);
                 for (IndexType i = 0; i < newLocalN; i++) {
@@ -973,7 +973,7 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
             else
             {
                 {
-                    SCAI_REGION("HilbertCurve.hilbertRedistribution.redistribute.permute");
+                    SCAI_REGION("HilbertCurve.redistribute.redistribute.permute");
                     scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[w].getLocalValues());
                     for (IndexType i = 0; i < localN; i++) {
                         sendBuffer[i] = rWeights[permutation[i]]; //TODO: how to make this more cache-friendly? (Probably by using pairs and sorting them.)
@@ -982,7 +982,7 @@ void HilbertCurve<IndexType, ValueType>::hilbertRedistribution(std::vector<Dense
                 comm->exchangeByPlan(recvBuffer.data(), recvPlan, sendBuffer.data(), sendPlan);
                 nodeWeights[w] = DenseVector<ValueType>(newDist, 0);
                 {
-                    SCAI_REGION("HilbertCurve.hilbertRedistribution.redistribute.permute");
+                    SCAI_REGION("HilbertCurve.redistribute.redistribute.permute");
                     scai::hmemo::WriteAccess<ValueType> wWeights(nodeWeights[w].getLocalValues());
                     for (IndexType i = 0; i < newLocalN; i++) {
                         wWeights[newDist->global2Local(recvIndices[i])] = recvBuffer[i];

@@ -1,0 +1,203 @@
+\documentclass[a4paper,10pt]{article}
+
+\usepackage[a4paper, total={6in, 9in}]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{color}
+\usepackage{subcaption}
+
+\author{Harry Tzovas}
+
+\definecolor{blue1}{RGB}{44,127,184}
+
+\newcommand{\wave}{$\mathcal{WAVE}$ }
+
+\newcommand{\bull}{$\bullet$}
+\newcommand{\red}[1]{{\color{red}{#1}}}
+\newcommand{\blue}[1]{{\color{blue1}{#1}}}
+\newcommand{\mz}{\mathbb{Z}}
+\newcommand{\quot}[1]{``#1''}
+\newcommand{\km}{$k$-means}
+\newcommand{\todo}[1]{{\red{TODO}}: #1}
+\newcommand\noIndent[1]{
+  \par\vbox{\parbox[t]{\linewidth}{#1}}
+}
+
+\graphicspath{{/home/harry/wave/figures/}{/home/harry/ResearchReports-CT/figures/}}
+\setcounter{secnumdepth}{3}
+
+
+\begin{document}
+
+
+\section{MultiSection (MS)}
+
+The experiments show that multisection, or zoltan's MultiJagged, gives better results for the gpi
+application. So we decided to revive the MS code. The date is 10/05/19 and as I go over the code
+again I am gonna keep some notes.
+
+\blue{*** See also the files monthly\_report\_17\_05, 03\_07 and 03\_08 in folder 
+$\sim$/ResearchReports-CT/monthly\_reports }
+
+The most interesting case is the non-uniform grid and the corresponding function is \\
+\texttt{MultiSection::getPartitionNonUniform}. First we scale the coordinates and convert them to
+an IndexType. This way, later we can directly project them to every dimension. The scaling factor
+is $N^{1/d}$ if $N$ is the total number of points (in the code \texttt{globaN}). This way the
+size of the array depends on the input but it may be too coarse for some inputs. Maybe we could
+parameterize that and use also other scaling factors for finer scaling/projection.
+
+On the other hand, we could also reduce the size of the projection using larger scaling factors.
+For example, if the input is 2D and $N=10^10$ then, each projection will have $10^5$ size. 
+As these projection vectors are used for global sums, this could be a bottleneck.
+Maybe the global sums can be avoided (see \cref{sec:opt}). 
+
+After scaling the coordinates we call \texttt{MultiSection::getRectanglesNonUniform} that does
+actual work. In \texttt{getRectanglesNonUniform} first we calculate how many times we should
+cut in every dimension in order to get the desired number of blocks. Currently, this works
+only for the cases where $k^{1/d}\in \mathbb{Z}$ and in this case we cut in $k^{1/d}$ in each
+dimension, where $k$ is the number of blocks. Another option is if the user provides the
+desired number of cuts per dimension using an input parameter, namely \texttt{settings.cutsPerDim}.
+
+Then we initialize the rectangle tree. This is a tree of rectangles, similar to a kd-tree. The 
+root rectangle is the whole grid/mesh (the bounding box of the mesh) and every rectangle 
+contains other rectangles as children. We execute the main loop once per dimension. First, we
+determine in what dimension we will cut for every rectangle. Each rectangle can be cut in different
+dimensions and we chose the dimension in which the side of the rectangle is longer. For example,
+if one rectangle has side lengths $(5,12,8)$ we will cut in the second dimension while if another
+rectangle has side lengths $(15,10,9)$ we will cut in the first dimension.
+
+To get the projections we call \texttt{projectionNonUniform}. First, we reserve the size that we 
+will need for all the projections in every rectangle. Maybe this is too much, see \cref{par:space}.
+Then we go over our local points to find in which rectangle every point belongs to. 
+Previous notes (see monthly\_reports) say that a bottleneck is the function \texttt{getContainingLeaf}
+that finds the leaf that one point belongs to. For possible optimization see \cref{par:getleaf}.
+
+\paragraph*{Notes:} The max imbalance calculated after MS finishes is different from the max 
+imbalance calculated during MS. This is because, for every rectangle at every cut, the optimum
+weight of each children is calculated based on its own weight. So, if the current rectangle
+is already overweight (or underweight), the opt weight if the leaves will be different.
+For example, say the total weight $W=1200$ and we want partition into $3\times 4=12$ blocks where is 
+block, optimally, would have a weight of $100$. In the first partition into 3 blocks, we have
+weights $350, 400, 450$. In the next step we will partition each rectangle into 4. The optimum weight 
+for each block is $350/4,\;400/4,\;450/4$. Now, suppose we achieve perfect balance in this step; so
+the imbalance calculated in the MS would be 0. But afterwards, the blocks of the last rectangle 
+will have an imbalance of $(myW-optW)/optW = (450/4-100)/100= 45/40-1 = 0.125$.
+
+This can be resolved if the 1D partition provides completely imbalanced solutions.
+We could determine the block weights from bottom up but still, this would not solve the problem.
+In the above example, for the last rectangle, even id I know that the optimum weights is $100$
+how is it gonna help me?
+
+\begin{figure}
+%\includegraphics[scale=0.45]{multisection2D}
+\includegraphics[scale=0.45]{rect_tree}
+\hfill
+\includegraphics[scale=0.45]{multisection3D}
+
+\caption{The trees, left for 2D, right for 3D}
+\end{figure}
+
+\paragraph*{MultiJagged shortcomings}: In the source code of ML, in file Zoltan2\_AlgMultijagged.hpp,
+in function mj\_get\_initial\_cut\_coords\_target\_weights, in line 2741, there is a output error
+message: \\
+\quot{MJ does not support non uniform part weights} \\
+Maybe this could be an additional feature to hit MJ if we can support non uniform blocks.
+
+Also, MJ seems to completely balance for the first weight while ignoring the others: typically the
+first weight has an imbalance of 0 while the second can be up to 30\%. There is room to utilize
+from that 0\% to 3\% imbalance where we could try to improve the other weights.
+
+
+
+
+\subsection{Possible optimizations}
+
+\subsubsection{Avoid global sum arrays} \label{sec:opt}
+Currently, we do a global sum of the projected arrays and each PE solves locally a 1D
+partitioning (a.k.a. chains-on-chains) problem. To avoid the global sum, we can do an iterative 
+process using spliters where the information that needs to be communicated is the size of the 
+the projected arrays between splitters (what? TODO: describe it better)
+
+\subsubsection{Save space in \texttt{projectionNonUniform}} \label{par:space}
+In \texttt{projectionNonUniform} we reserve a lot of space. Probably, every PE owns very few rectangles,
+there is no need to reserve space for all.
+
+\subsubsection{Improve time for \texttt{getContainingLeaf}} \label{par:getleaf}
+(Copying from monthly\_reports\_03\_08\_17)
+
+The bottleneck for the running time now is the function \emph{getContainingLeaf(point)} which returns the leaf/rectangle that this point resides in (\cref{alg:multisection}). The running time for one call, for one point is $d k^{1/d}$. This function is  called $d+1$ times for all points locally by every PE: $d$ times for every projection/multisection and one time at the end to set the output partition vector (we return a vector of size $n$ where each position has the index of the block it belongs to). So, in total, this takes time $O(d^2 k^{1/d})$ for every point.
+ 
+Since we know in which dimension every father-rectangle is divided, we can store its children in a shorted order according to that dimension. This way, as we descend the tree, we perform a binary search in every node to find the appropriate children. This would result in a $O(d^2 \log k^{1/d}) = O(d \log k)$ running time.
+
+Another way is to keep a pointer to the owner node for each point. This requires double memory as for each point we need to keep a pointer to the node in the tree. In the new iteration, we do not need to descend the tree from the root but only look the children of the father and reset the new father node. If we also keep the children shorted we will need $O(\log d \log k)$ time. 
+
+\paragraph*{Update, 10/05/19}: In function \texttt{getContainingLeaf} we have some checks and assertions
+that are not really necessary, especially if we want to optimize further for running time.
+With all the assertion, the algorithm takes about 7 seconds, without the checks for the point
+coordinates takes about 6 and I further disable the other assertion it takes 4 seconds.
+
+Below, are some tracing details for rectCell.getContainingLeaf:
+
+\begin{tabular}{c|c}
+full & \#calls = 693654, inclusive = 9584.640000, exclusive = 3137.896000 \\
+no ifLeaf check & \#calls = 693654, inclusive = 8385.444000, exclusive = 3138.125000 \\
+no check point & \#calls = 693654, inclusive = 5387.013000, exclusive = 1096.883000 \\
+no checks & \#calls = 693654, inclusive = 4627.264000, exclusive = 1151.447000
+\end{tabular}
+
+Especially the point check should be removes because the function is called recursively. From the 
+same run as above:\\
+getContainingLeaf.checkPoint (in ms) : \#calls = 1387308, inclusive = 283.299000, exclusive = 283.299000
+
+The other assertion is not so expensive:\\
+with the assertion: ifLeaf (in ms) : \#calls = 346824, inclusive = 617.368000, exclusive = 548.01200\\
+without ifLeaf (in ms) : \#calls = 346824, inclusive = 92.699000, exclusive = 92.699000
+
+
+
+\IncMargin{1em}
+\begin{algorithm}
+\SetKwData{Left}{left}\SetKwData{This}{this}\SetKwData{Up}{up}
+\SetKwFunction{Union}{Union}\SetKwFunction{FindCompress}{FindCompress}
+\SetKwInOut{Input}{input}\SetKwInOut{Output}{output}
+
+\Input{
+ $W$: a vector with the node weights of size $n$,\\
+ $coords$: the coordinates of every point, \\
+ $M$: the side of the cubical grid, \\
+ $k$: number of blocks, only for $k: k^{1/d}\in \mathbb{N}$ }
+\Output{partition into $k$ $d$-dimensional rectangles}
+\BlankLine
+scale all coordinates locally\\
+initlalize: $ rectTree = \{ (0,\dots,0)^d , (max, \dots, max)^d \} $\\
+\For{$i < d$}{
+  for each rectangle, choose dimension to project  \\
+	\For{ all local points $p[1,\dots,d]$}{
+	  \red{ get owner rectangle for $p$: $R = rectTree.contains(p)$ }\\
+    $proj(R,i) += w(p)$\\
+	}
+	\For{all rectangles $R$}{
+		\blue{ comm$\rightarrow$sumArray($proj(R,i)$) } \hfill //sum local array with all PEs \label{alg:comm}\\
+		//now, the projection array is duplicated in every PE\\
+		partition1D($proj(R,i)$) \hfill //locally calculate 1D partition\\
+	}
+}
+
+//set the partition for every point \\
+\For{ all local points $p[1,\dots,d]$}{
+  \red{get owner rectangle for $p$: $R = rectTree.contains(p)$} \\
+	$\Pi[p] = R.getID()$
+}
+
+\Return{$\Pi$}
+
+\caption{{\tt MultiSection}}\label{alg:multisection}
+\end{algorithm}
+\DecMargin{1em}
+
+\end{document}
