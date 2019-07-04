@@ -269,17 +269,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
     const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
     const IndexType rank = comm->getRank();
-	
-	
-    //-------------------------
-    //
-    // timing info
 
-    std::chrono::duration<double> migrationCalculation = std::chrono::duration<double> (0.0);
-    std::chrono::duration<double> migrationTime= std::chrono::duration<double>(0.0);
-    std::chrono::duration<double> secondRedistributionTime = std::chrono::duration<double>(0.0) ;
+	// timing info
     std::chrono::duration<double> partitionTime= std::chrono::duration<double>(0.0);
-
 	std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
     
 	/*
@@ -296,60 +288,13 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     // At this point we have the initial, geometric partition.
     //
 
+	
     if (comm->getSize() == k) {
         //WARNING: the result  is not redistributed. must redistribute afterwards
         if( !settings.noRefinement ) {
+			
+			doLocalRefinement( result,  input, coordinates, nodeWeights, comm, settings, metrics );
 
-            //uncomment to store the first, geometric partition into a file that then can be visualized using matlab and GPI's code
-            //std::string filename = "geomPart.mtx";
-            //result.writeToFile( filename );
-
-            SCAI_REGION("ParcoRepart.partitionGraph.initialRedistribution");
-            if (nodeWeights.size() > 1) {
-                throw std::logic_error("Local refinement not yet implemented for multiple weights.");
-            }
-            /*
-             * redistribute to prepare for local refinement
-             */
-            bool useRedistributor = true;
-            aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights[0], settings, useRedistributor);
-
-            partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
-            ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( input, result, true);
-            ValueType imbalance = GraphUtils<IndexType, ValueType>::computeImbalance(result, k, nodeWeights[0]);
-
-
-            //-----------------------------------------------------------
-            //
-            // output: in std and file
-            //
-
-            //now, every PE store its own times. These will be maxed afterwards, before printing in Metrics
-            
-            ValueType timeForSecondRedistr = secondRedistributionTime.count();
-            ValueType timeForInitPart = partitionTime.count();
-
-            metrics.MM["timeSecondDistribution"] = timeForSecondRedistr;
-            metrics.MM["timePreliminary"] = timeForInitPart;
-            metrics.MM["preliminaryCut"] = cut;
-            metrics.MM["preliminaryImbalance"] = imbalance;
-
-            if (settings.verbose ) {
-                //TODO: do this comm->max here? otherwise it is just PE 0 times
-                ValueType timeToCalcInitMigration = comm->max(migrationCalculation.count()) ;
-                ValueType timeForFirstRedistribution = comm->max( migrationTime.count() );
-                timeForSecondRedistr = comm->max( secondRedistributionTime.count() );
-                timeForInitPart = comm->max( partitionTime.count() );
-                if(comm->getRank() == 0 ) {
-                    std::cout<< std::endl << "\033[1;32mTiming: migration algo: "<< timeToCalcInitMigration << ", 1st redistr: " << timeForFirstRedistribution <<", only 2nd redistr: "<< timeForSecondRedistr <<", total:" << timeForInitPart << std::endl;
-                    std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
-                }
-            }
-
-            SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
-            scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(input);
-            ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights[0], coordinates, halo, settings, metrics);
-            SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
         }
     } else {
         result.redistribute(inputDist);
@@ -383,7 +328,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
 //-------------------------------------------------------------------------------------------------
 
-//the core implementation
+
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
     CSRSparseMatrix<ValueType> &input,
@@ -393,9 +338,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
     CommTree<IndexType,ValueType> commTree,
     scai::dmemo::CommunicatorPtr comm,
     Settings settings,
-    struct Metrics& metrics)
-{
+    struct Metrics& metrics){
     
+	SCAI_REGION( "ParcoRepart.initialPartition" )
+	
 	const IndexType k = settings.numBlocks;
 	std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
 
@@ -524,6 +470,64 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
 
     return result;
 } //initialPartition
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
+	DenseVector<IndexType> &result,
+    CSRSparseMatrix<ValueType> &input,
+    std::vector<DenseVector<ValueType>> &coordinates,
+    std::vector<DenseVector<ValueType>> &nodeWeights,
+	scai::dmemo::CommunicatorPtr comm,
+    Settings settings,
+	struct Metrics& metrics){
+
+	SCAI_REGION("ParcoRepart.doLocalRefinement");		
+	std::chrono::time_point<std::chrono::system_clock> start =  std::chrono::system_clock::now();
+	
+	//uncomment to store the first, geometric partition into a file that then can be visualized using matlab and GPI's code
+	//std::string filename = "geomPart.mtx";
+	//result.writeToFile( filename );
+	
+	if (nodeWeights.size() > 1) {
+		throw std::logic_error("Local refinement not yet implemented for multiple weights.");
+	}
+	
+	/*
+	 * redistribute to prepare for local refinement
+	 */
+	bool useRedistributor = true;
+	aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights[0], settings, useRedistributor);
+	
+	std::chrono::duration<double> redistTime =  std::chrono::system_clock::now() - start;
+	
+	const IndexType k = settings.numBlocks;
+	
+	ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( input, result, true);
+	ValueType imbalance = GraphUtils<IndexType, ValueType>::computeImbalance(result, k, nodeWeights[0]);
+	
+	//now, every PE store its own times. These will be maxed afterwards, before printing in Metrics
+	metrics.MM["timeSecondDistribution"] = redistTime.count();
+	metrics.MM["preliminaryCut"] = cut;
+	metrics.MM["preliminaryImbalance"] = imbalance;
+	
+	//
+	// output: in std and file
+	//	
+	if (settings.verbose ) {
+		ValueType timeForSecondRedistr = comm->max( redistTime.count() );
+		if(comm->getRank() == 0 ) {
+			std::cout<< std::endl << "\033[1;32mTiming: 2nd redist before local refinement: "<< timeForSecondRedistr << std::endl;
+			std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
+		}
+	}
+	
+	SCAI_REGION_START("ParcoRepart.doLocalRefinement.multiLevelStep")
+	scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(input);
+	ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights[0], coordinates, halo, settings, metrics);
+	SCAI_REGION_END("ParcoRepart.doLocalRefinement.multiLevelStep")
+			
+}//doLocalRefinement
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
