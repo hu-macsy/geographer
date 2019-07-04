@@ -1579,7 +1579,7 @@ DenseVector<IndexType> computeHierarchicalPartition(
     // warning: this functions redistributes the coordinates and the node weights.
     // TODO: is this supposed to be here? it is also in ParcoRepart::partitionGraph
 
-    HilbertCurve<IndexType,ValueType>::hilbertRedistribution(coordinates, nodeWeights, settings, metrics);
+    HilbertCurve<IndexType,ValueType>::redistribute(coordinates, nodeWeights, settings, metrics);
 
     if (settings.debugMode) {
         // added check to verify that the points are indeed distributed

@@ -18,7 +18,7 @@ namespace ITI {
 //TODO(?): Add an optimal algorithm for 1D partition
 //TODO(kind of): Keep in mind semi-structured grids
  template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartitionNonUniform(
+scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::computePartition(
 	const scai::lama::CSRSparseMatrix<ValueType> &input,
 	const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
 	const scai::lama::DenseVector<ValueType>& nodeWeights,
@@ -81,7 +81,7 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
 		    		localPoints[i][d] = localPartOfCoords[i];
 		   	}
 		}
-		return getPartitionNonUniform( input, localPoints, nodeWeights, minCoords, maxCoords, settings );
+		return computePartition( input, localPoints, nodeWeights, minCoords, maxCoords, settings );
 
 	}else if( not settings.useIter){
 		std::vector<intPoint> intLocalPoints( localN, intPoint(dim,0) );
@@ -103,7 +103,7 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
                 SCAI_ASSERT( scaledCoord >=0 and scaledCoord<=scale, "Wrong scaled coordinate " << scaledCoord << " is either negative or more than "<< scale);
             }
 		}
-		return getPartitionNonUniform( input, intLocalPoints, nodeWeights, scaledMin, scaledMax, settings );
+		return computePartition( input, intLocalPoints, nodeWeights, scaledMin, scaledMax, settings );
 
 	}else{
 		PRINT0("Currently, only supporting IndexType and ValueType for coordinate type.\nAborting");
@@ -115,14 +115,14 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartit
 
 template<typename IndexType, typename ValueType>
 template<typename T>
-scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::getPartitionNonUniform(
+scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::computePartition(
 	const scai::lama::CSRSparseMatrix<ValueType>& input,
 	const std::vector<std::vector<T>>& coordinates,
 	const scai::lama::DenseVector<ValueType>& nodeWeights,
     const std::vector<T> &minCoords,
     const std::vector<T> &maxCoords,
 	struct Settings settings ){ 
-    SCAI_REGION("MultiSection.getPartition");
+    SCAI_REGION("MultiSection.computePartition");
     
     std::chrono::time_point<std::chrono::steady_clock> start, afterMultSect;
     start = std::chrono::steady_clock::now();
@@ -408,7 +408,7 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
     SCAI_ASSERT( numLeaves==leafIndex, "Wrong leaf indexing");
     SCAI_ASSERT( numLeaves==dimensionToProject.size(), "Wrong dimensionToProject vector size.");
 
-    //TODO: pass allLeaves as argument since we already calculate them in getPartition
+    //TODO: pass allLeaves as argument since we already calculate them in computePartition
     
     const std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> allLeaves = treeRoot->getAllLeaves();
     SCAI_ASSERT( allLeaves.size()==numLeaves, "Not consistent number of leaf nodes.");
@@ -891,7 +891,7 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
     SCAI_ASSERT( numLeaves==leafIndex, "Wrong leaf indexing");
     SCAI_ASSERT( numLeaves==dimensionToProject.size(), "Wrong dimensionToProject vector size.");
     
-    //TODO: pass allLeaves as argument since we already calculate them in getPartition
+    //TODO: pass allLeaves as argument since we already calculate them in computePartition
     
     const std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> allLeaves = treeRoot->getAllLeaves();
     SCAI_ASSERT( allLeaves.size()==numLeaves, "Not consistent number of leaf nodes.");

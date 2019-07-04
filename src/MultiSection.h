@@ -419,14 +419,14 @@ public:
 	 * 
 	 * @return Distributed DenseVector of length n, partition[i] contains the block ID of node i
      */
-    static scai::lama::DenseVector<IndexType> getPartitionNonUniform( 
+    static scai::lama::DenseVector<IndexType> computePartition( 
     	const scai::lama::CSRSparseMatrix<ValueType> &input,
     	const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
     	const scai::lama::DenseVector<ValueType>& nodeWeights,
     	struct Settings settings );
 
 	template<typename T>
-	static scai::lama::DenseVector<IndexType> getPartitionNonUniform(
+	static scai::lama::DenseVector<IndexType> computePartition(
 		const scai::lama::CSRSparseMatrix<ValueType>& input,
 		const std::vector<std::vector<T>>& coordinates,
 		const scai::lama::DenseVector<ValueType>& nodeWeights,
@@ -649,6 +649,7 @@ const std::vector<IndexType>& dimensionToProject);
     	Settings settings);
     
     /* Overloaded version for the non-uniform grid that also takes as input the coordinates.
+	 * \overload
      */
     template<typename T>
     static ValueType getRectangleWeight(
@@ -658,6 +659,7 @@ const std::vector<IndexType>& dimensionToProject);
     	Settings settings);
     
 	/* Overloaded version for the non-uniform grid with different type for coordinates.
+	 * \overload
      */
     template<typename T>
     static ValueType getRectangleWeight(

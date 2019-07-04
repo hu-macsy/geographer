@@ -69,10 +69,12 @@ TEST_F(ParcoRepartTest, testInitialPartition) {
     settings.pixeledSideLen = 16;
     settings.useGeometricTieBreaking = 1;
     settings.dimensions = dimensions;
+	settings.initialPartition = ITI::Tool::geoSFC;
+	settings.noRefinement = true;
 
     //get sfc partition
-    DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(coords[0].getDistributionPtr(), 1);
-    DenseVector<IndexType> hilbertInitialPartition = ParcoRepart<IndexType, ValueType>::hilbertPartition(coords, uniformWeights, settings);
+	std::vector<scai::lama::DenseVector<ValueType>> uniformWeights(1, DenseVector<ValueType>(graph.getRowDistributionPtr(), 1));
+    DenseVector<IndexType> hilbertInitialPartition = ParcoRepart<IndexType, ValueType>::partitionGraph( coords, uniformWeights, settings );
     //ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coords, N, dimensions, "hilbertPartition");
 
     EXPECT_GE(k-1, scai::utilskernel::HArrayUtils::max(hilbertInitialPartition.getLocalValues()) );
