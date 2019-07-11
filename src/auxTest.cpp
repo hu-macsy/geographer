@@ -162,12 +162,12 @@ TEST_F (auxTest, testInitialPartitions) {
     }
     if(comm->getRank()==0) std::cout <<std::endl<<std::endl;
     PRINT0( "Get a hilbert/sfc partition");
-	
-	std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, DenseVector<ValueType>(graph.getRowDistributionPtr(), 1));
-	
-	settings.initialPartition = ITI::Tool::geoSFC;
-	settings.noRefinement = true;
-	
+
+    std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, DenseVector<ValueType>(graph.getRowDistributionPtr(), 1));
+
+    settings.initialPartition = ITI::Tool::geoSFC;
+    settings.noRefinement = true;
+
     // get a hilbertPartition
     scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::partitionGraph(coordinates, nodeWeights, settings, metrics);
 
