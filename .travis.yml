@@ -14,5 +14,5 @@ install:
   - pushd lama && mkdir build && cd build && cmake ../scai && make -j4 && sudo make install && popd
 
 script:
-  - mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../install .. && make -j4 && sudo make install
+  - mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../install .. && make -j4 && sudo make install && cd ..
   - mpirun -np 4 install/bin/GeographerTest
