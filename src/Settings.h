@@ -225,7 +225,7 @@ struct Settings {
     //@{
     bool bisect = false;    				///< if true, we perform a bisection ( false: works for square k, true: for k=power of 2)
     bool useIter = false;                   ///< use the iterative approach
-    IndexType maxIterations = 20;           ///< maximum number of iterations for iterative approach    
+    IndexType maxIterations = 20;           ///< maximum number of iterations for iterative approach
     std::vector<IndexType> cutsPerDim;		///< the cuts we must do per dimensions (size=dimensions)
     IndexType pixeledSideLen = 10;			///< the side length of a uniform grid
     //@}

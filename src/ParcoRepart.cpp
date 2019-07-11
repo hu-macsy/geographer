@@ -37,7 +37,7 @@
 
 
 namespace ITI {
-	
+
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     CSRSparseMatrix<ValueType> &input,
@@ -66,35 +66,35 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 // overloaded version without a graph
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
-	std::vector<DenseVector<ValueType>> &coordinates,
-	std::vector<DenseVector<ValueType>> &nodeWeights,
-	struct Settings settings,
-	struct Metrics& metrics){
+    std::vector<DenseVector<ValueType>> &coordinates,
+    std::vector<DenseVector<ValueType>> &nodeWeights,
+    struct Settings settings,
+    struct Metrics& metrics) {
 
-	const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-	if( settings.initialPartition!=ITI::Tool::geoSFC ){
-		if( comm->getRank()==0){
-			std::cout<< "Called ParcoRepart::partitionGraph without the graph as input argument but the tool to partition is "\
-					<< settings.initialPartition << " and it require the graph. Call again by also providing the graph" << std::endl;
-		}
-		throw std::runtime_error("Graph not given but required.");
-	}
-	
-	if( not settings.noRefinement ){
-		if( comm->getRank()==0){
-			std::cout << "The refinement flag is on but no graph is provided. Call again by also providing the graph" << std::endl;
-		}
-		throw std::runtime_error("Graph not given but required.");
-	}
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    if( settings.initialPartition!=ITI::Tool::geoSFC ) {
+        if( comm->getRank()==0) {
+            std::cout<< "Called ParcoRepart::partitionGraph without the graph as input argument but the tool to partition is "\
+                     << settings.initialPartition << " and it require the graph. Call again by also providing the graph" << std::endl;
+        }
+        throw std::runtime_error("Graph not given but required.");
+    }
 
-	const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
-	const IndexType N = dist->getGlobalSize();
-	const scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-	
+    if( not settings.noRefinement ) {
+        if( comm->getRank()==0) {
+            std::cout << "The refinement flag is on but no graph is provided. Call again by also providing the graph" << std::endl;
+        }
+        throw std::runtime_error("Graph not given but required.");
+    }
+
+    const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
+    const IndexType N = dist->getGlobalSize();
+    const scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+
     //generate dummy matrix
     scai::lama::CSRSparseMatrix<ValueType> graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDistPointer);
 
-	return partitionGraph( graph, coordinates, nodeWeights, settings, metrics );
+    return partitionGraph( graph, coordinates, nodeWeights, settings, metrics );
 }
 
 

@@ -36,7 +36,7 @@ public:
     /**
      * Partitions the given input graph
      * If the number of blocks is equal to the number of processes, graph, coordinates and weights are redistributed according to the partition.
-	 * \overload
+     * \overload
      *
      * @param[in,out] input Adjacency matrix of the input graph with n vertices. numRows=numColumns=n
      * @param[in,out] coordinates Coordinates of input points, coordinates.size()=n
@@ -52,27 +52,27 @@ public:
         std::vector<DenseVector<ValueType>> &nodeWeights,
         struct Settings settings,
         struct Metrics& metrics);
-	
-	/** Version to partition a point set, without using the graph.
-	 * \overload
-	*/
+
+    /** Version to partition a point set, without using the graph.
+     * \overload
+    */
     static DenseVector<IndexType> partitionGraph(
         std::vector<DenseVector<ValueType>> &coordinates,
         std::vector<DenseVector<ValueType>> &nodeWeights,
         struct Settings settings,
         struct Metrics& metrics);
-	
+
     /**
      * Wrapper without metrics.
-	 * \overload
+     * \overload
      */
-	static DenseVector<IndexType> partitionGraph(
+    static DenseVector<IndexType> partitionGraph(
         std::vector<DenseVector<ValueType>> &coordinates,
         std::vector<DenseVector<ValueType>> &nodeWeights,
-        struct Settings settings){
-		Metrics metrics(settings);
-		return partitionGraph( coordinates, nodeWeights, settings, metrics );
-	}
+        struct Settings settings) {
+        Metrics metrics(settings);
+        return partitionGraph( coordinates, nodeWeights, settings, metrics );
+    }
 
     /**
      * Repartitions the given input graph, starting from a given previous partition
@@ -99,29 +99,29 @@ public:
 
     /**
      * Wrapper without node weights.
-	 * \overload
+     * \overload
      */
     static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings, struct Metrics& metrics);
 
     /**
      * Wrapper without node weights and no metrics
-	 * \overload
+     * \overload
      */
     static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings);
 
     /**
      * Wrapper without metrics.
-	 * \overload
+     * \overload
      */
 
-    static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights, struct Settings settings){
-		Metrics metrics(settings);
-		return partitionGraph( input, coordinates, nodeWeights, settings, metrics);
-	}
+    static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights, struct Settings settings) {
+        Metrics metrics(settings);
+        return partitionGraph( input, coordinates, nodeWeights, settings, metrics);
+    }
 
     /**
     *	Wrapper with block sizes.
-	* \overload
+    * \overload
 
     @param[in] blockSizes \p blockSizes[i][j] is the wanted target weight of the i-th weight for the j-th block.
     blockSizes.size() = number of weights (remember: vertices can have multiple weights),

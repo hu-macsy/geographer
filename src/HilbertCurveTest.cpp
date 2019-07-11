@@ -546,23 +546,23 @@ TEST_F(HilbertCurveTest, testGetSortedHilbertIndices_Distributed) {
         scai::dmemo::DistributionPtr newDistribution = scai::dmemo::generalDistributionUnchecked(globalN, indexTransport, comm);
 
 //TODO: convert those prints into a meaningfull check
-if( comm->getRank()==1 ){
-  for( int i=0; i<coords[0].getLocalValues().size(); i++){
-    std::cout << coords[0].getLocalValues()[i] << ", " << coords[1].getLocalValues()[i] << std::endl;
-  }
-}
+        if( comm->getRank()==1 ) {
+            for( int i=0; i<coords[0].getLocalValues().size(); i++) {
+                std::cout << coords[0].getLocalValues()[i] << ", " << coords[1].getLocalValues()[i] << std::endl;
+            }
+        }
         for(int d=0; d<dimensions; d++) {
             coords[d].redistribute(newDistribution);
         }
         // *** till here
 
 //TODO: and that one
-std::cout<<"------ redistribute coords"<< std::endl;
-if( comm->getRank()==1 ){
-  for( int i=0; i<coords[0].getLocalValues().size(); i++){
-    std::cout << coords[0].getLocalValues()[i] << ", " << coords[1].getLocalValues()[i] << std::endl;
-  }
-}
+        std::cout<<"------ redistribute coords"<< std::endl;
+        if( comm->getRank()==1 ) {
+            for( int i=0; i<coords[0].getLocalValues().size(); i++) {
+                std::cout << coords[0].getLocalValues()[i] << ", " << coords[1].getLocalValues()[i] << std::endl;
+            }
+        }
 
         //take local hilbert indices and verify that they are sorted
         std::vector<ValueType> localHilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coords, settings.sfcResolution+1, settings.dimensions);
