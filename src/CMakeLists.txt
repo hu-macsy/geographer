@@ -17,13 +17,15 @@ endif()
 
 ### set files ###
 set(FILES_HEADER ParcoRepart.h MultiLevel.h LocalRefinement.h HilbertCurve.h MeshGenerator.h FileIO.h Diffusion.h GraphUtils.h MultiSection.h KMeans.h CommTree.h AuxiliaryFunctions.h HaloPlanFns.h Metrics.h Mapping.h Settings.h)
-set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp KMeans.cpp CommTree.cpp AuxiliaryFunctions.cpp HaloPlanFns.cpp Metrics.cpp Mapping.cpp Settings.cpp)
+set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp MultiSection_iter.cpp  KMeans.cpp CommTree.cpp AuxiliaryFunctions.cpp HaloPlanFns.cpp Metrics.cpp Mapping.cpp Settings.cpp)
 set(FILES_TEST test_main.cpp auxTest.cpp CommTreeTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp MappingTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp quadtree/test/QuadTreeTest.cpp )
+
 
 ###
 ### Check if external libraries metis, parmetis and zoltan2 are found. If they are found,
 ### create the allCompetitors executable and also, later, link them with libgeographer
 ###
+     
 
 ### find zoltan ###
 FIND_PACKAGE( Zoltan2 PATHS "/home/hpc/pr87si/di36qin/Code/Trilinos/build/packages/zoltan2/")
@@ -40,6 +42,7 @@ find_library( PARMETIS_LIB parmetis "${PARMETIS_BASE}/lib" )
 ###
 ### define libraries and executables
 ###
+
 
 ### for more info see the Zoltan2 documentation and https://trilinos.org/oldsite/Finding_Trilinos.txt
 ### see also in Trilinos_install_path/install/include/Makefile.export.Zoltan2
@@ -76,6 +79,7 @@ if( Zoltan2_FOUND AND METIS_BASE AND PARMETIS_BASE )
 else()
 	#message( "Package Zoltan2 was not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
 endif()
+
 
 ###
 ### geographer versions

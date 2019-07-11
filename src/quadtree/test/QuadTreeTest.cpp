@@ -635,6 +635,12 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
     settings.epsilon = epsilon;
     settings.dimensions = dimension;
     settings.useGeometricTieBreaking = 1;
+	settings.initialPartition = ITI::Tool::geoSFC;
+	settings.noRefinement = true;
+	
+	struct Metrics metrics(settings);
+	
+	std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, DenseVector<ValueType>(graph.getRowDistributionPtr(), 1));
 
     ValueType cut, maxCut= N;
     ValueType imbalance;
@@ -645,7 +651,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
 
     for(int detail= 0; detail<np; detail++) {
         settings.pixeledSideLen= std::pow( 2, detail + np );
-        sfcPartition = ITI::ParcoRepart<IndexType, ValueType>::hilbertPartition(coordsDV, settings);
+        sfcPartition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( coordsDV, nodeWeights, settings, metrics );
         scai::dmemo::DistributionPtr newDist = sfcPartition.getDistributionPtr();
         sfcPartition.redistribute(newDist);
         graph.redistribute(newDist, noDist);
@@ -672,7 +678,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         coordsDV[d].redistribute(dist);
     }
 
-    scai::lama::DenseVector<IndexType> hilbertPartition = ITI::ParcoRepart<IndexType, ValueType>::hilbertPartition(coordsDV, settings);
+    scai::lama::DenseVector<IndexType> hilbertPartition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( coordsDV, nodeWeights, settings, metrics );
     scai::dmemo::DistributionPtr newDist = hilbertPartition.getDistributionPtr();
     graph.redistribute(newDist, noDist);
     hilbertPartition.redistribute(newDist);
