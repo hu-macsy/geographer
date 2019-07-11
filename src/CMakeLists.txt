@@ -20,7 +20,6 @@ set(FILES_HEADER ParcoRepart.h MultiLevel.h LocalRefinement.h HilbertCurve.h Mes
 set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp MultiSection_iter.cpp  KMeans.cpp CommTree.cpp AuxiliaryFunctions.cpp HaloPlanFns.cpp Metrics.cpp Mapping.cpp Settings.cpp)
 set(FILES_TEST test_main.cpp auxTest.cpp CommTreeTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp MappingTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp quadtree/test/QuadTreeTest.cpp )
 
-
 ###
 ### Check if external libraries metis, parmetis and zoltan2 are found. If they are found,
 ### create the allCompetitors executable and also, later, link them with libgeographer
@@ -106,6 +105,8 @@ endif (USE_NETWORKIT)
 if (GTEST_FOUND AND Boost_FOUND)
 	add_executable(GeographerTest ${FILES_TEST})
 	target_include_directories(GeographerTest PUBLIC ${Boost_INCLUDE_DIRS})
+	target_compile_options(GeographerTest PRIVATE -fprofile-arcs -ftest-coverage)
+	target_link_libraries(GeographerTest -fprofile-arcs -ftest-coverage)
 	target_link_libraries(GeographerTest geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
 	target_link_libraries(GeographerTest -pthread)
 	add_test(NAME GeographerTest COMMAND GeographerTest WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

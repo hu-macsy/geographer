@@ -1,0 +1,18 @@
+dist: xenial
+language: cpp
+compiler: gcc
+
+addons:
+  apt:
+    update: true
+
+before_install:
+  - sudo apt-get install -y cmake mpi-default-dev libatlas-base-dev
+
+install:
+  - git clone git@github.com:kit-parco/lama.git
+  - pushd lama && mkdir build && cd build && cmake ../scai && make -j8 && sudo make install && popd
+
+script:
+  - mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../install .. && make -j8 && sudo make install && popd
+  - mpirun -np 4 install/bin/GeographerTest
