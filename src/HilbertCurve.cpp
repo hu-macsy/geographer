@@ -47,8 +47,8 @@ DenseVector<IndexType> HilbertCurve<IndexType, ValueType>::computePartition(cons
     //
     // vector of size k, each element represents the size of each block
     //
-	//TODO: either adapt hilbert partition to consider node weights and block
-	// sizes or add checks when used with nodeweights outside the function
+    //TODO: either adapt hilbert partition to consider node weights and block
+    // sizes or add checks when used with nodeweights outside the function
 
     /*
         std::vector<ValueType> blockSizes;

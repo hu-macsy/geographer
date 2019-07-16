@@ -242,11 +242,11 @@ Settings settings) {
         SCAI_ASSERT_EQ_ERROR(comm->sum(numOwnedCenters), numNewTotalBlocks, "Not all centers were found");
     }
 
-    // 
+    //
     // global sum operation. Doing it in a separate loop on purpose
     // since different PEs own centers from different blocks and a lot of
     // blocks own no centers at all
-    // 
+    //
 
     for (IndexType b=0; b<numOldBlocks; b++) {
 
@@ -605,7 +605,7 @@ DenseVector<IndexType> assignBlocks(
             return effectMinDistAllBlocks[a] < effectMinDistAllBlocks[b] \
                    || (effectMinDistAllBlocks[a] == effectMinDistAllBlocks[b] && a < b);
         }
-                );
+                 );
 
         std::sort(effectMinDistAllBlocks.begin()+rangeStart, effectMinDistAllBlocks.begin()+rangeEnd);
     }
@@ -740,9 +740,9 @@ DenseVector<IndexType> assignBlocks(
                         if (bestBlock != oldCluster) {
                             // assert(bestValue >= lowerBoundNextCenter[i]);
                             SCAI_ASSERT_GE_ERROR(bestValue, lowerBoundNextCenter[i], \
-                                                  "PE " << comm->getRank() << ": difference " << std::abs(bestValue - lowerBoundNextCenter[i]) << \
-                                                  " for i= " << i << ", oldCluster: " << oldCluster << ", newCluster: " << bestBlock << \
-                                                  ", influenceEffect: " << influenceEffectOfBestBlock);
+                                                 "PE " << comm->getRank() << ": difference " << std::abs(bestValue - lowerBoundNextCenter[i]) << \
+                                                 " for i= " << i << ", oldCluster: " << oldCluster << ", newCluster: " << bestBlock << \
+                                                 ", influenceEffect: " << influenceEffectOfBestBlock);
                         }
 
                         upperBoundOwnCenter[i] = bestValue;
@@ -811,10 +811,10 @@ DenseVector<IndexType> assignBlocks(
                 }
                 const ValueType thisInfluence = influence[i][j];
                 influence[i][j] = 	std::max(thisInfluence*influenceChangeLowerBound[j],
-                                              std::min(thisInfluence * std::pow(ratio, settings.influenceExponent),
-                                                        thisInfluence*influenceChangeUpperBound[j]
+                                             std::min(thisInfluence * std::pow(ratio, settings.influenceExponent),
+                                                      thisInfluence*influenceChangeUpperBound[j]
                                                      )
-                                          );
+                                           );
                 assert(influence[i][j] > 0);
 
                 ValueType influenceRatio = influence[i][j] / oldInfluence[i][j];
@@ -885,7 +885,7 @@ DenseVector<IndexType> assignBlocks(
                     return effectMinDistAllBlocks[a] < effectMinDistAllBlocks[b] \
                            || (effectMinDistAllBlocks[a] == effectMinDistAllBlocks[b] && a < b);
                 }
-                        );
+                         );
                 // sort also this part of the distances
                 std::sort(effectMinDistAllBlocks.begin()+rangeStart, effectMinDistAllBlocks.begin()+rangeEnd);
             }
@@ -981,9 +981,9 @@ DenseVector<IndexType> computeRepartition(
     }
 
     std::chrono::time_point<std::chrono::high_resolution_clock> startCents = std::chrono::high_resolution_clock::now();
-    // 
+    //
     // TODO: change to findCenters
-    // 
+    //
     std::vector<std::vector<ValueType> > initialCenters = findLocalCenters<IndexType,ValueType>(coordinates, nodeWeights);
     std::chrono::duration<ValueType,std::ratio<1>> centTime = std::chrono::high_resolution_clock::now() - startCents;
     ValueType time = centTime.count();
@@ -1113,9 +1113,9 @@ DenseVector<IndexType> computePartition(
 
     const IndexType p = comm->getSize();
 
-    // 
+    //
     // copy/convert node weights
-    // 
+    //
 
     std::vector<ValueType> nodeWeightSum(nodeWeights.size());
     std::vector<std::vector<ValueType>> convertedNodeWeights(nodeWeights.size());
@@ -1150,9 +1150,9 @@ DenseVector<IndexType> computePartition(
         }
     }
 
-    // 
+    //
     // copy coordinates
-    // 
+    //
 
     // min and max for local part of the coordinates
     std::vector<ValueType> minCoords(dim);
@@ -1201,9 +1201,9 @@ DenseVector<IndexType> computePartition(
     std::vector<ValueType> upperBoundOwnCenter(localN, std::numeric_limits<ValueType>::max());
     std::vector<ValueType> lowerBoundNextCenter(localN, 0);
 
-    // 
+    //
     // prepare sampling
-    // 
+    //
 
     std::vector<IndexType> localIndices(localN);
     std::iota(localIndices.begin(), localIndices.end(), 0);
@@ -1645,9 +1645,9 @@ DenseVector<IndexType> computeHierarchicalPartition(
             }
         }
 
-        // 
+        //
         // 1- find initial centers for this hierarchy level
-        // 
+        //
         // Only the new level is passed and the previous level is
         // reconstructed internally
 
@@ -1676,9 +1676,9 @@ DenseVector<IndexType> computeHierarchicalPartition(
             SCAI_ASSERT_EQ_ERROR(numOldBlocks-1, maxPart, "The provided partition must have equal number of blocks as the length of the vector with the new number of blocks per part");
         }
 
-        // 
+        //
         // 2- main k-means loop
-        // 
+        //
 
         // get the wanted block sizes for this level of the tree
         std::vector<std::vector<ValueType>> targetBlockWeights = commTree.getBalanceVectors(h);
@@ -1693,9 +1693,9 @@ DenseVector<IndexType> computeHierarchicalPartition(
 
         // TODO: not really needed assertions
         SCAI_ASSERT_EQ_ERROR(coordinates[0].getDistributionPtr()->getLocalSize(),\
-                              partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
+                             partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
         SCAI_ASSERT_EQ_ERROR(nodeWeights[0].getDistributionPtr()->getLocalSize(),\
-                              partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
+                             partition.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
 
         if (settings.debugMode) {
             // this check is done before. TODO: remove?
