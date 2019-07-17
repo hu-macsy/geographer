@@ -1378,7 +1378,7 @@ DenseVector<IndexType> computePartition(
             }
             deltas[j] = std::sqrt(squaredDeltas[j]);
             if (settings.erodeInfluence) {
-                const ValueType erosionFactor = 2/(1+exp(-std::max(deltas[j]/expectedBlockDiameter-0.1, ValueType(0.0)))) - 1;
+                const ValueType erosionFactor = 2/(1+exp(-std::max(deltas[j]/expectedBlockDiameter-ValueType(0.1), ValueType(0.0)))) - 1;
                 for (IndexType i = 0; i < numNodeWeights; i++) {
                     influence[i][j] = exp((1-erosionFactor)*log(influence[i][j]));
                     if (oldInfluence[i][j] / influence[i][j] < minRatio) minRatio = oldInfluence[i][j] / influence[i][j];

@@ -1210,14 +1210,14 @@ TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D) {
 
     rectangle bBox0;        //not a leaf => no projection calculated
     bBox0.bottom = {0, 0};
-    bBox0.top = { std::floor(maxCoord[0]/2-1), maxCoord[1] };
+    bBox0.top = { ValueType(std::floor(maxCoord[0]/2-1)), maxCoord[1] };
     ValueType bBox0Weight = (bBox0.top[0]-bBox0.bottom[0]+1)*(bBox0.top[1]-bBox0.bottom[1]+1);
     bBox0.weight = bBox0Weight;
     root->insert(bBox0);
     //if(comm->getRank()==0) bBox0.print();
 
     rectangle bBox1;        // leafID=2 => projection[2]
-    bBox1.bottom = { std::floor(maxCoord[0]/2), 0 };
+    bBox1.bottom = { ValueType(std::floor(maxCoord[0]/2)), 0 };
     bBox1.top = maxCoord;
     ValueType bBox1Weight = (bBox1.top[0]-bBox1.bottom[0]+1)*(bBox1.top[1]-bBox1.bottom[1]+1);
     bBox1.weight = bBox1Weight;
@@ -1226,15 +1226,15 @@ TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D) {
 
     rectangle bBox2;        // leafID=0 => projection[0]
     bBox2.bottom = {0, 0};
-    bBox2.top = { std::floor(maxCoord[0]/2-1), std::floor(maxCoord[1]*0.75 -1) };
+    bBox2.top = { ValueType(std::floor(maxCoord[0]/2-1)), ValueType(std::floor(maxCoord[1]*0.75 -1)) };
     ValueType bBox2Weight = (bBox2.top[0]-bBox2.bottom[0]+1)*(bBox2.top[1]-bBox2.bottom[1]+1);
     bBox2.weight = bBox2Weight;
     root->insert( bBox2 );
     //if(comm->getRank()==0)  bBox2.print();
 
     rectangle bBox3;        // leafID=1 => projection[1]
-    bBox3.bottom = {0, std::floor(maxCoord[1]*0.75) };
-    bBox3.top = { std::floor(maxCoord[0]/2 -1), maxCoord[1] };
+    bBox3.bottom = {0, ValueType(std::floor(maxCoord[1]*0.75)) };
+    bBox3.top = { ValueType(std::floor(maxCoord[0]/2 -1)), maxCoord[1] };
     ValueType bBox3Weight = (bBox3.top[0]-bBox3.bottom[0]+1)*(bBox3.top[1]-bBox3.bottom[1]+1);
     bBox3.weight = bBox3Weight;
     root->insert( bBox3 );
@@ -1265,9 +1265,9 @@ TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D) {
                 bBox1.top[d]-bBox1.bottom[d]
             };
             std::vector<std::vector<ValueType>> hyperplanes = {
-                {bBox2.bottom[d], bBox2.bottom[d]+extent[0]*0.2, bBox2.bottom[d]+extent[0]*0.6, bBox2.top[d]},
-                {bBox3.bottom[d], bBox3.bottom[d]+extent[1]*0.2, bBox3.bottom[d]+extent[1]*0.6, bBox3.top[d]},
-                {bBox1.bottom[d], bBox1.bottom[d]+extent[2]*0.2, bBox1.bottom[d]+extent[2]*0.6, bBox1.top[d]}
+                {bBox2.bottom[d], bBox2.bottom[d]+extent[0]*ValueType(0.2), bBox2.bottom[d]+extent[0]*ValueType(0.6), bBox2.top[d]},
+                {bBox3.bottom[d], bBox3.bottom[d]+extent[1]*ValueType(0.2), bBox3.bottom[d]+extent[1]*ValueType(0.6), bBox3.top[d]},
+                {bBox1.bottom[d], bBox1.bottom[d]+extent[2]*ValueType(0.2), bBox1.bottom[d]+extent[2]*ValueType(0.6), bBox1.top[d]}
             };
 
             projections = MultiSection<IndexType, ValueType>::projectionIter( localPointsVal, nodeWeights, root, root->getAllLeaves(), hyperplanes, dim2proj);
