@@ -847,11 +847,11 @@ DenseVector<IndexType> assignBlocks(
                     newInfluenceEffect += influence[j][cluster]*normalizedNodeWeights[j][i];
                 }
 
-                SCAI_ASSERT_LE_ERROR((newInfluenceEffect / influenceEffectOfOwn[veryLocalI]), maxRatio + 1e6, "Error in calculation of influence effect");
-                SCAI_ASSERT_GE_ERROR((newInfluenceEffect / influenceEffectOfOwn[veryLocalI]), minRatio - 1e6, "Error in calculation of influence effect");
+                SCAI_ASSERT_LE_ERROR((newInfluenceEffect / influenceEffectOfOwn[veryLocalI]), maxRatio + 1e-5, "Error in calculation of influence effect");
+                SCAI_ASSERT_GE_ERROR((newInfluenceEffect / influenceEffectOfOwn[veryLocalI]), minRatio - 1e-5, "Error in calculation of influence effect");
 
-                upperBoundOwnCenter[i] *= (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) + 1e-6;
-                lowerBoundNextCenter[i] *= minRatio - 1e-6;
+                upperBoundOwnCenter[i] *= (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) + 1e-5;
+                lowerBoundNextCenter[i] *= minRatio - 1e-5;
             }
         }
 
@@ -1369,10 +1369,8 @@ DenseVector<IndexType> computePartition(
 
         for (IndexType j = 0; j < totalNumNewBlocks; j++) {
             for (int d = 0; d < dim; d++) {
-                // TODO: copied from the Dev branch, commit 94e40203248c9e981af98c80fb47ba60e4c77ec2
-                // the same code does not exist in this version so I added the assertion here
-                SCAI_ASSERT_LE_ERROR(transCenters[j][d], globalMaxCoords[d]+ 1e-12, "New center coordinate out of bounds");
-                SCAI_ASSERT_GE_ERROR(transCenters[j][d], globalMinCoords[d]- 1e-12, "New center coordinate out of bounds");
+                SCAI_ASSERT_LE_ERROR(transCenters[j][d], globalMaxCoords[d]+ 1e-6, "New center coordinate out of bounds");
+                SCAI_ASSERT_GE_ERROR(transCenters[j][d], globalMinCoords[d]- 1e-6, "New center coordinate out of bounds");
                 ValueType diff = (centers1DVector[j][d] - transCenters[j][d]);
                 squaredDeltas[j] += diff*diff;
             }
