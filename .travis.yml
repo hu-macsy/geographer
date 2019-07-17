@@ -4,7 +4,8 @@ compiler: gcc
 
 matrix:
   include:
-    - os: linux
+    - name: GCC5, ValueType double
+      os: linux
       addons:
         apt:
           sources:
@@ -12,9 +13,10 @@ matrix:
           packages:
             - g++-5
       env:
-         - MATRIX_EVAL="CC=gcc-5 && CXX=g++-5"
+         - MATRIX_EVAL="CC=gcc-5 && CXX=g++-5 && ValueType=double"
 
-    - os: linux
+    - name: GCC6, ValueType double
+      os: linux
       addons:
         apt:
           sources:
@@ -22,9 +24,10 @@ matrix:
           packages:
             - g++-6
       env:
-        - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6"
+        - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6 && ValueType=double"
 
-    - os: linux
+    - name: GCC7, ValueType double
+      os: linux
       addons:
         apt:
           sources:
@@ -32,7 +35,40 @@ matrix:
           packages:
             - g++-7
       env:
-        - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
+        - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7 && ValueType=double"
+
+    - name: GCC5, ValueType float
+      os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-5
+      env:
+         - MATRIX_EVAL="CC=gcc-5 && CXX=g++-5 && ValueType=float"
+
+    - name: GCC6, ValueType float
+      os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-6
+      env:
+        - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6 && ValueType=float"
+
+    - name: GCC7, ValueType float
+      os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-7
+      env:
+        - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7 && ValueType=float"
 
 addons:
   apt:
@@ -47,5 +83,5 @@ install:
   - pushd lama && mkdir build && cd build && cmake ../scai && make -j4 && sudo make install && popd
 
 script:
-  - mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../install .. && make -j4 && sudo make install && cd ..
+  - mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../install -DGeographer_VALUE_TYPE=${ValueType} .. && make -j4 && sudo make install && cd ..
   - mpirun -np 4 install/bin/GeographerTest
