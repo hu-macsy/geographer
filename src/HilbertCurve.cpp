@@ -192,7 +192,8 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType const*
 
     size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
     if (recursionDepth > bitsInValueType/dimensions) {
-        throw std::runtime_error("Requested space-filling curve with precision " + std::to_string(recursionDepth)
+        recursionDepth = IndexType(bitsInValueType/dimensions);
+        PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
             + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
     }
 
@@ -257,7 +258,8 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const*
 
     size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
     if ((unsigned int) recursionDepth > bitsInValueType/dimensions) {
-        throw std::runtime_error("Requested space-filling curve with precision " + std::to_string(recursionDepth)
+        recursionDepth = IndexType(bitsInValueType/dimensions);
+        PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
             + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
     }
 
@@ -376,7 +378,8 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
 
     size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
     if (recursionDepth > bitsInValueType/dimensions) {
-        throw std::runtime_error("Requested space-filling curve with precision " + std::to_string(recursionDepth)
+        recursionDepth = IndexType(bitsInValueType/dimensions);
+        PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
             + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
     }
 
@@ -477,7 +480,8 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
 
     size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
     if (recursionDepth > bitsInValueType/dimensions) {
-        throw std::runtime_error("Requested space-filling curve with precision " + std::to_string(recursionDepth)
+        recursionDepth = IndexType(bitsInValueType/dimensions);
+        PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
             + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
     }
 
