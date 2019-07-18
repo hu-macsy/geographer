@@ -1488,10 +1488,10 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
             //std::cout << "Process " << thisPE << " reading from " << beginLocalCoords << " to " << endLocalCoords << ", in total, localNumCoords= " << localTotalNumOfCoords << " coordinates and " << (localTotalNumOfCoords)*sizeof(ValueType) << " bytes." << std::endl;
 
             SCAI_REGION_START("FileIO.readCoordsBinary.fileRead" );
-            const UINT startPos = beginLocalCoords*sizeof(ValueType);
-            ValueType* localPartOfCoords = new ValueType[localTotalNumOfCoords];
+            const UINT startPos = beginLocalCoords*sizeof(double);
+            double* localPartOfCoords = new double[localTotalNumOfCoords];
             file.seekg(startPos);
-            file.read( (char *)(localPartOfCoords), (localTotalNumOfCoords)*sizeof(ValueType) );
+            file.read( (char *)(localPartOfCoords), (localTotalNumOfCoords)*sizeof(double) );
             SCAI_REGION_END("FileIO.readCoordsBinary.fileRead" );
 
             for(IndexType i=0; i<localN; i++) {
