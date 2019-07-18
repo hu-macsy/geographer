@@ -1413,18 +1413,18 @@ DenseVector<IndexType> computePartition(
                     if (numNodeWeights > 0) throw std::logic_error("Influence erosion not yet implemented for multiple weights.");
 
                     // update due to erosion
-                    upperBoundOwnCenter[i] *= (influence[0][cluster] / oldInfluence[0][cluster]) + 1e-12;
-                    lowerBoundNextCenter[i] *= minRatio - 1e-12;
+                    upperBoundOwnCenter[i] *= (influence[0][cluster] / oldInfluence[0][cluster]) + 1e-6;
+                    lowerBoundNextCenter[i] *= minRatio - 1e-6;
                 }
 
                 // update due to delta
-                upperBoundOwnCenter[i] += (2*deltas[cluster]*std::sqrt(upperBoundOwnCenter[i]/influenceEffect) + squaredDeltas[cluster])*(influenceEffect + 1e-10);
+                upperBoundOwnCenter[i] += (2*deltas[cluster]*std::sqrt(upperBoundOwnCenter[i]/influenceEffect) + squaredDeltas[cluster])*(influenceEffect + 1e-6);
 
                 ValueType pureSqrt(std::sqrt(lowerBoundNextCenter[i]/maxInfluence));
                 if (pureSqrt < delta) {
                     lowerBoundNextCenter[i] = 0;
                 } else {
-                    ValueType diff = (-2*delta*pureSqrt + deltaSq)*(maxInfluence + 1e-10);
+                    ValueType diff = (-2*delta*pureSqrt + deltaSq)*(maxInfluence + 1e-6);
                     assert(diff <= 0);
                     lowerBoundNextCenter[i] += diff;
                     if (!(lowerBoundNextCenter[i] > 0)) lowerBoundNextCenter[i] = 0;
