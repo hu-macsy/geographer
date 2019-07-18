@@ -406,7 +406,7 @@ TEST_F(MultiSectionTest, test1DPartitionOptimalRandomWeights) {
     ValueType maxWeightOpt = *std::max_element(weightPerPart.begin(), weightPerPart.end());
     ValueType maxWeightGrd = *std::max_element(weightPerPartGreedy.begin(), weightPerPartGreedy.end());
 
-    SCAI_ASSERT( maxWeightOpt - maxWeightGrd < 0.00001, "Greedy solution better than \"optimal\"... :( ,  maxWeightOpt= " << maxWeightOpt << " , maxWeightGrd= " << maxWeightGrd );
+    SCAI_ASSERT( maxWeightOpt - maxWeightGrd < 0.0001, "Greedy solution better than \"optimal\"... :( ,  maxWeightOpt= " << maxWeightOpt << " , maxWeightGrd= " << maxWeightGrd );
     SCAI_ASSERT_EQ_ERROR( weightPerPartGreedy.size(), k, "Return vector has wrong size");
     SCAI_ASSERT_EQ_ERROR( part1DGreedy.size(), k, "Return vector has wrong size");
 

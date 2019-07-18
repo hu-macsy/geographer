@@ -480,12 +480,12 @@ TEST_F(MeshGeneratorTest, testSimpleMeshFromQuadTree_2D) {
 TEST_F(MeshGeneratorTest, testDistSquared) {
 
     EXPECT_EQ( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<IndexType>({1,1}),std::vector<IndexType>({2,2}) )), 2 );
-    EXPECT_NEAR( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<ValueType>({0.5,1.2}),std::vector<ValueType>({1.1,2.1}) )), 1.17, 1e-10);
+    EXPECT_NEAR( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<ValueType>({0.5,1.2}),std::vector<ValueType>({1.1,2.1}) )), 1.17, 1e-5);
     EXPECT_EQ( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<IndexType>({1,1,1}),std::vector<IndexType>({2,2,2}) )), 3 );
     EXPECT_EQ( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<IndexType>({1,2,3}),std::vector<IndexType>({4,5,6}) )), 3*3*3 );
     EXPECT_EQ( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<IndexType>({1,1,1,1}),std::vector<IndexType>({2,2,2,2}) )), 4 );
     EXPECT_EQ( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<IndexType>({1,1,2,2}),std::vector<IndexType>({1,1,2,5}) )), 3*3 );
-    EXPECT_NEAR( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<ValueType>({1.2,3,3.2,4.1}),std::vector<ValueType>({2.1,0.5,0.2,4.1}) )), 16.06, 1e-10 );
+    EXPECT_NEAR( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<ValueType>({1.2,3,3.2,4.1}),std::vector<ValueType>({2.1,0.5,0.2,4.1}) )), 16.06, 1e-5 );
 }
 //-----------------------------------------------------------------
 
