@@ -517,7 +517,7 @@ TEST_F(GraphUtilsTest, testImbalance) {
     //max block weight = 64
     //optimum size = total/k +(max-min) = 160/4 + (4-1) = 43
     //imbalance = (max-opt)/opt
-    EXPECT_EQ( imbalance, (64-43)/43.0 ); //for Grid8x8 and k=4
+    EXPECT_NEAR( imbalance, (64-43)/43.0, 1e-5 ); //for Grid8x8 and k=4
 
     //
     // --------- heterogeneous
@@ -538,7 +538,7 @@ TEST_F(GraphUtilsTest, testImbalance) {
     imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, k, nodeWeights, blockSizes );
 
     // (48-40)/48 = 8/40
-    EXPECT_EQ( imbalance, 8.0/40 );
+    EXPECT_NEAR( imbalance, 8.0/40, 1e-5 );
 
     //imbalanced 2
 
@@ -547,7 +547,7 @@ TEST_F(GraphUtilsTest, testImbalance) {
     imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, k, nodeWeights, blockSizes );
 
     // (16-10)/10 = 6/10
-    EXPECT_EQ( imbalance, 6.0/10 );
+    EXPECT_NEAR( imbalance, 6.0/10, 1e-5 );
 }
 //------------------------------------------------------------------------------
 

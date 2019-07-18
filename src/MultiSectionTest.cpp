@@ -414,7 +414,7 @@ TEST_F(MultiSectionTest, test1DPartitionOptimalRandomWeights) {
     SCAI_ASSERT_EQ_ERROR( part1D.size(), k, "Return vector has wrong size");
 
     const ValueType totalWeight = std::accumulate(weightPerPart.begin(), weightPerPart.end(), 0.0);
-    SCAI_ASSERT( totalWeight==origTotalWeight, "totalWeight= "<< totalWeight << " should be= "<< origTotalWeight );
+    SCAI_ASSERT( abs(totalWeight - origTotalWeight) < 1e-5, "totalWeight= "<< totalWeight << " should be= "<< origTotalWeight );
     const ValueType totalWeightGreedy = std::accumulate(weightPerPartGreedy.begin(), weightPerPartGreedy.end(), 0.0);
     SCAI_ASSERT( totalWeightGreedy-origTotalWeight<0.000001, "totalWeight= "<< totalWeightGreedy << " should be= "<< origTotalWeight );
 
