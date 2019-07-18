@@ -258,7 +258,7 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVe
     // copy coords to a local vector<vector>
     //
 
-    std::vector< std::vector<ValueType>> localPartOfCoords( localN, std::vector<ValueType>( dimension, 0.0) );
+    std::vector< std::vector<double>> localPartOfCoords( localN, std::vector<double>( dimension, 0.0) );
 
     for(IndexType d=0; d<dimension; d++) {
         scai::hmemo::ReadAccess<ValueType> localCoords( coords[d].getLocalValues() );
@@ -284,11 +284,11 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVe
 
             for( IndexType i=0; i<localN; i++) {
                 for( IndexType d=0; d<dimension; d++) {
-                    outfile.write( (char *)(&localPartOfCoords[i][d]), sizeof(ValueType) );
+                    outfile.write( (char *)(&localPartOfCoords[i][d]), sizeof(double) );
                 }
             }
 
-            SCAI_ASSERT_EQ_ERROR( outfile.tellp(), endLocalRange*dimension*sizeof(ValueType), "While writing coordinates in parallel: Position in file " << outFilename << " is not correct." );
+            SCAI_ASSERT_EQ_ERROR( outfile.tellp(), endLocalRange*dimension*sizeof(double), "While writing coordinates in parallel: Position in file " << outFilename << " is not correct." );
 
             outfile.close();
         }
