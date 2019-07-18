@@ -1502,9 +1502,9 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
 
             if( thisPE==numPEs-1) {
                 //SCAI_ASSERT_EQ_ERROR( file.tellg(), globalN*maxDimension*sizeof(ValueType) , "While reading coordinates in binary: Position in file " << filename << " is not correct for process " << thisPE );
-                SCAI_ASSERT_EQ_ERROR( file.tellg()/(maxDimension*sizeof(ValueType)), globalN, "While reading coordinates in binary: Position in file " << filename << " is not correct for process " << thisPE );
+                SCAI_ASSERT_EQ_ERROR( file.tellg()/(maxDimension*sizeof(double)), globalN, "While reading coordinates in binary: Position in file " << filename << " is not correct for process " << thisPE );
             } else {
-                SCAI_ASSERT_EQ_ERROR( file.tellg()/( maxDimension*sizeof(ValueType)*(thisPE+1) ), localN, "While reading coordinates in binary: Position in file " << filename << " is not correct for process " << thisPE );
+                SCAI_ASSERT_EQ_ERROR( file.tellg()/( maxDimension*sizeof(double)*(thisPE+1) ), localN, "While reading coordinates in binary: Position in file " << filename << " is not correct for process " << thisPE );
             }
 
             delete[] localPartOfCoords;
