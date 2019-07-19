@@ -507,7 +507,7 @@ bool CommTree<IndexType, ValueType>::checkTree( bool allTests ) const {
                 }
             }
             for( int w=0; w<numWeights; w++ ) {
-                SCAI_ASSERT( weightSums[w]-weightSumsLvL[w]<1e-8, "Weight sums must agree in all levels");
+                SCAI_ASSERT_LT_ERROR( abs(weightSums[w]-weightSumsLvL[w]), 1e-5, "Weight sums must agree in all levels");
             }
         }
     }

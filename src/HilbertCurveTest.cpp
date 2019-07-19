@@ -107,7 +107,7 @@ TEST_P(HilbertCurveTest, testHilbertIndexUnitSquare_Local) {
 
         ASSERT_EQ(dimensions, point.size());
         for (IndexType d = 0; d < dimensions; d++) {
-            EXPECT_NEAR(point[d]*(maxCoords[d] - minCoords[d])+minCoords[d], convertedCoords[i][d], 0.001);
+            EXPECT_NEAR(point[d]*(maxCoords[d] - minCoords[d])+minCoords[d], convertedCoords[i][d], 0.01);
         }
     }
 
@@ -413,7 +413,7 @@ TEST_F(HilbertCurveTest, testHilbertRedistribution) {
 
     //check checksum
     for (IndexType d = 0; d < settings.dimensions; d++) {
-        EXPECT_NEAR(coordSum[d], coords[d].sum(), 0.001);
+        EXPECT_NEAR(coordSum[d], coords[d].sum(), 1e-6*coordSum[d]);
     }
 
     //check distribution equality
