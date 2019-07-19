@@ -700,7 +700,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
 
 //
 
-TEST_F(QuadTreeTest, DISABLED_ testCartesianEuclidQuery) {
+TEST_F(QuadTreeTest, DISABLED_testCartesianEuclidQuery) {
     count n = 10000;
 
     assert(n > 0);
@@ -760,7 +760,7 @@ TEST_F(QuadTreeTest, DISABLED_ testCartesianEuclidQuery) {
 
 
 
-TEST_F(QuadTreeTest, DISABLED_ testPolarEuclidQuery) {
+TEST_F(QuadTreeTest, DISABLED_testPolarEuclidQuery) {
     /**
      * setup of data structures and constants
      */
