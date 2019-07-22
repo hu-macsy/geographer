@@ -730,7 +730,7 @@ TEST_F(QuadTreeTest, testCartesianEuclidQuery) {
         auto edgeProb = [acc](ValueType distance) -> ValueType {return acc;};
         std::vector<index> near;
         quad.getElementsProbabilistically(positions[query], edgeProb, near);
-        EXPECT_NEAR(near.size(), acc*n, std::max(acc*n*0.5, ValueType(10.0)));
+        EXPECT_NEAR(near.size(), acc*n, std::max(ValueType(acc*n*0.5), ValueType(10.0)));
     }
 
     for (index i = 0; i < 200; i++) {
@@ -802,7 +802,7 @@ TEST_F(QuadTreeTest, testPolarEuclidQuery) {
         auto edgeProb = [acc](ValueType distance) -> ValueType {return acc;};
         std::vector<index> near;
         tree.getElementsProbabilistically({angles[query], radii[query]}, edgeProb, near);
-        EXPECT_NEAR(near.size(), acc*n, std::max(acc*n*0.5, ValueType(10.0)));
+        EXPECT_NEAR(near.size(), acc*n, std::max(ValueType(acc*n*0.5), ValueType(10.0)));
     }
 
     //TODO: some test about appropriate subtrees and leaves

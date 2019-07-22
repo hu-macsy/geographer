@@ -177,8 +177,8 @@ TEST_F (GraphUtilsTest, testLocalDijkstra) {
         //PRINT0("set edge (9, 10) to 0.3");
         graph.setValue(9, 10, 0.3);
         shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 0, predecessor);
-        EXPECT_EQ( shortDist[15], 4.8);
-        EXPECT_EQ( shortDist[11], 4.3);
+        EXPECT_NEAR( shortDist[15], 4.8, 1e-5);
+        EXPECT_NEAR( shortDist[11], 4.3, 1e-5);
         EXPECT_EQ( predecessor[10], 9);
         EXPECT_EQ( predecessor[11], 10);
         EXPECT_EQ( predecessor[14], 10);
@@ -186,14 +186,14 @@ TEST_F (GraphUtilsTest, testLocalDijkstra) {
         graph.setValue(5, 9, 1.3);
         graph.setValue(7, 11, 1.3);
         shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 0, predecessor);
-        EXPECT_EQ( shortDist[15], 4.8);
-        EXPECT_EQ( shortDist[11], 4.3);
+        EXPECT_NEAR( shortDist[15], 4.8, 1e-5);
+        EXPECT_NEAR( shortDist[11], 4.3, 1e-5);
         EXPECT_EQ( predecessor[9], 8);
 
         shortDist = GraphUtils<IndexType,ValueType>::localDijkstra( graph, 13, predecessor);
         EXPECT_EQ( shortDist[0], 4);
         EXPECT_EQ( shortDist[15], 2);
-        EXPECT_EQ( shortDist[7], 3.3);
+        EXPECT_NEAR( shortDist[7], 3.3, 1e-5);
 
         //for( int i=0; i<N; i++){
         //    PRINT0("dist to vertex " << i << "= " << shortDist[i]);
@@ -517,7 +517,7 @@ TEST_F(GraphUtilsTest, testImbalance) {
     //max block weight = 64
     //optimum size = total/k +(max-min) = 160/4 + (4-1) = 43
     //imbalance = (max-opt)/opt
-    EXPECT_EQ( imbalance, (64-43)/43.0 ); //for Grid8x8 and k=4
+    EXPECT_NEAR( imbalance, (64-43)/43.0, 1e-5 ); //for Grid8x8 and k=4
 
     //
     // --------- heterogeneous
@@ -538,7 +538,7 @@ TEST_F(GraphUtilsTest, testImbalance) {
     imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, k, nodeWeights, blockSizes );
 
     // (48-40)/48 = 8/40
-    EXPECT_EQ( imbalance, 8.0/40 );
+    EXPECT_NEAR( imbalance, 8.0/40, 1e-5 );
 
     //imbalanced 2
 
@@ -547,7 +547,7 @@ TEST_F(GraphUtilsTest, testImbalance) {
     imbalance = ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, k, nodeWeights, blockSizes );
 
     // (16-10)/10 = 6/10
-    EXPECT_EQ( imbalance, 6.0/10 );
+    EXPECT_NEAR( imbalance, 6.0/10, 1e-5 );
 }
 //------------------------------------------------------------------------------
 

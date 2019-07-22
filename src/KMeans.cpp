@@ -847,11 +847,11 @@ DenseVector<IndexType> assignBlocks(
                     newInfluenceEffect += influence[j][cluster]*normalizedNodeWeights[j][i];
                 }
 
-                SCAI_ASSERT_LE_ERROR((newInfluenceEffect / influenceEffectOfOwn[veryLocalI]), maxRatio + 1e6, "Error in calculation of influence effect");
-                SCAI_ASSERT_GE_ERROR((newInfluenceEffect / influenceEffectOfOwn[veryLocalI]), minRatio - 1e6, "Error in calculation of influence effect");
+                SCAI_ASSERT_LE_ERROR((newInfluenceEffect / influenceEffectOfOwn[veryLocalI]), maxRatio + 1e-5, "Error in calculation of influence effect");
+                SCAI_ASSERT_GE_ERROR((newInfluenceEffect / influenceEffectOfOwn[veryLocalI]), minRatio - 1e-5, "Error in calculation of influence effect");
 
-                upperBoundOwnCenter[i] *= (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) + 1e-6;
-                lowerBoundNextCenter[i] *= minRatio - 1e-6;
+                upperBoundOwnCenter[i] *= (newInfluenceEffect / influenceEffectOfOwn[veryLocalI]) + 1e-5;
+                lowerBoundNextCenter[i] *= minRatio - 1e-5;
             }
         }
 
@@ -1369,16 +1369,14 @@ DenseVector<IndexType> computePartition(
 
         for (IndexType j = 0; j < totalNumNewBlocks; j++) {
             for (int d = 0; d < dim; d++) {
-                // TODO: copied from the Dev branch, commit 94e40203248c9e981af98c80fb47ba60e4c77ec2
-                // the same code does not exist in this version so I added the assertion here
-                SCAI_ASSERT_LE_ERROR(transCenters[j][d], globalMaxCoords[d]+ 1e-12, "New center coordinate out of bounds");
-                SCAI_ASSERT_GE_ERROR(transCenters[j][d], globalMinCoords[d]- 1e-12, "New center coordinate out of bounds");
+                SCAI_ASSERT_LE_ERROR(transCenters[j][d], globalMaxCoords[d]+ 1e-6, "New center coordinate out of bounds");
+                SCAI_ASSERT_GE_ERROR(transCenters[j][d], globalMinCoords[d]- 1e-6, "New center coordinate out of bounds");
                 ValueType diff = (centers1DVector[j][d] - transCenters[j][d]);
                 squaredDeltas[j] += diff*diff;
             }
             deltas[j] = std::sqrt(squaredDeltas[j]);
             if (settings.erodeInfluence) {
-                const ValueType erosionFactor = 2/(1+exp(-std::max(deltas[j]/expectedBlockDiameter-0.1, ValueType(0.0)))) - 1;
+                const ValueType erosionFactor = 2/(1+exp(-std::max(deltas[j]/expectedBlockDiameter-ValueType(0.1), ValueType(0.0)))) - 1;
                 for (IndexType i = 0; i < numNodeWeights; i++) {
                     influence[i][j] = exp((1-erosionFactor)*log(influence[i][j]));
                     if (oldInfluence[i][j] / influence[i][j] < minRatio) minRatio = oldInfluence[i][j] / influence[i][j];
@@ -1415,18 +1413,18 @@ DenseVector<IndexType> computePartition(
                     if (numNodeWeights > 0) throw std::logic_error("Influence erosion not yet implemented for multiple weights.");
 
                     // update due to erosion
-                    upperBoundOwnCenter[i] *= (influence[0][cluster] / oldInfluence[0][cluster]) + 1e-12;
-                    lowerBoundNextCenter[i] *= minRatio - 1e-12;
+                    upperBoundOwnCenter[i] *= (influence[0][cluster] / oldInfluence[0][cluster]) + 1e-6;
+                    lowerBoundNextCenter[i] *= minRatio - 1e-6;
                 }
 
                 // update due to delta
-                upperBoundOwnCenter[i] += (2*deltas[cluster]*std::sqrt(upperBoundOwnCenter[i]/influenceEffect) + squaredDeltas[cluster])*(influenceEffect + 1e-10);
+                upperBoundOwnCenter[i] += (2*deltas[cluster]*std::sqrt(upperBoundOwnCenter[i]/influenceEffect) + squaredDeltas[cluster])*(influenceEffect + 1e-6);
 
                 ValueType pureSqrt(std::sqrt(lowerBoundNextCenter[i]/maxInfluence));
                 if (pureSqrt < delta) {
                     lowerBoundNextCenter[i] = 0;
                 } else {
-                    ValueType diff = (-2*delta*pureSqrt + deltaSq)*(maxInfluence + 1e-10);
+                    ValueType diff = (-2*delta*pureSqrt + deltaSq)*(maxInfluence + 1e-6);
                     assert(diff <= 0);
                     lowerBoundNextCenter[i] += diff;
                     if (!(lowerBoundNextCenter[i] > 0)) lowerBoundNextCenter[i] = 0;

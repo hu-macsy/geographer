@@ -192,7 +192,9 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType const*
 
     size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
     if (recursionDepth > bitsInValueType/dimensions) {
-        throw std::runtime_error("A space-filling curve that precise won't fit into the return datatype.");
+        recursionDepth = IndexType(bitsInValueType/dimensions);
+        PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
+            + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
     }
 
     std::vector<ValueType> scaledCoord(dimensions);
@@ -256,7 +258,9 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const*
 
     size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
     if ((unsigned int) recursionDepth > bitsInValueType/dimensions) {
-        throw std::runtime_error("A space-filling curve that precise won't fit into the return datatype.");
+        recursionDepth = IndexType(bitsInValueType/dimensions);
+        PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
+            + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
     }
 
     std::vector<ValueType> scaledCoord(dimensions);
@@ -374,7 +378,9 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
 
     size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
     if (recursionDepth > bitsInValueType/dimensions) {
-        throw std::runtime_error("A space-filling curve that precise won't fit into the return datatype.");
+        recursionDepth = IndexType(bitsInValueType/dimensions);
+        PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
+            + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
     }
 
     if( dimensions!=2 ) {
@@ -474,7 +480,9 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
 
     size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
     if (recursionDepth > bitsInValueType/dimensions) {
-        throw std::runtime_error("A space-filling curve that precise won't fit into the return datatype.");
+        recursionDepth = IndexType(bitsInValueType/dimensions);
+        PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
+            + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
     }
 
     if( dimensions!=3 ) {
