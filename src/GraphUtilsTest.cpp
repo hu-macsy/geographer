@@ -6,6 +6,8 @@
 #include "FileIO.h"
 #include "GraphUtils.h"
 #include "MeshGenerator.h"
+#include "AuxiliaryFunctions.h"
+#include "HilbertCurve.h"
 
 #include <scai/dmemo/CyclicDistribution.hpp>
 #include <scai/hmemo/ReadAccess.hpp>
@@ -21,8 +23,10 @@ protected:
 };
 
 TEST_F(GraphUtilsTest, testReindexCut) {
-    std::string fileName = "trace-00008.graph";
+    //std::string fileName = "trace-00008.graph";
     //std::string fileName = "delaunayTest.graph";
+    std::string fileName = "Grid8x8";
+    std::string coordsFile = graphPath + "Grid8x8_altered.xyz";
 
     std::string file = graphPath + fileName;
 
@@ -30,24 +34,34 @@ TEST_F(GraphUtilsTest, testReindexCut) {
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     const IndexType n = graph.getNumRows();
 
-    const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
     // for now local refinement requires k = P
     const IndexType k = comm->getSize();
 
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), n, dimensions);
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordsFile, n, dimensions);
     ASSERT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
+
+std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, scai::lama::DenseVector<ValueType>(dist, 1));
 
     //get sfc partition
     Settings settings;
     settings.numBlocks = k;
     settings.noRefinement = true;
     settings.dimensions = dimensions;
+    settings.debugMode = true;
 
-    DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
+    DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, nodeWeights, settings);
 
     //WARNING: with the noRefinement flag the partition is not destributed
     partition.redistribute( dist);
+
+{
+aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights[0], settings );    
+dist = graph.getRowDistributionPtr();
+}
+
+ASSERT_TRUE( (HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(coords, nodeWeights[0], settings)) );
 
     ASSERT_TRUE( coords[0].getDistributionPtr()->isEqual(*dist) );
     ASSERT_TRUE( partition.getDistributionPtr()->isEqual(*dist) );

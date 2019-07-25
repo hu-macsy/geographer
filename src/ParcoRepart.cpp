@@ -269,7 +269,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
     const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
     const IndexType rank = comm->getRank();
-
+PRINT(*comm);
 	// timing info
     std::chrono::duration<double> partitionTime= std::chrono::duration<double>(0.0);
 	std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
@@ -341,7 +341,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
     struct Metrics& metrics){
     
 	SCAI_REGION( "ParcoRepart.initialPartition" )
-	
+PRINT(*comm);	
 	const IndexType k = settings.numBlocks;
 	std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
 
@@ -363,7 +363,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         if (comm->getRank() == 0) {
             std::cout << "Initial partition with K-Means" << std::endl;
         }
-
+PRINT(*comm);
         //prepare coordinates for k-means
         std::vector<DenseVector<ValueType>> coordinateCopy = coordinates;
         std::vector<DenseVector<ValueType>> nodeWeightCopy = nodeWeights;
@@ -375,7 +375,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
                 if (settings.initialMigration != ITI::Tool::geoSFC) {
                     throw std::logic_error("KMeans depends on pre-sorting with space filling curves.");
                 }
-
+PRINT(*comm);
                 HilbertCurve<IndexType,ValueType>::redistribute(coordinateCopy, nodeWeightCopy, settings, metrics);
             }
         }
