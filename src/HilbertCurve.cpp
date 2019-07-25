@@ -29,7 +29,7 @@ DenseVector<IndexType> HilbertCurve<IndexType, ValueType>::computePartition(cons
 
     const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
-
+PRINT(*comm);
     IndexType k = settings.numBlocks;
     const IndexType dimensions = coordinates.size();
     assert(dimensions == settings.dimensions);
@@ -193,6 +193,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType const*
     size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
     if (recursionDepth > bitsInValueType/dimensions) {
         recursionDepth = IndexType(bitsInValueType/dimensions);
+        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
         PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
             + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
     }
@@ -259,6 +260,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const*
     size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
     if ((unsigned int) recursionDepth > bitsInValueType/dimensions) {
         recursionDepth = IndexType(bitsInValueType/dimensions);
+        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
         PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
             + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
     }
@@ -379,12 +381,14 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
     size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
     if (recursionDepth > bitsInValueType/dimensions) {
         recursionDepth = IndexType(bitsInValueType/dimensions);
+        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
         PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
             + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
     }
 
     if( dimensions!=2 ) {
-        PRINT("In HilbertCurve.getHilbertIndex2DVector but dimensions is " << dimensions << " and not 2");
+        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        PRINT0("In HilbertCurve.getHilbertIndex2DVector but dimensions is " << dimensions << " and not 2");
         throw std::runtime_error("Wrong dimensions given");
     }
 
@@ -481,12 +485,14 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
     size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
     if (recursionDepth > bitsInValueType/dimensions) {
         recursionDepth = IndexType(bitsInValueType/dimensions);
+        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
         PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
             + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
     }
 
     if( dimensions!=3 ) {
-        PRINT("In HilbertCurve.getHilbertIndex2DVector but dimensions is " << dimensions << " and not 3");
+        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        PRINT0("In HilbertCurve.getHilbertIndex2DVector but dimensions is " << dimensions << " and not 3");
         throw std::runtime_error("Wrong dimensions given");
     }
 
@@ -851,7 +857,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     /*
      * fill sort pair
      */
-
+PRINT(*comm);
     scai::hmemo::HArray<IndexType> myGlobalIndices(localN, IndexType(0) );
     inputDist->getOwnedIndexes(myGlobalIndices);
     std::vector<sort_pair> localPairs(localN);
@@ -1001,6 +1007,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     }
     migrationTime = std::chrono::system_clock::now() - beforeMigration;
     metrics.MM["timeFirstDistribution"] = migrationTime.count();
+assert( confirmHilbertDistribution(coordinates, nodeWeights[0], settings) );
 }
 //-------------------------------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
@@ -1029,7 +1036,6 @@ bool HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(
     //the min and max local sfc value
     ValueType sfcMinMax[2] = { localSFCInd.front(), localSFCInd.back() };
 
-
     const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
 
     if( settings.debugMode ) {
@@ -1045,8 +1051,8 @@ bool HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(
     //so only the root PE allocates the array
     ValueType allMinMax[arraySize];
 
+    //every PE sends its local min and max to root
     comm->gather(allMinMax, 2, root, sfcMinMax );
-
 
     if( settings.debugMode and comm->getRank()==root ) {
         PRINT0("gathered: ");
@@ -1060,7 +1066,7 @@ bool HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(
     // true since their array has only one element
     std::vector<ValueType> gatheredInd( allMinMax, allMinMax+arraySize  );
     bool isSorted = std::is_sorted( gatheredInd.begin(), gatheredInd.end() );
-
+PRINT(*comm << ": " << isSorted );
     return comm->all( isSorted );
 }
 
