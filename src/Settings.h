@@ -26,22 +26,29 @@ const IndexType bytesPerVertex = 8;
 
 /** Different file formats to store a graph. See also FileIO.
 
-0. Auto: it tries to deduce the format automatically
-1. First line has a number that represents the number of vertices of the graph and some flags for vertex and node weights.
+AUTO: The program tries to deduce the format automatically
+
+METIS: First line has a number that represents the number of vertices of the graph and some flags for vertex and node weights.
 Then, line i has the vertices that are neighbors of vertex i.
 The METIS format is described in detail here <a href="glaros.dtc.umn.edu/gkhome/fetch/sw/metis/manual.pdf">metis manual</a>.
-2. -  //TODO: details
-3. Format to read ocean graphs //TODO: details
-4. The matrixmarket format. Details <a href="https://math.nist.gov/MatrixMarket/formats.html">here</a> and
+
+ADCIRC: Coordinate format of the ADCIRC sea simulation model
+
+MATRIXMARKET: The matrixmarket format. Details <a href="https://math.nist.gov/MatrixMarket/formats.html">here</a> and
 <a href="https://people.sc.fsu.edu/~jburkardt/data/mm/mm.html">here</a>.
-5. Graphs stored in the TEEC file format //TODO: probably not used
-6. Graphs stored in a binary format, see <a href="http://algo2.iti.kit.edu/schulz/software_releases/kahipv2.00.pdf">here</a>.
-7. The graph is stored as sequence of edges.
-8. The graph is stored as sequence of edges but stored in binary format.
-9. An edge list that is stored in several files.
+
+TEEC:  Graphs stored in the TEEC file format //TODO: probably not used
+
+BINARY: Graphs stored in a binary format, see <a href="http://algo2.iti.kit.edu/schulz/software_releases/kahipv2.00.pdf">here</a>.
+
+EDGELIST: The graph is stored as sequence of edges.
+
+BINARYEDGELIST The graph is stored as sequence of edges but stored in binary format.
+
+EDGELISTDIST: An edge list that is stored in several files.
 */
 
-enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4, TEEC = 5, BINARY = 6, EDGELIST = 7, BINARYEDGELIST = 8, EDGELISTDIST = 9};
+enum class Format {AUTO, METIS, ADCIRC, MATRIXMARKET, TEEC, BINARY, EDGELIST, BINARYEDGELIST, EDGELISTDIST};
 
 
 /** @brief Operator to convert an enum Format to a stream.
@@ -49,25 +56,23 @@ enum class Format {AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4,
 inline std::istream& operator>>(std::istream& in, Format& format) {
     std::string token;//TODO: There must be a more elegant way to do this with a map!
     in >> token;
-    if (token == "AUTO" or token == "0")
+    if (token == "AUTO")
         format = ITI::Format::AUTO ;
-    else if (token == "METIS" or token == "1")
+    else if (token == "METIS")
         format = ITI::Format::METIS;
-    else if (token == "ADCIRC" or token == "2")
+    else if (token == "ADCIRC")
         format = ITI::Format::ADCIRC;
-    else if (token == "OCEAN" or token == "3")
-        format = ITI::Format::OCEAN;
-    else if (token == "MATRIXMARKET" or token == "4")
+    else if (token == "MATRIXMARKET")
         format = ITI::Format::MATRIXMARKET;
-    else if (token == "TEEC" or token == "5")
+    else if (token == "TEEC")
         format = ITI::Format::TEEC;
-    else if (token == "BINARY" or token == "6")
+    else if (token == "BINARY")
         format = ITI::Format::BINARY;
-    else if (token == "EDGELIST" or token == "7")
+    else if (token == "EDGELIST")
         format = ITI::Format::EDGELIST;
-    else if (token == "BINARYEDGELIST" or token == "8")
+    else if (token == "BINARYEDGELIST")
         format = ITI::Format::BINARYEDGELIST;
-    else if (token == "EDGELISTDIST" or token == "9")
+    else if (token == "EDGELISTDIST")
         format = ITI::Format::EDGELISTDIST;
     else
         in.setstate(std::ios_base::failbit);
@@ -86,8 +91,6 @@ inline std::ostream& operator<<(std::ostream& out, Format method) {
         token = "METIS";
     else if (method == ITI::Format::ADCIRC)
         token = "ADCIRC";
-    else if (method == ITI::Format::OCEAN)
-        token = "OCEAN";
     else if (method == ITI::Format::MATRIXMARKET)
         token = "MATRIXMARKET";
     else if (method == ITI::Format::TEEC)

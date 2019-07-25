@@ -1327,8 +1327,8 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( co
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
 
-    if (format == Format::OCEAN) {
-        PRINT0("Reading coordinates in OCEAN format");
+    if (format == Format::ADCIRC) {
+        PRINT0("Reading coordinates in ADCIRC format");
         return readCoordsOcean(filename, dimension);
     }
     else if( format== Format::MATRIXMARKET) {

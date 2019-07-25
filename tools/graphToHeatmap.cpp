@@ -31,8 +31,8 @@ int main(int argc, char** argv) {
     //input and coordinates
     ("graphFile", "read graph from file", value<std::string>())
     ("coordFile", "coordinate file. If none given, assume that coordinates for graph arg are in file arg.xyz", value<std::string>())
-    ("fileFormat", "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.", value<ITI::Format>())
-    ("coordFormat", "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ", value<ITI::Format>())
+    ("fileFormat", "The format of the file to read, available are AUTO, METIS, ADCRIC and MatrixMarket format. See FileIO.h for more details.", value<ITI::Format>())
+    ("coordFormat", "format of coordinate file: AUTO, METIS, ADCIRC, MATRIXMARKET", value<ITI::Format>())
     ("nodeWeightIndex", "index of node weight", value<IndexType>()->default_value(0))
     ("numVertices", "Number of vertices, in case no graph file is given", value<IndexType>())
     ("dimensions", "Number of dimensions", value<IndexType>())

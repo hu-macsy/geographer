@@ -53,7 +53,7 @@ Use CMake to configure the project and make to build it, followed by make instal
 	mkdir build && cd build && cmake .. && make && sudo make install
 
 If you have installed Lama in a non-standard location, add `-DSCAI_DIR=<path/to/lama>` where `<path/to/lama>` is your Lama installation directory.
-To install Geographer in an alternative location, pass the argument `-DCMAKE_INSTALL_PREFIX=<path>` to cmake. After successful compilation, the library `libgeographer` and the standalone executable `Geographer` are installed into the installation target. If the Google Test library was found, the unit tests can be found in the executable `GeographerTest`.
+To install Geographer in an alternative location, pass the argument `-DCMAKE_INSTALL_PREFIX=<path>` to cmake. After successful compilation, the library `libgeographer` and the standalone executable `GeographerStandalone` are installed into the installation target. If the Google Test library was found, the unit tests can be found in the executable `GeographerTest`.
 
 ### Mac OS
 On Mac OS, the default compiler is LLVM, which is not supported by the Lama library on which we depend.
@@ -68,24 +68,24 @@ By default, it is assumed that the input graph is in the METIS format and that c
 If no coordinate file is given, it is assumed that the coordinates are in foo.metis.xyz for an input file foo.metis.
 For an input graph embedded in 2 dimensions, a graph file input.graph and a coordinate file input.graph.xyz, call the program like this:
 
-    ./Geographer --graphFile input.graph  --numBlocks 8 --dimensions 2 --outFile output.part
+    ./GeographerStandalone --graphFile input.graph  --numBlocks 8 --dimensions 2 --outFile output.part
 
 This will partition the graph into 8 blocks and write the result to output.part.
 
 ### Parallelization
 Geographer can run in parallel using MPI. An example call with 8 processes :
 
-    mpirun -np 8 Geographer --graphFile input.graph  --numBlocks 8 --dimensions 2 --outFile  output.part
+    mpirun -np 8 GeographerStandalone --graphFile input.graph  --numBlocks 8 --dimensions 2 --outFile  output.part
 
 The number of blocks can be different from the number of processes, but this will disable the local refinement. If the number of blocks is not given, it is set to the number of processes. Thus, the last command could also be phrased like this:
 
-    mpirun -np 8 Geographer --graphFile input.graph --dimensions 2 --outFile output.part
+    mpirun -np 8 GeographerStandalone --graphFile input.graph --dimensions 2 --outFile output.part
 
 ### Other parameters
-Geographer supports other parameters and input formats as well. For a full list call `./Geographer --help`.
+Geographer supports other parameters and input formats as well. For a full list call `./GeographerStandalone --help`.
 For example, to partition a graph formatted as METIS and coordinates given in the ADCIRC format into 512 blocks with a maximum imbalance of 0.01 according to the second node weight, use:
 
-    mpirun -np 8 Geographer --graphFile fesom_core2.graph --coordFile node2d_core2.out --coordFormat OCEAN --nodeWeightIndex 1 --epsilon 0.01 --dimensions 2 --numBlocks 512
+    mpirun -np 8 GeographerStandalone --graphFile fesom_core2.graph --coordFile node2d_core2.out --coordFormat ADCIRC --epsilon 0.01 --dimensions 2 --numBlocks 512
 
 ## Usage as Library
 

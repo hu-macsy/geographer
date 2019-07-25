@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
     ("version", "show version")
     //input and coordinates
     ("graphFile", "read graph from file", value<std::string>())
-    ("fileFormat", "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See FileIO.h for more details.", value<ITI::Format>())
+    ("fileFormat", "The format of the file to read, available are AUTO, METIS, ADCRIC and MatrixMarket format. See FileIO.h for more details.", value<ITI::Format>())
     ("dimensions", "Number of dimensions of generated graph", value<IndexType>()->default_value(std::to_string(settings.dimensions)))
     ("partition", "file of partition", value<std::string>())
     ("blockSizesFile", " file to read the block sizes for every block", value<std::string>() )

@@ -24,8 +24,8 @@ Options populateOptions() {
     ("numBlocks", "Number of blocks, default is number of processes", value<IndexType>())
     ("epsilon", "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.", value<double>()->default_value(std::to_string(settings.epsilon)))
     // other input specification
-    ("fileFormat", "The format of the file to read: 0 is for AUTO format, 1 for METIS, 2 for ADCRIC, 3 for OCEAN, 4 for MatrixMarket format. See Readme.md for more details.", value<ITI::Format>())
-    ("coordFormat", "format of coordinate file: AUTO = 0, METIS = 1, ADCIRC = 2, OCEAN = 3, MATRIXMARKET = 4 ", value<ITI::Format>())
+    ("fileFormat", "Format of graph file, available are AUTO, METIS, ADCRIC and MatrixMarket format. See Readme.md for more details.", value<ITI::Format>())
+    ("coordFormat", "format of coordinate file: AUTO, METIS, ADCIRC and MATRIXMARKET", value<ITI::Format>())
     ("numNodeWeights", "Number of node weights to use. If the input graph contains more node weights, only the first ones are used.", value<IndexType>())
     ("seed", "random seed, default is current time", value<double>()->default_value(std::to_string(time(NULL))))
     //mapping
