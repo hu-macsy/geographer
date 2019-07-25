@@ -102,7 +102,7 @@ before_install:
 
 install:
   - git clone --branch fix-compiler-warnings https://github.com/kit-parco/lama.git
-  - pushd lama && mkdir build && cd build && cmake -DADDITIONAL_WARNING_FALGS="" ../scai && make -j4 && sudo make install && popd
+  - pushd lama && mkdir build && cd build && cmake -DADDITIONAL_WARNING_FLAGS="" ../scai && make -j4 && sudo make install && popd
 
 script:
   - mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../install -DGeographer_VALUE_TYPE=${ValueType} .. && make -j4 && sudo make install && cd ..
