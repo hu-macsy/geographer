@@ -7,6 +7,10 @@ It is open to the public and continuously tested with Travis at \url{https://tra
 
 Currently there is a private repository called _geographer-dev_, which contains the current content of _geographer_ and, in addition, a few branches of unfinished development. The old _ParcoRepart_ repository is incompatible and should not be used any more.
 
+Mirroring these, there are also repositories _geographer_ and _geographer-dev_ on the Gitlab instance at [https://git.scc.kit.edu](https://git.scc.kit.edu).
+These should not be used for new development, but kept reasonably up to date.
+They were created as a way to share private developments with collaborators at KIT without a GitHub account.
+
 ## Developing
 For bugfixes or development which can be public, create a new branch in the _geographer_ repository and push your changes to it.
 If you do not have write access, create a public fork instead.
