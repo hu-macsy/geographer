@@ -231,9 +231,9 @@ TEST_F (auxTest, testPixelDistance) {
     std::tuple<IndexType, IndexType> coords2D;
     std::vector<IndexType> maxPoints= {sideLen, sideLen};
     do {
-        pixel= rand()%(sideLen*(sideLen-2)) +2*sideLen;
+        pixel= int( rand()%(sideLen*(sideLen-2)) +2*sideLen);
         coords2D = aux::index2_2DPoint( pixel, maxPoints );
-    } while( (std::get<0>(coords2D)>sideLen-4 and std::get<0>(coords2D)<4) and ( std::get<1>(coords2D)>sideLen-4 and std::get<1>(coords2D)<4) );
+    } while( (std::get<0>(coords2D)>sideLen-4 or std::get<0>(coords2D)<4) or ( std::get<1>(coords2D)>sideLen-4 or std::get<1>(coords2D)<4) );
 
     //PRINT( std::get<0>(coords2D) << " , " << std::get<1>(coords2D) );
 
