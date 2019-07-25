@@ -42,7 +42,7 @@ If its dependencies are installed, this can be done with the following commands:
 
 If root access is not available or not preferred, you can pass the argument `-DCMAKE_INSTALL_PREFIX=<path>`to cmake to specify an alternative install location.
 
-Note that on GCC (&gt;= 8), several type conversions trigger warning which are interpreted as errors.
+Note that on newer versions of GCC (&gt;= 8), several type conversions trigger warnings which are interpreted as errors.
 As a workaround, give `-DADDITIONAL_WARNING_FLAGS=""` as an argument to cmake.
 
 The *KaDIS* library for distributed sorting is included as a submodule in this repository.
