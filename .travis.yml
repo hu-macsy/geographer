@@ -37,6 +37,28 @@ matrix:
       env:
         - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7 && ValueType=double"
 
+    - name: GCC8, ValueType double
+      os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-8
+      env:
+        - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8 && ValueType=double"
+
+    - name: GCC9, ValueType double
+      os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-9
+      env:
+        - MATRIX_EVAL="CC=gcc-9 && CXX=g++-9 && ValueType=double" 
+
     - name: GCC5, ValueType float
       os: linux
       addons:
@@ -80,7 +102,7 @@ before_install:
 
 install:
   - git clone --branch fix-compiler-warnings https://github.com/kit-parco/lama.git
-  - pushd lama && mkdir build && cd build && cmake ../scai && make -j4 && sudo make install && popd
+  - pushd lama && mkdir build && cd build && cmake -DADDITIONAL_WARNING_FALGS="" ../scai && make -j4 && sudo make install && popd
 
 script:
   - mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../install -DGeographer_VALUE_TYPE=${ValueType} .. && make -j4 && sudo make install && cd ..
