@@ -44,7 +44,7 @@ TEST_F(DiffusionTest, testPotentials) {
     ValueType epsilon = 0.01;
     DenseVector<ValueType> potentials = Diffusion<IndexType, ValueType>::potentialsFromSource(L, nodeWeights, source, epsilon);
     ASSERT_EQ(n, potentials.size());
-    ASSERT_LT(potentials.sum(), 0.000001);
+    ASSERT_LT(potentials.sum(), 0.005);
 }
 
 TEST_F(DiffusionTest, testMultiplePotentials) {
