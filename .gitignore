@@ -22,6 +22,7 @@ testWriteDenseVectorCentral.part
 diffusion-coords.xyz
 hilbertPartition_*.xyz
 SpectralPartition_+trace01_*.xyz
+delaunayTest.graph_parallel.xyz
 
 # tracing output
 *.time.?
