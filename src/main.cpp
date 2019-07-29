@@ -525,9 +525,6 @@ int main(int argc, char** argv) {
             metricsVec[r].print( std::cout );
         }
         if( settings.storeInfo && settings.outFile!="-" ) {
-            //std::vector<std::string> strs;
-            //boost::split( strs, settings.outFile, boost::is_any_of("./") );
-            //TODO: create a better tmp name
             std::string fileName = settings.outFile+ "_r"+ std::to_string(r);
             if( comm->getRank()==0 ) {
                 std::ofstream outF( fileName, std::ios::out);

@@ -42,6 +42,20 @@ TEST_F(GraphUtilsTest, testReindexCut) {
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordsFile, n, dimensions);
     ASSERT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
 
+if( comm->getRank()==0 ){
+PRINT(coords[0].getLocalValues().size());
+    for( int i=0; i<coords[0].getLocalValues().size(); i++ ){
+        std::cout << i << ": " << coords[0].getLocalValues()[i] << ", " << coords[1].getLocalValues()[i] << std::endl; 
+    }
+}
+
+{
+    scai::hmemo::HArray< IndexType > myGlobalInd;
+    graph.getRowDistributionPtr()->getOwnedIndexes(myGlobalInd);
+    //std::cout<< myGlobalInd[0] << std::endl;
+    PRINT(*comm << ": " << myGlobalInd[0] );
+}    
+
 std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, scai::lama::DenseVector<ValueType>(dist, 1));
 
     //get sfc partition
@@ -53,13 +67,28 @@ std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, scai::lama::Dense
 
     DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, nodeWeights, settings);
 
+//if( comm->getRank()==0 )
+{
+    scai::hmemo::HArray< IndexType > myGlobalInd;
+    graph.getRowDistributionPtr()->getOwnedIndexes(myGlobalInd);
+    //std::cout<< myGlobalInd[0] << std::endl;
+    PRINT(*comm << ": " << myGlobalInd[0] );
+}    
+
     //WARNING: with the noRefinement flag the partition is not destributed
     partition.redistribute( dist);
 
 {
-aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights[0], settings );    
+aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings );    
 dist = graph.getRowDistributionPtr();
 }
+
+{
+    scai::hmemo::HArray< IndexType > myGlobalInd;
+    graph.getRowDistributionPtr()->getOwnedIndexes(myGlobalInd);
+    //std::cout<< myGlobalInd[0] << std::endl;
+    PRINT(*comm << ": " << myGlobalInd[0] );
+}    
 
 ASSERT_TRUE( (HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(coords, nodeWeights[0], settings)) );
 

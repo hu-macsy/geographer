@@ -692,9 +692,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
         if( !read) PRINT(*comm << ": " <<  i << " __ " << line << " || " << file.tellg() );
         //remove leading and trailing whitespace, since these can confuse the string splitter
-#ifdef USE_BOOST
-        boost::algorithm::trim(line);
-#endif
+
+        trim(line);
         assert(read);//if we have read past the end of the file, the node count was incorrect
         std::stringstream ss( line );
         std::string item;
@@ -2384,7 +2383,37 @@ bool FileIO<IndexType, ValueType>::fileExists(const std::string& filename) {
     }
     return false;
 }
-//------------------------------------------------------------------------------
+//
+
+// functions to trim a string of whitespaces
+// taken from 
+//https://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring
+
+// trim from start (in place)
+template<typename IndexType, typename ValueType>
+void FileIO<IndexType, ValueType>::ltrim(std::string &s) {
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int ch) {
+        return !std::isspace(ch);
+    }));
+}
+
+// trim from end (in place)
+template<typename IndexType, typename ValueType>
+void FileIO<IndexType, ValueType>::rtrim(std::string &s) {
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](int ch) {
+        return !std::isspace(ch);
+    }).base(), s.end());
+}
+
+// trim from both ends (in place)
+template<typename IndexType, typename ValueType>
+void FileIO<IndexType, ValueType>::trim(std::string &s) {
+    ltrim(s);
+    rtrim(s);
+}
+
+
+//---------------------------------------------------------------------------
 
 template class FileIO<IndexType, ValueType>;
 

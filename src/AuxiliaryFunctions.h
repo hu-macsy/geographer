@@ -327,7 +327,7 @@ public:
         DenseVector<IndexType>& partition,
         CSRSparseMatrix<ValueType>& graph,
         std::vector<DenseVector<ValueType>>& coordinates,
-        DenseVector<ValueType>& nodeWeights,
+        std::vector<DenseVector<ValueType>>& nodeWeights,
         Settings settings,
         bool useRedistributor = true,
         bool renumberPEs = true );

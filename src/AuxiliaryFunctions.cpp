@@ -10,7 +10,7 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
     DenseVector<IndexType>& partition,
     CSRSparseMatrix<ValueType>& graph,
     std::vector<DenseVector<ValueType>>& coordinates,
-    DenseVector<ValueType>& nodeWeights,
+    std::vector<DenseVector<ValueType>>& nodeWeights,
     Settings settings,
     bool useRedistributor,
     bool renumberPEs ) {
@@ -23,7 +23,7 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
 
     SCAI_ASSERT_EQ_ERROR( graph.getNumRows(), globalN, "Mismatch in graph and coordinates size" );
-    SCAI_ASSERT_EQ_ERROR( nodeWeights.getDistributionPtr()->getGlobalSize(), globalN, "Mismatch in nodeWeights vector" );
+    SCAI_ASSERT_EQ_ERROR( nodeWeights[0].getDistributionPtr()->getGlobalSize(), globalN, "Mismatch in nodeWeights vector" );
     SCAI_ASSERT_EQ_ERROR( partition.size(), globalN, "Mismatch in partition size");
     SCAI_ASSERT_EQ_ERROR( partition.min(), 0, "Minimum entry in partition should be 0" );
     SCAI_ASSERT_EQ_ERROR( partition.max(), numPEs-1, "Maximum entry in partition must be equal the number of processors.")
@@ -218,7 +218,10 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
         for (IndexType d=0; d<settings.dimensions; d++) {
             coordinates[d].redistribute(redistributor);
         }
-        nodeWeights.redistribute(redistributor);
+        for(int w=0; w<nodeWeights.size(); w++){
+            nodeWeights[w].redistribute(redistributor);
+        }
+
         graph.redistribute( redistributor, noDist );
 
         distFromPartition = resultRedist.getTargetDistributionPtr();
@@ -228,7 +231,10 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
 
         partition.redistribute( distFromPartition );
         graph.redistribute( distFromPartition, noDist );
-        nodeWeights.redistribute( distFromPartition );
+
+        for(int w=0; w<nodeWeights.size(); w++){
+            nodeWeights[w].redistribute( distFromPartition );
+        }
 
         // redistribute coordinates
         for (IndexType d = 0; d < settings.dimensions; d++) {
@@ -238,7 +244,7 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
     }
 
     const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
-    SCAI_ASSERT_ERROR( nodeWeights.getDistribution().isEqual(*inputDist), "Distribution mismatch" );
+    SCAI_ASSERT_ERROR( nodeWeights[0].getDistribution().isEqual(*inputDist), "Distribution mismatch" );
     SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*inputDist), "Distribution mismatch" );
     SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*inputDist), "Distribution mismatch" );
 

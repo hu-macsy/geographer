@@ -205,9 +205,9 @@ private:
     using the coordinates of the graph.
     */
     static DenseVector<IndexType> initialPartition(
-        CSRSparseMatrix<ValueType> &input,
-        std::vector<DenseVector<ValueType>> &coordinates,
-        std::vector<DenseVector<ValueType>> &nodeWeights,
+        const CSRSparseMatrix<ValueType> &input,
+        const std::vector<DenseVector<ValueType>> &coordinates,
+        const std::vector<DenseVector<ValueType>> &nodeWeights,
         DenseVector<IndexType>& previous,
         CommTree<IndexType,ValueType> commTree,
         scai::dmemo::CommunicatorPtr comm,
