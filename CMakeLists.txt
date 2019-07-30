@@ -146,6 +146,7 @@ if (DOXYGEN_FOUND)
     # request to configure the file
     configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
     message("Doxygen build started, documentation to be written in " ${CMAKE_CURRENT_BINARY_DIR}/doc)
+    message("Disable using BUILD_DOC=OFF")
     
 	# note the option ALL which allows to build the docs together with the application
     add_custom_target( doc_doxygen ALL
