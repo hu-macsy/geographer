@@ -138,7 +138,7 @@ option(BUILD_DOC "Build documentation, default=ON" ON)
 # check if Doxygen is installed
 find_package(Doxygen)
 
-if (DOXYGEN_FOUND)
+if (DOXYGEN_FOUND AND BUILD_DOC)
 	# set input and output files
     set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/doc/doxConfigFile)
     set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/doc/Doxyfile)
@@ -154,9 +154,15 @@ if (DOXYGEN_FOUND)
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc
         COMMENT "Generating API documentation with Doxygen"
         VERBATIM )
-else (DOXYGEN_FOUND)
-	message("Doxygen need to be installed to generate the doxygen documentation")
-endif (DOXYGEN_FOUND)
+else (DOXYGEN_FOUND AND BUILD_DOC)
+	if(NOT DOXYGEN_FOUND AND BUILD_DOC)
+		message("Doxygen need to be installed to generate the doxygen documentation")
+	endif()
+	if(NOT BUILD_DOC)
+		message("Building the documentation is deactivated, use BUILD_DOC=ON to activate it")
+	endif()
+endif (DOXYGEN_FOUND AND BUILD_DOC)
+
 
 ### install files ###
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfigVersion.cmake

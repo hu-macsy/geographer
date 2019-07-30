@@ -356,8 +356,8 @@ IndexType MultiSection<IndexType, ValueType>::projectAnd1Dpartition(
                     maxWeight = newRect.weight;
                 }
                 //dbg_rectW += newRect.weight;
-                if(comm->getRank()==0) newRect.print(std::cout);
-                PRINT0("this rect imbalance= " << (newRect.weight-optWeight)/optWeight << "  (opt= " << optWeight << " , myWeight= "<< newRect.weight << ")" );
+                //if(comm->getRank()==0) newRect.print(std::cout);
+                //PRINT0("this rect imbalance= " << (newRect.weight-optWeight)/optWeight << "  (opt= " << optWeight << " , myWeight= "<< newRect.weight << ")" );
             }
 
             //last rectangle
@@ -371,8 +371,8 @@ IndexType MultiSection<IndexType, ValueType>::projectAnd1Dpartition(
                 maxWeight = newRect.weight;
             }
             //dbg_rectW += newRect.weight;
-            if(comm->getRank()==0) newRect.print(std::cout);
-            PRINT0("this rect imbalance= " << (newRect.weight-optWeight)/optWeight << "  (opt= " << optWeight << " , myWeight= "<< newRect.weight << ")" );
+            //if(comm->getRank()==0) newRect.print(std::cout);
+            //PRINT0("this rect imbalance= " << (newRect.weight-optWeight)/optWeight << "  (opt= " << optWeight << " , myWeight= "<< newRect.weight << ")" );
 
             //TODO: only for debuging, remove variable dbg_rectW
             //SCAI_ASSERT_LE_ERROR( dbg_rectW-thisRectangle.weight, 0.0000001, "Rectangle weights not correct: dbg_rectW-this.weight= " << dbg_rectW - thisRectangle.weight);
