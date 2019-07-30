@@ -28,7 +28,7 @@ if(CMAKE_COMPILER_IS_GNUCXX)
     #setup_target_for_coverage(${PROJECT_NAME}_coverage ${PROJECT_TEST_NAME} coverage)
     setup_target_for_coverage_gcovr_html( 
         NAME ${PROJECT_NAME}_coverage 
-        EXECUTABLE GeographerTest
+        EXECUTABLE GeographerTest -j 4
         DEPANDENCIES GeographerTest)
     #setup_target_for_coverage(${PROJECT_NAME}_coverage GeographerTest coverage)
 endif()
